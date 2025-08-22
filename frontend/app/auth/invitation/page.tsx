@@ -28,6 +28,29 @@ const validatePassword = (password: string): string[] => {
   return errors
 }
 
+// Validation téléphone
+const validatePhone = (countryCode: string, areaCode: string, phoneNumber: string): boolean => {
+  if (!countryCode.trim() && !areaCode.trim() && !phoneNumber.trim()) {
+    return true
+  }
+  
+  if (countryCode.trim() || areaCode.trim() || phoneNumber.trim()) {
+    if (!countryCode.trim() || !/^\+[1-9]\d{0,3}$/.test(countryCode.trim())) {
+      return false
+    }
+    
+    if (!areaCode.trim() || !/^\d{3}$/.test(areaCode.trim())) {
+      return false
+    }
+    
+    if (!phoneNumber.trim() || !/^\d{7}$/.test(phoneNumber.trim())) {
+      return false
+    }
+  }
+  
+  return true
+}
+
 // ==================== LOGO INTELIA ====================
 const InteliaLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
   <img 
@@ -37,176 +60,7 @@ const InteliaLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
   />
 )
 
-// ==================== ICONES ====================
-const EyeIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-  </svg>
-)
-
-const EyeSlashIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.34 6.34m6.822 10.565l-3.536-3.536" />
-  </svg>
-)
-
-// ==================== COMPOSANT CHAMP MOT DE PASSE ====================
-interface PasswordFieldProps {
-  value: string
-  onChange: (value: string) => void
-  placeholder: string
-  label: string
-  disabled?: boolean
-  showStrength?: boolean
-  showRequirements?: boolean
-  confirmValue?: string
-  isConfirmField?: boolean
-}
-
-const PasswordField: React.FC<PasswordFieldProps> = ({
-  value,
-  onChange,
-  placeholder,
-  label,
-  disabled = false,
-  showStrength = false,
-  showRequirements = false,
-  confirmValue,
-  isConfirmField = false
-}) => {
-  const [showPassword, setShowPassword] = useState(false)
-  
-  const passwordErrors = validatePassword(value)
-  const strength = value ? 5 - passwordErrors.length : 0
-  
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">
-        {label}
-      </label>
-      <div className="relative">
-        <input
-          type={showPassword ? "text" : "password"}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10 transition-colors"
-          placeholder={placeholder}
-          disabled={disabled}
-          autoComplete={isConfirmField ? "new-password" : "new-password"}
-        />
-        <button
-          type="button"
-          onClick={() => setShowPassword(!showPassword)}
-          className="absolute inset-y-0 right-0 pr-3 flex items-center hover:text-gray-600 transition-colors"
-          disabled={disabled}
-        >
-          {showPassword ? (
-            <EyeSlashIcon className="h-5 w-5 text-gray-400" />
-          ) : (
-            <EyeIcon className="h-5 w-5 text-gray-400" />
-          )}
-        </button>
-      </div>
-      
-      {/* Indicateur de force du mot de passe */}
-      {showStrength && value && (
-        <div className="mt-2">
-          <div className="text-xs text-gray-600 mb-1">Force du mot de passe :</div>
-          <div className="flex space-x-1">
-            {[1, 2, 3, 4, 5].map((level) => (
-              <div
-                key={level}
-                className={`h-1 flex-1 rounded ${
-                  level <= strength
-                    ? strength <= 1
-                      ? 'bg-red-500'
-                      : strength <= 2
-                      ? 'bg-orange-500'
-                      : strength <= 3
-                      ? 'bg-yellow-500'
-                      : strength <= 4
-                      ? 'bg-blue-500'
-                      : 'bg-green-500'
-                    : 'bg-gray-200'
-                }`}
-              />
-            ))}
-          </div>
-          <div className="text-xs mt-1 text-gray-600">
-            {strength <= 1 && 'Très faible'}
-            {strength === 2 && 'Faible'}
-            {strength === 3 && 'Moyen'}
-            {strength === 4 && 'Fort'}
-            {strength === 5 && 'Très fort'}
-          </div>
-        </div>
-      )}
-      
-      {/* Indicateur de correspondance pour confirmation */}
-      {isConfirmField && value && confirmValue && (
-        <div className="mt-1 text-xs">
-          {confirmValue === value ? (
-            <span className="text-green-600 flex items-center">
-              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Les mots de passe correspondent
-            </span>
-          ) : (
-            <span className="text-red-600 flex items-center">
-              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              Les mots de passe ne correspondent pas
-            </span>
-          )}
-        </div>
-      )}
-      
-      {/* Exigences du mot de passe */}
-      {showRequirements && (
-        <div className="mt-3 bg-gray-50 rounded-lg p-3">
-          <h5 className="text-sm font-medium text-gray-900 mb-2">Exigences du mot de passe :</h5>
-          <ul className="text-xs text-gray-600 space-y-1">
-            <li className="flex items-center space-x-2">
-              <span className={value.length >= 8 ? 'text-green-600' : 'text-gray-400'}>
-                {value.length >= 8 ? '✓' : '○'}
-              </span>
-              <span>Au moins 8 caractères</span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <span className={/[A-Z]/.test(value) ? 'text-green-600' : 'text-gray-400'}>
-                {/[A-Z]/.test(value) ? '✓' : '○'}
-              </span>
-              <span>Au moins une majuscule</span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <span className={/[a-z]/.test(value) ? 'text-green-600' : 'text-gray-400'}>
-                {/[a-z]/.test(value) ? '✓' : '○'}
-              </span>
-              <span>Au moins une minuscule</span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <span className={/\d/.test(value) ? 'text-green-600' : 'text-gray-400'}>
-                {/\d/.test(value) ? '✓' : '○'}
-              </span>
-              <span>Au moins un chiffre</span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <span className={/[!@#$%^&*(),.?":{}|<>]/.test(value) ? 'text-green-600' : 'text-gray-400'}>
-                {/[!@#$%^&*(),.?":{}|<>]/.test(value) ? '✓' : '○'}
-              </span>
-              <span>Au moins un caractère spécial</span>
-            </li>
-          </ul>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ==================== COMPOSANT PRINCIPAL CORRIGÉ ====================
+// ==================== COMPOSANT PRINCIPAL ====================
 function InvitationAcceptPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -215,12 +69,43 @@ function InvitationAcceptPageContent() {
   const [userInfo, setUserInfo] = useState<any>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   
-  // États pour le formulaire de mot de passe
+  // États pour le formulaire complet
   const [formData, setFormData] = useState({
+    // Mot de passe
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    
+    // Informations personnelles
+    firstName: '',
+    lastName: '',
+    linkedinProfile: '',
+    
+    // Contact
+    country: '',
+    countryCode: '',
+    areaCode: '',
+    phoneNumber: '',
+    
+    // Entreprise
+    companyName: '',
+    companyWebsite: '',
+    companyLinkedin: ''
   })
+  
   const [errors, setErrors] = useState<string[]>([])
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  // Liste des pays
+  const countries = [
+    { value: 'CA', label: 'Canada' },
+    { value: 'US', label: 'États-Unis' },
+    { value: 'FR', label: 'France' },
+    { value: 'BE', label: 'Belgique' },
+    { value: 'CH', label: 'Suisse' },
+    { value: 'MX', label: 'Mexique' },
+    { value: 'BR', label: 'Brésil' }
+  ]
 
   useEffect(() => {
     const handleAuthCallback = async () => {
@@ -229,7 +114,7 @@ function InvitationAcceptPageContent() {
         
         const supabase = getSupabaseClient()
         
-        // 🔧 CORRECTION MAJEURE : Vérifier AUSSI les query parameters
+        // Vérifier les paramètres d'URL
         const hash = window.location.hash
         const token = searchParams.get('token')
         const type = searchParams.get('type')
@@ -239,7 +124,7 @@ function InvitationAcceptPageContent() {
         console.log('🔍 [InvitationAccept] Query type:', type)
         console.log('🔍 [InvitationAccept] URL complète:', window.location.href)
         
-        // Détecter l'invitation dans hash OU query parameters
+        // Détecter l'invitation
         const hasInvitationInHash = hash && (hash.includes('access_token') || hash.includes('type=invite'))
         const hasInvitationInQuery = token && type === 'invite'
         
@@ -247,28 +132,42 @@ function InvitationAcceptPageContent() {
           console.log('📧 [InvitationAccept] Invitation détectée dans URL')
           setMessage('Validation de votre invitation...')
           
-          // 🔧 CORRECTION : Laisser plus de temps à Supabase pour traiter
-          await new Promise(resolve => setTimeout(resolve, 2000))
+          // 🔧 CORRECTION : Laisser Supabase traiter l'invitation automatiquement
+          console.log('⏳ [InvitationAccept] Attente du traitement Supabase...')
+          await new Promise(resolve => setTimeout(resolve, 3000))
           
-          // Supabase va automatiquement traiter les tokens
-          const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+          // Vérifier plusieurs fois la session
+          let sessionData = null
+          let attempts = 0
+          const maxAttempts = 5
           
-          console.log('📊 [InvitationAccept] Session data:', sessionData)
-          console.log('📊 [InvitationAccept] Session error:', sessionError)
-          
-          if (sessionError) {
-            console.error('❌ [InvitationAccept] Erreur session:', sessionError)
-            throw new Error(`Erreur d'authentification: ${sessionError.message}`)
+          while (!sessionData?.session && attempts < maxAttempts) {
+            attempts++
+            console.log(`🔄 [InvitationAccept] Tentative ${attempts}/${maxAttempts} de récupération session`)
+            
+            const { data, error } = await supabase.auth.getSession()
+            
+            if (error) {
+              console.error('❌ [InvitationAccept] Erreur session:', error)
+              throw new Error(`Erreur d'authentification: ${error.message}`)
+            }
+            
+            sessionData = data
+            
+            if (!sessionData.session && attempts < maxAttempts) {
+              console.log('⏳ [InvitationAccept] Pas de session, attente...')
+              await new Promise(resolve => setTimeout(resolve, 2000))
+            }
           }
           
-          if (sessionData.session) {
+          if (sessionData?.session) {
             console.log('✅ [InvitationAccept] Session créée:', sessionData.session.user.email)
             
             // Extraire les métadonnées d'invitation
-            const userMetadata = sessionData.session.user.user_metadata
+            const user = sessionData.session.user
+            const userMetadata = user.user_metadata
             console.log('📋 [InvitationAccept] Métadonnées utilisateur:', userMetadata)
             
-            const user = sessionData.session.user
             setUserInfo({
               email: user.email,
               invitedBy: userMetadata?.inviter_name || userMetadata?.invited_by,
@@ -277,46 +176,18 @@ function InvitationAcceptPageContent() {
               language: userMetadata?.language || 'fr'
             })
             
-            // Vérifier si l'utilisateur a déjà un mot de passe
-            console.log('🔐 [InvitationAccept] Utilisateur créé récemment, demande de mot de passe')
+            console.log('🔧 [InvitationAccept] Passage au mode set-password')
             setStatus('set-password')
-            setMessage('Définissez votre mot de passe')
+            setMessage('Complétez votre profil')
             
             // Nettoyer l'URL
             window.history.replaceState({}, document.title, window.location.pathname)
             
           } else {
-            // 🔧 CORRECTION : Réessayer avec un délai plus long
-            console.log('⏳ [InvitationAccept] Pas de session immédiate, attente supplémentaire...')
-            setMessage('Finalisation de votre invitation...')
-            
-            await new Promise(resolve => setTimeout(resolve, 3000))
-            
-            const { data: retrySessionData } = await supabase.auth.getSession()
-            
-            if (retrySessionData.session) {
-              console.log('✅ [InvitationAccept] Session créée après retry')
-              const user = retrySessionData.session.user
-              const userMetadata = user.user_metadata
-              
-              setUserInfo({
-                email: user.email,
-                invitedBy: userMetadata?.inviter_name || userMetadata?.invited_by,
-                invitationDate: userMetadata?.invitation_date,
-                personalMessage: userMetadata?.personal_message,
-                language: userMetadata?.language || 'fr'
-              })
-              
-              setStatus('set-password')
-              setMessage('Définissez votre mot de passe')
-              window.history.replaceState({}, document.title, window.location.pathname)
-            } else {
-              throw new Error('Aucune session créée après traitement de l\'invitation')
-            }
+            throw new Error('Impossible de créer la session après plusieurs tentatives')
           }
           
         } else {
-          // Pas de fragments d'auth, vérifier s'il y a une session existante
           console.log('🔍 [InvitationAccept] Pas d\'invitation, vérification session existante')
           
           const { data: existingSession } = await supabase.auth.getSession()
@@ -344,7 +215,6 @@ function InvitationAcceptPageContent() {
           setMessage('Erreur lors du traitement de votre invitation')
         }
         
-        // Redirection vers login après erreur
         setTimeout(() => {
           router.push('/auth/login?error=' + encodeURIComponent(
             error instanceof Error ? error.message : 'Erreur d\'invitation'
@@ -353,7 +223,6 @@ function InvitationAcceptPageContent() {
       }
     }
 
-    // 🔧 CORRECTION : Délai réduit mais traitement plus robuste
     const timer = setTimeout(handleAuthCallback, 1000)
     return () => clearTimeout(timer)
   }, [router, searchParams])
@@ -365,23 +234,48 @@ function InvitationAcceptPageContent() {
     }
   }
 
-  const handlePasswordSubmit = async () => {
+  const validateForm = (): string[] => {
     const validationErrors: string[] = []
     
-    // Validations
+    // Validation mot de passe
     if (!formData.password) {
       validationErrors.push('Le mot de passe est requis')
+    } else {
+      const passwordErrors = validatePassword(formData.password)
+      validationErrors.push(...passwordErrors)
     }
+    
     if (!formData.confirmPassword) {
       validationErrors.push('La confirmation du mot de passe est requise')
     }
+    
     if (formData.password !== formData.confirmPassword) {
       validationErrors.push('Les mots de passe ne correspondent pas')
     }
     
-    // Validation de la force du mot de passe
-    const passwordValidationErrors = validatePassword(formData.password)
-    validationErrors.push(...passwordValidationErrors)
+    // Validation informations personnelles
+    if (!formData.firstName.trim()) {
+      validationErrors.push('Le prénom est requis')
+    }
+    
+    if (!formData.lastName.trim()) {
+      validationErrors.push('Le nom de famille est requis')
+    }
+    
+    if (!formData.country) {
+      validationErrors.push('Le pays est requis')
+    }
+    
+    // Validation téléphone (optionnel mais si rempli doit être valide)
+    if (!validatePhone(formData.countryCode, formData.areaCode, formData.phoneNumber)) {
+      validationErrors.push('Format de téléphone invalide')
+    }
+    
+    return validationErrors
+  }
+
+  const handleFormSubmit = async () => {
+    const validationErrors = validateForm()
     
     if (validationErrors.length > 0) {
       setErrors(validationErrors)
@@ -392,20 +286,65 @@ function InvitationAcceptPageContent() {
     setErrors([])
     
     try {
-      console.log('🔐 [InvitationAccept] Définition du mot de passe...')
+      console.log('🔧 [InvitationAccept] Finalisation du compte...')
       
       const supabase = getSupabaseClient()
       
-      // Mettre à jour le mot de passe de l'utilisateur
-      const { data, error } = await supabase.auth.updateUser({
+      // 1. Mettre à jour le mot de passe
+      const { error: passwordError } = await supabase.auth.updateUser({
         password: formData.password
       })
       
-      if (error) {
-        throw error
+      if (passwordError) {
+        throw passwordError
       }
       
-      console.log('✅ [InvitationAccept] Mot de passe défini avec succès')
+      // 2. Mettre à jour les métadonnées utilisateur avec les informations du formulaire
+      const { error: metadataError } = await supabase.auth.updateUser({
+        data: {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          linkedinProfile: formData.linkedinProfile,
+          country: formData.country,
+          countryCode: formData.countryCode,
+          areaCode: formData.areaCode,
+          phoneNumber: formData.phoneNumber,
+          companyName: formData.companyName,
+          companyWebsite: formData.companyWebsite,
+          companyLinkedin: formData.companyLinkedin,
+          profileCompleted: true,
+          completedAt: new Date().toISOString()
+        }
+      })
+      
+      if (metadataError) {
+        throw metadataError
+      }
+      
+      // 3. Optionnel : Marquer l'invitation comme acceptée dans votre système
+      try {
+        const response = await fetch('/api/v1/invitations/mark-accepted', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          },
+          body: JSON.stringify({
+            email: userInfo?.email
+          })
+        })
+        
+        if (response.ok) {
+          console.log('✅ [InvitationAccept] Invitation marquée comme acceptée')
+        } else {
+          console.warn('⚠️ [InvitationAccept] Erreur marquage invitation acceptée')
+        }
+      } catch (apiError) {
+        console.warn('⚠️ [InvitationAccept] Erreur API marquage:', apiError)
+        // Ne pas faire échouer le processus pour cette erreur
+      }
+      
+      console.log('✅ [InvitationAccept] Compte finalisé avec succès')
       setStatus('success')
       setMessage('Compte créé avec succès !')
       
@@ -416,8 +355,8 @@ function InvitationAcceptPageContent() {
       }, 2000)
       
     } catch (error: any) {
-      console.error('❌ [InvitationAccept] Erreur définition mot de passe:', error)
-      setErrors([error.message || 'Erreur lors de la définition du mot de passe'])
+      console.error('❌ [InvitationAccept] Erreur finalisation compte:', error)
+      setErrors([error.message || 'Erreur lors de la finalisation du compte'])
     } finally {
       setIsProcessing(false)
     }
@@ -428,7 +367,11 @@ function InvitationAcceptPageContent() {
       formData.password &&
       formData.confirmPassword &&
       formData.password === formData.confirmPassword &&
-      validatePassword(formData.password).length === 0
+      validatePassword(formData.password).length === 0 &&
+      formData.firstName.trim() &&
+      formData.lastName.trim() &&
+      formData.country &&
+      validatePhone(formData.countryCode, formData.areaCode, formData.phoneNumber)
     )
   }
 
@@ -444,11 +387,11 @@ function InvitationAcceptPageContent() {
           Intelia Expert
         </h1>
         <p className="text-center text-sm text-gray-600 mb-8">
-          {status === 'set-password' ? 'Définissez votre mot de passe' : 'Finalisation de votre invitation'}
+          {status === 'set-password' ? 'Complétez votre profil' : 'Finalisation de votre invitation'}
         </p>
       </div>
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+      <div className="sm:mx-auto sm:w-full sm:max-w-2xl">
         <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
           
           {/* Statut Loading */}
@@ -459,10 +402,9 @@ function InvitationAcceptPageContent() {
                 Traitement en cours...
               </h2>
               <p className="text-sm text-gray-600">
-                {message || 'Finalisation de votre invitation'}
+                {message || 'Validation de votre invitation...'}
               </p>
               
-              {/* 🆕 Indicateur de debug */}
               <div className="mt-4 text-xs text-gray-400">
                 <p>🔄 Vérification des tokens d'invitation...</p>
                 <p>⏳ Cela peut prendre quelques secondes</p>
@@ -470,11 +412,11 @@ function InvitationAcceptPageContent() {
             </div>
           )}
 
-          {/* Formulaire de définition du mot de passe */}
+          {/* Formulaire de création de profil complet */}
           {status === 'set-password' && (
-            <div>
+            <div className="max-h-screen overflow-y-auto">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 text-center">
-                Bienvenue ! Définissez votre mot de passe
+                Bienvenue ! Complétez votre profil
               </h2>
               
               {userInfo && (
@@ -510,31 +452,255 @@ function InvitationAcceptPageContent() {
               )}
               
               <div className="space-y-6">
-                {/* Nouveau mot de passe */}
-                <PasswordField
-                  value={formData.password}
-                  onChange={(value) => handleInputChange('password', value)}
-                  label="Votre mot de passe"
-                  placeholder="Créez un mot de passe sécurisé"
-                  showStrength={true}
-                  showRequirements={true}
-                  disabled={isProcessing}
-                />
+                
+                {/* Section Informations personnelles */}
+                <div className="border-b border-gray-200 pb-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Informations personnelles</h3>
+                  
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Prénom <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.firstName}
+                        onChange={(e) => handleInputChange('firstName', e.target.value)}
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        disabled={isProcessing}
+                      />
+                    </div>
 
-                {/* Confirmation */}
-                <PasswordField
-                  value={formData.confirmPassword}
-                  onChange={(value) => handleInputChange('confirmPassword', value)}
-                  label="Confirmer le mot de passe"
-                  placeholder="Retapez votre mot de passe"
-                  confirmValue={formData.password}
-                  isConfirmField={true}
-                  disabled={isProcessing}
-                />
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Nom de famille <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.lastName}
+                        onChange={(e) => handleInputChange('lastName', e.target.value)}
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        disabled={isProcessing}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Profil LinkedIn personnel (optionnel)
+                    </label>
+                    <input
+                      type="url"
+                      value={formData.linkedinProfile}
+                      onChange={(e) => handleInputChange('linkedinProfile', e.target.value)}
+                      placeholder="https://linkedin.com/in/votre-profil"
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                      disabled={isProcessing}
+                    />
+                  </div>
+                </div>
+
+                {/* Section Contact */}
+                <div className="border-b border-gray-200 pb-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Contact</h3>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Pays <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      required
+                      value={formData.country}
+                      onChange={(e) => handleInputChange('country', e.target.value)}
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                      disabled={isProcessing}
+                    >
+                      <option value="">Sélectionnez un pays</option>
+                      {countries.map(country => (
+                        <option key={country.value} value={country.value}>
+                          {country.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Téléphone optionnel */}
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Numéro de téléphone (optionnel)
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <input
+                        type="text"
+                        placeholder="+1"
+                        value={formData.countryCode}
+                        onChange={(e) => handleInputChange('countryCode', e.target.value)}
+                        className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        disabled={isProcessing}
+                      />
+                      <input
+                        type="text"
+                        placeholder="514"
+                        value={formData.areaCode}
+                        onChange={(e) => handleInputChange('areaCode', e.target.value)}
+                        className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        disabled={isProcessing}
+                      />
+                      <input
+                        type="text"
+                        placeholder="1234567"
+                        value={formData.phoneNumber}
+                        onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                        className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        disabled={isProcessing}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section Entreprise */}
+                <div className="border-b border-gray-200 pb-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Entreprise</h3>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Nom de l'entreprise (optionnel)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.companyName}
+                      onChange={(e) => handleInputChange('companyName', e.target.value)}
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                      disabled={isProcessing}
+                    />
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Site web de l'entreprise (optionnel)
+                    </label>
+                    <input
+                      type="url"
+                      value={formData.companyWebsite}
+                      onChange={(e) => handleInputChange('companyWebsite', e.target.value)}
+                      placeholder="https://votre-entreprise.com"
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                      disabled={isProcessing}
+                    />
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Page LinkedIn de l'entreprise (optionnel)
+                    </label>
+                    <input
+                      type="url"
+                      value={formData.companyLinkedin}
+                      onChange={(e) => handleInputChange('companyLinkedin', e.target.value)}
+                      placeholder="https://linkedin.com/company/votre-entreprise"
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                      disabled={isProcessing}
+                    />
+                  </div>
+                </div>
+
+                {/* Section Mot de passe */}
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Sécurité</h3>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Mot de passe <span className="text-red-500">*</span>
+                    </label>
+                    <div className="mt-1 relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={formData.password}
+                        onChange={(e) => handleInputChange('password', e.target.value)}
+                        className="block w-full rounded-md border border-gray-300 px-3 py-2 pr-10 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        disabled={isProcessing}
+                      />
+                      <button
+                        type="button"
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                        onClick={() => setShowPassword(!showPassword)}
+                        disabled={isProcessing}
+                      >
+                        {showPassword ? (
+                          <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                          </svg>
+                        ) : (
+                          <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Confirmer le mot de passe <span className="text-red-500">*</span>
+                    </label>
+                    <div className="mt-1 relative">
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        required
+                        value={formData.confirmPassword}
+                        onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                        className="block w-full rounded-md border border-gray-300 px-3 py-2 pr-10 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        disabled={isProcessing}
+                      />
+                      <button
+                        type="button"
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        disabled={isProcessing}
+                      >
+                        {showConfirmPassword ? (
+                          <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                          </svg>
+                        ) : (
+                          <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Indicateur de correspondance des mots de passe */}
+                  {formData.password && formData.confirmPassword && (
+                    <div className="mt-2 text-xs">
+                      {formData.confirmPassword === formData.password ? (
+                        <span className="text-green-600 flex items-center">
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Les mots de passe correspondent
+                        </span>
+                      ) : (
+                        <span className="text-red-600 flex items-center">
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                          Les mots de passe ne correspondent pas
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 <button
                   type="button"
-                  onClick={handlePasswordSubmit}
+                  onClick={handleFormSubmit}
                   disabled={isProcessing || !isFormValid()}
                   className="w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
