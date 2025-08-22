@@ -8,13 +8,14 @@ import type { Language, User } from '@/types'
 
 // Import des hooks et utilitaires
 import { 
+  useCountries, 
+  useCountryCodeMap, 
   translations, 
   validateEmail, 
   validatePassword, 
   validatePhone, 
   rememberMeUtils 
 } from './page_hooks'
-
 
 // Import des composants
 import { 
