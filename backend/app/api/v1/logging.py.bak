@@ -651,7 +651,7 @@ class AnalyticsManager:
                         "period_hours": hours,
                         "current_status": {
                             "overall_health": current_health,
-                            "avg_response_time_ms": round(float(global_stats.get("avg_response_time", 0) or 0), 3),
+                            "avg_response_time_ms": int(global_stats.get("avg_response_time", 0) or 0),
                             "error_rate_percent": round(global_stats.get("avg_error_rate", 0) or 0, 2)
                         },
                         "global_stats": global_stats,
