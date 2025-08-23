@@ -37,82 +37,67 @@ interface Country {
   flag?: string
 }
 
-// ✅ Hook personnalisé pour charger les pays avec fallback - VERSION CORRIGÉE
+// ✅ Hook personnalisé ULTRA-SIMPLIFIÉ pour debug
 const useCountries = () => {
-  const [countries, setCountries] = useState<Country[]>([]) // ✅ Commencer avec un array vide
-  const [loading, setLoading] = useState(true)
-  const [usingFallback, setUsingFallback] = useState(false)
-  const [forceRender, setForceRender] = useState(0) // ✅ Pour forcer le re-render si nécessaire
+  const [countries, setCountries] = useState<Country[]>(fallbackCountries)
+  const [loading, setLoading] = useState(false) // ✅ Pas de loading pour éviter les problèmes
+  const [usingFallback, setUsingFallback] = useState(true)
 
   useEffect(() => {
+    // ✅ APPROCHE ULTRA-DIRECTE : Remplacer immédiatement
+    console.log('🌍 [UserInfoModal] Hook démarré avec', fallbackCountries.length, 'pays fallback')
+    
     const fetchCountries = async () => {
       try {
         console.log('🌍 [UserInfoModal Countries] Tentative de chargement via API REST Countries...')
         
-        const response = await fetch('https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations', {
-          headers: {
-            'Accept': 'application/json',
-          }
-        })
+        const response = await fetch('https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations')
         
         if (!response.ok) {
-          throw new Error(`API Error: ${response.status} ${response.statusText}`)
+          throw new Error(`API Error: ${response.status}`)
         }
         
         const data = await response.json()
         console.log('🌍 [UserInfoModal Countries] Données reçues:', data.length, 'pays')
         
         const formattedCountries = data
-          .map((country: any) => {
-            const phoneCode = country.idd?.root + (country.idd?.suffixes?.[0] || '')
-            return {
-              value: country.cca2,
-              label: country.translations?.fra?.common || country.name.common,
-              phoneCode: phoneCode,
-              flag: country.flag
-            }
-          })
-          .filter((country: Country) => {
-            // Filtrer les pays sans code téléphone valide
-            const hasValidCode = country.phoneCode && 
-                                country.phoneCode !== 'undefined' && 
-                                country.phoneCode !== 'null' &&
-                                country.phoneCode.length > 1 &&
-                                country.phoneCode.startsWith('+')
-            return hasValidCode && country.value && country.label
-          })
+          .map((country: any) => ({
+            value: country.cca2,
+            label: country.translations?.fra?.common || country.name.common,
+            phoneCode: (country.idd?.root || '') + (country.idd?.suffixes?.[0] || ''),
+            flag: country.flag
+          }))
+          .filter((country: Country) => 
+            country.phoneCode && 
+            country.phoneCode.length > 1 &&
+            country.phoneCode.startsWith('+') &&
+            country.value && 
+            country.label
+          )
           .sort((a: Country, b: Country) => a.label.localeCompare(b.label))
         
         console.log('🌍 [UserInfoModal Countries] Pays formatés:', formattedCountries.length, 'pays valides')
         
         if (formattedCountries.length >= 50) {
-          console.log('✅ [UserInfoModal Countries] Mise à jour de la liste des pays...')
-          setCountries(formattedCountries) // ✅ Mettre à jour avec les pays de l'API
+          console.log('✅ [UserInfoModal Countries] REMPLACEMENT par', formattedCountries.length, 'pays API')
+          // ✅ FORCER le remplacement complet
+          setCountries([...formattedCountries])
           setUsingFallback(false)
-          setForceRender(prev => prev + 1) // ✅ Forcer le re-render
           console.log('✅ [UserInfoModal Countries] API REST Countries utilisée avec succès')
-        } else {
-          console.warn('⚠️ [UserInfoModal Countries] Peu de pays reçus, utilisation du fallback')
-          throw new Error('Données insuffisantes')
         }
         
       } catch (err) {
-        console.warn('⚠️ [UserInfoModal Countries] API REST Countries bloquée par CSP, utilisation du fallback:', err)
-        console.info('💡 [UserInfoModal Countries] Pour utiliser l\'API complète, ajoutez https://restcountries.com à votre CSP')
-        setCountries(fallbackCountries) // ✅ Fallback en cas d'erreur
-        setUsingFallback(true)
-        setForceRender(prev => prev + 1) // ✅ Forcer le re-render même en fallback
-      } finally {
-        console.log('🏁 [UserInfoModal Countries] Fin du chargement, setLoading(false)')
-        setLoading(false)
+        console.warn('⚠️ [UserInfoModal Countries] API échouée, garde fallback:', err)
       }
     }
 
-    // ✅ Exécuter immédiatement sans délai artificiel
+    // ✅ Démarrer immédiatement
     fetchCountries()
   }, [])
 
-  return { countries, loading, usingFallback, forceRender }
+  console.log('🎯 [useCountries] Render avec', countries.length, 'pays, usingFallback:', usingFallback)
+  
+  return { countries, loading, usingFallback }
 }
 
 // ==================== MODAL PROFIL REDESIGNÉ COMPLÈTEMENT ====================
@@ -123,11 +108,11 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('profile')
   
-  // ✅ Hook pour charger les pays avec la correction
-  const { countries, loading: countriesLoading, usingFallback, forceRender } = useCountries()
+  // ✅ Hook pour charger les pays avec la correction ULTRA-SIMPLE
+  const { countries, loading: countriesLoading, usingFallback } = useCountries()
   
-  // ✅ Debug du rendu
-  console.log('🎯 [UserInfoModal] Rendu composant, countries.length:', countries.length, 'forceRender:', forceRender)
+  // ✅ Debug console pour tracer le problème
+  console.log('🎯 [UserInfoModal] Rendu principal avec', countries.length, 'pays')
   
   // ✅ Créer le mapping des codes téléphoniques dynamiquement
   const countryCodeMap = useMemo(() => {
@@ -491,55 +476,36 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                       />
                     </div>
 
-                    {/* ✅ SÉLECTION PAYS CORRIGÉE */}
+                    {/* ✅ SÉLECTION PAYS VERSION ULTRA-SIMPLE */}
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         {t('profile.country')} <span className="text-gray-500 text-sm">(optionnel)</span>
                       </label>
-                      {countriesLoading ? (
-                        <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50">
-                          <div className="flex items-center space-x-2">
-                            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                            <span className="text-sm text-gray-600">Chargement des pays...</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          {/* Debug info améliorée - à supprimer en production */}
-                          {process.env.NODE_ENV === 'development' && (
-                            <div className="text-xs text-gray-500 mb-2 p-2 bg-blue-50 rounded border">
-                              <strong>🔍 Debug Info:</strong><br/>
-                              • Pays disponibles: <strong>{countries.length}</strong><br/>
-                              • Loading: {countriesLoading.toString()}<br/>
-                              • Fallback: {usingFallback.toString()}<br/>
-                              • ForceRender: {forceRender}<br/>
-                              • Premiers pays: {countries.slice(0, 3).map(c => c.label).join(', ')}
-                            </div>
-                          )}
-                          <select
-                            key={`country-select-${forceRender}`} // ✅ Clé dynamique pour forcer le re-render
-                            value={formData.country}
-                            onChange={(e) => {
-                              console.log('🔄 Pays sélectionné:', e.target.value, countries.find(c => c.value === e.target.value)?.label)
-                              setFormData(prev => ({ ...prev, country: e.target.value }))
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                          >
-                            <option value="">Sélectionner un pays</option>
-                            {countries.map((country, index) => {
-                              // Debug temporaire pour vérifier le rendu des options
-                              if (process.env.NODE_ENV === 'development' && index < 5) {
-                                console.log('🏗️ Rendu option:', country.value, country.label, country.flag)
-                              }
-                              return (
-                                <option key={`${country.value}-${forceRender}`} value={country.value}>
-                                  {country.flag} {country.label}
-                                </option>
-                              )
-                            })}
-                          </select>
-                        </>
-                      )}
+                      
+                      {/* ✅ DEBUG BOX TEMPORAIRE pour voir l'état EXACT */}
+                      <div className="text-xs bg-yellow-50 border border-yellow-200 rounded p-2 mb-2">
+                        <strong>🔍 DEBUG LIVE:</strong><br/>
+                        • Countries length: <strong>{countries.length}</strong><br/>
+                        • Using fallback: {usingFallback.toString()}<br/>
+                        • Premier pays: {countries[0] ? `${countries[0].flag} ${countries[0].label}` : 'AUCUN!'}<br/>
+                        • Dernier pays: {countries[countries.length - 1] ? `${countries[countries.length - 1].flag} ${countries[countries.length - 1].label}` : 'AUCUN!'}
+                      </div>
+
+                      <select
+                        value={formData.country}
+                        onChange={(e) => {
+                          console.log('🔄 Pays sélectionné:', e.target.value)
+                          setFormData(prev => ({ ...prev, country: e.target.value }))
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                      >
+                        <option value="">Sélectionner un pays (total: {countries.length})</option>
+                        {countries.map((country, index) => (
+                          <option key={country.value} value={country.value}>
+                            {country.flag} {country.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
