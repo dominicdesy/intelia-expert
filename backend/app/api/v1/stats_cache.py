@@ -4,6 +4,7 @@
 🚀 SYSTÈME DE CACHE STATISTIQUES OPTIMISÉ
 Tables de cache SQL + Gestionnaire pour performances ultra-rapides
 SAFE: N'interfère pas avec logging.py et billing.py existants
+✨ NOUVEAU: Migration automatique des colonnes feedback (Digital Ocean compatible)
 """
 
 import json
@@ -22,13 +23,112 @@ class StatisticsCache:
     - Stockage optimisé en base SQL
     - TTL automatique 
     - Gestion des erreurs et fallbacks
+    - Migration automatique des colonnes feedback
     """
     
     def __init__(self, dsn: str = None):
         self.dsn = dsn or os.getenv("DATABASE_URL")
         if not self.dsn:
             raise ValueError("DATABASE_URL manquant pour le cache statistiques")
+        
+        # Créer les tables de cache
         self._ensure_cache_tables()
+        
+        # 🔧 NOUVELLE FONCTIONNALITÉ: Migration automatique feedback
+        self._migration_feedback_success = self._ensure_user_questions_feedback_columns()
+        
+        if self._migration_feedback_success:
+            logger.info("✅ Système de cache statistiques initialisé avec support feedback")
+        else:
+            logger.warning("⚠️ Système de cache initialisé en mode dégradé (pas de feedback)")
+    
+    def _ensure_user_questions_feedback_columns(self):
+        """
+        🔧 MIGRATION AUTOMATIQUE: Assure que user_questions_complete a les colonnes feedback.
+        Pattern identique à postgres_memory.py - Compatible Digital Ocean App Platform.
+        
+        S'exécute automatiquement au démarrage de l'application.
+        Zero risk: Ne touche à rien si les colonnes existent déjà.
+        """
+        try:
+            with psycopg2.connect(self.dsn) as conn:
+                with conn.cursor() as cur:
+                    
+                    # 🔍 Étape 1: Vérifier si user_questions_complete existe
+                    cur.execute("""
+                        SELECT EXISTS (
+                            SELECT FROM information_schema.tables 
+                            WHERE table_schema = 'public' 
+                            AND table_name = 'user_questions_complete'
+                        )
+                    """)
+                    
+                    table_exists = cur.fetchone()[0]
+                    
+                    if not table_exists:
+                        logger.warning("⚠️ Table user_questions_complete n'existe pas - skip migration feedback")
+                        return False
+                    
+                    # 🔍 Étape 2: Vérifier colonnes existantes
+                    cur.execute("""
+                        SELECT column_name 
+                        FROM information_schema.columns 
+                        WHERE table_name = 'user_questions_complete'
+                    """)
+                    
+                    existing_columns = {row[0] for row in cur.fetchall()}
+                    logger.info(f"📋 Colonnes détectées dans user_questions_complete: {sorted(existing_columns)}")
+                    
+                    # 🔧 Étape 3: Définir colonnes feedback requises
+                    feedback_columns = {
+                        'feedback': 'INTEGER DEFAULT NULL CONSTRAINT valid_feedback_range CHECK (feedback IN (-1, 0, 1))',
+                        'feedback_comment': 'TEXT DEFAULT NULL'
+                    }
+                    
+                    # 🚀 Étape 4: Ajouter colonnes manquantes
+                    migrations_applied = []
+                    for column_name, column_definition in feedback_columns.items():
+                        if column_name not in existing_columns:
+                            logger.info(f"🔧 Migration: Ajout colonne {column_name}")
+                            
+                            try:
+                                cur.execute(f"""
+                                    ALTER TABLE user_questions_complete 
+                                    ADD COLUMN IF NOT EXISTS {column_name} {column_definition}
+                                """)
+                                migrations_applied.append(column_name)
+                                
+                            except Exception as col_error:
+                                logger.error(f"❌ Erreur ajout colonne {column_name}: {col_error}")
+                                # Continue avec les autres colonnes
+                    
+                    # 📊 Étape 5: Créer index de performance (si feedback ajouté)
+                    if 'feedback' in migrations_applied:
+                        try:
+                            cur.execute("""
+                                CREATE INDEX IF NOT EXISTS idx_user_questions_complete_feedback 
+                                ON user_questions_complete(feedback) 
+                                WHERE feedback IS NOT NULL
+                            """)
+                            logger.info("📊 Index feedback créé pour performances")
+                        except Exception as idx_error:
+                            logger.warning(f"⚠️ Index feedback non créé: {idx_error}")
+                    
+                    # ✅ Commit final
+                    conn.commit()
+                    
+                    if migrations_applied:
+                        logger.info(f"✅ Migration feedback terminée avec succès: {migrations_applied}")
+                        return True
+                    else:
+                        logger.info("✅ Colonnes feedback déjà présentes - pas de migration nécessaire")
+                        return True
+                        
+        except Exception as e:
+            logger.error(f"❌ Erreur migration feedback colonnes: {e}")
+            # 🛡️ IMPORTANT: Ne pas faire échouer l'initialisation
+            # L'application peut fonctionner en mode dégradé sans feedback
+            return False
     
     def _ensure_cache_tables(self):
         """Crée les tables de cache optimisées avec gestion robuste des erreurs"""
@@ -625,6 +725,12 @@ class StatisticsCache:
                     size_info = cur.fetchone()
                     stats['sizes'] = dict(size_info) if size_info else {}
                     
+                    # ✨ NOUVEAU: Statut migration feedback
+                    stats['migration_status'] = {
+                        'feedback_columns_migrated': self._migration_feedback_success,
+                        'timestamp': datetime.now().isoformat()
+                    }
+                    
                     stats['last_updated'] = datetime.now().isoformat()
                     
                     return stats
@@ -671,6 +777,7 @@ def force_cache_refresh() -> Dict[str, Any]:
             "status": "success",
             "cache_invalidated": invalidated,
             "entries_cleaned": cleaned,
+            "migration_status": cache._migration_feedback_success,
             "timestamp": datetime.now().isoformat()
         }
         

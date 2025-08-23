@@ -499,19 +499,8 @@ function PageContent() {
         {/* ⭐ CORRECTION 1: SUPPRESSION DE max-h-screen overflow-y-auto */}
         <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 relative">
           
-          {/* ⭐ CORRECTION 2: CONDITION PLUS STRICTE POUR ÉVITER LE TEXTE DEBUG */}
-          {usingFallback && !countriesLoading && isSignupMode && process.env.NODE_ENV === 'development' && (
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <div className="flex items-center space-x-2">
-                <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                <span className="text-sm text-yellow-800">
-                  {t.limitedCountryList}
-                </span>
-              </div>
-            </div>
-          )}
+          {/* ⭐ CORRECTION 2: SUPPRESSION COMPLÈTE DES MESSAGES DE DEBUG */}
+          {/* Pas de message de succès ou d'avertissement visible pour l'utilisateur final */}
 
           {/* Messages d'erreur et succès */}
           {localError && (

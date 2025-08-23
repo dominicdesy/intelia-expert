@@ -5,6 +5,7 @@
 Utilise les gestionnaires existants SANS les modifier
 Collecte périodique + cache optimisé
 SAFE: Aucune rupture avec logging.py et billing.py
+✨ NOUVEAU: Gestion défensive des colonnes feedback (Digital Ocean compatible)
 """
 
 import asyncio
@@ -30,6 +31,7 @@ class StatisticsUpdater:
     - Met à jour le cache périodiquement
     - Gère les erreurs et fallbacks
     - Optimise les performances avec collecte parallèle
+    - Support défensif pour colonnes feedback
     """
     
     def __init__(self):
@@ -38,6 +40,59 @@ class StatisticsUpdater:
         self.billing = get_billing_manager()
         self.last_update = None
         self.update_in_progress = False
+        
+        # ✨ NOUVEAU: Détecter la disponibilité des colonnes feedback au démarrage
+        self._feedback_columns_available = self._check_feedback_columns_availability()
+    
+    def _check_feedback_columns_availability(self) -> Dict[str, bool]:
+        """
+        🔍 Vérifie la disponibilité des colonnes feedback au démarrage.
+        Cache le résultat pour éviter les vérifications répétées.
+        """
+        try:
+            import psycopg2
+            from psycopg2.extras import RealDictCursor
+            
+            with psycopg2.connect(self.analytics.dsn) as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    
+                    # Vérifier si la table existe d'abord
+                    cur.execute("""
+                        SELECT EXISTS (
+                            SELECT FROM information_schema.tables 
+                            WHERE table_schema = 'public' 
+                            AND table_name = 'user_questions_complete'
+                        )
+                    """)
+                    
+                    table_exists = cur.fetchone()[0]
+                    
+                    if not table_exists:
+                        logger.warning("⚠️ Table user_questions_complete n'existe pas")
+                        return {"table_exists": False, "feedback": False, "feedback_comment": False}
+                    
+                    # Vérifier les colonnes feedback
+                    cur.execute("""
+                        SELECT column_name 
+                        FROM information_schema.columns 
+                        WHERE table_name = 'user_questions_complete' 
+                            AND column_name IN ('feedback', 'feedback_comment')
+                    """)
+                    
+                    available_columns = {row["column_name"] for row in cur.fetchall()}
+                    
+                    result = {
+                        "table_exists": True,
+                        "feedback": "feedback" in available_columns,
+                        "feedback_comment": "feedback_comment" in available_columns
+                    }
+                    
+                    logger.info(f"🔍 Détection colonnes feedback: {result}")
+                    return result
+                    
+        except Exception as e:
+            logger.error(f"❌ Erreur vérification colonnes feedback: {e}")
+            return {"table_exists": False, "feedback": False, "feedback_comment": False}
     
     async def update_all_statistics(self) -> Dict[str, Any]:
         """
@@ -54,7 +109,7 @@ class StatisticsUpdater:
         try:
             logger.info("🚀 Début mise à jour complète des statistiques")
             
-            # 🔄 COLLECTE PARALLÈLE pour performances maximales
+            # 📄 COLLECTE PARALLÈLE pour performances maximales
             results = await asyncio.gather(
                 self._update_dashboard_stats(),
                 self._update_openai_costs(),
@@ -97,7 +152,8 @@ class StatisticsUpdater:
                 "errors": errors,
                 "duration_ms": duration_ms,
                 "last_update": self.last_update.isoformat(),
-                "next_update_due": (self.last_update + timedelta(hours=1)).isoformat()
+                "next_update_due": (self.last_update + timedelta(hours=1)).isoformat(),
+                "feedback_support": self._feedback_columns_available
             }
             
             # Cacher le résumé de la mise à jour
@@ -124,6 +180,79 @@ class StatisticsUpdater:
             
         finally:
             self.update_in_progress = False
+
+    async def _get_feedback_stats_safe(self, cur) -> Dict[str, Any]:
+        """
+        🛡️ Collecte feedback stats avec vérification défensive des colonnes
+        Compatible avec toutes les configurations de base de données
+        """
+        try:
+            # Utiliser le cache de détection des colonnes
+            if not self._feedback_columns_available["table_exists"]:
+                logger.warning("⚠️ Table user_questions_complete manquante - pas de feedback")
+                return {
+                    "total": 0, "positive": 0, "negative": 0, 
+                    "with_comments": 0, "satisfaction_rate": 0.0,
+                    "note": "Table user_questions_complete manquante"
+                }
+            
+            has_feedback = self._feedback_columns_available["feedback"]
+            has_feedback_comment = self._feedback_columns_available["feedback_comment"]
+            
+            if not has_feedback:
+                logger.info("ℹ️ Colonne feedback non disponible - stats feedback désactivées")
+                return {
+                    "total": 0, "positive": 0, "negative": 0, 
+                    "with_comments": 0, "satisfaction_rate": 0.0,
+                    "note": "Migration feedback requise - colonnes manquantes"
+                }
+            
+            # ✅ Colonnes feedback disponibles - construire requête dynamique
+            query = """
+                SELECT 
+                    COUNT(*) FILTER (WHERE feedback = 1) as positive_feedback,
+                    COUNT(*) FILTER (WHERE feedback = -1) as negative_feedback,
+                    COUNT(*) FILTER (WHERE feedback IS NOT NULL) as total_feedback
+            """
+            
+            if has_feedback_comment:
+                query += ",\n                    COUNT(*) FILTER (WHERE feedback_comment IS NOT NULL AND feedback_comment != '') as feedback_with_comments"
+            else:
+                query += ",\n                    0 as feedback_with_comments"
+                
+            query += """
+                FROM user_questions_complete 
+                WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+            """
+            
+            cur.execute(query)
+            result = cur.fetchone()
+            
+            if result:
+                total_fb = result["total_feedback"] or 0
+                positive_fb = result["positive_feedback"] or 0
+                satisfaction_rate = (positive_fb / total_fb * 100) if total_fb > 0 else 0
+                
+                feedback_stats = {
+                    "total": total_fb,
+                    "positive": positive_fb,
+                    "negative": result["negative_feedback"] or 0,
+                    "with_comments": result.get("feedback_with_comments", 0),
+                    "satisfaction_rate": round(satisfaction_rate, 1)
+                }
+                
+                logger.info(f"📊 Feedback stats collectées: {total_fb} total, {satisfaction_rate}% satisfaction")
+                return feedback_stats
+            
+            return {"total": 0, "positive": 0, "negative": 0, "with_comments": 0, "satisfaction_rate": 0.0}
+            
+        except Exception as e:
+            logger.error(f"❌ Erreur collecte feedback safe: {e}")
+            return {
+                "total": 0, "positive": 0, "negative": 0, 
+                "with_comments": 0, "satisfaction_rate": 0.0,
+                "error": str(e)[:100]  # Limiter la longueur de l'erreur
+            }
 
     async def _update_dashboard_stats(self) -> Dict[str, Any]:
         """Collecte et cache les statistiques dashboard principales"""
@@ -239,30 +368,8 @@ class StatisticsUpdater:
                     
                     dashboard_data["top_users"] = top_users
                     
-                    # Stats de feedback
-                    cur.execute("""
-                        SELECT 
-                            COUNT(*) FILTER (WHERE feedback = 1) as positive_feedback,
-                            COUNT(*) FILTER (WHERE feedback = -1) as negative_feedback,
-                            COUNT(*) FILTER (WHERE feedback IS NOT NULL) as total_feedback,
-                            COUNT(*) FILTER (WHERE feedback_comment IS NOT NULL AND feedback_comment != '') as feedback_with_comments
-                        FROM user_questions_complete 
-                        WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
-                    """)
-                    
-                    feedback_result = cur.fetchone()
-                    if feedback_result:
-                        total_fb = feedback_result["total_feedback"] or 0
-                        positive_fb = feedback_result["positive_feedback"] or 0
-                        satisfaction_rate = (positive_fb / total_fb * 100) if total_fb > 0 else 0
-                        
-                        dashboard_data["feedback_stats"] = {
-                            "total": total_fb,
-                            "positive": positive_fb,
-                            "negative": feedback_result["negative_feedback"] or 0,
-                            "with_comments": feedback_result["feedback_with_comments"] or 0,
-                            "satisfaction_rate": round(satisfaction_rate, 1)
-                        }
+                    # 🛡️ STATS DE FEEDBACK DÉFENSIVES (NOUVELLE SECTION)
+                    dashboard_data["feedback_stats"] = await self._get_feedback_stats_safe(cur)
             
             # Récupérer données billing via billing.py
             try:
@@ -373,6 +480,9 @@ class StatisticsUpdater:
             
             # Calculer depuis la base directement (si table existe)
             try:
+                import psycopg2
+                from psycopg2.extras import RealDictCursor
+                
                 with psycopg2.connect(self.analytics.dsn) as conn:
                     with conn.cursor(cursor_factory=RealDictCursor) as cur:
                         
@@ -517,6 +627,9 @@ class StatisticsUpdater:
                 logger.warning(f"⚠️ Erreur récupération performance: {perf_error}")
                 
                 # Calculer des métriques basiques depuis les questions
+                import psycopg2
+                from psycopg2.extras import RealDictCursor
+                
                 with psycopg2.connect(self.analytics.dsn) as conn:
                     with conn.cursor(cursor_factory=RealDictCursor) as cur:
                         cur.execute("""
@@ -580,7 +693,8 @@ class StatisticsUpdater:
                     "status": "never_updated",
                     "message": "Aucune mise à jour effectuée",
                     "update_in_progress": self.update_in_progress,
-                    "last_update": self.last_update.isoformat() if self.last_update else None
+                    "last_update": self.last_update.isoformat() if self.last_update else None,
+                    "feedback_support": self._feedback_columns_available
                 }
                 
         except Exception as e:
@@ -610,6 +724,35 @@ class StatisticsUpdater:
             logger.error(f"❌ Erreur force update {component}: {e}")
             return {"status": "error", "error": str(e)}
 
+    def refresh_feedback_detection(self) -> Dict[str, Any]:
+        """
+        🔄 NOUVELLE MÉTHODE: Actualise la détection des colonnes feedback
+        Utile après une migration ou modification de schéma
+        """
+        try:
+            logger.info("🔄 Actualisation détection colonnes feedback...")
+            old_status = self._feedback_columns_available.copy()
+            self._feedback_columns_available = self._check_feedback_columns_availability()
+            
+            result = {
+                "status": "success",
+                "old_detection": old_status,
+                "new_detection": self._feedback_columns_available,
+                "changes_detected": old_status != self._feedback_columns_available,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            if result["changes_detected"]:
+                logger.info(f"🔄 Changements détectés dans les colonnes feedback: {result['new_detection']}")
+            else:
+                logger.info("ℹ️ Aucun changement détecté dans les colonnes feedback")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Erreur refresh feedback detection: {e}")
+            return {"status": "error", "error": str(e)}
+
 
 # ==================== SINGLETON GLOBAL ====================
 
@@ -634,3 +777,8 @@ async def force_update_all():
     """Force une mise à jour immédiate (pour admin)"""
     updater = get_stats_updater()
     return await updater.update_all_statistics()
+
+def refresh_feedback_columns():
+    """Force la re-détection des colonnes feedback"""
+    updater = get_stats_updater()
+    return updater.refresh_feedback_detection()
