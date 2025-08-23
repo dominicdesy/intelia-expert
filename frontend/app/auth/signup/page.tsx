@@ -623,10 +623,10 @@ function PageContent() {
         </div>
       </div>
 
-      {/* 🔧 MODAL D'INSCRIPTION - OVERLAY FULLSCREEN */}
+      {/* 🔧 MODAL D'INSCRIPTION - VERSION SIMPLE SANS DOUBLE SCROLL */}
       {isSignupMode && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 p-4">
+          <div className="h-full w-full max-w-2xl mx-auto bg-white rounded-lg shadow-xl overflow-y-auto">
               
               {/* Header de la modale avec bouton fermer */}
               <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-lg">
