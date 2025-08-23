@@ -461,9 +461,7 @@ function PageContent() {
   console.log('🎨 [Render] Rendu de la page principale')
 
   return (
-    <div className={`bg-gradient-to-br from-blue-50 via-white to-green-50 py-8 sm:px-6 lg:px-8 relative ${
-      isSignupMode ? 'min-h-full' : 'min-h-screen flex flex-col justify-center'
-    }`}>
+    <div className="bg-gradient-to-br from-blue-50 via-white to-green-50 py-8 sm:px-6 lg:px-8 relative min-h-screen">{/* Suppression de la logique conditionnelle qui cause le conflit */}
       
       {/* ⭐ BOÎTE DE DEBUG GLOBALE - RETIRÉE EN PRODUCTION */}
       {process.env.NODE_ENV === 'development' && (
@@ -488,18 +486,31 @@ function PageContent() {
         <LanguageSelector onLanguageChange={setCurrentLanguage} currentLanguage={currentLanguage} />
       </div>
       
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-          <InteliaLogo className="w-16 h-16" />
-        </div>
-        <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-          {t.title}
-        </h2>
-      </div>
+      <div className={`sm:mx-auto sm:w-full ${isSignupMode ? 'sm:max-w-2xl' : 'sm:max-w-md'} ${!isSignupMode ? 'flex flex-col justify-center min-h-screen' : ''}`}>
+        
+        {!isSignupMode && (
+          <div>
+            <div className="flex justify-center">
+              <InteliaLogo className="w-16 h-16" />
+            </div>
+            <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
+              {t.title}
+            </h2>
+          </div>
+        )}
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-2xl">
-        {/* 🔧 CORRECTION: Suppression des contraintes de hauteur qui causaient le double scroll */}
-        <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 relative">
+        {isSignupMode && (
+          <div className="text-center mb-8">
+            <div className="flex justify-center">
+              <InteliaLogo className="w-16 h-16" />
+            </div>
+            <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
+              {t.title}
+            </h2>
+          </div>
+        )}
+
+        <div className={`bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 relative ${isSignupMode ? 'mt-0' : 'mt-8'}`}>
           
           {/* Messages d'erreur et succès */}
           {localError && (
