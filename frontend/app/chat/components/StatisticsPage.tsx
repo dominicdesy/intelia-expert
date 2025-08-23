@@ -10,7 +10,7 @@ interface CacheStatus {
   is_available: boolean
   last_update: string | null
   cache_age_minutes: number
-  performance_gain: string
+  performance_gain: number  // 🔧 CORRECTION 1: string → number
   next_update: string | null
 }
 
@@ -20,6 +20,11 @@ interface FastDashboardStats {
   usage_stats: UsageStats
   billing_stats: BillingStats
   performance_stats: PerformanceStats
+  // 🚀 AJOUT: Support pour la nouvelle structure backend
+  systemStats?: SystemStats
+  usageStats?: UsageStats
+  billingStats?: BillingStats
+  performanceStats?: PerformanceStats & { performance_gain: number }
 }
 
 interface FastQuestionsResponse {
@@ -108,6 +113,7 @@ interface PerformanceStats {
   openai_costs: number
   error_count: number
   cache_hit_rate: number
+  performance_gain?: number  // 🚀 AJOUT: Support optionnel performance_gain
 }
 
 interface InvitationStats {
@@ -383,15 +389,27 @@ export const StatisticsPage: React.FC = () => {
       const loadTime = performance.now() - startTime
       console.log(`⚡ Performance ULTRA-RAPIDE: ${loadTime.toFixed(0)}ms`)
       
+      // 🔧 CORRECTION 2: Accès sécurisé à performance_gain
+      const performanceGainValue = fastData.performanceStats?.performance_gain || 
+                                   fastData.performance_stats?.performance_gain || 
+                                   fastData.cache_info?.performance_gain || 
+                                   0
+      
       // Mettre à jour le statut du cache
       setCacheStatus(fastData.cache_info)
-      setPerformanceGain(`${loadTime.toFixed(0)}ms (vs ${fastData.cache_info.performance_gain})`)
+      setPerformanceGain(`${loadTime.toFixed(0)}ms (vs ${performanceGainValue}%)`)
+      
+      // 🚀 Support pour les deux structures de données (nouvelle et ancienne)
+      const systemStatsData = fastData.systemStats || fastData.system_stats
+      const usageStatsData = fastData.usageStats || fastData.usage_stats  
+      const billingStatsData = fastData.billingStats || fastData.billing_stats
+      const performanceStatsData = fastData.performanceStats || fastData.performance_stats
       
       // Utiliser les données mises en cache
-      setSystemStats(fastData.system_stats)
-      setUsageStats(fastData.usage_stats)
-      setBillingStats(fastData.billing_stats)
-      setPerformanceStats(fastData.performance_stats)
+      setSystemStats(systemStatsData)
+      setUsageStats(usageStatsData)
+      setBillingStats(billingStatsData)
+      setPerformanceStats(performanceStatsData)
       
       console.log('✅ Toutes les statistiques chargées depuis le cache ultra-rapide!')
 
@@ -754,17 +772,17 @@ export const StatisticsPage: React.FC = () => {
             <div className="max-w-7xl mx-auto flex items-center justify-between text-xs">
               <div className="flex items-center space-x-4">
                 <span className="text-green-700">
-                  📅 Dernière MàJ: {cacheStatus.last_update ? new Date(cacheStatus.last_update).toLocaleString('fr-FR') : 'N/A'}
+                  📅 Dernière MÀJ: {cacheStatus.last_update ? new Date(cacheStatus.last_update).toLocaleString('fr-FR') : 'N/A'}
                 </span>
                 <span className="text-green-700">
                   ⏱️ Âge du cache: {cacheStatus.cache_age_minutes}min
                 </span>
                 <span className="text-green-700">
-                  🚀 Gain: {cacheStatus.performance_gain}
+                  🚀 Gain: {cacheStatus.performance_gain}%
                 </span>
               </div>
               <div className="text-green-600">
-                🔄 Prochaine MàJ: {cacheStatus.next_update ? new Date(cacheStatus.next_update).toLocaleString('fr-FR') : 'Automatique'}
+                🔄 Prochaine MÀJ: {cacheStatus.next_update ? new Date(cacheStatus.next_update).toLocaleString('fr-FR') : 'Automatique'}
               </div>
             </div>
           </div>
