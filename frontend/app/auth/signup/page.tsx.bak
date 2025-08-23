@@ -497,7 +497,7 @@ function PageContent() {
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-2xl">
-		<div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 relative">
+        <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 max-h-screen overflow-y-auto relative">
           
           {/* Statut du chargement des pays */}
           {usingFallback && !countriesLoading && isSignupMode && (

@@ -476,20 +476,11 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                       />
                     </div>
 
-                    {/* ✅ SÉLECTION PAYS VERSION ULTRA-SIMPLE */}
+                    {/* ✅ SÉLECTION PAYS VERSION FINALE PROPRE */}
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         {t('profile.country')} <span className="text-gray-500 text-sm">(optionnel)</span>
                       </label>
-                      
-                      {/* ✅ DEBUG BOX TEMPORAIRE pour voir l'état EXACT */}
-                      <div className="text-xs bg-yellow-50 border border-yellow-200 rounded p-2 mb-2">
-                        <strong>🔍 DEBUG LIVE:</strong><br/>
-                        • Countries length: <strong>{countries.length}</strong><br/>
-                        • Using fallback: {usingFallback.toString()}<br/>
-                        • Premier pays: {countries[0] ? `${countries[0].flag} ${countries[0].label}` : 'AUCUN!'}<br/>
-                        • Dernier pays: {countries[countries.length - 1] ? `${countries[countries.length - 1].flag} ${countries[countries.length - 1].label}` : 'AUCUN!'}
-                      </div>
 
                       <select
                         value={formData.country}
@@ -513,7 +504,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                             padding: '8px'
                           }}
                         >
-                          Sélectionner un pays (total: {countries.length})
+                          Sélectionner un pays
                         </option>
                         {countries.map((country, index) => (
                           <option 
