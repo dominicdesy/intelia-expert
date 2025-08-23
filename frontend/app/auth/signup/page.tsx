@@ -452,6 +452,22 @@ function PageContent() {
     }
   }, [hasHydrated, isLoading, isAuthenticated, user, safeRedirectToChat])
 
+  // 🔒 EFFET POUR BLOQUER LE SCROLL DU BODY EN MODE SIGNUP
+  useEffect(() => {
+    if (isSignupMode) {
+      // Bloquer le scroll du body
+      document.body.style.overflow = 'hidden'
+    } else {
+      // Restaurer le scroll du body
+      document.body.style.overflow = 'unset'
+    }
+    
+    // Cleanup au démontage
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [isSignupMode])
+
   // Affichage loading pendant l'hydratation
   if (!hasHydrated || isLoading) {
     console.log('⏳ [Render] Affichage du spinner de chargement')
@@ -461,76 +477,63 @@ function PageContent() {
   console.log('🎨 [Render] Rendu de la page principale')
 
   return (
-    <div className="bg-gradient-to-br from-blue-50 via-white to-green-50 py-8 sm:px-6 lg:px-8 relative min-h-screen">{/* Suppression de la logique conditionnelle qui cause le conflit */}
-      
-      {/* ⭐ BOÎTE DE DEBUG GLOBALE - RETIRÉE EN PRODUCTION */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed top-16 right-4 bg-purple-50 border border-purple-200 rounded-lg p-4 text-xs max-w-sm z-50">
-          <div className="font-semibold text-purple-800 mb-2">🧪 Debug Global</div>
-          <div className="space-y-1 text-purple-700">
-            <div>🎭 Mode: <span className="font-mono bg-purple-100 px-1 rounded">{isSignupMode ? 'Inscription' : 'Connexion'}</span></div>
-            <div>📊 Pays: <span className="font-mono bg-purple-100 px-1 rounded">{countries.length}</span></div>
-            <div>⏳ Loading: <span className="font-mono bg-purple-100 px-1 rounded">{countriesLoading ? 'Oui' : 'Non'}</span></div>
-            <div>🔄 Fallback: <span className="font-mono bg-purple-100 px-1 rounded">{usingFallback ? 'Oui' : 'Non'}</span></div>
-          </div>
-          <button 
-            onClick={toggleMode}
-            className="mt-2 text-xs bg-purple-100 hover:bg-purple-200 px-2 py-1 rounded"
-          >
-            Basculer mode
-          </button>
-        </div>
-      )}
-      
-      <div className="absolute top-4 right-4">
-        <LanguageSelector onLanguageChange={setCurrentLanguage} currentLanguage={currentLanguage} />
-      </div>
-      
-      <div className={`sm:mx-auto sm:w-full ${isSignupMode ? 'sm:max-w-2xl' : 'sm:max-w-md'} ${!isSignupMode ? 'flex flex-col justify-center min-h-screen' : ''}`}>
+    <>
+      {/* PAGE PRINCIPALE (LOGIN) */}
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative">
         
-        {!isSignupMode && (
-          <div>
-            <div className="flex justify-center">
-              <InteliaLogo className="w-16 h-16" />
+        {/* ⭐ BOÎTE DE DEBUG GLOBALE - RETIRÉE EN PRODUCTION */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="fixed top-16 right-4 bg-purple-50 border border-purple-200 rounded-lg p-4 text-xs max-w-sm z-50">
+            <div className="font-semibold text-purple-800 mb-2">🧪 Debug Global</div>
+            <div className="space-y-1 text-purple-700">
+              <div>🎭 Mode: <span className="font-mono bg-purple-100 px-1 rounded">{isSignupMode ? 'Modal' : 'Page'}</span></div>
+              <div>📊 Pays: <span className="font-mono bg-purple-100 px-1 rounded">{countries.length}</span></div>
+              <div>⏳ Loading: <span className="font-mono bg-purple-100 px-1 rounded">{countriesLoading ? 'Oui' : 'Non'}</span></div>
+              <div>🔄 Fallback: <span className="font-mono bg-purple-100 px-1 rounded">{usingFallback ? 'Oui' : 'Non'}</span></div>
             </div>
-            <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-              {t.title}
-            </h2>
+            <button 
+              onClick={toggleMode}
+              className="mt-2 text-xs bg-purple-100 hover:bg-purple-200 px-2 py-1 rounded"
+            >
+              {isSignupMode ? 'Fermer Modal' : 'Ouvrir Modal'}
+            </button>
           </div>
         )}
-
-        {isSignupMode && (
-          <div className="text-center mb-8">
-            <div className="flex justify-center">
-              <InteliaLogo className="w-16 h-16" />
-            </div>
-            <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-              {t.title}
-            </h2>
+        
+        <div className="absolute top-4 right-4">
+          <LanguageSelector onLanguageChange={setCurrentLanguage} currentLanguage={currentLanguage} />
+        </div>
+        
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="flex justify-center">
+            <InteliaLogo className="w-16 h-16" />
           </div>
-        )}
+          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
+            {t.title}
+          </h2>
+        </div>
 
-        <div className={`bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 relative ${isSignupMode ? 'mt-0' : 'mt-8'}`}>
-          
-          {/* Messages d'erreur et succès */}
-          {localError && (
-            <AlertMessage 
-              type="error" 
-              title={isSignupMode ? t.signupError : t.loginError} 
-              message={localError} 
-            />
-          )}
+        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
+            
+            {/* Messages d'erreur et succès pour login */}
+            {localError && !isSignupMode && (
+              <AlertMessage 
+                type="error" 
+                title={t.loginError} 
+                message={localError} 
+              />
+            )}
 
-          {localSuccess && (
-            <AlertMessage 
-              type="success" 
-              title="" 
-              message={localSuccess} 
-            />
-          )}
+            {localSuccess && !isSignupMode && (
+              <AlertMessage 
+                type="success" 
+                title="" 
+                message={localSuccess} 
+              />
+            )}
 
-          {/* FORMULAIRE DE CONNEXION */}
-          {!isSignupMode && (
+            {/* FORMULAIRE DE CONNEXION */}
             <form onSubmit={handleLogin} onKeyPress={handleKeyPress}>
               <div className="space-y-6">
                 <div>
@@ -600,270 +603,306 @@ function PageContent() {
                 </div>
               </div>
             </form>
-          )}
 
-          {/* FORMULAIRE D'INSCRIPTION AVEC SÉLECTEUR DE PAYS INTÉGRÉ */}
-          {isSignupMode && (
-            <form onSubmit={handleSignup} onKeyPress={handleKeyPress}>
-              <div className="space-y-6">
-                {/* Section Informations personnelles */}
-                <div className="border-b border-gray-200 pb-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">{t.personalInfo}</h3>
-                  
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        {t.firstName} <span className="text-red-500">{t.required}</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={signupData.firstName}
-                        onChange={(e) => handleSignupChange('firstName', e.target.value)}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      />
-                    </div>
+            {/* Bouton pour ouvrir la modale d'inscription */}
+            <div className="mt-6 text-center">
+              <p className="text-sm text-gray-600">
+                {t.newToIntelia}{' '}
+                <button
+                  onClick={toggleMode}
+                  className="font-medium text-blue-600 hover:text-blue-500"
+                >
+                  {t.createAccount}
+                </button>
+              </p>
+            </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        {t.lastName} <span className="text-red-500">{t.required}</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={signupData.lastName}
-                        onChange={(e) => handleSignupChange('lastName', e.target.value)}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      />
-                    </div>
-                  </div>
+            {/* Footer */}
+            <AuthFooter t={t} />
+          </div>
+        </div>
+      </div>
 
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700">
-                      {t.linkedinProfile} {t.optional}
-                    </label>
-                    <input
-                      type="url"
-                      value={signupData.linkedinProfile}
-                      onChange={(e) => handleSignupChange('linkedinProfile', e.target.value)}
-                      placeholder="https://linkedin.com/in/votre-profil"
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                    />
-                  </div>
-                </div>
+      {/* 🔧 MODAL D'INSCRIPTION - OVERLAY FULLSCREEN */}
+      {isSignupMode && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              
+              {/* Header de la modale avec bouton fermer */}
+              <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-lg">
+                <h3 className="text-lg font-semibold text-gray-900">{t.createAccount}</h3>
+                <button
+                  onClick={toggleMode}
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
 
-                {/* Section Contact */}
-                <div className="border-b border-gray-200 pb-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">{t.contact}</h3>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      {t.email} <span className="text-red-500">{t.required}</span>
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={signupData.email}
-                      onChange={(e) => handleSignupChange('email', e.target.value)}
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                    />
-                  </div>
+              {/* Corps de la modale */}
+              <div className="px-6 py-4">
+                
+                {/* Messages d'erreur et succès pour signup */}
+                {localError && (
+                  <AlertMessage 
+                    type="error" 
+                    title={t.signupError} 
+                    message={localError} 
+                  />
+                )}
 
-                  {/* ⭐ SÉLECTEUR DE PAYS INTÉGRÉ DIRECTEMENT */}
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700">
-                      {t.country} <span className="text-red-500">{t.required}</span>
-                    </label>
-                    
-                    {countriesLoading ? (
-                      <div className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 bg-gray-50">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                          <span className="text-sm text-gray-600">{t.loadingCountries}</span>
+                {localSuccess && (
+                  <AlertMessage 
+                    type="success" 
+                    title="" 
+                    message={localSuccess} 
+                  />
+                )}
+
+                {/* FORMULAIRE D'INSCRIPTION */}
+                <form onSubmit={handleSignup} onKeyPress={handleKeyPress}>
+                  <div className="space-y-6">
+                    {/* Section Informations personnelles */}
+                    <div className="border-b border-gray-200 pb-6">
+                      <h4 className="text-md font-medium text-gray-900 mb-4">{t.personalInfo}</h4>
+                      
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            {t.firstName} <span className="text-red-500">{t.required}</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={signupData.firstName}
+                            onChange={(e) => handleSignupChange('firstName', e.target.value)}
+                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            {t.lastName} <span className="text-red-500">{t.required}</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={signupData.lastName}
+                            onChange={(e) => handleSignupChange('lastName', e.target.value)}
+                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                          />
                         </div>
                       </div>
-                    ) : (
-                      <select
-                        required
-                        value={signupData.country}
-                        onChange={(e) => handleSignupChange('country', e.target.value)}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      >
-                        <option value="">{t.selectCountry}</option>
-                        {countries.map((country) => (
-                          <option key={country.value} value={country.value}>
-                            {country.flag ? `${country.flag} ` : ''}{country.label} ({country.phoneCode})
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
 
-                  {/* Téléphone optionnel */}
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {t.phoneNumber} {t.optional}
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">{t.countryCode}</label>
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.linkedinProfile} {t.optional}
+                        </label>
                         <input
-                          type="text"
-                          placeholder="+1"
-                          value={signupData.countryCode}
-                          onChange={(e) => handleSignupChange('countryCode', e.target.value)}
-                          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">{t.areaCode}</label>
-                        <input
-                          type="text"
-                          placeholder="514"
-                          value={signupData.areaCode}
-                          onChange={(e) => handleSignupChange('areaCode', e.target.value)}
-                          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">{t.phoneNumber}</label>
-                        <input
-                          type="text"
-                          placeholder="1234567"
-                          value={signupData.phoneNumber}
-                          onChange={(e) => handleSignupChange('phoneNumber', e.target.value)}
-                          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                          type="url"
+                          value={signupData.linkedinProfile}
+                          onChange={(e) => handleSignupChange('linkedinProfile', e.target.value)}
+                          placeholder="https://linkedin.com/in/votre-profil"
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
                         />
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* Section Entreprise */}
-                <div className="border-b border-gray-200 pb-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">{t.company}</h3>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      {t.companyName} {t.optional}
-                    </label>
-                    <input
-                      type="text"
-                      value={signupData.companyName}
-                      onChange={(e) => handleSignupChange('companyName', e.target.value)}
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                    />
-                  </div>
+                    {/* Section Contact */}
+                    <div className="border-b border-gray-200 pb-6">
+                      <h4 className="text-md font-medium text-gray-900 mb-4">{t.contact}</h4>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.email} <span className="text-red-500">{t.required}</span>
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          value={signupData.email}
+                          onChange={(e) => handleSignupChange('email', e.target.value)}
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        />
+                      </div>
 
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700">
-                      {t.companyWebsite} {t.optional}
-                    </label>
-                    <input
-                      type="url"
-                      value={signupData.companyWebsite}
-                      onChange={(e) => handleSignupChange('companyWebsite', e.target.value)}
-                      placeholder="https://votre-entreprise.com"
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                    />
-                  </div>
+                      {/* Sélecteur de pays */}
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.country} <span className="text-red-500">{t.required}</span>
+                        </label>
+                        
+                        {countriesLoading ? (
+                          <div className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 bg-gray-50">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                              <span className="text-sm text-gray-600">{t.loadingCountries}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <select
+                            required
+                            value={signupData.country}
+                            onChange={(e) => handleSignupChange('country', e.target.value)}
+                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                          >
+                            <option value="">{t.selectCountry}</option>
+                            {countries.map((country) => (
+                              <option key={country.value} value={country.value}>
+                                {country.flag ? `${country.flag} ` : ''}{country.label} ({country.phoneCode})
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
 
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700">
-                      {t.companyLinkedin} {t.optional}
-                    </label>
-                    <input
-                      type="url"
-                      value={signupData.companyLinkedin}
-                      onChange={(e) => handleSignupChange('companyLinkedin', e.target.value)}
-                      placeholder="https://linkedin.com/company/votre-entreprise"
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                    />
-                  </div>
-                </div>
+                      {/* Téléphone optionnel */}
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {t.phoneNumber} {t.optional}
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">{t.countryCode}</label>
+                            <input
+                              type="text"
+                              placeholder="+1"
+                              value={signupData.countryCode}
+                              onChange={(e) => handleSignupChange('countryCode', e.target.value)}
+                              className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">{t.areaCode}</label>
+                            <input
+                              type="text"
+                              placeholder="514"
+                              value={signupData.areaCode}
+                              onChange={(e) => handleSignupChange('areaCode', e.target.value)}
+                              className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">{t.phoneNumber}</label>
+                            <input
+                              type="text"
+                              placeholder="1234567"
+                              value={signupData.phoneNumber}
+                              onChange={(e) => handleSignupChange('phoneNumber', e.target.value)}
+                              className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
 
-                {/* Section Mot de passe */}
-                <div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      {t.password} <span className="text-red-500">{t.required}</span>
-                    </label>
-                    <div className="mt-1">
-                      <PasswordInput
-                        value={signupData.password}
-                        onChange={(e) => handleSignupChange('password', e.target.value)}
-                        required
+                    {/* Section Entreprise */}
+                    <div className="border-b border-gray-200 pb-6">
+                      <h4 className="text-md font-medium text-gray-900 mb-4">{t.company}</h4>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.companyName} {t.optional}
+                        </label>
+                        <input
+                          type="text"
+                          value={signupData.companyName}
+                          onChange={(e) => handleSignupChange('companyName', e.target.value)}
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        />
+                      </div>
+
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.companyWebsite} {t.optional}
+                        </label>
+                        <input
+                          type="url"
+                          value={signupData.companyWebsite}
+                          onChange={(e) => handleSignupChange('companyWebsite', e.target.value)}
+                          placeholder="https://votre-entreprise.com"
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        />
+                      </div>
+
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.companyLinkedin} {t.optional}
+                        </label>
+                        <input
+                          type="url"
+                          value={signupData.companyLinkedin}
+                          onChange={(e) => handleSignupChange('companyLinkedin', e.target.value)}
+                          placeholder="https://linkedin.com/company/votre-entreprise"
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Section Mot de passe */}
+                    <div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.password} <span className="text-red-500">{t.required}</span>
+                        </label>
+                        <div className="mt-1">
+                          <PasswordInput
+                            value={signupData.password}
+                            onChange={(e) => handleSignupChange('password', e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.confirmPassword} <span className="text-red-500">{t.required}</span>
+                        </label>
+                        <div className="mt-1">
+                          <PasswordInput
+                            value={signupData.confirmPassword}
+                            onChange={(e) => handleSignupChange('confirmPassword', e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {/* Indicateur de correspondance des mots de passe */}
+                      <PasswordMatchIndicator 
+                        password={signupData.password} 
+                        confirmPassword={signupData.confirmPassword} 
                       />
                     </div>
                   </div>
+                </form>
+              </div>
 
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700">
-                      {t.confirmPassword} <span className="text-red-500">{t.required}</span>
-                    </label>
-                    <div className="mt-1">
-                      <PasswordInput
-                        value={signupData.confirmPassword}
-                        onChange={(e) => handleSignupChange('confirmPassword', e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {/* Indicateur de correspondance des mots de passe */}
-                  <PasswordMatchIndicator 
-                    password={signupData.password} 
-                    confirmPassword={signupData.confirmPassword} 
-                  />
-                </div>
-
-                <div>
+              {/* Footer de la modale avec boutons */}
+              <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 rounded-b-lg">
+                <div className="flex space-x-3">
                   <button
-                    type="submit"
+                    type="button"
+                    onClick={toggleMode}
+                    className="flex-1 rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  >
+                    {t.backToLogin}
+                  </button>
+                  <button
+                    onClick={handleSignup}
                     disabled={isLoading}
-                    className="flex w-full justify-center rounded-md border border-transparent bg-green-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 rounded-md border border-transparent bg-green-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isLoading ? t.creating : t.createAccount}
                   </button>
                 </div>
               </div>
-            </form>
-          )}
-
-          {/* Boutons de navigation */}
-          <div className="mt-6 text-center">
-            {!isSignupMode ? (
-              <div>
-                <p className="text-sm text-gray-600">
-                  {t.newToIntelia}{' '}
-                  <button
-                    onClick={toggleMode}
-                    className="font-medium text-blue-600 hover:text-blue-500"
-                  >
-                    {t.createAccount}
-                  </button>
-                </p>
-              </div>
-            ) : (
-              <div>
-                <p className="text-sm text-gray-600">
-                  {t.alreadyHaveAccount}{' '}
-                  <button
-                    onClick={toggleMode}
-                    className="font-medium text-blue-600 hover:text-blue-500"
-                  >
-                    {t.backToLogin}
-                  </button>
-                </p>
-              </div>
-            )}
+            </div>
           </div>
-
-          {/* Footer */}
-          <AuthFooter t={t} />
         </div>
-      </div>
-    </div>
+      )}
+    </>
   )
 }
 
