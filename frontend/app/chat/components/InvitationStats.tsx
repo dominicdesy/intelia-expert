@@ -1,18 +1,6 @@
 import React from 'react'
 
-// 🚀 NOUVEAU: Interface pour les réponses cache ultra-rapides
-interface CacheInvitationResponse {
-  cache_info: {
-    is_available: boolean
-    last_update: string | null
-    cache_age_minutes: number
-    performance_gain: string
-    next_update: string | null
-  }
-  invitation_stats: InvitationStats
-}
-
-// CONSERVATION INTÉGRALE: Interface existante
+// Interface pour les statistiques d'invitations
 interface InvitationStats {
   total_invitations_sent: number
   total_invitations_accepted: number
@@ -34,10 +22,9 @@ interface InvitationStats {
   }>
 }
 
-// 🚀 MODIFIÉE: Props avec support du cache
+// 🚀 Props avec support du cache ultra-rapide uniquement
 interface InvitationStatsProps {
   invitationStats: InvitationStats | null
-  // 🚀 NOUVEAU: Props optionnelles pour le cache
   cacheStatus?: {
     is_available: boolean
     last_update: string | null
@@ -46,25 +33,21 @@ interface InvitationStatsProps {
     next_update: string | null
   } | null
   isLoading?: boolean
-  useFastEndpoints?: boolean
 }
 
 export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
   invitationStats,
-  // 🚀 NOUVEAU: Propriétés cache avec valeurs par défaut
   cacheStatus = null,
-  isLoading = false,
-  useFastEndpoints = true
+  isLoading = false
 }) => {
-  // 🚀 NOUVEAU: Affichage spécial pendant le chargement avec indicateur de mode
+  
+  // Affichage pendant le chargement
   if (isLoading) {
     return (
       <div className="bg-white border border-gray-200 p-8 text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
         <p className="text-gray-600">Chargement des statistiques d'invitations...</p>
-        <p className="text-xs text-gray-400 mt-2">
-          {useFastEndpoints ? '⚡ Mode cache ultra-rapide' : '📦 Mode classique'}
-        </p>
+        <p className="text-xs text-gray-400 mt-2">⚡ Mode cache ultra-rapide</p>
       </div>
     )
   }
@@ -75,10 +58,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
         <div className="text-center text-gray-500">
           <div className="text-gray-400 text-2xl mb-2">📨</div>
           <p>Statistiques d'invitations non disponibles</p>
-          {/* 🚀 NOUVEAU: Information sur la tentative de cache */}
-          <p className="text-xs text-gray-400 mt-2">
-            Mode {useFastEndpoints ? 'cache ultra-rapide' : 'classique'} - Aucune donnée
-          </p>
+          <p className="text-xs text-gray-400 mt-2">Cache ultra-rapide - Aucune donnée</p>
         </div>
       </div>
     )
@@ -86,7 +66,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* 🚀 NOUVEAU: Header avec indicateur de performance cache */}
+      {/* 🚀 Header avec indicateur de performance cache */}
       {cacheStatus && cacheStatus.is_available && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
@@ -110,14 +90,12 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
         </div>
       )}
 
-      {/* KPIs Invitations - CONSERVATION INTÉGRALE Style Compass */}
+      {/* KPIs Invitations */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Total Invitations Envoyées */}
         <div className="bg-white border border-gray-200 p-4">
           <div>
             <p className="text-sm text-gray-600 mb-1">Invitations Envoyées</p>
             <p className="text-2xl font-semibold text-gray-900">{invitationStats.total_invitations_sent}</p>
-            {/* 🚀 NOUVEAU: Petit indicateur source des données */}
             {cacheStatus && (
               <p className="text-xs text-gray-400 mt-1">
                 {cacheStatus.is_available ? '⚡ Cache' : '📦 Direct'}
@@ -126,72 +104,59 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
           </div>
         </div>
 
-        {/* Total Invitations Acceptées */}
         <div className="bg-white border border-gray-200 p-4">
           <div>
             <p className="text-sm text-gray-600 mb-1">Invitations Acceptées</p>
             <p className="text-2xl font-semibold text-green-600">{invitationStats.total_invitations_accepted}</p>
-            {/* 🚀 NOUVEAU: Indicateur de fraîcheur des données */}
             {cacheStatus && cacheStatus.is_available && (
-              <p className="text-xs text-green-500 mt-1">
-                Données mises en cache
-              </p>
+              <p className="text-xs text-green-500 mt-1">Données mises en cache</p>
             )}
           </div>
         </div>
 
-        {/* Utilisateurs Inviteurs */}
         <div className="bg-white border border-gray-200 p-4">
           <div>
             <p className="text-sm text-gray-600 mb-1">Utilisateurs Inviteurs</p>
             <p className="text-2xl font-semibold text-gray-900">{invitationStats.unique_inviters}</p>
-            {/* 🚀 NOUVEAU: Affichage conditionnel du mode */}
             {!cacheStatus?.is_available && (
-              <p className="text-xs text-amber-500 mt-1">
-                Mode direct
-              </p>
+              <p className="text-xs text-amber-500 mt-1">Mode direct</p>
             )}
           </div>
         </div>
 
-        {/* Taux d'Acceptation Global */}
         <div className="bg-white border border-gray-200 p-4">
           <div>
             <p className="text-sm text-gray-600 mb-1">Taux d'Acceptation</p>
             <p className="text-2xl font-semibold text-blue-600">{invitationStats.acceptance_rate.toFixed(1)}%</p>
-            {/* 🚀 NOUVEAU: Performance gain si disponible */}
             {cacheStatus?.is_available && (
-              <p className="text-xs text-blue-500 mt-1">
-                ⚡ {cacheStatus.performance_gain}
-              </p>
+              <p className="text-xs text-blue-500 mt-1">⚡ {cacheStatus.performance_gain}</p>
             )}
           </div>
         </div>
       </div>
 
-      {/* 🚀 NOUVEAU: Section d'information sur les données (optionnelle) */}
+      {/* Section d'information sur les données (si cache indisponible) */}
       {cacheStatus && !cacheStatus.is_available && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-          <div className="flex items-center space-x-2 text-amber-800">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+          <div className="flex items-center space-x-2 text-red-800">
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
-            <span className="text-sm font-medium">Données chargées en mode direct</span>
-            <span className="text-xs bg-amber-200 text-amber-800 px-2 py-1 rounded">
-              Performances standard
+            <span className="text-sm font-medium">Cache indisponible - Données en temps réel</span>
+            <span className="text-xs bg-red-200 text-red-800 px-2 py-1 rounded">
+              Performance standard
             </span>
           </div>
         </div>
       )}
 
-      {/* Tables des Top Inviters - CONSERVATION INTÉGRALE */}
+      {/* Tables des Top Inviters */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Top 5 Inviteurs par Nombre d'Invitations - CODE ORIGINAL CONSERVÉ */}
+        {/* Top 5 Inviteurs par Nombre d'Invitations */}
         <div className="bg-white border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-medium text-gray-900">Top 5 - Invitations Envoyées</h3>
-              {/* 🚀 NOUVEAU: Badge de source des données */}
               {cacheStatus && (
                 <span className={`text-xs px-2 py-1 rounded ${
                   cacheStatus.is_available 
@@ -240,7 +205,6 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
                     <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
                       <div className="text-gray-400 text-2xl mb-2">📨</div>
                       <p>Aucun inviteur trouvé</p>
-                      {/* 🚀 NOUVEAU: Information sur le mode de chargement */}
                       {cacheStatus && (
                         <p className="text-xs text-gray-400 mt-1">
                           Mode {cacheStatus.is_available ? 'cache' : 'direct'} - Aucune donnée
@@ -254,16 +218,13 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
           </div>
         </div>
 
-        {/* Top 5 Inviteurs par Acceptations - CODE ORIGINAL CONSERVÉ */}
+        {/* Top 5 Inviteurs par Acceptations */}
         <div className="bg-white border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-medium text-gray-900">Top 5 - Invitations Acceptées</h3>
-              {/* 🚀 NOUVEAU: Indicateur de temps de mise à jour */}
               {cacheStatus && cacheStatus.is_available && (
-                <span className="text-xs text-green-600">
-                  ⏱️ {cacheStatus.cache_age_minutes}min
-                </span>
+                <span className="text-xs text-green-600">⏱️ {cacheStatus.cache_age_minutes}min</span>
               )}
             </div>
           </div>
@@ -304,7 +265,6 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
                     <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
                       <div className="text-gray-400 text-2xl mb-2">✅</div>
                       <p>Aucune invitation acceptée</p>
-                      {/* 🚀 NOUVEAU: Information contextuelle */}
                       {cacheStatus && (
                         <p className="text-xs text-gray-400 mt-1">
                           Données {cacheStatus.is_available ? 'en cache' : 'directes'} - Aucun résultat
@@ -319,12 +279,11 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
         </div>
       </div>
 
-      {/* Section de Performance Invitations - CONSERVATION INTÉGRALE avec améliorations cache */}
+      {/* Section de Performance Invitations */}
       <div className="bg-white border border-gray-200">
         <div className="px-4 py-3 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-medium text-gray-900">Performance des Invitations</h3>
-            {/* 🚀 NOUVEAU: Horodatage des données */}
             {cacheStatus && cacheStatus.last_update && (
               <div className="text-xs text-gray-500">
                 📅 Dernière MàJ: {new Date(cacheStatus.last_update).toLocaleString('fr-FR')}
@@ -337,7 +296,6 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
             <div className="text-center p-3 bg-white border border-gray-200 relative">
               <p className="text-lg font-semibold text-gray-900">{invitationStats.total_invitations_sent}</p>
               <p className="text-xs text-gray-600">Total Envoyées</p>
-              {/* 🚀 NOUVEAU: Badge de performance dans les coins */}
               {cacheStatus?.is_available && (
                 <div className="absolute top-1 right-1">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -373,13 +331,13 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
             </div>
           </div>
 
-          {/* 🚀 NOUVEAU: Section d'informations sur le cache détaillée */}
+          {/* Section d'informations sur le cache détaillée */}
           {cacheStatus && (
             <div className="mt-4 pt-4 border-t border-gray-200">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                 <div className="text-center">
                   <div className={`inline-flex items-center space-x-1 ${
-                    cacheStatus.is_available ? 'text-green-600' : 'text-amber-600'
+                    cacheStatus.is_available ? 'text-green-600' : 'text-red-600'
                   }`}>
                     {cacheStatus.is_available ? (
                       <>
@@ -388,23 +346,19 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
                       </>
                     ) : (
                       <>
-                        <div className="w-2 h-2 bg-amber-600 rounded-full"></div>
-                        <span className="font-medium">Mode Direct</span>
+                        <div className="w-2 h-2 bg-red-600 rounded-full"></div>
+                        <span className="font-medium">Cache Indisponible</span>
                       </>
                     )}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Source des données
-                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Source des données</p>
                 </div>
 
                 <div className="text-center">
                   <div className="font-medium text-blue-600">
                     {cacheStatus.is_available ? cacheStatus.performance_gain : 'Performance standard'}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Temps de chargement
-                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Temps de chargement</p>
                 </div>
 
                 <div className="text-center">
@@ -414,13 +368,11 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
                       minute: '2-digit'
                     }) : 'Automatique'}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Prochaine mise à jour
-                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Prochaine mise à jour</p>
                 </div>
               </div>
 
-              {/* 🚀 NOUVEAU: Barre de progression de la fraîcheur du cache */}
+              {/* Barre de progression de la fraîcheur du cache */}
               {cacheStatus.is_available && (
                 <div className="mt-3">
                   <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
@@ -446,7 +398,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
         </div>
       </div>
 
-      {/* 🚀 NOUVEAU: Section d'export améliorée avec informations cache */}
+      {/* Section d'export améliorée avec informations cache */}
       <div className="bg-white border border-gray-200">
         <div className="px-4 py-3 border-b border-gray-200">
           <div className="flex items-center justify-between">
@@ -461,7 +413,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
         <div className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
-            {/* Export CSV - Amélioré avec infos cache */}
+            {/* Export CSV */}
             <div className="bg-white border border-gray-200 p-4 flex flex-col justify-between h-full">
               <div>
                 <h4 className="text-base font-medium text-gray-900 mb-1">Export CSV Complet</h4>
@@ -476,14 +428,13 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
               </div>
               <button
                 onClick={() => {
-                  // Données détaillées pour l'export CSV
                   const csvData = [
                     ['Métrique', 'Valeur', 'Source', 'Timestamp'],
                     ['Total Invitations Envoyées', invitationStats.total_invitations_sent, cacheStatus?.is_available ? 'Cache' : 'Direct', new Date().toISOString()],
                     ['Total Invitations Acceptées', invitationStats.total_invitations_accepted, cacheStatus?.is_available ? 'Cache' : 'Direct', new Date().toISOString()],
                     ['Taux d\'Acceptation Global', `${invitationStats.acceptance_rate.toFixed(1)}%`, cacheStatus?.is_available ? 'Cache' : 'Direct', new Date().toISOString()],
                     ['Nombre d\'Inviteurs Uniques', invitationStats.unique_inviters, cacheStatus?.is_available ? 'Cache' : 'Direct', new Date().toISOString()],
-                    ['', '', '', ''], // Séparateur
+                    ['', '', '', ''],
                     ['Top Inviteurs (Envoyées)', '', '', ''],
                     ...invitationStats.top_inviters.map(inviter => [
                       inviter.inviter_name || inviter.inviter_email,
@@ -491,7 +442,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
                       inviter.invitations_accepted,
                       `${inviter.acceptance_rate.toFixed(1)}%`
                     ]),
-                    ['', '', '', ''], // Séparateur
+                    ['', '', '', ''],
                     ['Top Inviteurs (Acceptées)', '', '', ''],
                     ...invitationStats.top_accepted.map(inviter => [
                       inviter.inviter_name || inviter.inviter_email,
@@ -523,7 +474,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
               </button>
             </div>
 
-            {/* Export JSON - Amélioré avec métadonnées cache */}
+            {/* Export JSON */}
             <div className="bg-white border border-gray-200 p-4 flex flex-col justify-between h-full">
               <div>
                 <h4 className="text-base font-medium text-gray-900 mb-1">Export JSON Détaillé</h4>

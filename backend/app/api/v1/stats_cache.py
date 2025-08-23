@@ -5,17 +5,31 @@
 Tables de cache SQL + Gestionnaire pour performances ultra-rapides
 SAFE: N'interfère pas avec logging.py et billing.py existants
 ✨ NOUVEAU: Migration automatique des colonnes feedback (Digital Ocean compatible)
+🔧 CORRECTIF: Sérialisation JSON sécurisée pour les objets Decimal de PostgreSQL
 """
 
 import json
 import logging
 import os
+import decimal
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
 logger = logging.getLogger(__name__)
+
+# ✅ CORRECTIF CRITIQUE: Converter pour sérialisation JSON sécurisée
+def decimal_safe_json_encoder(obj):
+    """
+    Converter JSON pour gérer les types Decimal de PostgreSQL
+    Résout l'erreur: "Object of type Decimal is not JSON serializable"
+    """
+    if isinstance(obj, decimal.Decimal):
+        # Convertir Decimal en float pour JSON
+        return float(obj)
+    # Pour d'autres types non-sérialisables, lever TypeError
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 class StatisticsCache:
     """
@@ -24,6 +38,7 @@ class StatisticsCache:
     - TTL automatique 
     - Gestion des erreurs et fallbacks
     - Migration automatique des colonnes feedback
+    - Sérialisation JSON sécurisée pour les objets Decimal
     """
     
     def __init__(self, dsn: str = None):
@@ -389,10 +404,10 @@ class StatisticsCache:
             logger.warning(f"⚠️ Erreur création index (non-critique): {idx_error}")
             # Ne pas lever d'exception - les tables fonctionnent sans index
 
-    # ==================== MÉTHODES GÉNÉRIQUES (CONSERVÉES INTÉGRALEMENT) ====================
+    # ==================== MÉTHODES GÉNÉRIQUES (CORRIGÉES POUR DECIMAL) ====================
     
     def set_cache(self, key: str, data: Any, ttl_hours: int = 1, source: str = "computed") -> bool:
-        """Stocke des données dans le cache générique"""
+        """Stocke des données dans le cache générique - ✅ CORRIGÉ POUR DECIMAL"""
         try:
             expires_at = datetime.now() + timedelta(hours=ttl_hours)
             
@@ -407,7 +422,8 @@ class StatisticsCache:
                             expires_at = EXCLUDED.expires_at,
                             source = EXCLUDED.source,
                             updated_at = CURRENT_TIMESTAMP
-                    """, (key, json.dumps(data), expires_at, source))
+                    """, (key, json.dumps(data, default=decimal_safe_json_encoder), expires_at, source))
+                    #              ↑↑↑ CORRECTIF APPLIQUÉ ↑↑↑
                     conn.commit()
                     
             logger.info(f"✅ Cache SET: {key} (TTL: {ttl_hours}h)")
@@ -485,10 +501,10 @@ class StatisticsCache:
             logger.error(f"❌ Erreur invalidation cache: {e}")
             return 0
 
-    # ==================== MÉTHODES SPÉCIALISÉES (CONSERVÉES INTÉGRALEMENT) ====================
+    # ==================== MÉTHODES SPÉCIALISÉES (CORRIGÉES POUR DECIMAL) ====================
     
     def set_dashboard_snapshot(self, stats: Dict[str, Any], period_hours: int = 24) -> bool:
-        """Stocke un snapshot complet du dashboard"""
+        """Stocke un snapshot complet du dashboard - ✅ CORRIGÉ POUR DECIMAL"""
         try:
             now = datetime.now()
             period_start = now - timedelta(hours=period_hours)
@@ -525,11 +541,12 @@ class StatisticsCache:
                         stats.get('median_response_time', 0),
                         stats.get('error_rate', 0),
                         stats.get('system_health', 'healthy'),
-                        json.dumps(stats.get('source_distribution', {})),
-                        json.dumps(stats.get('plan_distribution', {})),
-                        json.dumps(stats.get('feedback_stats', {})),
-                        json.dumps(stats.get('top_users', [])),
-                        json.dumps(stats.get('top_inviters', [])),
+                        # ✅ CORRECTIFS APPLIQUÉS: decimal_safe_json_encoder
+                        json.dumps(stats.get('source_distribution', {}), default=decimal_safe_json_encoder),
+                        json.dumps(stats.get('plan_distribution', {}), default=decimal_safe_json_encoder),
+                        json.dumps(stats.get('feedback_stats', {}), default=decimal_safe_json_encoder),
+                        json.dumps(stats.get('top_users', []), default=decimal_safe_json_encoder),
+                        json.dumps(stats.get('top_inviters', []), default=decimal_safe_json_encoder),
                         period_start,
                         now
                     ))
@@ -581,7 +598,7 @@ class StatisticsCache:
             return None
 
     def set_openai_costs(self, start_date: str, end_date: str, period_type: str, costs_data: Dict[str, Any]) -> bool:
-        """Cache les coûts OpenAI"""
+        """Cache les coûts OpenAI - ✅ CORRIGÉ POUR DECIMAL"""
         try:
             with psycopg2.connect(self.dsn) as conn:
                 with conn.cursor() as cur:
@@ -610,13 +627,14 @@ class StatisticsCache:
                         costs_data.get('total_cost', 0),
                         costs_data.get('total_tokens', 0),
                         costs_data.get('api_calls', 0),
-                        json.dumps(costs_data.get('models_usage', {})),
-                        json.dumps(costs_data.get('daily_breakdown', {})),
-                        json.dumps(costs_data.get('cost_by_purpose', {})),
+                        # ✅ CORRECTIFS APPLIQUÉS: decimal_safe_json_encoder
+                        json.dumps(costs_data.get('models_usage', {}), default=decimal_safe_json_encoder),
+                        json.dumps(costs_data.get('daily_breakdown', {}), default=decimal_safe_json_encoder),
+                        json.dumps(costs_data.get('cost_by_purpose', {}), default=decimal_safe_json_encoder),
                         costs_data.get('data_source', 'openai_api'),
                         costs_data.get('api_calls_made', 0),
                         costs_data.get('cached_days', 0),
-                        json.dumps(costs_data.get('errors', []))
+                        json.dumps(costs_data.get('errors', []), default=decimal_safe_json_encoder)
                     ))
                     conn.commit()
                     
@@ -728,6 +746,7 @@ class StatisticsCache:
                     # ✨ NOUVEAU: Statut migration feedback
                     stats['migration_status'] = {
                         'feedback_columns_migrated': self._migration_feedback_success,
+                        'decimal_serialization_fixed': True,  # ✅ NOUVEAU FLAG
                         'timestamp': datetime.now().isoformat()
                     }
                     
@@ -778,6 +797,7 @@ def force_cache_refresh() -> Dict[str, Any]:
             "cache_invalidated": invalidated,
             "entries_cleaned": cleaned,
             "migration_status": cache._migration_feedback_success,
+            "decimal_fix_applied": True,  # ✅ NOUVEAU FLAG
             "timestamp": datetime.now().isoformat()
         }
         
