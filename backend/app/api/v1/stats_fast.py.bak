@@ -16,7 +16,7 @@ from app.api.v1.stats_cache import get_stats_cache
 # Import des permissions depuis logging.py (SAFE)
 from app.api.v1.logging import has_permission, Permission
 
-router = APIRouter(tags=["statistics-fast"])
+router = APIRouter(prefix="/stats-fast", tags=["statistics-fast"])
 logger = logging.getLogger(__name__)
 
 # ==================== ENDPOINTS DASHBOARD ====================
