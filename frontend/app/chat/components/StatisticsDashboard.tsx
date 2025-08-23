@@ -1,21 +1,6 @@
 import React from 'react'
 
-// 🚀 NOUVEAU: Interface pour les réponses cache ultra-rapides
-interface CacheDashboardResponse {
-  cache_info: {
-    is_available: boolean
-    last_update: string | null
-    cache_age_minutes: number
-    performance_gain: string
-    next_update: string | null
-  }
-  system_stats: SystemStats
-  usage_stats: UsageStats
-  billing_stats: BillingStats
-  performance_stats: PerformanceStats
-}
-
-// CONSERVATION INTÉGRALE: Interfaces existantes
+// Interfaces pour les données de statistiques
 interface SystemStats {
   system_health: {
     uptime_hours: number
@@ -76,13 +61,12 @@ interface PerformanceStats {
   cache_hit_rate: number
 }
 
-// 🚀 MODIFIÉE: Props avec support du cache
+// 🚀 Props avec support du cache ultra-rapide uniquement
 interface StatisticsDashboardProps {
   systemStats: SystemStats | null
   usageStats: UsageStats | null
   billingStats: BillingStats | null
   performanceStats: PerformanceStats | null
-  // 🚀 NOUVEAU: Props optionnelles pour le cache
   cacheStatus?: {
     is_available: boolean
     last_update: string | null
@@ -91,7 +75,6 @@ interface StatisticsDashboardProps {
     next_update: string | null
   } | null
   isLoading?: boolean
-  useFastEndpoints?: boolean
 }
 
 export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
@@ -99,22 +82,18 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
   usageStats,
   billingStats,
   performanceStats,
-  // 🚀 NOUVEAU: Propriétés cache avec valeurs par défaut
   cacheStatus = null,
-  isLoading = false,
-  useFastEndpoints = true
+  isLoading = false
 }) => {
   
-  // 🚀 NOUVEAU: Indicateur de chargement amélioré
+  // Indicateur de chargement amélioré
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Chargement du tableau de bord...</p>
-          <p className="text-sm text-gray-400 mt-2">
-            {useFastEndpoints ? '⚡ Mode cache ultra-rapide' : '📦 Mode classique'}
-          </p>
+          <p className="text-sm text-gray-400 mt-2">⚡ Mode cache ultra-rapide</p>
         </div>
       </div>
     )
@@ -122,7 +101,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
 
   return (
     <>
-      {/* 🚀 NOUVEAU: Header avec informations de performance cache */}
+      {/* 🚀 Header avec informations de performance cache */}
       {cacheStatus && cacheStatus.is_available && (
         <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4 mb-6">
           <div className="flex items-center justify-between">
@@ -152,14 +131,31 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
         </div>
       )}
 
-      {/* KPIs Row - CONSERVATION INTÉGRALE EXACT Compass Style - AVEC indicateurs cache */}
+      {/* Alerte si cache indisponible */}
+      {cacheStatus && !cacheStatus.is_available && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <div className="flex items-center space-x-3">
+            <div className="w-3 h-3 bg-red-600 rounded-full"></div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-red-900">❌ Cache Ultra-Rapide Indisponible</h3>
+              <p className="text-sm text-red-700 mt-1">
+                Les données sont chargées en mode dégradé. Les performances peuvent être réduites.
+              </p>
+            </div>
+            <div className="bg-white bg-opacity-80 px-3 py-1 rounded-full">
+              <span className="text-sm font-medium text-red-800">Mode de secours</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* KPIs Row - AVEC indicateurs cache */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {/* Utilisateurs Actifs - AVEC badge cache */}
+        {/* Utilisateurs Actifs */}
         <div className="bg-white border border-gray-200 p-4 relative">
           <div>
             <p className="text-sm text-gray-600 mb-1">Utilisateurs Actifs</p>
             <p className="text-2xl font-semibold text-gray-900">{usageStats?.unique_users || 0}</p>
-            {/* 🚀 NOUVEAU: Badge cache dans le coin */}
             {cacheStatus?.is_available && (
               <div className="absolute top-2 right-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full" title="Données en cache"></div>
@@ -168,7 +164,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
           </div>
         </div>
 
-        {/* Questions ce mois - AVEC indicateur de fraîcheur */}
+        {/* Questions ce mois */}
         <div className="bg-white border border-gray-200 p-4 relative">
           <div>
             <p className="text-sm text-gray-600 mb-1">Questions ce mois</p>
@@ -184,7 +180,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
           </div>
         </div>
 
-        {/* Revenus Totaux - AVEC performance */}
+        {/* Revenus Totaux */}
         <div className="bg-white border border-gray-200 p-4 relative">
           <div>
             <p className="text-sm text-gray-600 mb-1">Revenus Totaux</p>
@@ -200,7 +196,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
           </div>
         </div>
 
-        {/* Temps de Réponse - AVEC source */}
+        {/* Temps de Réponse */}
         <div className="bg-white border border-gray-200 p-4 relative">
           <div>
             <p className="text-sm text-gray-600 mb-1">Temps de Réponse</p>
@@ -209,13 +205,13 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
               <>
                 <div className="absolute top-2 right-2">
                   <div className={`w-2 h-2 rounded-full ${
-                    cacheStatus.is_available ? 'bg-green-500' : 'bg-amber-500'
+                    cacheStatus.is_available ? 'bg-green-500' : 'bg-red-500'
                   }`}></div>
                 </div>
                 <p className={`text-xs mt-1 ${
-                  cacheStatus.is_available ? 'text-green-600' : 'text-amber-600'
+                  cacheStatus.is_available ? 'text-green-600' : 'text-red-600'
                 }`}>
-                  {cacheStatus.is_available ? '⚡ Cache' : '📦 Direct'}
+                  {cacheStatus.is_available ? '⚡ Cache' : '❌ Cache indisponible'}
                 </p>
               </>
             ) : (
@@ -225,21 +221,20 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
         </div>
       </div>
 
-      {/* Main Content Grid - CONSERVATION INTÉGRALE Style Compass avec layout exact */}
+      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        {/* Sources des Réponses - AVEC indicateurs cache Table style Compass */}
+        {/* Sources des Réponses - AVEC indicateurs cache */}
         <div className="bg-white border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-medium text-gray-900">Sources des Réponses</h3>
-              {/* 🚀 NOUVEAU: Indicateur de source des données */}
               {cacheStatus && (
                 <span className={`text-xs px-2 py-1 rounded ${
                   cacheStatus.is_available 
                     ? 'bg-green-100 text-green-800' 
-                    : 'bg-amber-100 text-amber-800'
+                    : 'bg-red-100 text-red-800'
                 }`}>
-                  {cacheStatus.is_available ? '⚡ Cache' : '📦 Direct'}
+                  {cacheStatus.is_available ? '⚡ Cache' : '❌ Cache indisponible'}
                 </span>
               )}
             </div>
@@ -288,7 +283,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
               })}
             </div>
 
-            {/* 🚀 NOUVEAU: Footer avec informations de cache */}
+            {/* Footer avec informations de cache */}
             {cacheStatus && cacheStatus.is_available && (
               <div className="mt-4 pt-3 border-t border-gray-100">
                 <div className="flex items-center justify-between text-xs text-green-600">
@@ -302,19 +297,18 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
           </div>
         </div>
 
-        {/* Santé du Système - CONSERVATION INTÉGRALE Style Compass exact AVEC cache */}
+        {/* Santé du Système - AVEC cache */}
         <div className="bg-white border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-medium text-gray-900">Santé du Système</h3>
-              {/* 🚀 NOUVEAU: Indicateur temps réel vs cache */}
               {cacheStatus && (
                 <div className="flex items-center space-x-2">
                   <div className={`w-2 h-2 rounded-full ${
-                    cacheStatus.is_available ? 'bg-green-500 animate-pulse' : 'bg-gray-500'
+                    cacheStatus.is_available ? 'bg-green-500 animate-pulse' : 'bg-red-500'
                   }`}></div>
                   <span className="text-xs text-gray-600">
-                    {cacheStatus.is_available ? 'Cache' : 'Temps réel'}
+                    {cacheStatus.is_available ? 'Cache' : 'Cache indisponible'}
                   </span>
                 </div>
               )}
@@ -342,7 +336,6 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
                   <span className="text-sm font-medium text-green-600">
                     {performanceStats?.cache_hit_rate?.toFixed(1) || '0.0'}%
                   </span>
-                  {/* 🚀 NOUVEAU: Indicateur de performance cache système */}
                   {cacheStatus?.is_available && (
                     <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">
                       Ultra-rapide
@@ -365,7 +358,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
                 </div>
               </div>
 
-              {/* 🚀 NOUVEAU: Section de performance du cache système */}
+              {/* Section de performance du cache système */}
               {cacheStatus && (
                 <div className="pt-3 border-t border-gray-200">
                   <p className="text-sm font-medium text-gray-900 mb-2">Performance Cache</p>
@@ -373,9 +366,9 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
                     <div className="flex justify-between items-center">
                       <span className="text-xs text-gray-600">Statut</span>
                       <span className={`text-xs px-2 py-1 ${
-                        cacheStatus.is_available ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+                        cacheStatus.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                       }`}>
-                        {cacheStatus.is_available ? 'Actif' : 'Inactif'}
+                        {cacheStatus.is_available ? 'Actif' : 'Indisponible'}
                       </span>
                     </div>
                     {cacheStatus.is_available && (
@@ -406,14 +399,13 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
         </div>
       </div>
 
-      {/* Tables Section - CONSERVATION INTÉGRALE Style Compass exact comme dans les images */}
+      {/* Tables Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        {/* Top Users Table - CONSERVATION INTÉGRALE Style exact Compass AVEC cache */}
+        {/* Top Users Table - AVEC cache */}
         <div className="bg-white border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-medium text-gray-900">Utilisateurs les Plus Actifs</h3>
-              {/* 🚀 NOUVEAU: Métadonnées de cache */}
               {cacheStatus && cacheStatus.is_available && (
                 <div className="text-xs text-green-600 flex items-center space-x-2">
                   <div className="w-1.5 h-1.5 bg-green-600 rounded-full"></div>
@@ -470,12 +462,11 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
           </div>
         </div>
 
-        {/* Plans Distribution - CONSERVATION INTÉGRALE Style exact Compass AVEC cache */}
+        {/* Plans Distribution - AVEC cache */}
         <div className="bg-white border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-medium text-gray-900">Répartition des Plans</h3>
-              {/* 🚀 NOUVEAU: Indicateur de performance */}
               {cacheStatus && cacheStatus.is_available && (
                 <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
                   {cacheStatus.performance_gain}
@@ -499,16 +490,16 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
               ))}
             </div>
 
-            {/* 🚀 NOUVEAU: Information sur la source des données plans */}
+            {/* Information sur la source des données plans */}
             {cacheStatus && (
               <div className="mt-4 pt-3 border-t border-gray-200">
                 <div className="flex items-center justify-between text-xs">
                   <span className={`${
-                    cacheStatus.is_available ? 'text-green-600' : 'text-amber-600'
+                    cacheStatus.is_available ? 'text-green-600' : 'text-red-600'
                   }`}>
                     {cacheStatus.is_available ? 
                       '⚡ Données optimisées par cache' : 
-                      '📦 Données en temps réel'
+                      '❌ Cache indisponible - Mode dégradé'
                     }
                   </span>
                   {cacheStatus.is_available && (
@@ -525,12 +516,11 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
         </div>
       </div>
 
-      {/* Costs Section - CONSERVATION INTÉGRALE Style Compass exact avec fond blanc et POLICE NOIRE AVEC cache */}
+      {/* Costs Section - AVEC cache */}
       <div className="bg-white border border-gray-200">
         <div className="px-4 py-3 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-medium text-gray-900">Coûts et Performance</h3>
-            {/* 🚀 NOUVEAU: Statut global du cache */}
             {cacheStatus && (
               <div className="flex items-center space-x-3">
                 {cacheStatus.is_available ? (
@@ -544,9 +534,9 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
                     </span>
                   </>
                 ) : (
-                  <div className="flex items-center space-x-1 text-amber-600">
-                    <div className="w-2 h-2 bg-amber-600 rounded-full"></div>
-                    <span className="text-sm font-medium">Mode Standard</span>
+                  <div className="flex items-center space-x-1 text-red-600">
+                    <div className="w-2 h-2 bg-red-600 rounded-full"></div>
+                    <span className="text-sm font-medium">Cache Indisponible</span>
                   </div>
                 )}
               </div>
@@ -555,7 +545,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
         </div>
         <div className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Coûts OpenAI - AVEC indicateur cache */}
+            {/* Coûts OpenAI */}
             <div className="text-center p-3 bg-white border border-gray-200 relative">
               <p className="text-lg font-semibold text-gray-900">${performanceStats?.openai_costs?.toFixed(2) || '0.00'}</p>
               <p className="text-xs text-gray-600">Coûts OpenAI</p>
@@ -566,7 +556,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
               )}
             </div>
 
-            {/* Erreurs - AVEC indicateur cache */}
+            {/* Erreurs */}
             <div className="text-center p-3 bg-white border border-gray-200 relative">
               <p className="text-lg font-semibold text-gray-900">{performanceStats?.error_count || 0}</p>
               <p className="text-xs text-gray-600">Erreurs</p>
@@ -577,7 +567,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
               )}
             </div>
 
-            {/* Requêtes Totales - AVEC indicateur cache */}
+            {/* Requêtes Totales */}
             <div className="text-center p-3 bg-white border border-gray-200 relative">
               <p className="text-lg font-semibold text-gray-900">{systemStats?.system_health?.total_requests || 0}</p>
               <p className="text-xs text-gray-600">Requêtes Totales</p>
@@ -588,7 +578,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
               )}
             </div>
 
-            {/* Questions Aujourd'hui - AVEC indicateur cache */}
+            {/* Questions Aujourd'hui */}
             <div className="text-center p-3 bg-white border border-gray-200 relative">
               <p className="text-lg font-semibold text-gray-900">{usageStats?.questions_today || 0}</p>
               <p className="text-xs text-gray-600">Questions Aujourd'hui</p>
@@ -600,26 +590,36 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
             </div>
           </div>
 
-          {/* 🚀 NOUVEAU: Section détaillée de métriques de cache */}
+          {/* Section détaillée de métriques de cache */}
           {cacheStatus && (
             <div className="mt-6 pt-4 border-t border-gray-200">
               <h4 className="text-sm font-medium text-gray-900 mb-3">Métriques de Performance Cache</h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 
-                <div className="bg-gradient-to-br from-green-50 to-green-100 p-3 rounded-lg border border-green-200">
+                <div className={`${
+                  cacheStatus.is_available 
+                    ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-200' 
+                    : 'bg-gradient-to-br from-red-50 to-red-100 border-red-200'
+                } p-3 rounded-lg border`}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-green-800">Statut Cache</span>
+                    <span className={`text-sm font-medium ${
+                      cacheStatus.is_available ? 'text-green-800' : 'text-red-800'
+                    }`}>Statut Cache</span>
                     <div className={`w-2 h-2 rounded-full ${
                       cacheStatus.is_available ? 'bg-green-600 animate-pulse' : 'bg-red-600'
                     }`}></div>
                   </div>
-                  <p className="text-lg font-semibold text-green-900">
-                    {cacheStatus.is_available ? 'Actif' : 'Inactif'}
+                  <p className={`text-lg font-semibold ${
+                    cacheStatus.is_available ? 'text-green-900' : 'text-red-900'
+                  }`}>
+                    {cacheStatus.is_available ? 'Actif' : 'Indisponible'}
                   </p>
-                  <p className="text-xs text-green-700 mt-1">
+                  <p className={`text-xs mt-1 ${
+                    cacheStatus.is_available ? 'text-green-700' : 'text-red-700'
+                  }`}>
                     {cacheStatus.is_available ? 
                       'Données ultra-rapides disponibles' : 
-                      'Utilisation des endpoints directs'
+                      'Utilisation du mode de secours'
                     }
                   </p>
                 </div>
@@ -664,7 +664,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
 
               </div>
 
-              {/* 🚀 NOUVEAU: Barre de progression de fraîcheur du cache */}
+              {/* Barre de progression de fraîcheur du cache */}
               {cacheStatus.is_available && (
                 <div className="mt-4">
                   <div className="flex items-center justify-between text-xs text-gray-600 mb-1">

@@ -1,32 +1,6 @@
 import React from 'react'
-// 🚀 CONSERVATION INTÉGRALE - Analyse détaillée des images - Style EXACT Compass
 
-// 🚀 NOUVEAU: Interface pour les réponses cache ultra-rapides
-interface CacheQuestionResponse {
-  cache_info: {
-    is_available: boolean
-    last_update: string | null
-    cache_age_minutes: number
-    performance_gain: string
-    next_update: string | null
-  }
-  questions: QuestionLog[]
-  pagination: {
-    page: number
-    limit: number
-    total: number
-    pages: number
-    has_next?: boolean
-    has_prev?: boolean
-  }
-  meta?: {
-    retrieved: number
-    user_role: string
-    timestamp: string
-  }
-}
-
-// CONSERVATION INTÉGRALE: Types existants
+// Types pour les données
 interface QuestionLog {
   id: string
   timestamp: string
@@ -43,7 +17,7 @@ interface QuestionLog {
   feedback_comment: string | null
 }
 
-// CONSERVATION INTÉGRALE: Props du composant
+// Props du composant
 interface QuestionsTabProps {
   questionLogs: QuestionLog[]
   questionFilters: {
@@ -68,17 +42,15 @@ interface QuestionsTabProps {
   setSelectedQuestion: React.Dispatch<React.SetStateAction<QuestionLog | null>>
   isLoading?: boolean
   totalQuestions?: number
-  // 🚀 NOUVEAU: Props optionnelles pour le cache
   cacheStatus?: {
     is_available: boolean
     last_update: string | null
     cache_age_minutes: number
     performance_gain: string
   } | null
-  useFastEndpoints?: boolean
 }
 
-// CONSERVATION INTÉGRALE: Interface pour l'export CSV
+// Interface pour l'export CSV
 interface ConversationExport {
   session_id: string
   user_email: string
@@ -107,12 +79,10 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
   setSelectedQuestion,
   isLoading = false,
   totalQuestions = 0,
-  // 🚀 NOUVEAU: Propriétés cache avec valeurs par défaut
-  cacheStatus = null,
-  useFastEndpoints = true
+  cacheStatus = null
 }) => {
   
-  // 🎨 Fonctions utilitaires pour le styling - CONSERVATION INTÉGRALE EXACT Compass
+  // Fonctions utilitaires pour le styling
   const getConfidenceColor = (score: number) => {
     if (score >= 0.9) return 'text-green-600 bg-green-100'
     if (score >= 0.7) return 'text-yellow-600 bg-yellow-100'  
@@ -147,7 +117,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
     return '❓'
   }
 
-  // 🚀 FONCTION CSV AVANCÉE - CONVERSATIONS EN LIGNES (CONSERVATION INTÉGRALE)
+  // Fonction CSV avancée - Conversations en lignes
   const groupQuestionsByConversation = (questions: QuestionLog[]): ConversationExport[] => {
     const conversationMap = new Map<string, QuestionLog[]>()
     
@@ -187,7 +157,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
     return conversations
   }
 
-  // 🚀 EXPORT CSV CONVERSATIONS avec choix de scope (CONSERVATION INTÉGRALE)
+  // Export CSV Conversations avec choix de scope
   const exportConversationsToCSV = () => {
     try {
       const shouldExportAll = window.confirm(
@@ -320,7 +290,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
     }
   }
 
-  // 🔍 Filtrage côté client - CONSERVATION INTÉGRALE
+  // Filtrage côté client
   const filteredQuestions = questionLogs.filter(q => {
     if (questionFilters.search && !q.question.toLowerCase().includes(questionFilters.search.toLowerCase()) && 
         !q.response.toLowerCase().includes(questionFilters.search.toLowerCase()) &&
@@ -345,7 +315,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
     return true
   })
 
-  // 📊 Calculs statistiques - CONSERVATION INTÉGRALE
+  // Calculs statistiques
   const uniqueUsers = Array.from(new Set(questionLogs.map(q => q.user_email)))
   const feedbackStats = {
     total: questionLogs.filter(q => q.feedback !== null).length,
@@ -362,16 +332,14 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
     return acc
   }, {} as Record<string, number>)
 
-  // 🚀 NOUVEAU: Affichage spécial si les données viennent du cache
+  // Affichage spécial si chargement
   if (isLoading && questionLogs.length === 0) {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Chargement des questions...</p>
-          <p className="text-sm text-gray-400 mt-2">
-            {useFastEndpoints ? '⚡ Mode cache ultra-rapide' : '📦 Mode classique'}
-          </p>
+          <p className="text-sm text-gray-400 mt-2">⚡ Mode cache ultra-rapide</p>
         </div>
       </div>
     )
@@ -379,7 +347,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* 🚀 NOUVEAU: Header avec indicateur de cache - STYLE COMPASS AMÉLIORÉ */}
+      {/* 🚀 Header avec indicateur de cache */}
       <div className="bg-white border-b border-gray-200">
         <div className="flex items-center space-x-8 px-4 py-3">
           <div className="flex items-center space-x-2">
@@ -389,7 +357,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
             <h2 className="text-lg font-medium text-gray-900">Questions & Réponses</h2>
           </div>
           
-          {/* 🚀 NOUVEAU: Indicateur de cache */}
+          {/* Indicateur de cache */}
           {cacheStatus && cacheStatus.is_available && (
             <div className="flex items-center space-x-2 text-green-600">
               <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></div>
@@ -403,14 +371,12 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
           {isLoading && (
             <div className="flex items-center text-blue-600 ml-auto">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-              <span className="text-sm">
-                {useFastEndpoints ? '⚡ Chargement ultra-rapide...' : 'Actualisation...'}
-              </span>
+              <span className="text-sm">⚡ Chargement ultra-rapide...</span>
             </div>
           )}
         </div>
         
-        {/* 🚀 NOUVEAU: Barre d'information cache détaillée */}
+        {/* Barre d'information cache détaillée */}
         {cacheStatus && cacheStatus.is_available && (
           <div className="bg-blue-50 border-t border-blue-200 px-4 py-2">
             <div className="flex items-center justify-between text-xs">
@@ -418,15 +384,13 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                 <span>📅 Cache mis à jour: {cacheStatus.last_update ? new Date(cacheStatus.last_update).toLocaleString('fr-FR') : 'N/A'}</span>
                 <span>⏱️ Âge: {cacheStatus.cache_age_minutes} minutes</span>
               </div>
-              <div className="text-blue-600 font-medium">
-                🚀 Performance optimisée
-              </div>
+              <div className="text-blue-600 font-medium">🚀 Performance optimisée</div>
             </div>
           </div>
         )}
       </div>
 
-      {/* 🔧 Filtres - CONSERVATION INTÉGRALE Style Compass condensé */}
+      {/* Filtres */}
       <div className="bg-white border border-gray-200">
         <div className="px-4 py-3 border-b border-gray-200">
           <h3 className="text-base font-medium text-gray-900">Filtres</h3>
@@ -536,14 +500,14 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                   Filtré
                 </span>
               )}
-              {/* 🚀 NOUVEAU: Indicateur source des données */}
+              {/* Indicateur source des données */}
               {cacheStatus && (
                 <span className={`inline-flex items-center px-2 py-1 text-xs font-medium ${
                   cacheStatus.is_available 
                     ? 'bg-green-100 text-green-800' 
-                    : 'bg-amber-100 text-amber-800'
+                    : 'bg-red-100 text-red-800'
                 }`}>
-                  {cacheStatus.is_available ? '⚡ Cache' : '📦 Direct'}
+                  {cacheStatus.is_available ? '⚡ Cache' : '❌ Cache indisponible'}
                 </span>
               )}
             </div>
@@ -566,9 +530,9 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
         </div>
       </div>
 
-      {/* 📈 Analyse côte à côte - CONSERVATION INTÉGRALE Style Compass exact */}
+      {/* Analyse côte à côte */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Feedback Analysis - CODE ORIGINAL CONSERVÉ */}
+        {/* Feedback Analysis */}
         <div className="bg-white border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200">
             <h3 className="text-base font-medium text-gray-900">Analyse des Commentaires</h3>
@@ -602,7 +566,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
               </div>
             </div>
 
-            {/* Barre de progression - Style Compass */}
+            {/* Barre de progression */}
             <div className="w-full bg-gray-200 h-2 mb-4">
               <div 
                 className={`h-2 transition-all duration-300 ${
@@ -613,7 +577,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
               ></div>
             </div>
 
-            {/* Commentaires récents - CODE ORIGINAL CONSERVÉ */}
+            {/* Commentaires récents */}
             <div className="border-t border-gray-200 pt-3">
               <h4 className="text-sm font-medium text-gray-800 mb-2">Commentaires Récents</h4>
               <div className="space-y-2 max-h-32 overflow-y-auto">
@@ -627,6 +591,52 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                         <span className="text-xs text-gray-500">{question.user_email}</span>
                         <span className="text-sm">{getFeedbackIcon(question.feedback)}</span>
                       </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Pagination */}
+        {filteredQuestions.length > 0 && (
+          <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 border border-gray-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white transition-colors"
+              >
+                ← Précédent
+              </button>
+              <span className="text-sm text-gray-600 px-2 py-1 bg-white border border-gray-300">
+                Page {currentPage}
+              </span>
+              <button
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={filteredQuestions.length < questionsPerPage}
+                className="px-3 py-1 border border-gray-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white transition-colors"
+              >
+                Suivant →
+              </button>
+            </div>
+            <div className="text-sm text-gray-600">
+              {filteredQuestions.length} question(s) affichée(s)
+              {totalQuestions > questionLogs.length && (
+                <span className="text-blue-600"> sur {totalQuestions} au total</span>
+              )}
+              {/* Indicateur de performance cache */}
+              {cacheStatus && cacheStatus.is_available && (
+                <span className="text-green-600 ml-2">
+                  • ⚡ Chargé en {cacheStatus.performance_gain}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}>
                       <p className="text-xs text-gray-700 italic line-clamp-2">"{question.feedback_comment}"</p>
                       <p className="text-xs text-gray-500 mt-1">
                         {new Date(question.timestamp).toLocaleDateString('fr-FR')}
@@ -642,7 +652,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
           </div>
         </div>
 
-        {/* Sources Distribution - CODE ORIGINAL CONSERVÉ */}
+        {/* Sources Distribution */}
         <div className="bg-white border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200">
             <h3 className="text-base font-medium text-gray-900">Distribution des Sources</h3>
@@ -682,7 +692,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                 })}
             </div>
 
-            {/* Métriques de qualité - CODE ORIGINAL CONSERVÉ */}
+            {/* Métriques de qualité */}
             <div className="mt-4 pt-3 border-t border-gray-200">
               <h4 className="text-sm font-medium text-gray-800 mb-2">Métriques de Qualité</h4>
               <div className="grid grid-cols-2 gap-3">
@@ -708,16 +718,15 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
         </div>
       </div>
 
-      {/* 💾 Export Section - CONSERVATION INTÉGRALE Style Compass avec cartes uniformes */}
+      {/* Export Section */}
       <div className="bg-white border border-gray-200">
         <div className="px-4 py-3 border-b border-gray-200">
           <h3 className="text-base font-medium text-gray-900">Export des Données</h3>
         </div>
         <div className="p-4">
-          {/* Grille de 4 cartes uniformes - CONSERVATION INTÉGRALE Style Compass */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
             
-            {/* Carte 1: Conversations - CODE ORIGINAL CONSERVÉ */}
+            {/* Carte 1: Conversations */}
             <div className="bg-white border border-gray-200 p-4 flex flex-col justify-between h-full">
               <div>
                 <h4 className="text-base font-medium text-gray-900 mb-1">Conversations</h4>
@@ -725,6 +734,9 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                 <div className="text-xs text-gray-500 mb-4">
                   <p>• Choix automatique: Filtrées ({filteredQuestions.length}) ou toutes ({totalQuestions})</p>
                   <p>• Colonnes: Q1, R1, Source1, Q2, R2, Source2...</p>
+                  {cacheStatus?.is_available && (
+                    <p>• ⚡ Données optimisées par cache</p>
+                  )}
                 </div>
               </div>
               <button
@@ -736,7 +748,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
               </button>
             </div>
 
-            {/* Carte 2: Commentaires - CODE ORIGINAL CONSERVÉ */}
+            {/* Carte 2: Commentaires */}
             <div className="bg-white border border-gray-200 p-4 flex flex-col justify-between h-full">
               <div>
                 <h4 className="text-base font-medium text-gray-900 mb-1">Commentaires</h4>
@@ -744,6 +756,9 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                 <div className="text-xs text-gray-500 mb-4">
                   <p>• Feedback positifs et négatifs</p>
                   <p>• Commentaires avec contexte question</p>
+                  {cacheStatus?.is_available && (
+                    <p>• ⚡ Performance {cacheStatus.performance_gain}</p>
+                  )}
                 </div>
               </div>
               <button
@@ -780,7 +795,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
               </button>
             </div>
 
-            {/* Carte 3: Questions Filtrées - CODE ORIGINAL CONSERVÉ */}
+            {/* Carte 3: Questions Filtrées */}
             <div className="bg-white border border-gray-200 p-4 flex flex-col justify-between h-full">
               <div>
                 <h4 className="text-base font-medium text-gray-900 mb-1">Questions Filtrées</h4>
@@ -788,6 +803,9 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                 <div className="text-xs text-gray-500 mb-4">
                   <p>• {filteredQuestions.length} questions sélectionnées</p>
                   <p>• Données complètes avec réponses</p>
+                  {cacheStatus?.is_available && (
+                    <p>• ⚡ Cache {cacheStatus.cache_age_minutes}min</p>
+                  )}
                 </div>
               </div>
               <button
@@ -823,7 +841,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
               </button>
             </div>
 
-            {/* Carte 4: Statistiques - CODE ORIGINAL CONSERVÉ */}
+            {/* Carte 4: Statistiques */}
             <div className="bg-white border border-gray-200 p-4 flex flex-col justify-between h-full">
               <div>
                 <h4 className="text-base font-medium text-gray-900 mb-1">Statistiques</h4>
@@ -831,6 +849,9 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                 <div className="text-xs text-gray-500 mb-4">
                   <p>• Métriques de satisfaction et performance</p>
                   <p>• Format JSON pour analyse avancée</p>
+                  {cacheStatus?.is_available && (
+                    <p>• 🚀 Métadonnées de cache incluses</p>
+                  )}
                 </div>
               </div>
               <button
@@ -844,7 +865,6 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                     feedback_stats: feedbackStats,
                     source_distribution: sourceStats,
                     filters_applied: questionFilters,
-                    // 🚀 NOUVEAU: Informations sur le cache
                     cache_info: cacheStatus ? {
                       data_from_cache: cacheStatus.is_available,
                       cache_age_minutes: cacheStatus.cache_age_minutes,
@@ -870,26 +890,25 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
         </div>
       </div>
 
-      {/* 📋 Table des Questions - CONSERVATION INTÉGRALE Style EXACT Compass */}
+      {/* Table des Questions */}
       <div className="bg-white border border-gray-200">
         <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
           <h3 className="text-base font-medium text-gray-900">Questions et Réponses</h3>
           <div className="flex items-center space-x-3">
             <span className="text-sm text-gray-500">{filteredQuestions.length} questions affichées</span>
-            {/* 🚀 NOUVEAU: Badge source des données */}
+            {/* Badge source des données */}
             {cacheStatus && (
               <span className={`text-xs px-2 py-1 rounded ${
                 cacheStatus.is_available 
                   ? 'bg-green-100 text-green-800' 
-                  : 'bg-gray-100 text-gray-800'
+                  : 'bg-red-100 text-red-800'
               }`}>
-                {cacheStatus.is_available ? 'Cache' : 'Direct'}
+                {cacheStatus.is_available ? 'Cache' : 'Cache indisponible'}
               </span>
             )}
           </div>
         </div>
         
-        {/* CONSERVATION INTÉGRALE: Contenu de la table et logique d'affichage */}
         {filteredQuestions.length === 0 ? (
           <div className="p-8 text-center">
             <div className="text-gray-400 text-4xl mb-4">🔍</div>
@@ -922,7 +941,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
               <div key={question.id} className="p-4 hover:bg-gray-50 transition-colors">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    {/* En-tête condensé - CONSERVATION INTÉGRALE Style Compass */}
+                    {/* En-tête condensé */}
                     <div className="flex items-center space-x-3 mb-3">
                       <div className="w-8 h-8 bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
                         {question.user_name.split(' ').map(n => n[0]).join('').toUpperCase()}
@@ -947,7 +966,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                       </div>
                     </div>
                     
-                    {/* Question - CONSERVATION INTÉGRALE Compact */}
+                    {/* Question */}
                     <div className="mb-3">
                       <p className="text-sm font-medium text-gray-900 mb-1">Question:</p>
                       <p className="text-sm text-gray-700 bg-blue-50 p-3 border-l-4 border-blue-400">
@@ -955,7 +974,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                       </p>
                     </div>
                     
-                    {/* Réponse - CONSERVATION INTÉGRALE Compact */}
+                    {/* Réponse */}
                     <div className="mb-3">
                       <p className="text-sm font-medium text-gray-900 mb-1">Réponse:</p>
                       <div className="text-sm text-gray-700 bg-gray-50 p-3 max-h-32 overflow-y-auto border border-gray-200">
@@ -967,7 +986,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                       </div>
                     </div>
                     
-                    {/* Métadonnées - CONSERVATION INTÉGRALE Compact */}
+                    {/* Métadonnées */}
                     <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
                       <div className="flex items-center space-x-4">
                         <span>{new Date(question.timestamp).toLocaleString('fr-FR')}</span>
@@ -983,7 +1002,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                       </button>
                     </div>
                     
-                    {/* Commentaire de feedback - CONSERVATION INTÉGRALE Compact */}
+                    {/* Commentaire de feedback */}
                     {question.feedback_comment && (
                       <div className="mt-3 p-3 bg-blue-50 border-l-4 border-blue-400">
                         <div className="flex items-start space-x-2">
@@ -998,50 +1017,4 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                         </div>
                       </div>
                     )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        
-        {/* Pagination - CONSERVATION INTÉGRALE Style Compass */}
-        {filteredQuestions.length > 0 && (
-          <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1 border border-gray-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white transition-colors"
-              >
-                ← Précédent
-              </button>
-              <span className="text-sm text-gray-600 px-2 py-1 bg-white border border-gray-300">
-                Page {currentPage}
-              </span>
-              <button
-                onClick={() => setCurrentPage(currentPage + 1)}
-                disabled={filteredQuestions.length < questionsPerPage}
-                className="px-3 py-1 border border-gray-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white transition-colors"
-              >
-                Suivant →
-              </button>
-            </div>
-            <div className="text-sm text-gray-600">
-              {filteredQuestions.length} question(s) affichée(s)
-              {totalQuestions > questionLogs.length && (
-                <span className="text-blue-600"> sur {totalQuestions} au total</span>
-              )}
-              {/* 🚀 NOUVEAU: Indicateur de performance cache */}
-              {cacheStatus && cacheStatus.is_available && (
-                <span className="text-green-600 ml-2">
-                  • ⚡ Chargé en {cacheStatus.performance_gain}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
+                  </div

@@ -70,7 +70,7 @@ const useCountries = () => {
     
     const fetchCountries = async () => {
       try {
-        console.log('🌐 [Countries] Début du chargement depuis l\'API REST Countries...')
+        console.log('🌍 [Countries] Début du chargement depuis l\'API REST Countries...')
         
         const controller = new AbortController()
         const timeoutId = setTimeout(() => {
@@ -98,7 +98,7 @@ const useCountries = () => {
         console.log(`📊 [Countries] Données reçues: ${data.length} pays bruts`)
         
         if (!Array.isArray(data)) {
-          console.error('⌐ [Countries] Format invalide - pas un array')
+          console.error('❌ [Countries] Format invalide - pas un array')
           throw new Error('Format de données invalide')
         }
         
@@ -254,7 +254,7 @@ function PageContent() {
     try {
       router.push('/chat')
     } catch (error) {
-      console.error('⌐ [Redirect] Erreur redirection:', error)
+      console.error('❌ [Redirect] Erreur redirection:', error)
       redirectLock.current = false
     }
   }, [router])
@@ -324,7 +324,7 @@ function PageContent() {
     }
 
     try {
-      console.log('📝 [Login] Tentative connexion...')
+      console.log('🔐 [Login] Tentative connexion...')
       
       await login(loginData.email, loginData.password)
       
@@ -340,7 +340,7 @@ function PageContent() {
       }, 1000)
       
     } catch (error: any) {
-      console.error('⌐ [Login] Erreur connexion:', error)
+      console.error('❌ [Login] Erreur connexion:', error)
       setLocalError(error?.message || t.authError)
     }
   }
@@ -358,7 +358,7 @@ function PageContent() {
     }
 
     try {
-      console.log('📝 [Signup] Tentative création compte...')
+      console.log('🔐 [Signup] Tentative création compte...')
       
       const userData = {
         email: signupData.email,
@@ -386,7 +386,7 @@ function PageContent() {
       }, 2000)
       
     } catch (error: any) {
-      console.error('⌐ [Signup] Erreur création compte:', error)
+      console.error('❌ [Signup] Erreur création compte:', error)
       setLocalError(error?.message || t.signupError)
     }
   }
@@ -412,7 +412,7 @@ function PageContent() {
   useEffect(() => {
     if (!hasInitialized.current) {
       hasInitialized.current = true
-      console.log('📝 [Init] Initialisation unique')
+      console.log('🏁 [Init] Initialisation unique')
       
       // Charger remember me
       const { rememberMe, lastEmail } = rememberMeUtils.load()
@@ -431,7 +431,7 @@ function PageContent() {
     
     if (!sessionInitialized.current) {
       sessionInitialized.current = true
-      console.log('📝 [Session] Initialisation unique de la session')
+      console.log('🔐 [Session] Initialisation unique de la session')
       initializeSession()
     }
   }, [hasHydrated, initializeSession])
@@ -441,13 +441,13 @@ function PageContent() {
     
     if (!hasCheckedAuth.current && !isLoading) {
       hasCheckedAuth.current = true
-      console.log('🔍 [Auth] Vérification unique de l\'authentification')
+      console.log('🔐 [Auth] Vérification unique de l\'authentification')
       
       if (isAuthenticated && user) {
         console.log('✅ [Auth] Utilisateur connecté, redirection...')
         safeRedirectToChat()
       } else {
-        console.log('⌐ [Auth] Utilisateur non connecté')
+        console.log('❌ [Auth] Utilisateur non connecté')
       }
     }
   }, [hasHydrated, isLoading, isAuthenticated, user, safeRedirectToChat])
@@ -461,14 +461,16 @@ function PageContent() {
   console.log('🎨 [Render] Rendu de la page principale')
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative">
+    <div className={`bg-gradient-to-br from-blue-50 via-white to-green-50 py-8 sm:px-6 lg:px-8 relative ${
+      isSignupMode ? 'min-h-full' : 'min-h-screen flex flex-col justify-center'
+    }`}>
       
       {/* ⭐ BOÎTE DE DEBUG GLOBALE - RETIRÉE EN PRODUCTION */}
       {process.env.NODE_ENV === 'development' && (
         <div className="fixed top-16 right-4 bg-purple-50 border border-purple-200 rounded-lg p-4 text-xs max-w-sm z-50">
           <div className="font-semibold text-purple-800 mb-2">🧪 Debug Global</div>
           <div className="space-y-1 text-purple-700">
-            <div>📝 Mode: <span className="font-mono bg-purple-100 px-1 rounded">{isSignupMode ? 'Inscription' : 'Connexion'}</span></div>
+            <div>🎭 Mode: <span className="font-mono bg-purple-100 px-1 rounded">{isSignupMode ? 'Inscription' : 'Connexion'}</span></div>
             <div>📊 Pays: <span className="font-mono bg-purple-100 px-1 rounded">{countries.length}</span></div>
             <div>⏳ Loading: <span className="font-mono bg-purple-100 px-1 rounded">{countriesLoading ? 'Oui' : 'Non'}</span></div>
             <div>🔄 Fallback: <span className="font-mono bg-purple-100 px-1 rounded">{usingFallback ? 'Oui' : 'Non'}</span></div>
@@ -496,12 +498,9 @@ function PageContent() {
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-2xl">
-        {/* ⭐ CORRECTION 1: SUPPRESSION DE max-h-screen overflow-y-auto */}
+        {/* 🔧 CORRECTION: Suppression des contraintes de hauteur qui causaient le double scroll */}
         <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 relative">
           
-          {/* ⭐ CORRECTION 2: SUPPRESSION COMPLÈTE DES MESSAGES DE DEBUG */}
-          {/* Pas de message de succès ou d'avertissement visible pour l'utilisateur final */}
-
           {/* Messages d'erreur et succès */}
           {localError && (
             <AlertMessage 
@@ -859,7 +858,7 @@ function PageContent() {
 
 // Export principal avec Suspense
 export default function Page() {
-  console.log('📝 [Page] Composant Page principal appelé')
+  console.log('🎁 [Page] Composant Page principal appelé')
   return (
     <Suspense fallback={<LoadingSpinner />}>
       <PageContent />
