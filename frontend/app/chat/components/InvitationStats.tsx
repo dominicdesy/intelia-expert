@@ -580,5 +580,4 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
       </div>
     </div>
   )
-} font-medium text-gray-500 uppercase">Inviteur</th>
-                  <th className="px-4 py-2 text-left text-xs
+}
