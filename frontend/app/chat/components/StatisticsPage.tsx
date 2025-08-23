@@ -10,7 +10,7 @@ interface CacheStatus {
   is_available: boolean
   last_update: string | null
   cache_age_minutes: number
-  performance_gain: number  // 🔧 CORRECTION 1: string → number
+  performance_gain: string | number  // 🔧 CORRECTION: Support string ET number
   next_update: string | null
 }
 
@@ -389,15 +389,24 @@ export const StatisticsPage: React.FC = () => {
       const loadTime = performance.now() - startTime
       console.log(`⚡ Performance ULTRA-RAPIDE: ${loadTime.toFixed(0)}ms`)
       
-      // 🔧 CORRECTION 2: Accès sécurisé à performance_gain
+      // 🔧 CORRECTION 2: Conversion sécurisée en string pour l'affichage
       const performanceGainValue = fastData.performanceStats?.performance_gain || 
                                    fastData.performance_stats?.performance_gain || 
                                    fastData.cache_info?.performance_gain || 
                                    0
       
+      // Convertir en string pour compatibilité avec les composants existants
+      const performanceGainString = typeof performanceGainValue === 'number' 
+        ? `${performanceGainValue}%` 
+        : performanceGainValue?.toString() || '0%'
+      
       // Mettre à jour le statut du cache
-      setCacheStatus(fastData.cache_info)
-      setPerformanceGain(`${loadTime.toFixed(0)}ms (vs ${performanceGainValue}%)`)
+      const updatedCacheStatus = {
+        ...fastData.cache_info,
+        performance_gain: performanceGainString  // Toujours string pour compatibilité
+      }
+      setCacheStatus(updatedCacheStatus)
+      setPerformanceGain(`${loadTime.toFixed(0)}ms (vs ${performanceGainString})`)
       
       // 🚀 Support pour les deux structures de données (nouvelle et ancienne)
       const systemStatsData = fastData.systemStats || fastData.system_stats
@@ -778,7 +787,7 @@ export const StatisticsPage: React.FC = () => {
                   ⏱️ Âge du cache: {cacheStatus.cache_age_minutes}min
                 </span>
                 <span className="text-green-700">
-                  🚀 Gain: {cacheStatus.performance_gain}%
+                  🚀 Gain: {typeof cacheStatus.performance_gain === 'string' ? cacheStatus.performance_gain : `${cacheStatus.performance_gain}%`}
                 </span>
               </div>
               <div className="text-green-600">
