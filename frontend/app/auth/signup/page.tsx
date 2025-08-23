@@ -15,18 +15,175 @@ import {
   rememberMeUtils 
 } from './page_hooks'
 
-
-// Import des composants
+// Import des composants - RETRAIT DE CountrySelector
 import { 
   InteliaLogo, 
   LanguageSelector, 
-  CountrySelector, 
+  // CountrySelector, ❌ RETIRÉ - n'existe pas dans page_components
   AlertMessage, 
   PasswordInput, 
   PasswordMatchIndicator, 
   LoadingSpinner, 
   AuthFooter 
 } from './page_components'
+
+// ==================== HOOK USECOUNTRIES INTÉGRÉ ====================
+const fallbackCountries = [
+  { value: 'CA', label: 'Canada', phoneCode: '+1', flag: '🇨🇦' },
+  { value: 'US', label: 'États-Unis', phoneCode: '+1', flag: '🇺🇸' },
+  { value: 'FR', label: 'France', phoneCode: '+33', flag: '🇫🇷' },
+  { value: 'GB', label: 'Royaume-Uni', phoneCode: '+44', flag: '🇬🇧' },
+  { value: 'DE', label: 'Allemagne', phoneCode: '+49', flag: '🇩🇪' },
+  { value: 'IT', label: 'Italie', phoneCode: '+39', flag: '🇮🇹' },
+  { value: 'ES', label: 'Espagne', phoneCode: '+34', flag: '🇪🇸' },
+  { value: 'BE', label: 'Belgique', phoneCode: '+32', flag: '🇧🇪' },
+  { value: 'CH', label: 'Suisse', phoneCode: '+41', flag: '🇨🇭' },
+  { value: 'MX', label: 'Mexique', phoneCode: '+52', flag: '🇲🇽' },
+  { value: 'BR', label: 'Brésil', phoneCode: '+55', flag: '🇧🇷' },
+  { value: 'AU', label: 'Australie', phoneCode: '+61', flag: '🇦🇺' },
+  { value: 'JP', label: 'Japon', phoneCode: '+81', flag: '🇯🇵' },
+  { value: 'CN', label: 'Chine', phoneCode: '+86', flag: '🇨🇳' },
+  { value: 'IN', label: 'Inde', phoneCode: '+91', flag: '🇮🇳' },
+  { value: 'NL', label: 'Pays-Bas', phoneCode: '+31', flag: '🇳🇱' },
+  { value: 'SE', label: 'Suède', phoneCode: '+46', flag: '🇸🇪' },
+  { value: 'NO', label: 'Norvège', phoneCode: '+47', flag: '🇳🇴' },
+  { value: 'DK', label: 'Danemark', phoneCode: '+45', flag: '🇩🇰' },
+  { value: 'FI', label: 'Finlande', phoneCode: '+358', flag: '🇫🇮' }
+]
+
+interface Country {
+  value: string
+  label: string
+  phoneCode: string
+  flag?: string
+}
+
+// Hook pour charger les pays depuis l'API REST Countries
+const useCountries = () => {
+  console.log('🎯 [Countries] Hook useCountries appelé!')
+  
+  const [countries, setCountries] = useState<Country[]>(fallbackCountries)
+  const [loading, setLoading] = useState(true)
+  const [usingFallback, setUsingFallback] = useState(true)
+
+  useEffect(() => {
+    console.log('🚀 [Countries] DÉMARRAGE du processus de chargement des pays')
+    
+    const fetchCountries = async () => {
+      try {
+        console.log('🌍 [Countries] Début du chargement depuis l\'API REST Countries...')
+        
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => {
+          console.log('⏱️ [Countries] Timeout atteint (10s)')
+          controller.abort()
+        }, 10000)
+        
+        const response = await fetch('https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations', {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (compatible; Intelia/1.0)',
+            'Cache-Control': 'no-cache'
+          },
+          signal: controller.signal
+        })
+        
+        clearTimeout(timeoutId)
+        console.log(`📡 [Countries] Statut HTTP: ${response.status} ${response.statusText}`)
+        
+        if (!response.ok) {
+          throw new Error(`API indisponible: ${response.status}`)
+        }
+        
+        const data = await response.json()
+        console.log(`📊 [Countries] Données reçues: ${data.length} pays bruts`)
+        
+        if (!Array.isArray(data)) {
+          console.error('❌ [Countries] Format invalide - pas un array')
+          throw new Error('Format de données invalide')
+        }
+        
+        const formattedCountries = data
+          .map((country: any, index: number) => {
+            let phoneCode = ''
+            if (country.idd?.root) {
+              phoneCode = country.idd.root
+              if (country.idd.suffixes && country.idd.suffixes[0]) {
+                phoneCode += country.idd.suffixes[0]
+              }
+            }
+            
+            const formatted = {
+              value: country.cca2,
+              label: country.translations?.fra?.common || country.name?.common || country.cca2,
+              phoneCode: phoneCode,
+              flag: country.flag || ''
+            }
+            
+            return formatted
+          })
+          .filter((country: Country) => {
+            const hasValidCode = country.phoneCode && 
+                                country.phoneCode !== 'undefined' && 
+                                country.phoneCode !== 'null' &&
+                                country.phoneCode.length > 1 &&
+                                country.phoneCode.startsWith('+') &&
+                                /^\+\d+$/.test(country.phoneCode)
+            
+            const hasValidInfo = country.value && 
+                                country.value.length === 2 &&
+                                country.label && 
+                                country.label.length > 1
+            
+            return hasValidCode && hasValidInfo
+          })
+          .sort((a: Country, b: Country) => a.label.localeCompare(b.label, 'fr', { numeric: true }))
+        
+        console.log(`✅ [Countries] Pays valides après filtrage: ${formattedCountries.length}`)
+        
+        if (formattedCountries.length >= 50) {
+          console.log('🎉 [Countries] API validée! Utilisation des données complètes')
+          setCountries(formattedCountries)
+          setUsingFallback(false)
+        } else {
+          console.warn(`⚠️ [Countries] Pas assez de pays valides: ${formattedCountries.length}/50`)
+          throw new Error(`Qualité insuffisante: ${formattedCountries.length}/50 pays`)
+        }
+        
+      } catch (err: any) {
+        console.error('💥 [Countries] ERREUR:', err)
+        console.warn('🔄 [Countries] Passage en mode fallback')
+        setCountries(fallbackCountries)
+        setUsingFallback(true)
+      } finally {
+        console.log('🏁 [Countries] Chargement terminé')
+        setLoading(false)
+      }
+    }
+
+    const timer = setTimeout(() => {
+      console.log('⏰ [Countries] Démarrage après délai de 100ms')
+      fetchCountries()
+    }, 100)
+    
+    return () => clearTimeout(timer)
+  }, [])
+
+  return { countries, loading, usingFallback }
+}
+
+// Hook pour créer le mapping des codes téléphoniques
+const useCountryCodeMap = (countries: Country[]) => {
+  return useMemo(() => {
+    const mapping = countries.reduce((acc, country) => {
+      acc[country.value] = country.phoneCode
+      return acc
+    }, {} as Record<string, string>)
+    
+    console.log(`🗺️ [CountryCodeMap] Mapping créé avec ${Object.keys(mapping).length} entrées`)
+    return mapping
+  }, [countries])
+}
 
 // Contenu principal de la page
 function PageContent() {
@@ -85,17 +242,6 @@ function PageContent() {
     companyWebsite: '',
     companyLinkedin: ''
   })
-
-  // ⭐ FORCER LE MODE INSCRIPTION POUR DEBUG
-  useEffect(() => {
-    console.log('🧪 [Debug] Force le passage en mode inscription après 2 secondes pour tester les pays')
-    const timer = setTimeout(() => {
-      console.log('🧪 [Debug] Passage en mode inscription pour voir le sélecteur de pays')
-      setIsSignupMode(true)
-    }, 2000)
-    
-    return () => clearTimeout(timer)
-  }, [])
 
   const safeRedirectToChat = useCallback(() => {
     if (redirectLock.current) {
@@ -179,7 +325,7 @@ function PageContent() {
     }
 
     try {
-      console.log('📄 [Login] Tentative connexion...')
+      console.log('🔄 [Login] Tentative connexion...')
       
       await login(loginData.email, loginData.password)
       
@@ -213,7 +359,7 @@ function PageContent() {
     }
 
     try {
-      console.log('📄 [Signup] Tentative création compte...')
+      console.log('🔄 [Signup] Tentative création compte...')
       
       const userData = {
         email: signupData.email,
@@ -267,7 +413,7 @@ function PageContent() {
   useEffect(() => {
     if (!hasInitialized.current) {
       hasInitialized.current = true
-      console.log('📄 [Init] Initialisation unique')
+      console.log('🔄 [Init] Initialisation unique')
       
       // Charger remember me
       const { rememberMe, lastEmail } = rememberMeUtils.load()
@@ -286,7 +432,7 @@ function PageContent() {
     
     if (!sessionInitialized.current) {
       sessionInitialized.current = true
-      console.log('📄 [Session] Initialisation unique de la session')
+      console.log('🔄 [Session] Initialisation unique de la session')
       initializeSession()
     }
   }, [hasHydrated, initializeSession])
@@ -318,7 +464,7 @@ function PageContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative">
       
-      {/* ⭐ AJOUT D'UNE BOÎTE DE DEBUG GLOBALE */}
+      {/* ⭐ BOÎTE DE DEBUG GLOBALE */}
       {process.env.NODE_ENV === 'development' && (
         <div className="fixed top-16 right-4 bg-purple-50 border border-purple-200 rounded-lg p-4 text-xs max-w-sm z-50">
           <div className="font-semibold text-purple-800 mb-2">🧪 Debug Global</div>
@@ -457,7 +603,7 @@ function PageContent() {
             </form>
           )}
 
-          {/* FORMULAIRE D'INSCRIPTION */}
+          {/* FORMULAIRE D'INSCRIPTION AVEC SÉLECTEUR DE PAYS INTÉGRÉ */}
           {isSignupMode && (
             <form onSubmit={handleSignup} onKeyPress={handleKeyPress}>
               <div className="space-y-6">
@@ -524,15 +670,35 @@ function PageContent() {
                     />
                   </div>
 
-                  {/* ⭐ SÉLECTEUR DE PAYS TOUJOURS AFFICHÉ EN MODE INSCRIPTION */}
-                  <CountrySelector
-                    countries={countries}
-                    countriesLoading={countriesLoading}
-                    usingFallback={usingFallback}
-                    value={signupData.country}
-                    onChange={(value) => handleSignupChange('country', value)}
-                    t={t}
-                  />
+                  {/* ⭐ SÉLECTEUR DE PAYS INTÉGRÉ DIRECTEMENT */}
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700">
+                      {t.country} <span className="text-red-500">{t.required}</span>
+                    </label>
+                    
+                    {countriesLoading ? (
+                      <div className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 bg-gray-50">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                          <span className="text-sm text-gray-600">{t.loadingCountries}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <select
+                        required
+                        value={signupData.country}
+                        onChange={(e) => handleSignupChange('country', e.target.value)}
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                      >
+                        <option value="">{t.selectCountry}</option>
+                        {countries.map((country) => (
+                          <option key={country.value} value={country.value}>
+                            {country.flag ? `${country.flag} ` : ''}{country.label} ({country.phoneCode})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
 
                   {/* Téléphone optionnel */}
                   <div className="mt-4">
@@ -704,7 +870,7 @@ function PageContent() {
 
 // Export principal avec Suspense
 export default function Page() {
-  console.log('📄 [Page] Composant Page principal appelé')
+  console.log('🔄 [Page] Composant Page principal appelé')
   return (
     <Suspense fallback={<LoadingSpinner />}>
       <PageContent />
