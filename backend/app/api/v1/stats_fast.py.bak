@@ -519,4 +519,4 @@ def format_timestamp(timestamp: Optional[str]) -> str:
         dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
         return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
     except:
-        return str(timestamp)
+        return str(timestamp)%

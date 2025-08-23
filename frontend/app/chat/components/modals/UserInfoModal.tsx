@@ -498,10 +498,34 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                           setFormData(prev => ({ ...prev, country: e.target.value }))
                         }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                        style={{
+                          backgroundColor: 'white',
+                          color: 'black',
+                          fontSize: '14px',
+                          lineHeight: '1.5'
+                        }}
                       >
-                        <option value="">Sélectionner un pays (total: {countries.length})</option>
+                        <option 
+                          value=""
+                          style={{
+                            backgroundColor: 'white',
+                            color: 'black',
+                            padding: '8px'
+                          }}
+                        >
+                          Sélectionner un pays (total: {countries.length})
+                        </option>
                         {countries.map((country, index) => (
-                          <option key={country.value} value={country.value}>
+                          <option 
+                            key={country.value} 
+                            value={country.value}
+                            style={{
+                              backgroundColor: 'white',
+                              color: 'black',
+                              padding: '8px',
+                              fontSize: '14px'
+                            }}
+                          >
                             {country.flag} {country.label}
                           </option>
                         ))}

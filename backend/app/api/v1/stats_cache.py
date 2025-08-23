@@ -229,30 +229,50 @@ class StatisticsCache:
                         );
                     """)
                     
-                    # 🔍 INDEX POUR PERFORMANCES ULTRA
+                    # 🔍 INDEX POUR PERFORMANCES ULTRA - VERSION CORRIGÉE POSTGRESQL
                     indexes = [
+                        # Cache principal - index simples et sûrs
                         "CREATE INDEX IF NOT EXISTS idx_stats_cache_key_expires ON statistics_cache(cache_key, expires_at DESC);",
-                        "CREATE INDEX IF NOT EXISTS idx_stats_cache_expires ON statistics_cache(expires_at) WHERE expires_at > CURRENT_TIMESTAMP;",
+                        "CREATE INDEX IF NOT EXISTS idx_stats_cache_expires ON statistics_cache(expires_at);",  # ✅ Pas de WHERE clause
+                        "CREATE INDEX IF NOT EXISTS idx_stats_cache_source ON statistics_cache(source, created_at DESC);",
                         
-                        "CREATE INDEX IF NOT EXISTS idx_dashboard_current ON dashboard_stats_snapshot(is_current, generated_at DESC) WHERE is_current = TRUE;",
+                        # Dashboard snapshots
+                        "CREATE INDEX IF NOT EXISTS idx_dashboard_current ON dashboard_stats_snapshot(is_current, generated_at DESC);",  # ✅ Pas de WHERE
                         "CREATE INDEX IF NOT EXISTS idx_dashboard_period ON dashboard_stats_snapshot(period_start, period_end);",
+                        "CREATE INDEX IF NOT EXISTS idx_dashboard_type ON dashboard_stats_snapshot(snapshot_type, generated_at DESC);",
                         
+                        # Cache questions
                         "CREATE INDEX IF NOT EXISTS idx_questions_cache_key ON questions_cache(cache_key, expires_at);",
                         "CREATE INDEX IF NOT EXISTS idx_questions_filters ON questions_cache USING GIN(filters_applied);",
+                        "CREATE INDEX IF NOT EXISTS idx_questions_page ON questions_cache(page, limit_per_page);",
                         
+                        # Coûts OpenAI
                         "CREATE INDEX IF NOT EXISTS idx_openai_period ON openai_costs_cache(start_date, end_date, period_type);",
-                        "CREATE INDEX IF NOT EXISTS idx_openai_expires ON openai_costs_cache(expires_at) WHERE expires_at > CURRENT_TIMESTAMP;",
+                        "CREATE INDEX IF NOT EXISTS idx_openai_expires ON openai_costs_cache(expires_at);",  # ✅ Pas de WHERE clause
+                        "CREATE INDEX IF NOT EXISTS idx_openai_type ON openai_costs_cache(period_type, start_date DESC);",
                         
+                        # Cache invitations
                         "CREATE INDEX IF NOT EXISTS idx_invitations_type ON invitations_cache(cache_type, expires_at);",
+                        "CREATE INDEX IF NOT EXISTS idx_invitations_period ON invitations_cache(period_days, analyzed_until);",
                         
-                        "CREATE INDEX IF NOT EXISTS idx_analytics_metric ON analytics_cache(metric_type, metric_key, expires_at);"
+                        # Analytics détaillés
+                        "CREATE INDEX IF NOT EXISTS idx_analytics_metric ON analytics_cache(metric_type, metric_key, expires_at);",
+                        "CREATE INDEX IF NOT EXISTS idx_analytics_period ON analytics_cache(period_start, period_end);",
+                        
+                        # Index composites pour requêtes fréquentes
+                        "CREATE INDEX IF NOT EXISTS idx_stats_cache_valid ON statistics_cache(source, cache_key) WHERE expires_at > NOW();",  # ✅ NOW() au lieu de CURRENT_TIMESTAMP
+                        "CREATE INDEX IF NOT EXISTS idx_dashboard_current_valid ON dashboard_stats_snapshot(snapshot_type) WHERE is_current = true;"  # ✅ Constante au lieu de fonction
                     ]
                     
                     for index_sql in indexes:
-                        cur.execute(index_sql)
+                        try:
+                            cur.execute(index_sql)
+                        except Exception as idx_error:
+                            logger.warning(f"⚠️ Index non créé (peut-être déjà existant): {idx_error}")
+                            # Continue avec les autres index même si un échoue
                     
                     conn.commit()
-                    logger.info("✅ Tables de cache statistiques créées avec index optimisés")
+                    logger.info("✅ Tables de cache statistiques créées avec index optimisés PostgreSQL")
                     
         except Exception as e:
             logger.error(f"❌ Erreur création tables cache: {e}")
@@ -299,10 +319,11 @@ class StatisticsCache:
                             WHERE cache_key = %s
                         """, (key,))
                     else:
+                        # ✅ Utilisation de NOW() au lieu de CURRENT_TIMESTAMP pour cohérence
                         cur.execute("""
                             SELECT data, created_at, updated_at, expires_at, source
                             FROM statistics_cache 
-                            WHERE cache_key = %s AND expires_at > CURRENT_TIMESTAMP
+                            WHERE cache_key = %s AND expires_at > NOW()
                         """, (key,))
                     
                     result = cur.fetchone()
@@ -341,7 +362,7 @@ class StatisticsCache:
                     
                     else:
                         # Invalider tout le cache expiré
-                        cur.execute("DELETE FROM statistics_cache WHERE expires_at <= CURRENT_TIMESTAMP")
+                        cur.execute("DELETE FROM statistics_cache WHERE expires_at <= NOW()")
                     
                     deleted_count = cur.rowcount
                     conn.commit()
@@ -504,12 +525,12 @@ class StatisticsCache:
                     # Nettoyer chaque table de cache
                     tables_cleaned = 0
                     
-                    # Cache générique
-                    cur.execute("DELETE FROM statistics_cache WHERE expires_at <= CURRENT_TIMESTAMP")
+                    # Cache générique - ✅ Utilisation de NOW()
+                    cur.execute("DELETE FROM statistics_cache WHERE expires_at <= NOW()")
                     tables_cleaned += cur.rowcount
                     
                     # Cache questions (TTL court)
-                    cur.execute("DELETE FROM questions_cache WHERE expires_at <= CURRENT_TIMESTAMP")
+                    cur.execute("DELETE FROM questions_cache WHERE expires_at <= NOW()")
                     tables_cleaned += cur.rowcount
                     
                     # Anciens snapshots dashboard (garder seulement les 5 derniers)
@@ -524,15 +545,15 @@ class StatisticsCache:
                     tables_cleaned += cur.rowcount
                     
                     # Coûts OpenAI expirés
-                    cur.execute("DELETE FROM openai_costs_cache WHERE expires_at <= CURRENT_TIMESTAMP")
+                    cur.execute("DELETE FROM openai_costs_cache WHERE expires_at <= NOW()")
                     tables_cleaned += cur.rowcount
                     
                     # Cache invitations
-                    cur.execute("DELETE FROM invitations_cache WHERE expires_at <= CURRENT_TIMESTAMP")
+                    cur.execute("DELETE FROM invitations_cache WHERE expires_at <= NOW()")
                     tables_cleaned += cur.rowcount
                     
                     # Analytics détaillés
-                    cur.execute("DELETE FROM analytics_cache WHERE expires_at <= CURRENT_TIMESTAMP")
+                    cur.execute("DELETE FROM analytics_cache WHERE expires_at <= NOW()")
                     tables_cleaned += cur.rowcount
                     
                     conn.commit()
@@ -552,12 +573,12 @@ class StatisticsCache:
                     
                     stats = {}
                     
-                    # Cache générique
+                    # Cache générique - ✅ Utilisation de NOW()
                     cur.execute("""
                         SELECT 
                             COUNT(*) as total,
-                            COUNT(*) FILTER (WHERE expires_at > CURRENT_TIMESTAMP) as valid,
-                            COUNT(*) FILTER (WHERE expires_at <= CURRENT_TIMESTAMP) as expired
+                            COUNT(*) FILTER (WHERE expires_at > NOW()) as valid,
+                            COUNT(*) FILTER (WHERE expires_at <= NOW()) as expired
                         FROM statistics_cache
                     """)
                     stats['general_cache'] = dict(cur.fetchone() or {})
@@ -571,14 +592,14 @@ class StatisticsCache:
                     
                     # Questions cache
                     cur.execute("""
-                        SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE expires_at > CURRENT_TIMESTAMP) as valid
+                        SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE expires_at > NOW()) as valid
                         FROM questions_cache
                     """)
                     stats['questions_cache'] = dict(cur.fetchone() or {})
                     
                     # OpenAI costs
                     cur.execute("""
-                        SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE expires_at > CURRENT_TIMESTAMP) as valid
+                        SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE expires_at > NOW()) as valid
                         FROM openai_costs_cache
                     """)
                     stats['openai_costs'] = dict(cur.fetchone() or {})
