@@ -263,6 +263,12 @@ export const StatisticsPage: React.FC = () => {
     if (authStatus === 'ready' && !statsLoading) {
       console.log('[StatisticsPage] Lancement chargement des statistiques (singleton)')
       loadAllStatistics()
+      
+      // 🔥 AJOUT POUR FORCER LE TEST DES INVITATIONS
+      console.log('🧪 Test forcé du chargement des invitations...')
+      setTimeout(() => {
+        loadInvitationStats()
+      }, 1000) // Délai pour éviter les conflits
     }
   }, [authStatus, selectedTimeRange])
 
@@ -282,48 +288,125 @@ export const StatisticsPage: React.FC = () => {
     }
   }, [authStatus, activeTab])
 
-  // FONCTION POUR RECUPERER LES HEADERS D'AUTHENTIFICATION (CORRIGEE)
-  const getAuthHeaders = async () => {
+  // FONCTION POUR RECUPERER LES HEADERS D'AUTHENTIFICATION (CORRIGEE AVEC COOKIES)
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
     try {
-      // Changement: Utiliser le singleton au lieu de createClientComponentClient
-      const supabase = getSupabaseClient()
-      const { data: { session }, error } = await supabase.auth.getSession()
+      console.log('🔐 getAuthHeaders: Début...')
       
-      if (error || !session) {
-        console.error('Erreur recuperation session (singleton):', error)
-        return {}
+      // SOLUTION 1: Essayer Supabase getSession() d'abord
+      try {
+        const supabase = getSupabaseClient()
+        console.log('🔐 getAuthHeaders: Supabase client récupéré')
+        
+        console.log('🔐 getAuthHeaders: Tentative getSession()...')
+        const { data: { session }, error } = await supabase.auth.getSession()
+        console.log('🔐 getAuthHeaders: Session récupérée:', { 
+          hasSession: !!session, 
+          hasError: !!error,
+          hasAccessToken: !!session?.access_token,
+          errorMessage: error?.message
+        })
+        
+        if (session?.access_token && !error) {
+          console.log('✅ Token trouvé via Supabase getSession()')
+          return {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      } catch (supabaseError) {
+        console.log('⚠️ Supabase getSession() échoué, essai cookies...')
       }
       
-      return {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json'
+      // SOLUTION 2: Fallback vers les cookies (solution éprouvée)
+      console.log('🍪 Tentative récupération token depuis cookies...')
+      const cookieToken = getCookieToken()
+      if (cookieToken) {
+        console.log('✅ Token trouvé dans cookies')
+        return {
+          'Authorization': `Bearer ${cookieToken}`,
+          'Content-Type': 'application/json'
+        }
       }
-    } catch (error) {
-      console.error('Erreur getAuthHeaders (singleton):', error)
+      
+      console.error('❌ Aucun token trouvé (ni Supabase ni cookies)')
       return {}
+      
+    } catch (error) {
+      console.error('❌ Erreur getAuthHeaders:', error)
+      return {}
+    }
+  }
+
+  // FONCTION HELPER POUR EXTRAIRE LE TOKEN DES COOKIES (de vos conversations précédentes)
+  const getCookieToken = (): string | null => {
+    try {
+      const cookies = document.cookie.split(';')
+      const sbCookie = cookies.find(cookie => 
+        cookie.trim().startsWith('sb-cdrmjshmkdfwwtsfdvbl-auth-token=')
+      )
+      
+      if (sbCookie) {
+        const cookieValue = sbCookie.split('=')[1]
+        const decodedValue = decodeURIComponent(cookieValue)
+        const parsed = JSON.parse(decodedValue)
+        
+        // Le token est dans parsed.access_token
+        if (parsed && parsed.access_token) {
+          console.log('🍪 Token extrait des cookies avec succès')
+          return parsed.access_token
+        }
+      }
+      
+      console.log('🍪 Pas de cookie Supabase trouvé')
+      return null
+    } catch (error) {
+      console.error('❌ Erreur parsing cookie:', error)
+      return null
     }
   }
 
   // NOUVELLE FONCTION: Charger les statistiques d'invitations
   const loadInvitationStats = async () => {
-    if (invitationLoading) return
+    console.log('🔥 loadInvitationStats DÉMARRÉ !') // Log d'entrée
+    
+    if (invitationLoading) {
+      console.log('⚠️ Déjà en cours de chargement, abandon')
+      return
+    }
     
     console.log('[StatisticsPage] Debut chargement stats invitations (singleton)')
     setInvitationLoading(true)
     setError(null)
 
     try {
+      console.log('🔐 Récupération des headers d\'authentification...')
       const headers = await getAuthHeaders()
+      console.log('🔐 Headers récupérés:', Object.keys(headers)) // Ne pas logger le token complet
+      
+      if (!headers || !('Authorization' in headers) || !headers.Authorization) {
+        console.error('❌ Pas de token d\'authentification disponible')
+        throw new Error('Pas de token d\'authentification disponible')
+      }
 
+      console.log('📡 Tentative fetch vers /api/v1/invitations/stats/global-enhanced')
+      
       // UTILISER LE NOUVEL ENDPOINT ENRICHI
       const enhancedStatsRes = await fetch('/api/v1/invitations/stats/global-enhanced', { headers })
       
+      console.log('📡 Réponse reçue, status:', enhancedStatsRes.status)
+      console.log('📡 Réponse headers:', enhancedStatsRes.headers)
+      
       if (!enhancedStatsRes.ok) {
+        console.log('⚠️ Endpoint enrichi échoué, tentative fallback...')
         // Fallback vers l'endpoint simple si l'enrichi n'existe pas encore
         console.log('Endpoint enrichi non disponible, utilisation endpoint simple...')
         const globalStatsRes = await fetch('/api/v1/invitations/stats/global', { headers })
         
+        console.log('📡 Fallback endpoint, status:', globalStatsRes.status)
+        
         if (!globalStatsRes.ok) {
+          console.error('❌ Tous les endpoints échouent:', globalStatsRes.status)
           throw new Error(`Erreur stats globales: ${globalStatsRes.status}`)
         }
 
@@ -891,10 +974,10 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  const getFeedbackIcon = (feedback: number | null) => {
-    if (feedback === 1) return '??'
-    if (feedback === -1) return '??'
-    return '?'
+  const getFeedbackIcon = (feedback: number | null): string => {
+    if (feedback === 1) return '👍'
+    if (feedback === -1) return '👎'
+    return '❓'
   }
 
   // RENDU CONDITIONNEL ULTRA-SIMPLE - Style Compass
@@ -928,7 +1011,7 @@ export const StatisticsPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
         <div className="bg-white border border-gray-200 max-w-md w-full text-center p-8">
-          <div className="text-red-600 text-6xl mb-4">??</div>
+          <div className="text-red-600 text-6xl mb-4">🔒</div>
           <h2 className="text-2xl font-semibold text-gray-900 mb-4">Connexion requise</h2>
           <p className="text-gray-600 mb-6">Vous devez etre connecte pour acceder a cette page.</p>
           <div className="flex space-x-3">
@@ -954,7 +1037,7 @@ export const StatisticsPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
         <div className="bg-white border border-gray-200 max-w-md w-full text-center p-8">
-          <div className="text-red-600 text-6xl mb-4">??</div>
+          <div className="text-red-600 text-6xl mb-4">🚫</div>
           <h2 className="text-2xl font-semibold text-gray-900 mb-4">Acces refuse</h2>
           <p className="text-gray-600 mb-2">Cette page est reservee aux super administrateurs.</p>
           <p className="text-sm text-gray-500 mb-6">Votre role actuel : <span className="font-medium">{user?.user_type || 'non defini'}</span></p>
@@ -986,7 +1069,7 @@ export const StatisticsPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
         <div className="bg-white border border-gray-200 max-w-md w-full text-center p-8">
-          <div className="text-amber-600 text-6xl mb-4">??</div>
+          <div className="text-amber-600 text-6xl mb-4">⚠️</div>
           <h2 className="text-2xl font-semibold text-gray-900 mb-4">Erreur</h2>
           <p className="text-gray-600 mb-6">{error}</p>
           <button
@@ -1048,7 +1131,7 @@ export const StatisticsPage: React.FC = () => {
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  ?? Invitations
+                  📧 Invitations
                 </button>
               </div>
             </div>
@@ -1160,7 +1243,7 @@ export const StatisticsPage: React.FC = () => {
                 <div className="space-y-4">
                   <div className="bg-blue-50 p-4 border border-blue-200">
                     <h4 className="font-medium text-gray-900 mb-2 flex items-center space-x-2">
-                      <span>?</span>
+                      <span>❓</span>
                       <span>Question:</span>
                     </h4>
                     <p className="text-gray-700">{selectedQuestion.question}</p>
@@ -1168,7 +1251,7 @@ export const StatisticsPage: React.FC = () => {
                   
                   <div className="bg-gray-50 p-4 border border-gray-200">
                     <h4 className="font-medium text-gray-900 mb-2 flex items-center space-x-2">
-                      <span>??</span>
+                      <span>💬</span>
                       <span>Reponse:</span>
                     </h4>
                     <div className="text-gray-700 whitespace-pre-wrap">{selectedQuestion.response}</div>
@@ -1177,7 +1260,7 @@ export const StatisticsPage: React.FC = () => {
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div className="bg-white p-4 border border-gray-200">
                       <h4 className="font-medium text-gray-900 mb-3 flex items-center space-x-2">
-                        <span>??</span>
+                        <span>📊</span>
                         <span>Metadonnees:</span>
                       </h4>
                       <table className="w-full text-sm">
@@ -1204,7 +1287,7 @@ export const StatisticsPage: React.FC = () => {
                     
                     <div className="bg-white p-4 border border-gray-200">
                       <h4 className="font-medium text-gray-900 mb-3 flex items-center space-x-2">
-                        <span>??</span>
+                        <span>👤</span>
                         <span>Utilisateur:</span>
                       </h4>
                       <table className="w-full text-sm">
@@ -1233,7 +1316,7 @@ export const StatisticsPage: React.FC = () => {
                   {selectedQuestion.feedback_comment && (
                     <div className="bg-purple-50 p-4 border border-purple-200">
                       <h4 className="font-medium text-gray-900 mb-2 flex items-center space-x-2">
-                        <span>??</span>
+                        <span>💭</span>
                         <span>Commentaire:</span>
                       </h4>
                       <p className="text-gray-700 italic">"{selectedQuestion.feedback_comment}"</p>

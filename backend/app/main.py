@@ -1,6 +1,7 @@
-# app/main.py - VERSION 3 RAG COMPLETS - CORRIGÉ AVEC AUTH + MONITORING COMPLET + ANALYTICS
-# ✅ CORRECTION DU ROUTING AUTH POUR RÉSOUDRE LE CATCH-22
-# 🔧 CORRECTION CORS POUR CREDENTIALS: 'INCLUDE' - VERSION FINALE
+# app/main.py - VERSION 4.0 AVEC SYSTÈME DE CACHE STATISTIQUES INTÉGRÉ
+# ✅ CONSERVATION INTÉGRALE DU CODE ORIGINAL + AJOUTS CACHE SAFE
+# 🚀 NOUVEAU: Système de cache statistiques automatique
+# 🔧 CORRECTION CORS POUR CREDENTIALS: 'INCLUDE' - VERSION FINALE CONSERVÉE
 from __future__ import annotations
 
 import os
@@ -26,20 +27,36 @@ except Exception:
 logger = logging.getLogger("app.main")
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
-# 🆕 ACTIVATION SYNTHÈSE LLM AU DÉMARRAGE
+# 🆕 ACTIVATION SYNTHÈSE LLM AU DÉMARRAGE (CONSERVÉ)
 synthesis_enabled = str(os.getenv("ENABLE_SYNTH_PROMPT", "0")).lower() in ("1", "true", "yes", "on")
 if synthesis_enabled:
     logger.info("✅ Synthèse LLM activée (ENABLE_SYNTH_PROMPT=1)")
 else:
     logger.info("ℹ️ Synthèse LLM désactivée (ENABLE_SYNTH_PROMPT=0)")
 
-# ========== VARIABLES GLOBALES DE MONITORING ==========
+# ========== VARIABLES GLOBALES DE MONITORING (CONSERVÉES) ==========
 request_counter = 0
 error_counter = 0
 start_time = time.time()
 active_requests = 0
 
-# ========== FONCTION DE MONITORING PÉRIODIQUE AMÉLIORÉE ==========
+# 🚀 NOUVEAU: Variables pour le système de cache statistiques
+stats_scheduler_task = None
+cache_update_counter = 0
+cache_error_counter = 0
+
+# 🚀 NOUVEAU: Import du système de cache (SAFE - avec gestion d'erreur)
+STATS_CACHE_AVAILABLE = False
+try:
+    from app.api.v1.stats_cache import get_stats_cache, is_cache_available, force_cache_refresh
+    from app.api.v1.stats_updater import get_stats_updater, run_update_cycle, force_update_all
+    STATS_CACHE_AVAILABLE = True
+    logger.info("✅ Système de cache statistiques importé avec succès")
+except ImportError as e:
+    logger.warning(f"⚠️ Système de cache statistiques non disponible: {e}")
+    logger.info("ℹ️ L'application fonctionnera normalement sans le cache optimisé")
+
+# ========== FONCTION DE MONITORING PÉRIODIQUE AMÉLIORÉE (CONSERVÉE) ==========
 async def periodic_monitoring():
     """Monitoring périodique des performances serveur avec logging en base"""
     while True:
@@ -87,17 +104,90 @@ async def periodic_monitoring():
             except Exception as e:
                 logger.warning(f"⚠️ Erreur logging métriques en base: {e}")
                 
+            # 🚀 NOUVEAU: Ajouter les métriques du cache
+            cache_info = ""
+            if STATS_CACHE_AVAILABLE:
+                cache_info = f", cache: {cache_update_counter} updates, {cache_error_counter} erreurs"
+                
             logger.info(f"📊 Métriques: {requests_per_minute:.1f} req/min, "
                        f"erreurs: {error_rate_percent:.1f}%, "
                        f"CPU: {cpu_percent:.1f}%, RAM: {memory_percent:.1f}%, "
-                       f"santé: {health_status}")
+                       f"santé: {health_status}{cache_info}")
             
         except Exception as e:
             logger.error(f"⌛ Erreur monitoring périodique: {e}")
             await asyncio.sleep(60)  # Retry dans 1 minute en cas d'erreur
 
+# 🚀 NOUVEAU: Fonction de mise à jour périodique du cache statistiques
+async def periodic_stats_update():
+    """🔄 Mise à jour périodique du cache statistiques toutes les heures"""
+    global cache_update_counter, cache_error_counter
+    
+    if not STATS_CACHE_AVAILABLE:
+        logger.warning("⚠️ Cache statistiques non disponible - arrêt scheduler")
+        return
+    
+    # Attendre 5 minutes avant la première mise à jour (laisser le système s'initialiser)
+    await asyncio.sleep(300)
+    
+    # Première mise à jour au démarrage
+    logger.info("🚀 Lancement première mise à jour cache statistiques au démarrage")
+    try:
+        result = await run_update_cycle()
+        if result.get("status") == "completed":
+            cache_update_counter += 1
+            logger.info("✅ Première mise à jour cache réussie au démarrage")
+        else:
+            cache_error_counter += 1
+            logger.warning(f"⚠️ Première mise à jour cache échouée: {result.get('error', 'Unknown')}")
+    except Exception as e:
+        cache_error_counter += 1
+        logger.error(f"❌ Erreur première mise à jour cache: {e}")
+    
+    # Boucle principale - mise à jour toutes les heures
+    while True:
+        try:
+            # Attendre 1 heure (3600 secondes)
+            await asyncio.sleep(3600)
+            
+            logger.info("🔄 Début mise à jour périodique cache statistiques")
+            start_update = time.time()
+            
+            # Lancer la mise à jour
+            result = await run_update_cycle()
+            
+            update_duration = (time.time() - start_update) * 1000  # en ms
+            
+            if result.get("status") == "completed":
+                cache_update_counter += 1
+                successful = result.get("successful_updates", 0)
+                total = result.get("total_updates", 0)
+                duration = result.get("duration_ms", update_duration)
+                
+                logger.info(f"✅ Cache mis à jour: {successful}/{total} succès en {duration:.0f}ms")
+                
+                # Log détaillé si des erreurs
+                errors = result.get("errors", [])
+                if errors:
+                    logger.warning(f"⚠️ Erreurs durant la mise à jour: {errors}")
+                
+            elif result.get("status") == "failed":
+                cache_error_counter += 1
+                error_msg = result.get("error", "Erreur inconnue")
+                logger.error(f"❌ Mise à jour cache échouée: {error_msg}")
+                
+            else:
+                cache_error_counter += 1
+                logger.warning(f"⚠️ Mise à jour cache statut inattendu: {result}")
+            
+        except Exception as e:
+            cache_error_counter += 1
+            logger.error(f"❌ Erreur durant mise à jour périodique cache: {e}")
+            # Attendre 10 minutes avant de retry en cas d'erreur
+            await asyncio.sleep(600)
+
 # -------------------------------------------------------------------
-# FONCTION RAG COMPLÈTE - 3 RAG
+# FONCTION RAG COMPLÈTE - 3 RAG (CONSERVÉE INTÉGRALEMENT)
 # -------------------------------------------------------------------
 def get_rag_paths() -> Dict[str, str]:
     """🎯 TOUS LES RAG : Global + Broiler + Layer"""
@@ -109,14 +199,14 @@ def get_rag_paths() -> Dict[str, str]:
     }
 
 # -------------------------------------------------------------------
-# Lifespan: init Supabase + 3 RAG COMPLETS + MONITORING
+# Lifespan: init Supabase + 3 RAG COMPLETS + MONITORING + CACHE (ÉTENDU)
 # -------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ========== INITIALISATION AU DÉMARRAGE ==========
-    logger.info("🚀 Démarrage de l'application Expert API avec système complet")
+    logger.info("🚀 Démarrage de l'application Expert API avec système complet + cache statistiques")
     
-    # ========== INITIALISATION DES SERVICES AMÉLIORÉE ==========
+    # ========== INITIALISATION DES SERVICES AMÉLIORÉE (CONSERVÉE) ==========
     try:
         logger.info("📊 Initialisation des services analytics et facturation...")
         
@@ -140,6 +230,15 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.warning(f"⚠️ Service billing partiellement disponible: {e}")
             
+            # 🚀 NOUVEAU: Initialiser le système de cache statistiques
+            if STATS_CACHE_AVAILABLE:
+                try:
+                    cache = get_stats_cache()
+                    cache_stats = cache.get_cache_stats()
+                    logger.info(f"✅ Cache statistiques initialisé: {cache_stats}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Cache statistiques partiellement disponible: {e}")
+            
             # Nettoyer les anciennes sessions (plus de 7 jours)
             try:
                 from app.api.v1.pipeline.postgres_memory import PostgresMemory
@@ -157,7 +256,7 @@ async def lifespan(app: FastAPI):
         logger.error(f"⌛ Erreur initialisation services: {e}")
         # Ne pas empêcher le démarrage
     
-    # Initialisation Supabase (CONSERVÉ)
+    # Initialisation Supabase (CONSERVÉE)
     app.state.supabase = None
     try:
         from supabase import create_client
@@ -179,7 +278,7 @@ async def lifespan(app: FastAPI):
         from rag.embedder import FastRAGEmbedder
 
         rag_paths = get_rag_paths()
-        logger.info(f"📁 Chargement des 3 RAG: {list(rag_paths.keys())}")
+        logger.info(f"🔍 Chargement des 3 RAG: {list(rag_paths.keys())}")
 
         # Variables d'environnement (override si définies)
         env_override = {
@@ -214,7 +313,7 @@ async def lifespan(app: FastAPI):
 
         # 🚀 GLOBAL
         global_path = rag_paths["global"]
-        logger.info(f"📁 Chargement RAG Global: {global_path}")
+        logger.info(f"🔍 Chargement RAG Global: {global_path}")
         if os.path.exists(global_path):
             global_embedder = FastRAGEmbedder(debug=True, cache_embeddings=True, max_workers=2)
             if global_embedder.load_index(global_path) and global_embedder.has_search_engine():
@@ -227,7 +326,7 @@ async def lifespan(app: FastAPI):
 
         # 🚀 BROILER
         broiler_path = rag_paths["broiler"]
-        logger.info(f"📁 Chargement RAG Broiler: {broiler_path}")
+        logger.info(f"🔍 Chargement RAG Broiler: {broiler_path}")
         if os.path.exists(broiler_path):
             try:
                 broiler_embedder = FastRAGEmbedder(debug=False, cache_embeddings=True, max_workers=2)
@@ -243,7 +342,7 @@ async def lifespan(app: FastAPI):
 
         # 🚀 LAYER
         layer_path = rag_paths["layer"]
-        logger.info(f"📁 Chargement RAG Layer: {layer_path}")
+        logger.info(f"🔍 Chargement RAG Layer: {layer_path}")
         if os.path.exists(layer_path):
             try:
                 layer_embedder = FastRAGEmbedder(debug=False, cache_embeddings=True, max_workers=2)
@@ -278,7 +377,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error("⌛ Erreur critique initialisation RAG: %s", e)
 
-    # ========== DÉMARRAGE DU MONITORING PÉRIODIQUE ==========
+    # ========== DÉMARRAGE DU MONITORING PÉRIODIQUE (CONSERVÉ) ==========
     monitoring_task = None
     try:
         monitoring_task = asyncio.create_task(periodic_monitoring())
@@ -286,9 +385,25 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"⌛ Erreur démarrage monitoring: {e}")
 
+    # 🚀 NOUVEAU: DÉMARRAGE DU SCHEDULER CACHE STATISTIQUES
+    global stats_scheduler_task
+    if STATS_CACHE_AVAILABLE:
+        try:
+            stats_scheduler_task = asyncio.create_task(periodic_stats_update())
+            logger.info("🔄 Scheduler cache statistiques démarré (mise à jour toutes les heures)")
+        except Exception as e:
+            logger.error(f"❌ Erreur démarrage scheduler cache: {e}")
+    else:
+        logger.info("ℹ️ Scheduler cache statistiques désactivé (module non disponible)")
+
     # ========== L'APPLICATION DÉMARRE ==========
-    logger.info("🎯 Application Expert API prête avec système complet")
-    yield  # --- L'application fonctionne ---
+    system_features = []
+    if STATS_CACHE_AVAILABLE:
+        system_features.append("cache statistiques optimisé")
+    system_features.extend(["3 RAG", "monitoring", "analytics", "billing"])
+    
+    logger.info(f"🎯 Application Expert API prête avec: {', '.join(system_features)}")
+    yield  # --- L'APPLICATION FONCTIONNE ---
 
     # ========== NETTOYAGE À L'ARRÊT ==========
     logger.info("🛑 Arrêt de l'application Expert API")
@@ -301,17 +416,30 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"⌛ Erreur arrêt monitoring: {e}")
     
+    # 🚀 NOUVEAU: Arrêter le scheduler cache
+    if stats_scheduler_task:
+        try:
+            stats_scheduler_task.cancel()
+            logger.info("🔄 Scheduler cache statistiques arrêté")
+        except Exception as e:
+            logger.error(f"❌ Erreur arrêt scheduler cache: {e}")
+    
     # Statistiques finales
     uptime_hours = (time.time() - start_time) / 3600
-    logger.info(f"📈 Statistiques finales: {request_counter} requêtes en {uptime_hours:.1f}h, "
-               f"{error_counter} erreurs ({(error_counter/max(request_counter,1)*100):.1f}%)")
+    final_stats = f"{request_counter} requêtes en {uptime_hours:.1f}h, {error_counter} erreurs ({(error_counter/max(request_counter,1)*100):.1f}%)"
+    
+    if STATS_CACHE_AVAILABLE and cache_update_counter > 0:
+        cache_success_rate = ((cache_update_counter / max(cache_update_counter + cache_error_counter, 1)) * 100)
+        final_stats += f", cache: {cache_update_counter} mises à jour ({cache_success_rate:.1f}% succès)"
+    
+    logger.info(f"📈 Statistiques finales: {final_stats}")
 
 # -------------------------------------------------------------------
-# FastAPI
+# FastAPI (CONSERVÉ INTÉGRALEMENT)
 # -------------------------------------------------------------------
 app = FastAPI(
     title="Intelia Expert API",
-    version="3.5.5",
+    version="4.0.0",  # 🚀 NOUVEAU: Version mise à jour
     root_path="/api",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -320,7 +448,7 @@ app = FastAPI(
 )
 
 # =============================================================================
-# 🔥 CORRECTION CORS CRITIQUE - FIXED POUR CREDENTIALS: 'INCLUDE'
+# 🔥 CORRECTION CORS CRITIQUE - FIXED POUR CREDENTIALS: 'INCLUDE' (CONSERVÉE)
 # =============================================================================
 app.add_middleware(
     CORSMiddleware,
@@ -354,7 +482,7 @@ app.add_middleware(
 )
 
 # =============================================================================
-# MIDDLEWARE DE MONITORING DES REQUÊTES
+# MIDDLEWARE DE MONITORING DES REQUÊTES (CONSERVÉ)
 # =============================================================================
 @app.middleware("http")
 async def monitoring_middleware(request: Request, call_next):
@@ -387,7 +515,7 @@ async def monitoring_middleware(request: Request, call_next):
         if processing_time > 5000:  # Plus de 5 secondes
             logger.warning(f"🌀 Requête lente: {request.method} {request.url.path} - {processing_time:.0f}ms")
 
-# 🔒 AJOUT DU MIDDLEWARE D'AUTHENTIFICATION (CONSERVÉ)
+# 🔐 AJOUT DU MIDDLEWARE D'AUTHENTIFICATION (CONSERVÉ)
 try:
     from app.middleware.auth_middleware import auth_middleware
     app.middleware("http")(auth_middleware)
@@ -398,7 +526,7 @@ except Exception as e:
     logger.error(f"⌛ Erreur lors de l'activation du middleware d'auth: {e}")
 
 # -------------------------------------------------------------------
-# 🔧 CORRECTION MAJEURE : Montage des routers avec AUTH ROUTING FIXÉ
+# 🔧 CORRECTION MAJEURE : Montage des routers avec AUTH ROUTING FIXÉ (CONSERVÉ)
 # -------------------------------------------------------------------
 # 🔧 CREATION D'UN ROUTER V1 TEMPORAIRE SI LE FICHIER __init__.py EST VIDE
 try:
@@ -421,19 +549,19 @@ except ImportError as e:
     except ImportError as e:
         logger.error(f"⌛ Impossible de charger expert router: {e}")
     
-    # ✅ CORRECTION CRITIQUE DU ROUTING AUTH - Résout le catch-22
+    # ✅ CORRECTION CRITIQUE DU ROUTING AUTH - Résout le catch-22 (CONSERVÉ)
     try:
         from app.api.v1.auth import router as auth_router
         
-        # 📁 Debug du router auth avant montage
-        logger.info(f"📁 Auth router prefix avant montage: {getattr(auth_router, 'prefix', 'None')}")
-        logger.info(f"📁 Auth router routes count: {len(auth_router.routes)}")
+        # 🔍 Debug du router auth avant montage
+        logger.info(f"🔍 Auth router prefix avant montage: {getattr(auth_router, 'prefix', 'None')}")
+        logger.info(f"🔍 Auth router routes count: {len(auth_router.routes)}")
         
         # Debug détaillé des routes auth
         for route in auth_router.routes:
             if hasattr(route, 'path') and hasattr(route, 'methods'):
                 methods_list = list(route.methods) if hasattr(route, 'methods') else ['UNKNOWN']
-                logger.info(f"📁 Route auth: {route.path} {methods_list}")
+                logger.info(f"🔍 Route auth: {route.path} {methods_list}")
         
         # ✅ MONTAGE CORRIGÉ - Pas de prefix car auth.py a déjà /auth
         temp_v1_router.include_router(
@@ -454,7 +582,25 @@ except ImportError as e:
         import traceback
         logger.error(f"⌛ Traceback: {traceback.format_exc()}")
     
-    # ✅ ENDPOINTS DE TEST TEMPORAIRES pour vérifier le fix
+    # 🚀 NOUVEAU: Montage des routers cache statistiques (SAFE)
+    if STATS_CACHE_AVAILABLE:
+        try:
+            from app.api.v1.stats_fast import router as stats_fast_router
+            temp_v1_router.include_router(stats_fast_router, tags=["statistics-fast"])
+            logger.info("✅ Stats Fast router ajouté (endpoints ultra-rapides)")
+        except ImportError as e:
+            logger.warning(f"⚠️ Stats Fast router non disponible: {e}")
+        
+        try:
+            from app.api.v1.stats_admin import router as stats_admin_router
+            temp_v1_router.include_router(stats_admin_router, tags=["statistics-admin"])
+            logger.info("✅ Stats Admin router ajouté (administration cache)")
+        except ImportError as e:
+            logger.warning(f"⚠️ Stats Admin router non disponible: {e}")
+    else:
+        logger.info("ℹ️ Routers cache statistiques non montés (module non disponible)")
+    
+    # ✅ ENDPOINTS DE TEST TEMPORAIRES pour vérifier le fix (CONSERVÉS)
     @temp_v1_router.get("/auth/test-routing")
     async def test_auth_routing():
         """Endpoint temporaire pour vérifier que le routing auth fonctionne"""
@@ -479,6 +625,40 @@ except ImportError as e:
             "message": "POST sur auth routing fonctionne",
             "note": "Le vrai login est sur /v1/auth/login"
         }
+    
+    # 🚀 NOUVEAU: Endpoints de test pour le cache
+    if STATS_CACHE_AVAILABLE:
+        @temp_v1_router.get("/stats/test")
+        async def test_stats_cache():
+            """Test du système de cache statistiques"""
+            try:
+                cache = get_stats_cache()
+                
+                # Test simple d'écriture/lecture
+                test_data = {"test": True, "timestamp": datetime.now().isoformat()}
+                cache.set_cache("test:endpoint", test_data, ttl_hours=1)
+                cached_result = cache.get_cache("test:endpoint")
+                
+                return {
+                    "status": "success",
+                    "message": "Système de cache statistiques fonctionnel",
+                    "cache_test": "ok" if cached_result else "failed",
+                    "available_endpoints": [
+                        "GET /v1/stats-fast/dashboard (dashboard ultra-rapide)",
+                        "GET /v1/stats-fast/questions (questions ultra-rapides)", 
+                        "GET /v1/stats-admin/status (administration cache)",
+                        "POST /v1/stats-admin/force-update/all (force mise à jour)"
+                    ],
+                    "scheduler_active": stats_scheduler_task is not None and not stats_scheduler_task.done(),
+                    "cache_updates": cache_update_counter,
+                    "cache_errors": cache_error_counter
+                }
+            except Exception as e:
+                return {
+                    "status": "error",
+                    "message": f"Erreur test cache: {e}",
+                    "cache_available": False
+                }
     
     # Continuer avec les autres routers (CONSERVÉ)
     try:
@@ -509,15 +689,13 @@ except ImportError as e:
     except ImportError as e:
         logger.warning(f"⚠️ Invitations router non disponible: {e}")
 
-
-# 🆕 NOUVEAU: Router auth invitations
+    # 🆕 NOUVEAU: Router auth invitations (CONSERVÉ)
     try:
         from app.api.v1.auth_invitations import router as auth_invitations_router
         temp_v1_router.include_router(auth_invitations_router, tags=["auth-invitations"])
         logger.info("✅ Auth invitations router ajouté")
     except ImportError as e:
         logger.warning(f"⚠️ Auth invitations router non disponible: {e}")
-
     
     try:
         from app.api.v1.logging import router as logging_router
@@ -550,14 +728,14 @@ except ImportError as e:
     
     # Monter le router temporaire
     app.include_router(temp_v1_router)
-    logger.info("✅ Router v1 temporaire monté avec succès")
+    logger.info("✅ Router v1 temporaire monté avec succès (incluant cache statistiques)")
 
 # -------------------------------------------------------------------
-# Debug RAG - 3 RAG COMPLETS (INCHANGÉ)
+# Debug RAG - 3 RAG COMPLETS (CONSERVÉ INTÉGRALEMENT)
 # -------------------------------------------------------------------
 @app.get("/rag/debug", tags=["Debug"])
 async def rag_debug():
-    """📁 Debug des 3 RAG (Global + Broiler + Layer)"""
+    """🔍 Debug des 3 RAG (Global + Broiler + Layer)"""
     rag_paths = get_rag_paths()
     env_vars = {
         "RAG_INDEX_GLOBAL": os.getenv("RAG_INDEX_GLOBAL"),
@@ -728,10 +906,10 @@ async def test_rag_access():
 
     return results
 
-# ========== HEALTH CHECK COMPLET AMÉLIORÉ ==========
+# ========== HEALTH CHECK COMPLET AMÉLIORÉ AVEC CACHE (ÉTENDU) ==========
 @app.get("/health/complete", tags=["Health"])
 async def complete_health_check():
-    """🥼 Check de santé complet du système avec billing et analytics"""
+    """🥼 Check de santé complet du système avec billing, analytics et cache"""
     try:
         health_status = {
             "timestamp": datetime.utcnow().isoformat(),
@@ -771,6 +949,37 @@ async def complete_health_check():
             }
             health_status["status"] = "degraded"
         
+        # 🚀 NOUVEAU: Check système de cache statistiques
+        if STATS_CACHE_AVAILABLE:
+            try:
+                cache = get_stats_cache()
+                cache_stats = cache.get_cache_stats()
+                
+                scheduler_active = stats_scheduler_task is not None and not stats_scheduler_task.done()
+                cache_success_rate = 100
+                if cache_update_counter + cache_error_counter > 0:
+                    cache_success_rate = (cache_update_counter / (cache_update_counter + cache_error_counter)) * 100
+                
+                health_status["components"]["statistics_cache"] = {
+                    "status": "healthy" if cache_stats and scheduler_active else "degraded",
+                    "scheduler_active": scheduler_active,
+                    "cache_updates": cache_update_counter,
+                    "cache_errors": cache_error_counter,
+                    "success_rate": round(cache_success_rate, 1),
+                    "cache_entries": cache_stats
+                }
+            except Exception as e:
+                health_status["components"]["statistics_cache"] = {
+                    "status": "unhealthy",
+                    "error": str(e)
+                }
+                health_status["status"] = "degraded"
+        else:
+            health_status["components"]["statistics_cache"] = {
+                "status": "not_available",
+                "message": "Module cache statistiques non importé"
+            }
+        
         # Check RAG
         total_rags = sum(1 for rag in [
             getattr(app.state, "rag", None),
@@ -790,7 +999,7 @@ async def complete_health_check():
             "status": "configured" if openai_key else "not_configured"
         }
         
-        # 🔥 NOUVEAU: Check OpenAI Billing API
+        # 🔥 NOUVEAU: Check OpenAI Billing API (CONSERVÉ)
         try:
             from app.api.v1.billing_openai import get_openai_organization_id
             org_id = get_openai_organization_id()
@@ -806,7 +1015,7 @@ async def complete_health_check():
                 "error": str(e)
             }
         
-        # ✅ NOUVEAU: Check Auth system
+        # ✅ NOUVEAU: Check Auth system (CONSERVÉ)
         try:
             jwt_secret = os.getenv("JWT_SECRET") or os.getenv("SUPABASE_JWT_SECRET")
             supabase_url = os.getenv("SUPABASE_URL") 
@@ -830,13 +1039,17 @@ async def complete_health_check():
                 "error": str(e)
             }
         
-        # Métriques système
+        # Métriques système (ÉTENDUES)
         uptime_hours = (time.time() - start_time) / 3600
         health_status["metrics"] = {
             "uptime_hours": round(uptime_hours, 2),
             "total_requests": request_counter,
             "error_rate_percent": round((error_counter / max(request_counter, 1)) * 100, 2),
-            "active_requests": active_requests
+            "active_requests": active_requests,
+            # 🚀 NOUVEAU: Métriques cache
+            "cache_updates": cache_update_counter,
+            "cache_errors": cache_error_counter,
+            "scheduler_active": stats_scheduler_task is not None and not stats_scheduler_task.done() if STATS_CACHE_AVAILABLE else False
         }
         
         # Déterminer le statut global
@@ -860,11 +1073,11 @@ async def complete_health_check():
 
 @app.get("/metrics", tags=["Monitoring"])
 async def system_metrics():
-    """📊 Métriques système pour monitoring externe"""
+    """📊 Métriques système pour monitoring externe (ÉTENDUES)"""
     try:
         uptime_seconds = time.time() - start_time
         
-        return {
+        base_metrics = {
             "uptime_seconds": uptime_seconds,
             "requests_total": request_counter,
             "errors_total": error_counter,
@@ -882,13 +1095,28 @@ async def system_metrics():
             "direct_auth_endpoints": True,  # ✅ NOUVEAU FLAG AUTH DIRECT
             "cors_credentials_fixed": True,  # 🔧 NOUVEAU FLAG CORS CREDENTIALS
         }
+        
+        # 🚀 NOUVEAU: Ajouter métriques cache si disponible
+        if STATS_CACHE_AVAILABLE:
+            base_metrics.update({
+                "cache_system_enabled": True,
+                "cache_updates_total": cache_update_counter,
+                "cache_errors_total": cache_error_counter,
+                "cache_success_rate": (cache_update_counter / max(cache_update_counter + cache_error_counter, 1)) * 100,
+                "scheduler_active": stats_scheduler_task is not None and not stats_scheduler_task.done()
+            })
+        else:
+            base_metrics["cache_system_enabled"] = False
+        
+        return base_metrics
+        
     except Exception as e:
         return {"error": str(e)}
 
-# ========== NOUVEAU ENDPOINT DE STATISTIQUES ADMIN ==========
+# ========== NOUVEAU ENDPOINT DE STATISTIQUES ADMIN ÉTENDU ==========
 @app.get("/admin/stats", tags=["Admin"])
 async def admin_statistics():
-    """📈 Statistiques administrateur complètes"""
+    """📈 Statistiques administrateur complètes avec cache"""
     try:
         from app.api.v1.billing import get_billing_manager
         from app.api.v1.logging import get_analytics_manager
@@ -899,7 +1127,7 @@ async def admin_statistics():
         # Stats analytics (approximatives - à adapter selon les besoins)
         uptime_hours = (time.time() - start_time) / 3600
         
-        return {
+        base_stats = {
             "system_health": {
                 "uptime_hours": round(uptime_hours, 2),
                 "total_requests": request_counter,
@@ -924,17 +1152,121 @@ async def admin_statistics():
                 "cors_middleware_fixed": True,  # ✅ NOUVEAU FLAG CORS
                 "direct_auth_endpoints": True,  # ✅ NOUVEAU FLAG AUTH DIRECT
                 "cors_credentials_fixed": True,  # 🔧 NOUVEAU FLAG CORS CREDENTIALS
+                "statistics_cache_system": STATS_CACHE_AVAILABLE,  # 🚀 NOUVEAU
             }
         }
+        
+        # 🚀 NOUVEAU: Ajouter stats cache si disponible
+        if STATS_CACHE_AVAILABLE:
+            try:
+                cache = get_stats_cache()
+                cache_stats = cache.get_cache_stats()
+                
+                base_stats["cache_system"] = {
+                    "enabled": True,
+                    "scheduler_active": stats_scheduler_task is not None and not stats_scheduler_task.done(),
+                    "updates_total": cache_update_counter,
+                    "errors_total": cache_error_counter,
+                    "success_rate": round((cache_update_counter / max(cache_update_counter + cache_error_counter, 1)) * 100, 1),
+                    "cache_statistics": cache_stats
+                }
+            except Exception as e:
+                base_stats["cache_system"] = {
+                    "enabled": True,
+                    "status": "error",
+                    "error": str(e)
+                }
+        else:
+            base_stats["cache_system"] = {
+                "enabled": False,
+                "reason": "Module non importé"
+            }
+        
+        return base_stats
         
     except Exception as e:
         return {"error": str(e)}
 
+# 🚀 NOUVEAU: Endpoint pour contrôle manuel du cache
+@app.post("/admin/cache/force-update", tags=["Admin"])
+async def admin_force_cache_update():
+    """🔄 Force une mise à jour manuelle du cache (admin)"""
+    if not STATS_CACHE_AVAILABLE:
+        return {
+            "status": "unavailable",
+            "message": "Système de cache non disponible"
+        }
+    
+    try:
+        logger.info("🔄 Force update cache demandé via admin endpoint")
+        result = await force_update_all()
+        
+        global cache_update_counter, cache_error_counter
+        if result.get("status") == "completed":
+            cache_update_counter += 1
+        else:
+            cache_error_counter += 1
+        
+        return {
+            "status": "success",
+            "message": "Mise à jour cache forcée",
+            "result": result,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        cache_error_counter += 1
+        logger.error(f"❌ Erreur force update admin: {e}")
+        return {
+            "status": "error",
+            "message": f"Erreur mise à jour: {e}",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+@app.get("/admin/cache/status", tags=["Admin"])
+async def admin_cache_status():
+    """📊 Statut détaillé du système de cache (admin)"""
+    if not STATS_CACHE_AVAILABLE:
+        return {
+            "status": "unavailable",
+            "message": "Système de cache non disponible",
+            "enabled": False
+        }
+    
+    try:
+        cache = get_stats_cache()
+        updater = get_stats_updater()
+        
+        cache_stats = cache.get_cache_stats()
+        update_status = updater.get_update_status()
+        
+        return {
+            "status": "available",
+            "enabled": True,
+            "scheduler": {
+                "active": stats_scheduler_task is not None and not stats_scheduler_task.done(),
+                "task_done": stats_scheduler_task.done() if stats_scheduler_task else True
+            },
+            "counters": {
+                "updates_successful": cache_update_counter,
+                "updates_failed": cache_error_counter,
+                "success_rate": round((cache_update_counter / max(cache_update_counter + cache_error_counter, 1)) * 100, 1)
+            },
+            "cache_statistics": cache_stats,
+            "last_update": update_status,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e),
+            "enabled": True
+        }
+
 # ===============================================================================
-# ROUTER AUTH DIRECT - CONTOURNEMENT DU PROBLÈME DE MONTAGE
+# ROUTER AUTH DIRECT - CONTOURNEMENT DU PROBLÈME DE MONTAGE (CONSERVÉ)
 # ===============================================================================
 
-# ✅ ENDPOINTS AUTH DIRECTS - Évite le problème de montage du router
+# ✅ ENDPOINTS AUTH DIRECTS - Évite le problème de montage du router (CONSERVÉS INTÉGRALEMENT)
 @app.post("/v1/auth/login")
 async def auth_login_direct(request: Request):
     """Endpoint login direct - contournement du problème de router"""
@@ -1018,6 +1350,7 @@ async def auth_debug_direct():
         "api_corrected": True,  # 🔧 NOUVEAU FLAG
         "routing_fixed": True,   # 🔧 NOUVEAU FLAG
         "cors_credentials_fixed": True,  # 🔧 NOUVEAU FLAG CORS CREDENTIALS
+        "cache_system_enabled": STATS_CACHE_AVAILABLE,  # 🚀 NOUVEAU
         "secrets_available": [
             name for name, value in [
                 ("SUPABASE_JWT_SECRET", os.getenv("SUPABASE_JWT_SECRET")),
@@ -1130,6 +1463,7 @@ async def auth_test_direct():
         "catch_22_resolved": True,
         "routing_fixed": True,  # 🔧 NOUVEAU FLAG
         "cors_credentials_fixed": True,  # 🔧 NOUVEAU FLAG CORS CREDENTIALS
+        "cache_system_available": STATS_CACHE_AVAILABLE,  # 🚀 NOUVEAU
         "solution": "direct_endpoints_bypass",
         "timestamp": datetime.utcnow().isoformat()
     }
@@ -1142,7 +1476,8 @@ async def cors_test_fixed(request: Request):
         "origin": request.headers.get("Origin"),
         "timestamp": datetime.utcnow().isoformat(),
         "cors_fixed": True,
-        "cors_credentials_fixed": True  # 🔧 NOUVEAU FLAG CORS CREDENTIALS
+        "cors_credentials_fixed": True,  # 🔧 NOUVEAU FLAG CORS CREDENTIALS
+        "cache_system_available": STATS_CACHE_AVAILABLE  # 🚀 NOUVEAU
     }
 
 @app.get("/", tags=["Root"])
@@ -1164,9 +1499,17 @@ async def root():
     # Calculer l'uptime
     uptime_hours = (time.time() - start_time) / 3600
     
+    # 🚀 NOUVEAU: Statut cache
+    cache_status = "not_available"
+    if STATS_CACHE_AVAILABLE:
+        if stats_scheduler_task and not stats_scheduler_task.done():
+            cache_status = "active"
+        else:
+            cache_status = "available_but_inactive"
+    
     return {
         "status": "running",
-        "version": "3.5.5",
+        "version": "4.0.0",  # 🚀 NOUVEAU: Version mise à jour
         "environment": os.getenv("ENV", "production"),
         "database": bool(getattr(app.state, "supabase", None)),
         "postgresql": bool(os.getenv("DATABASE_URL")),
@@ -1179,6 +1522,7 @@ async def root():
         "cors_middleware_fixed": True,  # ✅ NOUVEAU FLAG CORS
         "direct_auth_endpoints": True,  # ✅ NOUVEAU FLAG AUTH DIRECT
         "cors_credentials_fixed": True,  # 🔧 NOUVEAU FLAG CORS CREDENTIALS
+        "statistics_cache_system": cache_status,  # 🚀 NOUVEAU
         "new_features": {
             "billing_system": True,
             "analytics_tracking": True,
@@ -1196,15 +1540,19 @@ async def root():
             "cors_middleware_fixed": True,  # ✅ NOUVEAU FLAG CORS
             "direct_auth_endpoints": True,  # ✅ NOUVEAU FLAG AUTH DIRECT
             "cors_credentials_support": True,  # 🔧 NOUVEAU FLAG CORS CREDENTIALS
+            "statistics_cache_optimized": STATS_CACHE_AVAILABLE,  # 🚀 NOUVEAU
+            "hourly_cache_updates": STATS_CACHE_AVAILABLE,  # 🚀 NOUVEAU
+            "ultra_fast_endpoints": STATS_CACHE_AVAILABLE,  # 🚀 NOUVEAU
         },
         "uptime_hours": round(uptime_hours, 2),
         "requests_processed": request_counter,
-        "last_update": "2025-08-20T01:30:00Z",  # 🔧 FLAG DE DEBUG UPDATED
-        "deployment_version": "v3.5.5-cors-credentials-fixed"  # 🔧 FLAG DE DEBUG UPDATED
+        "cache_updates": cache_update_counter if STATS_CACHE_AVAILABLE else 0,  # 🚀 NOUVEAU
+        "last_update": "2025-08-22T15:00:00Z",  # 🚀 NOUVEAU: Updated timestamp
+        "deployment_version": "v4.0.0-with-stats-cache"  # 🚀 NOUVEAU: Updated version
     }
 
 # ===============================================================================
-# ENDPOINTS AUTH TEMPORAIRES - SOLUTION GARANTIE 
+# ENDPOINTS AUTH TEMPORAIRES - SOLUTION GARANTIE (CONSERVÉS)
 # ===============================================================================
 
 @app.post("/auth-temp/login")
@@ -1354,7 +1702,8 @@ async def temp_auth_test():
         "deployment_confirmed": True,
         "timestamp": datetime.utcnow().isoformat(),
         "version": "temp-auth-v1",
-        "cors_credentials_fixed": True  # 🔧 NOUVEAU FLAG CORS CREDENTIALS
+        "cors_credentials_fixed": True,  # 🔧 NOUVEAU FLAG CORS CREDENTIALS
+        "cache_system_available": STATS_CACHE_AVAILABLE  # 🚀 NOUVEAU
     }
 
 @app.get("/deployment-debug")
@@ -1362,9 +1711,9 @@ async def deployment_debug():
     """🔧 DEBUG - Confirmer que cette version est déployée"""
     return {
         "deployment_status": "SUCCESS",
-        "version": "3.5.5-cors-credentials-fixed",  # 🔧 UPDATED
+        "version": "4.0.0-with-stats-cache",  # 🚀 UPDATED
         "timestamp": datetime.utcnow().isoformat(),
-        "last_update": "2025-08-20T01:30:00Z",  # 🔧 UPDATED
+        "last_update": "2025-08-22T15:00:00Z",  # 🚀 UPDATED
         "cors_status": "FIXED_CREDENTIALS",  # 🔧 UPDATED
         "auth_endpoints": {
             "v1_direct": "UPDATED",
@@ -1376,8 +1725,18 @@ async def deployment_debug():
             "credentials_support": True,
             "specific_origins_only": True
         },
-        "confirmation": "Cette version contient TOUTES les corrections CORS + Auth",
-        "next_test": "Le frontend avec credentials: 'include' devrait maintenant fonctionner"
+        "new_systems": {  # 🚀 NOUVEAU
+            "statistics_cache": {
+                "enabled": STATS_CACHE_AVAILABLE,
+                "scheduler_active": stats_scheduler_task is not None and not stats_scheduler_task.done() if STATS_CACHE_AVAILABLE else False,
+                "cache_updates": cache_update_counter,
+                "cache_errors": cache_error_counter
+            },
+            "ultra_fast_endpoints": STATS_CACHE_AVAILABLE,
+            "admin_cache_control": STATS_CACHE_AVAILABLE
+        },
+        "confirmation": "Cette version contient TOUTES les corrections CORS + Auth + NOUVEAU système cache",
+        "next_test": "Le frontend avec credentials: 'include' + endpoints /stats-fast/ devraient maintenant être ultra-rapides"
     }
 
 # Exception handlers (CONSERVÉS INTÉGRALEMENT MAIS AVEC CORS CORRIGÉ)

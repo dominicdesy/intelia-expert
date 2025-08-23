@@ -1,4 +1,4 @@
-# app/api/v1/__init__.py - VERSION AVEC DEBUG COMPLET
+# app/api/v1/__init__.py - VERSION AVEC DEBUG COMPLET + AUTH_INVITATIONS
 from fastapi import APIRouter
 import logging
 
@@ -42,6 +42,32 @@ except Exception as e:
     import traceback
     logger.error("❌ Traceback complet auth: %s", traceback.format_exc())
     auth_router = None
+
+# 🆕 NOUVEAU: Auth invitations router
+try:
+    logger.info("🔄 Tentative import auth_invitations router...")
+    from .auth_invitations import router as auth_invitations_router
+    logger.info("✅ Auth invitations router importé avec succès!")
+    logger.info("✅ Auth invitations router a %d routes", len(auth_invitations_router.routes))
+    logger.info("✅ Auth invitations router prefix: %s", getattr(auth_invitations_router, 'prefix', 'None'))
+    auth_inv_routes = [f"{route.path} ({', '.join(route.methods)})" for route in auth_invitations_router.routes[:3]]
+    logger.info("✅ Auth invitations routes échantillon: %s", auth_inv_routes)
+except ImportError as ie:
+    logger.error("❌ IMPORT ERROR auth_invitations router: %s", ie)
+    logger.error("❌ Le module auth_invitations.py n'a pas pu être importé")
+    import traceback
+    logger.error("❌ Traceback import auth_invitations: %s", traceback.format_exc())
+    auth_invitations_router = None
+except AttributeError as ae:
+    logger.error("❌ ATTRIBUTE ERROR auth_invitations router: %s", ae)
+    logger.error("❌ Le module auth_invitations.py n'exporte pas 'router'")
+    auth_invitations_router = None
+except Exception as e:
+    logger.error("❌ ERREUR GÉNÉRALE auth_invitations router: %s", e)
+    logger.error("❌ Type d'erreur: %s", type(e).__name__)
+    import traceback
+    logger.error("❌ Traceback complet auth_invitations: %s", traceback.format_exc())
+    auth_invitations_router = None
 
 # Admin router
 try:
@@ -140,6 +166,19 @@ if auth_router:
 else:
     logger.error("❌ Auth router NON MONTÉ - import a échoué")
 
+# 🆕 NOUVEAU: Auth invitations - AVEC DEBUG COMPLET
+if auth_invitations_router:
+    try:
+        router.include_router(auth_invitations_router, tags=["Auth-Invitations"])
+        logger.info("✅ Auth invitations router monté avec succès!")
+        logger.info("✅ Auth invitations router maintenant disponible sur /v1/auth/invitations/*")
+    except Exception as e:
+        logger.error("❌ ERREUR montage auth_invitations router: %s", e)
+        import traceback
+        logger.error("❌ Traceback montage auth_invitations: %s", traceback.format_exc())
+else:
+    logger.error("❌ Auth invitations router NON MONTÉ - import a échoué")
+
 # Admin
 if admin_router:
     router.include_router(admin_router, tags=["Admin"])
@@ -193,5 +232,15 @@ if auth_route_count > 0:
     logger.info("🔍 Routes auth disponibles: %s", auth_routes_debug[:5])
 else:
     logger.error("❌ AUCUNE route auth détectée dans le router final!")
+
+# 🆕 NOUVEAU: Debug des routes auth invitations spécifiquement
+auth_inv_route_count = len([r for r in router.routes if '/auth/invitations' in r.path])
+logger.info("🔍 Routes auth invitations détectées: %d", auth_inv_route_count)
+
+if auth_inv_route_count > 0:
+    auth_inv_routes_debug = [f"{r.path} ({', '.join(r.methods)})" for r in router.routes if '/auth/invitations' in r.path]
+    logger.info("🔍 Routes auth invitations disponibles: %s", auth_inv_routes_debug)
+else:
+    logger.error("❌ AUCUNE route auth invitations détectée dans le router final!")
 
 __all__ = ["router"]
