@@ -590,7 +590,22 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs text-gray-500">{question.user_email}</span>
                         <span className="text-sm">{getFeedbackIcon(question.feedback)}</span>
+                        {/* Commentaire de feedback */}
+                    {question.feedback_comment && (
+                      <div className="mt-3 p-3 bg-blue-50 border-l-4 border-blue-400">
+                        <div className="flex items-start space-x-2">
+                          <span className="text-lg">{getFeedbackIcon(question.feedback)}</span>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-blue-900 mb-1">Commentaire utilisateur:</p>
+                            <p className="text-sm text-blue-800 italic">"{question.feedback_comment}"</p>
+                            <p className="text-xs text-blue-600 mt-1">
+                              Feedback {question.feedback === 1 ? 'positif' : 'négatif'} • {new Date(question.timestamp).toLocaleDateString('fr-FR')}
+                            </p>
+                          </div>
+                        </div>
                       </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
