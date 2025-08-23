@@ -347,7 +347,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* 🚀 Header avec indicateur de cache */}
+      {/* Header avec indicateur de cache */}
       <div className="bg-white border-b border-gray-200">
         <div className="flex items-center space-x-8 px-4 py-3">
           <div className="flex items-center space-x-2">
@@ -590,68 +590,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs text-gray-500">{question.user_email}</span>
                         <span className="text-sm">{getFeedbackIcon(question.feedback)}</span>
-                        {/* Commentaire de feedback */}
-                    {question.feedback_comment && (
-                      <div className="mt-3 p-3 bg-blue-50 border-l-4 border-blue-400">
-                        <div className="flex items-start space-x-2">
-                          <span className="text-lg">{getFeedbackIcon(question.feedback)}</span>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-blue-900 mb-1">Commentaire utilisateur:</p>
-                            <p className="text-sm text-blue-800 italic">"{question.feedback_comment}"</p>
-                            <p className="text-xs text-blue-600 mt-1">
-                              Feedback {question.feedback === 1 ? 'positif' : 'négatif'} • {new Date(question.timestamp).toLocaleDateString('fr-FR')}
-                            </p>
-                          </div>
-                        </div>
                       </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        
-        {/* Pagination */}
-        {filteredQuestions.length > 0 && (
-          <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1 border border-gray-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white transition-colors"
-              >
-                ← Précédent
-              </button>
-              <span className="text-sm text-gray-600 px-2 py-1 bg-white border border-gray-300">
-                Page {currentPage}
-              </span>
-              <button
-                onClick={() => setCurrentPage(currentPage + 1)}
-                disabled={filteredQuestions.length < questionsPerPage}
-                className="px-3 py-1 border border-gray-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white transition-colors"
-              >
-                Suivant →
-              </button>
-            </div>
-            <div className="text-sm text-gray-600">
-              {filteredQuestions.length} question(s) affichée(s)
-              {totalQuestions > questionLogs.length && (
-                <span className="text-blue-600"> sur {totalQuestions} au total</span>
-              )}
-              {/* Indicateur de performance cache */}
-              {cacheStatus && cacheStatus.is_available && (
-                <span className="text-green-600 ml-2">
-                  • ⚡ Chargé en {cacheStatus.performance_gain}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}>
                       <p className="text-xs text-gray-700 italic line-clamp-2">"{question.feedback_comment}"</p>
                       <p className="text-xs text-gray-500 mt-1">
                         {new Date(question.timestamp).toLocaleDateString('fr-FR')}
@@ -900,7 +839,6 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                 Exporter JSON
               </button>
             </div>
-
           </div>
         </div>
       </div>
@@ -1032,4 +970,50 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                         </div>
                       </div>
                     )}
-                  </div
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Pagination */}
+        {filteredQuestions.length > 0 && (
+          <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 border border-gray-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white transition-colors"
+              >
+                ← Précédent
+              </button>
+              <span className="text-sm text-gray-600 px-2 py-1 bg-white border border-gray-300">
+                Page {currentPage}
+              </span>
+              <button
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={filteredQuestions.length < questionsPerPage}
+                className="px-3 py-1 border border-gray-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white transition-colors"
+              >
+                Suivant →
+              </button>
+            </div>
+            <div className="text-sm text-gray-600">
+              {filteredQuestions.length} question(s) affichée(s)
+              {totalQuestions > questionLogs.length && (
+                <span className="text-blue-600"> sur {totalQuestions} au total</span>
+              )}
+              {/* Indicateur de performance cache */}
+              {cacheStatus && cacheStatus.is_available && (
+                <span className="text-green-600 ml-2">
+                  • ⚡ Chargé en {cacheStatus.performance_gain}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
