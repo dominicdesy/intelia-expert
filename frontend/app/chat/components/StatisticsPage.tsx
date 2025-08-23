@@ -806,7 +806,12 @@ export const StatisticsPage: React.FC = () => {
             usageStats={usageStats}
             billingStats={billingStats}
             performanceStats={performanceStats}
-            cacheStatus={cacheStatus}
+            cacheStatus={cacheStatus ? {
+              ...cacheStatus,
+              performance_gain: typeof cacheStatus.performance_gain === 'string' 
+                ? cacheStatus.performance_gain 
+                : `${cacheStatus.performance_gain}%`
+            } : null}
             isLoading={statsLoading}
           />
         ) : activeTab === 'questions' ? (
@@ -822,7 +827,12 @@ export const StatisticsPage: React.FC = () => {
             setSelectedQuestion={setSelectedQuestion}
             isLoading={questionsLoading}
             totalQuestions={totalQuestions}
-            cacheStatus={cacheStatus}
+            cacheStatus={cacheStatus ? {
+              ...cacheStatus,
+              performance_gain: typeof cacheStatus.performance_gain === 'string' 
+                ? cacheStatus.performance_gain 
+                : `${cacheStatus.performance_gain}%`
+            } : null}
           />
         ) : activeTab === 'invitations' ? (
           <>
@@ -835,7 +845,12 @@ export const StatisticsPage: React.FC = () => {
             ) : (
               <InvitationStatsComponent 
                 invitationStats={invitationStats} 
-                cacheStatus={cacheStatus}
+                cacheStatus={cacheStatus ? {
+                  ...cacheStatus,
+                  performance_gain: typeof cacheStatus.performance_gain === 'string' 
+                    ? cacheStatus.performance_gain 
+                    : `${cacheStatus.performance_gain}%`
+                } : null}
                 isLoading={invitationLoading}
               />
             )}
