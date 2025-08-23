@@ -31,13 +31,14 @@ class StatisticsCache:
         self._ensure_cache_tables()
     
     def _ensure_cache_tables(self):
-        """Crée les tables de cache optimisées"""
+        """Crée les tables de cache optimisées avec gestion robuste des erreurs"""
         try:
             with psycopg2.connect(self.dsn) as conn:
                 with conn.cursor() as cur:
                     
-                    # 🏆 TABLE PRINCIPALE - Cache générique clé-valeur
-                    cur.execute("""
+                    # 🏆 CRÉER TOUTES LES TABLES D'ABORD (partie sûre)
+                    tables_sql = [
+                        """
                         CREATE TABLE IF NOT EXISTS statistics_cache (
                             id SERIAL PRIMARY KEY,
                             cache_key VARCHAR(200) UNIQUE NOT NULL,
@@ -57,10 +58,9 @@ class StatisticsCache:
                             -- Index pour performance
                             CONSTRAINT valid_cache_key CHECK (cache_key != '')
                         );
-                    """)
-                    
-                    # 🎯 SNAPSHOT DASHBOARD - KPIs pré-calculés
-                    cur.execute("""
+                        """,
+                        
+                        """
                         CREATE TABLE IF NOT EXISTS dashboard_stats_snapshot (
                             id SERIAL PRIMARY KEY,
                             snapshot_type VARCHAR(50) DEFAULT 'hourly',
@@ -104,10 +104,9 @@ class StatisticsCache:
                             -- Index performance
                             UNIQUE(snapshot_type, period_start, period_end)
                         );
-                    """)
-                    
-                    # 📊 CACHE QUESTIONS - Pagination pré-calculée  
-                    cur.execute("""
+                        """,
+                        
+                        """
                         CREATE TABLE IF NOT EXISTS questions_cache (
                             id SERIAL PRIMARY KEY,
                             
@@ -135,10 +134,9 @@ class StatisticsCache:
                             CONSTRAINT positive_page CHECK (page > 0),
                             CONSTRAINT positive_limit CHECK (limit_per_page > 0)
                         );
-                    """)
-                    
-                    # 💰 CACHE COÛTS OPENAI - Données externes précieuses
-                    cur.execute("""
+                        """,
+                        
+                        """
                         CREATE TABLE IF NOT EXISTS openai_costs_cache (
                             id SERIAL PRIMARY KEY,
                             
@@ -170,10 +168,9 @@ class StatisticsCache:
                             -- Index
                             UNIQUE(start_date, end_date, period_type)
                         );
-                    """)
-                    
-                    # 📧 CACHE INVITATIONS - Données pré-calculées
-                    cur.execute("""
+                        """,
+                        
+                        """
                         CREATE TABLE IF NOT EXISTS invitations_cache (
                             id SERIAL PRIMARY KEY,
                             cache_type VARCHAR(50) DEFAULT 'global_stats',
@@ -199,10 +196,9 @@ class StatisticsCache:
                             
                             UNIQUE(cache_type, period_days)
                         );
-                    """)
-                    
-                    # 📈 CACHE ANALYTICS DÉTAILLÉS - Métriques avancées
-                    cur.execute("""
+                        """,
+                        
+                        """
                         CREATE TABLE IF NOT EXISTS analytics_cache (
                             id SERIAL PRIMARY KEY,
                             metric_type VARCHAR(100) NOT NULL, -- 'user_analytics', 'server_performance', etc.
@@ -227,58 +223,73 @@ class StatisticsCache:
                             -- Index composé pour requêtes rapides
                             UNIQUE(metric_type, metric_key, period_start, period_end)
                         );
-                    """)
+                        """
+                    ]
                     
-                    # 🔍 INDEX POUR PERFORMANCES ULTRA - VERSION CORRIGÉE POSTGRESQL
-                    indexes = [
-                        # Cache principal - index simples et sûrs
+                    # Exécuter chaque table individuellement pour éviter les rollbacks
+                    tables_created = 0
+                    for i, table_sql in enumerate(tables_sql):
+                        try:
+                            cur.execute(table_sql)
+                            conn.commit()  # Commit après chaque table
+                            tables_created += 1
+                        except Exception as table_error:
+                            logger.error(f"❌ Erreur création table {i}: {table_error}")
+                            conn.rollback()  # Rollback si erreur
+                            # Continue avec les autres tables
+                    
+                    logger.info(f"✅ Tables de cache créées: {tables_created}/{len(tables_sql)}")
+                    
+        except Exception as e:
+            logger.error(f"❌ Erreur générale création tables cache: {e}")
+            # Ne pas lever l'exception - continuer le démarrage
+            
+        # 🔍 CRÉER LES INDEX DANS UNE TRANSACTION SÉPARÉE (pour éviter les échecs)
+        try:
+            with psycopg2.connect(self.dsn) as conn:
+                with conn.cursor() as cur:
+                    # Index simples SANS prédicats WHERE problématiques
+                    safe_indexes = [
                         "CREATE INDEX IF NOT EXISTS idx_stats_cache_key_expires ON statistics_cache(cache_key, expires_at DESC);",
-                        "CREATE INDEX IF NOT EXISTS idx_stats_cache_expires ON statistics_cache(expires_at);",  # ✅ Pas de WHERE clause
+                        "CREATE INDEX IF NOT EXISTS idx_stats_cache_expires ON statistics_cache(expires_at);",
                         "CREATE INDEX IF NOT EXISTS idx_stats_cache_source ON statistics_cache(source, created_at DESC);",
                         
-                        # Dashboard snapshots
-                        "CREATE INDEX IF NOT EXISTS idx_dashboard_current ON dashboard_stats_snapshot(is_current, generated_at DESC);",  # ✅ Pas de WHERE
+                        "CREATE INDEX IF NOT EXISTS idx_dashboard_current ON dashboard_stats_snapshot(is_current, generated_at DESC);",
                         "CREATE INDEX IF NOT EXISTS idx_dashboard_period ON dashboard_stats_snapshot(period_start, period_end);",
                         "CREATE INDEX IF NOT EXISTS idx_dashboard_type ON dashboard_stats_snapshot(snapshot_type, generated_at DESC);",
                         
-                        # Cache questions
                         "CREATE INDEX IF NOT EXISTS idx_questions_cache_key ON questions_cache(cache_key, expires_at);",
                         "CREATE INDEX IF NOT EXISTS idx_questions_filters ON questions_cache USING GIN(filters_applied);",
                         "CREATE INDEX IF NOT EXISTS idx_questions_page ON questions_cache(page, limit_per_page);",
                         
-                        # Coûts OpenAI
                         "CREATE INDEX IF NOT EXISTS idx_openai_period ON openai_costs_cache(start_date, end_date, period_type);",
-                        "CREATE INDEX IF NOT EXISTS idx_openai_expires ON openai_costs_cache(expires_at);",  # ✅ Pas de WHERE clause
+                        "CREATE INDEX IF NOT EXISTS idx_openai_expires ON openai_costs_cache(expires_at);",
                         "CREATE INDEX IF NOT EXISTS idx_openai_type ON openai_costs_cache(period_type, start_date DESC);",
                         
-                        # Cache invitations
                         "CREATE INDEX IF NOT EXISTS idx_invitations_type ON invitations_cache(cache_type, expires_at);",
                         "CREATE INDEX IF NOT EXISTS idx_invitations_period ON invitations_cache(period_days, analyzed_until);",
                         
-                        # Analytics détaillés
                         "CREATE INDEX IF NOT EXISTS idx_analytics_metric ON analytics_cache(metric_type, metric_key, expires_at);",
-                        "CREATE INDEX IF NOT EXISTS idx_analytics_period ON analytics_cache(period_start, period_end);",
-                        
-                        # Index composites pour requêtes fréquentes
-                        "CREATE INDEX IF NOT EXISTS idx_stats_cache_valid ON statistics_cache(source, cache_key) WHERE expires_at > NOW();",  # ✅ NOW() au lieu de CURRENT_TIMESTAMP
-                        "CREATE INDEX IF NOT EXISTS idx_dashboard_current_valid ON dashboard_stats_snapshot(snapshot_type) WHERE is_current = true;"  # ✅ Constante au lieu de fonction
+                        "CREATE INDEX IF NOT EXISTS idx_analytics_period ON analytics_cache(period_start, period_end);"
                     ]
                     
-                    for index_sql in indexes:
+                    created_indexes = 0
+                    for index_sql in safe_indexes:
                         try:
                             cur.execute(index_sql)
+                            created_indexes += 1
                         except Exception as idx_error:
-                            logger.warning(f"⚠️ Index non créé (peut-être déjà existant): {idx_error}")
-                            # Continue avec les autres index même si un échoue
+                            logger.warning(f"⚠️ Index ignoré: {idx_error}")
+                            # Continue sans lever d'exception
                     
                     conn.commit()
-                    logger.info("✅ Tables de cache statistiques créées avec index optimisés PostgreSQL")
+                    logger.info(f"✅ Index de performance créés: {created_indexes}/{len(safe_indexes)}")
                     
-        except Exception as e:
-            logger.error(f"❌ Erreur création tables cache: {e}")
-            raise
+        except Exception as idx_error:
+            logger.warning(f"⚠️ Erreur création index (non-critique): {idx_error}")
+            # Ne pas lever d'exception - les tables fonctionnent sans index
 
-    # ==================== MÉTHODES GÉNÉRIQUES ====================
+    # ==================== MÉTHODES GÉNÉRIQUES (CONSERVÉES INTÉGRALEMENT) ====================
     
     def set_cache(self, key: str, data: Any, ttl_hours: int = 1, source: str = "computed") -> bool:
         """Stocke des données dans le cache générique"""
@@ -374,7 +385,7 @@ class StatisticsCache:
             logger.error(f"❌ Erreur invalidation cache: {e}")
             return 0
 
-    # ==================== MÉTHODES SPÉCIALISÉES ====================
+    # ==================== MÉTHODES SPÉCIALISÉES (CONSERVÉES INTÉGRALEMENT) ====================
     
     def set_dashboard_snapshot(self, stats: Dict[str, Any], period_hours: int = 24) -> bool:
         """Stocke un snapshot complet du dashboard"""
@@ -623,7 +634,7 @@ class StatisticsCache:
             return {"error": str(e)}
 
 
-# ==================== SINGLETON GLOBAL ====================
+# ==================== SINGLETON GLOBAL (CONSERVÉ INTÉGRALEMENT) ====================
 
 _stats_cache_instance = None
 
@@ -635,7 +646,7 @@ def get_stats_cache() -> StatisticsCache:
     return _stats_cache_instance
 
 
-# ==================== FONCTION UTILITAIRES ====================
+# ==================== FONCTIONS UTILITAIRES (CONSERVÉES INTÉGRALEMENT) ====================
 
 def is_cache_available() -> bool:
     """Vérifie si le système de cache est disponible"""
