@@ -625,9 +625,8 @@ function PageContent() {
 
       {/* 🔧 MODAL D'INSCRIPTION - OVERLAY FULLSCREEN */}
       {isSignupMode && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50">
-          <div className="flex min-h-full items-center justify-center p-4">
-            <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
               
               {/* Header de la modale avec bouton fermer */}
               <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-lg">
@@ -643,7 +642,7 @@ function PageContent() {
               </div>
 
               {/* Corps de la modale */}
-              <div className="px-6 py-4">
+              <div className="flex-1 overflow-y-auto px-6 py-4">
                 
                 {/* Messages d'erreur et succès pour signup */}
                 {localError && (
@@ -880,7 +879,7 @@ function PageContent() {
               </div>
 
               {/* Footer de la modale avec boutons */}
-              <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 rounded-b-lg">
+              <div className="flex-shrink-0 bg-gray-50 border-t border-gray-200 px-6 py-4 rounded-b-lg">
                 <div className="flex space-x-3">
                   <button
                     type="button"
@@ -900,7 +899,6 @@ function PageContent() {
               </div>
             </div>
           </div>
-        </div>
       )}
     </>
   )
