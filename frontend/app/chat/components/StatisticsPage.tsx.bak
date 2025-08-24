@@ -414,25 +414,6 @@ export const StatisticsPage: React.FC = () => {
       const billingStatsData = fastData.billingStats || fastData.billing_stats
       const performanceStatsData = fastData.performanceStats || fastData.performance_stats
       
-      // 🔧 CORRECTION: Conversion sécurisée des systemStats
-      const safeSystemStats = systemStatsData ? {
-        ...systemStatsData,
-        system_health: systemStatsData.system_health ? {
-          ...systemStatsData.system_health,
-          error_rate: typeof systemStatsData.system_health.error_rate === 'string'
-            ? parseFloat(systemStatsData.system_health.error_rate) || 0
-            : (systemStatsData.system_health.error_rate || 0)
-        } : systemStatsData.system_health
-      } : null
-      
-      // 🔧 CORRECTION: Conversion sécurisée des billingStats  
-      const safeBillingStats = billingStatsData ? {
-        ...billingStatsData,
-        total_revenue: typeof billingStatsData.total_revenue === 'string'
-          ? parseFloat(billingStatsData.total_revenue) || 0
-          : (billingStatsData.total_revenue || 0)
-      } : null
-      
       // 🔧 CORRECTION: Conversion sécurisée des strings en numbers pour éviter erreur toFixed
       const safePerformanceStats = performanceStatsData ? {
         ...performanceStatsData,
@@ -465,25 +446,11 @@ export const StatisticsPage: React.FC = () => {
           : (performanceStatsData.performance_gain || 0)
       } : null
       
-      // Utiliser les données mises en cache avec conversions sécurisées
-      setSystemStats(safeSystemStats)
+      // Utiliser les données mises en cache
+      setSystemStats(systemStatsData)
       setUsageStats(usageStatsData)
-      setBillingStats(safeBillingStats)
+      setBillingStats(billingStatsData)
       setPerformanceStats(safePerformanceStats)
-      
-      // 🔧 PROTECTION: Log des types pour debug
-      console.log('🔍 Types de données après conversion:', {
-        systemStats: safeSystemStats ? {
-          error_rate: `${safeSystemStats.system_health?.error_rate} (${typeof safeSystemStats.system_health?.error_rate})`
-        } : 'null',
-        billingStats: safeBillingStats ? {
-          total_revenue: `${safeBillingStats.total_revenue} (${typeof safeBillingStats.total_revenue})`
-        } : 'null',
-        performanceStats: safePerformanceStats ? {
-          avg_response_time: `${safePerformanceStats.avg_response_time} (${typeof safePerformanceStats.avg_response_time})`,
-          openai_costs: `${safePerformanceStats.openai_costs} (${typeof safePerformanceStats.openai_costs})`
-        } : 'null'
-      })
       
       console.log('✅ Toutes les statistiques chargées depuis le cache ultra-rapide!')
 

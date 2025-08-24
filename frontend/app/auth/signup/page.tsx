@@ -412,7 +412,7 @@ function PageContent() {
   useEffect(() => {
     if (!hasInitialized.current) {
       hasInitialized.current = true
-      console.log('🏁 [Init] Initialisation unique')
+      console.log('🎯 [Init] Initialisation unique')
       
       // Charger remember me
       const { rememberMe, lastEmail } = rememberMeUtils.load()
@@ -452,19 +452,22 @@ function PageContent() {
     }
   }, [hasHydrated, isLoading, isAuthenticated, user, safeRedirectToChat])
 
-  // 🔒 EFFET POUR BLOQUER LE SCROLL DU BODY EN MODE SIGNUP
+  // 🔒 EFFET POUR BLOQUER LE SCROLL HTML + BODY EN MODE SIGNUP (CORRIGÉ)
   useEffect(() => {
     if (isSignupMode) {
-      // Bloquer le scroll du body
+      // Bloquer le scroll du body ET du html
       document.body.style.overflow = 'hidden'
+      document.documentElement.style.overflow = 'hidden'
     } else {
-      // Restaurer le scroll du body
+      // Restaurer le scroll du body ET du html
       document.body.style.overflow = 'unset'
+      document.documentElement.style.overflow = 'unset'
     }
     
     // Cleanup au démontage
     return () => {
       document.body.style.overflow = 'unset'
+      document.documentElement.style.overflow = 'unset'
     }
   }, [isSignupMode])
 
@@ -623,10 +626,10 @@ function PageContent() {
         </div>
       </div>
 
-      {/* 🔧 MODAL D'INSCRIPTION - VERSION SIMPLE SANS DOUBLE SCROLL */}
+      {/* 🔧 MODAL D'INSCRIPTION - VERSION CORRIGÉE SANS DOUBLE SCROLL */}
       {isSignupMode && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 p-4">
-		  <div className="w-full max-w-2xl mx-auto bg-white rounded-lg shadow-xl max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain">
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 p-4 overflow-hidden overscroll-none">
+          <div className="w-full max-w-2xl mx-auto bg-white rounded-lg shadow-xl max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain">
               
               {/* Header de la modale avec bouton fermer */}
               <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-lg">
@@ -641,8 +644,8 @@ function PageContent() {
                 </button>
               </div>
 
-              {/* Corps de la modale */}
-			  <div className="flex-1 px-6 py-4">
+              {/* Corps de la modale - OVERFLOW SUPPRIMÉ */}
+              <div className="flex-1 px-6 py-4">
                 
                 {/* Messages d'erreur et succès pour signup */}
                 {localError && (
