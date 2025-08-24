@@ -10,7 +10,7 @@ interface CacheStatus {
   is_available: boolean
   last_update: string | null
   cache_age_minutes: number
-  performance_gain: string | number  // 🔧 CORRECTION: Support string ET number
+  performance_gain: string | number
   next_update: string | null
 }
 
@@ -20,7 +20,6 @@ interface FastDashboardStats {
   usage_stats: UsageStats
   billing_stats: BillingStats
   performance_stats: PerformanceStats
-  // 🚀 AJOUT: Support pour la nouvelle structure backend
   systemStats?: SystemStats
   usageStats?: UsageStats
   billingStats?: BillingStats
@@ -113,7 +112,7 @@ interface PerformanceStats {
   openai_costs: number
   error_count: number
   cache_hit_rate: number
-  performance_gain?: number  // 🚀 AJOUT: Support optionnel performance_gain
+  performance_gain?: number
 }
 
 interface InvitationStats {
@@ -162,7 +161,7 @@ export const StatisticsPage: React.FC = () => {
   const [invitationLoading, setInvitationLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
-  // 🚀 États pour le cache ultra-rapide - SÉPARÉS par onglet pour éviter les conflits
+  // 🚀 États pour le cache ultra-rapide - SÉPARÉS par onglet
   const [dashboardCacheStatus, setDashboardCacheStatus] = useState<CacheStatus | null>(null)
   const [questionsCacheStatus, setQuestionsCacheStatus] = useState<CacheStatus | null>(null)  
   const [invitationCacheStatus, setInvitationCacheStatus] = useState<CacheStatus | null>(null)
@@ -191,11 +190,14 @@ export const StatisticsPage: React.FC = () => {
   const [questionsPerPage] = useState(20)
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionLog | null>(null)
   
-  // Référence pour éviter les vérifications multiples
+  // 🔧 CORRECTION: Références pour éviter les chargements multiples
   const authCheckRef = useRef<boolean>(false)
   const stabilityCounterRef = useRef<number>(0)
+  const dashboardLoadedRef = useRef<boolean>(false)
+  const questionsLoadedRef = useRef<Map<string, boolean>>(new Map())
+  const invitationsLoadedRef = useRef<boolean>(false)
 
-  // LOGIQUE D'AUTHENTIFICATION
+  // LOGIQUE D'AUTHENTIFICATION - IDENTIQUE
   useEffect(() => {
     let timeoutId: NodeJS.Timeout
 
@@ -204,7 +206,7 @@ export const StatisticsPage: React.FC = () => {
         return
       }
 
-      console.log('[StatisticsPage] Auth check (cache ultra-rapide):', { 
+      console.log('[StatisticsPage] Auth check:', { 
         user: user === undefined ? 'undefined' : user === null ? 'null' : 'defined',
         email: user?.email,
         user_type: user?.user_type,
@@ -213,14 +215,14 @@ export const StatisticsPage: React.FC = () => {
       })
 
       if (user === undefined) {
-        console.log('[StatisticsPage] Phase 1: Attente initialisation auth (cache)...')
+        console.log('[StatisticsPage] Phase 1: Attente initialisation auth...')
         setAuthStatus('initializing')
         stabilityCounterRef.current = 0
         return
       }
 
       if (user !== null && (!user.email || !user.user_type)) {
-        console.log('[StatisticsPage] Phase 2: Données utilisateur incomplètes, attente (cache)...')
+        console.log('[StatisticsPage] Phase 2: Données utilisateur incomplètes, attente...')
         setAuthStatus('checking')
         stabilityCounterRef.current = 0
         return
@@ -231,28 +233,28 @@ export const StatisticsPage: React.FC = () => {
       }
 
       if (stabilityCounterRef.current < 2 && authStatus !== 'ready') {
-        console.log(`[StatisticsPage] Stabilisation (cache)... (${stabilityCounterRef.current}/2)`)
+        console.log(`[StatisticsPage] Stabilisation... (${stabilityCounterRef.current}/2)`)
         setAuthStatus('checking')
         timeoutId = setTimeout(performAuthCheck, 150)
         return
       }
 
       if (user === null) {
-        console.log('[StatisticsPage] Utilisateur non connecté (cache)')
+        console.log('[StatisticsPage] Utilisateur non connecté')
         setAuthStatus('unauthorized')
         setError("Vous devez être connecté pour accéder à cette page")
         return
       }
 
       if (user.user_type !== 'super_admin') {
-        console.log('[StatisticsPage] Permissions insuffisantes (cache):', user.user_type)
+        console.log('[StatisticsPage] Permissions insuffisantes:', user.user_type)
         setAuthStatus('forbidden')
         setError("Accès refusé - Permissions super_admin requises")
         return
       }
 
       if (!authCheckRef.current) {
-        console.log('[StatisticsPage] Authentification réussie (cache ultra-rapide):', user.email)
+        console.log('[StatisticsPage] Authentification réussie:', user.email)
         setAuthStatus('ready')
         setError(null)
         authCheckRef.current = true
@@ -266,31 +268,51 @@ export const StatisticsPage: React.FC = () => {
     }
   }, [user, authStatus])
 
-  // 🚀 Charger les statistiques avec le système de cache ultra-rapide
+  // 🔧 CORRECTION: Chargement des statistiques - UNE SEULE FOIS
   useEffect(() => {
-    if (authStatus === 'ready' && !statsLoading) {
-      console.log('[StatisticsPage] Lancement chargement des statistiques (CACHE ULTRA-RAPIDE)')
+    if (authStatus === 'ready' && !statsLoading && !dashboardLoadedRef.current) {
+      console.log('[StatisticsPage] Lancement chargement des statistiques')
+      dashboardLoadedRef.current = true
       loadAllStatistics()
     }
-  }, [authStatus, selectedTimeRange])
+  }, [authStatus])
 
-  // Charger les questions si nécessaire
+  // 🔧 CORRECTION: Chargement des questions - SEULEMENT SI NÉCESSAIRE
   useEffect(() => {
     if (authStatus === 'ready' && activeTab === 'questions' && !questionsLoading) {
-      console.log('[StatisticsPage] Lancement chargement des questions (CACHE ULTRA-RAPIDE)')
-      loadQuestionLogs()
+      const pageKey = `${currentPage}-${questionsPerPage}`
+      if (!questionsLoadedRef.current.get(pageKey)) {
+        console.log('[StatisticsPage] Lancement chargement des questions pour page:', pageKey)
+        questionsLoadedRef.current.set(pageKey, true)
+        loadQuestionLogs()
+      }
     }
   }, [authStatus, activeTab, currentPage])
 
-  // Charger les invitations
+  // 🔧 CORRECTION: Chargement des invitations - UNE SEULE FOIS PAR VISITE
   useEffect(() => {
-    if (authStatus === 'ready' && activeTab === 'invitations' && !invitationLoading) {
-      console.log('[StatisticsPage] Lancement chargement des invitations (CACHE ULTRA-RAPIDE)')
+    if (authStatus === 'ready' && activeTab === 'invitations' && !invitationLoading && !invitationsLoadedRef.current) {
+      console.log('[StatisticsPage] Lancement chargement des invitations')
+      invitationsLoadedRef.current = true
       loadInvitationStats()
     }
   }, [authStatus, activeTab])
 
-  // FONCTION POUR RÉCUPÉRER LES HEADERS D'AUTHENTIFICATION
+  // 🔧 CORRECTION: Reset des références quand on change d'onglet
+  const handleTabChange = (newTab: 'dashboard' | 'questions' | 'invitations') => {
+    if (newTab !== activeTab) {
+      console.log('[StatisticsPage] Changement onglet:', activeTab, '->', newTab)
+      
+      // Reset seulement si nécessaire
+      if (newTab === 'questions') {
+        questionsLoadedRef.current.clear()
+      }
+      
+      setActiveTab(newTab)
+    }
+  }
+
+  // FONCTION POUR RÉCUPÉRER LES HEADERS D'AUTHENTIFICATION - IDENTIQUE
   const getAuthHeaders = async (): Promise<Record<string, string>> => {
     try {
       console.log('🔍 getAuthHeaders: Début...')
@@ -337,7 +359,7 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  // FONCTION HELPER POUR EXTRAIRE LE TOKEN DES COOKIES
+  // FONCTION HELPER POUR EXTRAIRE LE TOKEN DES COOKIES - IDENTIQUE
   const getCookieToken = (): string | null => {
     try {
       const cookies = document.cookie.split(';')
@@ -364,11 +386,14 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  // 🚀 Charger toutes les statistiques avec le cache ultra-rapide
+  // Charger toutes les statistiques - AVEC PROTECTION CONTRE LES DOUBLONS
   const loadAllStatistics = async () => {
-    if (statsLoading) return
+    if (statsLoading) {
+      console.log('📊 [StatisticsPage] Chargement déjà en cours, annulation...')
+      return
+    }
     
-    console.log('🚀 [StatisticsPage] DÉBUT chargement statistiques ULTRA-RAPIDE')
+    console.log('🚀 [StatisticsPage] DÉBUT chargement statistiques')
     setStatsLoading(true)
     setError(null)
 
@@ -377,7 +402,7 @@ export const StatisticsPage: React.FC = () => {
     try {
       const headers = await getAuthHeaders()
 
-      console.log('⚡ Tentative endpoint cache ultra-rapide: /api/v1/stats-fast/dashboard')
+      console.log('⚡ Tentative endpoint cache: /api/v1/stats-fast/dashboard')
       
       const fastResponse = await fetch('/api/v1/stats-fast/dashboard', { headers })
       
@@ -386,37 +411,32 @@ export const StatisticsPage: React.FC = () => {
       }
 
       const fastData: FastDashboardStats = await fastResponse.json()
-      console.log('🎉 SUCCÈS endpoint ultra-rapide!', fastData)
+      console.log('🎉 SUCCÈS endpoint!', fastData)
       
       const loadTime = performance.now() - startTime
-      console.log(`⚡ Performance ULTRA-RAPIDE: ${loadTime.toFixed(0)}ms`)
+      console.log(`⚡ Performance: ${loadTime.toFixed(0)}ms`)
       
-      // 🔧 CORRECTION 2: Conversion sécurisée en string pour l'affichage
       const performanceGainValue = fastData.performanceStats?.performance_gain || 
                                    fastData.performance_stats?.performance_gain || 
                                    fastData.cache_info?.performance_gain || 
                                    0
       
-      // Convertir en string pour compatibilité avec les composants existants
       const performanceGainString = typeof performanceGainValue === 'number' 
         ? `${performanceGainValue}%` 
         : performanceGainValue?.toString() || '0%'
       
-      // 🚀 Mettre à jour le statut du cache SPÉCIFIQUE AU DASHBOARD
       const updatedCacheStatus = {
         ...fastData.cache_info,
-        performance_gain: performanceGainString  // Toujours string pour compatibilité
+        performance_gain: performanceGainString
       }
-      setDashboardCacheStatus(updatedCacheStatus) // ✅ Cache spécifique dashboard
+      setDashboardCacheStatus(updatedCacheStatus)
       setPerformanceGain(`${loadTime.toFixed(0)}ms (vs ${performanceGainString})`)
       
-      // 🚀 Support pour les deux structures de données (nouvelle et ancienne)
       const systemStatsData = fastData.systemStats || fastData.system_stats
       const usageStatsData = fastData.usageStats || fastData.usage_stats  
       const billingStatsData = fastData.billingStats || fastData.billing_stats
       const performanceStatsData = fastData.performanceStats || fastData.performance_stats
       
-      // 🔧 CORRECTION: Conversion sécurisée des systemStats
       const safeSystemStats = systemStatsData ? {
         ...systemStatsData,
         system_health: systemStatsData.system_health ? {
@@ -427,7 +447,6 @@ export const StatisticsPage: React.FC = () => {
         } : systemStatsData.system_health
       } : null
       
-      // 🔧 CORRECTION: Conversion sécurisée des billingStats  
       const safeBillingStats = billingStatsData ? {
         ...billingStatsData,
         total_revenue: typeof billingStatsData.total_revenue === 'string'
@@ -435,7 +454,6 @@ export const StatisticsPage: React.FC = () => {
           : (billingStatsData.total_revenue || 0)
       } : null
       
-      // 🔧 CORRECTION: Conversion sécurisée des strings en numbers pour éviter erreur toFixed
       const safePerformanceStats = performanceStatsData ? {
         ...performanceStatsData,
         avg_response_time: typeof performanceStatsData.avg_response_time === 'string' 
@@ -467,41 +485,30 @@ export const StatisticsPage: React.FC = () => {
           : (performanceStatsData.performance_gain || 0)
       } : null
       
-      // Utiliser les données mises en cache avec conversions sécurisées
       setSystemStats(safeSystemStats)
       setUsageStats(usageStatsData)
       setBillingStats(safeBillingStats)
       setPerformanceStats(safePerformanceStats)
       
-      // 🔧 PROTECTION: Log des types pour debug
-      console.log('🔍 Types de données après conversion:', {
-        systemStats: safeSystemStats ? {
-          error_rate: `${safeSystemStats.system_health?.error_rate} (${typeof safeSystemStats.system_health?.error_rate})`
-        } : 'null',
-        billingStats: safeBillingStats ? {
-          total_revenue: `${safeBillingStats.total_revenue} (${typeof safeBillingStats.total_revenue})`
-        } : 'null',
-        performanceStats: safePerformanceStats ? {
-          avg_response_time: `${safePerformanceStats.avg_response_time} (${typeof safePerformanceStats.avg_response_time})`,
-          openai_costs: `${safePerformanceStats.openai_costs} (${typeof safePerformanceStats.openai_costs})`
-        } : 'null'
-      })
-      
-      console.log('✅ Toutes les statistiques chargées depuis le cache ultra-rapide!')
+      console.log('✅ Toutes les statistiques chargées depuis le cache!')
 
     } catch (err) {
       console.error('❌ [StatisticsPage] Erreur chargement statistiques:', err)
       setError(`Erreur lors du chargement des statistiques: ${err}`)
+      dashboardLoadedRef.current = false // Permettre un retry
     } finally {
       setStatsLoading(false)
     }
   }
 
-  // 🚀 Charger les questions avec le cache ultra-rapide  
+  // Charger les questions - AVEC PROTECTION CONTRE LES DOUBLONS
   const loadQuestionLogs = async () => {
-    if (questionsLoading) return
+    if (questionsLoading) {
+      console.log('📝 [Questions] Chargement déjà en cours, annulation...')
+      return
+    }
     
-    console.log('⚡ [Questions] Chargement ULTRA-RAPIDE')
+    console.log('⚡ [Questions] Chargement')
     setQuestionsLoading(true)
     const startTime = performance.now()
     
@@ -519,20 +526,11 @@ export const StatisticsPage: React.FC = () => {
       }
 
       const fastData: FastQuestionsResponse = await fastResponse.json()
-      console.log('🎉 Questions chargées depuis le cache ultra-rapide!', fastData)
-      
-      // 🔍 DÉBOGAGE: Analyser les données reçues
-      console.log('🔍 [DEBUG] Données questions reçues:', {
-        total_questions: fastData.pagination?.total,
-        questions_count: fastData.questions?.length,
-        first_question: fastData.questions?.[0],
-        pagination: fastData.pagination
-      })
+      console.log('🎉 Questions chargées!', fastData)
       
       const loadTime = performance.now() - startTime
       console.log(`⚡ Questions Performance: ${loadTime.toFixed(0)}ms`)
       
-      // 🚀 Adapter pour l'interface (pas de cache info dans logging endpoint) - CACHE SPÉCIFIQUE QUESTIONS
       const cacheInfo = {
         is_available: false,
         last_update: null,
@@ -540,9 +538,8 @@ export const StatisticsPage: React.FC = () => {
         performance_gain: `${loadTime.toFixed(0)}ms`,
         next_update: null
       }
-      setQuestionsCacheStatus(cacheInfo) // ✅ Cache spécifique questions
+      setQuestionsCacheStatus(cacheInfo)
       
-      // Adapter les données pour l'UI (mapping des champs logging)
       const adaptedQuestions: QuestionLog[] = fastData.questions.map(q => ({
         id: q.id,
         timestamp: q.timestamp,
@@ -566,17 +563,22 @@ export const StatisticsPage: React.FC = () => {
       console.error('❌ Erreur chargement questions:', err)
       setError(`Erreur chargement questions: ${err}`)
       setQuestionLogs([])
+      // Reset la référence pour permettre un retry
+      const pageKey = `${currentPage}-${questionsPerPage}`
+      questionsLoadedRef.current.delete(pageKey)
     } finally {
       setQuestionsLoading(false)
     }
   }
 
-  // 🚀 Charger les invitations avec le cache ultra-rapide
+  // Charger les invitations - AVEC PROTECTION CONTRE LES DOUBLONS
   const loadInvitationStats = async () => {
-    console.log('⚡ [Invitations] Chargement ULTRA-RAPIDE')
+    if (invitationLoading) {
+      console.log('📨 [Invitations] Chargement déjà en cours, annulation...')
+      return
+    }
     
-    if (invitationLoading) return
-    
+    console.log('⚡ [Invitations] Chargement')
     setInvitationLoading(true)
     setError(null)
     const startTime = performance.now()
@@ -597,20 +599,21 @@ export const StatisticsPage: React.FC = () => {
       }
 
       const fastData: FastInvitationStats = await fastResponse.json()
-      console.log('🎉 Invitations chargées depuis le cache ultra-rapide!', fastData)
+      console.log('🎉 Invitations chargées!', fastData)
       
       const loadTime = performance.now() - startTime
       console.log(`⚡ Invitations Performance: ${loadTime.toFixed(0)}ms`)
       
-      // 🚀 Mettre à jour le statut du cache SPÉCIFIQUE AUX INVITATIONS
-      setInvitationCacheStatus(fastData.cache_info) // ✅ Cache spécifique invitations
+      setInvitationCacheStatus(fastData.cache_info)
       setInvitationStats(fastData.invitation_stats)
 
     } catch (err) {
       console.error('[StatisticsPage] Erreur chargement stats invitations:', err)
       setError(`Erreur lors du chargement des statistiques d'invitations: ${err}`)
       
-      // Définir des stats par défaut en cas d'erreur
+      // Reset la référence pour permettre un retry
+      invitationsLoadedRef.current = false
+      
       setInvitationStats({
         total_invitations_sent: 0,
         total_invitations_accepted: 0,
@@ -624,7 +627,7 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  // Fonctions helpers
+  // Fonctions helpers - IDENTIQUES
   const mapResponseSource = (source: string): QuestionLog['response_source'] => {
     switch (source) {
       case 'rag': return 'rag'
@@ -642,14 +645,14 @@ export const StatisticsPage: React.FC = () => {
     return '❓'
   }
 
-  // RENDU CONDITIONNEL
+  // RENDU CONDITIONNEL - IDENTIQUE
   
   if (authStatus === 'initializing') {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Initialisation (cache ultra-rapide)...</p>
+          <p className="text-gray-600">Initialisation...</p>
         </div>
       </div>
     )
@@ -660,7 +663,7 @@ export const StatisticsPage: React.FC = () => {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Vérification des permissions (cache)...</p>
+          <p className="text-gray-600">Vérification des permissions...</p>
           <p className="text-xs text-gray-400 mt-2">Stabilisation des données d'authentification</p>
         </div>
       </div>
@@ -718,8 +721,7 @@ export const StatisticsPage: React.FC = () => {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement des statistiques (cache ultra-rapide)...</p>
-          <p className="text-xs text-gray-400 mt-2">⚡ Performance optimisée avec cache</p>
+          <p className="text-gray-600">Chargement des statistiques...</p>
         </div>
       </div>
     )
@@ -734,7 +736,10 @@ export const StatisticsPage: React.FC = () => {
           <h2 className="text-2xl font-semibold text-gray-900 mb-4">Erreur</h2>
           <p className="text-gray-600 mb-6">{error}</p>
           <button
-            onClick={loadAllStatistics}
+            onClick={() => {
+              dashboardLoadedRef.current = false
+              loadAllStatistics()
+            }}
             className="w-full bg-blue-600 text-white px-6 py-2 hover:bg-blue-700 transition-colors"
           >
             Réessayer
@@ -744,10 +749,9 @@ export const StatisticsPage: React.FC = () => {
     )
   }
 
-  // PAGE PRINCIPALE - Header avec indicateurs de cache
+  // PAGE PRINCIPALE - AVEC GESTION CORRECTE DES ONGLETS
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* 🚀 Header avec indicateurs de performance cache */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -762,7 +766,7 @@ export const StatisticsPage: React.FC = () => {
               
               <div className="flex items-center space-x-8">
                 <button
-                  onClick={() => setActiveTab('dashboard')}
+                  onClick={() => handleTabChange('dashboard')}
                   className={`px-3 py-2 text-sm font-medium transition-colors ${
                     activeTab === 'dashboard' 
                       ? 'text-blue-600 border-b-2 border-blue-600' 
@@ -772,7 +776,7 @@ export const StatisticsPage: React.FC = () => {
                   Tableau de bord
                 </button>
                 <button
-                  onClick={() => setActiveTab('questions')}
+                  onClick={() => handleTabChange('questions')}
                   className={`px-3 py-2 text-sm font-medium transition-colors ${
                     activeTab === 'questions' 
                       ? 'text-blue-600 border-b-2 border-blue-600' 
@@ -782,7 +786,7 @@ export const StatisticsPage: React.FC = () => {
                   Questions & Réponses
                 </button>
                 <button
-                  onClick={() => setActiveTab('invitations')}
+                  onClick={() => handleTabChange('invitations')}
                   className={`px-3 py-2 text-sm font-medium transition-colors ${
                     activeTab === 'invitations' 
                       ? 'text-blue-600 border-b-2 border-blue-600' 
@@ -797,7 +801,10 @@ export const StatisticsPage: React.FC = () => {
             <div className="flex items-center space-x-4">
               {activeTab === 'dashboard' && (
                 <button
-                  onClick={loadAllStatistics}
+                  onClick={() => {
+                    dashboardLoadedRef.current = false
+                    loadAllStatistics()
+                  }}
                   disabled={statsLoading}
                   className="bg-blue-600 text-white px-3 py-1 text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center space-x-1"
                 >
@@ -810,7 +817,10 @@ export const StatisticsPage: React.FC = () => {
 
               {activeTab === 'questions' && (
                 <button
-                  onClick={loadQuestionLogs}
+                  onClick={() => {
+                    questionsLoadedRef.current.clear()
+                    loadQuestionLogs()
+                  }}
                   disabled={questionsLoading}
                   className="bg-blue-600 text-white px-3 py-1 text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center space-x-1"
                 >
@@ -823,7 +833,10 @@ export const StatisticsPage: React.FC = () => {
 
               {activeTab === 'invitations' && (
                 <button
-                  onClick={loadInvitationStats}
+                  onClick={() => {
+                    invitationsLoadedRef.current = false
+                    loadInvitationStats()
+                  }}
                   disabled={invitationLoading}
                   className="bg-blue-600 text-white px-3 py-1 text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center space-x-1"
                 >
@@ -840,7 +853,6 @@ export const StatisticsPage: React.FC = () => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* 🚀 ONGLETS AVEC CACHE STATUS SÉPARÉS */}
         {activeTab === 'dashboard' ? (
           <StatisticsDashboard
             systemStats={systemStats}
@@ -877,11 +889,10 @@ export const StatisticsPage: React.FC = () => {
           />
         ) : activeTab === 'invitations' ? (
           <>
-            {invitationLoading ? (
+            {invitationLoading && !invitationStats ? (
               <div className="bg-white border border-gray-200 p-8 text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
                 <p className="text-gray-600">Chargement des statistiques d'invitations...</p>
-                <p className="text-xs text-gray-400 mt-2">⚡ Mode ultra-rapide</p>
               </div>
             ) : (
               <InvitationStatsComponent 
@@ -898,7 +909,7 @@ export const StatisticsPage: React.FC = () => {
           </>
         ) : null}
 
-        {/* Modal de détail de question */}
+        {/* Modal de détail de question - IDENTIQUE */}
         {selectedQuestion && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
