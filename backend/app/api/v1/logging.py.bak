@@ -1,10 +1,8 @@
 # app/api/v1/logging.py
 # -*- coding: utf-8 -*-
 """
-🚀 SYSTÈME COMPLET DE LOGGING ET ANALYTICS - VERSION AMÉLIORÉE
-🛡️ SÉCURITÉ: Initialisation contrôlée + Cache intelligent + Gestion mémoire
-✅ COMPATIBILITÉ: 100% du code original conservé pour éviter les ruptures
-🔧 AMÉLIORATIONS: Cache, optimisations, monitoring, sécurité mémoire
+Système complet de logging et analytics séparé du système de facturation
+Tracking des questions/réponses, erreurs, performance et coûts OpenAI
 """
 import json
 import time
@@ -16,80 +14,13 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from fastapi import APIRouter, Depends, Query, HTTPException
 from enum import Enum
-from functools import wraps, lru_cache
-import threading
+from functools import wraps
 
 # Import authentification
 from app.api.v1.auth import get_current_user
 
 router = APIRouter(prefix="/logging", tags=["logging"])
 logger = logging.getLogger(__name__)
-
-# ============================================================================
-# 🛡️ NOUVELLES SÉCURITÉS ET CACHE INTELLIGENT
-# ============================================================================
-
-# Cache intelligent global
-_analytics_cache = {}
-_cache_lock = threading.Lock()
-_initialization_lock = threading.Lock()
-CACHE_TTL_SECONDS = int(os.getenv("ANALYTICS_CACHE_TTL", "300"))  # 5 minutes par défaut
-
-def get_cached_or_compute(cache_key: str, compute_func, ttl_seconds=None):
-    """Cache intelligent avec TTL pour optimiser les requêtes lourdes"""
-    if ttl_seconds is None:
-        ttl_seconds = CACHE_TTL_SECONDS
-    
-    with _cache_lock:
-        cached_item = _analytics_cache.get(cache_key)
-        
-        if cached_item:
-            cached_time, cached_data = cached_item
-            if datetime.now() - cached_time < timedelta(seconds=ttl_seconds):
-                logger.info(f"✅ Cache HIT pour {cache_key}")
-                return cached_data
-            else:
-                logger.info(f"⏰ Cache EXPIRED pour {cache_key}")
-        
-        # Recalculer
-        logger.info(f"🔄 Cache MISS - Calcul pour {cache_key}")
-        fresh_data = compute_func()
-        _analytics_cache[cache_key] = (datetime.now(), fresh_data)
-        return fresh_data
-
-def clear_analytics_cache(pattern: str = None):
-    """Nettoie le cache (utile après modifications)"""
-    with _cache_lock:
-        if pattern:
-            keys_to_remove = [k for k in _analytics_cache.keys() if pattern in k]
-            for k in keys_to_remove:
-                del _analytics_cache[k]
-            logger.info(f"🧹 Cache nettoyé: {len(keys_to_remove)} entrées supprimées")
-        else:
-            _analytics_cache.clear()
-            logger.info("🧹 Cache complètement nettoyé")
-
-def get_cache_stats():
-    """Statistiques du cache pour monitoring"""
-    with _cache_lock:
-        total_entries = len(_analytics_cache)
-        expired_entries = 0
-        now = datetime.now()
-        
-        for cached_time, _ in _analytics_cache.values():
-            if now - cached_time > timedelta(seconds=CACHE_TTL_SECONDS):
-                expired_entries += 1
-        
-        return {
-            "total_entries": total_entries,
-            "expired_entries": expired_entries,
-            "active_entries": total_entries - expired_entries,
-            "cache_ttl_seconds": CACHE_TTL_SECONDS
-        }
-
-# ============================================================================
-# 🔄 CODE ORIGINAL CONSERVÉ - ENUMS ET CLASSES (INCHANGÉ)
-# ============================================================================
 
 class LogLevel(str, Enum):
     INFO = "info"
@@ -104,7 +35,7 @@ class ResponseSource(str, Enum):
     VALIDATION_REJECTED = "validation_rejected"
     QUOTA_EXCEEDED = "quota_exceeded"
 
-# 🆕 SYSTÈME DE RÔLES ET PERMISSIONS (CODE ORIGINAL CONSERVÉ)
+# 🆕 SYSTÈME DE RÔLES ET PERMISSIONS
 class UserRole(str, Enum):
     USER = "user"
     MODERATOR = "moderator"
@@ -119,7 +50,7 @@ class Permission(str, Enum):
     MANAGE_SYSTEM = "manage_system"
     ADMIN_DASHBOARD = "admin_dashboard"
 
-# 🆕 SYSTÈME DE PERMISSIONS PAR RÔLE (CODE ORIGINAL CONSERVÉ)
+# 🆕 SYSTÈME DE PERMISSIONS PAR RÔLE
 ROLE_PERMISSIONS = {
     UserRole.USER: [
         Permission.VIEW_OWN_ANALYTICS,
@@ -147,10 +78,7 @@ ROLE_PERMISSIONS = {
     ]
 }
 
-# ============================================================================
-# 🔄 FONCTIONS DE PERMISSIONS (CODE ORIGINAL CONSERVÉ)
-# ============================================================================
-
+# 🆕 FONCTIONS DE VÉRIFICATION DES PERMISSIONS
 def has_permission(user: Dict[str, Any], permission: Permission) -> bool:
     """Vérifie si un utilisateur a une permission spécifique"""
     user_type = user.get("user_type", "user")
@@ -200,75 +128,19 @@ def is_admin_user(user: Dict[str, Any]) -> bool:
         user.get("user_type") in ["admin", "super_admin"]
     )
 
-# ============================================================================
-# 🚀 ANALYTICS MANAGER - VERSION AMÉLIORÉE AVEC SÉCURITÉS
-# ============================================================================
-
 class AnalyticsManager:
     """
-    🚀 Gestionnaire complet d'analytics et logging - VERSION SÉCURISÉE
-    🛡️ NOUVEAUTÉS: Initialisation contrôlée, cache intelligent, gestion mémoire
-    ✅ COMPATIBILITÉ: Toutes les méthodes originales conservées
+    Gestionnaire complet d'analytics et logging
     """
     
-    def __init__(self, dsn=None, auto_init=None):
-        """
-        🛡️ INITIALISATION SÉCURISÉE
-        - auto_init=None : Utilise les variables d'environnement (défaut)
-        - auto_init=True : Force l'initialisation (pour tests/admin)
-        - auto_init=False : Pas d'initialisation automatique
-        """
+    def __init__(self, dsn=None):
         self.dsn = dsn or os.getenv("DATABASE_URL")
         if not self.dsn:
             raise ValueError("⛔ DATABASE_URL manquant - stockage persistant requis")
-        
-        # 🛡️ SÉCURITÉ: Contrôle fin de l'initialisation
-        should_auto_init = auto_init
-        if auto_init is None:
-            # Utiliser les variables d'environnement
-            should_auto_init = (
-                os.getenv("FORCE_ANALYTICS_INIT", "false").lower() == "true" and
-                os.getenv("DISABLE_ANALYTICS_AUTO_INIT", "false").lower() != "true"
-            )
-        
-        if should_auto_init:
-            logger.info("🚀 Initialisation des tables analytics (contrôlée)")
-            self._ensure_analytics_tables()
-        else:
-            logger.info("🛡️ Tables analytics: initialisation désactivée (sécurité)")
-    
-    def ensure_tables_if_needed(self):
-        """
-        🆕 NOUVELLE MÉTHODE: Création manuelle et sécurisée des tables
-        Utilise les variables d'environnement pour éviter les conflits
-        """
-        if os.getenv("ANALYTICS_TABLES_READY", "false").lower() == "true":
-            logger.info("✅ Tables analytics déjà prêtes")
-            return True
-        
-        try:
-            with _initialization_lock:
-                # Double vérification avec lock
-                if os.getenv("ANALYTICS_TABLES_READY", "false").lower() == "true":
-                    return True
-                
-                logger.info("🔧 Création des tables analytics...")
-                self._ensure_analytics_tables()
-                
-                # Marquer comme prêt
-                os.environ["ANALYTICS_TABLES_READY"] = "true"
-                logger.info("✅ Tables analytics créées et marquées comme prêtes")
-                return True
-                
-        except Exception as e:
-            logger.error(f"❌ Erreur création tables: {e}")
-            return False
+        # self._ensure_analytics_tables()
     
     def _ensure_analytics_tables(self):
-        """
-        🔄 MÉTHODE ORIGINALE CONSERVÉE - Création des tables
-        ✅ INCHANGÉE pour compatibilité
-        """
+        """Crée toutes les tables d'analytics et logging"""
         try:
             with psycopg2.connect(self.dsn) as conn:
                 with conn.cursor() as cur:
@@ -437,15 +309,11 @@ class AnalyticsManager:
                         cur.execute(index_sql)
                     
                     conn.commit()
-                    logger.info("✅ Tables d'analytics et logging créées avec succès")
+                    logger.info("✅ Tables d'analytics et logging créées")
                     
         except Exception as e:
             logger.error(f"⛔ Erreur création tables analytics: {e}")
             raise
-    
-    # ============================================================================
-    # 🔄 TOUTES LES MÉTHODES ORIGINALES CONSERVÉES (log_question_response, etc.)
-    # ============================================================================
     
     def log_question_response(
         self, 
@@ -463,7 +331,7 @@ class AnalyticsManager:
         entities: Dict[str, Any] = None,
         error_info: Dict[str, Any] = None
     ) -> str:
-        """🔄 MÉTHODE ORIGINALE CONSERVÉE - Log une question/réponse complète"""
+        """Log une question/réponse complète"""
         try:
             question_id = f"{session_id}_{int(time.time() * 1000)}"
             
@@ -486,9 +354,6 @@ class AnalyticsManager:
                     ))
                     conn.commit()
                     
-            # 🆕 AMÉLIORATION: Nettoyer le cache après écriture
-            clear_analytics_cache(f"user_analytics_{user_email}")
-            
             return question_id
             
         except Exception as e:
@@ -508,7 +373,7 @@ class AnalyticsManager:
         error_traceback: str = None,
         context_data: Dict[str, Any] = None
     ) -> None:
-        """🔄 MÉTHODE ORIGINALE CONSERVÉE - Log une erreur système"""
+        """Log une erreur système"""
         try:
             with psycopg2.connect(self.dsn) as conn:
                 with conn.cursor() as cur:
@@ -543,7 +408,7 @@ class AnalyticsManager:
         success: bool = True,
         error_message: str = None
     ) -> None:
-        """🔄 MÉTHODE ORIGINALE CONSERVÉE - Track un appel OpenAI avec calcul des coûts"""
+        """Track un appel OpenAI avec calcul des coûts"""
         try:
             # ✅ MODIFICATION: Use environment variable for default model if not specified
             if model is None:
@@ -594,14 +459,11 @@ class AnalyticsManager:
                     
                     conn.commit()
                     
-            # 🆕 AMÉLIORATION: Nettoyer le cache après écriture
-            clear_analytics_cache(f"user_analytics_{user_email}")
-            
         except Exception as e:
             logger.error(f"⛔ Erreur track OpenAI call: {e}")
     
     def _update_daily_openai_summary(self, cur, user_email, cost_usd, cost_eur, tokens, purpose, success, response_time_ms):
-        """🔄 MÉTHODE ORIGINALE CONSERVÉE - Met à jour le résumé quotidien OpenAI"""
+        """Met à jour le résumé quotidien OpenAI"""
         try:
             today = datetime.now().date()
             
@@ -631,19 +493,7 @@ class AnalyticsManager:
             logger.error(f"⛔ Erreur update daily summary: {e}")
     
     def get_user_analytics(self, user_email: str, days: int = 30) -> Dict[str, Any]:
-        """
-        🚀 MÉTHODE AMÉLIORÉE - Analytics complètes avec cache intelligent
-        ✅ Fonctionnalité conservée + optimisations performances
-        """
-        cache_key = f"user_analytics_{user_email}_{days}"
-        
-        def compute_analytics():
-            return self._compute_user_analytics_direct(user_email, days)
-        
-        return get_cached_or_compute(cache_key, compute_analytics)
-    
-    def _compute_user_analytics_direct(self, user_email: str, days: int = 30) -> Dict[str, Any]:
-        """🔄 CALCUL DIRECT - Méthode originale renommée pour le cache"""
+        """Analytics complètes pour un utilisateur"""
         try:
             start_date = datetime.now() - timedelta(days=days)
             
@@ -696,8 +546,7 @@ class AnalyticsManager:
                         "period_days": days,
                         "questions": questions_stats,
                         "openai_costs": openai_stats,
-                        "cost_by_purpose": cost_by_purpose,
-                        "cached": False  # Marquer comme calcul direct
+                        "cost_by_purpose": cost_by_purpose
                     }
                     
         except Exception as e:
@@ -719,7 +568,7 @@ class AnalyticsManager:
         validation_rejections: int = 0,
         quota_blocks: int = 0
     ) -> None:
-        """🔄 MÉTHODE ORIGINALE CONSERVÉE - Log des métriques de performance serveur par heure"""
+        """Log des métriques de performance serveur par heure"""
         try:
             with psycopg2.connect(self.dsn) as conn:
                 with conn.cursor() as cur:
@@ -754,20 +603,7 @@ class AnalyticsManager:
             logger.error(f"⛔ Erreur log server performance: {e}")
     
     def get_server_performance_analytics(self, hours: int = 24) -> Dict[str, Any]:
-        """
-        🚀 MÉTHODE AMÉLIORÉE - Performance serveur avec cache
-        ✅ Fonctionnalité conservée + optimisations
-        """
-        cache_key = f"server_performance_{hours}h"
-        
-        def compute_performance():
-            return self._compute_server_performance_direct(hours)
-        
-        # Cache plus court pour les métriques de performance (2 minutes)
-        return get_cached_or_compute(cache_key, compute_performance, ttl_seconds=120)
-    
-    def _compute_server_performance_direct(self, hours: int = 24) -> Dict[str, Any]:
-        """🔄 CALCUL DIRECT - Performance serveur (méthode originale)"""
+        """Analytics de performance serveur sur les dernières heures"""
         try:
             start_time = datetime.now() - timedelta(hours=hours)
             
@@ -819,61 +655,32 @@ class AnalyticsManager:
                             "error_rate_percent": round(global_stats.get("avg_error_rate", 0) or 0, 2)
                         },
                         "global_stats": global_stats,
-                        "hourly_usage_patterns": hourly_patterns,
-                        "cached": False  # Marquer comme calcul direct
+                        "hourly_usage_patterns": hourly_patterns
                     }
                     
         except Exception as e:
             logger.error(f"⛔ Erreur get server performance analytics: {e}")
             return {"error": str(e)}
 
-# ============================================================================
-# 🚀 SINGLETON SÉCURISÉ AVEC CONTRÔLE
-# ============================================================================
-
+# Singleton
 _analytics_manager = None
 
-def get_analytics_manager(force_init=None) -> AnalyticsManager:
-    """
-    🚀 SINGLETON SÉCURISÉ - Version améliorée
-    - force_init=None : Utilise les variables d'environnement
-    - force_init=True : Force l'initialisation (admin/tests)
-    - force_init=False : Pas d'initialisation automatique
-    """
+def get_analytics_manager() -> AnalyticsManager:
     global _analytics_manager
-    
     if _analytics_manager is None:
-        with _initialization_lock:
-            # Double vérification avec lock
-            if _analytics_manager is None:
-                logger.info("🔧 Création du gestionnaire analytics...")
-                _analytics_manager = AnalyticsManager(auto_init=force_init)
-                logger.info("✅ Gestionnaire analytics créé")
-    
+        _analytics_manager = AnalyticsManager()
     return _analytics_manager
 
-def reset_analytics_manager():
-    """🆕 NOUVELLE FONCTION - Reset pour tests/redémarrage"""
-    global _analytics_manager
-    with _initialization_lock:
-        _analytics_manager = None
-        clear_analytics_cache()
-        logger.info("🔄 Gestionnaire analytics reset")
-
-# ============================================================================
-# 🔄 TOUTES LES FONCTIONS HELPER ORIGINALES CONSERVÉES
-# ============================================================================
+# ========== FONCTION POUR MAIN.PY ==========
 
 def get_analytics():
-    """🔄 FONCTION ORIGINALE - Fonction analytics pour compatibilité avec main.py"""
+    """Fonction analytics pour compatibilité avec main.py"""
     try:
         analytics = get_analytics_manager()
         return {
             "status": "analytics_available",
             "tables_created": True,
-            "dsn_configured": bool(analytics.dsn),
-            "cache_enabled": True,
-            "cache_entries": get_cache_stats()["total_entries"]
+            "dsn_configured": bool(analytics.dsn)
         }
     except Exception as e:
         return {
@@ -881,8 +688,10 @@ def get_analytics():
             "error": str(e)
         }
 
+# ========== FONCTIONS HELPER POUR MAIN.PY ==========
+
 def log_server_performance(**kwargs) -> None:
-    """🔄 FONCTION ORIGINALE - Fonction helper pour logger les performances serveur depuis main.py"""
+    """Fonction helper pour logger les performances serveur depuis main.py"""
     try:
         analytics = get_analytics_manager()
         analytics.log_server_performance(**kwargs)
@@ -890,13 +699,15 @@ def log_server_performance(**kwargs) -> None:
         logger.error(f"⛔ Erreur log server performance helper: {e}")
 
 def get_server_analytics(hours: int = 24) -> Dict[str, Any]:
-    """🔄 FONCTION ORIGINALE - Fonction helper pour récupérer les analytics serveur depuis main.py"""
+    """Fonction helper pour récupérer les analytics serveur depuis main.py"""
     try:
         analytics = get_analytics_manager()
         return analytics.get_server_performance_analytics(hours)
     except Exception as e:
         logger.error(f"⛔ Erreur get server analytics: {e}")
         return {"error": str(e)}
+
+# ========== FONCTIONS MIDDLEWARE POUR EXPERT.PY ==========
 
 def log_question_to_analytics(
     current_user: Optional[Dict[str, Any]],
@@ -906,7 +717,7 @@ def log_question_to_analytics(
     processing_time_ms: int = 0,
     error_info: Dict[str, Any] = None
 ) -> None:
-    """🔄 FONCTION ORIGINALE - Fonction helper pour logger depuis expert.py"""
+    """Fonction helper pour logger depuis expert.py"""
     try:
         analytics = get_analytics_manager()
         
@@ -957,7 +768,7 @@ def track_openai_call(
     response_time_ms: int = 0,
     success: bool = True
 ) -> None:
-    """🔄 FONCTION ORIGINALE - Fonction helper pour tracker les appels OpenAI"""
+    """Fonction helper pour tracker les appels OpenAI"""
     try:
         analytics = get_analytics_manager()
         analytics.track_openai_call(
@@ -975,15 +786,13 @@ def track_openai_call(
     except Exception as e:
         logger.error(f"⛔ Erreur track OpenAI call: {e}")
 
-# ============================================================================
-# 🔄 TOUS LES ENDPOINTS ORIGINAUX CONSERVÉS + NOUVEAUX ENDPOINTS OPTIMISÉS
-# ============================================================================
+# ========== ENDPOINTS ANALYTICS AVEC RÔLES ==========
 
 @router.get("/analytics/dashboard")
 async def analytics_dashboard(
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """🔄 ENDPOINT ORIGINAL CONSERVÉ - Dashboard analytics (admin+ only)"""
+    """Dashboard analytics (admin+ only)"""
     if not has_permission(current_user, Permission.ADMIN_DASHBOARD):
         raise HTTPException(
             status_code=403, 
@@ -996,8 +805,7 @@ async def analytics_dashboard(
             "status": "dashboard_available",
             "message": "Dashboard analytics à implémenter",
             "user_role": current_user.get("user_type"),
-            "permissions": [p.value for p in ROLE_PERMISSIONS.get(UserRole(current_user.get("user_type", "user")), [])],
-            "cache_stats": get_cache_stats()
+            "permissions": [p.value for p in ROLE_PERMISSIONS.get(UserRole(current_user.get("user_type", "user")), [])]
         }
     except Exception as e:
         return {"error": str(e)}
@@ -1007,7 +815,7 @@ async def my_usage_analytics(
     days: int = Query(30, ge=1, le=365),
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """🔄 ENDPOINT ORIGINAL CONSERVÉ - Analytics personnelles de l'utilisateur"""
+    """Analytics personnelles de l'utilisateur"""
     if not has_permission(current_user, Permission.VIEW_OWN_ANALYTICS):
         raise HTTPException(status_code=403, detail="View analytics permission required")
     
@@ -1029,7 +837,7 @@ async def openai_costs_analytics(
     user_email: str = Query(None),
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """🔄 ENDPOINT ORIGINAL CONSERVÉ - Analytics des coûts OpenAI"""
+    """Analytics des coûts OpenAI"""
     
     # Si user_email spécifié, vérifier les permissions
     if user_email:
@@ -1061,7 +869,7 @@ async def server_performance_analytics(
     hours: int = Query(24, ge=1, le=168),
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """🔄 ENDPOINT ORIGINAL CONSERVÉ - Analytics de performance serveur (admin+ only)"""
+    """Analytics de performance serveur (admin+ only)"""
     if not has_permission(current_user, Permission.VIEW_SERVER_PERFORMANCE):
         raise HTTPException(
             status_code=403, 
@@ -1076,11 +884,12 @@ async def server_performance_analytics(
     except Exception as e:
         return {"error": str(e)}
 
+# 🆕 NOUVEL ENDPOINT pour voir ses permissions
 @router.get("/my-permissions")
 async def get_my_permissions(
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """🔄 ENDPOINT ORIGINAL CONSERVÉ - Récupère les permissions de l'utilisateur connecté"""
+    """Récupère les permissions de l'utilisateur connecté"""
     user_type = current_user.get("user_type", "user")
     
     try:
@@ -1104,18 +913,13 @@ async def get_my_permissions(
 
 @router.get("/health-check")
 def analytics_health_check() -> Dict[str, Any]:
-    """🔄 ENDPOINT ORIGINAL CONSERVÉ - Health check du système analytics"""
+    """Health check du système analytics"""
     try:
         analytics = get_analytics_manager()
-        cache_stats = get_cache_stats()
-        
         return {
             "status": "healthy",
             "analytics_available": True,
             "database_connected": bool(analytics.dsn),
-            "tables_ready": os.getenv("ANALYTICS_TABLES_READY", "false").lower() == "true",
-            "cache_enabled": True,
-            "cache_stats": cache_stats,
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
@@ -1126,95 +930,9 @@ def analytics_health_check() -> Dict[str, Any]:
             "timestamp": datetime.now().isoformat()
         }
 
-# ============================================================================
-# 🆕 NOUVEAUX ENDPOINTS OPTIMISÉS ET DE GESTION
-# ============================================================================
 
-@router.post("/admin/initialize-tables")
-async def initialize_analytics_tables(
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """🆕 NOUVEAU - Initialisation manuelle sécurisée des tables (super_admin only)"""
-    if current_user.get("user_type") != "super_admin":
-        raise HTTPException(status_code=403, detail="Super admin required")
-    
-    try:
-        analytics = get_analytics_manager(force_init=True)
-        success = analytics.ensure_tables_if_needed()
-        
-        return {
-            "status": "success" if success else "error",
-            "message": "Tables d'analytics créées et initialisées",
-            "tables_ready": os.getenv("ANALYTICS_TABLES_READY", "false").lower() == "true",
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
-
-@router.post("/admin/clear-cache")
-async def clear_analytics_cache_endpoint(
-    pattern: str = Query(None, description="Pattern optionnel pour nettoyer seulement certaines entrées"),
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """🆕 NOUVEAU - Nettoyage manuel du cache (admin+)"""
-    if not has_permission(current_user, Permission.ADMIN_DASHBOARD):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
-    try:
-        stats_before = get_cache_stats()
-        clear_analytics_cache(pattern)
-        stats_after = get_cache_stats()
-        
-        return {
-            "status": "success",
-            "message": f"Cache nettoyé (pattern: {pattern or 'all'})",
-            "entries_before": stats_before["total_entries"],
-            "entries_after": stats_after["total_entries"],
-            "entries_removed": stats_before["total_entries"] - stats_after["total_entries"],
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-@router.get("/admin/cache-stats")
-async def get_cache_statistics(
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """🆕 NOUVEAU - Statistiques du cache (admin+)"""
-    if not has_permission(current_user, Permission.ADMIN_DASHBOARD):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
-    try:
-        stats = get_cache_stats()
-        
-        # Détails des clés en cache
-        with _cache_lock:
-            cache_keys = list(_analytics_cache.keys())
-            cache_details = {}
-            for key in cache_keys:
-                cached_time, _ = _analytics_cache[key]
-                age_seconds = (datetime.now() - cached_time).total_seconds()
-                cache_details[key] = {
-                    "age_seconds": round(age_seconds, 1),
-                    "expired": age_seconds > CACHE_TTL_SECONDS
-                }
-        
-        return {
-            "status": "success",
-            "cache_stats": stats,
-            "cache_details": cache_details,
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-# ============================================================================
-# 🔄 TOUS LES AUTRES ENDPOINTS ORIGINAUX CONSERVÉS
-# ============================================================================
+# Correction de l'endpoint /questions dans logging.py
+# Remplacez la fonction get_questions par cette version corrigée :
 
 @router.get("/questions")
 async def get_questions(
@@ -1222,7 +940,7 @@ async def get_questions(
     limit: int = Query(20, ge=1, le=100),
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """🔄 ENDPOINT ORIGINAL CONSERVÉ - Récupère les questions avec pagination"""
+    """Récupère les questions avec pagination - VERSION CORRIGÉE"""
     
     # Log de debug
     logger.info(f"Endpoint /questions appelé par {current_user.get('email')} (page={page}, limit={limit})")
@@ -1378,11 +1096,14 @@ async def get_questions(
             }
         }
 
+
+
+
 @router.get("/admin/stats")
 async def billing_admin_stats(
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """🔄 ENDPOINT ORIGINAL CONSERVÉ - Statistiques de facturation pour admin (super_admin only)"""
+    """Statistiques de facturation pour admin (super_admin only)"""
     
     if not has_permission(current_user, Permission.ADMIN_DASHBOARD):
         raise HTTPException(
@@ -1404,3 +1125,293 @@ async def billing_admin_stats(
                     SELECT 
                         ubi.plan_name,
                         COUNT(*) as user_count,
+                        AVG(bp.price_per_month) as avg_revenue
+                    FROM user_billing_info ubi
+                    LEFT JOIN billing_plans bp ON ubi.plan_name = bp.plan_name
+                    GROUP BY ubi.plan_name, bp.price_per_month
+                """)
+                
+                plan_stats = {}
+                total_revenue = 0
+                for row in cur.fetchall():
+                    plan_name = row['plan_name']
+                    user_count = row['user_count']
+                    avg_revenue = float(row['avg_revenue'] or 0)
+                    revenue = user_count * avg_revenue
+                    
+                    plan_stats[plan_name] = {
+                        "user_count": user_count,
+                        "revenue": revenue
+                    }
+                    total_revenue += revenue
+                
+                # Top utilisateurs
+                cur.execute("""
+                    SELECT 
+                        ubi.user_email,
+                        COALESCE(SUM(mut.questions_used), 0) as question_count,
+                        ubi.plan_name
+                    FROM user_billing_info ubi
+                    LEFT JOIN monthly_usage_tracking mut ON ubi.user_email = mut.user_email
+                    GROUP BY ubi.user_email, ubi.plan_name
+                    ORDER BY question_count DESC
+                    LIMIT 10
+                """)
+                
+                top_users = [dict(row) for row in cur.fetchall()]
+                
+                return {
+                    "plans": plan_stats,
+                    "total_revenue": total_revenue,
+                    "top_users": top_users
+                }
+                
+    except Exception as e:
+        logger.error(f"⌫ Erreur billing admin stats: {e}")
+        return {"error": str(e)}
+
+@router.get("/debug-questions")
+async def debug_questions(current_user: dict = Depends(get_current_user)):
+    """Debug temporaire pour voir ce qui se passe"""
+    try:
+        analytics = get_analytics_manager()
+        
+        with psycopg2.connect(analytics.dsn) as conn:
+            with conn.cursor() as cur:
+                # Test 1: La table existe-t-elle ?
+                cur.execute("""
+                    SELECT COUNT(*) FROM information_schema.tables 
+                    WHERE table_name = 'user_questions_complete'
+                """)
+                table_exists = cur.fetchone()[0] > 0
+                
+                # Test 2: Y a-t-il des données ?
+                if table_exists:
+                    cur.execute("SELECT COUNT(*) FROM user_questions_complete")
+                    total_rows = cur.fetchone()[0]
+                    
+                    # Colonnes de la table
+                    cur.execute("""
+                        SELECT column_name, data_type 
+                        FROM information_schema.columns 
+                        WHERE table_name = 'user_questions_complete' 
+                        ORDER BY ordinal_position
+                    """)
+                    columns = cur.fetchall()
+                    
+                    # Sample data
+                    cur.execute("SELECT * FROM user_questions_complete ORDER BY created_at DESC LIMIT 1")
+                    sample_row = cur.fetchone()
+                else:
+                    total_rows = 0
+                    columns = []
+                    sample_row = None
+                
+                return {
+                    "table_exists": table_exists,
+                    "total_rows": total_rows,
+                    "columns": columns,
+                    "sample_row": str(sample_row) if sample_row else None,
+                    "user_role": current_user.get("user_type")
+                }
+                
+    except Exception as e:
+        return {"debug_error": str(e)}
+
+# ========== ENDPOINTS DE TEST ==========
+
+@router.get("/simple-test")
+async def simple_test():
+    """Test 1: Endpoint ultra-simple sans dépendances"""
+    return {"test": "success", "message": "Endpoint works", "timestamp": datetime.now().isoformat()}
+
+@router.get("/test-db-direct")
+async def test_db_direct():
+    """Test 2: Connexion DB directe sans analytics manager"""
+    try:
+        import os
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        dsn = os.getenv("DATABASE_URL")
+        with psycopg2.connect(dsn) as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT COUNT(*) as count FROM user_questions_complete")
+                result = cur.fetchone()
+                
+                cur.execute("SELECT id, user_email, question FROM user_questions_complete ORDER BY created_at DESC LIMIT 3")
+                samples = [dict(row) for row in cur.fetchall()]
+                
+                return {
+                    "count": result["count"],
+                    "samples": samples,
+                    "success": True,
+                    "dsn_available": bool(dsn)
+                }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__, "dsn": bool(os.getenv("DATABASE_URL"))}
+
+@router.get("/test-analytics-manager")
+async def test_analytics_manager():
+    """Test 3: Analytics manager seul"""
+    try:
+        analytics = get_analytics_manager()
+        return {
+            "analytics_available": analytics is not None,
+            "dsn": bool(analytics.dsn) if analytics else False,
+            "type": type(analytics).__name__ if analytics else None
+        }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}
+
+@router.get("/test-permissions")
+async def test_permissions(current_user: dict = Depends(get_current_user)):
+    """Test 4: Système de permissions"""
+    try:
+        user_type = current_user.get("user_type", "unknown")
+        email = current_user.get("email", "unknown")
+        
+        # Test permissions individuelles
+        perms = {}
+        try:
+            perms["view_all"] = has_permission(current_user, Permission.VIEW_ALL_ANALYTICS)
+        except Exception as e:
+            perms["view_all_error"] = str(e)
+            
+        try:
+            perms["admin_dashboard"] = has_permission(current_user, Permission.ADMIN_DASHBOARD)
+        except Exception as e:
+            perms["admin_dashboard_error"] = str(e)
+        
+        return {
+            "user_type": user_type,
+            "email": email,
+            "permissions": perms,
+            "raw_user": current_user
+        }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}
+
+@router.get("/questions-final")
+async def questions_final(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """ENDPOINT FINAL - Version ultra-robuste avec logs détaillés"""
+    
+    debug_info = {
+        "step": "start",
+        "user_type": current_user.get("user_type"),
+        "email": current_user.get("email")
+    }
+    
+    try:
+        # Vérification super admin
+        if current_user.get("user_type") != "super_admin":
+            debug_info["step"] = "permission_denied"
+            raise HTTPException(status_code=403, detail="Super admin required")
+        
+        debug_info["step"] = "getting_analytics"
+        
+        # Import direct pour éviter problèmes
+        import os
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        dsn = os.getenv("DATABASE_URL")
+        if not dsn:
+            debug_info["step"] = "no_dsn"
+            return {"error": "No DATABASE_URL", "debug": debug_info}
+        
+        debug_info["step"] = "connecting"
+        
+        with psycopg2.connect(dsn) as conn:
+            debug_info["step"] = "connected"
+            
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                debug_info["step"] = "cursor_ready"
+                
+                # Count total
+                cur.execute("SELECT COUNT(*) as count FROM user_questions_complete")
+                total_result = cur.fetchone()
+                total_count = total_result["count"] if total_result else 0
+                
+                debug_info["step"] = "count_done"
+                debug_info["total_found"] = total_count
+                
+                if total_count == 0:
+                    return {
+                        "questions": [],
+                        "pagination": {"page": 1, "limit": limit, "total": 0, "pages": 0},
+                        "debug": debug_info
+                    }
+                
+                # Récupérer les données
+                offset = (page - 1) * limit
+                cur.execute("""
+                    SELECT 
+                        id, user_email, question, response_text, 
+                        response_source, response_confidence, processing_time_ms,
+                        language, session_id, created_at, status
+                    FROM user_questions_complete 
+                    ORDER BY created_at DESC 
+                    LIMIT %s OFFSET %s
+                """, (limit, offset))
+                
+                rows = cur.fetchall()
+                debug_info["step"] = "data_retrieved"
+                debug_info["rows_found"] = len(rows)
+                
+                # Formatage
+                questions = []
+                for i, row in enumerate(rows):
+                    try:
+                        questions.append({
+                            "id": str(row["id"]),
+                            "timestamp": row["created_at"].isoformat() if row["created_at"] else None,
+                            "user_email": row["user_email"] or "",
+                            "user_name": (row["user_email"] or "").split('@')[0].replace('.', ' ').title(),
+                            "question": row["question"] or "",
+                            "response": row["response_text"] or "",
+                            "response_source": row["response_source"] or "unknown",
+                            "confidence_score": float(row["response_confidence"] or 0),
+                            "response_time": int(row["processing_time_ms"] or 0) / 1000,
+                            "language": row["language"] or "fr",
+                            "session_id": row["session_id"] or "",
+                            "feedback": None,
+                            "feedback_comment": None
+                        })
+                    except Exception as format_error:
+                        debug_info[f"format_error_{i}"] = str(format_error)
+                        continue
+                
+                debug_info["step"] = "formatting_done"
+                debug_info["questions_formatted"] = len(questions)
+                
+                return {
+                    "questions": questions,
+                    "pagination": {
+                        "page": page,
+                        "limit": limit,
+                        "total": total_count,
+                        "pages": (total_count + limit - 1) // limit
+                    },
+                    "debug": debug_info,
+                    "success": True
+                }
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        debug_info["step"] = "exception"
+        debug_info["exception_type"] = type(e).__name__
+        debug_info["exception_message"] = str(e)
+        
+        return {
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "debug": debug_info,
+            "questions": [],
+            "pagination": {"page": 1, "limit": limit, "total": 0, "pages": 0}
+        }
