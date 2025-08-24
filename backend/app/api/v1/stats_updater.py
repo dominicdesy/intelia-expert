@@ -6,6 +6,7 @@ Utilise les gestionnaires existants SANS les modifier
 Collecte périodique + cache optimisé
 SAFE: Aucune rupture avec logging.py et billing.py
 ✨ NOUVEAU: Gestion défensive des colonnes feedback (Digital Ocean compatible)
+🔧 FIXED: Correction erreur retour 0 dans _check_feedback_columns_availability
 """
 
 import asyncio
@@ -41,17 +42,43 @@ class StatisticsUpdater:
         self.last_update = None
         self.update_in_progress = False
         
-        # ✨ NOUVEAU: Détecter la disponibilité des colonnes feedback au démarrage
-        self._feedback_columns_available = self._check_feedback_columns_availability()
+        # ✅ CORRECTION: Vérifier que analytics est correctement initialisé
+        if not self.analytics:
+            logger.error("❌ Analytics manager non disponible")
+            self._feedback_columns_available = {
+                "table_exists": False, 
+                "feedback": False, 
+                "feedback_comment": False, 
+                "error": "no_analytics_manager"
+            }
+        else:
+            # ✅ NOUVEAU: Détecter la disponibilité des colonnes feedback au démarrage avec gestion d'erreur
+            try:
+                self._feedback_columns_available = self._check_feedback_columns_availability()
+                logger.info(f"🔍 Détection feedback au démarrage: {self._feedback_columns_available}")
+            except Exception as e:
+                logger.error(f"❌ Erreur détection feedback au démarrage: {e}")
+                self._feedback_columns_available = {
+                    "table_exists": False, 
+                    "feedback": False, 
+                    "feedback_comment": False, 
+                    "error": str(e)
+                }
     
     def _check_feedback_columns_availability(self) -> Dict[str, bool]:
         """
         🔍 Vérifie la disponibilité des colonnes feedback au démarrage.
         Cache le résultat pour éviter les vérifications répétées.
+        ✅ CORRIGÉ: Retourne toujours un dictionnaire valide
         """
         try:
             import psycopg2
             from psycopg2.extras import RealDictCursor
+            
+            # ✅ CORRECTION: Vérifier que l'analytics manager existe et a un DSN
+            if not hasattr(self.analytics, 'dsn') or not self.analytics.dsn:
+                logger.warning("⚠️ DSN analytics non disponible - utilisation valeurs par défaut")
+                return {"table_exists": False, "feedback": False, "feedback_comment": False}
             
             with psycopg2.connect(self.analytics.dsn) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -90,10 +117,223 @@ class StatisticsUpdater:
                     logger.info(f"🔍 Détection colonnes feedback: {result}")
                     return result
                     
+        except ImportError as import_err:
+            logger.error(f"❌ Module psycopg2 non disponible: {import_err}")
+            return {
+                "table_exists": False, 
+                "feedback": False, 
+                "feedback_comment": False, 
+                "error": "psycopg2_missing"
+            }
+            
         except Exception as e:
+            # ✅ CORRECTION: Retourner un dictionnaire valide au lieu de 0
             logger.error(f"❌ Erreur vérification colonnes feedback: {e}")
-            return {"table_exists": False, "feedback": False, "feedback_comment": False}
+            return {
+                "table_exists": False, 
+                "feedback": False, 
+                "feedback_comment": False,
+                "error": str(e)[:100]  # Limiter la taille de l'erreur
+            }
     
+    def diagnose_database_connection(self) -> Dict[str, Any]:
+        """
+        🔧 NOUVELLE MÉTHODE: Diagnostique complet de la connection base de données
+        """
+        try:
+            diagnosis = {
+                "analytics_manager": {
+                    "available": self.analytics is not None,
+                    "has_dsn": hasattr(self.analytics, 'dsn') if self.analytics else False,
+                    "dsn_configured": bool(getattr(self.analytics, 'dsn', None)) if self.analytics else False
+                },
+                "database_connection": {
+                    "can_connect": False,
+                    "tables_found": [],
+                    "user_questions_complete": {
+                        "exists": False,
+                        "columns": []
+                    }
+                },
+                "psycopg2_available": False,
+                "errors": []
+            }
+            
+            # Test import psycopg2
+            try:
+                import psycopg2
+                from psycopg2.extras import RealDictCursor
+                diagnosis["psycopg2_available"] = True
+            except ImportError as e:
+                diagnosis["errors"].append(f"psycopg2 non disponible: {e}")
+                return diagnosis
+            
+            # Test connection database
+            if diagnosis["analytics_manager"]["dsn_configured"]:
+                try:
+                    with psycopg2.connect(self.analytics.dsn) as conn:
+                        diagnosis["database_connection"]["can_connect"] = True
+                        
+                        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                            # Lister toutes les tables
+                            cur.execute("""
+                                SELECT table_name 
+                                FROM information_schema.tables 
+                                WHERE table_schema = 'public'
+                                ORDER BY table_name
+                            """)
+                            
+                            diagnosis["database_connection"]["tables_found"] = [
+                                row["table_name"] for row in cur.fetchall()
+                            ]
+                            
+                            # Vérifier user_questions_complete spécifiquement
+                            if "user_questions_complete" in diagnosis["database_connection"]["tables_found"]:
+                                diagnosis["database_connection"]["user_questions_complete"]["exists"] = True
+                                
+                                cur.execute("""
+                                    SELECT column_name, data_type, is_nullable
+                                    FROM information_schema.columns 
+                                    WHERE table_name = 'user_questions_complete'
+                                    ORDER BY ordinal_position
+                                """)
+                                
+                                diagnosis["database_connection"]["user_questions_complete"]["columns"] = [
+                                    {
+                                        "name": row["column_name"],
+                                        "type": row["data_type"],
+                                        "nullable": row["is_nullable"] == "YES"
+                                    }
+                                    for row in cur.fetchall()
+                                ]
+                            
+                except Exception as db_err:
+                    diagnosis["errors"].append(f"Erreur connexion DB: {db_err}")
+            else:
+                diagnosis["errors"].append("DSN non configuré dans analytics manager")
+            
+            return diagnosis
+            
+        except Exception as e:
+            return {
+                "status": "diagnostic_failed",
+                "error": str(e),
+                "timestamp": datetime.now().isoformat()
+            }
+
+    async def create_missing_tables(self) -> Dict[str, Any]:
+        """
+        🛠️ NOUVELLE MÉTHODE: Crée automatiquement les tables manquantes
+        """
+        try:
+            if not hasattr(self.analytics, 'dsn') or not self.analytics.dsn:
+                return {"status": "error", "error": "DSN non configuré"}
+            
+            import psycopg2
+            from psycopg2.extras import RealDictCursor
+            
+            results = {
+                "tables_created": [],
+                "tables_updated": [],
+                "errors": []
+            }
+            
+            with psycopg2.connect(self.analytics.dsn) as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    
+                    # Créer user_questions_complete si manquante
+                    cur.execute("""
+                        SELECT EXISTS (
+                            SELECT FROM information_schema.tables 
+                            WHERE table_schema = 'public' 
+                            AND table_name = 'user_questions_complete'
+                        )
+                    """)
+                    
+                    if not cur.fetchone()[0]:
+                        logger.info("🔧 Création table user_questions_complete...")
+                        
+                        create_table_sql = """
+                        CREATE TABLE user_questions_complete (
+                            id SERIAL PRIMARY KEY,
+                            question_id VARCHAR(50) UNIQUE,
+                            user_email VARCHAR(255),
+                            session_id VARCHAR(100),
+                            question TEXT NOT NULL,
+                            response_text TEXT,
+                            response_source VARCHAR(50),
+                            response_confidence DECIMAL(5,4),
+                            processing_time_ms INTEGER,
+                            status VARCHAR(20) DEFAULT 'success',
+                            intent VARCHAR(100),
+                            entities JSONB,
+                            language VARCHAR(10) DEFAULT 'fr',
+                            completeness_score DECIMAL(5,4),
+                            error_type VARCHAR(50),
+                            error_message TEXT,
+                            error_traceback TEXT,
+                            feedback INTEGER CHECK (feedback IN (-1, 0, 1)),
+                            feedback_comment TEXT,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                        
+                        cur.execute(create_table_sql)
+                        
+                        # Créer index pour performance
+                        cur.execute("CREATE INDEX idx_user_questions_created_at ON user_questions_complete(created_at)")
+                        cur.execute("CREATE INDEX idx_user_questions_user_email ON user_questions_complete(user_email)")
+                        cur.execute("CREATE INDEX idx_user_questions_feedback ON user_questions_complete(feedback) WHERE feedback IS NOT NULL")
+                        
+                        conn.commit()
+                        results["tables_created"].append("user_questions_complete")
+                        logger.info("✅ Table user_questions_complete créée avec succès")
+                    
+                    else:
+                        # Vérifier si colonnes feedback existent, les ajouter si nécessaire
+                        cur.execute("""
+                            SELECT column_name 
+                            FROM information_schema.columns 
+                            WHERE table_name = 'user_questions_complete' 
+                            AND column_name IN ('feedback', 'feedback_comment')
+                        """)
+                        
+                        existing_feedback_cols = {row["column_name"] for row in cur.fetchall()}
+                        
+                        if "feedback" not in existing_feedback_cols:
+                            cur.execute("""
+                                ALTER TABLE user_questions_complete 
+                                ADD COLUMN feedback INTEGER CHECK (feedback IN (-1, 0, 1))
+                            """)
+                            results["tables_updated"].append("user_questions_complete: ajout colonne feedback")
+                            logger.info("✅ Colonne feedback ajoutée")
+                        
+                        if "feedback_comment" not in existing_feedback_cols:
+                            cur.execute("""
+                                ALTER TABLE user_questions_complete 
+                                ADD COLUMN feedback_comment TEXT
+                            """)
+                            results["tables_updated"].append("user_questions_complete: ajout colonne feedback_comment")
+                            logger.info("✅ Colonne feedback_comment ajoutée")
+                        
+                        if results["tables_updated"]:
+                            conn.commit()
+            
+            # Actualiser la détection après création
+            self._feedback_columns_available = self._check_feedback_columns_availability()
+            
+            return {
+                "status": "success",
+                "results": results,
+                "new_feedback_status": self._feedback_columns_available,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Erreur création tables: {e}")
+            return {"status": "error", "error": str(e)}
+
     async def update_all_statistics(self) -> Dict[str, Any]:
         """
         🎯 FONCTION PRINCIPALE - Met à jour toutes les statistiques
@@ -109,7 +349,7 @@ class StatisticsUpdater:
         try:
             logger.info("🚀 Début mise à jour complète des statistiques")
             
-            # 📄 COLLECTE PARALLÈLE pour performances maximales
+            # 🔄 COLLECTE PARALLÈLE pour performances maximales
             results = await asyncio.gather(
                 self._update_dashboard_stats(),
                 self._update_openai_costs(),

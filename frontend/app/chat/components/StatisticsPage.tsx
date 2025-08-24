@@ -162,8 +162,10 @@ export const StatisticsPage: React.FC = () => {
   const [invitationLoading, setInvitationLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
-  // 🚀 États pour le cache ultra-rapide
-  const [cacheStatus, setCacheStatus] = useState<CacheStatus | null>(null)
+  // 🚀 États pour le cache ultra-rapide - SÉPARÉS par onglet pour éviter les conflits
+  const [dashboardCacheStatus, setDashboardCacheStatus] = useState<CacheStatus | null>(null)
+  const [questionsCacheStatus, setQuestionsCacheStatus] = useState<CacheStatus | null>(null)  
+  const [invitationCacheStatus, setInvitationCacheStatus] = useState<CacheStatus | null>(null)
   const [performanceGain, setPerformanceGain] = useState<string>('')
   
   // États pour les données
@@ -400,12 +402,12 @@ export const StatisticsPage: React.FC = () => {
         ? `${performanceGainValue}%` 
         : performanceGainValue?.toString() || '0%'
       
-      // Mettre à jour le statut du cache
+      // 🚀 Mettre à jour le statut du cache SPÉCIFIQUE AU DASHBOARD
       const updatedCacheStatus = {
         ...fastData.cache_info,
         performance_gain: performanceGainString  // Toujours string pour compatibilité
       }
-      setCacheStatus(updatedCacheStatus)
+      setDashboardCacheStatus(updatedCacheStatus) // ✅ Cache spécifique dashboard
       setPerformanceGain(`${loadTime.toFixed(0)}ms (vs ${performanceGainString})`)
       
       // 🚀 Support pour les deux structures de données (nouvelle et ancienne)
@@ -530,7 +532,7 @@ export const StatisticsPage: React.FC = () => {
       const loadTime = performance.now() - startTime
       console.log(`⚡ Questions Performance: ${loadTime.toFixed(0)}ms`)
       
-      // Adapter pour l'interface (pas de cache info dans logging endpoint)
+      // 🚀 Adapter pour l'interface (pas de cache info dans logging endpoint) - CACHE SPÉCIFIQUE QUESTIONS
       const cacheInfo = {
         is_available: false,
         last_update: null,
@@ -538,7 +540,7 @@ export const StatisticsPage: React.FC = () => {
         performance_gain: `${loadTime.toFixed(0)}ms`,
         next_update: null
       }
-      setCacheStatus(cacheInfo)
+      setQuestionsCacheStatus(cacheInfo) // ✅ Cache spécifique questions
       
       // Adapter les données pour l'UI (mapping des champs logging)
       const adaptedQuestions: QuestionLog[] = fastData.questions.map(q => ({
@@ -600,8 +602,8 @@ export const StatisticsPage: React.FC = () => {
       const loadTime = performance.now() - startTime
       console.log(`⚡ Invitations Performance: ${loadTime.toFixed(0)}ms`)
       
-      // Mettre à jour le statut du cache
-      setCacheStatus(fastData.cache_info)
+      // 🚀 Mettre à jour le statut du cache SPÉCIFIQUE AUX INVITATIONS
+      setInvitationCacheStatus(fastData.cache_info) // ✅ Cache spécifique invitations
       setInvitationStats(fastData.invitation_stats)
 
     } catch (err) {
@@ -790,8 +792,6 @@ export const StatisticsPage: React.FC = () => {
                   Invitations
                 </button>
               </div>
-              
-
             </div>
             
             <div className="flex items-center space-x-4">
@@ -836,23 +836,22 @@ export const StatisticsPage: React.FC = () => {
             </div>
           </div>
         </div>
-        
-
       </div>
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* 🚀 ONGLETS AVEC CACHE STATUS SÉPARÉS */}
         {activeTab === 'dashboard' ? (
           <StatisticsDashboard
             systemStats={systemStats}
             usageStats={usageStats}
             billingStats={billingStats}
             performanceStats={performanceStats}
-            cacheStatus={cacheStatus ? {
-              ...cacheStatus,
-              performance_gain: typeof cacheStatus.performance_gain === 'string' 
-                ? cacheStatus.performance_gain 
-                : `${cacheStatus.performance_gain}%`
+            cacheStatus={dashboardCacheStatus ? {
+              ...dashboardCacheStatus,
+              performance_gain: typeof dashboardCacheStatus.performance_gain === 'string' 
+                ? dashboardCacheStatus.performance_gain 
+                : `${dashboardCacheStatus.performance_gain}%`
             } : null}
             isLoading={statsLoading}
           />
@@ -869,11 +868,11 @@ export const StatisticsPage: React.FC = () => {
             setSelectedQuestion={setSelectedQuestion}
             isLoading={questionsLoading}
             totalQuestions={totalQuestions}
-            cacheStatus={cacheStatus ? {
-              ...cacheStatus,
-              performance_gain: typeof cacheStatus.performance_gain === 'string' 
-                ? cacheStatus.performance_gain 
-                : `${cacheStatus.performance_gain}%`
+            cacheStatus={questionsCacheStatus ? {
+              ...questionsCacheStatus,
+              performance_gain: typeof questionsCacheStatus.performance_gain === 'string' 
+                ? questionsCacheStatus.performance_gain 
+                : `${questionsCacheStatus.performance_gain}%`
             } : null}
           />
         ) : activeTab === 'invitations' ? (
@@ -887,11 +886,11 @@ export const StatisticsPage: React.FC = () => {
             ) : (
               <InvitationStatsComponent 
                 invitationStats={invitationStats} 
-                cacheStatus={cacheStatus ? {
-                  ...cacheStatus,
-                  performance_gain: typeof cacheStatus.performance_gain === 'string' 
-                    ? cacheStatus.performance_gain 
-                    : `${cacheStatus.performance_gain}%`
+                cacheStatus={invitationCacheStatus ? {
+                  ...invitationCacheStatus,
+                  performance_gain: typeof invitationCacheStatus.performance_gain === 'string' 
+                    ? invitationCacheStatus.performance_gain 
+                    : `${invitationCacheStatus.performance_gain}%`
                 } : null}
                 isLoading={invitationLoading}
               />
