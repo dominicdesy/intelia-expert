@@ -545,7 +545,7 @@ export const StatisticsPage: React.FC = () => {
         id: q.id,
         timestamp: q.timestamp,
         user_email: q.user_email,
-        user_name: q.user_name || (q.user_email || "").split('@')[0].replace('.', ' ').title(),
+        user_name: q.user_name || (q.user_email || "").split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase()),
         question: q.question,
         response: q.response,
         response_source: mapResponseSource(q.response_source),
