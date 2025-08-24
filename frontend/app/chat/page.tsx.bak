@@ -136,17 +136,13 @@ export default function ChatInterface() {
   // NOUVEAU REF pour l'input mobile - CODE ORIGINAL CONSERVÉ
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // 🛠️ CORRECTION CRITIQUE : Mémoisation stable des données pour éviter les re-rendus
-  const messages: Message[] = useMemo(() => {
-    return currentConversation?.messages || []
-  }, [currentConversation?.messages])
+  const messages: Message[] = currentConversation?.messages || []
+  const hasMessages = messages.length > 0
 
-  const hasMessages = useMemo(() => {
-    return messages.length > 0
-  }, [messages.length])
+  console.log('[Render] Messages:', messages.length, 'Clarification:', !!clarificationState, 'Concision:', config.level)
 
-  // 🛠️ CORRECTION : Mémoisation des fonctions pour éviter les re-créations
-  const handleAuthError = useCallback((error: any) => {
+  // NOUVELLE FONCTION : Gestion intelligente des erreurs auth
+  const handleAuthError = (error: any) => {
     console.log('🔧 [Auth] Gestion erreur auth:', error)
     
     if (error?.status === 403 || 
@@ -156,9 +152,9 @@ export default function ChatInterface() {
       console.log('🔄 [Auth] Session expirée détectée, redirection')
       handleRedirectToLogin('Session expirée')
     }
-  }, []) // Pas de dépendances pour éviter les re-créations
+  }
 
-  // 🛠️ CORRECTION : Fonction de redirection stable
+  // FONCTION CORRIGÉE : Redirection intelligente vers login
   const handleRedirectToLogin = useCallback((reason: string = 'Session expirée') => {
     console.log('🔄 [Auth] Redirection vers login:', reason)
     
@@ -186,7 +182,7 @@ export default function ChatInterface() {
   }, [router])
 
   // FONCTION UTILITAIRE : Extraire les initiales de l'utilisateur - CODE ORIGINAL CONSERVÉ
-  const getUserInitials = useCallback((user: any): string => {
+  const getUserInitials = (user: any): string => {
     if (!user) return 'U'
 
     // Essayer depuis le nom complet
@@ -209,10 +205,10 @@ export default function ChatInterface() {
     }
 
     return 'U'
-  }, [])
+  }
 
   // FONCTION RENFORCÉE : Préprocesseur Markdown pour réparer le formatage cassé - CODE ORIGINAL CONSERVÉ
-  const preprocessMarkdown = useCallback((content: string): string => {
+  const preprocessMarkdown = (content: string): string => {
     if (!content) return ""
 
     let processed = content
@@ -259,19 +255,66 @@ export default function ChatInterface() {
     // Supprimer espaces en début/fin
     processed = processed.trim()
 
-    return processed
-  }, [])
+    console.log('[preprocessMarkdown] Réparation intensive:', {
+      original_length: content.length,
+      processed_length: processed.length,
+      repairs_made: content !== processed,
+      preview: processed.substring(0, 300)
+    })
 
-  // 🛠️ CORRECTION : Mémoisation stable du contenu traité
+    return processed
+  }
+
+  // Calculer le contenu préprocessé avant le rendu - CODE ORIGINAL CONSERVÉ
   const processedMessages = useMemo(() => {
     return messages.map(message => ({
       ...message,
       processedContent: message.isUser ? message.content : preprocessMarkdown(message.content)
     }))
-  }, [messages, preprocessMarkdown])
+  }, [messages])
 
-  // FONCTION ÉTENDUE : Nettoyer le texte de réponse - CODE ORIGINAL CONSERVÉ avec mémoisation
-  const cleanResponseText = useCallback((text: string): string => {
+  // FONCTION NOUVELLE : Reprocesser tous les messages avec nouvelles versions - CODE ORIGINAL CONSERVÉ
+  const reprocessAllMessages = () => {
+    if (!currentConversation?.messages) return
+
+    const updatedMessages = currentConversation.messages.map(message => {
+      // Ne traiter que les réponses IA qui ont response_versions
+      if (!message.isUser &&
+          message.id !== 'welcome' &&
+          message.response_versions &&
+          !message.content.includes('Mode clarification') &&
+          !message.content.includes('Répondez simplement')) {
+
+        const selectedContent = (message.response_versions?.standard || 
+                               message.response_versions?.detailed || 
+                               message.response_versions?.concise || 
+                               Object.values(message.response_versions || {})[0] || '')
+
+        console.log(`[reprocessAllMessages] Message ${message.id} - passage à ${config.level}`, {
+          original_length: message.content.length,
+          new_length: selectedContent.length,
+          versions_available: Object.keys(message.response_versions)
+        })
+
+        return {
+          ...message,
+          content: selectedContent
+        }
+      }
+      return message
+    })
+
+    const updatedConversation = {
+      ...currentConversation,
+      messages: updatedMessages
+    }
+
+    setCurrentConversation(updatedConversation)
+    console.log('[reprocessAllMessages] Tous les messages retraités avec niveau:', config.level)
+  }
+
+  // FONCTION ÉTENDUE : Nettoyer le texte de réponse - CODE ORIGINAL CONSERVÉ
+  const cleanResponseText = (text: string): string => {
     if (!text) return ""
 
     // Ne pas nettoyer les réponses courtes PerfStore
@@ -355,10 +398,10 @@ export default function ChatInterface() {
     cleaned = cleaned.replace(/\n+\s*$/, '')
 
     return cleaned.trim()
-  }, [])
+  }
 
-  // 🛠️ CORRECTION : Fonction de chargement des conversations avec dépendances stables
-  const loadConversationsWithBreaker = useCallback(async (userId: string) => {
+  // Fonction wrapper pour charger les conversations avec circuit breaker - CODE ORIGINAL CONSERVÉ
+  const loadConversationsWithBreaker = async (userId: string) => {
     // Vérification du circuit breaker
     if (!pageLoadingBreaker.canAttempt()) {
       console.warn('[loadConversationsWithBreaker] Circuit breaker actif - chargement bloqué')
@@ -405,23 +448,20 @@ export default function ChatInterface() {
       
       throw error
     }
-  }, [handleAuthError])
+  }
 
-  // 🛠️ CORRECTION MAJEURE : useEffect pour auth backend avec dépendances stables
+  // ✅ NOUVEAU useEffect simplifié pour auth backend - CORRIGÉ POUR DÉCONNEXION
   useEffect(() => {
-    // Vérifier si on a déjà initialisé pour éviter les boucles
-    let isInitializing = false
-    
+    // Initialiser la session une seule fois au montage
     const initAuth = async () => {
-      if (isInitializing || !hasHydrated) return
-      isInitializing = true
+      if (!hasHydrated) return // Attendre l'hydratation
       
-      console.log('🔐 [Auth] Initialisation auth backend')
+      console.log('🔍 [Auth] Initialisation auth backend')
       
       try {
         const sessionValid = await initializeSession()
         
-        if (!sessionValid && isMountedRef.current) {
+        if (!sessionValid) {
           console.log('❌ [Auth] Session invalide, redirection')
           handleRedirectToLogin('Session expirée')
         } else {
@@ -429,11 +469,7 @@ export default function ChatInterface() {
         }
       } catch (error) {
         console.error('❌ [Auth] Erreur initialisation:', error)
-        if (isMountedRef.current) {
-          handleAuthError(error)
-        }
-      } finally {
-        isInitializing = false
+        handleAuthError(error)
       }
     }
     
@@ -441,9 +477,9 @@ export default function ChatInterface() {
     if (hasHydrated && isAuthenticated !== false) {
       initAuth()
     }
-  }, [hasHydrated, isAuthenticated, initializeSession, handleRedirectToLogin, handleAuthError])
+  }, [hasHydrated, initializeSession, handleRedirectToLogin, isAuthenticated])
 
-  // ✅ CORRECTION : useEffect pour gérer la déconnexion avec dépendances stables
+  // ✅ NOUVEAU useEffect pour gérer la déconnexion
   useEffect(() => {
     // Si l'utilisateur n'est plus authentifié et que le store a été hydraté
     if (hasHydrated && isAuthenticated === false && !isLoading) {
@@ -452,7 +488,7 @@ export default function ChatInterface() {
     }
   }, [hasHydrated, isAuthenticated, isLoading, handleRedirectToLogin])
 
-  // 🛠️ CORRECTION : useEffect pour gestion clavier mobile avec cleanup approprié
+  // NOUVEAU useEffect pour gérer le clavier mobile - CODE ORIGINAL CONSERVÉ
   useEffect(() => {
     if (!isMobileDevice) return
 
@@ -563,7 +599,7 @@ export default function ChatInterface() {
     }
   }, [isMobileDevice])
 
-  // 🛠️ CORRECTION : useEffect de montage avec cleanup complet
+  // Tous les useEffect existants - CODE ORIGINAL CONSERVÉ
   useEffect(() => {
     isMountedRef.current = true
     return () => {
@@ -581,7 +617,6 @@ export default function ChatInterface() {
     }
   }, [])
 
-  // 🛠️ CORRECTION : Détection de device mobile avec dépendances stables
   useEffect(() => {
     const detectMobileDevice = () => {
       const userAgent = navigator.userAgent.toLowerCase()
@@ -606,22 +641,18 @@ export default function ChatInterface() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // 🛠️ CORRECTION : Auto-scroll avec dépendances optimisées
   useEffect(() => {
     if (isMountedRef.current && messages.length > lastMessageCountRef.current && shouldAutoScroll && !isUserScrolling) {
-      const scrollTimeout = setTimeout(() => {
+      setTimeout(() => {
         if (isMountedRef.current) {
           messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
         }
       }, 100)
-      
-      return () => clearTimeout(scrollTimeout)
     }
 
     lastMessageCountRef.current = messages.length
-  }, [messages.length, shouldAutoScroll, isUserScrolling])
+  }, [messages.length, messages, shouldAutoScroll, isUserScrolling])
 
-  // 🛠️ CORRECTION : Gestion du scroll avec cleanup approprié
   useEffect(() => {
     const chatContainer = chatContainerRef.current
     if (!chatContainer) return
@@ -665,7 +696,6 @@ export default function ChatInterface() {
     }
   }, [messages.length])
 
-  // 🛠️ CORRECTION : Gestion du message de bienvenue avec dépendances stables
   useEffect(() => {
     if (isAuthenticated && !currentConversation && !hasMessages && isMountedRef.current) {
       const welcomeMessage: Message = {
@@ -692,7 +722,6 @@ export default function ChatInterface() {
     }
   }, [isAuthenticated, currentConversation, hasMessages, t, currentLanguage, setCurrentConversation])
 
-  // 🛠️ CORRECTION : Update du message de bienvenue avec dépendances stables
   useEffect(() => {
     if (currentConversation?.id === 'welcome' &&
         currentConversation.messages.length === 1 &&
@@ -711,9 +740,9 @@ export default function ChatInterface() {
 
       setCurrentConversation(updatedConversation)
     }
-  }, [currentLanguage, t, currentConversation, setCurrentConversation])
+  }, [currentLanguage, t])
 
-  // 🛠️ CORRECTION MAJEURE : Chargement des conversations avec timeout et dépendances stables
+  // useEffect pour charger les conversations SANS loadConversations dans les dépendances - CODE ORIGINAL CONSERVÉ
   useEffect(() => {
     if (isAuthenticated && user?.id && isMountedRef.current && !hasLoadedConversationsRef.current) {
       // Nettoyer le timeout précédent si existant
@@ -745,9 +774,9 @@ export default function ChatInterface() {
         }
       }
     }
-  }, [isAuthenticated, user?.id, loadConversationsWithBreaker])
+  }, [isAuthenticated, user?.id])
 
-  // 🛠️ CORRECTION : Reset circuit breaker avec dépendances stables
+  // useEffect pour reset le circuit breaker quand l'utilisateur change - CODE ORIGINAL CONSERVÉ
   useEffect(() => {
     if (user?.id) {
       // Reset les flags et circuit breaker pour un nouvel utilisateur
@@ -877,8 +906,8 @@ export default function ChatInterface() {
     return [answerText, []]
   }
 
-  // 🛠️ CORRECTION : handleSendMessage avec mémoisation et cleanup
-  const handleSendMessage = useCallback(async (text: string = inputMessage) => {
+  // FONCTION : handleSendMessage avec nettoyage du texte - CODE ORIGINAL CONSERVÉ
+  const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim() || !isMountedRef.current) return
 
     console.log('[ChatInterface] Envoi message:', {
@@ -1032,10 +1061,10 @@ export default function ChatInterface() {
         setIsLoadingChat(false)
       }
     }
-  }, [inputMessage, clarificationState, config.level, currentConversation, addMessage, user, currentLanguage, t, handleAuthError, cleanResponseText])
+  }
 
-  // 🛠️ CORRECTION : Fonctions de feedback avec mémoisation
-  const handleFeedbackClick = useCallback((messageId: string, feedback: 'positive' | 'negative') => {
+  // Toutes les autres fonctions restent identiques - CODE ORIGINAL CONSERVÉ
+  const handleFeedbackClick = (messageId: string, feedback: 'positive' | 'negative') => {
     if (!isMountedRef.current) return
 
     setFeedbackModal({
@@ -1043,9 +1072,9 @@ export default function ChatInterface() {
       messageId,
       feedbackType: feedback
     })
-  }, [])
+  }
 
-  const handleFeedbackSubmit = useCallback(async (feedback: 'positive' | 'negative', comment?: string) => {
+  const handleFeedbackSubmit = async (feedback: 'positive' | 'negative', comment?: string) => {
     const { messageId } = feedbackModal
     if (!messageId || !isMountedRef.current) return
 
@@ -1097,9 +1126,9 @@ export default function ChatInterface() {
         setIsSubmittingFeedback(false)
       }
     }
-  }, [feedbackModal, messages, updateMessage, handleAuthError])
+  }
 
-  const handleFeedbackModalClose = useCallback(() => {
+  const handleFeedbackModalClose = () => {
     if (!isMountedRef.current) return
 
     setFeedbackModal({
@@ -1107,9 +1136,9 @@ export default function ChatInterface() {
       messageId: null,
       feedbackType: null
     })
-  }, [])
+  }
 
-  const handleNewConversation = useCallback(() => {
+  const handleNewConversation = () => {
     if (!isMountedRef.current) return
 
     createNewConversation()
@@ -1140,40 +1169,36 @@ export default function ChatInterface() {
     setShouldAutoScroll(true)
     setIsUserScrolling(false)
     setShowScrollButton(false)
-  }, [createNewConversation, t, currentLanguage, setCurrentConversation])
+  }
 
-  const scrollToBottom = useCallback(() => {
+  const scrollToBottom = () => {
     if (!isMountedRef.current) return
 
     setShouldAutoScroll(true)
     setIsUserScrolling(false)
     setShowScrollButton(false)
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [])
+  }
 
-  // CALCUL des styles dynamiques pour mobile - CODE ORIGINAL CONSERVÉ avec mémoisation
-  const containerStyle = useMemo(() => {
-    return isMobileDevice ? {
-      height: '100vh',
-      minHeight: '100vh',
-      maxHeight: '100vh'
-    } : {}
-  }, [isMobileDevice])
+  // CALCUL des styles dynamiques pour mobile - CODE ORIGINAL CONSERVÉ
+  const containerStyle = isMobileDevice ? {
+    height: '100vh',
+    minHeight: '100vh',
+    maxHeight: '100vh'
+  } : {}
 
-  const chatScrollStyle = useMemo(() => {
-    return isMobileDevice ? {
-      height: isKeyboardVisible 
-        ? `calc(100vh - 140px - ${keyboardHeight}px)` 
-        : 'calc(100vh - 140px)',
-      maxHeight: isKeyboardVisible 
-        ? `calc(100vh - 140px - ${keyboardHeight}px)` 
-        : 'calc(100vh - 140px)',
-      overflow: 'auto',
-      paddingBottom: '1rem'
-    } : {
-      scrollPaddingBottom: '7rem'
-    }
-  }, [isMobileDevice, isKeyboardVisible, keyboardHeight])
+  const chatScrollStyle = isMobileDevice ? {
+    height: isKeyboardVisible 
+      ? `calc(100vh - 140px - ${keyboardHeight}px)` 
+      : 'calc(100vh - 140px)',
+    maxHeight: isKeyboardVisible 
+      ? `calc(100vh - 140px - ${keyboardHeight}px)` 
+      : 'calc(100vh - 140px)',
+    overflow: 'auto',
+    paddingBottom: '1rem'
+  } : {
+    scrollPaddingBottom: '7rem'
+  }
 
   return (
     <>
@@ -1185,42 +1210,42 @@ export default function ChatInterface() {
         style={containerStyle}
       >
 
-        <header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
-          <div className="flex items-center justify-between">
-            {/* Gauche – + puis Historique */}
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={handleNewConversation}
-                className="w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center border border-gray-200"
-                title={t('nav.newConversation')}
-                aria-label={t('nav.newConversation')}
-              >
-                <PlusIcon className="w-5 h-5" />
-              </button>
+		<header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
+		  <div className="flex items-center justify-between">
+			{/* Gauche – + puis Historique */}
+			<div className="flex items-center space-x-2">
+			  <button
+				onClick={handleNewConversation}
+				className="w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center border border-gray-200"
+				title={t('nav.newConversation')}
+				aria-label={t('nav.newConversation')}
+			  >
+				<PlusIcon className="w-5 h-5" />
+			  </button>
 
-              {/* History rendu directement (plus de proxy/hidden) */}
-              <div className="header-icon-container history-menu-container">
-                <HistoryMenu />
-              </div>
-            </div>
+			  {/* History rendu directement (plus de proxy/hidden) */}
+			  <div className="header-icon-container history-menu-container">
+				<HistoryMenu />
+			  </div>
+			</div>
 
-            {/* Centre – Logo + Titre */}
-            <div className="flex-1 min-w-0 flex justify-center items-center space-x-3">
-              <div className="w-10 h-10 grid place-items-center">
-                <InteliaLogo className="h-8 w-auto" />
-              </div>
-              <h1 className="text-lg font-medium text-gray-900 truncate">Intelia Expert</h1>
-            </div>
+			{/* Centre – Logo + Titre */}
+			<div className="flex-1 min-w-0 flex justify-center items-center space-x-3">
+			  <div className="w-10 h-10 grid place-items-center">
+				<InteliaLogo className="h-8 w-auto" />
+			  </div>
+			  <h1 className="text-lg font-medium text-gray-900 truncate">Intelia Expert</h1>
+			</div>
 
-            {/* Droite – Bouton DD */}
-            <div className="flex items-center space-x-2">
-              {/* UserMenu rendu directement (plus de proxy/hidden) */}
-              <div className="header-icon-container user-menu-container">
-                <UserMenuButton />
-              </div>
-            </div>
-          </div>
-        </header>
+			{/* Droite – Bouton DD */}
+			<div className="flex items-center space-x-2">
+			  {/* UserMenu rendu directement (plus de proxy/hidden) */}
+			  <div className="header-icon-container user-menu-container">
+				<UserMenuButton />
+			  </div>
+			</div>
+		  </div>
+		</header>
 
         <div className="flex-1 overflow-hidden flex flex-col min-h-0">
           {/* ZONE CHAT avec styles dynamiques mobile - CODE ORIGINAL CONSERVÉ */}
@@ -1247,12 +1272,12 @@ export default function ChatInterface() {
                   <div key={`${message.id}-${index}`}>
                     <div className={`flex items-start space-x-3 min-w-0 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
                       {!message.isUser && (
-                        <div className="flex-shrink-0 w-10 h-10 grid place-items-center">
+						<div className="flex-shrink-0 w-10 h-10 grid place-items-center">
                           <InteliaLogo className="h-8 w-auto" />
                         </div>
                       )}
 
-                      <div className={`px-3 sm:px-4 py-2 rounded-2xl max-w-[85%] sm:max-w-none break-words ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
+					  <div className={`px-3 sm:px-4 py-2 rounded-2xl max-w-[85%] sm:max-w-none break-words ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
                         {message.isUser ? (
                           <p className="whitespace-pre-wrap leading-relaxed text-sm">
                             {message.content}
@@ -1405,7 +1430,7 @@ export default function ChatInterface() {
               opacity: 1
             }}
           >
-            <div className="max-w-full sm:max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto w-full sm:w-[90%] lg:w-[75%] xl:w-[60%]">
+			<div className="max-w-full sm:max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto w-full sm:w-[90%] lg:w-[75%] xl:w-[60%]">
               {clarificationState && (
                 <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center justify-between">
@@ -1425,9 +1450,9 @@ export default function ChatInterface() {
                 </div>
               )}
 
-              {/* CONTAINER INPUT MOBILE CORRIGÉ avec largeur élargie - CODE ORIGINAL CONSERVÉ */}
-              <div className={`flex items-center min-h-[48px] w-full ${isMobileDevice ? 'mobile-input-container' : 'space-x-3'}`}>
-              
+			  {/* CONTAINER INPUT MOBILE CORRIGÉ avec largeur élargie - CODE ORIGINAL CONSERVÉ */}
+			  <div className={`flex items-center min-h-[48px] w-full ${isMobileDevice ? 'mobile-input-container' : 'space-x-3'}`}>
+			  
                 <div className={`flex-1 ${isMobileDevice ? 'mobile-input-wrapper' : ''}`}>
                   <input
                     ref={inputRef}
