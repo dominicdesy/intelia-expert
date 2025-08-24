@@ -561,7 +561,10 @@ function PageContent() {
         )}
         
         <div className="absolute top-4 right-4">
-          <LanguageSelector onLanguageChange={setCurrentLanguage} currentLanguage={currentLanguage} />
+          <LanguageSelector onLanguageChange={(lang) => {
+            setCurrentLanguage(lang)
+            localStorage.setItem('intelia-language', lang)
+          }} currentLanguage={currentLanguage} />
         </div>
         
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
