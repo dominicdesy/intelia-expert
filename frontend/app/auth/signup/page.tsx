@@ -24,7 +24,7 @@ import {
   PasswordMatchIndicator, 
   LoadingSpinner, 
   AuthFooter 
-} from './page_components'
+} from './signup_components'
 
 // ==================== HOOK USECOUNTRIES INTÉGRÉ ====================
 const fallbackCountries = [
