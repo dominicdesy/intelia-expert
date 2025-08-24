@@ -510,27 +510,42 @@ export const StatisticsPage: React.FC = () => {
         limit: questionsPerPage.toString()
       })
 
-      const fastResponse = await fetch(`/api/v1/stats-fast/questions?${params}`, { headers })
+      const fastResponse = await fetch(`/api/v1/logging/questions?${params}`, { headers })
       
       if (!fastResponse.ok) {
-        throw new Error(`Erreur cache questions: ${fastResponse.status} - ${fastResponse.statusText}`)
+        throw new Error(`Erreur questions: ${fastResponse.status} - ${fastResponse.statusText}`)
       }
 
       const fastData: FastQuestionsResponse = await fastResponse.json()
       console.log('🎉 Questions chargées depuis le cache ultra-rapide!', fastData)
       
+      // 🔍 DÉBOGAGE: Analyser les données reçues
+      console.log('🔍 [DEBUG] Données questions reçues:', {
+        total_questions: fastData.pagination?.total,
+        questions_count: fastData.questions?.length,
+        first_question: fastData.questions?.[0],
+        pagination: fastData.pagination
+      })
+      
       const loadTime = performance.now() - startTime
       console.log(`⚡ Questions Performance: ${loadTime.toFixed(0)}ms`)
       
-      // Mettre à jour le statut du cache
-      setCacheStatus(fastData.cache_info)
+      // Adapter pour l'interface (pas de cache info dans logging endpoint)
+      const cacheInfo = {
+        is_available: false,
+        last_update: null,
+        cache_age_minutes: 0,
+        performance_gain: `${loadTime.toFixed(0)}ms`,
+        next_update: null
+      }
+      setCacheStatus(cacheInfo)
       
-      // Adapter les données pour l'UI
+      // Adapter les données pour l'UI (mapping des champs logging)
       const adaptedQuestions: QuestionLog[] = fastData.questions.map(q => ({
         id: q.id,
         timestamp: q.timestamp,
         user_email: q.user_email,
-        user_name: q.user_name,
+        user_name: q.user_name || (q.user_email || "").split('@')[0].replace('.', ' ').title(),
         question: q.question,
         response: q.response,
         response_source: mapResponseSource(q.response_source),
