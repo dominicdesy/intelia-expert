@@ -137,7 +137,7 @@ class AnalyticsManager:
         self.dsn = dsn or os.getenv("DATABASE_URL")
         if not self.dsn:
             raise ValueError("⛔ DATABASE_URL manquant - stockage persistant requis")
-        self._ensure_analytics_tables()
+        # self._ensure_analytics_tables()
     
     def _ensure_analytics_tables(self):
         """Crée toutes les tables d'analytics et logging"""
