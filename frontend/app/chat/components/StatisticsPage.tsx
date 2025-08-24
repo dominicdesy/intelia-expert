@@ -414,11 +414,43 @@ export const StatisticsPage: React.FC = () => {
       const billingStatsData = fastData.billingStats || fastData.billing_stats
       const performanceStatsData = fastData.performanceStats || fastData.performance_stats
       
+      // 🔧 CORRECTION: Conversion sécurisée des strings en numbers pour éviter erreur toFixed
+      const safePerformanceStats = performanceStatsData ? {
+        ...performanceStatsData,
+        avg_response_time: typeof performanceStatsData.avg_response_time === 'string' 
+          ? parseFloat(performanceStatsData.avg_response_time) || 0
+          : (performanceStatsData.avg_response_time || 0),
+        median_response_time: typeof performanceStatsData.median_response_time === 'string'
+          ? parseFloat(performanceStatsData.median_response_time) || 0
+          : (performanceStatsData.median_response_time || 0),
+        min_response_time: typeof performanceStatsData.min_response_time === 'string'
+          ? parseFloat(performanceStatsData.min_response_time) || 0
+          : (performanceStatsData.min_response_time || 0),
+        max_response_time: typeof performanceStatsData.max_response_time === 'string'
+          ? parseFloat(performanceStatsData.max_response_time) || 0
+          : (performanceStatsData.max_response_time || 0),
+        response_time_count: typeof performanceStatsData.response_time_count === 'string'
+          ? parseInt(performanceStatsData.response_time_count) || 0
+          : (performanceStatsData.response_time_count || 0),
+        openai_costs: typeof performanceStatsData.openai_costs === 'string'
+          ? parseFloat(performanceStatsData.openai_costs) || 0
+          : (performanceStatsData.openai_costs || 0),
+        error_count: typeof performanceStatsData.error_count === 'string'
+          ? parseInt(performanceStatsData.error_count) || 0
+          : (performanceStatsData.error_count || 0),
+        cache_hit_rate: typeof performanceStatsData.cache_hit_rate === 'string'
+          ? parseFloat(performanceStatsData.cache_hit_rate) || 0
+          : (performanceStatsData.cache_hit_rate || 0),
+        performance_gain: typeof performanceStatsData.performance_gain === 'string'
+          ? parseFloat(performanceStatsData.performance_gain) || 0
+          : (performanceStatsData.performance_gain || 0)
+      } : null
+      
       // Utiliser les données mises en cache
       setSystemStats(systemStatsData)
       setUsageStats(usageStatsData)
       setBillingStats(billingStatsData)
-      setPerformanceStats(performanceStatsData)
+      setPerformanceStats(safePerformanceStats)
       
       console.log('✅ Toutes les statistiques chargées depuis le cache ultra-rapide!')
 
