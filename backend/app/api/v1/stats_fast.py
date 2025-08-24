@@ -1,425 +1,101 @@
 # app/api/v1/stats_fast.py
 # -*- coding: utf-8 -*-
 """
-🚀 ENDPOINTS ULTRA-RAPIDES - Version Fonctionnelle et Safe
-✅ CONSERVE: Tout le code original qui fonctionnait
-❌ SUPPRIME: Seulement les parties problématiques (proxy HTTP, imports lourds)
+🔬 STATS FAST - VERSION DEBUG MINIMALE
+🚨 EMERGENCY: Version ultra-simple pour identifier la cause du problème mémoire
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
-from fastapi import APIRouter, Depends, Query, HTTPException
-from app.api.v1.auth import get_current_user
-from app.api.v1.stats_cache import get_stats_cache
+from datetime import datetime
+from typing import Dict, Any
+from fastapi import APIRouter, Depends, HTTPException
 
-# Import des permissions depuis logging.py (SAFE)
-from app.api.v1.logging import has_permission, Permission
+# ⚠️ IMPORTS MINIMAUX - Tester un par un
+try:
+    from app.api.v1.auth import get_current_user
+    auth_import_ok = True
+except Exception as e:
+    auth_import_ok = False
+    auth_error = str(e)
+
+try:
+    from app.api.v1.logging import has_permission, Permission
+    permissions_import_ok = True
+except Exception as e:
+    permissions_import_ok = False
+    permissions_error = str(e)
+
+# ❌ DÉSACTIVER TEMPORAIREMENT - Suspect principal
+# from app.api.v1.stats_cache import get_stats_cache
 
 router = APIRouter(tags=["statistics-fast"])
 logger = logging.getLogger(__name__)
 
-# ==================== UTILITAIRES (CONSERVÉS INTÉGRALEMENT) ====================
+# ==================== DEBUG ENDPOINT ====================
 
-def calculate_performance_gain(dashboard_snapshot: Dict[str, Any]) -> float:
-    """🚀 Calcul intelligent du gain de performance"""
-    try:
-        cache_hit_rate = 85.2
-        avg_response_time = float(dashboard_snapshot.get("avg_response_time", 0.250))
-        total_questions = dashboard_snapshot.get("total_questions", 0)
-        error_rate = float(dashboard_snapshot.get("error_rate", 0))
-        
-        cache_gain = min(cache_hit_rate * 0.7, 60)
-        
-        if avg_response_time > 0:
-            time_gain = min(25, max(0, (1.0 - avg_response_time) * 25))
-        else:
-            time_gain = 25
-        
-        reliability_gain = max(0, 10 - (error_rate * 2))
-        volume_bonus = min(5, total_questions * 0.01)
-        total_gain = cache_gain + time_gain + reliability_gain + volume_bonus
-        
-        return min(round(total_gain, 1), 100.0)
-        
-    except Exception as e:
-        logger.warning(f"Erreur calcul performance_gain: {e}")
-        return 75.0
-
-def calculate_cache_age_minutes(generated_at: str = None) -> int:
-    """Calcule l'âge du cache en minutes"""
-    if not generated_at:
-        return 0
+@router.get("/debug/memory")
+async def debug_memory_usage() -> Dict[str, Any]:
+    """🔬 Debug: État mémoire et imports"""
+    import psutil
+    import os
     
     try:
-        cache_time = datetime.fromisoformat(generated_at.replace('Z', '+00:00'))
-        current_time = datetime.now()
-        if cache_time.tzinfo:
-            from datetime import timezone
-            current_time = current_time.replace(tzinfo=timezone.utc)
+        # Mémoire du processus actuel
+        process = psutil.Process(os.getpid())
+        memory_info = process.memory_info()
         
-        age_delta = current_time - cache_time
-        return int(age_delta.total_seconds() / 60)
-    except:
-        return 0
+        return {
+            "status": "debug_active",
+            "timestamp": datetime.now().isoformat(),
+            "memory": {
+                "rss_mb": round(memory_info.rss / 1024 / 1024, 2),
+                "vms_mb": round(memory_info.vms / 1024 / 1024, 2),
+                "percent": process.memory_percent()
+            },
+            "imports": {
+                "auth_import_ok": auth_import_ok,
+                "auth_error": auth_error if not auth_import_ok else None,
+                "permissions_import_ok": permissions_import_ok,
+                "permissions_error": permissions_error if not permissions_import_ok else None,
+                "stats_cache_disabled": True
+            },
+            "system": {
+                "available_memory_mb": round(psutil.virtual_memory().available / 1024 / 1024, 2),
+                "total_memory_mb": round(psutil.virtual_memory().total / 1024 / 1024, 2)
+            }
+        }
+    except Exception as e:
+        return {
+            "status": "debug_error",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
 
-# ==================== DASHBOARD ENDPOINT (CONSERVÉ INTÉGRALEMENT) ====================
+# ==================== ENDPOINTS MINIMAUX ====================
+
+@router.get("/health")
+async def minimal_health() -> Dict[str, Any]:
+    """🏥 Health check ultra-simple"""
+    return {
+        "status": "minimal_healthy",
+        "timestamp": datetime.now().isoformat(),
+        "message": "Stats fast running in debug mode",
+        "memory_safe": True
+    }
 
 @router.get("/dashboard")
-async def get_dashboard_fast(
-    current_user: dict = Depends(get_current_user)
+async def minimal_dashboard(
+    current_user: dict = Depends(get_current_user) if auth_import_ok else None
 ) -> Dict[str, Any]:
-    """🚀 DASHBOARD ULTRA-RAPIDE - Code original qui fonctionnait"""
-    if not has_permission(current_user, Permission.ADMIN_DASHBOARD):
-        raise HTTPException(
-            status_code=403, 
-            detail=f"Admin dashboard access required. Your role: {current_user.get('user_type', 'user')}"
-        )
+    """📊 Dashboard ultra-minimal"""
     
-    try:
-        cache = get_stats_cache()
-        
-        # 📊 Récupération snapshot dashboard
-        dashboard_snapshot = cache.get_dashboard_snapshot()
-        cache_available = True
-        
-        if not dashboard_snapshot:
-            # Fallback sur cache générique
-            cached_data = cache.get_cache("dashboard:main")
-            if cached_data:
-                dashboard_snapshot = cached_data["data"]
-            else:
-                # Fallback ultime avec données minimales
-                cache_available = False
-                dashboard_snapshot = {
-                    "total_users": 0,
-                    "total_questions": 0,
-                    "questions_this_month": 0,
-                    "total_revenue": 0,
-                    "avg_response_time": 0,
-                    "source_distribution": {},
-                    "system_health": "unknown",
-                    "error_rate": 0,
-                    "top_users": [],
-                    "note": "Cache non disponible - données par défaut"
-                }
-        
-        # 🚀 CALCUL DU PERFORMANCE_GAIN
-        performance_gain = calculate_performance_gain(dashboard_snapshot)
-        
-        # 🕐 Calcul de l'âge du cache
-        cache_age_minutes = calculate_cache_age_minutes(dashboard_snapshot.get("generated_at"))
-        
-        # 🔄 Formatage pour compatibilité avec les composants existants
-        formatted_response = {
-            # 🚀 AJOUT CRITIQUE: cache_info pour le frontend
-            "cache_info": {
-                "is_available": cache_available,
-                "last_update": dashboard_snapshot.get("generated_at", datetime.now().isoformat()),
-                "cache_age_minutes": cache_age_minutes,
-                "performance_gain": f"{performance_gain}%",
-                "next_update": (datetime.now() + timedelta(hours=1)).isoformat()
-            },
-            
-            # System Stats (pour StatisticsDashboard)
-            "systemStats": {
-                "system_health": {
-                    "uptime_hours": 24 * 7,
-                    "total_requests": dashboard_snapshot.get("total_questions", 0),
-                    "error_rate": float(dashboard_snapshot.get("error_rate", 0)),
-                    "rag_status": {
-                        "global": True,
-                        "broiler": True,
-                        "layer": True
-                    }
-                },
-                "billing_stats": {
-                    "plans_available": 4,
-                    "plan_names": ["free", "basic", "premium", "enterprise"]
-                },
-                "features_enabled": {
-                    "analytics": True,
-                    "billing": True,
-                    "authentication": True,
-                    "openai_fallback": True
-                }
-            },
-            
-            # Usage Stats
-            "usageStats": {
-                "unique_users": dashboard_snapshot.get("total_users", 0),
-                "total_questions": dashboard_snapshot.get("total_questions", 0),
-                "questions_today": dashboard_snapshot.get("questions_today", 0),
-                "questions_this_month": dashboard_snapshot.get("questions_this_month", 0),
-                "source_distribution": dashboard_snapshot.get("source_distribution", {}),
-                "monthly_breakdown": {
-                    datetime.now().strftime("%Y-%m"): dashboard_snapshot.get("questions_this_month", 0)
-                }
-            },
-            
-            # Billing Stats
-            "billingStats": {
-                "plans": dashboard_snapshot.get("plan_distribution", {}),
-                "total_revenue": float(dashboard_snapshot.get("total_revenue", 0)),
-                "top_users": dashboard_snapshot.get("top_users", [])
-            },
-            
-            # Performance Stats
-            "performanceStats": {
-                "avg_response_time": float(dashboard_snapshot.get("avg_response_time", 0)),
-                "median_response_time": float(dashboard_snapshot.get("median_response_time", 0)),
-                "min_response_time": 0,
-                "max_response_time": 0,
-                "response_time_count": 0,
-                "openai_costs": float(dashboard_snapshot.get("openai_costs", 0)),
-                "error_count": 0,
-                "cache_hit_rate": 85.2,
-                "performance_gain": performance_gain
-            },
-            
-            # Metadata
-            "meta": {
-                "cached": True,
-                "cache_age": dashboard_snapshot.get("generated_at", datetime.now().isoformat()),
-                "response_time_ms": "< 100ms",
-                "data_source": "statistics_cache"
-            }
-        }
-        
-        logger.info(f"📊 Dashboard fast response: {current_user.get('email')}")
-        return formatted_response
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur dashboard fast: {e}")
-        raise HTTPException(status_code=500, detail=f"Cache error: {str(e)}")
-
-# ==================== AUTRES ENDPOINTS (CONSERVÉS) ====================
-
-@router.get("/performance")
-async def get_performance_fast(
-    hours: int = Query(24, ge=1, le=168),
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """🚀 Performance serveur ultra-rapide"""
-    if not has_permission(current_user, Permission.VIEW_SERVER_PERFORMANCE):
-        raise HTTPException(status_code=403, detail="Server performance access required")
+    # Si pas d'auth, données publiques
+    if not auth_import_ok or not current_user:
+        user_info = "no_auth"
+    else:
+        user_info = current_user.get("email", "unknown")
     
-    try:
-        cache = get_stats_cache()
-        performance_data = cache.get_cache("server:performance:24h")
-        
-        if not performance_data:
-            performance_data = {
-                "data": {
-                    "period_hours": 24,
-                    "current_status": {
-                        "overall_health": "unknown",
-                        "avg_response_time_ms": 0,
-                        "error_rate_percent": 0
-                    },
-                    "global_stats": {},
-                    "note": "Cache performance non disponible"
-                }
-            }
-        
-        result = performance_data["data"]
-        result["requested_by_role"] = current_user.get("user_type")
-        
-        logger.info(f"⚡ Performance fast response: {current_user.get('email')}")
-        return result
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur performance fast: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/openai-costs/current")
-async def get_openai_costs_fast(
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """💰 Coûts OpenAI ultra-rapides"""
-    if not has_permission(current_user, Permission.VIEW_OPENAI_COSTS):
-        raise HTTPException(status_code=403, detail="View OpenAI costs permission required")
-    
-    try:
-        cache = get_stats_cache()
-        costs_data = cache.get_cache("openai:costs:current")
-        
-        if not costs_data:
-            costs_data = cache.get_cache("openai:costs:fallback")
-            
-        if not costs_data:
-            costs_data = {
-                "data": {
-                    "total_cost": 6.30,
-                    "total_tokens": 450000,
-                    "api_calls": 250,
-                    "models_usage": {},
-                    "note": "Cache coûts OpenAI non disponible"
-                }
-            }
-        
-        result = costs_data["data"]
-        result["user_role"] = current_user.get("user_type")
-        
-        logger.info(f"💰 OpenAI costs fast response: {current_user.get('email')}")
-        return result
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur OpenAI costs fast: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ==================== QUESTIONS ENDPOINT (CONSERVÉ) ====================
-
-@router.get("/questions")
-async def get_questions_fast(
-    page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100),
-    search: str = Query("", description="Recherche dans questions/réponses"),
-    source: str = Query("all", description="Filtrer par source"),
-    confidence: str = Query("all", description="Filtrer par confiance"),
-    feedback: str = Query("all", description="Filtrer par feedback"),
-    user: str = Query("all", description="Filtrer par utilisateur"),
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """📋 Questions ultra-rapides avec pagination cachée"""
-    if not has_permission(current_user, Permission.VIEW_ALL_ANALYTICS):
-        raise HTTPException(status_code=403, detail="View all analytics permission required")
-    
-    try:
-        cache = get_stats_cache()
-        
-        # Construire clé de cache basée sur les filtres
-        filters = {
-            "search": search.lower() if search else "",
-            "source": source,
-            "confidence": confidence,
-            "feedback": feedback,
-            "user": user
-        }
-        
-        cache_key = f"questions:page:{page}:limit:{limit}:filters:{hash(str(sorted(filters.items())))}"
-        cached_questions = cache.get_cache(cache_key)
-        
-        if cached_questions:
-            result = cached_questions["data"]
-            result["meta"]["cache_hit"] = True
-            result["cache_info"] = {
-                "is_available": True,
-                "last_update": datetime.now().isoformat(),
-                "cache_age_minutes": 0,
-                "performance_gain": "90%",
-                "next_update": None
-            }
-            
-            logger.info(f"📋 Questions cache HIT: page {page}")
-            return result
-        
-        # Cache MISS - Fallback vers l'ancien endpoint
-        logger.info(f"📋 Questions cache MISS: {cache_key} - utilisation fallback")
-        
-        try:
-            from app.api.v1.logging import questions_final
-            
-            old_response = await questions_final(
-                page=page,
-                limit=limit,
-                current_user=current_user
-            )
-            
-            fallback_response = {
-                "cache_info": {
-                    "is_available": True,
-                    "last_update": datetime.now().isoformat(),
-                    "cache_age_minutes": 0,
-                    "performance_gain": "50%",
-                    "next_update": None,
-                    "fallback_used": True
-                },
-                "questions": old_response.get("questions", []),
-                "pagination": old_response.get("pagination", {
-                    "page": page,
-                    "limit": limit,
-                    "total": 0,
-                    "pages": 0,
-                    "has_next": False,
-                    "has_prev": False
-                }),
-                "meta": {
-                    "retrieved": len(old_response.get("questions", [])),
-                    "user_role": current_user.get("user_type"),
-                    "timestamp": datetime.now().isoformat(),
-                    "cache_hit": False,
-                    "source": "fallback_to_logging_questions_final",
-                    "fallback_successful": True
-                }
-            }
-            
-            logger.info(f"📋 Questions fallback SUCCESS: {len(old_response.get('questions', []))} résultats")
-            return fallback_response
-            
-        except Exception as fallback_error:
-            logger.error(f"❌ Fallback logging endpoint échoué: {fallback_error}")
-        
-        # Fallback ultime avec données vides
-        fallback_response = {
-            "cache_info": {
-                "is_available": False,
-                "last_update": None,
-                "cache_age_minutes": 0,
-                "performance_gain": "0%",
-                "next_update": None,
-                "error": "Tous les fallbacks ont échoué"
-            },
-            "questions": [],
-            "pagination": {
-                "page": page,
-                "limit": limit,
-                "total": 0,
-                "pages": 0,
-                "has_next": False,
-                "has_prev": False
-            },
-            "meta": {
-                "retrieved": 0,
-                "user_role": current_user.get("user_type"),
-                "timestamp": datetime.now().isoformat(),
-                "cache_hit": False,
-                "note": "Cache questions non disponible - utilisez l'ancien endpoint /logging/questions-final"
-            }
-        }
-        
-        logger.error(f"📋 Questions FALLBACK ULTIME: page {page} - aucune donnée disponible")
-        return fallback_response
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur questions fast: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ==================== INVITATIONS ENDPOINT - VERSION SIMPLE ====================
-
-@router.get("/invitations")
-async def get_invitations_fast(
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """📧 Invitations - Redirect vers endpoint classique"""
-    logger.info(f"📧 Invitations endpoint appelé par: {current_user.get('email')}")
-    return await get_invitations_stats_fast(current_user)
-
-@router.get("/invitations/stats")
-async def get_invitations_stats_fast(
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """
-    📧 Statistiques invitations - VERSION SIMPLE
-    🎯 SOLUTION: Message pour utiliser l'endpoint qui fonctionne
-    """
-    if not has_permission(current_user, Permission.VIEW_ALL_ANALYTICS):
-        logger.warning(f"📧 Permission refusée pour {current_user.get('email')}")
-        raise HTTPException(status_code=403, detail="View analytics permission required")
-    
-    # ✅ SOLUTION SIMPLE: Retour immédiat avec message explicite
-    logger.info(f"📧 Redirection vers endpoint classique pour: {current_user.get('email')}")
-    
+    # Données statiques minimales (pas de cache, pas de DB)
     return {
         "cache_info": {
             "is_available": False,
@@ -427,8 +103,56 @@ async def get_invitations_stats_fast(
             "cache_age_minutes": 0,
             "performance_gain": "0%",
             "next_update": None,
-            "message": "Utilisez /api/v1/invitations/stats pour les données réelles",
-            "redirect_to": "/api/v1/invitations/stats"
+            "debug_mode": True,
+            "message": "Mode debug - pas de cache actif"
+        },
+        "systemStats": {
+            "system_health": {
+                "uptime_hours": 0,
+                "total_requests": 0,
+                "error_rate": 0.0,
+                "rag_status": {"global": False, "broiler": False, "layer": False}
+            },
+            "debug_info": {
+                "memory_safe_mode": True,
+                "cache_disabled": True,
+                "user": user_info
+            }
+        },
+        "usageStats": {
+            "unique_users": 0,
+            "total_questions": 0,
+            "questions_today": 0,
+            "questions_this_month": 0,
+            "source_distribution": {},
+            "debug": "Données temporaires"
+        },
+        "billingStats": {"plans": {}, "total_revenue": 0.0, "top_users": []},
+        "performanceStats": {
+            "avg_response_time": 0.0,
+            "median_response_time": 0.0,
+            "openai_costs": 0.0,
+            "cache_hit_rate": 0.0,
+            "debug_mode": True
+        },
+        "meta": {
+            "debug": True,
+            "timestamp": datetime.now().isoformat(),
+            "data_source": "minimal_static"
+        }
+    }
+
+@router.get("/invitations")
+async def minimal_invitations(
+    current_user: dict = Depends(get_current_user) if auth_import_ok else None
+) -> Dict[str, Any]:
+    """📧 Invitations ultra-minimal"""
+    
+    return {
+        "cache_info": {
+            "is_available": False,
+            "debug_mode": True,
+            "message": "Mode debug - utilisez /api/v1/invitations/stats"
         },
         "invitation_stats": {
             "total_invitations_sent": 0,
@@ -437,167 +161,195 @@ async def get_invitations_stats_fast(
             "unique_inviters": 0,
             "top_inviters": [],
             "top_accepted": [],
-            "note": "Données réelles disponibles sur /api/v1/invitations/stats"
+            "debug": "Endpoint en mode debug"
         }
     }
 
-# ==================== AUTRES ENDPOINTS (CONSERVÉS) ====================
-
-@router.get("/my-analytics")
-async def get_my_analytics_fast(
-    days: int = Query(30, ge=1, le=365),
-    current_user: dict = Depends(get_current_user)
+@router.get("/invitations/stats")
+async def minimal_invitations_stats(
+    current_user: dict = Depends(get_current_user) if auth_import_ok else None
 ) -> Dict[str, Any]:
-    """📈 Analytics personnelles ultra-rapides"""
-    if not has_permission(current_user, Permission.VIEW_OWN_ANALYTICS):
-        raise HTTPException(status_code=403, detail="View own analytics permission required")
-    
-    try:
-        user_email = current_user.get("email")
-        if not user_email:
-            raise HTTPException(status_code=400, detail="User email not found")
-        
-        cache = get_stats_cache()
-        cache_key = f"analytics:user:{user_email}:days:{days}"
-        user_analytics = cache.get_cache(cache_key)
-        
-        if not user_analytics:
-            user_analytics = {
-                "data": {
-                    "user_email": user_email,
-                    "period_days": days,
-                    "questions": {
-                        "total_questions": 0,
-                        "successful_questions": 0,
-                        "failed_questions": 0,
-                        "avg_processing_time": 0,
-                        "avg_confidence": 0
-                    },
-                    "openai_costs": {
-                        "total_calls": 0,
-                        "total_tokens": 0,
-                        "total_cost_usd": 0,
-                        "avg_cost_per_call": 0
-                    },
-                    "cost_by_purpose": [],
-                    "note": "Cache utilisateur non disponible"
-                }
-            }
-        
-        result = user_analytics["data"]
-        result["user_role"] = current_user.get("user_type")
-        
-        logger.info(f"📈 User analytics fast response: {user_email}")
-        return result
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur user analytics fast: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    """📧 Invitations stats ultra-minimal"""
+    return await minimal_invitations(current_user)
 
-@router.get("/health")
-async def cache_health() -> Dict[str, Any]:
-    """🏥 Health check du système de cache"""
-    try:
-        cache = get_stats_cache()
-        cache_stats = cache.get_cache_stats()
-        
-        test_key = "health:test"
-        test_data = {"timestamp": datetime.now().isoformat()}
-        
-        write_success = cache.set_cache(test_key, test_data, ttl_hours=1, source="health_check")
-        read_result = cache.get_cache(test_key)
-        read_success = read_result is not None
-        
-        cache.invalidate_cache(key=test_key)
-        
-        health_status = {
-            "status": "healthy" if write_success and read_success else "degraded",
-            "cache_available": write_success and read_success,
-            "cache_statistics": cache_stats,
-            "test_results": {
-                "write": write_success,
-                "read": read_success
-            },
+@router.get("/questions")
+async def minimal_questions(
+    current_user: dict = Depends(get_current_user) if auth_import_ok else None
+) -> Dict[str, Any]:
+    """📋 Questions ultra-minimal"""
+    
+    return {
+        "cache_info": {
+            "is_available": False,
+            "debug_mode": True,
+            "message": "Mode debug - pas de données"
+        },
+        "questions": [],
+        "pagination": {
+            "page": 1,
+            "limit": 20,
+            "total": 0,
+            "pages": 0,
+            "has_next": False,
+            "has_prev": False
+        },
+        "meta": {
+            "retrieved": 0,
+            "debug": True,
             "timestamp": datetime.now().isoformat()
         }
-        
-        logger.info("🏥 Cache health check completed")
-        return health_status
-        
+    }
+
+@router.get("/performance")
+async def minimal_performance(
+    current_user: dict = Depends(get_current_user) if auth_import_ok else None
+) -> Dict[str, Any]:
+    """⚡ Performance ultra-minimal"""
+    
+    return {
+        "period_hours": 24,
+        "current_status": {
+            "overall_health": "debug",
+            "avg_response_time_ms": 0,
+            "error_rate_percent": 0
+        },
+        "global_stats": {},
+        "debug": {
+            "mode": "minimal",
+            "cache_disabled": True,
+            "timestamp": datetime.now().isoformat()
+        }
+    }
+
+@router.get("/openai-costs/current")
+async def minimal_openai_costs(
+    current_user: dict = Depends(get_current_user) if auth_import_ok else None
+) -> Dict[str, Any]:
+    """💰 OpenAI costs ultra-minimal"""
+    
+    return {
+        "total_cost": 0.0,
+        "total_tokens": 0,
+        "api_calls": 0,
+        "models_usage": {},
+        "debug": {
+            "mode": "minimal",
+            "cache_disabled": True,
+            "timestamp": datetime.now().isoformat()
+        }
+    }
+
+@router.get("/my-analytics")
+async def minimal_my_analytics(
+    current_user: dict = Depends(get_current_user) if auth_import_ok else None
+) -> Dict[str, Any]:
+    """📈 Analytics ultra-minimal"""
+    
+    user_email = "debug_user"
+    if current_user:
+        user_email = current_user.get("email", "unknown")
+    
+    return {
+        "user_email": user_email,
+        "period_days": 30,
+        "questions": {
+            "total_questions": 0,
+            "successful_questions": 0,
+            "failed_questions": 0,
+            "avg_processing_time": 0,
+            "avg_confidence": 0
+        },
+        "openai_costs": {
+            "total_calls": 0,
+            "total_tokens": 0,
+            "total_cost_usd": 0,
+            "avg_cost_per_call": 0
+        },
+        "cost_by_purpose": [],
+        "debug": {
+            "mode": "minimal",
+            "timestamp": datetime.now().isoformat()
+        }
+    }
+
+# ==================== ENDPOINTS DE TEST ====================
+
+@router.get("/test/imports")
+async def test_imports() -> Dict[str, Any]:
+    """🧪 Test des imports pour identifier la cause"""
+    
+    results = {
+        "timestamp": datetime.now().isoformat(),
+        "imports": {}
+    }
+    
+    # Test import auth
+    try:
+        from app.api.v1.auth import get_current_user
+        results["imports"]["auth"] = {"status": "ok", "module": "app.api.v1.auth"}
     except Exception as e:
-        logger.error(f"❌ Erreur cache health: {e}")
+        results["imports"]["auth"] = {"status": "error", "error": str(e)}
+    
+    # Test import permissions
+    try:
+        from app.api.v1.logging import has_permission, Permission
+        results["imports"]["logging"] = {"status": "ok", "module": "app.api.v1.logging"}
+    except Exception as e:
+        results["imports"]["logging"] = {"status": "error", "error": str(e)}
+    
+    # Test import stats_cache (SUSPECT PRINCIPAL)
+    try:
+        from app.api.v1.stats_cache import get_stats_cache
+        cache = get_stats_cache()
+        results["imports"]["stats_cache"] = {
+            "status": "ok", 
+            "module": "app.api.v1.stats_cache",
+            "cache_available": cache is not None
+        }
+    except Exception as e:
+        results["imports"]["stats_cache"] = {"status": "error", "error": str(e)}
+    
+    # Test import stats_updater
+    try:
+        from app.api.v1.stats_updater import get_stats_updater
+        results["imports"]["stats_updater"] = {"status": "ok", "module": "app.api.v1.stats_updater"}
+    except Exception as e:
+        results["imports"]["stats_updater"] = {"status": "error", "error": str(e)}
+    
+    return results
+
+@router.get("/test/memory-stress")
+async def test_memory_stress() -> Dict[str, Any]:
+    """🧪 Test de stress mémoire contrôlé"""
+    import psutil
+    import os
+    
+    process = psutil.Process(os.getpid())
+    initial_memory = process.memory_info().rss
+    
+    try:
+        # Test création liste en mémoire (contrôlé)
+        test_data = []
+        for i in range(1000):  # Petit test
+            test_data.append({"id": i, "data": f"test_{i}"})
+        
+        final_memory = process.memory_info().rss
+        memory_diff = final_memory - initial_memory
+        
+        # Nettoyer
+        del test_data
+        
         return {
-            "status": "unhealthy",
+            "status": "completed",
+            "initial_memory_mb": round(initial_memory / 1024 / 1024, 2),
+            "final_memory_mb": round(final_memory / 1024 / 1024, 2),
+            "memory_diff_mb": round(memory_diff / 1024 / 1024, 2),
+            "test_size": 1000,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "error",
             "error": str(e),
             "timestamp": datetime.now().isoformat()
         }
-
-@router.get("/cache-info")
-async def cache_info(
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """ℹ️ Informations détaillées sur le cache (admin)"""
-    if not has_permission(current_user, Permission.ADMIN_DASHBOARD):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
-    try:
-        cache = get_stats_cache()
-        cache_stats = cache.get_cache_stats()
-        last_update = cache.get_cache("system:last_update_summary")
-        
-        cache_info_data = {
-            "cache_statistics": cache_stats,
-            "last_update_summary": last_update["data"] if last_update else None,
-            "available_cache_keys": [
-                "dashboard:main",
-                "openai:costs:current", 
-                "invitations:global_stats",
-                "server:performance:24h"
-            ],
-            "cache_configuration": {
-                "default_ttl_hours": 1,
-                "openai_ttl_hours": 4,
-                "questions_ttl_minutes": 15,
-                "dashboard_ttl_hours": 1
-            },
-            "system_info": {
-                "cache_enabled": True,
-                "database_connected": bool(cache.dsn),
-                "timestamp": datetime.now().isoformat()
-            }
-        }
-        
-        logger.info(f"ℹ️ Cache info requested by: {current_user.get('email')}")
-        return cache_info_data
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur cache info: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ==================== ENDPOINTS DE COMPATIBILITÉ (CONSERVÉS) ====================
-
-@router.get("/compatibility/logging-dashboard") 
-async def compatibility_logging_dashboard(
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """🔄 Compatibilité avec /logging/analytics/dashboard"""
-    return await get_dashboard_fast(current_user)
-
-@router.get("/compatibility/logging-performance")
-async def compatibility_logging_performance(
-    hours: int = Query(24, ge=1, le=168),
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """🔄 Compatibilité avec /logging/analytics/performance"""
-    return await get_performance_fast(hours, current_user)
-
-def format_timestamp(timestamp: Optional[str]) -> str:
-    """Formate un timestamp pour l'affichage"""
-    if not timestamp:
-        return "N/A"
-    
-    try:
-        dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-        return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
-    except:
-        return str(timestamp)
