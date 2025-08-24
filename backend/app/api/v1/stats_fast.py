@@ -1,11 +1,9 @@
 # app/api/v1/stats_fast.py
 # -*- coding: utf-8 -*-
 """
-🚀 ENDPOINTS ULTRA-RAPIDES - Lecture cache uniquement
-Performance <100ms vs 10-30 secondes des anciens endpoints
-SAFE: Nouveaux endpoints en parallèle des anciens (pas de rupture)
-✅ CORRECTIONS: Questions cache_info + Invitations endpoint fixes
-🔧 FIX INVITATIONS: Utilise la même logique que l'endpoint qui fonctionne
+🚀 ENDPOINTS ULTRA-RAPIDES - Version Fonctionnelle et Safe
+✅ CONSERVE: Tout le code original qui fonctionnait
+❌ SUPPRIME: Seulement les parties problématiques (proxy HTTP, imports lourds)
 """
 
 import logging
@@ -21,45 +19,32 @@ from app.api.v1.logging import has_permission, Permission
 router = APIRouter(tags=["statistics-fast"])
 logger = logging.getLogger(__name__)
 
-# ==================== UTILITAIRE PERFORMANCE_GAIN (CONSERVÉ) ====================
+# ==================== UTILITAIRES (CONSERVÉS INTÉGRALEMENT) ====================
 
 def calculate_performance_gain(dashboard_snapshot: Dict[str, Any]) -> float:
-    """
-    🚀 Calcul intelligent du gain de performance
-    Basé sur cache hit rate, temps de réponse, et métriques système
-    """
+    """🚀 Calcul intelligent du gain de performance"""
     try:
-        # Facteurs de performance
-        cache_hit_rate = 85.2  # Votre cache hit rate actuel
+        cache_hit_rate = 85.2
         avg_response_time = float(dashboard_snapshot.get("avg_response_time", 0.250))
         total_questions = dashboard_snapshot.get("total_questions", 0)
         error_rate = float(dashboard_snapshot.get("error_rate", 0))
         
-        # Base gain du cache (0-60%)
         cache_gain = min(cache_hit_rate * 0.7, 60)
         
-        # Gain du temps de réponse (0-25%)
-        # Plus le temps est faible, plus le gain est élevé
         if avg_response_time > 0:
             time_gain = min(25, max(0, (1.0 - avg_response_time) * 25))
         else:
             time_gain = 25
         
-        # Gain de fiabilité basé sur le taux d'erreur (0-10%)
         reliability_gain = max(0, 10 - (error_rate * 2))
-        
-        # Bonus de volume si beaucoup de questions (0-5%)
         volume_bonus = min(5, total_questions * 0.01)
-        
-        # Calcul final
         total_gain = cache_gain + time_gain + reliability_gain + volume_bonus
         
-        # Cap à 100% et arrondi
         return min(round(total_gain, 1), 100.0)
         
     except Exception as e:
         logger.warning(f"Erreur calcul performance_gain: {e}")
-        return 75.0  # Valeur par défaut raisonnable
+        return 75.0
 
 def calculate_cache_age_minutes(generated_at: str = None) -> int:
     """Calcule l'âge du cache en minutes"""
@@ -78,16 +63,13 @@ def calculate_cache_age_minutes(generated_at: str = None) -> int:
     except:
         return 0
 
-# ==================== ENDPOINTS DASHBOARD (CONSERVÉ INTÉGRALEMENT) ====================
+# ==================== DASHBOARD ENDPOINT (CONSERVÉ INTÉGRALEMENT) ====================
 
 @router.get("/dashboard")
 async def get_dashboard_fast(
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """
-    🚀 DASHBOARD ULTRA-RAPIDE - Lecture cache uniquement
-    Compatible avec StatisticsDashboard.tsx existant
-    """
+    """🚀 DASHBOARD ULTRA-RAPIDE - Code original qui fonctionnait"""
     if not has_permission(current_user, Permission.ADMIN_DASHBOARD):
         raise HTTPException(
             status_code=403, 
@@ -142,9 +124,9 @@ async def get_dashboard_fast(
             # System Stats (pour StatisticsDashboard)
             "systemStats": {
                 "system_health": {
-                    "uptime_hours": 24 * 7,  # Approximation
+                    "uptime_hours": 24 * 7,
                     "total_requests": dashboard_snapshot.get("total_questions", 0),
-                    "error_rate": float(dashboard_snapshot.get("error_rate", 0)),  # ✅ Conversion en float
+                    "error_rate": float(dashboard_snapshot.get("error_rate", 0)),
                     "rag_status": {
                         "global": True,
                         "broiler": True,
@@ -178,21 +160,21 @@ async def get_dashboard_fast(
             # Billing Stats
             "billingStats": {
                 "plans": dashboard_snapshot.get("plan_distribution", {}),
-                "total_revenue": float(dashboard_snapshot.get("total_revenue", 0)),  # ✅ Conversion en float
+                "total_revenue": float(dashboard_snapshot.get("total_revenue", 0)),
                 "top_users": dashboard_snapshot.get("top_users", [])
             },
             
-            # Performance Stats - AVEC PERFORMANCE_GAIN ET CONVERSIONS
+            # Performance Stats
             "performanceStats": {
-                "avg_response_time": float(dashboard_snapshot.get("avg_response_time", 0)),  # ✅ Conversion
-                "median_response_time": float(dashboard_snapshot.get("median_response_time", 0)),  # ✅ Conversion
+                "avg_response_time": float(dashboard_snapshot.get("avg_response_time", 0)),
+                "median_response_time": float(dashboard_snapshot.get("median_response_time", 0)),
                 "min_response_time": 0,
                 "max_response_time": 0,
                 "response_time_count": 0,
-                "openai_costs": float(dashboard_snapshot.get("openai_costs", 0)),  # ✅ Conversion
+                "openai_costs": float(dashboard_snapshot.get("openai_costs", 0)),
                 "error_count": 0,
                 "cache_hit_rate": 85.2,
-                "performance_gain": performance_gain  # 🚀 NOUVEAU CHAMP AJOUTÉ
+                "performance_gain": performance_gain
             },
             
             # Metadata
@@ -211,7 +193,7 @@ async def get_dashboard_fast(
         logger.error(f"❌ Erreur dashboard fast: {e}")
         raise HTTPException(status_code=500, detail=f"Cache error: {str(e)}")
 
-# ==================== AUTRES ENDPOINTS (CONSERVÉS INTÉGRALEMENT) ====================
+# ==================== AUTRES ENDPOINTS (CONSERVÉS) ====================
 
 @router.get("/performance")
 async def get_performance_fast(
@@ -224,12 +206,9 @@ async def get_performance_fast(
     
     try:
         cache = get_stats_cache()
-        
-        # Récupérer depuis le cache
         performance_data = cache.get_cache("server:performance:24h")
         
         if not performance_data:
-            # Fallback minimal
             performance_data = {
                 "data": {
                     "period_hours": 24,
@@ -263,16 +242,12 @@ async def get_openai_costs_fast(
     
     try:
         cache = get_stats_cache()
-        
-        # Essayer le cache principal
         costs_data = cache.get_cache("openai:costs:current")
         
         if not costs_data:
-            # Fallback sur le cache de secours
             costs_data = cache.get_cache("openai:costs:fallback")
             
         if not costs_data:
-            # Fallback ultime
             costs_data = {
                 "data": {
                     "total_cost": 6.30,
@@ -306,7 +281,7 @@ async def get_questions_fast(
     user: str = Query("all", description="Filtrer par utilisateur"),
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """📋 Questions ultra-rapides avec pagination cachée - VERSION CORRIGÉE"""
+    """📋 Questions ultra-rapides avec pagination cachée"""
     if not has_permission(current_user, Permission.VIEW_ALL_ANALYTICS):
         raise HTTPException(status_code=403, detail="View all analytics permission required")
     
@@ -322,17 +297,12 @@ async def get_questions_fast(
             "user": user
         }
         
-        # Clé de cache unique
         cache_key = f"questions:page:{page}:limit:{limit}:filters:{hash(str(sorted(filters.items())))}"
-        
-        # Essayer le cache d'abord
         cached_questions = cache.get_cache(cache_key)
         
         if cached_questions:
             result = cached_questions["data"]
             result["meta"]["cache_hit"] = True
-            
-            # ✅ CORRECTION: cache_info indique disponible
             result["cache_info"] = {
                 "is_available": True,
                 "last_update": datetime.now().isoformat(),
@@ -344,29 +314,26 @@ async def get_questions_fast(
             logger.info(f"📋 Questions cache HIT: page {page}")
             return result
         
-        # Cache MISS - Fallback vers données calculées en temps réel
+        # Cache MISS - Fallback vers l'ancien endpoint
         logger.info(f"📋 Questions cache MISS: {cache_key} - utilisation fallback")
         
         try:
-            # ✅ CORRECTION: Import correct de l'ancien endpoint
             from app.api.v1.logging import questions_final
             
-            # Appeler l'ancien endpoint comme fallback (paramètres simplifiés)
             old_response = await questions_final(
                 page=page,
                 limit=limit,
                 current_user=current_user
             )
             
-            # ✅ CORRECTION: cache_info indique que le cache a fonctionné via fallback
             fallback_response = {
                 "cache_info": {
-                    "is_available": True,  # ✅ Le système fonctionne via fallback
+                    "is_available": True,
                     "last_update": datetime.now().isoformat(),
                     "cache_age_minutes": 0,
-                    "performance_gain": "50%",  # Gain partiel via fallback
+                    "performance_gain": "50%",
                     "next_update": None,
-                    "fallback_used": True  # ✅ Indication que fallback utilisé
+                    "fallback_used": True
                 },
                 "questions": old_response.get("questions", []),
                 "pagination": old_response.get("pagination", {
@@ -383,7 +350,7 @@ async def get_questions_fast(
                     "timestamp": datetime.now().isoformat(),
                     "cache_hit": False,
                     "source": "fallback_to_logging_questions_final",
-                    "fallback_successful": True  # ✅ Indique succès du fallback
+                    "fallback_successful": True
                 }
             }
             
@@ -393,10 +360,10 @@ async def get_questions_fast(
         except Exception as fallback_error:
             logger.error(f"❌ Fallback logging endpoint échoué: {fallback_error}")
         
-        # Fallback ultime avec données vides - CACHE RÉELLEMENT INDISPONIBLE
+        # Fallback ultime avec données vides
         fallback_response = {
             "cache_info": {
-                "is_available": False,  # ✅ Vraiment indisponible ici
+                "is_available": False,
                 "last_update": None,
                 "cache_age_minutes": 0,
                 "performance_gain": "0%",
@@ -428,13 +395,13 @@ async def get_questions_fast(
         logger.error(f"❌ Erreur questions fast: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# ==================== 🔧 ENDPOINTS INVITATIONS - VERSION SIMPLIFIÉE STABLE ====================
+# ==================== INVITATIONS ENDPOINT - VERSION SIMPLE ====================
 
 @router.get("/invitations")
 async def get_invitations_fast(
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """📧 Endpoint invitations simple - VERSION STABLE"""
+    """📧 Invitations - Redirect vers endpoint classique"""
     logger.info(f"📧 Invitations endpoint appelé par: {current_user.get('email')}")
     return await get_invitations_stats_fast(current_user)
 
@@ -443,71 +410,38 @@ async def get_invitations_stats_fast(
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
-    📧 Statistiques invitations ultra-rapides - VERSION STABLE
-    🛡️ SAFE: Sans proxy HTTP ni opérations bloquantes
+    📧 Statistiques invitations - VERSION SIMPLE
+    🎯 SOLUTION: Message pour utiliser l'endpoint qui fonctionne
     """
     if not has_permission(current_user, Permission.VIEW_ALL_ANALYTICS):
         logger.warning(f"📧 Permission refusée pour {current_user.get('email')}")
         raise HTTPException(status_code=403, detail="View analytics permission required")
     
-    try:
-        logger.info(f"📧 Récupération stats invitations pour: {current_user.get('email')}")
-        
-        # 🚨 SOLUTION TEMPORAIRE: Rediriger vers l'endpoint qui fonctionne
-        # Le frontend devrait utiliser /api/v1/invitations/stats directement
-        
-        # 🎯 FALLBACK IMMÉDIAT: Données simulées basées sur les tests console
-        # D'après vos tests : 2 envoyées, 1 acceptée, 50% taux
-        logger.info("📧 Utilisation de données basées sur les tests console réussis")
-        
-        # Données basées sur vos vrais résultats de test
-        simulated_result = {
-            "cache_info": {
-                "is_available": False,  # Indique clairement que c'est temporaire
-                "last_update": datetime.now().isoformat(),
-                "cache_age_minutes": 0,
-                "performance_gain": "0%",
-                "next_update": None,
-                "message": "Utilise l'endpoint /api/v1/invitations/stats pour les vraies données"
-            },
-            "invitation_stats": {
-                "total_invitations_sent": 0,  # Temporairement à 0 pour forcer l'utilisation du bon endpoint
-                "total_invitations_accepted": 0,
-                "acceptance_rate": 0,
-                "unique_inviters": 0,
-                "top_inviters": [],
-                "top_accepted": [],
-                "note": "Données temporaires - utilisez /api/v1/invitations/stats"
-            }
+    # ✅ SOLUTION SIMPLE: Retour immédiat avec message explicite
+    logger.info(f"📧 Redirection vers endpoint classique pour: {current_user.get('email')}")
+    
+    return {
+        "cache_info": {
+            "is_available": False,
+            "last_update": None,
+            "cache_age_minutes": 0,
+            "performance_gain": "0%",
+            "next_update": None,
+            "message": "Utilisez /api/v1/invitations/stats pour les données réelles",
+            "redirect_to": "/api/v1/invitations/stats"
+        },
+        "invitation_stats": {
+            "total_invitations_sent": 0,
+            "total_invitations_accepted": 0,
+            "acceptance_rate": 0.0,
+            "unique_inviters": 0,
+            "top_inviters": [],
+            "top_accepted": [],
+            "note": "Données réelles disponibles sur /api/v1/invitations/stats"
         }
-        
-        logger.info("📧 Retour données temporaires - frontend doit utiliser l'endpoint classique")
-        return simulated_result
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur invitations fast: {e}")
-        
-        # Fallback ultra-simple sans aucune opération risquée
-        return {
-            "cache_info": {
-                "is_available": False,
-                "last_update": None,
-                "cache_age_minutes": 0,
-                "performance_gain": "0%",
-                "next_update": None,
-                "error": "Endpoint en maintenance"
-            },
-            "invitation_stats": {
-                "total_invitations_sent": 0,
-                "total_invitations_accepted": 0,
-                "acceptance_rate": 0.0,
-                "unique_inviters": 0,
-                "top_inviters": [],
-                "top_accepted": []
-            }
-        }
+    }
 
-# ==================== AUTRES ENDPOINTS (CONSERVÉS INTÉGRALEMENT) ====================
+# ==================== AUTRES ENDPOINTS (CONSERVÉS) ====================
 
 @router.get("/my-analytics")
 async def get_my_analytics_fast(
@@ -524,15 +458,10 @@ async def get_my_analytics_fast(
             raise HTTPException(status_code=400, detail="User email not found")
         
         cache = get_stats_cache()
-        
-        # Clé de cache pour l'utilisateur
         cache_key = f"analytics:user:{user_email}:days:{days}"
-        
-        # Récupérer depuis le cache analytics détaillé
         user_analytics = cache.get_cache(cache_key)
         
         if not user_analytics:
-            # Fallback minimal
             user_analytics = {
                 "data": {
                     "user_email": user_email,
@@ -570,11 +499,8 @@ async def cache_health() -> Dict[str, Any]:
     """🏥 Health check du système de cache"""
     try:
         cache = get_stats_cache()
-        
-        # Statistiques du cache
         cache_stats = cache.get_cache_stats()
         
-        # Test simple d'écriture/lecture
         test_key = "health:test"
         test_data = {"timestamp": datetime.now().isoformat()}
         
@@ -582,7 +508,6 @@ async def cache_health() -> Dict[str, Any]:
         read_result = cache.get_cache(test_key)
         read_success = read_result is not None
         
-        # Nettoyer le test
         cache.invalidate_cache(key=test_key)
         
         health_status = {
@@ -617,11 +542,7 @@ async def cache_info(
     
     try:
         cache = get_stats_cache()
-        
-        # Récupérer toutes les statistiques
         cache_stats = cache.get_cache_stats()
-        
-        # Informations sur les dernières mises à jour
         last_update = cache.get_cache("system:last_update_summary")
         
         cache_info_data = {
@@ -669,8 +590,6 @@ async def compatibility_logging_performance(
 ) -> Dict[str, Any]:
     """🔄 Compatibilité avec /logging/analytics/performance"""
     return await get_performance_fast(hours, current_user)
-
-# ==================== UTILITAIRES (CONSERVÉS) ====================
 
 def format_timestamp(timestamp: Optional[str]) -> str:
     """Formate un timestamp pour l'affichage"""
