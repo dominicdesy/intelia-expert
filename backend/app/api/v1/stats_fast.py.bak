@@ -348,13 +348,18 @@ async def get_questions_fast(
         # Cache MISS - Fallback vers données calculées en temps réel
         # 🚀 AMÉLIORATION: Essayer de récupérer depuis l'ancien endpoint
         try:
-            # ✅ CORRECTION: Import correct de l'ancien endpoint
-            from app.api.v1.logging import questions_final
+            # Import optionnel de l'ancien endpoint
+            from app.api.v1.logging import get_questions_final
             
-            # Appeler l'ancien endpoint comme fallback (paramètres simplifiés)
-            old_response = await questions_final(
+            # Appeler l'ancien endpoint comme fallback
+            old_response = await get_questions_final(
                 page=page,
                 limit=limit,
+                search=search,
+                source=source,
+                confidence=confidence,
+                feedback=feedback,
+                user=user,
                 current_user=current_user
             )
             
@@ -381,7 +386,7 @@ async def get_questions_fast(
                     "user_role": current_user.get("user_type"),
                     "timestamp": datetime.now().isoformat(),
                     "cache_hit": False,
-                    "source": "fallback_to_logging_questions_final"
+                    "source": "fallback_to_logging_endpoint"
                 }
             }
             
@@ -427,13 +432,6 @@ async def get_questions_fast(
 
 
 # ==================== ENDPOINTS INVITATIONS ====================
-
-@router.get("/invitations")
-async def get_invitations_fast(
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """📧 Endpoint invitations simple (alias pour /invitations/stats)"""
-    return await get_invitations_stats_fast(current_user)
 
 @router.get("/invitations/stats")
 async def get_invitations_stats_fast(

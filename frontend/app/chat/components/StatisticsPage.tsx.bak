@@ -288,6 +288,125 @@ export const StatisticsPage: React.FC = () => {
     }
   }, [authStatus, activeTab])
 
+	// 🔍 CODE DIAGNOSTIC - À ajouter temporairement dans ton composant PageContent
+
+	// Ajoute ce useEffect après les autres pour diagnostiquer le scroll
+	useEffect(() => {
+	  if (isSignupMode) {
+		console.log('🔍 DIAGNOSTIC SCROLL - Mode signup activé')
+		
+		// Vérifier tous les éléments qui peuvent scroll
+		const checkScrollElements = () => {
+		  const elements = [
+			{ name: 'html', el: document.documentElement },
+			{ name: 'body', el: document.body },
+			{ name: 'page-wrapper', el: document.querySelector('.min-h-screen') },
+			{ name: 'modal-overlay', el: document.querySelector('.fixed.inset-0') },
+			{ name: 'modal-card', el: document.querySelector('.max-w-2xl') },
+			{ name: 'modal-body', el: document.querySelector('.flex-1.px-6') }
+		  ]
+		  
+		  elements.forEach(({ name, el }) => {
+			if (el) {
+			  const styles = window.getComputedStyle(el)
+			  const hasScroll = el.scrollHeight > el.clientHeight
+			  const overflowY = styles.overflowY
+			  
+			  console.log(`📊 ${name}:`, {
+				overflowY,
+				hasScroll,
+				scrollHeight: el.scrollHeight,
+				clientHeight: el.clientHeight,
+				offsetHeight: el.offsetHeight
+			  })
+			}
+		  })
+		}
+		
+		// Check immédiat et après 100ms pour voir les changements
+		checkScrollElements()
+		setTimeout(checkScrollElements, 100)
+	  }
+	}, [isSignupMode])
+
+	// 🎯 SOLUTION RADICALE - Remplace complètement ta structure JSX par ceci:
+
+	return (
+	  <>
+		{!isSignupMode ? (
+		  // PAGE LOGIN SEULE
+		  <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative">
+			{/* Tout ton contenu de login ici */}
+			
+			<div className="absolute top-4 right-4">
+			  <LanguageSelector onLanguageChange={setCurrentLanguage} currentLanguage={currentLanguage} />
+			</div>
+			
+			<div className="sm:mx-auto sm:w-full sm:max-w-md">
+			  <div className="flex justify-center">
+				<InteliaLogo className="w-16 h-16" />
+			  </div>
+			  <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
+				{t.title}
+			  </h2>
+			</div>
+
+			<div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+			  <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
+				{/* Formulaire login complet */}
+				<button
+				  onClick={toggleMode}
+				  className="font-medium text-blue-600 hover:text-blue-500"
+				>
+				  {t.createAccount}
+				</button>
+			  </div>
+			</div>
+		  </div>
+		) : (
+		  // MODALE SIGNUP SEULE (fullscreen, pas d'overlay)
+		  <div className="fixed inset-0 z-50 bg-white">
+			<div className="h-full flex flex-col">
+			  {/* Header fixe */}
+			  <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+				<h3 className="text-lg font-semibold text-gray-900">{t.createAccount}</h3>
+				<button onClick={toggleMode} className="p-2 text-gray-400 hover:text-gray-600">
+				  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+				  </svg>
+				</button>
+			  </div>
+			  
+			  {/* Corps scrollable */}
+			  <div className="flex-1 overflow-y-auto px-6 py-4">
+				{/* Formulaire signup complet */}
+			  </div>
+			  
+			  {/* Footer fixe */}
+			  <div className="flex-shrink-0 bg-gray-50 border-t border-gray-200 px-6 py-4">
+				<div className="flex space-x-3">
+				  <button onClick={toggleMode}>Retour</button>
+				  <button onClick={handleSignup}>Créer compte</button>
+				</div>
+			  </div>
+			</div>
+		  </div>
+		)}
+	  </>
+	)
+
+
+
+
+
+
+
+
+
+
+
+
+
   // FONCTION POUR RÉCUPÉRER LES HEADERS D'AUTHENTIFICATION
   const getAuthHeaders = async (): Promise<Record<string, string>> => {
     try {
@@ -414,6 +533,25 @@ export const StatisticsPage: React.FC = () => {
       const billingStatsData = fastData.billingStats || fastData.billing_stats
       const performanceStatsData = fastData.performanceStats || fastData.performance_stats
       
+      // 🔧 CORRECTION: Conversion sécurisée des systemStats
+      const safeSystemStats = systemStatsData ? {
+        ...systemStatsData,
+        system_health: systemStatsData.system_health ? {
+          ...systemStatsData.system_health,
+          error_rate: typeof systemStatsData.system_health.error_rate === 'string'
+            ? parseFloat(systemStatsData.system_health.error_rate) || 0
+            : (systemStatsData.system_health.error_rate || 0)
+        } : systemStatsData.system_health
+      } : null
+      
+      // 🔧 CORRECTION: Conversion sécurisée des billingStats  
+      const safeBillingStats = billingStatsData ? {
+        ...billingStatsData,
+        total_revenue: typeof billingStatsData.total_revenue === 'string'
+          ? parseFloat(billingStatsData.total_revenue) || 0
+          : (billingStatsData.total_revenue || 0)
+      } : null
+      
       // 🔧 CORRECTION: Conversion sécurisée des strings en numbers pour éviter erreur toFixed
       const safePerformanceStats = performanceStatsData ? {
         ...performanceStatsData,
@@ -446,11 +584,25 @@ export const StatisticsPage: React.FC = () => {
           : (performanceStatsData.performance_gain || 0)
       } : null
       
-      // Utiliser les données mises en cache
-      setSystemStats(systemStatsData)
+      // Utiliser les données mises en cache avec conversions sécurisées
+      setSystemStats(safeSystemStats)
       setUsageStats(usageStatsData)
-      setBillingStats(billingStatsData)
+      setBillingStats(safeBillingStats)
       setPerformanceStats(safePerformanceStats)
+      
+      // 🔧 PROTECTION: Log des types pour debug
+      console.log('🔍 Types de données après conversion:', {
+        systemStats: safeSystemStats ? {
+          error_rate: `${safeSystemStats.system_health?.error_rate} (${typeof safeSystemStats.system_health?.error_rate})`
+        } : 'null',
+        billingStats: safeBillingStats ? {
+          total_revenue: `${safeBillingStats.total_revenue} (${typeof safeBillingStats.total_revenue})`
+        } : 'null',
+        performanceStats: safePerformanceStats ? {
+          avg_response_time: `${safePerformanceStats.avg_response_time} (${typeof safePerformanceStats.avg_response_time})`,
+          openai_costs: `${safePerformanceStats.openai_costs} (${typeof safePerformanceStats.openai_costs})`
+        } : 'null'
+      })
       
       console.log('✅ Toutes les statistiques chargées depuis le cache ultra-rapide!')
 

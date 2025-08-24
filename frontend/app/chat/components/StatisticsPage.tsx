@@ -291,14 +291,14 @@ export const StatisticsPage: React.FC = () => {
   // FONCTION POUR RÉCUPÉRER LES HEADERS D'AUTHENTIFICATION
   const getAuthHeaders = async (): Promise<Record<string, string>> => {
     try {
-      console.log('🔍 getAuthHeaders: Début...')
+      console.log('🔐 getAuthHeaders: Début...')
       
       try {
         const supabase = getSupabaseClient()
-        console.log('🔍 getAuthHeaders: Supabase client récupéré')
+        console.log('🔐 getAuthHeaders: Supabase client récupéré')
         
         const { data: { session }, error } = await supabase.auth.getSession()
-        console.log('🔍 getAuthHeaders: Session récupérée:', { 
+        console.log('🔐 getAuthHeaders: Session récupérée:', { 
           hasSession: !!session, 
           hasError: !!error,
           hasAccessToken: !!session?.access_token,
@@ -772,7 +772,7 @@ export const StatisticsPage: React.FC = () => {
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  📧 Invitations
+                  🔧 Invitations
                 </button>
               </div>
               
