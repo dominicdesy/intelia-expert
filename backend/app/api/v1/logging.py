@@ -1404,3 +1404,695 @@ async def billing_admin_stats(
                     SELECT 
                         ubi.plan_name,
                         COUNT(*) as user_count,
+                        AVG(bp.price_per_month) as avg_revenue
+                    FROM user_billing_info ubi
+                    LEFT JOIN billing_plans bp ON ubi.plan_name = bp.plan_name
+                    GROUP BY ubi.plan_name, bp.price_per_month
+                """)
+                
+                plan_stats = {}
+                total_revenue = 0
+                for row in cur.fetchall():
+                    plan_name = row['plan_name']
+                    user_count = row['user_count']
+                    avg_revenue = float(row['avg_revenue'] or 0)
+                    revenue = user_count * avg_revenue
+                    
+                    plan_stats[plan_name] = {
+                        "user_count": user_count,
+                        "revenue": revenue
+                    }
+                    total_revenue += revenue
+                
+                # Top utilisateurs
+                cur.execute("""
+                    SELECT 
+                        ubi.user_email,
+                        COALESCE(SUM(mut.questions_used), 0) as question_count,
+                        ubi.plan_name
+                    FROM user_billing_info ubi
+                    LEFT JOIN monthly_usage_tracking mut ON ubi.user_email = mut.user_email
+                    GROUP BY ubi.user_email, ubi.plan_name
+                    ORDER BY question_count DESC
+                    LIMIT 10
+                """)
+                
+                top_users = [dict(row) for row in cur.fetchall()]
+                
+                return {
+                    "plans": plan_stats,
+                    "total_revenue": total_revenue,
+                    "top_users": top_users
+                }
+                
+    except Exception as e:
+        logger.error(f"❌ Erreur billing admin stats: {e}")
+        return {"error": str(e)}
+
+# ============================================================================
+# 🔄 ENDPOINTS DE DEBUG/TEST ORIGINAUX CONSERVÉS
+# ============================================================================
+
+@router.get("/debug-questions")
+async def debug_questions(current_user: dict = Depends(get_current_user)):
+    """🔄 ENDPOINT ORIGINAL CONSERVÉ - Debug temporaire pour voir ce qui se passe"""
+    try:
+        analytics = get_analytics_manager()
+        
+        with psycopg2.connect(analytics.dsn) as conn:
+            with conn.cursor() as cur:
+                # Test 1: La table existe-t-elle ?
+                cur.execute("""
+                    SELECT COUNT(*) FROM information_schema.tables 
+                    WHERE table_name = 'user_questions_complete'
+                """)
+                table_exists = cur.fetchone()[0] > 0
+                
+                # Test 2: Y a-t-il des données ?
+                if table_exists:
+                    cur.execute("SELECT COUNT(*) FROM user_questions_complete")
+                    total_rows = cur.fetchone()[0]
+                    
+                    # Colonnes de la table
+                    cur.execute("""
+                        SELECT column_name, data_type 
+                        FROM information_schema.columns 
+                        WHERE table_name = 'user_questions_complete' 
+                        ORDER BY ordinal_position
+                    """)
+                    columns = cur.fetchall()
+                    
+                    # Sample data
+                    cur.execute("SELECT * FROM user_questions_complete ORDER BY created_at DESC LIMIT 1")
+                    sample_row = cur.fetchone()
+                else:
+                    total_rows = 0
+                    columns = []
+                    sample_row = None
+                
+                return {
+                    "table_exists": table_exists,
+                    "total_rows": total_rows,
+                    "columns": columns,
+                    "sample_row": str(sample_row) if sample_row else None,
+                    "user_role": current_user.get("user_type"),
+                    "cache_stats": get_cache_stats()
+                }
+                
+    except Exception as e:
+        return {"debug_error": str(e)}
+
+@router.get("/simple-test")
+async def simple_test():
+    """🔄 ENDPOINT ORIGINAL CONSERVÉ - Test 1: Endpoint ultra-simple sans dépendances"""
+    return {
+        "test": "success", 
+        "message": "Endpoint works", 
+        "timestamp": datetime.now().isoformat(),
+        "cache_enabled": True,
+        "cache_stats": get_cache_stats()
+    }
+
+@router.get("/test-db-direct")
+async def test_db_direct():
+    """🔄 ENDPOINT ORIGINAL CONSERVÉ - Test 2: Connexion DB directe sans analytics manager"""
+    try:
+        import os
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        dsn = os.getenv("DATABASE_URL")
+        with psycopg2.connect(dsn) as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT COUNT(*) as count FROM user_questions_complete")
+                result = cur.fetchone()
+                
+                cur.execute("SELECT id, user_email, question FROM user_questions_complete ORDER BY created_at DESC LIMIT 3")
+                samples = [dict(row) for row in cur.fetchall()]
+                
+                return {
+                    "count": result["count"],
+                    "samples": samples,
+                    "success": True,
+                    "dsn_available": bool(dsn)
+                }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__, "dsn": bool(os.getenv("DATABASE_URL"))}
+
+@router.get("/test-analytics-manager")
+async def test_analytics_manager():
+    """🔄 ENDPOINT ORIGINAL CONSERVÉ - Test 3: Analytics manager seul"""
+    try:
+        analytics = get_analytics_manager()
+        return {
+            "analytics_available": analytics is not None,
+            "dsn": bool(analytics.dsn) if analytics else False,
+            "type": type(analytics).__name__ if analytics else None,
+            "tables_ready": os.getenv("ANALYTICS_TABLES_READY", "false").lower() == "true"
+        }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}
+
+@router.get("/test-permissions")
+async def test_permissions(current_user: dict = Depends(get_current_user)):
+    """🔄 ENDPOINT ORIGINAL CONSERVÉ - Test 4: Système de permissions"""
+    try:
+        user_type = current_user.get("user_type", "unknown")
+        email = current_user.get("email", "unknown")
+        
+        # Test permissions individuelles
+        perms = {}
+        try:
+            perms["view_all"] = has_permission(current_user, Permission.VIEW_ALL_ANALYTICS)
+        except Exception as e:
+            perms["view_all_error"] = str(e)
+            
+        try:
+            perms["admin_dashboard"] = has_permission(current_user, Permission.ADMIN_DASHBOARD)
+        except Exception as e:
+            perms["admin_dashboard_error"] = str(e)
+        
+        return {
+            "user_type": user_type,
+            "email": email,
+            "permissions": perms,
+            "raw_user": current_user
+        }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}
+
+@router.get("/questions-final")
+async def questions_final(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """🔄 ENDPOINT ORIGINAL CONSERVÉ - ENDPOINT FINAL - Version ultra-robuste avec logs détaillés"""
+    
+    debug_info = {
+        "step": "start",
+        "user_type": current_user.get("user_type"),
+        "email": current_user.get("email")
+    }
+    
+    try:
+        # Vérification super admin
+        if current_user.get("user_type") != "super_admin":
+            debug_info["step"] = "permission_denied"
+            raise HTTPException(status_code=403, detail="Super admin required")
+        
+        debug_info["step"] = "getting_analytics"
+        
+        # Import direct pour éviter problèmes
+        import os
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        dsn = os.getenv("DATABASE_URL")
+        if not dsn:
+            debug_info["step"] = "no_dsn"
+            return {"error": "No DATABASE_URL", "debug": debug_info}
+        
+        debug_info["step"] = "connecting"
+        
+        with psycopg2.connect(dsn) as conn:
+            debug_info["step"] = "connected"
+            
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                debug_info["step"] = "cursor_ready"
+                
+                # Count total
+                cur.execute("SELECT COUNT(*) as count FROM user_questions_complete")
+                total_result = cur.fetchone()
+                total_count = total_result["count"] if total_result else 0
+                
+                debug_info["step"] = "count_done"
+                debug_info["total_found"] = total_count
+                
+                if total_count == 0:
+                    return {
+                        "questions": [],
+                        "pagination": {"page": 1, "limit": limit, "total": 0, "pages": 0},
+                        "debug": debug_info
+                    }
+                
+                # Récupérer les données
+                offset = (page - 1) * limit
+                cur.execute("""
+                    SELECT 
+                        id, user_email, question, response_text, 
+                        response_source, response_confidence, processing_time_ms,
+                        language, session_id, created_at, status
+                    FROM user_questions_complete 
+                    ORDER BY created_at DESC 
+                    LIMIT %s OFFSET %s
+                """, (limit, offset))
+                
+                rows = cur.fetchall()
+                debug_info["step"] = "data_retrieved"
+                debug_info["rows_found"] = len(rows)
+                
+                # Formatage
+                questions = []
+                for i, row in enumerate(rows):
+                    try:
+                        questions.append({
+                            "id": str(row["id"]),
+                            "timestamp": row["created_at"].isoformat() if row["created_at"] else None,
+                            "user_email": row["user_email"] or "",
+                            "user_name": (row["user_email"] or "").split('@')[0].replace('.', ' ').title(),
+                            "question": row["question"] or "",
+                            "response": row["response_text"] or "",
+                            "response_source": row["response_source"] or "unknown",
+                            "confidence_score": float(row["response_confidence"] or 0),
+                            "response_time": int(row["processing_time_ms"] or 0) / 1000,
+                            "language": row["language"] or "fr",
+                            "session_id": row["session_id"] or "",
+                            "feedback": None,
+                            "feedback_comment": None
+                        })
+                    except Exception as format_error:
+                        debug_info[f"format_error_{i}"] = str(format_error)
+                        continue
+                
+                debug_info["step"] = "formatting_done"
+                debug_info["questions_formatted"] = len(questions)
+                
+                return {
+                    "questions": questions,
+                    "pagination": {
+                        "page": page,
+                        "limit": limit,
+                        "total": total_count,
+                        "pages": (total_count + limit - 1) // limit
+                    },
+                    "debug": debug_info,
+                    "success": True
+                }
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        debug_info["step"] = "exception"
+        debug_info["exception_type"] = type(e).__name__
+        debug_info["exception_message"] = str(e)
+        
+        return {
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "debug": debug_info,
+            "questions": [],
+            "pagination": {"page": 1, "limit": limit, "total": 0, "pages": 0}
+        }
+
+# ============================================================================
+# 🚀 INFORMATIONS SYSTÈME ET MONITORING
+# ============================================================================
+
+@router.get("/system-info")
+async def get_system_info(
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """🆕 NOUVEAU - Informations système pour debugging et monitoring"""
+    if not has_permission(current_user, Permission.ADMIN_DASHBOARD):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        analytics = get_analytics_manager()
+        cache_stats = get_cache_stats()
+        
+        # Variables d'environnement importantes
+        env_vars = {
+            "DATABASE_URL": bool(os.getenv("DATABASE_URL")),
+            "ANALYTICS_TABLES_READY": os.getenv("ANALYTICS_TABLES_READY", "false"),
+            "ANALYTICS_CACHE_TTL": os.getenv("ANALYTICS_CACHE_TTL", "300"),
+            "FORCE_ANALYTICS_INIT": os.getenv("FORCE_ANALYTICS_INIT", "false"),
+            "DISABLE_ANALYTICS_AUTO_INIT": os.getenv("DISABLE_ANALYTICS_AUTO_INIT", "false"),
+            "DEFAULT_MODEL": os.getenv("DEFAULT_MODEL", "gpt-5")
+        }
+        
+        # Status des tables
+        table_status = {}
+        try:
+            with psycopg2.connect(analytics.dsn) as conn:
+                with conn.cursor() as cur:
+                    tables = [
+                        "user_questions_complete",
+                        "system_errors", 
+                        "openai_api_calls",
+                        "daily_openai_summary",
+                        "server_performance_metrics"
+                    ]
+                    
+                    for table in tables:
+                        try:
+                            cur.execute(f"SELECT COUNT(*) FROM {table}")
+                            count = cur.fetchone()[0]
+                            table_status[table] = {"exists": True, "rows": count}
+                        except:
+                            table_status[table] = {"exists": False, "rows": 0}
+        except Exception as e:
+            table_status["error"] = str(e)
+        
+        return {
+            "status": "success",
+            "analytics_manager": {
+                "initialized": analytics is not None,
+                "dsn_configured": bool(analytics.dsn) if analytics else False
+            },
+            "cache_system": cache_stats,
+            "environment_variables": env_vars,
+            "database_tables": table_status,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error", 
+            "message": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+# ============================================================================
+# 🔄 ENDPOINTS DE DEBUG/TEST ORIGINAUX CONSERVÉS
+# ============================================================================
+
+@router.get("/debug-questions")
+async def debug_questions(current_user: dict = Depends(get_current_user)):
+    """🔄 ENDPOINT ORIGINAL CONSERVÉ - Debug temporaire pour voir ce qui se passe"""
+    try:
+        analytics = get_analytics_manager()
+        
+        with psycopg2.connect(analytics.dsn) as conn:
+            with conn.cursor() as cur:
+                # Test 1: La table existe-t-elle ?
+                cur.execute("""
+                    SELECT COUNT(*) FROM information_schema.tables 
+                    WHERE table_name = 'user_questions_complete'
+                """)
+                table_exists = cur.fetchone()[0] > 0
+                
+                # Test 2: Y a-t-il des données ?
+                if table_exists:
+                    cur.execute("SELECT COUNT(*) FROM user_questions_complete")
+                    total_rows = cur.fetchone()[0]
+                    
+                    # Colonnes de la table
+                    cur.execute("""
+                        SELECT column_name, data_type 
+                        FROM information_schema.columns 
+                        WHERE table_name = 'user_questions_complete' 
+                        ORDER BY ordinal_position
+                    """)
+                    columns = cur.fetchall()
+                    
+                    # Sample data
+                    cur.execute("SELECT * FROM user_questions_complete ORDER BY created_at DESC LIMIT 1")
+                    sample_row = cur.fetchone()
+                else:
+                    total_rows = 0
+                    columns = []
+                    sample_row = None
+                
+                return {
+                    "table_exists": table_exists,
+                    "total_rows": total_rows,
+                    "columns": columns,
+                    "sample_row": str(sample_row) if sample_row else None,
+                    "user_role": current_user.get("user_type"),
+                    "cache_stats": get_cache_stats()
+                }
+                
+    except Exception as e:
+        return {"debug_error": str(e)}
+
+@router.get("/simple-test")
+async def simple_test():
+    """🔄 ENDPOINT ORIGINAL CONSERVÉ - Test 1: Endpoint ultra-simple sans dépendances"""
+    return {
+        "test": "success", 
+        "message": "Endpoint works", 
+        "timestamp": datetime.now().isoformat(),
+        "cache_enabled": True,
+        "cache_stats": get_cache_stats()
+    }
+
+@router.get("/test-db-direct")
+async def test_db_direct():
+    """🔄 ENDPOINT ORIGINAL CONSERVÉ - Test 2: Connexion DB directe sans analytics manager"""
+    try:
+        import os
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        dsn = os.getenv("DATABASE_URL")
+        with psycopg2.connect(dsn) as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT COUNT(*) as count FROM user_questions_complete")
+                result = cur.fetchone()
+                
+                cur.execute("SELECT id, user_email, question FROM user_questions_complete ORDER BY created_at DESC LIMIT 3")
+                samples = [dict(row) for row in cur.fetchall()]
+                
+                return {
+                    "count": result["count"],
+                    "samples": samples,
+                    "success": True,
+                    "dsn_available": bool(dsn)
+                }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__, "dsn": bool(os.getenv("DATABASE_URL"))}
+
+@router.get("/test-analytics-manager")
+async def test_analytics_manager():
+    """🔄 ENDPOINT ORIGINAL CONSERVÉ - Test 3: Analytics manager seul"""
+    try:
+        analytics = get_analytics_manager()
+        return {
+            "analytics_available": analytics is not None,
+            "dsn": bool(analytics.dsn) if analytics else False,
+            "type": type(analytics).__name__ if analytics else None,
+            "tables_ready": os.getenv("ANALYTICS_TABLES_READY", "false").lower() == "true"
+        }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}
+
+@router.get("/test-permissions")
+async def test_permissions(current_user: dict = Depends(get_current_user)):
+    """🔄 ENDPOINT ORIGINAL CONSERVÉ - Test 4: Système de permissions"""
+    try:
+        user_type = current_user.get("user_type", "unknown")
+        email = current_user.get("email", "unknown")
+        
+        # Test permissions individuelles
+        perms = {}
+        try:
+            perms["view_all"] = has_permission(current_user, Permission.VIEW_ALL_ANALYTICS)
+        except Exception as e:
+            perms["view_all_error"] = str(e)
+            
+        try:
+            perms["admin_dashboard"] = has_permission(current_user, Permission.ADMIN_DASHBOARD)
+        except Exception as e:
+            perms["admin_dashboard_error"] = str(e)
+        
+        return {
+            "user_type": user_type,
+            "email": email,
+            "permissions": perms,
+            "raw_user": current_user
+        }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}
+
+@router.get("/questions-final")
+async def questions_final(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """🔄 ENDPOINT ORIGINAL CONSERVÉ - ENDPOINT FINAL - Version ultra-robuste avec logs détaillés"""
+    
+    debug_info = {
+        "step": "start",
+        "user_type": current_user.get("user_type"),
+        "email": current_user.get("email")
+    }
+    
+    try:
+        # Vérification super admin
+        if current_user.get("user_type") != "super_admin":
+            debug_info["step"] = "permission_denied"
+            raise HTTPException(status_code=403, detail="Super admin required")
+        
+        debug_info["step"] = "getting_analytics"
+        
+        # Import direct pour éviter problèmes
+        import os
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        dsn = os.getenv("DATABASE_URL")
+        if not dsn:
+            debug_info["step"] = "no_dsn"
+            return {"error": "No DATABASE_URL", "debug": debug_info}
+        
+        debug_info["step"] = "connecting"
+        
+        with psycopg2.connect(dsn) as conn:
+            debug_info["step"] = "connected"
+            
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                debug_info["step"] = "cursor_ready"
+                
+                # Count total
+                cur.execute("SELECT COUNT(*) as count FROM user_questions_complete")
+                total_result = cur.fetchone()
+                total_count = total_result["count"] if total_result else 0
+                
+                debug_info["step"] = "count_done"
+                debug_info["total_found"] = total_count
+                
+                if total_count == 0:
+                    return {
+                        "questions": [],
+                        "pagination": {"page": 1, "limit": limit, "total": 0, "pages": 0},
+                        "debug": debug_info
+                    }
+                
+                # Récupérer les données
+                offset = (page - 1) * limit
+                cur.execute("""
+                    SELECT 
+                        id, user_email, question, response_text, 
+                        response_source, response_confidence, processing_time_ms,
+                        language, session_id, created_at, status
+                    FROM user_questions_complete 
+                    ORDER BY created_at DESC 
+                    LIMIT %s OFFSET %s
+                """, (limit, offset))
+                
+                rows = cur.fetchall()
+                debug_info["step"] = "data_retrieved"
+                debug_info["rows_found"] = len(rows)
+                
+                # Formatage
+                questions = []
+                for i, row in enumerate(rows):
+                    try:
+                        questions.append({
+                            "id": str(row["id"]),
+                            "timestamp": row["created_at"].isoformat() if row["created_at"] else None,
+                            "user_email": row["user_email"] or "",
+                            "user_name": (row["user_email"] or "").split('@')[0].replace('.', ' ').title(),
+                            "question": row["question"] or "",
+                            "response": row["response_text"] or "",
+                            "response_source": row["response_source"] or "unknown",
+                            "confidence_score": float(row["response_confidence"] or 0),
+                            "response_time": int(row["processing_time_ms"] or 0) / 1000,
+                            "language": row["language"] or "fr",
+                            "session_id": row["session_id"] or "",
+                            "feedback": None,
+                            "feedback_comment": None
+                        })
+                    except Exception as format_error:
+                        debug_info[f"format_error_{i}"] = str(format_error)
+                        continue
+                
+                debug_info["step"] = "formatting_done"
+                debug_info["questions_formatted"] = len(questions)
+                
+                return {
+                    "questions": questions,
+                    "pagination": {
+                        "page": page,
+                        "limit": limit,
+                        "total": total_count,
+                        "pages": (total_count + limit - 1) // limit
+                    },
+                    "debug": debug_info,
+                    "success": True
+                }
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        debug_info["step"] = "exception"
+        debug_info["exception_type"] = type(e).__name__
+        debug_info["exception_message"] = str(e)
+        
+        return {
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "debug": debug_info,
+            "questions": [],
+            "pagination": {"page": 1, "limit": limit, "total": 0, "pages": 0}
+        }
+
+# ============================================================================
+# 🚀 INFORMATIONS SYSTÈME ET MONITORING
+# ============================================================================
+
+@router.get("/system-info")
+async def get_system_info(
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """🆕 NOUVEAU - Informations système pour debugging et monitoring"""
+    if not has_permission(current_user, Permission.ADMIN_DASHBOARD):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        analytics = get_analytics_manager()
+        cache_stats = get_cache_stats()
+        
+        # Variables d'environnement importantes
+        env_vars = {
+            "DATABASE_URL": bool(os.getenv("DATABASE_URL")),
+            "ANALYTICS_TABLES_READY": os.getenv("ANALYTICS_TABLES_READY", "false"),
+            "ANALYTICS_CACHE_TTL": os.getenv("ANALYTICS_CACHE_TTL", "300"),
+            "FORCE_ANALYTICS_INIT": os.getenv("FORCE_ANALYTICS_INIT", "false"),
+            "DISABLE_ANALYTICS_AUTO_INIT": os.getenv("DISABLE_ANALYTICS_AUTO_INIT", "false"),
+            "DEFAULT_MODEL": os.getenv("DEFAULT_MODEL", "gpt-5")
+        }
+        
+        # Status des tables
+        table_status = {}
+        try:
+            with psycopg2.connect(analytics.dsn) as conn:
+                with conn.cursor() as cur:
+                    tables = [
+                        "user_questions_complete",
+                        "system_errors", 
+                        "openai_api_calls",
+                        "daily_openai_summary",
+                        "server_performance_metrics"
+                    ]
+                    
+                    for table in tables:
+                        try:
+                            cur.execute(f"SELECT COUNT(*) FROM {table}")
+                            count = cur.fetchone()[0]
+                            table_status[table] = {"exists": True, "rows": count}
+                        except:
+                            table_status[table] = {"exists": False, "rows": 0}
+        except Exception as e:
+            table_status["error"] = str(e)
+        
+        return {
+            "status": "success",
+            "analytics_manager": {
+                "initialized": analytics is not None,
+                "dsn_configured": bool(analytics.dsn) if analytics else False
+            },
+            "cache_system": cache_stats,
+            "environment_variables": env_vars,
+            "database_tables": table_status,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error", 
+            "message": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
