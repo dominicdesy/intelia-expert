@@ -1,5 +1,3 @@
-// page.tsx
-
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback, Suspense, useMemo } from 'react'
@@ -8,567 +6,33 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
 import type { Language, User } from '@/types'
 
-// ==================== HOOK USECOUNTRIES INTÉGRÉ AVEC API REST COUNTRIES ====================
-const fallbackCountries = [
-  { value: 'CA', label: 'Canada', phoneCode: '+1', flag: '🇨🇦' },
-  { value: 'US', label: 'États-Unis', phoneCode: '+1', flag: '🇺🇸' },
-  { value: 'FR', label: 'France', phoneCode: '+33', flag: '🇫🇷' },
-  { value: 'GB', label: 'Royaume-Uni', phoneCode: '+44', flag: '🇬🇧' },
-  { value: 'DE', label: 'Allemagne', phoneCode: '+49', flag: '🇩🇪' },
-  { value: 'IT', label: 'Italie', phoneCode: '+39', flag: '🇮🇹' },
-  { value: 'ES', label: 'Espagne', phoneCode: '+34', flag: '🇪🇸' },
-  { value: 'BE', label: 'Belgique', phoneCode: '+32', flag: '🇧🇪' },
-  { value: 'CH', label: 'Suisse', phoneCode: '+41', flag: '🇨🇭' },
-  { value: 'MX', label: 'Mexique', phoneCode: '+52', flag: '🇲🇽' },
-  { value: 'BR', label: 'Brésil', phoneCode: '+55', flag: '🇧🇷' },
-  { value: 'AU', label: 'Australie', phoneCode: '+61', flag: '🇦🇺' },
-  { value: 'JP', label: 'Japon', phoneCode: '+81', flag: '🇯🇵' },
-  { value: 'CN', label: 'Chine', phoneCode: '+86', flag: '🇨🇳' },
-  { value: 'IN', label: 'Inde', phoneCode: '+91', flag: '🇮🇳' },
-  { value: 'NL', label: 'Pays-Bas', phoneCode: '+31', flag: '🇳🇱' },
-  { value: 'SE', label: 'Suède', phoneCode: '+46', flag: '🇸🇪' },
-  { value: 'NO', label: 'Norvège', phoneCode: '+47', flag: '🇳🇴' },
-  { value: 'DK', label: 'Danemark', phoneCode: '+45', flag: '🇩🇰' },
-  { value: 'FI', label: 'Finlande', phoneCode: '+358', flag: '🇫🇮' }
-]
+// Imports locaux
+import { translations } from './page_translations'
+import { 
+  useCountries, 
+  useCountryCodeMap, 
+  validateEmail, 
+  validatePassword, 
+  validatePhone,
+  validateLinkedIn,
+  validateWebsite, 
+  rememberMeUtils 
+} from './page_hooks'
+import { InteliaLogo, LanguageSelector, AlertMessage, PasswordInput, PasswordMatchIndicator, LoadingSpinner, AuthFooter } from './page_components'
+import type { LoginData, SignupData } from './page_types'
 
-interface Country {
-  value: string
-  label: string
-  phoneCode: string
-  flag?: string
-}
-
-// Hook pour charger les pays depuis l'API REST Countries avec debug complet
-const useCountries = () => {
-  console.log('🎯 [Countries] Hook useCountries appelé!')
-  
-  const [countries, setCountries] = useState<Country[]>(fallbackCountries)
-  const [loading, setLoading] = useState(true)
-  const [usingFallback, setUsingFallback] = useState(true)
-
-  useEffect(() => {
-    console.log('🚀 [Countries] DÉMARRAGE du processus de chargement des pays')
-    
-    const fetchCountries = async () => {
-      try {
-        console.log('🌍 [Countries] Début du chargement depuis l\'API REST Countries...')
-        console.log('📡 [Countries] URL: https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations')
-        
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => {
-          console.log('⏱️ [Countries] Timeout atteint (10s)')
-          controller.abort()
-        }, 10000)
-        
-        const response = await fetch('https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations', {
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (compatible; Intelia/1.0)',
-            'Cache-Control': 'no-cache'
-          },
-          signal: controller.signal
-        })
-        
-        clearTimeout(timeoutId)
-        console.log(`📡 [Countries] Statut HTTP: ${response.status} ${response.statusText}`)
-        
-        if (!response.ok) {
-          throw new Error(`API indisponible: ${response.status}`)
-        }
-        
-        const data = await response.json()
-        console.log(`📊 [Countries] Données reçues: ${data.length} pays bruts`)
-        console.log('🔍 [Countries] Échantillon brut:', data.slice(0, 2))
-        
-        if (!Array.isArray(data)) {
-          console.error('❌ [Countries] Format invalide - pas un array')
-          throw new Error('Format de données invalide')
-        }
-        
-        const formattedCountries = data
-          .map((country: any, index: number) => {
-            let phoneCode = ''
-            if (country.idd?.root) {
-              phoneCode = country.idd.root
-              if (country.idd.suffixes && country.idd.suffixes[0]) {
-                phoneCode += country.idd.suffixes[0]
-              }
-            }
-            
-            const formatted = {
-              value: country.cca2,
-              label: country.translations?.fra?.common || country.name?.common || country.cca2,
-              phoneCode: phoneCode,
-              flag: country.flag || ''
-            }
-            
-            if (index < 3) {
-              console.log(`🏳️ [Countries] Pays ${index + 1}:`, formatted)
-            }
-            
-            return formatted
-          })
-          .filter((country: Country, index: number) => {
-            const hasValidCode = country.phoneCode && 
-                                country.phoneCode !== 'undefined' && 
-                                country.phoneCode !== 'null' &&
-                                country.phoneCode.length > 1 &&
-                                country.phoneCode.startsWith('+') &&
-                                /^\+\d+$/.test(country.phoneCode)
-            
-            const hasValidInfo = country.value && 
-                                country.value.length === 2 &&
-                                country.label && 
-                                country.label.length > 1
-            
-            const isValid = hasValidCode && hasValidInfo
-            
-            if (!isValid && index < 5) {
-              console.log(`❌ [Countries] Pays rejeté:`, {
-                country: country.label,
-                code: country.value,
-                phoneCode: country.phoneCode,
-                hasValidCode,
-                hasValidInfo
-              })
-            }
-            
-            return isValid
-          })
-          .sort((a: Country, b: Country) => a.label.localeCompare(b.label, 'fr', { numeric: true }))
-        
-        console.log(`✅ [Countries] Pays valides après filtrage: ${formattedCountries.length}`)
-        console.log('📋 [Countries] Échantillon final:', formattedCountries.slice(0, 5))
-        
-        if (formattedCountries.length >= 50) {
-          console.log('🎉 [Countries] API validée! Utilisation des données complètes')
-          console.log(`📈 [Countries] Transition: fallback(${fallbackCountries.length}) → API(${formattedCountries.length})`)
-          setCountries(formattedCountries)
-          setUsingFallback(false)
-        } else {
-          console.warn(`⚠️ [Countries] Pas assez de pays valides: ${formattedCountries.length}/50`)
-          throw new Error(`Qualité insuffisante: ${formattedCountries.length}/50 pays`)
-        }
-        
-      } catch (err: any) {
-        console.error('💥 [Countries] ERREUR:', err)
-        console.warn('🔄 [Countries] Passage en mode fallback')
-        
-        if (err.name === 'AbortError') {
-          console.warn('⏱️ [Countries] Cause: Timeout de l\'API (10s)')
-        } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
-          console.warn('🌐 [Countries] Cause: Problème de connexion réseau')
-        } else {
-          console.warn('🐛 [Countries] Cause:', err.message)
-        }
-        
-        setCountries(fallbackCountries)
-        setUsingFallback(true)
-      } finally {
-        console.log('🏁 [Countries] Chargement terminé')
-        setLoading(false)
-      }
-    }
-
-    const timer = setTimeout(() => {
-      console.log('⏰ [Countries] Démarrage après délai de 100ms')
-      fetchCountries()
-    }, 100)
-    
-    return () => clearTimeout(timer)
-  }, [])
-
-  console.log(`🔄 [Countries] Render - ${countries.length} pays, loading:${loading}, fallback:${usingFallback}`)
-  return { countries, loading, usingFallback }
-}
-
-// Hook pour créer le mapping des codes téléphoniques
-const useCountryCodeMap = (countries: Country[]) => {
-  return useMemo(() => {
-    const mapping = countries.reduce((acc, country) => {
-      acc[country.value] = country.phoneCode
-      return acc
-    }, {} as Record<string, string>)
-    
-    console.log(`🗺️ [CountryCodeMap] Mapping créé avec ${Object.keys(mapping).length} entrées`)
-    if (Object.keys(mapping).length > 0) {
-      console.log('📋 [CountryCodeMap] Échantillon:', Object.entries(mapping).slice(0, 3))
-    }
-    
-    return mapping
-  }, [countries])
-}
-
-const translations = {
-  fr: {
-    title: 'Intelia Expert',
-    email: 'Email',
-    password: 'Mot de passe',
-    confirmPassword: 'Confirmer le mot de passe',
-    login: 'Se connecter',
-    signup: 'Créer un compte',
-    rememberMe: 'Se souvenir de mon email',
-    forgotPassword: 'Mot de passe oublié ?',
-    newToIntelia: 'Nouveau sur Intelia ?',
-    connecting: 'Connexion en cours...',
-    creating: 'Création en cours...',
-    loginError: 'Erreur de connexion',
-    signupError: 'Erreur de création',
-    emailRequired: 'L\'adresse email est requise',
-    emailInvalid: 'Veuillez entrer une adresse email valide',
-    passwordRequired: 'Le mot de passe est requis',
-    passwordTooShort: 'Le mot de passe doit contenir au moins 8 caractères, une majuscule et un chiffre',
-    passwordMismatch: 'Les mots de passe ne correspondent pas',
-    firstNameRequired: 'Le prénom est requis',
-    lastNameRequired: 'Le nom de famille est requis',
-    countryRequired: 'Le pays est requis',
-    phoneInvalid: 'Format de téléphone invalide',
-    terms: 'conditions d\'utilisation',
-    privacy: 'politique de confidentialité',
-    gdprNotice: 'En vous connectant, vous acceptez nos',
-    needHelp: 'Besoin d\'aide ?',
-    contactSupport: 'Contactez le support',
-    createAccount: 'Créer un compte',
-    backToLogin: 'Retour à la connexion',
-    confirmationSent: 'Email de confirmation envoyé ! Vérifiez votre boîte mail.',
-    accountCreated: 'Compte créé avec succès ! Vérifiez vos emails pour confirmer votre compte.',
-    personalInfo: 'Informations personnelles',
-    firstName: 'Prénom',
-    lastName: 'Nom de famille',
-    linkedinProfile: 'Profil LinkedIn personnel',
-    contact: 'Contact',
-    country: 'Pays',
-    countryCode: 'Indicatif pays',
-    areaCode: 'Indicatif régional',
-    phoneNumber: 'Numéro de téléphone',
-    company: 'Entreprise',
-    companyName: 'Nom de l\'entreprise',
-    companyWebsite: 'Site web de l\'entreprise',
-    companyLinkedin: 'Page LinkedIn de l\'entreprise',
-    optional: '(optionnel)',
-    required: '*',
-    close: 'Fermer',
-    alreadyHaveAccount: 'Déjà un compte ?',
-    authSuccess: 'Connexion réussie !',
-    authError: 'Erreur de connexion, veuillez réessayer.',
-    authIncomplete: 'Connexion incomplète, veuillez réessayer.',
-    sessionCleared: 'Session précédente effacée',
-    forceLogout: 'Déconnexion automatique',
-    loadingCountries: 'Chargement des pays...',
-    limitedCountryList: 'Liste de pays limitée (connexion API limitée)',
-    selectCountry: 'Sélectionner un pays...'
-  },
-  en: {
-    title: 'Intelia Expert',
-    email: 'Email',
-    password: 'Password',
-    confirmPassword: 'Confirm password',
-    login: 'Sign in',
-    signup: 'Create account',
-    rememberMe: 'Remember my email',
-    forgotPassword: 'Forgot password?',
-    newToIntelia: 'New to Intelia?',
-    connecting: 'Signing in...',
-    creating: 'Creating account...',
-    loginError: 'Login error',
-    signupError: 'Signup error',
-    emailRequired: 'Email address is required',
-    emailInvalid: 'Please enter a valid email address',
-    passwordRequired: 'Password is required',
-    passwordTooShort: 'Password must be at least 8 characters with one uppercase letter and one number',
-    passwordMismatch: 'Passwords do not match',
-    firstNameRequired: 'First name is required',
-    lastNameRequired: 'Last name is required',
-    countryRequired: 'Country is required',
-    phoneInvalid: 'Invalid phone format',
-    terms: 'terms of service',
-    privacy: 'privacy policy',
-    gdprNotice: 'By signing in, you accept our',
-    needHelp: 'Need help?',
-    contactSupport: 'Contact support',
-    createAccount: 'Create account',
-    backToLogin: 'Back to login',
-    confirmationSent: 'Confirmation email sent! Check your mailbox.',
-    accountCreated: 'Account created successfully! Check your emails to confirm your account.',
-    personalInfo: 'Personal Information',
-    firstName: 'First Name',
-    lastName: 'Last Name',
-    linkedinProfile: 'Personal LinkedIn Profile',
-    contact: 'Contact',
-    country: 'Country',
-    countryCode: 'Country Code',
-    areaCode: 'Area Code',
-    phoneNumber: 'Phone Number',
-    company: 'Company',
-    companyName: 'Company Name',
-    companyWebsite: 'Company Website',
-    companyLinkedin: 'Company LinkedIn Page',
-    optional: '(optional)',
-    required: '*',
-    close: 'Close',
-    alreadyHaveAccount: 'Already have an account?',
-    authSuccess: 'Successfully logged in!',
-    authError: 'Login error, please try again.',
-    authIncomplete: 'Incomplete login, please try again.',
-    sessionCleared: 'Previous session cleared',
-    forceLogout: 'Automatic logout',
-    loadingCountries: 'Loading countries...',
-    limitedCountryList: 'Limited country list (limited internet connection)',
-    selectCountry: 'Select a country...'
-  },
-  es: {
-    title: 'Intelia Expert',
-    email: 'Email',
-    password: 'Contraseña',
-    confirmPassword: 'Confirmar contraseña',
-    login: 'Iniciar sesión',
-    signup: 'Crear cuenta',
-    rememberMe: 'Recordar mi email',
-    forgotPassword: '¿Olvidaste tu contraseña?',
-    newToIntelia: '¿Nuevo en Intelia?',
-    connecting: 'Iniciando sesión...',
-    creating: 'Creando cuenta...',
-    loginError: 'Error de inicio de sesión',
-    signupError: 'Error de registro',
-    emailRequired: 'La dirección de correo es requerida',
-    emailInvalid: 'Por favor ingresa una dirección de correo válida',
-    passwordRequired: 'La contraseña es requerida',
-    passwordTooShort: 'La contraseña debe tener al menos 8 caracteres con una mayúscula y un número',
-    passwordMismatch: 'Las contraseñas no coinciden',
-    firstNameRequired: 'El nombre es requerido',
-    lastNameRequired: 'El apellido es requerido',
-    countryRequired: 'El país es requerido',
-    phoneInvalid: 'Formato de teléfono inválido',
-    terms: 'términos de servicio',
-    privacy: 'política de privacidad',
-    gdprNotice: 'Al iniciar sesión, aceptas nuestros',
-    needHelp: '¿Necesitas ayuda?',
-    contactSupport: 'Contactar soporte',
-    createAccount: 'Crear cuenta',
-    backToLogin: 'Volver al inicio',
-    confirmationSent: '¡Email de confirmación enviado! Revisa tu bandeja de entrada.',
-    accountCreated: '¡Cuenta creada exitosamente! Revisa tus emails para confirmar tu cuenta.',
-    personalInfo: 'Información Personal',
-    firstName: 'Nombre',
-    lastName: 'Apellido',
-    linkedinProfile: 'Perfil Personal de LinkedIn',
-    contact: 'Contacto',
-    country: 'País',
-    countryCode: 'Código de País',
-    areaCode: 'Código de Área',
-    phoneNumber: 'Número de Teléfono',
-    company: 'Empresa',
-    companyName: 'Nombre de la Empresa',
-    companyWebsite: 'Sitio Web de la Empresa',
-    companyLinkedin: 'Página LinkedIn de la Empresa',
-    optional: '(opcional)',
-    required: '*',
-    close: 'Cerrar',
-    alreadyHaveAccount: '¿Ya tienes cuenta?',
-    authSuccess: '¡Inicio de sesión exitoso!',
-    authError: 'Error de conexión, por favor intenta de nuevo.',
-    authIncomplete: 'Inicio de sesión incompleto, por favor intenta de nuevo.',
-    sessionCleared: 'Sesión anterior eliminada',
-    forceLogout: 'Desconexión automática',
-    loadingCountries: 'Cargando países...',
-    limitedCountryList: 'Lista de países limitada (conexión de internet limitada)',
-    selectCountry: 'Seleccionar país...'
-  },
-  de: {
-    title: 'Intelia Expert',
-    email: 'E-Mail',
-    password: 'Passwort',
-    confirmPassword: 'Passwort bestätigen',
-    login: 'Anmelden',
-    signup: 'Konto erstellen',
-    rememberMe: 'E-Mail merken',
-    forgotPassword: 'Passwort vergessen?',
-    newToIntelia: 'Neu bei Intelia?',
-    connecting: 'Anmeldung läuft...',
-    creating: 'Konto wird erstellt...',
-    loginError: 'Anmeldefehler',
-    signupError: 'Registrierungsfehler',
-    emailRequired: 'E-Mail-Adresse ist erforderlich',
-    emailInvalid: 'Bitte geben Sie eine gültige E-Mail-Adresse ein',
-    passwordRequired: 'Passwort ist erforderlich',
-    passwordTooShort: 'Passwort muss mindestens 8 Zeichen mit einem Großbuchstaben und einer Zahl haben',
-    passwordMismatch: 'Passwörter stimmen nicht überein',
-    firstNameRequired: 'Vorname ist erforderlich',
-    lastNameRequired: 'Nachname ist erforderlich',
-    countryRequired: 'Land ist erforderlich',
-    phoneInvalid: 'Ungültiges Telefonformat',
-    terms: 'Nutzungsbedingungen',
-    privacy: 'Datenschutzrichtlinie',
-    gdprNotice: 'Durch die Anmeldung akzeptieren Sie unsere',
-    needHelp: 'Brauchen Sie Hilfe?',
-    contactSupport: 'Support kontaktieren',
-    createAccount: 'Konto erstellen',
-    backToLogin: 'Zurück zur Anmeldung',
-    confirmationSent: 'Bestätigungs-E-Mail gesendet! Überprüfen Sie Ihr Postfach.',
-    accountCreated: 'Konto erfolgreich erstellt! Überprüfen Sie Ihre E-Mails zur Kontobestätigung.',
-    personalInfo: 'Persönliche Informationen',
-    firstName: 'Vorname',
-    lastName: 'Nachname',
-    linkedinProfile: 'Persönliches LinkedIn-Profil',
-    contact: 'Kontakt',
-    country: 'Land',
-    countryCode: 'Ländercode',
-    areaCode: 'Vorwahl',
-    phoneNumber: 'Telefonnummer',
-    company: 'Unternehmen',
-    companyName: 'Firmenname',
-    companyWebsite: 'Firmen-Website',
-    companyLinkedin: 'Unternehmens-LinkedIn-Seite',
-    optional: '(optional)',
-    required: '*',
-    close: 'Schließen',
-    alreadyHaveAccount: 'Bereits ein Konto?',
-    authSuccess: 'Erfolgreich angemeldet!',
-    authError: 'Anmeldefehler, bitte versuchen Sie es erneut.',
-    authIncomplete: 'Unvollständige Anmeldung, bitte versuchen Sie es erneut.',
-    sessionCleared: 'Vorherige Sitzung gelöscht',
-    forceLogout: 'Automatische Abmeldung',
-    loadingCountries: 'Länder werden geladen...',
-    limitedCountryList: 'Begrenzte Länderliste (begrenzte Internetverbindung)',
-    selectCountry: 'Land auswählen...'
-  }
-}
-
-const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
-  <img 
-    src="/images/favicon.png" 
-    alt="Intelia Logo" 
-    className={className}
-  />
-)
-
-const LanguageSelector = ({ onLanguageChange, currentLanguage }: { 
-  onLanguageChange: (lang: Language) => void
-  currentLanguage: Language 
-}) => {
-  const [isOpen, setIsOpen] = useState(false)
-
-  const languages = [
-    { code: 'fr' as Language, name: 'Français', flag: '🇫🇷' },
-    { code: 'en' as Language, name: 'English', flag: '🇺🇸' },
-    { code: 'es' as Language, name: 'Español', flag: '🇪🇸' },
-    { code: 'de' as Language, name: 'Deutsch', flag: '🇩🇪' }
-  ]
-
-  const currentLang = languages.find(lang => lang.code === currentLanguage)
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
-      >
-        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-        </svg>
-        <span>{currentLang?.name}</span>
-        <svg className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {isOpen && (
-        <>
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setIsOpen(false)}
-          />
-          <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-            {languages.map((lang) => (
-              <button
-                key={lang.code}
-                onClick={() => {
-                  onLanguageChange(lang.code)
-                  setIsOpen(false)
-                }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2 ${
-                  lang.code === currentLanguage ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-                } first:rounded-t-lg last:rounded-b-lg transition-colors`}
-              >
-                <span>{lang.flag}</span>
-                <span>{lang.name}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
-const validateEmail = (email: string): boolean => {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-}
-
-const validatePassword = (password: string): { isValid: boolean; errors: string[] } => {
-  const errors: string[] = []
-  
-  if (password.length < 8) {
-    errors.push('Au moins 8 caractères')
-  }
-  if (!/[A-Z]/.test(password)) {
-    errors.push('Une majuscule')
-  }
-  if (!/[0-9]/.test(password)) {
-    errors.push('Un chiffre')
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  }
-}
-
-const validatePhone = (countryCode: string, areaCode: string, phoneNumber: string): boolean => {
-  if (!countryCode.trim() && !areaCode.trim() && !phoneNumber.trim()) {
-    return true
-  }
-  
-  if (countryCode.trim() || areaCode.trim() || phoneNumber.trim()) {
-    if (!countryCode.trim() || !/^\+[1-9]\d{0,3}$/.test(countryCode.trim())) {
-      return false
-    }
-    
-    if (!areaCode.trim() || !/^\d{3}$/.test(areaCode.trim())) {
-      return false
-    }
-    
-    if (!phoneNumber.trim() || !/^\d{7}$/.test(phoneNumber.trim())) {
-      return false
-    }
-  }
-  
-  return true
-}
-
-const validateLinkedIn = (url: string): boolean => {
-  if (!url.trim()) return true
-  return /^(https?:\/\/)?(www\.)?linkedin\.com\/(in|company)\/[\w\-]+\/?$/.test(url)
-}
-
-const validateWebsite = (url: string): boolean => {
-  if (!url.trim()) return true
-  return /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/.test(url)
-}
-
-// 🔧 1. Votre contenu existant devient PageContent
+// Contenu principal de la page
 function PageContent() {
   console.log('🚀 [PageContent] Composant PageContent rendu')
   
   const router = useRouter()
   const pathname = usePathname()
-  const searchParams = useSearchParams() // ✅ Maintenant autorisé dans Suspense
+  const searchParams = useSearchParams()
   
-  const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore() // Données
-  const { login, register, initializeSession } = useAuthStore() // Actions
+  const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore()
+  const { login, register, initializeSession } = useAuthStore()
 
-  // ⭐ APPEL DU HOOK USECONTRIES IMMÉDIATEMENT
+  // ⭐ HOOK APPELÉ IMMÉDIATEMENT - PAS DE CONDITION
   console.log('🎯 [PageContent] Appel du hook useCountries...')
   const { countries, loading: countriesLoading, usingFallback } = useCountries()
   console.log('📊 [PageContent] Hook useCountries retourné:', { 
@@ -576,30 +40,35 @@ function PageContent() {
     loading: countriesLoading, 
     usingFallback 
   })
-
+  
   // Créer le mapping des codes téléphoniques dynamiquement
   const countryCodeMap = useCountryCodeMap(countries)
 
-  // 🛡️ PROTECTION + REMEMBER ME FEATURES + FIX REDIRECTION
+  // Refs pour éviter les doubles appels
   const hasInitialized = useRef(false)
   const hasCheckedAuth = useRef(false)
-  const redirectLock = useRef(false) // 🔧 Protection contre la boucle
+  const redirectLock = useRef(false)
   const sessionInitialized = useRef(false)
 
   const [currentLanguage, setCurrentLanguage] = useState<Language>('fr')
-  const t = translations[currentLanguage]
+  const t = useMemo(() => translations[currentLanguage], [currentLanguage])
   
-  const [isSignupMode, setIsSignupMode] = useState(false)
+  const [isSignupMode, setIsSignupMode] = useState(false) // ⭐ COMMENCER EN MODE LOGIN
   const [localError, setLocalError] = useState('')
   const [localSuccess, setLocalSuccess] = useState('')
   
-  const [loginData, setLoginData] = useState({
+  const [loginData, setLoginData] = useState<LoginData>({
     email: '',
     password: '',
     rememberMe: false
   })
 
-  const [signupData, setSignupData] = useState({
+  // États locaux avec gestion avancée
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const passwordInputRef = useRef<HTMLInputElement>(null)
+  
+  const [signupData, setSignupData] = useState<SignupData>({
     email: '',
     password: '',
     confirmPassword: '',
@@ -615,53 +84,14 @@ function PageContent() {
     companyLinkedin: ''
   })
 
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const passwordInputRef = useRef<HTMLInputElement>(null)
-
-  // ✅ UTILITAIRES REMEMBER ME CORRIGÉS + AMÉLIORÉS
-  const rememberMeUtils = {
-    save: (email: string, remember = true) => {
-      try {
-        if (remember && email?.trim()) {
-          localStorage.setItem('intelia-remember-me', 'true')
-          localStorage.setItem('intelia-last-email', email.trim())
-          console.log('✅ [RememberMe] Email sauvegardé:', email.trim())
-        } else {
-          localStorage.removeItem('intelia-remember-me')
-          localStorage.removeItem('intelia-last-email')
-          console.log('🗑️ [RememberMe] Préférences effacées')
-        }
-      } catch (error) {
-        console.error('❌ [RememberMe] Erreur sauvegarde:', error)
-      }
-    },
-    
-    load: () => {
-      try {
-        const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
-        const lastEmail = localStorage.getItem('intelia-last-email') || ''
-        
-        return {
-          rememberMe,
-          lastEmail: rememberMe ? lastEmail : '',
-          hasRememberedEmail: rememberMe && lastEmail.length > 0
-        }
-      } catch (error) {
-        console.error('❌ [RememberMe] Erreur chargement:', error)
-        return { rememberMe: false, lastEmail: '', hasRememberedEmail: false }
-      }
-    }
-  }
-
-  // 🛡️ FONCTION DE REDIRECTION SÉCURISÉE (FIX PRINCIPAL)
+  // Fonction de redirection sécurisée avec logique pathname
   const safeRedirectToChat = useCallback(() => {
     if (redirectLock.current) {
       console.log('🔒 [Redirect] Déjà en cours de redirection, ignoré')
       return
     }
     
-    // 🔧 NE PAS rediriger si on est déjà sur /chat
+    // NE PAS rediriger si on est déjà sur /chat
     if (pathname?.startsWith("/chat")) {
       console.log('🔧 [Redirect] Déjà sur /chat, pas de redirection')
       return
@@ -670,156 +100,17 @@ function PageContent() {
     console.log('🚀 [Redirect] Redirection vers /chat depuis:', pathname)
     redirectLock.current = true
     
-    // ✅ Utiliser router.replace au lieu de window.location
+    // Utiliser router.replace au lieu de window.location
     // pour éviter le reload et donc la re-montée des providers
     router.replace('/chat')
   }, [pathname, router])
 
-  // ✅ INITIALISATION CORRIGÉE AVEC REMEMBER ME
-  useEffect(() => {
-    if (hasInitialized.current) return
-    
-    // Charger les préférences utilisateur
-    const savedLanguage = localStorage.getItem('intelia-language') as Language
-    if (savedLanguage && translations[savedLanguage]) {
-      setCurrentLanguage(savedLanguage)
-    } else {
-      const browserLanguage = navigator.language.substring(0, 2) as Language
-      if (translations[browserLanguage]) {
-        setCurrentLanguage(browserLanguage)
-      }
-    }
-
-    // ✅ RESTAURER EMAIL avec fonction utilitaire
-    const { rememberMe, lastEmail, hasRememberedEmail } = rememberMeUtils.load()
-    
-    console.log('📄 [Init] Chargement remember me:', { rememberMe, lastEmail, hasRememberedEmail })
-    
-    if (hasRememberedEmail) {
-      setLoginData({
-        email: lastEmail,
-        password: '', // ✅ Toujours vider le mot de passe
-        rememberMe: true
-      })
-      
-      setLocalSuccess(`Email restauré : ${lastEmail}. Entrez votre mot de passe.`)
-      setTimeout(() => setLocalSuccess(''), 4000)
-    }
-
-    hasInitialized.current = true
-  }, [])
-
-  // ✅ FOCUS AUTOMATIQUE sur mot de passe si email pré-rempli
-  useEffect(() => {
-    const { rememberMe, lastEmail } = rememberMeUtils.load()
-    
-    if (rememberMe && lastEmail && loginData.email && !loginData.password && passwordInputRef.current) {
-      setTimeout(() => {
-        passwordInputRef.current?.focus()
-      }, 500)
-    }
-  }, [loginData.email, loginData.password])
-
-  // 🛡️ VÉRIFICATION AUTH UNE SEULE FOIS (FIX PRINCIPAL)
-  useEffect(() => {
-    if (!hasHydrated || !hasInitialized.current || hasCheckedAuth.current) {
-      return
-    }
-
-    hasCheckedAuth.current = true
-    console.log('🔍 [Auth] Vérification unique de l\'authentification')
-
-    // Si déjà connecté, rediriger immédiatement
-    if (isAuthenticated) {
-      console.log('✅ [Auth] Déjà connecté, redirection immédiate')
-      safeRedirectToChat()
-      return
-    }
-
-    // Sinon, initialiser la session une seule fois
-    if (!sessionInitialized.current) {
-      sessionInitialized.current = true
-      console.log('📄 [Session] Initialisation unique de la session')
-      
-      initializeSession().then((sessionFound) => {
-        if (sessionFound) {
-          console.log('✅ [Session] Session trouvée, redirection automatique')
-          // La redirection sera gérée par le changement d'état isAuthenticated
-        } else {
-          console.log('❌ [Session] Aucune session trouvée')
-        }
-      }).catch(error => {
-        console.error('❌ [Session] Erreur initialisation:', error)
-      })
-    }
-  }, [hasHydrated, hasInitialized.current, isAuthenticated, initializeSession, safeRedirectToChat])
-
-  // 🛡️ SURVEILLANCE CHANGEMENT AUTH (FIX PRINCIPAL)
-  useEffect(() => {
-    if (!hasHydrated || !hasInitialized.current || !hasCheckedAuth.current) {
-      return
-    }
-
-    // 🔧 Uniquement quand l'auth est prête ET valide
-    if (!isLoading && isAuthenticated) {
-      console.log('🔄 [Auth] État auth changé, redirection sécurisée')
-      safeRedirectToChat()
-    }
-  }, [isAuthenticated, isLoading, hasHydrated, safeRedirectToChat])
-
-  // 🛡️ GESTION URL CALLBACK
-  useEffect(() => {
-    if (!hasInitialized.current) return
-
-    const authStatus = searchParams.get('auth')
-    if (!authStatus) return
-    
-    if (authStatus === 'success') {
-      setLocalSuccess(t.authSuccess)
-    } else if (authStatus === 'error') {
-      setLocalError(t.authError)
-    } else if (authStatus === 'incomplete') {
-      setLocalError(t.authIncomplete)
-    }
-    
-    // Nettoyer l'URL
-    const url = new URL(window.location.href)
-    url.searchParams.delete('auth')
-    window.history.replaceState({}, '', url.pathname)
-    
-    // Masquer les messages après 3 secondes
-    const timer = setTimeout(() => {
-      setLocalSuccess('')
-      setLocalError('')
-    }, 3000)
-    
-    return () => clearTimeout(timer)
-  }, [searchParams, t])
-
-  // ✅ AFFICHAGE CONDITIONNEL
-  if (!hasHydrated || !hasInitialized.current) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
-        <div className="text-center">
-          <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Initialisation...</p>
-        </div>
-      </div>
-    )
-  }
-
-  const handleLanguageChange = (newLanguage: Language) => {
-    setCurrentLanguage(newLanguage)
-    localStorage.setItem('intelia-language', newLanguage)
-  }
-
-  // ✅ FONCTION HANDLELOGINCHANGE CORRIGÉE AVEC PERSISTENCE EN TEMPS RÉEL
-  const handleLoginChange = (field: string, value: string | boolean) => {
+  // Gestion des changements de formulaires avec logique avancée
+  const handleLoginChange = (field: keyof LoginData, value: string | boolean) => {
     setLoginData(prev => {
       const newData = { ...prev, [field]: value }
       
-      // 🔧 NOUVELLE LOGIQUE : Gestion spéciale pour rememberMe
+      // Gestion spéciale pour rememberMe
       if (field === 'rememberMe') {
         const isRememberChecked = value as boolean
         console.log('🛯 [HandleChange] RememberMe changé:', isRememberChecked)
@@ -836,7 +127,7 @@ function PageContent() {
         }
       }
       
-      // 🔧 NOUVELLE LOGIQUE : Gestion spéciale pour l'email quand rememberMe est actif
+      // Gestion spéciale pour l'email quand rememberMe est actif
       if (field === 'email' && prev.rememberMe) {
         const emailValue = (value as string).trim()
         if (emailValue && validateEmail(emailValue)) {
@@ -853,7 +144,7 @@ function PageContent() {
     if (localSuccess) setLocalSuccess('')
   }
 
-  const handleSignupChange = (field: string, value: string) => {
+  const handleSignupChange = (field: keyof SignupData, value: string) => {
     setSignupData(prev => {
       const newData = { ...prev, [field]: value }
       
@@ -865,9 +156,7 @@ function PageContent() {
       
       return newData
     })
-    
-    if (localError) setLocalError('')
-    if (localSuccess) setLocalSuccess('')
+    setLocalError('')
   }
 
   const validateSignupForm = (): string | null => {
@@ -900,21 +189,22 @@ function PageContent() {
     return null
   }
 
-  // ✅ LOGIN AVEC GESTION "SE SOUVENIR DE MOI" CORRIGÉE
-  const handleLogin = async () => {
+  // Gestion de la connexion avec logique avancée
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
     setLocalError('')
     setLocalSuccess('')
-    
+
     if (!loginData.email.trim()) {
       setLocalError(t.emailRequired)
       return
     }
-    
+
     if (!validateEmail(loginData.email)) {
       setLocalError(t.emailInvalid)
       return
     }
-    
+
     if (!loginData.password) {
       setLocalError(t.passwordRequired)
       return
@@ -926,17 +216,23 @@ function PageContent() {
     }
 
     try {
+      console.log('🔑 [Login] Tentative connexion...')
+      
       await login(loginData.email.trim(), loginData.password)
       
-      // ✅ GESTION "Se souvenir de moi" avec fonction utilitaire CORRIGÉE
-      // Note: La persistence a déjà été faite dans handleLoginChange, mais on confirme ici pour sécurité
+      // Gestion "Se souvenir de moi" avec fonction utilitaire
       rememberMeUtils.save(loginData.email.trim(), loginData.rememberMe)
       console.log('✅ [Login] Confirmation persistence remember me:', loginData.rememberMe)
       
-      // 🔧 Pas de redirection manuelle ici, elle sera gérée par useEffect
+      setLocalSuccess(t.authSuccess)
+      console.log('✅ [Login] Connexion réussie')
+      
+      // Pas de redirection manuelle ici, elle sera gérée par useEffect
       
     } catch (error: any) {
-      // 🔧 Réinitialiser les verrous en cas d'erreur
+      console.error('❌ [Login] Erreur connexion:', error)
+      
+      // Réinitialiser les verrous en cas d'erreur
       redirectLock.current = false
       
       if (error.message?.includes('Invalid login credentials')) {
@@ -951,10 +247,12 @@ function PageContent() {
     }
   }
 
-  const handleSignup = async () => {
+  // Gestion de l'inscription avec validation avancée
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault()
     setLocalError('')
     setLocalSuccess('')
-    
+
     const validationError = validateSignupForm()
     if (validationError) {
       setLocalError(validationError)
@@ -962,7 +260,7 @@ function PageContent() {
     }
 
     try {
-      console.log('📝 [Signup] Tentative d\'inscription:', signupData.email)
+      console.log('🔑 [Signup] Tentative création compte...')
       
       const userData: Partial<User> = {
         name: `${signupData.firstName.trim()} ${signupData.lastName.trim()}`,
@@ -973,6 +271,7 @@ function PageContent() {
       await register(signupData.email.trim(), signupData.password, userData)
       
       setLocalSuccess(t.accountCreated)
+      console.log('✅ [Signup] Création compte réussie')
       
       // Réinitialiser le formulaire
       setSignupData({
@@ -989,54 +288,218 @@ function PageContent() {
       }, 4000)
       
     } catch (error: any) {
-      console.error('❌ [Signup] Erreur:', error)
+      console.error('❌ [Signup] Erreur création compte:', error)
       setLocalError(error.message || 'Erreur lors de la création du compte')
     }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !isLoading) {
+    if (e.key === 'Enter') {
       if (isSignupMode) {
-        handleSignup()
+        handleSignup(e as any)
       } else {
-        handleLogin()
+        handleLogin(e as any)
       }
     }
   }
 
-  // ✅ GESTION MODES AVEC REMEMBER EMAIL CORRIGÉE
-  const handleCloseSignup = () => {
-    setIsSignupMode(false)
+  const toggleMode = () => {
+    console.log('🔄 [UI] Basculement mode:', isSignupMode ? 'signup → login' : 'login → signup')
+    setIsSignupMode(!isSignupMode)
     setLocalError('')
     setLocalSuccess('')
+  }
+
+  // Effects d'initialisation avec Remember Me
+  useEffect(() => {
+    if (!hasInitialized.current) {
+      hasInitialized.current = true
+      console.log('🎯 [Init] Initialisation unique')
+      
+      // Charger les préférences utilisateur
+      const savedLanguage = localStorage.getItem('intelia-language') as Language
+      if (savedLanguage && translations[savedLanguage]) {
+        setCurrentLanguage(savedLanguage)
+      } else {
+        const browserLanguage = navigator.language.substring(0, 2) as Language
+        if (translations[browserLanguage]) {
+          setCurrentLanguage(browserLanguage)
+        }
+      }
+
+      // Restaurer EMAIL avec fonction utilitaire
+      const { rememberMe, lastEmail, hasRememberedEmail } = rememberMeUtils.load()
+      
+      console.log('🔄 [Init] Chargement remember me:', { rememberMe, lastEmail, hasRememberedEmail })
+      
+      if (hasRememberedEmail) {
+        setLoginData({
+          email: lastEmail,
+          password: '', // Toujours vider le mot de passe
+          rememberMe: true
+        })
+        
+        setLocalSuccess(`Email restauré : ${lastEmail}. Entrez votre mot de passe.`)
+        setTimeout(() => setLocalSuccess(''), 4000)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!hasHydrated) return
     
-    // ✅ Restaurer EMAIL avec fonction utilitaire
+    if (!sessionInitialized.current) {
+      sessionInitialized.current = true
+      console.log('🔐 [Session] Initialisation unique de la session')
+      initializeSession()
+    }
+  }, [hasHydrated, initializeSession])
+
+  // Vérification authentification avec logique avancée
+  useEffect(() => {
+    if (!hasHydrated || !hasInitialized.current || hasCheckedAuth.current) {
+      return
+    }
+
+    hasCheckedAuth.current = true
+    console.log('🔐 [Auth] Vérification unique de l\'authentification')
+
+    // Si déjà connecté, rediriger immédiatement
+    if (isAuthenticated) {
+      console.log('✅ [Auth] Déjà connecté, redirection immédiate')
+      safeRedirectToChat()
+      return
+    }
+
+    // Sinon, initialiser la session une seule fois
+    if (!sessionInitialized.current) {
+      sessionInitialized.current = true
+      console.log('🔄 [Session] Initialisation unique de la session')
+      
+      initializeSession().then((sessionFound) => {
+        if (sessionFound) {
+          console.log('✅ [Session] Session trouvée, redirection automatique')
+          // La redirection sera gérée par le changement d'état isAuthenticated
+        } else {
+          console.log('❌ [Session] Aucune session trouvée')
+        }
+      }).catch(error => {
+        console.error('❌ [Session] Erreur initialisation:', error)
+      })
+    }
+  }, [hasHydrated, hasInitialized.current, isAuthenticated, initializeSession, safeRedirectToChat])
+
+  // Surveillance changement AUTH
+  useEffect(() => {
+    if (!hasHydrated || !hasInitialized.current || !hasCheckedAuth.current) {
+      return
+    }
+
+    // Uniquement quand l'auth est prête ET valide
+    if (!isLoading && isAuthenticated) {
+      console.log('🔄 [Auth] État auth changé, redirection sécurisée')
+      safeRedirectToChat()
+    }
+  }, [isAuthenticated, isLoading, hasHydrated, safeRedirectToChat])
+
+  // Focus automatique sur mot de passe si email pré-rempli
+  useEffect(() => {
     const { rememberMe, lastEmail } = rememberMeUtils.load()
     
-    console.log('📝 [Signup] Fermeture signup - restore email:', lastEmail)
+    if (rememberMe && lastEmail && loginData.email && !loginData.password && passwordInputRef.current) {
+      setTimeout(() => {
+        passwordInputRef.current?.focus()
+      }, 500)
+    }
+  }, [loginData.email, loginData.password])
+
+  // Gestion URL callback
+  useEffect(() => {
+    if (!hasInitialized.current) return
+
+    const authStatus = searchParams.get('auth')
+    if (!authStatus) return
     
-    setLoginData({ 
-      email: lastEmail, 
-      password: '', // ✅ Toujours vider mot de passe
-      rememberMe 
-    })
-    
-    // Message si email restauré
-    if (rememberMe && lastEmail) {
-      setLocalSuccess(`Email restauré : ${lastEmail}`)
-      setTimeout(() => setLocalSuccess(''), 3000)
+    if (authStatus === 'success') {
+      setLocalSuccess(t.authSuccess)
+    } else if (authStatus === 'error') {
+      setLocalError(t.authError)
+    } else if (authStatus === 'incomplete') {
+      setLocalError(t.authIncomplete)
     }
     
-    // Réinitialiser le formulaire d'inscription
-    setSignupData({
-      email: '', password: '', confirmPassword: '',
-      firstName: '', lastName: '', linkedinProfile: '',
-      country: '', countryCode: '', areaCode: '', phoneNumber: '',
-      companyName: '', companyWebsite: '', companyLinkedin: ''
-    })
+    // Nettoyer l'URL
+    const url = new URL(window.location.href)
+    url.searchParams.delete('auth')
+    window.history.replaceState({}, '', url.pathname)
+    
+    // Masquer les messages après 3 secondes
+    const timer = setTimeout(() => {
+      setLocalSuccess('')
+      setLocalError('')
+    }, 3000)
+    
+    return () => clearTimeout(timer)
+  }, [searchParams, t])
+
+  // 🔒 EFFET POUR BLOQUER LE SCROLL HTML + BODY EN MODE SIGNUP (CORRIGÉ)
+  useEffect(() => {
+    if (isSignupMode) {
+      // Bloquer le scroll du body ET du html
+      document.body.style.overflow = 'hidden'
+      document.documentElement.style.overflow = 'hidden'
+    } else {
+      // Restaurer le scroll du body ET du html
+      document.body.style.overflow = 'unset'
+      document.documentElement.style.overflow = 'unset'
+    }
+    
+    // Cleanup au démontage
+    return () => {
+      document.body.style.overflow = 'unset'
+      document.documentElement.style.overflow = 'unset'
+    }
+  }, [isSignupMode])
+
+  // 🔒 EFFET POUR BLOQUER LE SCROLL HTML + BODY EN MODE SIGNUP (CORRIGÉ)
+  useEffect(() => {
+    if (isSignupMode) {
+      // Bloquer le scroll du body ET du html
+      document.body.style.overflow = 'hidden'
+      document.documentElement.style.overflow = 'hidden'
+    } else {
+      // Restaurer le scroll du body ET du html
+      document.body.style.overflow = 'unset'
+      document.documentElement.style.overflow = 'unset'
+    }
+    
+    // Cleanup au démontage
+    return () => {
+      document.body.style.overflow = 'unset'
+      document.documentElement.style.overflow = 'unset'
+    }
+  }, [isSignupMode])
+
+  // Affichage conditionnel avec spinner amélioré
+  if (!hasHydrated || !hasInitialized.current) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Initialisation...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const handleLanguageChange = (newLanguage: Language) => {
+    setCurrentLanguage(newLanguage)
+    localStorage.setItem('intelia-language', newLanguage)
   }
 
   const toggleMode = () => {
+    console.log('🔄 [UI] Basculement mode:', isSignupMode ? 'signup → login' : 'login → signup')
     setIsSignupMode(!isSignupMode)
     setLocalError('')
     setLocalSuccess('')
@@ -1052,7 +515,7 @@ function PageContent() {
       
       setLoginData({ 
         email: lastEmail, 
-        password: '', // ✅ Toujours vider mot de passe
+        password: '', // Toujours vider mot de passe
         rememberMe 
       })
       
@@ -1071,727 +534,838 @@ function PageContent() {
     })
   }
 
+  console.log('🎨 [Render] Rendu de la page principale')
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative">
-      
-      {/* ⭐ BOÎTE DE DEBUG EN MODE DÉVELOPPEMENT */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed top-16 right-4 bg-purple-50 border border-purple-200 rounded-lg p-4 text-xs max-w-sm z-50">
-          <div className="font-semibold text-purple-800 mb-2">🧪 Debug Countries API</div>
-          <div className="space-y-1 text-purple-700">
-            <div>📊 Pays: <span className="font-mono bg-purple-100 px-1 rounded">{countries.length}</span></div>
-            <div>⏳ Loading: <span className="font-mono bg-purple-100 px-1 rounded">{countriesLoading ? 'Oui' : 'Non'}</span></div>
-            <div>🔄 Fallback: <span className="font-mono bg-purple-100 px-1 rounded">{usingFallback ? 'Oui' : 'Non'}</span></div>
-            <div>🎯 Source: <span className="font-mono bg-purple-100 px-1 rounded">{usingFallback ? 'Liste locale' : 'API REST Countries'}</span></div>
-          </div>
-          {countries.length > 0 && (
-            <div className="mt-2 p-2 bg-purple-100 rounded text-xs">
-              <div className="font-semibold">Premier pays:</div>
-              <div className="font-mono">{countries[0].flag} {countries[0].label} ({countries[0].phoneCode})</div>
+    <>
+      {/* PAGE PRINCIPALE (LOGIN) - RETRAIT DE LA CONDITION overflow-hidden */}
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative">
+        
+        {/* ⭐ BOÎTE DE DEBUG GLOBALE - RETIRÉE EN PRODUCTION */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="fixed top-16 right-4 bg-purple-50 border border-purple-200 rounded-lg p-4 text-xs max-w-sm z-50">
+            <div className="font-semibold text-purple-800 mb-2">🧪 Debug Global</div>
+            <div className="space-y-1 text-purple-700">
+              <div>🎭 Mode: <span className="font-mono bg-purple-100 px-1 rounded">{isSignupMode ? 'Modal' : 'Page'}</span></div>
+              <div>📊 Pays: <span className="font-mono bg-purple-100 px-1 rounded">{countries.length}</span></div>
+              <div>⏳ Loading: <span className="font-mono bg-purple-100 px-1 rounded">{countriesLoading ? 'Oui' : 'Non'}</span></div>
+              <div>🔄 Fallback: <span className="font-mono bg-purple-100 px-1 rounded">{usingFallback ? 'Oui' : 'Non'}</span></div>
             </div>
-          )}
-          <button 
-            onClick={() => setIsSignupMode(!isSignupMode)}
-            className="mt-2 text-xs bg-purple-100 hover:bg-purple-200 px-2 py-1 rounded"
-          >
-            {isSignupMode ? 'Mode Login' : 'Mode Inscription'}
-          </button>
-        </div>
-      )}
-      
-      <div className="absolute top-4 right-4">
-        <LanguageSelector onLanguageChange={handleLanguageChange} currentLanguage={currentLanguage} />
-      </div>
-      
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-          <InteliaLogo className="w-16 h-16" />
-        </div>
-        <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-          {t.title}
-        </h2>
-      </div>
-
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-2xl">
-        <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 max-h-screen overflow-y-auto relative">
-          
-          {/* Bouton de fermeture pour le mode inscription */}
-          {isSignupMode && (
-            <button
-              onClick={handleCloseSignup}
-              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors z-10"
-              title={t.close}
-              disabled={isLoading}
+            <button 
+              onClick={toggleMode}
+              className="mt-2 text-xs bg-purple-100 hover:bg-purple-200 px-2 py-1 rounded"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              {isSignupMode ? 'Fermer Modal' : 'Ouvrir Modal'}
             </button>
-          )}
+          </div>
+        )}
+        
+        <div className="absolute top-4 right-4">
+          <LanguageSelector onLanguageChange={setCurrentLanguage} currentLanguage={currentLanguage} />
+        </div>
+        
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="flex justify-center">
+            <InteliaLogo className="w-16 h-16" />
+          </div>
+          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
+            {t.title}
+          </h2>
+        </div>
 
-          {/* Statut du chargement des pays */}
-          {usingFallback && !countriesLoading && isSignupMode && (
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <div className="flex items-center space-x-2">
-                <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                <span className="text-sm text-yellow-800">
-                  {t.limitedCountryList}
-                </span>
-              </div>
-            </div>
-          )}
+        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
+            
+            {/* Messages d'erreur et succès pour login */}
+            {localError && !isSignupMode && (
+              <AlertMessage 
+                type="error" 
+                title={t.loginError} 
+                message={localError} 
+              />
+            )}
 
-          {/* Messages d'erreur et succès */}
-          {localError && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
-                    {isSignupMode ? t.signupError : t.loginError}
-                  </h3>
-                  <div className="mt-1 text-sm text-red-700">
-                    {localError}
+            {localSuccess && !isSignupMode && (
+              <AlertMessage 
+                type="success" 
+                title="" 
+                message={localSuccess} 
+              />
+            )}
+
+            {/* FORMULAIRE DE CONNEXION */}
+            <form onSubmit={handleLogin} onKeyPress={handleKeyPress}>
+              <div className="space-y-6">
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                    {t.email}
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={loginData.email}
+                      onChange={(e) => handleLoginChange('email', e.target.value)}
+                      className="block w-full rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                    />
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
 
-          {localSuccess && (
-            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <div className="text-sm text-green-700">
-                    {localSuccess}
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                    {t.password}
+                  </label>
+                  <div className="mt-1">
+                    <PasswordInput
+                      id="password"
+                      name="password"
+                      value={loginData.password}
+                      onChange={(e) => handleLoginChange('password', e.target.value)}
+                      autoComplete="current-password"
+                      required
+                    />
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
 
-          {/* Formulaire de connexion */}
-          {!isSignupMode && (
-            <div className="space-y-6">
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  {t.email} <span className="text-red-500">*</span>
-                </label>
-                <div className="mt-1">
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    value={loginData.email}
-                    onChange={(e) => handleLoginChange('email', e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm transition-colors"
-                    placeholder="votre@email.com"
-                    disabled={isLoading}
-                  />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <input
+                      id="remember-me"
+                      name="remember-me"
+                      type="checkbox"
+                      checked={loginData.rememberMe}
+                      onChange={(e) => {
+                        console.log('🛯 [Checkbox] Événement onChange déclenché!')
+                        console.log('🛯 [Checkbox] e.target.checked:', e.target.checked)
+                        console.log('🛯 [Checkbox] État actuel rememberMe:', loginData.rememberMe)
+                        
+                        // Appel simplifié et direct
+                        handleLoginChange('rememberMe', e.target.checked)
+                      }}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      disabled={isLoading}
+                    />
+                    <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
+                      {t.rememberMe}
+                    </label>
+                  </div>
+
+                  <div className="text-sm">
+                    <Link 
+                      href="/auth/forgot-password" 
+                      className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
+                    >
+                      {t.forgotPassword}
+                    </Link>
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                  {t.password} <span className="text-red-500">*</span>
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                    ref={passwordInputRef}
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="current-password"
-                    required
-                    value={loginData.password}
-                    onChange={(e) => handleLoginChange('password', e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm transition-colors"
-                    placeholder={loginData.email ? "Entrez votre mot de passe" : "••••••••"}
-                    disabled={isLoading}
-                  />
+                <div>
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center hover:text-gray-600 transition-colors"
-                    disabled={isLoading}
-                    tabIndex={-1}
+                    onClick={handleLogin}
+                    disabled={isLoading || !loginData.email || !loginData.password}
+                    className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    {showPassword ? (
-                      <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.34 6.34m6.822 10.565l-3.536-3.536" />
-                      </svg>
+                    {isLoading ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>{t.connecting}</span>
+                      </div>
                     ) : (
-                      <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
+                      t.login
                     )}
                   </button>
                 </div>
               </div>
+            </form>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <input
-                    id="remember-me"
-                    name="remember-me"
-                    type="checkbox"
-                    checked={loginData.rememberMe}
-                    onChange={(e) => {
-                      console.log('🛯 [Checkbox] Événement onChange déclenché!')
-                      console.log('🛯 [Checkbox] e.target.checked:', e.target.checked)
-                      console.log('🛯 [Checkbox] État actuel rememberMe:', loginData.rememberMe)
-                      
-                      // ✅ APPEL SIMPLIFIÉ ET DIRECT
-                      handleLoginChange('rememberMe', e.target.checked)
-                    }}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    disabled={isLoading}
-                  />
-                  <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-                    {t.rememberMe}
-                  </label>
-                </div>
-
-                <div className="text-sm">
-                  <Link 
-                    href="/auth/forgot-password" 
-                    className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
-                  >
-                    {t.forgotPassword}
-                  </Link>
-                </div>
-              </div>
-
-              <div>
+            {/* Bouton pour ouvrir la modale d'inscription */}
+            <div className="mt-6 text-center">
+              <p className="text-sm text-gray-600">
+                {t.newToIntelia}{' '}
                 <button
-                  type="button"
-                  onClick={handleLogin}
-                  disabled={isLoading || !loginData.email || !loginData.password}
-                  className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  onClick={toggleMode}
+                  className="font-medium text-blue-600 hover:text-blue-500"
                 >
-                  {isLoading ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>{t.connecting}</span>
-                    </div>
-                  ) : (
-                    t.login
-                  )}
+                  {t.createAccount}
+                </button>
+              </p>
+            </div>
+
+            {/* Footer */}
+            <AuthFooter t={t} />
+          </div>
+        </div>
+      </div>
+
+      {/* 🔧 MODAL D'INSCRIPTION - VERSION CORRIGÉE SANS DOUBLE SCROLL */}
+      {isSignupMode && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 p-4 overflow-hidden overscroll-none">
+          <div className="w-full max-w-2xl mx-auto bg-white rounded-lg shadow-xl max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain">
+              
+              {/* Header de la modale avec bouton fermer */}
+              <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-lg">
+                <h3 className="text-lg font-semibold text-gray-900">{t.createAccount}</h3>
+                <button
+                  onClick={toggleMode}
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
               </div>
-            </div>
-          )}
 
-          {/* Formulaire d'inscription avec sélecteur de pays amélioré */}
-          {isSignupMode && (
-            <div className="space-y-6 pt-2">
-              {/* Section: Informations personnelles */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
-                  {t.personalInfo}
-                </h3>
+              {/* Corps de la modale */}
+              <div className="flex-1 px-6 py-4">
                 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
-                      {t.firstName} <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="firstName"
-                      type="text"
-                      required
-                      value={signupData.firstName}
-                      onChange={(e) => handleSignupChange('firstName', e.target.value)}
-                      className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isLoading}
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
-                      {t.lastName} <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="lastName"
-                      type="text"
-                      required
-                      value={signupData.lastName}
-                      onChange={(e) => handleSignupChange('lastName', e.target.value)}
-                      className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isLoading}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <label htmlFor="linkedinProfile" className="block text-sm font-medium text-gray-700">
-                    {t.linkedinProfile} <span className="text-gray-500 text-xs">{t.optional}</span>
-                  </label>
-                  <input
-                    id="linkedinProfile"
-                    type="url"
-                    value={signupData.linkedinProfile}
-                    onChange={(e) => handleSignupChange('linkedinProfile', e.target.value)}
-                    placeholder="https://linkedin.com/in/votre-profil"
-                    className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                    disabled={isLoading}
+                {/* Messages d'erreur et succès pour signup */}
+                {localError && (
+                  <AlertMessage 
+                    type="error" 
+                    title={t.signupError} 
+                    message={localError} 
                   />
-                </div>
-              </div>
+                )}
 
-              {/* Section: Contact */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
-                  {t.contact}
-                </h3>
-
-                <div className="mb-4">
-                  <label htmlFor="signupEmail" className="block text-sm font-medium text-gray-700">
-                    {t.email} <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="signupEmail"
-                    type="email"
-                    required
-                    value={signupData.email}
-                    onChange={(e) => handleSignupChange('email', e.target.value)}
-                    placeholder="votre@email.com"
-                    className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                    disabled={isLoading}
+                {localSuccess && (
+                  <AlertMessage 
+                    type="success" 
+                    title="" 
+                    message={localSuccess} 
                   />
-                </div>
+                )}
 
-                {/* ⭐ SÉLECTEUR DE PAYS AVEC API REST COUNTRIES */}
-                <div className="mb-4">
-                  <label htmlFor="country" className="block text-sm font-medium text-gray-700">
-                    {t.country} <span className="text-red-500">*</span>
-                  </label>
-                  
-                  {countriesLoading ? (
-                    <div className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 bg-gray-50">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                        <span className="text-sm text-gray-600">{t.loadingCountries}</span>
+                {/* FORMULAIRE D'INSCRIPTION */}
+                <form onSubmit={handleSignup} onKeyPress={handleKeyPress}>
+                  <div className="space-y-6">
+                    {/* Section Informations personnelles */}
+                    <div className="border-b border-gray-200 pb-6">
+                      <h4 className="text-md font-medium text-gray-900 mb-4">{t.personalInfo}</h4>
+                      
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            {t.firstName} <span className="text-red-500">{t.required}</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={signupData.firstName}
+                            onChange={(e) => handleSignupChange('firstName', e.target.value)}
+                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            {t.lastName} <span className="text-red-500">{t.required}</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={signupData.lastName}
+                            onChange={(e) => handleSignupChange('lastName', e.target.value)}
+                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.linkedinProfile} {t.optional}
+                        </label>
+                        <input
+                          type="url"
+                          value={signupData.linkedinProfile}
+                          onChange={(e) => handleSignupChange('linkedinProfile', e.target.value)}
+                          placeholder="https://linkedin.com/in/votre-profil"
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        />
                       </div>
                     </div>
-                  ) : (
-                    <select
-                      id="country"
-                      required
-                      value={signupData.country}
-                      onChange={(e) => {
-                        console.log('🏳️ [Country] Sélection pays:', e.target.value)
-                        handleSignupChange('country', e.target.value)
-                      }}
-                      className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isLoading}
-                    >
-                      <option value="">{t.selectCountry}</option>
-                      {countries.length === 0 ? (
-                        <option disabled>Aucun pays disponible</option>
-                      ) : (
-                        countries.map((country) => (
-                          <option key={country.value} value={country.value}>
-                            {country.flag ? `${country.flag} ` : ''}{country.label} ({country.phoneCode})
-                          </option>
-                        ))
-                      )}
-                    </select>
-                  )}
-                </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Téléphone <span className="text-gray-500 text-xs">{t.optional}</span>
-                  </label>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label htmlFor="countryCode" className="block text-xs font-medium text-gray-600 mb-1">
-                        {t.countryCode}
-                      </label>
-                      <input
-                        id="countryCode"
-                        type="text"
-                        value={signupData.countryCode}
-                        onChange={(e) => handleSignupChange('countryCode', e.target.value)}
-                        placeholder="+1"
-                        className="block w-full appearance-none rounded-md border border-gray-300 px-2 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 text-sm"
-                        disabled={isLoading}
-                      />
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="areaCode" className="block text-xs font-medium text-gray-600 mb-1">
-                        {t.areaCode}
-                      </label>
-                      <input
-                        id="areaCode"
-                        type="tel"
-                        value={signupData.areaCode}
-                        onChange={(e) => handleSignupChange('areaCode', e.target.value)}
-                        placeholder="514"
-                        maxLength={3}
-                        className="block w-full appearance-none rounded-md border border-gray-300 px-2 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 text-sm"
-                        disabled={isLoading}
-                      />
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="phoneNumber" className="block text-xs font-medium text-gray-600 mb-1">
-                        {t.phoneNumber}
-                      </label>
-                      <input
-                        id="phoneNumber"
-                        type="tel"
-                        value={signupData.phoneNumber}
-                        onChange={(e) => handleSignupChange('phoneNumber', e.target.value)}
-                        placeholder="1234567"
-                        maxLength={7}
-                        className="block w-full appearance-none rounded-md border border-gray-300 px-2 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 text-sm"
-                        disabled={isLoading}
-                      />
-                    </div>
-                  </div>
-                  
-                  {(signupData.countryCode || signupData.areaCode || signupData.phoneNumber) && (
-                    <div className="mt-2">
-                      {validatePhone(signupData.countryCode, signupData.areaCode, signupData.phoneNumber) ? (
-                        <div className="flex items-center text-xs text-green-600">
-                          <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          Format téléphone valide
-                        </div>
-                      ) : (
-                        <div className="flex items-center text-xs text-red-600">
-                          <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                          </svg>
-                          Tous les champs téléphone sont requis
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+                    {/* Section Contact */}
+                    <div className="border-b border-gray-200 pb-6">
+                      <h4 className="text-md font-medium text-gray-900 mb-4">{t.contact}</h4>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.email} <span className="text-red-500">{t.required}</span>
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          value={signupData.email}
+                          onChange={(e) => handleSignupChange('email', e.target.value)}
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        />
+                      </div>
 
-              {/* Section: Mots de passe */}
-              <div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label htmlFor="signupPassword" className="block text-sm font-medium text-gray-700">
-                      {t.password} <span className="text-red-500">*</span>
-                    </label>
-                    <div className="mt-1 relative">
-                      <input
-                        id="signupPassword"
-                        type={showPassword ? "text" : "password"}
-                        required
-                        value={signupData.password}
-                        onChange={(e) => handleSignupChange('password', e.target.value)}
-                        className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        placeholder="••••••••"
-                        disabled={isLoading}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                        tabIndex={-1}
-                      >
-                        <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      </button>
-                    </div>
-                    {signupData.password && (
-                      <div className="mt-2 space-y-1">
-                        {(() => {
-                          const validation = validatePassword(signupData.password)
-                          return validation.errors.map((error, index) => (
-                            <div key={index} className="flex items-center text-xs text-red-600">
-                              <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                              </svg>
-                              {error}
+                      {/* Sélecteur de pays */}
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.country} <span className="text-red-500">{t.required}</span>
+                        </label>
+                        
+                        {countriesLoading ? (
+                          <div className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 bg-gray-50">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                              <span className="text-sm text-gray-600">{t.loadingCountries}</span>
                             </div>
-                          ))
-                        })()}
-                        {validatePassword(signupData.password).isValid && (
-                          <div className="flex items-center text-xs text-green-600">
-                            <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            Mot de passe valide
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                      {t.confirmPassword} <span className="text-red-500">*</span>
-                    </label>
-                    <div className="mt-1 relative">
-                      <input
-                        id="confirmPassword"
-                        type={showConfirmPassword ? "text" : "password"}
-                        required
-                        value={signupData.confirmPassword}
-                        onChange={(e) => handleSignupChange('confirmPassword', e.target.value)}
-                        className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        placeholder="••••••••"
-                        disabled={isLoading}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                        tabIndex={-1}
-                      >
-                        <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      </button>
-                    </div>
-                    {signupData.confirmPassword && (
-                      <div className="mt-2">
-                        {signupData.password === signupData.confirmPassword ? (
-                          <div className="flex items-center text-xs text-green-600">
-                            <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            Mots de passe identiques
                           </div>
                         ) : (
-                          <div className="flex items-center text-xs text-red-600">
-                            <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                            </svg>
-                            Les mots de passe ne correspondent pas
-                          </div>
+                          <select
+                            required
+                            value={signupData.country}
+                            onChange={(e) => handleSignupChange('country', e.target.value)}
+                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                          >
+                            <option value="">{t.selectCountry}</option>
+                            {countries.map((country) => (
+                              <option key={country.value} value={country.value}>
+                                {country.flag ? `${country.flag} ` : ''}{country.label} ({country.phoneCode})
+                              </option>
+                            ))}
+                          </select>
                         )}
                       </div>
-                    )}
-                  </div>
-                </div>
-              </div>
 
-              {/* Section: Entreprise */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
-                  {t.company}
-                </h3>
-
-                <div className="mb-4">
-                  <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">
-                    {t.companyName} <span className="text-gray-500 text-xs">{t.optional}</span>
-                  </label>
-                  <input
-                    id="companyName"
-                    type="text"
-                    value={signupData.companyName}
-                    onChange={(e) => handleSignupChange('companyName', e.target.value)}
-                    className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <div className="mb-4">
-                  <label htmlFor="companyWebsite" className="block text-sm font-medium text-gray-700">
-                    {t.companyWebsite} <span className="text-gray-500 text-xs">{t.optional}</span>
-                  </label>
-                  <input
-                    id="companyWebsite"
-                    type="url"
-                    value={signupData.companyWebsite}
-                    onChange={(e) => handleSignupChange('companyWebsite', e.target.value)}
-                    placeholder="https://www.entreprise.com"
-                    className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="companyLinkedin" className="block text-sm font-medium text-gray-700">
-                    {t.companyLinkedin} <span className="text-gray-500 text-xs">{t.optional}</span>
-                  </label>
-                  <input
-                    id="companyLinkedin"
-                    type="url"
-                    value={signupData.companyLinkedin}
-                    onChange={(e) => handleSignupChange('companyLinkedin', e.target.value)}
-                    placeholder="https://linkedin.com/company/votre-entreprise"
-                    className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              <div className="pt-4">
-                <button
-                  type="button"
-                  onClick={handleSignup}
-                  disabled={isLoading}
-                  className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isLoading ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>{t.creating}</span>
+                      {/* Téléphone optionnel */}
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {t.phoneNumber} {t.optional}
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">{t.countryCode}</label>
+                            <input
+                              type="text"
+                              placeholder="+1"
+                              value={signupData.countryCode}
+                              onChange={(e) => handleSignupChange('countryCode', e.target.value)}
+                              className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">{t.areaCode}</label>
+                            <input
+                              type="text"
+                              placeholder="514"
+                              value={signupData.areaCode}
+                              onChange={(e) => handleSignupChange('areaCode', e.target.value)}
+                              className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">{t.phoneNumber}</label>
+                            <input
+                              type="text"
+                              placeholder="1234567"
+                              value={signupData.phoneNumber}
+                              onChange={(e) => handleSignupChange('phoneNumber', e.target.value)}
+                              className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  ) : (
-                    t.signup
-                  )}
-                </button>
+
+                    {/* Section Entreprise */}
+                    <div className="border-b border-gray-200 pb-6">
+                      <h4 className="text-md font-medium text-gray-900 mb-4">{t.company}</h4>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.companyName} {t.optional}
+                        </label>
+                        <input
+                          type="text"
+                          value={signupData.companyName}
+                          onChange={(e) => handleSignupChange('companyName', e.target.value)}
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        />
+                      </div>
+
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.companyWebsite} {t.optional}
+                        </label>
+                        <input
+                          type="url"
+                          value={signupData.companyWebsite}
+                          onChange={(e) => handleSignupChange('companyWebsite', e.target.value)}
+                          placeholder="https://votre-entreprise.com"
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        />
+                      </div>
+
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.companyLinkedin} {t.optional}
+                        </label>
+                        <input
+                          type="url"
+                          value={signupData.companyLinkedin}
+                          onChange={(e) => handleSignupChange('companyLinkedin', e.target.value)}
+                          placeholder="https://linkedin.com/company/votre-entreprise"
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Section Mot de passe */}
+                    <div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.password} <span className="text-red-500">{t.required}</span>
+                        </label>
+                        <div className="mt-1">
+                          <PasswordInput
+                            value={signupData.password}
+                            onChange={(e) => handleSignupChange('password', e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.confirmPassword} <span className="text-red-500">{t.required}</span>
+                        </label>
+                        <div className="mt-1">
+                          <PasswordInput
+                            value={signupData.confirmPassword}
+                            onChange={(e) => handleSignupChange('confirmPassword', e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {/* Indicateur de correspondance des mots de passe */}
+                      <PasswordMatchIndicator 
+                        password={signupData.password} 
+                        confirmPassword={signupData.confirmPassword} 
+                      />
+                    </div>
+                  </div>
+                </form>
               </div>
-            </div>
-          )}
 
-          {/* Section des boutons de basculement - seulement visible en mode connexion */}
-          {!isSignupMode && (
-            <>
-              <div className="mt-6">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-300" />
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="bg-white px-2 text-gray-500">
-                      {t.newToIntelia}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-6">
+              {/* Footer de la modale avec boutons */}
+              <div className="flex-shrink-0 bg-gray-50 border-t border-gray-200 px-6 py-4 rounded-b-lg">
+                <div className="flex space-x-3">
                   <button
                     type="button"
                     onClick={toggleMode}
-                    className="flex w-full justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                    disabled={isLoading}
+                    className="flex-1 rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                   >
-                    {t.createAccount}
+                    {t.backToLogin}
+                  </button>
+                  <button
+                    onClick={handleSignup}
+                    disabled={isLoading}
+                    className="flex-1 rounded-md border border-transparent bg-green-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? t.creating : t.createAccount}
                   </button>
                 </div>
               </div>
-            </>
-          )}
-
-          {/* Toggle pour revenir au login depuis signup */}
-          {isSignupMode && (
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="bg-white px-2 text-gray-500">
-                    {t.alreadyHaveAccount}
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-6">
+            </div>
+          </div>
+      )}
+      {/* 🔧 MODAL D'INSCRIPTION - VERSION CORRIGÉE SANS DOUBLE SCROLL */}
+      {isSignupMode && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 p-4 overflow-hidden overscroll-none">
+          <div className="w-full max-w-2xl mx-auto bg-white rounded-lg shadow-xl max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain">
+              
+              {/* Header de la modale avec bouton fermer */}
+              <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-lg">
+                <h3 className="text-lg font-semibold text-gray-900">{t.createAccount}</h3>
                 <button
-                  type="button"
                   onClick={toggleMode}
-                  className="flex w-full justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                  disabled={isLoading}
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
                 >
-                  {t.backToLogin}
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
               </div>
-            </div>
-          )}
 
-          {/* Section RGPD améliorée */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <div className="flex items-start space-x-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex-shrink-0 mt-0.5">
-                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+              {/* Corps de la modale */}
+              <div className="flex-1 px-6 py-4">
+                
+                {/* Messages d'erreur et succès pour signup */}
+                {localError && (
+                  <AlertMessage 
+                    type="error" 
+                    title={t.signupError} 
+                    message={localError} 
+                  />
+                )}
+
+                {localSuccess && (
+                  <AlertMessage 
+                    type="success" 
+                    title="" 
+                    message={localSuccess} 
+                  />
+                )}
+
+                {/* FORMULAIRE D'INSCRIPTION COMPLET */}
+                <form onSubmit={handleSignup} onKeyPress={handleKeyPress}>
+                  <div className="space-y-6">
+                    {/* Section Informations personnelles */}
+                    <div className="border-b border-gray-200 pb-6">
+                      <h4 className="text-md font-medium text-gray-900 mb-4">{t.personalInfo}</h4>
+                      
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            {t.firstName} <span className="text-red-500">{t.required}</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={signupData.firstName}
+                            onChange={(e) => handleSignupChange('firstName', e.target.value)}
+                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                            disabled={isLoading}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            {t.lastName} <span className="text-red-500">{t.required}</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={signupData.lastName}
+                            onChange={(e) => handleSignupChange('lastName', e.target.value)}
+                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                            disabled={isLoading}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.linkedinProfile} {t.optional}
+                        </label>
+                        <input
+                          type="url"
+                          value={signupData.linkedinProfile}
+                          onChange={(e) => handleSignupChange('linkedinProfile', e.target.value)}
+                          placeholder="https://linkedin.com/in/votre-profil"
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                          disabled={isLoading}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Section Contact */}
+                    <div className="border-b border-gray-200 pb-6">
+                      <h4 className="text-md font-medium text-gray-900 mb-4">{t.contact}</h4>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.email} <span className="text-red-500">{t.required}</span>
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          value={signupData.email}
+                          onChange={(e) => handleSignupChange('email', e.target.value)}
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                          disabled={isLoading}
+                        />
+                      </div>
+
+                      {/* Sélecteur de pays */}
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.country} <span className="text-red-500">{t.required}</span>
+                        </label>
+                        
+                        {countriesLoading ? (
+                          <div className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 bg-gray-50">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                              <span className="text-sm text-gray-600">{t.loadingCountries}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <select
+                            required
+                            value={signupData.country}
+                            onChange={(e) => handleSignupChange('country', e.target.value)}
+                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                            disabled={isLoading}
+                          >
+                            <option value="">{t.selectCountry}</option>
+                            {countries.map((country) => (
+                              <option key={country.value} value={country.value}>
+                                {country.flag ? `${country.flag} ` : ''}{country.label} ({country.phoneCode})
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+
+                      {/* Téléphone optionnel */}
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Téléphone {t.optional}
+                        </label>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">{t.countryCode}</label>
+                            <input
+                              type="text"
+                              value={signupData.countryCode}
+                              onChange={(e) => handleSignupChange('countryCode', e.target.value)}
+                              placeholder="+1"
+                              className="block w-full rounded-md border border-gray-300 px-2 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 text-sm"
+                              disabled={isLoading}
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">{t.areaCode}</label>
+                            <input
+                              type="tel"
+                              value={signupData.areaCode}
+                              onChange={(e) => handleSignupChange('areaCode', e.target.value)}
+                              placeholder="514"
+                              maxLength={3}
+                              className="block w-full rounded-md border border-gray-300 px-2 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 text-sm"
+                              disabled={isLoading}
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">{t.phoneNumber}</label>
+                            <input
+                              type="tel"
+                              value={signupData.phoneNumber}
+                              onChange={(e) => handleSignupChange('phoneNumber', e.target.value)}
+                              placeholder="1234567"
+                              maxLength={7}
+                              className="block w-full rounded-md border border-gray-300 px-2 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 text-sm"
+                              disabled={isLoading}
+                            />
+                          </div>
+                        </div>
+                        
+                        {(signupData.countryCode || signupData.areaCode || signupData.phoneNumber) && (
+                          <div className="mt-2">
+                            {validatePhone(signupData.countryCode, signupData.areaCode, signupData.phoneNumber) ? (
+                              <div className="flex items-center text-xs text-green-600">
+                                <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                                Format téléphone valide
+                              </div>
+                            ) : (
+                              <div className="flex items-center text-xs text-red-600">
+                                <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                </svg>
+                                Tous les champs téléphone sont requis
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Section Entreprise */}
+                    <div className="border-b border-gray-200 pb-6">
+                      <h4 className="text-md font-medium text-gray-900 mb-4">{t.company}</h4>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.companyName} {t.optional}
+                        </label>
+                        <input
+                          type="text"
+                          value={signupData.companyName}
+                          onChange={(e) => handleSignupChange('companyName', e.target.value)}
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                          disabled={isLoading}
+                        />
+                      </div>
+
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.companyWebsite} {t.optional}
+                        </label>
+                        <input
+                          type="url"
+                          value={signupData.companyWebsite}
+                          onChange={(e) => handleSignupChange('companyWebsite', e.target.value)}
+                          placeholder="https://www.entreprise.com"
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                          disabled={isLoading}
+                        />
+                      </div>
+
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t.companyLinkedin} {t.optional}
+                        </label>
+                        <input
+                          type="url"
+                          value={signupData.companyLinkedin}
+                          onChange={(e) => handleSignupChange('companyLinkedin', e.target.value)}
+                          placeholder="https://linkedin.com/company/votre-entreprise"
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                          disabled={isLoading}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Section Mot de passe */}
+                    <div>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            {t.password} <span className="text-red-500">{t.required}</span>
+                          </label>
+                          <div className="mt-1 relative">
+                            <input
+                              type={showPassword ? "text" : "password"}
+                              required
+                              value={signupData.password}
+                              onChange={(e) => handleSignupChange('password', e.target.value)}
+                              className="block w-full rounded-md border border-gray-300 px-3 py-2 pr-10 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                              placeholder="••••••••"
+                              disabled={isLoading}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                              tabIndex={-1}
+                            >
+                              <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            </button>
+                          </div>
+                          {signupData.password && (
+                            <div className="mt-2 space-y-1">
+                              {(() => {
+                                const validation = validatePassword(signupData.password)
+                                return validation.errors.map((error, index) => (
+                                  <div key={index} className="flex items-center text-xs text-red-600">
+                                    <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                    </svg>
+                                    {error}
+                                  </div>
+                                ))
+                              })()}
+                              {validatePassword(signupData.password).isValid && (
+                                <div className="flex items-center text-xs text-green-600">
+                                  <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                  </svg>
+                                  Mot de passe valide
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            {t.confirmPassword} <span className="text-red-500">{t.required}</span>
+                          </label>
+                          <div className="mt-1 relative">
+                            <input
+                              type={showConfirmPassword ? "text" : "password"}
+                              required
+                              value={signupData.confirmPassword}
+                              onChange={(e) => handleSignupChange('confirmPassword', e.target.value)}
+                              className="block w-full rounded-md border border-gray-300 px-3 py-2 pr-10 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                              placeholder="••••••••"
+                              disabled={isLoading}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                              tabIndex={-1}
+                            >
+                              <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            </button>
+                          </div>
+                          {signupData.confirmPassword && (
+                            <div className="mt-2">
+                              {signupData.password === signupData.confirmPassword ? (
+                                <div className="flex items-center text-xs text-green-600">
+                                  <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                  </svg>
+                                  Mots de passe identiques
+                                </div>
+                              ) : (
+                                <div className="flex items-center text-xs text-red-600">
+                                  <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                  </svg>
+                                  Les mots de passe ne correspondent pas
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </form>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-blue-800 leading-relaxed">
-                  <span className="font-medium">Déclaration de conformité :</span>{' '}
-                  {t.gdprNotice}{' '}
-                  <Link 
-                    href="/terms" 
-                    className="text-blue-700 hover:text-blue-900 underline font-medium transition-colors"
-                    target="_blank"
+
+              {/* Footer de la modale avec boutons */}
+              <div className="flex-shrink-0 bg-gray-50 border-t border-gray-200 px-6 py-4 rounded-b-lg">
+                <div className="flex space-x-3">
+                  <button
+                    type="button"
+                    onClick={toggleMode}
+                    className="flex-1 rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                   >
-                    {t.terms}
-                  </Link>{' '}
-                  et notre{' '}
-                  <Link 
-                    href="/privacy" 
-                    className="text-blue-700 hover:text-blue-900 underline font-medium transition-colors"
-                    target="_blank"
+                    {t.backToLogin}
+                  </button>
+                  <button
+                    onClick={handleSignup}
+                    disabled={isLoading}
+                    className="flex-1 rounded-md border border-transparent bg-green-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {t.privacy}
-                  </Link>
-                  .
-                </p>
+                    {isLoading ? t.creating : t.createAccount}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Section d'aide */}
-      <div className="mt-8 text-center">
-        <p className="text-xs text-gray-500">
-          {t.needHelp}{' '}
-          <button
-            type="button"
-            onClick={() => window.open('mailto:support@intelia.com', '_blank')}
-            className="text-blue-600 hover:underline font-medium"
-          >
-            {t.contactSupport}
-          </button>
-        </p>
-      </div>
-    </div>
-  )
+      )}
 }
 
-// 🔧 2. Export principal avec Suspense
+// Export principal avec Suspense
 export default function Page() {
-  console.log('📄 [Page] Composant Page principal appelé')
+  console.log('🎁 [Page] Composant Page principal appelé')
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
-        <div className="text-center">
-          <img 
-            src="/images/favicon.png" 
-            alt="Intelia Logo" 
-            className="w-16 h-16 mx-auto mb-4"
-          />
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement...</p>
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<LoadingSpinner />}>
       <PageContent />
     </Suspense>
   )
