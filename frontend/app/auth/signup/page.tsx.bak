@@ -626,7 +626,7 @@ function PageContent() {
       {/* 🔧 MODAL D'INSCRIPTION - VERSION SIMPLE SANS DOUBLE SCROLL */}
       {isSignupMode && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-50 p-4">
-		  <div className="w-full max-w-2xl mx-auto bg-white rounded-lg shadow-xl max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain">
+          <div className="h-full w-full max-w-2xl mx-auto bg-white rounded-lg shadow-xl overflow-y-auto">
               
               {/* Header de la modale avec bouton fermer */}
               <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-lg">
@@ -642,7 +642,7 @@ function PageContent() {
               </div>
 
               {/* Corps de la modale */}
-			  <div className="flex-1 px-6 py-4">
+              <div className="flex-1 overflow-y-auto px-6 py-4">
                 
                 {/* Messages d'erreur et succès pour signup */}
                 {localError && (
