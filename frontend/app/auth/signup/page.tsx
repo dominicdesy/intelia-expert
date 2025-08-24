@@ -482,7 +482,7 @@ function PageContent() {
   return (
     <>
       {/* PAGE PRINCIPALE (LOGIN) */}
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative">
+      <div className={`min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative ${isSignupMode ? 'overflow-hidden' : ''}`}>
         
         {/* ⭐ BOÎTE DE DEBUG GLOBALE - RETIRÉE EN PRODUCTION */}
         {process.env.NODE_ENV === 'development' && (
