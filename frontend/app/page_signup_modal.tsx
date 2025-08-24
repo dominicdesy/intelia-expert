@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { AlertMessage } from './page_components'
+import { AlertMessage } from './page_components.tsx'
 
 interface SignupModalProps {
   authLogic: any
