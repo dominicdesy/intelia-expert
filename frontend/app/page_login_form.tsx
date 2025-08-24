@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { AlertMessage, PasswordInput } from './page_components'
+import { AlertMessage, PasswordInput } from './page_components.tsx'
 
 interface LoginFormProps {
   authLogic: any
