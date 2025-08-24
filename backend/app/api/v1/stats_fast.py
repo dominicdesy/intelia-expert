@@ -1,10 +1,10 @@
 # app/api/v1/stats_fast.py
 # -*- coding: utf-8 -*-
 """
-🚀 ENDPOINTS ULTRA-RAPIDES - Version Complète Sécurisée AVEC INVITATIONS RÉELLES
-🛡️ SAFE: Imports conditionnels + Gestion d'erreurs robuste + Pas d'auto-init
-✅ FULL: Toutes les fonctionnalités mais sans risques mémoire
-📧 NEW: Statistiques d'invitations réelles implémentées
+🚀 ENDPOINTS ULTRA-RAPIDES - Version Optimisée Mémoire
+🛡️ SAFE: Imports conditionnels + Gestion d'erreurs robuste 
+⚡ OPTIMIZED: Suppression des parties problématiques de mémoire
+📧 WORKING: Invitations avec vraies données
 """
 
 import logging
@@ -35,7 +35,6 @@ except ImportError as e:
 
 # Import stats_cache AVEC protection mémoire
 try:
-    # 🛡️ PROTECTION: Vérifier qu'on n'est pas en mode auto-init
     import os
     if os.getenv("DISABLE_STATS_CACHE") != "true":
         from app.api.v1.stats_cache import get_stats_cache
@@ -53,7 +52,7 @@ logger = logging.getLogger(__name__)
 # ==================== UTILITAIRES SÉCURISÉS ====================
 
 def calculate_performance_gain(dashboard_snapshot: Dict[str, Any]) -> float:
-    """🚀 Calcul intelligent du gain de performance - VERSION SÉCURISÉE"""
+    """🚀 Calcul intelligent du gain de performance"""
     try:
         cache_hit_rate = 85.2
         avg_response_time = float(dashboard_snapshot.get("avg_response_time", 0.250))
@@ -78,7 +77,7 @@ def calculate_performance_gain(dashboard_snapshot: Dict[str, Any]) -> float:
         return 75.0
 
 def calculate_cache_age_minutes(generated_at: str = None) -> int:
-    """Calcule l'âge du cache en minutes - VERSION SÉCURISÉE"""
+    """Calcule l'âge du cache en minutes"""
     if not generated_at:
         return 0
     
@@ -109,7 +108,6 @@ def safe_get_cache():
 def safe_has_permission(user: Dict[str, Any], permission_name: str) -> bool:
     """🛡️ Vérification sécurisée des permissions"""
     if not PERMISSIONS_AVAILABLE:
-        # Fallback: permettre si super_admin
         return user.get("user_type") == "super_admin"
     
     try:
@@ -121,82 +119,14 @@ def safe_has_permission(user: Dict[str, Any], permission_name: str) -> bool:
         logger.warning(f"⚠️ Erreur vérification permission: {e}")
         return user.get("user_type") == "super_admin"
 
-def get_sample_invitation_stats() -> Dict[str, Any]:
-    """📧 Données d'exemple pour les invitations (quand la DB n'est pas disponible)"""
-    return {
-        "cache_info": {
-            "is_available": False,
-            "last_update": datetime.now().isoformat(),
-            "cache_age_minutes": 0,
-            "performance_gain": "0%",
-            "next_update": None,
-            "safe_mode": True,
-            "data_source": "sample_data",
-            "note": "Table invitations non disponible - données d'exemple"
-        },
-        "invitation_stats": {
-            "total_invitations_sent": 25,
-            "total_invitations_accepted": 18,
-            "acceptance_rate": 72.0,
-            "unique_inviters": 8,
-            "top_inviters": [
-                {
-                    "inviter_email": "dominic.desy@intelia.com",
-                    "inviter_name": "Dominic Desy",
-                    "invitations_sent": 8,
-                    "invitations_accepted": 6,
-                    "acceptance_rate": 75.0
-                },
-                {
-                    "inviter_email": "admin@intelia.com",
-                    "inviter_name": "Admin Intelia",
-                    "invitations_sent": 5,
-                    "invitations_accepted": 4,
-                    "acceptance_rate": 80.0
-                },
-                {
-                    "inviter_email": "user@example.com",
-                    "inviter_name": "Test User",
-                    "invitations_sent": 3,
-                    "invitations_accepted": 2,
-                    "acceptance_rate": 66.7
-                }
-            ],
-            "top_accepted": [
-                {
-                    "inviter_email": "dominic.desy@intelia.com",
-                    "inviter_name": "Dominic Desy",
-                    "invitations_sent": 8,
-                    "invitations_accepted": 6,
-                    "acceptance_rate": 75.0
-                },
-                {
-                    "inviter_email": "admin@intelia.com",
-                    "inviter_name": "Admin Intelia", 
-                    "invitations_sent": 5,
-                    "invitations_accepted": 4,
-                    "acceptance_rate": 80.0
-                },
-                {
-                    "inviter_email": "user@example.com",
-                    "inviter_name": "Test User",
-                    "invitations_sent": 3,
-                    "invitations_accepted": 2,
-                    "acceptance_rate": 66.7
-                }
-            ]
-        }
-    }
-
 # ==================== ENDPOINTS PRINCIPAUX ====================
 
 @router.get("/dashboard")
 async def get_dashboard_fast(
     current_user: dict = Depends(get_current_user) if AUTH_AVAILABLE else None
 ) -> Dict[str, Any]:
-    """🚀 DASHBOARD ULTRA-RAPIDE - Version sécurisée complète"""
+    """🚀 DASHBOARD ULTRA-RAPIDE"""
     
-    # Vérification permissions sécurisée
     if current_user and not safe_has_permission(current_user, "ADMIN_DASHBOARD"):
         raise HTTPException(
             status_code=403, 
@@ -208,7 +138,6 @@ async def get_dashboard_fast(
         dashboard_snapshot = None
         cache_available = False
         
-        # 🛡️ Récupération sécurisée du cache
         if cache:
             try:
                 dashboard_snapshot = cache.get_dashboard_snapshot()
@@ -216,7 +145,6 @@ async def get_dashboard_fast(
             except Exception as cache_error:
                 logger.warning(f"⚠️ Erreur récupération snapshot: {cache_error}")
             
-            # Fallback sur cache générique
             if not dashboard_snapshot:
                 try:
                     cached_data = cache.get_cache("dashboard:main")
@@ -226,7 +154,6 @@ async def get_dashboard_fast(
                 except Exception as fallback_error:
                     logger.warning(f"⚠️ Erreur cache fallback: {fallback_error}")
         
-        # Données par défaut sécurisées
         if not dashboard_snapshot:
             cache_available = False
             dashboard_snapshot = {
@@ -243,11 +170,9 @@ async def get_dashboard_fast(
                 "note": "Mode sécurisé - cache non disponible"
             }
         
-        # Calculs sécurisés
         performance_gain = calculate_performance_gain(dashboard_snapshot)
         cache_age_minutes = calculate_cache_age_minutes(dashboard_snapshot.get("generated_at"))
         
-        # Formatage sécurisé pour compatibilité frontend
         formatted_response = {
             "cache_info": {
                 "is_available": cache_available,
@@ -255,7 +180,6 @@ async def get_dashboard_fast(
                 "cache_age_minutes": cache_age_minutes,
                 "performance_gain": f"{performance_gain}%",
                 "next_update": (datetime.now() + timedelta(hours=1)).isoformat(),
-                "safe_mode": True,
                 "stats_cache_available": STATS_CACHE_AVAILABLE
             },
             
@@ -315,24 +239,22 @@ async def get_dashboard_fast(
                 "cached": cache_available,
                 "cache_age": dashboard_snapshot.get("generated_at", datetime.now().isoformat()),
                 "response_time_ms": "< 100ms",
-                "data_source": "statistics_cache_secure" if cache_available else "fallback_secure",
-                "safe_mode": True
+                "data_source": "statistics_cache_secure" if cache_available else "fallback_secure"
             }
         }
         
-        logger.info(f"📊 Dashboard fast response (secure): {current_user.get('email') if current_user else 'anonymous'}")
+        logger.info(f"📊 Dashboard fast response: {current_user.get('email') if current_user else 'anonymous'}")
         return formatted_response
         
     except Exception as e:
-        logger.error(f"❌ Erreur dashboard fast (secure): {e}")
-        # Fallback ultra-sécurisé
+        logger.error(f"❌ Erreur dashboard fast: {e}")
         return {
-            "cache_info": {"is_available": False, "safe_mode": True, "error": "Dashboard en mode sécurisé"},
+            "cache_info": {"is_available": False, "error": "Dashboard en mode sécurisé"},
             "systemStats": {"system_health": {"uptime_hours": 0, "total_requests": 0, "error_rate": 0.0}},
             "usageStats": {"unique_users": 0, "total_questions": 0, "questions_today": 0, "questions_this_month": 0, "source_distribution": {}},
             "billingStats": {"plans": {}, "total_revenue": 0.0, "top_users": []},
             "performanceStats": {"avg_response_time": 0.0, "median_response_time": 0.0, "openai_costs": 0.0, "cache_hit_rate": 0.0},
-            "meta": {"safe_mode": True, "fallback_activated": True}
+            "meta": {"fallback_activated": True}
         }
 
 @router.get("/performance")
@@ -340,7 +262,7 @@ async def get_performance_fast(
     hours: int = Query(24, ge=1, le=168),
     current_user: dict = Depends(get_current_user) if AUTH_AVAILABLE else None
 ) -> Dict[str, Any]:
-    """🚀 Performance serveur ultra-rapide - Version sécurisée"""
+    """🚀 Performance serveur ultra-rapide"""
     
     if current_user and not safe_has_permission(current_user, "VIEW_SERVER_PERFORMANCE"):
         raise HTTPException(status_code=403, detail="Server performance access required")
@@ -365,24 +287,22 @@ async def get_performance_fast(
                         "error_rate_percent": 0
                     },
                     "global_stats": {},
-                    "note": "Cache performance non disponible - mode sécurisé"
+                    "note": "Cache performance non disponible"
                 }
             }
         
         result = performance_data["data"]
         result["requested_by_role"] = current_user.get("user_type") if current_user else "anonymous"
-        result["safe_mode"] = True
         
-        logger.info(f"⚡ Performance fast response (secure): {current_user.get('email') if current_user else 'anonymous'}")
+        logger.info(f"⚡ Performance fast response: {current_user.get('email') if current_user else 'anonymous'}")
         return result
         
     except Exception as e:
-        logger.error(f"❌ Erreur performance fast (secure): {e}")
+        logger.error(f"❌ Erreur performance fast: {e}")
         return {
             "period_hours": hours,
             "current_status": {"overall_health": "error", "avg_response_time_ms": 0, "error_rate_percent": 0},
             "global_stats": {},
-            "safe_mode": True,
             "error": "Performance endpoint en mode sécurisé"
         }
 
@@ -390,7 +310,7 @@ async def get_performance_fast(
 async def get_openai_costs_fast(
     current_user: dict = Depends(get_current_user) if AUTH_AVAILABLE else None
 ) -> Dict[str, Any]:
-    """💰 Coûts OpenAI ultra-rapides - Version sécurisée"""
+    """💰 Coûts OpenAI ultra-rapides"""
     
     if current_user and not safe_has_permission(current_user, "VIEW_OPENAI_COSTS"):
         raise HTTPException(status_code=403, detail="View OpenAI costs permission required")
@@ -414,25 +334,23 @@ async def get_openai_costs_fast(
                     "total_tokens": 450000,
                     "api_calls": 250,
                     "models_usage": {},
-                    "note": "Cache coûts OpenAI non disponible - données par défaut"
+                    "note": "Cache coûts OpenAI non disponible"
                 }
             }
         
         result = costs_data["data"]
         result["user_role"] = current_user.get("user_type") if current_user else "anonymous"
-        result["safe_mode"] = True
         
-        logger.info(f"💰 OpenAI costs fast response (secure): {current_user.get('email') if current_user else 'anonymous'}")
+        logger.info(f"💰 OpenAI costs fast response: {current_user.get('email') if current_user else 'anonymous'}")
         return result
         
     except Exception as e:
-        logger.error(f"❌ Erreur OpenAI costs fast (secure): {e}")
+        logger.error(f"❌ Erreur OpenAI costs fast: {e}")
         return {
             "total_cost": 0.0,
             "total_tokens": 0,
             "api_calls": 0,
             "models_usage": {},
-            "safe_mode": True,
             "error": "OpenAI costs endpoint en mode sécurisé"
         }
 
@@ -447,7 +365,7 @@ async def get_questions_fast(
     user: str = Query("all", description="Filtrer par utilisateur"),
     current_user: dict = Depends(get_current_user) if AUTH_AVAILABLE else None
 ) -> Dict[str, Any]:
-    """📋 Questions ultra-rapides - Version sécurisée avec fallback"""
+    """📋 Questions ultra-rapides"""
     
     if current_user and not safe_has_permission(current_user, "VIEW_ALL_ANALYTICS"):
         raise HTTPException(status_code=403, detail="View all analytics permission required")
@@ -456,7 +374,6 @@ async def get_questions_fast(
         cache = safe_get_cache()
         cached_questions = None
         
-        # Tentative cache sécurisée
         if cache:
             try:
                 filters = {
@@ -479,16 +396,13 @@ async def get_questions_fast(
                 "last_update": datetime.now().isoformat(),
                 "cache_age_minutes": 0,
                 "performance_gain": "90%",
-                "next_update": None,
-                "safe_mode": True
+                "next_update": None
             }
             
-            logger.info(f"📋 Questions cache HIT (secure): page {page}")
+            logger.info(f"📋 Questions cache HIT: page {page}")
             return result
         
-        # Fallback sécurisé vers logging endpoint
-        logger.info(f"📋 Questions cache MISS (secure) - tentative fallback")
-        
+        # Fallback sécurisé
         try:
             if LOGGING_AVAILABLE:
                 from app.api.v1.logging import questions_final
@@ -506,8 +420,7 @@ async def get_questions_fast(
                         "cache_age_minutes": 0,
                         "performance_gain": "50%",
                         "next_update": None,
-                        "fallback_used": True,
-                        "safe_mode": True
+                        "fallback_used": True
                     },
                     "questions": old_response.get("questions", []),
                     "pagination": old_response.get("pagination", {
@@ -524,18 +437,16 @@ async def get_questions_fast(
                         "timestamp": datetime.now().isoformat(),
                         "cache_hit": False,
                         "source": "secure_fallback_to_logging",
-                        "fallback_successful": True,
-                        "safe_mode": True
+                        "fallback_successful": True
                     }
                 }
                 
-                logger.info(f"📋 Questions fallback SUCCESS (secure): {len(old_response.get('questions', []))} résultats")
+                logger.info(f"📋 Questions fallback SUCCESS: {len(old_response.get('questions', []))} résultats")
                 return fallback_response
                 
         except Exception as fallback_error:
-            logger.warning(f"⚠️ Fallback logging endpoint échoué (secure): {fallback_error}")
+            logger.warning(f"⚠️ Fallback logging endpoint échoué: {fallback_error}")
         
-        # Fallback ultime sécurisé
         fallback_response = {
             "cache_info": {
                 "is_available": False,
@@ -543,8 +454,7 @@ async def get_questions_fast(
                 "cache_age_minutes": 0,
                 "performance_gain": "0%",
                 "next_update": None,
-                "safe_mode": True,
-                "error": "Mode sécurisé - cache et fallbacks indisponibles"
+                "error": "Cache et fallbacks indisponibles"
             },
             "questions": [],
             "pagination": {
@@ -560,45 +470,44 @@ async def get_questions_fast(
                 "user_role": current_user.get("user_type") if current_user else "anonymous",
                 "timestamp": datetime.now().isoformat(),
                 "cache_hit": False,
-                "safe_mode": True,
                 "note": "Questions endpoint en mode sécurisé"
             }
         }
         
-        logger.info(f"📋 Questions fallback ultime (secure): page {page}")
+        logger.info(f"📋 Questions fallback ultime: page {page}")
         return fallback_response
         
     except Exception as e:
-        logger.error(f"❌ Erreur questions fast (secure): {e}")
+        logger.error(f"❌ Erreur questions fast: {e}")
         return {
-            "cache_info": {"is_available": False, "safe_mode": True},
+            "cache_info": {"is_available": False},
             "questions": [],
             "pagination": {"page": page, "limit": limit, "total": 0, "pages": 0},
-            "meta": {"safe_mode": True, "error": "Questions endpoint en mode sécurisé"}
+            "meta": {"error": "Questions endpoint en mode sécurisé"}
         }
 
 @router.get("/invitations")
 async def get_invitations_fast(
     current_user: dict = Depends(get_current_user) if AUTH_AVAILABLE else None
 ) -> Dict[str, Any]:
-    """📧 Invitations - Version sécurisée avec redirect vers stats"""
-    logger.info(f"📧 Invitations endpoint appelé (secure): {current_user.get('email') if current_user else 'anonymous'}")
+    """📧 Invitations - Redirect vers stats"""
+    logger.info(f"📧 Invitations endpoint appelé: {current_user.get('email') if current_user else 'anonymous'}")
     return await get_invitations_stats_fast(current_user)
 
 @router.get("/invitations/stats")
 async def get_invitations_stats_fast(
     current_user: dict = Depends(get_current_user) if AUTH_AVAILABLE else None
 ) -> Dict[str, Any]:
-    """📧 Statistiques invitations - IMPLÉMENTATION RÉELLE"""
+    """📧 Statistiques invitations - VRAIES DONNÉES"""
     
     if current_user and not safe_has_permission(current_user, "VIEW_ALL_ANALYTICS"):
-        logger.warning(f"📧 Permission refusée (secure): {current_user.get('email')}")
+        logger.warning(f"📧 Permission refusée: {current_user.get('email')}")
         raise HTTPException(status_code=403, detail="View analytics permission required")
     
-    logger.info(f"📧 Invitations stats (secure): {current_user.get('email') if current_user else 'anonymous'}")
+    logger.info(f"📧 Invitations stats: {current_user.get('email') if current_user else 'anonymous'}")
     
     try:
-        # Essayer de récupérer depuis le cache d'abord
+        # Essayer le cache d'abord
         cache = safe_get_cache()
         if cache:
             try:
@@ -609,152 +518,151 @@ async def get_invitations_stats_fast(
             except Exception as cache_error:
                 logger.warning(f"⚠️ Erreur cache invitations: {cache_error}")
         
-        # Calculer les statistiques réelles
-        import psycopg2
-        from psycopg2.extras import RealDictCursor
+        # Import conditionnel pour éviter surcharge mémoire
+        try:
+            import psycopg2
+            from psycopg2.extras import RealDictCursor
+        except ImportError:
+            logger.error("❌ psycopg2 non disponible")
+            raise HTTPException(status_code=500, detail="Database driver not available")
         
         dsn = os.getenv("DATABASE_URL")
         if not dsn:
-            logger.warning("⚠️ Pas de DATABASE_URL - utilisation données de test")
-            return get_sample_invitation_stats()
+            logger.error("❌ DATABASE_URL manquante")
+            raise HTTPException(status_code=500, detail="Database not configured")
         
-        try:
-            with psycopg2.connect(dsn) as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    
-                    # Vérifier si la table invitations existe
-                    cur.execute("""
-                        SELECT EXISTS (
-                            SELECT FROM information_schema.tables 
-                            WHERE table_name = 'invitations'
-                        )
-                    """)
-                    
-                    table_exists = cur.fetchone()['exists']
-                    
-                    if not table_exists:
-                        logger.warning("⚠️ Table invitations n'existe pas - création données de test")
-                        return get_sample_invitation_stats()
-                    
-                    # Récupérer les statistiques globales
-                    cur.execute("""
-                        SELECT 
-                            COUNT(*) as total_sent,
-                            COUNT(*) FILTER (WHERE status = 'accepted') as total_accepted,
-                            COUNT(DISTINCT inviter_email) as unique_inviters
-                        FROM invitations
-                    """)
-                    
-                    totals = dict(cur.fetchone() or {})
-                    total_sent = totals.get('total_sent', 0)
-                    total_accepted = totals.get('total_accepted', 0)
-                    unique_inviters = totals.get('unique_inviters', 0)
-                    
-                    acceptance_rate = (total_accepted / total_sent * 100) if total_sent > 0 else 0
-                    
-                    # Top inviters par nombre d'invitations envoyées
-                    cur.execute("""
-                        SELECT 
-                            inviter_email,
-                            inviter_name,
-                            COUNT(*) as invitations_sent,
-                            COUNT(*) FILTER (WHERE status = 'accepted') as invitations_accepted,
-                            CASE 
-                                WHEN COUNT(*) > 0 THEN 
-                                    (COUNT(*) FILTER (WHERE status = 'accepted')::float / COUNT(*) * 100)
-                                ELSE 0 
-                            END as acceptance_rate
-                        FROM invitations
-                        GROUP BY inviter_email, inviter_name
-                        ORDER BY invitations_sent DESC
-                        LIMIT 10
-                    """)
-                    
-                    top_inviters = []
-                    for row in cur.fetchall():
-                        top_inviters.append({
-                            "inviter_email": row['inviter_email'] or '',
-                            "inviter_name": row['inviter_name'] or row['inviter_email'] or 'Unknown',
-                            "invitations_sent": int(row['invitations_sent']),
-                            "invitations_accepted": int(row['invitations_accepted']),
-                            "acceptance_rate": float(row['acceptance_rate'])
-                        })
-                    
-                    # Top inviters par nombre d'invitations acceptées
-                    cur.execute("""
-                        SELECT 
-                            inviter_email,
-                            inviter_name,
-                            COUNT(*) as invitations_sent,
-                            COUNT(*) FILTER (WHERE status = 'accepted') as invitations_accepted,
-                            CASE 
-                                WHEN COUNT(*) > 0 THEN 
-                                    (COUNT(*) FILTER (WHERE status = 'accepted')::float / COUNT(*) * 100)
-                                ELSE 0 
-                            END as acceptance_rate
-                        FROM invitations
-                        GROUP BY inviter_email, inviter_name
-                        HAVING COUNT(*) FILTER (WHERE status = 'accepted') > 0
-                        ORDER BY invitations_accepted DESC
-                        LIMIT 10
-                    """)
-                    
-                    top_accepted = []
-                    for row in cur.fetchall():
-                        top_accepted.append({
-                            "inviter_email": row['inviter_email'] or '',
-                            "inviter_name": row['inviter_name'] or row['inviter_email'] or 'Unknown',
-                            "invitations_sent": int(row['invitations_sent']),
-                            "invitations_accepted": int(row['invitations_accepted']),
-                            "acceptance_rate": float(row['acceptance_rate'])
-                        })
-                    
-                    # Construire la réponse finale
-                    result = {
-                        "cache_info": {
-                            "is_available": True,
-                            "last_update": datetime.now().isoformat(),
-                            "cache_age_minutes": 0,
-                            "performance_gain": "95%",
-                            "next_update": (datetime.now() + timedelta(hours=2)).isoformat(),
-                            "safe_mode": True,
-                            "data_source": "database_direct"
-                        },
-                        "invitation_stats": {
-                            "total_invitations_sent": total_sent,
-                            "total_invitations_accepted": total_accepted,
-                            "acceptance_rate": round(acceptance_rate, 1),
-                            "unique_inviters": unique_inviters,
-                            "top_inviters": top_inviters,
-                            "top_accepted": top_accepted
-                        }
+        with psycopg2.connect(dsn) as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                
+                # Vérifier si la table invitations existe
+                cur.execute("""
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_name = 'invitations'
+                    )
+                """)
+                
+                table_exists = cur.fetchone()['exists']
+                
+                if not table_exists:
+                    logger.error("❌ Table invitations n'existe pas")
+                    raise HTTPException(status_code=500, detail="Invitations table does not exist")
+                
+                # Récupérer les statistiques globales
+                cur.execute("""
+                    SELECT 
+                        COUNT(*) as total_sent,
+                        COUNT(*) FILTER (WHERE status = 'accepted') as total_accepted,
+                        COUNT(DISTINCT inviter_email) as unique_inviters
+                    FROM invitations
+                """)
+                
+                totals = dict(cur.fetchone() or {})
+                total_sent = totals.get('total_sent', 0)
+                total_accepted = totals.get('total_accepted', 0)
+                unique_inviters = totals.get('unique_inviters', 0)
+                
+                acceptance_rate = (total_accepted / total_sent * 100) if total_sent > 0 else 0
+                
+                # Top inviters par nombre d'invitations envoyées
+                cur.execute("""
+                    SELECT 
+                        inviter_email,
+                        inviter_name,
+                        COUNT(*) as invitations_sent,
+                        COUNT(*) FILTER (WHERE status = 'accepted') as invitations_accepted,
+                        CASE 
+                            WHEN COUNT(*) > 0 THEN 
+                                (COUNT(*) FILTER (WHERE status = 'accepted')::float / COUNT(*) * 100)
+                            ELSE 0 
+                        END as acceptance_rate
+                    FROM invitations
+                    GROUP BY inviter_email, inviter_name
+                    ORDER BY invitations_sent DESC
+                    LIMIT 10
+                """)
+                
+                top_inviters = []
+                for row in cur.fetchall():
+                    top_inviters.append({
+                        "inviter_email": row['inviter_email'] or '',
+                        "inviter_name": row['inviter_name'] or row['inviter_email'] or 'Unknown',
+                        "invitations_sent": int(row['invitations_sent']),
+                        "invitations_accepted": int(row['invitations_accepted']),
+                        "acceptance_rate": float(row['acceptance_rate'])
+                    })
+                
+                # Top inviters par nombre d'invitations acceptées
+                cur.execute("""
+                    SELECT 
+                        inviter_email,
+                        inviter_name,
+                        COUNT(*) as invitations_sent,
+                        COUNT(*) FILTER (WHERE status = 'accepted') as invitations_accepted,
+                        CASE 
+                            WHEN COUNT(*) > 0 THEN 
+                                (COUNT(*) FILTER (WHERE status = 'accepted')::float / COUNT(*) * 100)
+                            ELSE 0 
+                        END as acceptance_rate
+                    FROM invitations
+                    GROUP BY inviter_email, inviter_name
+                    HAVING COUNT(*) FILTER (WHERE status = 'accepted') > 0
+                    ORDER BY invitations_accepted DESC
+                    LIMIT 10
+                """)
+                
+                top_accepted = []
+                for row in cur.fetchall():
+                    top_accepted.append({
+                        "inviter_email": row['inviter_email'] or '',
+                        "inviter_name": row['inviter_name'] or row['inviter_email'] or 'Unknown',
+                        "invitations_sent": int(row['invitations_sent']),
+                        "invitations_accepted": int(row['invitations_accepted']),
+                        "acceptance_rate": float(row['acceptance_rate'])
+                    })
+                
+                result = {
+                    "cache_info": {
+                        "is_available": True,
+                        "last_update": datetime.now().isoformat(),
+                        "cache_age_minutes": 0,
+                        "performance_gain": "95%",
+                        "next_update": (datetime.now() + timedelta(hours=2)).isoformat(),
+                        "data_source": "database_direct"
+                    },
+                    "invitation_stats": {
+                        "total_invitations_sent": total_sent,
+                        "total_invitations_accepted": total_accepted,
+                        "acceptance_rate": round(acceptance_rate, 1),
+                        "unique_inviters": unique_inviters,
+                        "top_inviters": top_inviters,
+                        "top_accepted": top_accepted
                     }
-                    
-                    # Sauvegarder dans le cache si disponible
-                    if cache:
-                        try:
-                            cache.set_cache("invitations:real_stats", result, ttl_hours=2, source="invitations_stats_real")
-                            logger.info("✅ Statistiques invitations sauvées dans le cache")
-                        except Exception as cache_save_error:
-                            logger.warning(f"⚠️ Erreur sauvegarde cache: {cache_save_error}")
-                    
-                    logger.info(f"✅ Statistiques invitations calculées: {total_sent} sent, {total_accepted} accepted")
-                    return result
-                    
-        except psycopg2.Error as db_error:
-            logger.error(f"❌ Erreur base de données: {db_error}")
-            return get_sample_invitation_stats()
-            
+                }
+                
+                # Sauvegarder dans le cache
+                if cache:
+                    try:
+                        cache.set_cache("invitations:real_stats", result, ttl_hours=2, source="invitations_stats_real")
+                        logger.info("✅ Statistiques invitations sauvées dans le cache")
+                    except Exception as cache_save_error:
+                        logger.warning(f"⚠️ Erreur sauvegarde cache: {cache_save_error}")
+                
+                logger.info(f"✅ Statistiques invitations calculées: {total_sent} sent, {total_accepted} accepted")
+                return result
+                
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Erreur générale invitations stats: {e}")
-        return get_sample_invitation_stats()
+        raise HTTPException(status_code=500, detail="Internal server error retrieving invitation stats")
 
 @router.get("/my-analytics")
 async def get_my_analytics_fast(
     days: int = Query(30, ge=1, le=365),
     current_user: dict = Depends(get_current_user) if AUTH_AVAILABLE else None
 ) -> Dict[str, Any]:
-    """📈 Analytics personnelles - Version sécurisée"""
+    """📈 Analytics personnelles"""
     
     if current_user and not safe_has_permission(current_user, "VIEW_OWN_ANALYTICS"):
         raise HTTPException(status_code=403, detail="View own analytics permission required")
@@ -793,55 +701,50 @@ async def get_my_analytics_fast(
                         "avg_cost_per_call": 0
                     },
                     "cost_by_purpose": [],
-                    "note": "Mode sécurisé - cache utilisateur non disponible"
+                    "note": "Cache utilisateur non disponible"
                 }
             }
         
         result = user_analytics["data"]
         result["user_role"] = current_user.get("user_type") if current_user else "anonymous"
-        result["safe_mode"] = True
         
-        logger.info(f"📈 User analytics fast response (secure): {user_email}")
+        logger.info(f"📈 User analytics fast response: {user_email}")
         return result
         
     except Exception as e:
-        logger.error(f"❌ Erreur user analytics fast (secure): {e}")
+        logger.error(f"❌ Erreur user analytics fast: {e}")
         return {
             "user_email": current_user.get("email") if current_user else "anonymous",
             "period_days": days,
-            "safe_mode": True,
             "error": "User analytics en mode sécurisé"
         }
 
-# ==================== ENDPOINTS DE MONITORING SÉCURISÉS ====================
+# ==================== ENDPOINTS DE MONITORING ====================
 
 @router.get("/health")
 async def cache_health() -> Dict[str, Any]:
-    """🏥 Health check sécurisé"""
+    """🏥 Health check"""
     try:
         cache = safe_get_cache()
         
         health_status = {
-            "status": "healthy_secure",
+            "status": "healthy",
             "cache_available": cache is not None,
             "stats_cache_available": STATS_CACHE_AVAILABLE,
             "auth_available": AUTH_AVAILABLE,
             "permissions_available": PERMISSIONS_AVAILABLE,
-            "safe_mode": True,
             "timestamp": datetime.now().isoformat()
         }
         
         if cache:
             try:
-                # Test simple sans création automatique
-                test_key = "health:test:secure"
-                test_data = {"timestamp": datetime.now().isoformat(), "safe": True}
+                test_key = "health:test"
+                test_data = {"timestamp": datetime.now().isoformat()}
                 
-                write_success = cache.set_cache(test_key, test_data, ttl_hours=1, source="health_check_secure")
+                write_success = cache.set_cache(test_key, test_data, ttl_hours=1, source="health_check")
                 read_result = cache.get_cache(test_key)
                 read_success = read_result is not None
                 
-                # Nettoyer
                 cache.invalidate_cache(key=test_key)
                 
                 health_status.update({
@@ -855,32 +758,29 @@ async def cache_health() -> Dict[str, Any]:
                 logger.warning(f"⚠️ Test cache health échoué: {test_error}")
                 health_status["cache_test_error"] = str(test_error)
         
-        logger.info("🏥 Cache health check completed (secure)")
+        logger.info("🏥 Cache health check completed")
         return health_status
         
     except Exception as e:
-        logger.error(f"❌ Erreur cache health (secure): {e}")
+        logger.error(f"❌ Erreur cache health: {e}")
         return {
-            "status": "error_secure",
+            "status": "error",
             "error": str(e),
-            "safe_mode": True,
             "timestamp": datetime.now().isoformat()
         }
 
 @router.get("/system-info")
 async def get_system_info() -> Dict[str, Any]:
-    """ℹ️ Informations système sécurisées"""
+    """ℹ️ Informations système"""
     return {
-        "status": "secure_mode_active",
+        "status": "active",
         "components": {
             "stats_cache": STATS_CACHE_AVAILABLE,
             "auth": AUTH_AVAILABLE,
             "permissions": PERMISSIONS_AVAILABLE,
             "logging": LOGGING_AVAILABLE
         },
-        "safe_mode": True,
-        "version": "secure_full_featured",
-        "memory_safe": True,
+        "version": "optimized_memory",
         "timestamp": datetime.now().isoformat()
     }
 
@@ -890,7 +790,7 @@ async def get_system_info() -> Dict[str, Any]:
 async def compatibility_logging_dashboard(
     current_user: dict = Depends(get_current_user) if AUTH_AVAILABLE else None
 ) -> Dict[str, Any]:
-    """📄 Compatibilité sécurisée avec /logging/analytics/dashboard"""
+    """📄 Compatibilité avec /logging/analytics/dashboard"""
     return await get_dashboard_fast(current_user)
 
 @router.get("/compatibility/logging-performance")
@@ -898,13 +798,13 @@ async def compatibility_logging_performance(
     hours: int = Query(24, ge=1, le=168),
     current_user: dict = Depends(get_current_user) if AUTH_AVAILABLE else None
 ) -> Dict[str, Any]:
-    """📄 Compatibilité sécurisée avec /logging/analytics/performance"""
+    """📄 Compatibilité avec /logging/analytics/performance"""
     return await get_performance_fast(hours, current_user)
 
 # ==================== UTILITAIRES ====================
 
 def format_timestamp(timestamp: Optional[str]) -> str:
-    """Formate un timestamp pour l'affichage - Version sécurisée"""
+    """Formate un timestamp pour l'affichage"""
     if not timestamp:
         return "N/A"
     
@@ -914,192 +814,3 @@ def format_timestamp(timestamp: Optional[str]) -> str:
     except Exception as e:
         logger.warning(f"Erreur format timestamp: {e}")
         return str(timestamp)
-        
-
-# Ajouter cet endpoint à votre stats_fast.py
-
-@router.post("/admin/ensure-invitations-table")
-async def ensure_invitations_table(
-    current_user: dict = Depends(get_current_user) if AUTH_AVAILABLE else None
-) -> Dict[str, Any]:
-    """🛠️ S'assurer que la table invitations existe (sécurisé - une seule fois)"""
-    
-    if not current_user or current_user.get("user_type") != "super_admin":
-        raise HTTPException(status_code=403, detail="Super admin required")
-    
-    logger.info(f"🛠️ Vérification table invitations par: {current_user.get('email')}")
-    
-    try:
-        import psycopg2
-        from psycopg2.extras import RealDictCursor
-        dsn = os.getenv("DATABASE_URL")
-        
-        if not dsn:
-            return {"status": "error", "message": "DATABASE_URL manquante"}
-        
-        with psycopg2.connect(dsn) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                
-                # 🔍 ÉTAPE 1: Vérifier si la table existe déjà
-                cur.execute("""
-                    SELECT EXISTS (
-                        SELECT FROM information_schema.tables 
-                        WHERE table_name = 'invitations'
-                    )
-                """)
-                
-                table_exists = cur.fetchone()['exists']
-                
-                if table_exists:
-                    # Table existe déjà - récupérer les stats
-                    cur.execute("SELECT COUNT(*) as count FROM invitations")
-                    count = cur.fetchone()['count']
-                    
-                    logger.info(f"✅ Table invitations existe déjà avec {count} entrées")
-                    return {
-                        "status": "already_exists",
-                        "message": "Table invitations existe déjà",
-                        "current_count": count,
-                        "action_taken": "none"
-                    }
-                
-                # 🔨 ÉTAPE 2: Créer la table si elle n'existe pas
-                logger.info("🔨 Création de la table invitations...")
-                
-                cur.execute("""
-                    CREATE TABLE invitations (
-                        id SERIAL PRIMARY KEY,
-                        inviter_email VARCHAR(255) NOT NULL,
-                        inviter_name VARCHAR(255),
-                        invited_email VARCHAR(255) NOT NULL,
-                        status VARCHAR(50) DEFAULT 'sent' CHECK (status IN ('sent', 'accepted', 'declined', 'expired')),
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        accepted_at TIMESTAMP,
-                        declined_at TIMESTAMP,
-                        expired_at TIMESTAMP,
-                        message TEXT,
-                        invitation_token VARCHAR(255) UNIQUE,
-                        
-                        -- Contraintes
-                        CONSTRAINT valid_email_inviter CHECK (inviter_email ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
-                        CONSTRAINT valid_email_invited CHECK (invited_email ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
-                    );
-                """)
-                
-                # 🏗️ ÉTAPE 3: Créer les index pour les performances
-                cur.execute("CREATE INDEX idx_invitations_inviter ON invitations(inviter_email);")
-                cur.execute("CREATE INDEX idx_invitations_status ON invitations(status);")
-                cur.execute("CREATE INDEX idx_invitations_created ON invitations(created_at);")
-                cur.execute("CREATE INDEX idx_invitations_token ON invitations(invitation_token);")
-                
-                # 🎯 ÉTAPE 4: Ajouter quelques données de démonstration (optionnel)
-                cur.execute("""
-                    INSERT INTO invitations (
-                        inviter_email, inviter_name, invited_email, status, created_at
-                    ) VALUES 
-                        (%s, %s, 'demo1@example.com', 'sent', NOW() - INTERVAL '2 days'),
-                        (%s, %s, 'demo2@example.com', 'accepted', NOW() - INTERVAL '1 day'),
-                        (%s, %s, 'demo3@example.com', 'accepted', NOW() - INTERVAL '3 hours')
-                """, (
-                    current_user.get('email'), current_user.get('email', 'Admin'),
-                    current_user.get('email'), current_user.get('email', 'Admin'), 
-                    current_user.get('email'), current_user.get('email', 'Admin')
-                ))
-                
-                conn.commit()
-                
-                # 🔍 ÉTAPE 5: Vérifier la création
-                cur.execute("SELECT COUNT(*) as count FROM invitations")
-                final_count = cur.fetchone()['count']
-                
-                logger.info(f"✅ Table invitations créée avec succès - {final_count} entrées")
-                
-                return {
-                    "status": "created",
-                    "message": "Table invitations créée avec succès",
-                    "current_count": final_count,
-                    "action_taken": "table_created_with_demo_data",
-                    "demo_data_added": True
-                }
-                
-    except psycopg2.Error as db_error:
-        logger.error(f"❌ Erreur PostgreSQL: {db_error}")
-        return {
-            "status": "error",
-            "message": f"Erreur base de données: {str(db_error)}",
-            "error_type": "database_error"
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur générale création table: {e}")
-        return {
-            "status": "error",
-            "message": f"Erreur générale: {str(e)}",
-            "error_type": "general_error"
-        }
-
-@router.get("/admin/invitations-table-status")
-async def get_invitations_table_status(
-    current_user: dict = Depends(get_current_user) if AUTH_AVAILABLE else None
-) -> Dict[str, Any]:
-    """📊 Vérifier le statut de la table invitations"""
-    
-    if not current_user or current_user.get("user_type") != "super_admin":
-        raise HTTPException(status_code=403, detail="Super admin required")
-    
-    try:
-        import psycopg2
-        from psycopg2.extras import RealDictCursor
-        dsn = os.getenv("DATABASE_URL")
-        
-        with psycopg2.connect(dsn) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                
-                # Vérifier existence
-                cur.execute("""
-                    SELECT EXISTS (
-                        SELECT FROM information_schema.tables 
-                        WHERE table_name = 'invitations'
-                    )
-                """)
-                
-                table_exists = cur.fetchone()['exists']
-                
-                if not table_exists:
-                    return {
-                        "status": "not_exists",
-                        "message": "Table invitations n'existe pas",
-                        "table_exists": False,
-                        "current_count": 0
-                    }
-                
-                # Récupérer les statistiques
-                cur.execute("""
-                    SELECT 
-                        COUNT(*) as total,
-                        COUNT(*) FILTER (WHERE status = 'sent') as sent,
-                        COUNT(*) FILTER (WHERE status = 'accepted') as accepted,
-                        COUNT(*) FILTER (WHERE status = 'declined') as declined
-                    FROM invitations
-                """)
-                
-                stats = dict(cur.fetchone())
-                
-                return {
-                    "status": "exists",
-                    "message": "Table invitations existe",
-                    "table_exists": True,
-                    "current_count": stats['total'],
-                    "breakdown": {
-                        "sent": stats['sent'],
-                        "accepted": stats['accepted'], 
-                        "declined": stats['declined']
-                    }
-                }
-                
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e),
-            "table_exists": None
-        }
