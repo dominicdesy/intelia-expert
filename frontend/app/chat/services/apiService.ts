@@ -21,7 +21,7 @@ const API_BASE_URL = getApiConfig()
 // ✅ Fonction auth Supabase native MISE À JOUR avec singleton
 const getAuthToken = async (): Promise<string | null> => {
   try {
-    console.log('[apiService] Recuperation token Supabase natif (singleton)...')
+    console.log('[apiService] Initializing authentication...')
     
     // 🎯 CHANGEMENT: Utiliser getSupabaseClient() au lieu de supabase direct
     const supabase = getSupabaseClient()
@@ -29,7 +29,7 @@ const getAuthToken = async (): Promise<string | null> => {
     const token = session?.access_token
     
     if (token && token !== 'null' && token !== 'undefined') {
-      console.log('[apiService] Token Supabase natif recupere (singleton)')
+      console.log('[apiService] Authentication initialized')
       return token
     }
 
@@ -50,7 +50,7 @@ const getAuthHeaders = async (): Promise<Record<string, string>> => {
   const authToken = await getAuthToken()
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`
-    console.log('[apiService] Token Supabase natif ajoute aux headers (singleton)')
+    console.log('[apiService] Authentication initialized')
   } else {
     console.warn('[apiService] Requete sans authentification - pas de token Supabase (singleton)')
   }
