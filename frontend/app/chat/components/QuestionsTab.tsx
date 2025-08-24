@@ -274,7 +274,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
 • ${uniqueUsers} utilisateurs uniques
 • ${maxQuestions} questions max par conversation
 
-📁 Fichier: ${fileName}
+📄 Fichier: ${fileName}
 
 📋 Format: Une ligne par conversation
 • Colonnes fixes: Session, Utilisateur, Dates...
@@ -339,7 +339,6 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Chargement des questions...</p>
-          <p className="text-sm text-gray-400 mt-2">⚡ Mode cache ultra-rapide</p>
         </div>
       </div>
     )
@@ -347,7 +346,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Header avec indicateur de cache */}
+      {/* Header simple */}
       <div className="bg-white border-b border-gray-200">
         <div className="flex items-center space-x-8 px-4 py-3">
           <div className="flex items-center space-x-2">
@@ -357,37 +356,13 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
             <h2 className="text-lg font-medium text-gray-900">Questions & Réponses</h2>
           </div>
           
-          {/* Indicateur de cache */}
-          {cacheStatus && cacheStatus.is_available && (
-            <div className="flex items-center space-x-2 text-green-600">
-              <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></div>
-              <span className="text-sm font-medium">Données en cache</span>
-              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                {cacheStatus.performance_gain}
-              </span>
-            </div>
-          )}
-          
           {isLoading && (
             <div className="flex items-center text-blue-600 ml-auto">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-              <span className="text-sm">⚡ Chargement ultra-rapide...</span>
+              <span className="text-sm">Chargement...</span>
             </div>
           )}
         </div>
-        
-        {/* Barre d'information cache détaillée */}
-        {cacheStatus && cacheStatus.is_available && (
-          <div className="bg-blue-50 border-t border-blue-200 px-4 py-2">
-            <div className="flex items-center justify-between text-xs">
-              <div className="flex items-center space-x-4 text-blue-700">
-                <span>📅 Cache mis à jour: {cacheStatus.last_update ? new Date(cacheStatus.last_update).toLocaleString('fr-FR') : 'N/A'}</span>
-                <span>⏱️ Âge: {cacheStatus.cache_age_minutes} minutes</span>
-              </div>
-              <div className="text-blue-600 font-medium">🚀 Performance optimisée</div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Filtres */}
@@ -498,16 +473,6 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
               {filteredQuestions.length !== questionLogs.length && (
                 <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800">
                   Filtré
-                </span>
-              )}
-              {/* Indicateur source des données */}
-              {cacheStatus && (
-                <span className={`inline-flex items-center px-2 py-1 text-xs font-medium ${
-                  cacheStatus.is_available 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-red-100 text-red-800'
-                }`}>
-                  {cacheStatus.is_available ? '⚡ Cache' : '❌ Cache indisponible'}
                 </span>
               )}
             </div>
@@ -688,9 +653,6 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                 <div className="text-xs text-gray-500 mb-4">
                   <p>• Choix automatique: Filtrées ({filteredQuestions.length}) ou toutes ({totalQuestions})</p>
                   <p>• Colonnes: Q1, R1, Source1, Q2, R2, Source2...</p>
-                  {cacheStatus?.is_available && (
-                    <p>• ⚡ Données optimisées par cache</p>
-                  )}
                 </div>
               </div>
               <button
@@ -710,9 +672,6 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                 <div className="text-xs text-gray-500 mb-4">
                   <p>• Feedback positifs et négatifs</p>
                   <p>• Commentaires avec contexte question</p>
-                  {cacheStatus?.is_available && (
-                    <p>• ⚡ Performance {cacheStatus.performance_gain}</p>
-                  )}
                 </div>
               </div>
               <button
@@ -757,9 +716,6 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                 <div className="text-xs text-gray-500 mb-4">
                   <p>• {filteredQuestions.length} questions sélectionnées</p>
                   <p>• Données complètes avec réponses</p>
-                  {cacheStatus?.is_available && (
-                    <p>• ⚡ Cache {cacheStatus.cache_age_minutes}min</p>
-                  )}
                 </div>
               </div>
               <button
@@ -803,9 +759,6 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                 <div className="text-xs text-gray-500 mb-4">
                   <p>• Métriques de satisfaction et performance</p>
                   <p>• Format JSON pour analyse avancée</p>
-                  {cacheStatus?.is_available && (
-                    <p>• 🚀 Métadonnées de cache incluses</p>
-                  )}
                 </div>
               </div>
               <button
@@ -818,12 +771,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                     unique_users: uniqueUsers.length,
                     feedback_stats: feedbackStats,
                     source_distribution: sourceStats,
-                    filters_applied: questionFilters,
-                    cache_info: cacheStatus ? {
-                      data_from_cache: cacheStatus.is_available,
-                      cache_age_minutes: cacheStatus.cache_age_minutes,
-                      performance_gain: cacheStatus.performance_gain
-                    } : null
+                    filters_applied: questionFilters
                   }
                   
                   const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(statsData, null, 2))
@@ -847,19 +795,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
       <div className="bg-white border border-gray-200">
         <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
           <h3 className="text-base font-medium text-gray-900">Questions et Réponses</h3>
-          <div className="flex items-center space-x-3">
-            <span className="text-sm text-gray-500">{filteredQuestions.length} questions affichées</span>
-            {/* Badge source des données */}
-            {cacheStatus && (
-              <span className={`text-xs px-2 py-1 rounded ${
-                cacheStatus.is_available 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-red-100 text-red-800'
-              }`}>
-                {cacheStatus.is_available ? 'Cache' : 'Cache indisponible'}
-              </span>
-            )}
-          </div>
+          <span className="text-sm text-gray-500">{filteredQuestions.length} questions affichées</span>
         </div>
         
         {filteredQuestions.length === 0 ? (
@@ -1003,12 +939,6 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
               {filteredQuestions.length} question(s) affichée(s)
               {totalQuestions > questionLogs.length && (
                 <span className="text-blue-600"> sur {totalQuestions} au total</span>
-              )}
-              {/* Indicateur de performance cache */}
-              {cacheStatus && cacheStatus.is_available && (
-                <span className="text-green-600 ml-2">
-                  • ⚡ Chargé en {cacheStatus.performance_gain}
-                </span>
               )}
             </div>
           </div>
