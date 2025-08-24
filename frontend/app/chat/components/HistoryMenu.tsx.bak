@@ -19,11 +19,24 @@ export const HistoryMenu = () => {
     useConversationActions()
   const { currentConversation, loadConversation } = useCurrentConversation()
 
+  // 🔧 CORRECTION : Éviter la boucle infinie dans handleToggle
   const handleToggle = async () => {
-    if (!isOpen && user) {
-      await loadConversations(user.email || user.id)
+    console.log('[HistoryMenu] Toggle clicked, isOpen:', isOpen, 'user:', !!user)
+    
+    // Changer l'état AVANT de charger pour éviter les boucles
+    const newIsOpen = !isOpen
+    setIsOpen(newIsOpen)
+    
+    // Charger seulement si on OUVRE le menu et qu'on a un utilisateur
+    if (newIsOpen && user && !isLoadingHistory) {
+      console.log('[HistoryMenu] Chargement conversations pour:', user.email || user.id)
+      try {
+        await loadConversations(user.email || user.id)
+        console.log('[HistoryMenu] Conversations chargées avec succès')
+      } catch (error) {
+        console.error('[HistoryMenu] Erreur chargement conversations:', error)
+      }
     }
-    setIsOpen(!isOpen)
   }
 
   const handleRefresh = async (e: React.MouseEvent) => {
@@ -82,6 +95,15 @@ export const HistoryMenu = () => {
     0
   )
 
+  // 🔧 DEBUG : Ajouter des logs pour comprendre l'état
+  console.log('[HistoryMenu] Render state:', {
+    isOpen,
+    totalConversations,
+    conversationGroupsLength: conversationGroups.length,
+    isLoadingHistory,
+    hasUser: !!user
+  })
+
   return (
     <div className="relative header-icon-container">
       {/* Bouton 40×40 : icône "history" (SVG inline) + badge externe */}
@@ -109,6 +131,7 @@ export const HistoryMenu = () => {
         <span className="notification-badge">{totalConversations}</span>
       )}
 
+      {/* 🔧 CORRECTION CRITIQUE : S'assurer que le menu s'affiche quand isOpen=true */}
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
