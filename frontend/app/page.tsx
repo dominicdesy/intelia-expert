@@ -5,7 +5,7 @@ import { useAuthenticationLogic } from './page_authentication'
 import { LoginForm } from './page_login_form'
 import { SignupModal } from './page_signup_modal'
 import { usePageInitialization } from './page_initialization'
-import { InteliaLogo, LanguageSelector, LoadingSpinner, AuthFooter } from './page_components.tsx'
+import { InteliaLogo, LanguageSelector, LoadingSpinner, AuthFooter } from './page_components'
 
 // Contenu principal de la page
 function PageContent() {
