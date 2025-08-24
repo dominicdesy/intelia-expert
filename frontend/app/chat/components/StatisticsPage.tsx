@@ -291,14 +291,14 @@ export const StatisticsPage: React.FC = () => {
   // FONCTION POUR RÉCUPÉRER LES HEADERS D'AUTHENTIFICATION
   const getAuthHeaders = async (): Promise<Record<string, string>> => {
     try {
-      console.log('🔐 getAuthHeaders: Début...')
+      console.log('🔍 getAuthHeaders: Début...')
       
       try {
         const supabase = getSupabaseClient()
-        console.log('🔐 getAuthHeaders: Supabase client récupéré')
+        console.log('🔍 getAuthHeaders: Supabase client récupéré')
         
         const { data: { session }, error } = await supabase.auth.getSession()
-        console.log('🔐 getAuthHeaders: Session récupérée:', { 
+        console.log('🔍 getAuthHeaders: Session récupérée:', { 
           hasSession: !!session, 
           hasError: !!error,
           hasAccessToken: !!session?.access_token,
@@ -772,29 +772,11 @@ export const StatisticsPage: React.FC = () => {
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  🔧 Invitations
+                  Invitations
                 </button>
               </div>
               
-              {/* 🚀 Indicateurs de performance cache */}
-              {cacheStatus && (
-                <div className="flex items-center space-x-3">
-                  {cacheStatus.is_available ? (
-                    <div className="flex items-center space-x-1 text-green-600">
-                      <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></div>
-                      <span className="text-xs font-medium">Cache Actif</span>
-                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                        {performanceGain}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-1 text-red-600">
-                      <div className="w-2 h-2 bg-red-600 rounded-full"></div>
-                      <span className="text-xs font-medium">Cache Indisponible</span>
-                    </div>
-                  )}
-                </div>
-              )}
+
             </div>
             
             <div className="flex items-center space-x-4">
@@ -840,27 +822,7 @@ export const StatisticsPage: React.FC = () => {
           </div>
         </div>
         
-        {/* 🚀 Barre de statut cache détaillée */}
-        {cacheStatus && cacheStatus.is_available && (
-          <div className="bg-green-50 border-t border-green-200 px-4 py-2">
-            <div className="max-w-7xl mx-auto flex items-center justify-between text-xs">
-              <div className="flex items-center space-x-4">
-                <span className="text-green-700">
-                  📅 Dernière MÀJ: {cacheStatus.last_update ? new Date(cacheStatus.last_update).toLocaleString('fr-FR') : 'N/A'}
-                </span>
-                <span className="text-green-700">
-                  ⏱️ Âge du cache: {cacheStatus.cache_age_minutes}min
-                </span>
-                <span className="text-green-700">
-                  🚀 Gain: {typeof cacheStatus.performance_gain === 'string' ? cacheStatus.performance_gain : `${cacheStatus.performance_gain}%`}
-                </span>
-              </div>
-              <div className="text-green-600">
-                🔄 Prochaine MÀJ: {cacheStatus.next_update ? new Date(cacheStatus.next_update).toLocaleString('fr-FR') : 'Automatique'}
-              </div>
-            </div>
-          </div>
-        )}
+
       </div>
 
       {/* Main Content */}
