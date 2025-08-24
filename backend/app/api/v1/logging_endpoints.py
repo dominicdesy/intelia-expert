@@ -14,7 +14,7 @@ from psycopg2.extras import RealDictCursor
 from fastapi import APIRouter, Depends, Query, HTTPException
 
 from app.api.v1.auth import get_current_user
-from .logging_models import Permission
+from .logging_models import Permission, UserRole, ROLE_PERMISSIONS, UserRole, ROLE_PERMISSIONS
 from .logging_permissions import has_permission
 from .logging_helpers import get_analytics_manager
 from .logging_cache import clear_analytics_cache, get_cache_stats
@@ -45,8 +45,8 @@ async def analytics_dashboard(
             "status": "dashboard_available",
             "message": "Dashboard analytics à implémenter",
             "user_role": current_user.get("user_type"),
-            "permissions": [p.value for p in has_permission.__globals__['ROLE_PERMISSIONS'].get(
-                has_permission.__globals__['UserRole'](current_user.get("user_type", "user")), []
+            "permissions": [p.value for p in ROLE_PERMISSIONS.get(
+                UserRole(current_user.get("user_type", "user")), []
             )],
             "cache_stats": get_cache_stats()
         }
@@ -136,8 +136,6 @@ async def get_my_permissions(
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """Récupère les permissions de l'utilisateur connecté"""
-    from .logging_models import UserRole, ROLE_PERMISSIONS
-    
     user_type = current_user.get("user_type", "user")
     
     try:
@@ -581,7 +579,7 @@ async def billing_admin_stats(
 
 
 # ============================================================================
-# 🐛 ENDPOINTS DE DEBUG ET TEST
+# 🛠 ENDPOINTS DE DEBUG ET TEST
 # ============================================================================
 
 @router.get("/debug-questions")
