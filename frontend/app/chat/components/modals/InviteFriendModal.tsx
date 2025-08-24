@@ -54,7 +54,7 @@ const invitationService = {
         throw new Error('Session expirée - reconnexion nécessaire')
       }
 
-      console.log('✅ [InvitationService] Token récupéré')
+      console.log('✅ [InvitationService] Service initialized')
       
       // URL selon votre configuration
       const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert.intelia.com/api'
