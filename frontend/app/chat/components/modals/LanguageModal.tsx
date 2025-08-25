@@ -12,9 +12,9 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
   const languages = [
     { 
       code: 'fr', 
-      name: 'Français', 
+      name: 'Francais', 
       flag: '🇫🇷',
-      description: 'Interface en français'
+      description: 'Interface en francais'
     },
     { 
       code: 'en', 
@@ -24,37 +24,38 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     },
     { 
       code: 'es', 
-      name: 'Español', 
+      name: 'Espanol', 
       flag: '🇪🇸',
-      description: 'Interfaz en español'
+      description: 'Interfaz en espanol'
     }
   ]
 
   const handleLanguageChange = async (languageCode: string) => {
-    if (languageCode === currentLanguage) return
+    if (languageCode === currentLanguage || isUpdating) return
 
     setIsUpdating(true)
     try {
       console.log('🔄 [LanguageModal] Début changement langue:', currentLanguage, '→', languageCode)
       
-      // 1. Changer la langue dans le hook (déclenche les re-renders)
-      changeLanguage(languageCode)
-      console.log('✅ [LanguageModal] changeLanguage() appelée avec:', languageCode)
-      
-      // 2. Sauvegarder dans le profil utilisateur
+      // 1. Sauvegarder dans le profil utilisateur d'abord
       await updateProfile({ language: languageCode } as any)
       console.log('✅ [LanguageModal] updateProfile() terminé')
       
-      // 3. Forcer la mise à jour globale
+      // 2. Changer la langue dans le hook après la sauvegarde
+      changeLanguage(languageCode)
+      console.log('✅ [LanguageModal] changeLanguage() appelée avec:', languageCode)
+      
+      // 3. Fermer la modal après un court délai
       setTimeout(() => {
         console.log('📊 [LanguageModal] Langue finale:', languageCode)
+        setIsUpdating(false)
         onClose()
-      }, 500)
+      }, 300)
       
     } catch (error) {
       console.error('❌ [LanguageModal] Erreur changement langue:', error)
+      setIsUpdating(false)
     }
-    setIsUpdating(false)
   }
 
   return (
