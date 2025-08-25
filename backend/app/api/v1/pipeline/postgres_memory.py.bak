@@ -81,8 +81,8 @@ class PostgresMemory:
                 
                 self._async_pool = await asyncpg.create_pool(
                     dsn,
-                    min_size=1,
-                    max_size=3,
+                    min_size=2,
+                    max_size=10,
                     command_timeout=30
                 )
                 self._pool_initialized = True
