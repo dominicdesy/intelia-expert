@@ -1,4 +1,4 @@
-# app/api/v1/expert_core.py
+-# app/api/v1/expert_core.py
 # -*- coding: utf-8 -*-
 """
 Fonctions métier et validation pour expert.py
@@ -289,7 +289,10 @@ async def ask_internal_async(payload, request: Request, current_user: Optional[D
             "validation_confidence_included": bool(validation_result_dict)
         }
 
-        logger.info(f"✅ Réponse générée: type={result.get('type')}, confidence={result.get('confidence', {}).get('score', 'N/A')}%")
+        confidence_raw = result.get('confidence', {}).get('score', 'N/A')
+        confidence_display = f"{confidence_raw * 100:.1f}" if isinstance(confidence_raw, (int, float)) and confidence_raw <= 1.0 else confidence_raw
+        logger.info(f"✅ Réponse générée: type={result.get('type')}, confidence={confidence_display}%")
+
         return result
         
     except Exception as e:
