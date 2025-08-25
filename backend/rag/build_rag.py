@@ -744,6 +744,27 @@ def _have_faiss() -> bool:
     except Exception:
         return False
 
+
+# ---- OpenAI (API) ----
+def _embed_openai(texts: List[str], model_name: str) -> np.ndarray:
+    from openai import OpenAI
+    client = OpenAI()
+    embs: List[List[float]] = []
+    B = 512
+    for i in range(0, len(texts), B):
+        chunk = texts[i:i+B]
+        resp = client.embeddings.create(model=model_name, input=chunk)
+        embs.extend([d.embedding for d in resp.data])
+    return np.asarray(embs, dtype="float32")
+
+# ---- FastEmbed (ONNX, torch-free) ----
+def _embed_fastembed(texts: List[str], model_name: str, batch_size: int = 64) -> np.ndarray:
+    from fastembed import TextEmbedding
+    emb = TextEmbedding(model_name=model_name)
+    vectors = list(emb.embed(texts, batch_size=batch_size))
+    return np.asarray(vectors, dtype="float32")
+
+
 def _embed(model, texts: List[str], batch_size: int = 64) -> np.ndarray:
     embs = model.encode(
         texts,
@@ -889,8 +910,9 @@ def _parse_args():
     p.add_argument("--src", required=True, help="Document file or directory")
     p.add_argument("--out", required=True, help="Output root directory (indexes saved under <out>/<species>/)")
     p.add_argument("--species", required=True, help="global|broiler|layer|... (free text)")
-    p.add_argument("--embed-model", default="sentence-transformers/all-MiniLM-L6-v2",
-                   help="Sentence-Transformers model name")
+    p.add_argument("--embeddings", choices=["openai","fastembed","sentencetransformers"], default="openai", help="Embedding provider")
+    p.add_argument("--embed-model", default="text-embedding-3-small",
+                   help="Embedding model name (OpenAI: text-embedding-3-small/-3-large; FastEmbed: BAAI/bge-small-en-v1.5; ST: sentence-transformers/all-MiniLM-L6-v2)")
     p.add_argument("--exts", default=".pdf,.txt,.md,.html,.htm,.csv,.xlsx,.xls",
                    help="Comma-separated list of extensions to include")
     p.add_argument("--recursive", action=argparse.BooleanOptionalAction, default=True,
@@ -949,6 +971,7 @@ def main() -> int:
     src = Path(args.src)
     out_root = Path(args.out)
     species = args.species.strip().lower()
+    provider = getattr(args, "embeddings", "openai").lower()
     model_name = args.embed_model
 
     exts = tuple((e if e.startswith(".") else f".{e}").lower().strip()
@@ -961,6 +984,7 @@ def main() -> int:
     log(f"🔎 Source root: {src}")
     log(f"💾 Output root: {out_root}")
     log(f"🐔 Species to build: {species}")
+    log(f"🧠 Embeddings provider: {provider}")
     log(f"🧠 Embedding model: {model_name}")
     log(f"⚡ Enhanced metadata: {args.enhanced_metadata}")
     log(f"🔍 Quality filtering: {args.enable_quality_filter}")
@@ -1146,9 +1170,17 @@ def main() -> int:
 
     # Embeddings
     texts = [it["text"] for it in items]
-    log(f"\n🧠 Generating embeddings with {model_name} (batch={args.embed_batch_size})")
-    model = _load_model(model_name)
-    embs = _embed(model, texts, batch_size=args.embed_batch_size)
+    log(f"\n🧠 Generating embeddings with provider={provider} model={model_name} (batch={args.embed_batch_size})")
+    if provider == "openai":
+        embs = _embed_openai(texts, model_name)
+        embedding_method = "OpenAI"
+    elif provider == "fastembed":
+        embs = _embed_fastembed(texts, model_name, batch_size=args.embed_batch_size)
+        embedding_method = "FastEmbed"
+    else:
+        model = _load_model(model_name)
+        embs = _embed(model, texts, batch_size=args.embed_batch_size)
+        embedding_method = "SentenceTransformers"
 
     if not _have_faiss():
         log("❌ FAISS not available (pip install faiss-cpu).")
@@ -1165,8 +1197,8 @@ def main() -> int:
     with open(out_dir / "index.pkl", "wb") as f:
         index_data = {
             "documents": items,
-            "method": "SentenceTransformers",
-            "embedding_method": "SentenceTransformers",
+            "method": embedding_method,
+            "embedding_method": embedding_method,
             "model_name": model_name,
             "embedding_dim": int(embs.shape[1]),
             "enhanced_version": "v1.4",
