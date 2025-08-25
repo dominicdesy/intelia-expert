@@ -32,8 +32,22 @@ except ImportError as e:
     def calculate_unified_confidence(*args, **kwargs):
         return None
     
+    # 🛠️ FIX: Fonction fallback corrigée pour gérer les décimaux
     def get_confidence_summary(breakdown):
-        return {"score": 75.0, "level": "medium", "explanation": "Score par défaut"}
+        if breakdown is None:
+            return {"score": 75.0, "level": "medium", "explanation": "Score par défaut"}
+        
+        # Fix: convertir décimal en pourcentage si nécessaire
+        raw_score = getattr(breakdown, 'unified_score', 0.75)
+        score = raw_score * 100 if raw_score <= 1.0 else raw_score
+        level = getattr(breakdown, 'level', 'medium')
+        level_str = level.value if hasattr(level, 'value') else str(level)
+        
+        return {
+            "score": score,
+            "level": level_str,
+            "explanation": f"Score unifié calculé: {score:.1f}%"
+        }
 
 # 🎯 Import système d'analyse des intentions
 try:
@@ -139,7 +153,14 @@ def apply_unified_confidence(
         if debug_confidence:
             response["confidence_debug"] = get_detailed_confidence(confidence_breakdown)
         
-        logger.info(f"🎯 Confidence unifié calculé: {confidence_breakdown.unified_score}% ({confidence_breakdown.level.value})")
+        # 🛠️ FIX: Log corrigé pour afficher le pourcentage correct
+        if confidence_breakdown:
+            raw_score = getattr(confidence_breakdown, 'unified_score', 0)
+            display_score = raw_score * 100 if raw_score <= 1.0 else raw_score
+            level_value = getattr(confidence_breakdown.level, 'value', str(confidence_breakdown.level)) if hasattr(confidence_breakdown, 'level') else 'unknown'
+            logger.info(f"🎯 Confidence unifié calculé: {display_score:.1f}% ({level_value})")
+        else:
+            logger.warning("⚠️ confidence_breakdown est None")
         
         return response
         

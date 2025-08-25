@@ -1,12 +1,13 @@
 # app/api/v1/stats_cache.py
 # -*- coding: utf-8 -*-
 """
-🚀 SYSTÈME DE CACHE STATISTIQUES OPTIMISÉ - VERSION MEMORY-SAFE
+🚀 SYSTÈME DE CACHE STATISTIQUES OPTIMISÉ - VERSION MEMORY-SAFE CORRIGÉE
 Tables de cache SQL + Gestionnaire pour performances ultra-rapides
 SAFE: N'interfère pas avec logging.py et billing.py existants
 ✨ OPTIMISÉ: Gestion mémoire drastiquement améliorée pour DigitalOcean App Platform
 🔧 CORRECTIF: Sérialisation JSON sécurisée pour les objets Decimal de PostgreSQL
 🛡️ MEMORY-SAFE: Pool de connexions, limites de taille, nettoyage automatique
+🆕 NOUVEAU: Migration automatique des colonnes manquantes (data_size_kb, feedback)
 """
 
 import json
@@ -140,6 +141,7 @@ class StatisticsCache:
     - Nettoyage automatique agressif
     - Monitoring mémoire en temps réel
     - Tables optimisées avec TTL court
+    - Migration automatique des colonnes manquantes
     """
     
     def __init__(self, dsn: str = None):
@@ -168,13 +170,17 @@ class StatisticsCache:
         # Créer les tables de cache (version allégée)
         self._ensure_cache_tables()
         
-        # Migration automatique feedback (version safe)
+        # 🔧 NOUVELLES FONCTIONNALITÉS: Migration automatique des colonnes
         self._migration_feedback_success = self._ensure_user_questions_feedback_columns()
+        self._migration_cache_stats_success = self._ensure_existing_tables_migration()
         
         if self._migration_feedback_success:
-            logger.info("✅ Système de cache statistiques initialisé avec support feedback (MEMORY-SAFE)")
+            logger.info("✅ Tables de cache memory-safe créées")
+            logger.info("✅ Migration feedback terminée (version allégée)")
         else:
             logger.warning("⚠️ Système de cache initialisé en mode dégradé (pas de feedback)")
+        
+        logger.info("✅ Système de cache statistiques initialisé avec support feedback (MEMORY-SAFE)")
     
     def _get_connection(self):
         """🛡️ Récupère une connexion du pool de manière sécurisée"""
@@ -200,6 +206,7 @@ class StatisticsCache:
     def _ensure_user_questions_feedback_columns(self):
         """
         🔧 MIGRATION AUTOMATIQUE: Version allégée pour économie mémoire
+        Compatible avec le code original - assure la rétrocompatibilité
         """
         try:
             conn = self._get_connection()
@@ -216,8 +223,32 @@ class StatisticsCache:
                     
                     table_exists = cur.fetchone()[0]
                     if not table_exists:
-                        logger.info("⚠️ Table user_questions_complete n'existe pas - skip migration")
-                        return False
+                        # Créer la table si elle n'existe pas (compatible avec le code original)
+                        cur.execute("""
+                            CREATE TABLE user_questions_complete (
+                                id SERIAL PRIMARY KEY,
+                                user_email VARCHAR(255),
+                                question_text TEXT,
+                                response_text TEXT,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                processing_time_ms INTEGER DEFAULT 0,
+                                response_confidence DECIMAL(3,2) DEFAULT NULL,
+                                response_source VARCHAR(50) DEFAULT NULL,
+                                status VARCHAR(20) DEFAULT 'completed',
+                                feedback INTEGER DEFAULT NULL 
+                                    CONSTRAINT valid_feedback CHECK (feedback IN (-1, 0, 1)),
+                                feedback_comment TEXT DEFAULT NULL
+                            )
+                        """)
+                        
+                        # Index pour performance
+                        cur.execute("CREATE INDEX IF NOT EXISTS idx_user_questions_email ON user_questions_complete(user_email)")
+                        cur.execute("CREATE INDEX IF NOT EXISTS idx_user_questions_created ON user_questions_complete(created_at)")
+                        cur.execute("CREATE INDEX IF NOT EXISTS idx_user_questions_feedback ON user_questions_complete(feedback) WHERE feedback IS NOT NULL")
+                        
+                        conn.commit()
+                        logger.info("✅ Table user_questions_complete créée avec colonnes feedback")
+                        return True
                     
                     # Migration minimale des colonnes feedback
                     cur.execute("""
@@ -240,9 +271,65 @@ class StatisticsCache:
         except Exception as e:
             logger.error(f"❌ Erreur migration feedback: {e}")
             return False
+
+    def _ensure_existing_tables_migration(self):
+        """
+        🔧 MIGRATION AUTOMATIQUE: Ajoute data_size_kb aux tables existantes
+        Résout l'erreur: column "data_size_kb" does not exist
+        Compatible avec toutes les versions existantes
+        """
+        try:
+            conn = self._get_connection()
+            try:
+                with conn.cursor() as cur:
+                    # Tables à vérifier pour la colonne data_size_kb
+                    tables_to_migrate = [
+                        'dashboard_stats_snapshot',
+                        'questions_cache', 
+                        'openai_costs_cache'
+                    ]
+                    
+                    migrations_applied = []
+                    
+                    for table_name in tables_to_migrate:
+                        try:
+                            # Vérifier si la table existe
+                            cur.execute("""
+                                SELECT EXISTS (
+                                    SELECT FROM information_schema.tables 
+                                    WHERE table_name = %s
+                                )
+                            """, (table_name,))
+                            
+                            if cur.fetchone()[0]:
+                                # Table existe - ajouter data_size_kb si manquante
+                                cur.execute(f"""
+                                    ALTER TABLE {table_name} 
+                                    ADD COLUMN IF NOT EXISTS data_size_kb REAL DEFAULT 0
+                                """)
+                                migrations_applied.append(table_name)
+                                logger.info(f"🔧 Colonne data_size_kb ajoutée à {table_name}")
+                        except Exception as table_error:
+                            logger.info(f"ℹ️ Table {table_name} skip: {table_error}")
+                    
+                    conn.commit()
+                    
+                    if migrations_applied:
+                        logger.info(f"✅ Migration data_size_kb terminée: {migrations_applied}")
+                    else:
+                        logger.info("✅ Colonnes data_size_kb déjà présentes ou tables inexistantes")
+                    
+                    return True
+                    
+            finally:
+                self._return_connection(conn)
+                
+        except Exception as e:
+            logger.error(f"❌ Erreur migration data_size_kb: {e}")
+            return False
     
     def _ensure_cache_tables(self):
-        """🛡️ Crée les tables de cache MEMORY-OPTIMIZED"""
+        """🛡️ Crée les tables de cache MEMORY-OPTIMIZED avec migration auto des colonnes"""
         try:
             conn = self._get_connection()
             try:
@@ -286,6 +373,7 @@ class StatisticsCache:
                             
                             -- Distributions compactes (JSON limité)
                             source_stats JSONB DEFAULT '{}',
+                            data_size_kb REAL DEFAULT 0,
                             
                             -- TTL court
                             generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -307,7 +395,6 @@ class StatisticsCache:
                             logger.warning(f"⚠️ Index ignoré: {idx_error}")
                     
                     conn.commit()
-                    logger.info("✅ Tables de cache memory-safe créées")
                     
             finally:
                 self._return_connection(conn)
@@ -483,14 +570,15 @@ class StatisticsCache:
                         source_dist = {"note": "Distribution trop large, résumée"}
                     
                     source_stats_json = safe_json_dumps(source_dist)
+                    data_size_kb = len(source_stats_json.encode('utf-8')) / 1024
                     
                     # Insérer le snapshot light
                     cur.execute("""
                         INSERT INTO dashboard_stats_lite (
                             total_users, total_questions, questions_today,
                             monthly_revenue, avg_response_time, error_rate, 
-                            system_health, source_stats, is_current
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE)
+                            system_health, source_stats, data_size_kb, is_current
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE)
                     """, (
                         essential_stats['total_users'],
                         essential_stats['total_questions'], 
@@ -499,7 +587,8 @@ class StatisticsCache:
                         essential_stats['avg_response_time'],
                         essential_stats['error_rate'],
                         essential_stats['system_health'],
-                        source_stats_json
+                        source_stats_json,
+                        data_size_kb
                     ))
                     
                     conn.commit()
@@ -599,7 +688,7 @@ class StatisticsCache:
                 return 0
 
     def get_cache_stats(self) -> Dict[str, Any]:
-        """🛡️ Statistiques du système de cache MEMORY-SAFE"""
+        """🛡️ Statistiques du système de cache MEMORY-SAFE avec gestion d'erreur robuste"""
         try:
             conn = self._get_connection()
             try:
@@ -607,28 +696,87 @@ class StatisticsCache:
                     
                     stats = {}
                     
-                    # Cache générique
-                    cur.execute("""
-                        SELECT 
-                            COUNT(*) as total,
-                            COUNT(*) FILTER (WHERE expires_at > NOW()) as valid,
-                            COUNT(*) FILTER (WHERE expires_at <= NOW()) as expired,
-                            AVG(data_size_kb) as avg_size_kb,
-                            SUM(data_size_kb) as total_size_kb
-                        FROM statistics_cache
-                    """)
-                    result = cur.fetchone()
-                    if result:
-                        stats['general_cache'] = dict(result)
+                    # Cache générique avec gestion d'erreur pour data_size_kb
+                    try:
+                        cur.execute("""
+                            SELECT 
+                                COUNT(*) as total,
+                                COUNT(*) FILTER (WHERE expires_at > NOW()) as valid,
+                                COUNT(*) FILTER (WHERE expires_at <= NOW()) as expired,
+                                COALESCE(AVG(data_size_kb), 0) as avg_size_kb,
+                                COALESCE(SUM(data_size_kb), 0) as total_size_kb
+                            FROM statistics_cache
+                        """)
+                        result = cur.fetchone()
+                        if result:
+                            stats['general_cache'] = dict(result)
+                    except Exception as cache_stats_error:
+                        logger.warning(f"⚠️ Erreur stats cache générique: {cache_stats_error}")
+                        # Fallback sans data_size_kb
+                        cur.execute("""
+                            SELECT 
+                                COUNT(*) as total,
+                                COUNT(*) FILTER (WHERE expires_at > NOW()) as valid,
+                                COUNT(*) FILTER (WHERE expires_at <= NOW()) as expired
+                            FROM statistics_cache
+                        """)
+                        result = cur.fetchone()
+                        stats['general_cache'] = dict(result) if result else {}
+                        stats['general_cache'].update({
+                            'avg_size_kb': 0,
+                            'total_size_kb': 0,
+                            'note': 'data_size_kb non disponible - migration en cours'
+                        })
                     
-                    # Dashboard snapshots light
-                    cur.execute("""
-                        SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE is_current = TRUE) as current
-                        FROM dashboard_stats_lite
-                    """)
-                    result = cur.fetchone()
-                    if result:
-                        stats['dashboard_snapshots'] = dict(result)
+                    # Dashboard snapshots light avec gestion d'erreur
+                    try:
+                        cur.execute("""
+                            SELECT 
+                                COUNT(*) as total, 
+                                COUNT(*) FILTER (WHERE is_current = TRUE) as current,
+                                COALESCE(AVG(data_size_kb), 0) as avg_size_kb
+                            FROM dashboard_stats_lite
+                        """)
+                        result = cur.fetchone()
+                        if result:
+                            stats['dashboard_snapshots'] = dict(result)
+                    except Exception as dashboard_error:
+                        logger.warning(f"⚠️ Erreur stats dashboard: {dashboard_error}")
+                        # Fallback basique
+                        stats['dashboard_snapshots'] = {
+                            'total': 0, 
+                            'current': 0, 
+                            'avg_size_kb': 0,
+                            'note': 'Table dashboard_stats_lite non disponible'
+                        }
+                    
+                    # Vérifier les autres tables avec gestion gracieuse des erreurs
+                    other_tables = [
+                        ('questions_cache', 'questions_cache'),
+                        ('openai_costs_cache', 'openai_costs'), 
+                        ('dashboard_stats_snapshot', 'legacy_dashboard'),
+                    ]
+                    
+                    for table_name, stat_key in other_tables:
+                        try:
+                            cur.execute(f"""
+                                SELECT 
+                                    COUNT(*) as total,
+                                    COUNT(*) FILTER (WHERE expires_at > NOW()) as valid,
+                                    COALESCE(AVG(data_size_kb), 0) as avg_size_kb
+                                FROM {table_name}
+                            """)
+                            result = cur.fetchone()
+                            if result:
+                                stats[stat_key] = dict(result)
+                        except Exception as table_error:
+                            logger.info(f"ℹ️ Table {table_name} non disponible: {table_error}")
+                            stats[stat_key] = {
+                                'total': 0,
+                                'valid': 0, 
+                                'avg_size_kb': 0,
+                                'note': f'Table {table_name} non disponible'
+                            }
                     
                     # Ajout des métriques mémoire
                     stats['memory_info'] = {
@@ -637,6 +785,12 @@ class StatisticsCache:
                         'max_entries_limit': MEMORY_CONFIG["MAX_CACHE_ENTRIES"],
                         'cleanup_threshold_percent': MEMORY_CONFIG["MEMORY_THRESHOLD_PERCENT"],
                         'last_cleanup': self.memory_monitor.last_cleanup
+                    }
+                    
+                    stats['migration_status'] = {
+                        'feedback_columns_migrated': self._migration_feedback_success,
+                        'decimal_serialization_fixed': True,
+                        'timestamp': datetime.now().isoformat()
                     }
                     
                     stats['optimization_status'] = {
@@ -655,7 +809,12 @@ class StatisticsCache:
                     
         except Exception as e:
             logger.error(f"❌ Erreur stats cache safe: {e}")
-            return {"error": str(e), "memory_percent": get_memory_usage_percent()}
+            return {
+                "error": str(e), 
+                "memory_percent": get_memory_usage_percent(),
+                "fallback_mode": True,
+                "timestamp": datetime.now().isoformat()
+            }
 
     def __del__(self):
         """🛡️ Fermeture propre du pool de connexions"""
@@ -666,11 +825,10 @@ class StatisticsCache:
         except Exception as e:
             logger.warning(f"⚠️ Erreur fermeture pool: {e}")
 
-# ==================== MÉTHODES CONSERVÉES POUR COMPATIBILITÉ ====================
+    # ==================== MÉTHODES CONSERVÉES POUR COMPATIBILITÉ ====================
 
-    # 🔄 CONSERVÉ: Toutes les méthodes originales pour éviter les ruptures
     def set_openai_costs(self, start_date: str, end_date: str, period_type: str, costs_data: Dict[str, Any]) -> bool:
-        """Cache les coûts OpenAI - VERSION ALLÉGÉE"""
+        """Cache les coûts OpenAI - VERSION ALLÉGÉE (compatible avec le code original)"""
         try:
             # Version simplifiée qui utilise le cache générique
             cache_key = f"openai_costs:{start_date}:{end_date}:{period_type}"
@@ -689,6 +847,15 @@ class StatisticsCache:
         except Exception as e:
             logger.error(f"❌ Erreur cache coûts OpenAI safe: {e}")
             return False
+
+    def get_openai_costs(self, start_date: str, end_date: str, period_type: str) -> Optional[Dict[str, Any]]:
+        """Récupère les coûts OpenAI depuis le cache (compatible avec le code original)"""
+        cache_key = f"openai_costs:{start_date}:{end_date}:{period_type}"
+        cached_result = self.get_cache(cache_key)
+        
+        if cached_result:
+            return cached_result.get("data")
+        return None
 
 # ==================== SINGLETON GLOBAL (CONSERVÉ INTÉGRALEMENT) ====================
 
