@@ -1,9 +1,9 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState } from 'react'
 import { useTranslation } from '../../hooks/useTranslation'
 import { useAuthStore } from '@/lib/stores/auth' 
 import { CheckIcon } from '../../utils/icons'
 
-// ==================== MODAL LANGUE AVEC POSITIONNEMENT CORRIGÉ ====================
+// ==================== MODAL LANGUE AVEC CORRECTION COMPLETE ====================
 export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
   const { t, changeLanguage, currentLanguage } = useTranslation()
   const { updateProfile } = useAuthStore() 
@@ -12,9 +12,9 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
   const languages = [
     { 
       code: 'fr', 
-      name: 'Francais', 
+      name: 'Français', 
       flag: '🇫🇷',
-      description: 'Interface en francais'
+      description: 'Interface en français'
     },
     { 
       code: 'en', 
@@ -24,13 +24,13 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     },
     { 
       code: 'es', 
-      name: 'Espanol', 
+      name: 'Español', 
       flag: '🇪🇸',
-      description: 'Interfaz en espanol'
+      description: 'Interfaz en español'
     }
   ]
 
-  const handleLanguageChange = useCallback(async (languageCode: string) => {
+  const handleLanguageChange = async (languageCode: string) => {
     if (languageCode === currentLanguage || isUpdating) return
 
     setIsUpdating(true)
@@ -38,24 +38,24 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     try {
       console.log('🔄 [LanguageModal] Début changement langue:', currentLanguage, '→', languageCode)
       
-      // Sauvegarder dans le profil utilisateur seulement
+      // 1. Sauvegarder d'abord dans le profil
       await updateProfile({ language: languageCode } as any)
       console.log('✅ [LanguageModal] updateProfile() terminé')
       
-      // Fermer immédiatement sans appeler changeLanguage
+      // 2. Fermer la modal immédiatement
       onClose()
       
-      // Changer la langue après fermeture de la modal
-      setTimeout(() => {
+      // 3. Changer la langue après un micro-délai pour éviter la boucle
+      requestAnimationFrame(() => {
         changeLanguage(languageCode)
         console.log('✅ [LanguageModal] changeLanguage() appelée avec:', languageCode)
-      }, 100)
+      })
       
     } catch (error) {
       console.error('❌ [LanguageModal] Erreur changement langue:', error)
       setIsUpdating(false)
     }
-  }, [currentLanguage, isUpdating, updateProfile, onClose, changeLanguage])
+  }
 
   return (
     <>
@@ -86,7 +86,7 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
             </button>
           </div>
           
-          {/* Content - contenu original inchangé */}
+          {/* Content */}
           <div className="p-6">
             <div className="space-y-4">
               <p className="text-sm text-gray-600 mb-4">
@@ -108,8 +108,12 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
                     <div className="flex items-center space-x-4">
                       <span className="text-3xl">{language.flag}</span>
                       <div className="text-left">
-                        <div className="font-semibold text-base">{language.name}</div>
-                        <div className="text-xs text-gray-400 mt-1">{language.description}</div>
+                        <div className="font-semibold text-base text-gray-900">
+                          {language.name}
+                        </div>
+                        <div className="text-xs text-gray-400 mt-1">
+                          {language.description}
+                        </div>
                       </div>
                     </div>
                     

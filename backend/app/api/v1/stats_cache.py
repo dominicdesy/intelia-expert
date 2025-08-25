@@ -277,13 +277,16 @@ class StatisticsCache:
         🔧 MIGRATION AUTOMATIQUE: Ajoute data_size_kb aux tables existantes
         Résout l'erreur: column "data_size_kb" does not exist
         Compatible avec toutes les versions existantes
+        CORRECTIF: Inclut statistics_cache dans la migration
         """
         try:
             conn = self._get_connection()
             try:
                 with conn.cursor() as cur:
                     # Tables à vérifier pour la colonne data_size_kb
+                    # CORRECTIF: Ajouter statistics_cache à la liste !
                     tables_to_migrate = [
+                        'statistics_cache',           # ← TABLE PRINCIPALE MANQUANTE !
                         'dashboard_stats_snapshot',
                         'questions_cache', 
                         'openai_costs_cache'
