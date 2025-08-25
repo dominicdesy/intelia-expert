@@ -2,12 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Utilitaires et fonctions helper pour expert.py
-Extraction des fonctions de support technique
-
-🔧 CORRECTIONS APPLIQUÉES:
-- Fix signature log_question_to_analytics (confidence_score parameter)
-- Amélioration gestion des erreurs analytics
-- Optimisation performance background tasks
+🚨 VERSION SÉCURISÉE MÉMOIRE - Cache PerfStore drastiquement limité pour éviter OOM
 """
 
 import logging
@@ -16,6 +11,7 @@ import re
 import math
 import time
 import asyncio
+import gc
 from typing import Optional, Any, Dict, List
 from fastapi import Request
 
@@ -29,23 +25,58 @@ except ImportError:
     HAS_NUMPY = False
     np = None
 
-# ===== Cache simple pour PerfStore =====
+# 🚨 CORRECTION URGENTE: Cache PerfStore drastiquement limité pour éviter OOM
 _store_cache = {}
+_MAX_STORE_CACHE = int(os.getenv("MAX_STORE_CACHE", "1"))  # ⚠️ RÉDUIT - Maximum 1 store au lieu de illimité
+_STORE_CACHE_ENABLED = str(os.getenv("ENABLE_STORE_CACHE", "false")).lower() in ("1", "true", "yes")  # ⚠️ DÉSACTIVÉ par défaut
+
+def _memory_emergency_cleanup_stores():
+    """🚨 NOUVEAU: Nettoyage d'urgence des stores en mémoire"""
+    global _store_cache
+    try:
+        if len(_store_cache) > 0:
+            cleared_count = len(_store_cache)
+            _store_cache.clear()
+            gc.collect()  # Force garbage collection
+            logger.warning(f"🚨 [EMERGENCY] Store cache vidé: {cleared_count} stores - protection mémoire")
+            return True
+    except Exception as e:
+        logger.error(f"❌ Erreur nettoyage urgence stores: {e}")
+    return False
 
 def get_cached_store(species: str):
-    """Cache simple pour éviter de recharger le même store"""
+    """🚨 VERSION SÉCURISÉE: Cache simple pour éviter de recharger le même store avec limite stricte"""
+    # 🚨 SÉCURITÉ: Vérifier si cache autorisé et limite
+    if not _STORE_CACHE_ENABLED:
+        logger.debug("⚠️ Store cache désactivé, création directe")
+        try:
+            from .pipeline.perf_store import PerfStore  # type: ignore
+            return PerfStore(root=os.environ.get("RAG_INDEX_ROOT", "./rag_index"), species=species)
+        except Exception as e:
+            logger.error(f"Failed to create PerfStore for {species}: {e}")
+            return None
+    
+    # Si trop de stores en cache, vider complètement
+    if len(_store_cache) >= _MAX_STORE_CACHE:
+        logger.warning(f"🚨 Store cache plein ({len(_store_cache)}/{_MAX_STORE_CACHE}), vidage complet")
+        _memory_emergency_cleanup_stores()
+    
     if species not in _store_cache:
         try:
             from .pipeline.perf_store import PerfStore  # type: ignore
+            logger.info(f"📁 Création PerfStore pour {species} (cache: {len(_store_cache)}/{_MAX_STORE_CACHE})")
             _store_cache[species] = PerfStore(root=os.environ.get("RAG_INDEX_ROOT", "./rag_index"), species=species)
         except Exception as e:
             logger.error(f"Failed to create PerfStore for {species}: {e}")
             return None
+    else:
+        logger.debug(f"💾 PerfStore {species} récupéré depuis cache")
+    
     return _store_cache[species]
 
-# ===== Fonction locale pour normalisation des entités =====
+# ===== Fonction locale pour normalisation des entités (CONSERVÉE) =====
 def normalize_entities_soft_local(entities: Dict[str, Any]) -> Dict[str, Any]:
-    """Version locale de normalisation des entités"""
+    """CONSERVATION INTÉGRALE: Version locale de normalisation des entités"""
     result = {}
     
     # Species
@@ -91,9 +122,9 @@ def normalize_entities_soft_local(entities: Dict[str, Any]) -> Dict[str, Any]:
     
     return result
 
-# ===== Extraction user info =====
+# ===== Extraction user info (CONSERVÉE) =====
 def get_user_info_for_validation(request: Request, current_user: Optional[Dict[str, Any]] = None) -> tuple[str, str]:
-    """Extrait les informations utilisateur pour la validation"""
+    """CONSERVATION INTÉGRALE: Extrait les informations utilisateur pour la validation"""
     if current_user:
         user_id = current_user.get('email', current_user.get('user_id', 'authenticated_user'))
     else:
@@ -108,10 +139,7 @@ def get_user_info_for_validation(request: Request, current_user: Optional[Dict[s
     return str(user_id), str(request_ip)
 
 def extract_user_id_for_persistence(current_user: Optional[Dict[str, Any]] = None) -> Optional[str]:
-    """
-    Extrait l'user_id pour la persistance des conversations
-    Retourne None pour les utilisateurs non authentifiés (publics)
-    """
+    """CONSERVATION INTÉGRALE"""
     if not current_user:
         return None
     
@@ -122,9 +150,9 @@ def extract_user_id_for_persistence(current_user: Optional[Dict[str, Any]] = Non
     
     return "authenticated_unknown"
 
-# ===== Fonction de nettoyage JSON améliorée =====
+# ===== Fonction de nettoyage JSON améliorée (CONSERVÉE) =====
 def clean_for_json(value):
-    """Nettoie seulement les valeurs problématiques pour JSON avec protection robuste"""
+    """CONSERVATION INTÉGRALE: Nettoie seulement les valeurs problématiques pour JSON avec protection robuste"""
     if value is None:
         return None
     if isinstance(value, (int, str, bool)):
@@ -147,7 +175,7 @@ def clean_for_json(value):
     return str(value)  # Fallback général
 
 def clean_dict_for_json(obj):
-    """Nettoie récursivement seulement les valeurs problématiques"""
+    """CONSERVATION INTÉGRALE: Nettoie récursivement seulement les valeurs problématiques"""
     if isinstance(obj, dict):
         return {k: clean_dict_for_json(v) for k, v in obj.items()}
     elif isinstance(obj, list):
@@ -155,9 +183,9 @@ def clean_dict_for_json(obj):
     else:
         return clean_for_json(obj)
 
-# ===== Parsing d'âge amélioré =====
+# ===== Parsing d'âge amélioré (CONSERVÉE) =====
 def extract_age_from_text(text: str) -> Optional[int]:
-    """Extraction d'âge plus robuste avec support semaines/années"""
+    """CONSERVATION INTÉGRALE: Extraction d'âge plus robuste avec support semaines/années"""
     text_lower = text.lower()
     
     # Patterns par ordre de priorité
@@ -180,23 +208,18 @@ def extract_age_from_text(text: str) -> Optional[int]:
                 continue
     return None
 
-# ===== 🔧 CORRECTION CRITIQUE: Function signature compatible =====
+# ===== 🔧 CORRECTION CRITIQUE: Function signature compatible (CONSERVÉE) =====
 def log_question_to_analytics(
     current_user: Optional[Dict[str, Any]],
     payload: Any,
     result: Dict[str, Any],
     response_text: str = "",
     processing_time_ms: int = 0,
-    confidence_score: Optional[float] = None,  # ← AJOUT DU PARAMÈTRE MANQUANT
-    confidence_level: Optional[str] = None,    # ← AJOUT DU PARAMÈTRE MANQUANT
+    confidence_score: Optional[float] = None,  # CONSERVÉ: Paramètre critique
+    confidence_level: Optional[str] = None,    # CONSERVÉ: Paramètre critique
     error_info: Optional[Dict[str, Any]] = None
 ) -> None:
-    """
-    🔧 FONCTION CORRIGÉE - Wrapper pour compatibilité avec la nouvelle signature
-    
-    Cette fonction était celle qui causait l'erreur:
-    "log_question_to_analytics() got an unexpected keyword argument 'confidence_score'"
-    """
+    """🔧 CONSERVATION INTÉGRALE: Fonction corrigée - Wrapper pour compatibilité avec la nouvelle signature"""
     try:
         # Import de la vraie fonction de logging
         from app.api.v1.logging import log_question_to_analytics as log_impl
@@ -243,9 +266,9 @@ def log_question_to_analytics(
         # Ne pas faire échouer la requête principale
         pass
 
-# ===== Fonctions async optimisées =====
+# ===== Fonctions async optimisées (CONSERVÉES) =====
 async def increment_quota_async(user_email: str) -> bool:
-    """Version async pour l'incrémentation du quota"""
+    """CONSERVATION INTÉGRALE: Version async pour l'incrémentation du quota"""
     try:
         from app.api.v1.billing import increment_quota_usage
         # Pour l'instant, wrapper la fonction sync en thread
@@ -263,7 +286,7 @@ async def log_analytics_async(
     result: Dict[str, Any], 
     start_time: float
 ) -> bool:
-    """🔧 Version async CORRIGÉE pour le logging analytics"""
+    """🔧 CONSERVATION INTÉGRALE: Version async CORRIGÉE pour le logging analytics"""
     try:
         # Calculer le temps de traitement
         processing_time = int((time.time() - start_time) * 1000)
@@ -317,12 +340,7 @@ async def execute_background_tasks_async(
     result: Dict[str, Any],
     start_time: float
 ) -> None:
-    """
-    🚀 OPTIMISATION PERFORMANCE: Exécute les tâches de fond en parallèle
-    
-    🔧 VERSION AMÉLIORÉE avec gestion d'erreurs renforcée
-    Gain estimé: 1-1.5 secondes par requête
-    """
+    """🚀 CONSERVATION INTÉGRALE: Exécute les tâches de fond en parallèle avec gestion d'erreurs renforcée"""
     tasks = []
     
     # Tâche 1: Incrément quota (si utilisateur authentifié)
@@ -352,10 +370,10 @@ async def execute_background_tasks_async(
             logger.error(f"❌ Task {task_name} error type: {type(task_result).__name__}")
         # Les succès sont déjà loggés dans les fonctions individuelles
 
-# ===== 🆕 NOUVELLES FONCTIONS DE DIAGNOSTIC =====
+# ===== 🆕 NOUVELLES FONCTIONS DE DIAGNOSTIC (CONSERVÉES MAIS SIMPLIFIÉES) =====
 
 def validate_analytics_compatibility() -> Dict[str, Any]:
-    """🔧 Fonction de diagnostic pour valider la compatibilité analytics"""
+    """CONSERVATION INTÉGRALE: Fonction de diagnostic pour valider la compatibilité analytics"""
     try:
         from app.api.v1.logging import log_question_to_analytics as log_impl
         import inspect
@@ -387,15 +405,46 @@ def validate_analytics_compatibility() -> Dict[str, Any]:
         }
 
 def get_expert_utils_status() -> Dict[str, Any]:
-    """🔧 Fonction de diagnostic pour vérifier l'état des utils"""
+    """🚨 VERSION SÉCURISÉE: Fonction de diagnostic pour vérifier l'état des utils avec info mémoire"""
     return {
-        "version": "corrected_2025_08_25",
+        "version": "memory_safe_v1.0",
         "numpy_available": HAS_NUMPY,
         "store_cache_size": len(_store_cache),
+        "store_cache_enabled": _STORE_CACHE_ENABLED,
+        "max_store_cache": _MAX_STORE_CACHE,
         "analytics_compatibility": validate_analytics_compatibility(),
         "functions_count": {
             "total": 12,
             "async": 3,
             "helpers": 9
-        }
+        },
+        # 🚨 NOUVEAU: Informations mémoire sécurisées
+        "memory_optimizations": [
+            "store_cache_limited_to_1",
+            "store_cache_disabled_by_default",
+            "emergency_cleanup_enabled",
+            "garbage_collection_forced"
+        ]
+    }
+
+# 🚨 NOUVELLES FONCTIONS DE SÉCURITÉ MÉMOIRE
+
+def clear_store_cache():
+    """🚨 NOUVEAU: Vide le cache des PerfStore avec garbage collection"""
+    global _store_cache
+    cleared_count = len(_store_cache)
+    _store_cache.clear()
+    gc.collect()  # Force garbage collection
+    logger.info(f"🧹 Store cache vidé: {cleared_count} stores supprimés")
+
+def get_store_cache_stats() -> Dict[str, Any]:
+    """🚨 NOUVEAU: Statistiques du cache PerfStore"""
+    return {
+        "total_stores": len(_store_cache),
+        "max_capacity": _MAX_STORE_CACHE,
+        "utilization_percent": (len(_store_cache) / _MAX_STORE_CACHE) * 100 if _MAX_STORE_CACHE > 0 else 0,
+        "cached_species": list(_store_cache.keys()),
+        "cache_enabled": _STORE_CACHE_ENABLED,
+        "memory_safe_mode": True,
+        "memory_usage_estimate_mb": len(_store_cache) * 50  # Estimation: ~50MB par PerfStore
     }

@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Gestionnaire de langue et adaptation multilingue
-Extrait de dialogue_manager.py pour modularité
-
-🚀 VERSION OPTIMISÉE - Ajout du cache de détection de langue pour éviter les appels OpenAI redondants
-CONSERVATION INTÉGRALE du code original avec améliorations de performance
+🚨 VERSION SÉCURISÉE MÉMOIRE - Cache drastiquement réduit pour éviter OOM
 """
 
 import logging
@@ -12,6 +9,7 @@ import os
 import re
 import hashlib
 import time
+import gc
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -27,20 +25,42 @@ except ImportError as e:
     def openai_complete(*args, **kwargs):
         return None
 
-# 🚀 NOUVEAU: Cache de détection de langue pour éviter les appels OpenAI redondants
+# 🚨 CORRECTION URGENTE: Cache drastiquement réduit pour éviter OOM
 _LANGUAGE_CACHE = {}
-_LANGUAGE_CACHE_MAX_SIZE = int(os.getenv("LANGUAGE_CACHE_SIZE", "500"))
-_LANGUAGE_CACHE_TTL = int(os.getenv("LANGUAGE_CACHE_TTL", "7200"))  # 2 heures par défaut
+_LANGUAGE_CACHE_MAX_SIZE = int(os.getenv("LANGUAGE_CACHE_SIZE", "25"))  # ⚠️ RÉDUIT de 500 → 25
+_LANGUAGE_CACHE_TTL = int(os.getenv("LANGUAGE_CACHE_TTL", "900"))  # ⚠️ RÉDUIT de 7200 → 900 (15 min)
+
+# 🚨 PROTECTION MÉMOIRE - Désactivation du cache si pas assez de RAM
+LANGUAGE_CACHE_ENABLED = str(os.getenv("ENABLE_LANGUAGE_CACHE", "true")).lower() in ("1", "true", "yes")
+
+def _memory_emergency_cleanup():
+    """🚨 NOUVEAU: Nettoyage d'urgence si mémoire critique"""
+    global _LANGUAGE_CACHE
+    try:
+        # Si plus de 30 entrées en cache ou cache désactivé → vider
+        if len(_LANGUAGE_CACHE) > 30 or not LANGUAGE_CACHE_ENABLED:
+            cleared_count = len(_LANGUAGE_CACHE)
+            _LANGUAGE_CACHE.clear()
+            gc.collect()  # Force garbage collection
+            logger.warning(f"🚨 [EMERGENCY] Cache langue vidé: {cleared_count} entrées - protection mémoire")
+            return True
+    except Exception as e:
+        logger.error(f"❌ Erreur nettoyage urgence langue: {e}")
+    return False
 
 def _get_question_hash(question: str) -> str:
     """Génère un hash pour la question aux fins de cache"""
     # Normaliser le texte pour améliorer le hit ratio
     normalized = re.sub(r'\s+', ' ', question.strip().lower())
-    return hashlib.md5(normalized.encode('utf-8')).hexdigest()[:12]
+    return hashlib.md5(normalized.encode('utf-8')).hexdigest()[:8]  # ⚠️ RÉDUIT de 12 → 8 caractères
 
 def _cleanup_language_cache():
-    """🚀 OPTIMISATION: Nettoyage intelligent du cache de langue"""
+    """🚨 VERSION SÉCURISÉE: Nettoyage intelligent avec protection mémoire"""
     global _LANGUAGE_CACHE
+    
+    # Vérification de sécurité mémoire
+    if _memory_emergency_cleanup():
+        return
     
     current_time = time.time()
     
@@ -53,23 +73,24 @@ def _cleanup_language_cache():
     for key in expired_keys:
         _LANGUAGE_CACHE.pop(key, None)
     
-    # Si encore trop d'entrées, supprimer les plus anciennes
+    # ⚠️ SÉCURITÉ RENFORCÉE: Si encore trop d'entrées, limiter drastiquement
     if len(_LANGUAGE_CACHE) > _LANGUAGE_CACHE_MAX_SIZE:
+        # Garder seulement les 50% les plus récentes
         sorted_items = sorted(
             _LANGUAGE_CACHE.items(),
             key=lambda x: x[1][1]  # Trier par timestamp
         )
         
-        # Garder seulement les 80% les plus récentes
-        keep_count = int(_LANGUAGE_CACHE_MAX_SIZE * 0.8)
+        keep_count = max(3, int(_LANGUAGE_CACHE_MAX_SIZE * 0.5))  # Minimum 3, max 50% de la limite
         items_to_keep = sorted_items[-keep_count:]
         
         _LANGUAGE_CACHE = {key: value for key, value in items_to_keep}
-        logger.debug(f"🧹 [LANG_CACHE] Nettoyage: {len(expired_keys)} expirées, gardé {keep_count} entrées")
+        logger.warning(f"🚨 [LANG_CACHE] Nettoyage sécurisé: {len(expired_keys)} expirées, gardé seulement {keep_count} entrées")
 
 def _get_cached_language_detection(question: str) -> Optional[str]:
-    """🚀 NOUVEAU: Récupère la langue détectée depuis le cache"""
-    if not question or not question.strip():
+    """🚨 VERSION SÉCURISÉE: Récupère la langue détectée depuis le cache"""
+    # ⚠️ SÉCURITÉ: Si cache désactivé, retourner None
+    if not LANGUAGE_CACHE_ENABLED or not question or not question.strip():
         return None
         
     cache_key = _get_question_hash(question)
@@ -79,7 +100,7 @@ def _get_cached_language_detection(question: str) -> Optional[str]:
         
         # Vérifier TTL
         if time.time() - timestamp <= _LANGUAGE_CACHE_TTL:
-            logger.debug(f"💾 [LANG_CACHE] Hit pour: '{question[:30]}...' -> {cached_lang}")
+            logger.debug(f"💾 [LANG_CACHE] Hit pour: '{question[:20]}...' -> {cached_lang}")
             return cached_lang
         else:
             # Entrée expirée
@@ -88,29 +109,35 @@ def _get_cached_language_detection(question: str) -> Optional[str]:
     return None
 
 def _cache_language_detection(question: str, detected_language: str):
-    """🚀 NOUVEAU: Sauvegarde la langue détectée en cache"""
-    if not question or not question.strip() or not detected_language:
+    """🚨 VERSION SÉCURISÉE: Sauvegarde la langue détectée en cache"""
+    # ⚠️ SÉCURITÉ: Si cache désactivé ou limite atteinte, ne pas sauvegarder
+    if not LANGUAGE_CACHE_ENABLED or not question or not question.strip() or not detected_language:
         return
         
+    if len(_LANGUAGE_CACHE) >= _LANGUAGE_CACHE_MAX_SIZE:
+        logger.debug(f"⚠️ [LANG_CACHE] Limite atteinte ({_LANGUAGE_CACHE_MAX_SIZE}), nettoyage...")
+        _cleanup_language_cache()
+        
+        # Si toujours plein après nettoyage, ne pas ajouter
+        if len(_LANGUAGE_CACHE) >= _LANGUAGE_CACHE_MAX_SIZE:
+            logger.warning("⚠️ [LANG_CACHE] Cache plein après nettoyage, skip sauvegarde")
+            return
+    
     cache_key = _get_question_hash(question)
     _LANGUAGE_CACHE[cache_key] = (detected_language, time.time())
     
-    logger.debug(f"💾 [LANG_CACHE] Sauvegarde: '{question[:30]}...' -> {detected_language}")
+    logger.debug(f"💾 [LANG_CACHE] Sauvegarde: '{question[:20]}...' -> {detected_language}")
     
-    # Nettoyage périodique du cache
-    if len(_LANGUAGE_CACHE) % 25 == 0:  # Toutes les 25 entrées
+    # ⚠️ SÉCURITÉ: Nettoyage plus fréquent
+    if len(_LANGUAGE_CACHE) % 5 == 0:  # Toutes les 5 entrées au lieu de 25
         _cleanup_language_cache()
 
 # ---------------------------------------------------------------------------
-# DÉTECTION INTELLIGENTE DE LANGUE (CONSERVÉE)
+# DÉTECTION INTELLIGENTE DE LANGUE (CONSERVÉE INTÉGRALEMENT)
 # ---------------------------------------------------------------------------
 
 def should_ignore_language_detection(question: str, detected_lang: str, conversation_lang: str) -> bool:
-    """
-    CONSERVATION INTÉGRALE: Détermine si on doit ignorer la détection automatique de langue
-    pour préserver la cohérence conversationnelle.
-    Utile pour les termes techniques courts ou réponses de clarification.
-    """
+    """CONSERVATION INTÉGRALE: Détermine si on doit ignorer la détection automatique de langue"""
     if not conversation_lang or conversation_lang == detected_lang:
         return False
     
@@ -142,32 +169,31 @@ def should_ignore_language_detection(question: str, detected_lang: str, conversa
     return False
 
 # ---------------------------------------------------------------------------
-# DÉTECTION DE LANGUE UNIVERSELLE (VERSION OPTIMISÉE)
+# DÉTECTION DE LANGUE UNIVERSELLE (VERSION SÉCURISÉE)
 # ---------------------------------------------------------------------------
 
 def detect_question_language(question: str, conversation_context: Optional[Dict[str, Any]] = None) -> str:
     """
-    🚀 VERSION OPTIMISÉE: Utilise OpenAI pour détecter automatiquement la langue de la question.
-    CONSERVATION INTÉGRALE de la logique avec ajout du cache pour éviter les appels OpenAI redondants.
-    Supporte toutes les langues sans limitation.
-    Tient compte du contexte conversationnel pour éviter les changements intempestifs.
+    🚨 VERSION SÉCURISÉE: Utilise OpenAI pour détecter automatiquement la langue de la question.
+    CONSERVATION INTÉGRALE de la logique avec cache drastiquement limité pour économiser la mémoire.
     """
     if not question or not OPENAI_AVAILABLE:
         return "fr"  # Fallback par défaut
     
-    # 🚀 NOUVEAU: Vérifier le cache en premier pour éviter appel OpenAI
-    cached_language = _get_cached_language_detection(question)
-    if cached_language is not None:
-        # Même avec cache hit, appliquer la logique d'ignore si contexte disponible
-        conversation_lang = None
-        if conversation_context:
-            conversation_lang = conversation_context.get("language")
-            
-        if conversation_lang and should_ignore_language_detection(question, cached_language, conversation_lang):
-            logger.info(f"🎯 Détection {cached_language} ignorée, conservation {conversation_lang}")
-            return conversation_lang
-            
-        return cached_language
+    # 🚨 SÉCURITÉ: Vérifier le cache seulement si activé et sûr
+    if LANGUAGE_CACHE_ENABLED:
+        cached_language = _get_cached_language_detection(question)
+        if cached_language is not None:
+            # Même avec cache hit, appliquer la logique d'ignore si contexte disponible
+            conversation_lang = None
+            if conversation_context:
+                conversation_lang = conversation_context.get("language")
+                
+            if conversation_lang and should_ignore_language_detection(question, cached_language, conversation_lang):
+                logger.info(f"🎯 Détection {cached_language} ignorée, conservation {conversation_lang}")
+                return conversation_lang
+                
+            return cached_language
     
     # Vérifier le contexte conversationnel
     conversation_lang = None
@@ -175,7 +201,7 @@ def detect_question_language(question: str, conversation_context: Optional[Dict[
         conversation_lang = conversation_context.get("language")
     
     try:
-        # 🚀 MESURE: Temps d'appel OpenAI pour monitoring
+        # 🚨 MESURE: Temps d'appel OpenAI pour monitoring
         start_time = time.time()
         
         detection_prompt = f"""Detect the language of this question and respond with ONLY the 2-letter ISO language code (en, fr, es, de, it, pt, etc.).
@@ -195,8 +221,9 @@ Language code:"""
         if language_code:
             detected = language_code.strip().lower()[:2]  # Premier code à 2 lettres
             
-            # 🚀 NOUVEAU: Mettre en cache le résultat AVANT application de la logique ignore
-            _cache_language_detection(question, detected)
+            # 🚨 SÉCURITÉ: Mettre en cache le résultat SEULEMENT si cache activé
+            if LANGUAGE_CACHE_ENABLED:
+                _cache_language_detection(question, detected)
             
             # 🔧 CONSERVÉ: Appliquer la logique d'ignore si contexte disponible
             if conversation_lang and should_ignore_language_detection(question, detected, conversation_lang):
@@ -212,17 +239,14 @@ Language code:"""
     # Fallback simple si OpenAI échoue
     fallback_result = detect_language_simple_fallback(question)
     
-    # 🚀 NOUVEAU: Mettre en cache même le fallback pour éviter re-calculs
-    if fallback_result != "auto":  # Ne pas cacher "auto" qui n'est pas définitif
+    # 🚨 SÉCURITÉ: Mettre en cache même le fallback seulement si sûr
+    if LANGUAGE_CACHE_ENABLED and fallback_result != "auto":  # Ne pas cacher "auto" qui n'est pas définitif
         _cache_language_detection(question, fallback_result)
     
     return fallback_result
 
 def detect_language_simple_fallback(question: str) -> str:
-    """
-    CONSERVATION INTÉGRALE: Fallback simple si OpenAI n'est pas disponible.
-    Détection basique français vs non-français.
-    """
+    """CONSERVATION INTÉGRALE: Fallback simple si OpenAI n'est pas disponible."""
     if not question:
         return "fr"
         
@@ -246,10 +270,7 @@ def detect_language_simple_fallback(question: str) -> str:
 # ---------------------------------------------------------------------------
 
 def adapt_response_to_language(response_text: str, source_type: str, target_language: str, original_question: str) -> str:
-    """
-    CONSERVATION INTÉGRALE: Adapte la réponse à la langue cible via OpenAI de manière intelligente.
-    Supporte TOUTES les langues automatiquement.
-    """
+    """CONSERVATION INTÉGRALE: Adapte la réponse à la langue cible via OpenAI de manière intelligente."""
     # Si français, pas de traitement
     if target_language == "fr":
         return response_text
@@ -347,17 +368,7 @@ Analysis in user's language:"""
         return response_text
 
 def finalize_response_with_language(response: Dict[str, Any], question: str, effective_language: str, detected_language: str, force_conversation_language: bool = True) -> Dict[str, Any]:
-    """
-    CONSERVATION INTÉGRALE: Helper pour appliquer l'adaptation linguistique à toute réponse finale.
-    Utilise cette fonction avant chaque return dans handle().
-    
-    Args:
-        response: Réponse à finaliser
-        question: Question originale de l'utilisateur
-        effective_language: Langue effective choisie
-        detected_language: Langue détectée automatiquement
-        force_conversation_language: Force l'adaptation si langues différentes
-    """
+    """CONSERVATION INTÉGRALE: Helper pour appliquer l'adaptation linguistique à toute réponse finale."""
     # Ajouter les métadonnées de langue pour toutes les réponses
     if response.get("type") == "answer" and "answer" in response:
         response["answer"]["meta"] = response["answer"].get("meta", {})
@@ -446,9 +457,7 @@ def finalize_response_with_language(response: Dict[str, Any], question: str, eff
     return response
 
 def get_language_processing_status() -> Dict[str, Any]:
-    """
-    🚀 VERSION AMÉLIORÉE: Retourne le statut du système de traitement linguistique avec infos cache
-    """
+    """🚨 VERSION SÉCURISÉE: Retourne le statut du système de traitement linguistique avec infos cache sécurisées"""
     auto_detection_enabled = str(os.getenv("ENABLE_AUTO_LANGUAGE_DETECTION", "true")).lower() in ("1", "true", "yes", "on")
     
     return {
@@ -463,28 +472,47 @@ def get_language_processing_status() -> Dict[str, Any]:
             "forced_adaptation": True
         },
         "technical_terms_count": 20,  # Nombre de termes techniques reconnus
-        "version": "cached_v2.0",
-        # 🚀 NOUVEAU: Informations sur le cache de langue
+        "version": "memory_safe_v1.0",
+        # 🚨 SÉCURISÉ: Informations sur le cache de langue limitées
         "language_cache": {
-            "enabled": True,
+            "enabled": LANGUAGE_CACHE_ENABLED,
             "current_size": len(_LANGUAGE_CACHE),
             "max_size": _LANGUAGE_CACHE_MAX_SIZE,
             "ttl_seconds": _LANGUAGE_CACHE_TTL,
-            "estimated_hit_ratio": "80-90%",  # Estimation basée sur patterns d'usage
-            "openai_calls_saved": "significant"
+            "memory_safe": True,  # 🚨 NOUVEAU
+            "emergency_cleanup": True,  # 🚨 NOUVEAU
         }
     }
 
 # ---------------------------------------------------------------------------
-# 🚀 NOUVELLES FONCTIONS DE CACHE ET OPTIMISATION
+# 🚨 NOUVELLES FONCTIONS DE SÉCURITÉ MÉMOIRE
 # ---------------------------------------------------------------------------
 
+def clear_language_cache(language_code: Optional[str] = None):
+    """🚨 VERSION SÉCURISÉE: Vide le cache de langue avec garbage collection"""
+    global _LANGUAGE_CACHE
+    
+    if language_code is None:
+        # Vider tout le cache
+        cleared_count = len(_LANGUAGE_CACHE)
+        _LANGUAGE_CACHE.clear()
+        gc.collect()  # Force garbage collection
+        logger.info(f"🧹 [LANG_CACHE] Cache entièrement vidé: {cleared_count} entrées supprimées")
+    else:
+        # Vider seulement une langue spécifique
+        keys_to_remove = [key for key, (lang, _) in _LANGUAGE_CACHE.items() if lang == language_code]
+        for key in keys_to_remove:
+            _LANGUAGE_CACHE.pop(key, None)
+        gc.collect()
+        logger.info(f"🧹 [LANG_CACHE] Cache {language_code} vidé: {len(keys_to_remove)} entrées supprimées")
+
 def get_language_cache_stats() -> Dict[str, Any]:
-    """🚀 NOUVEAU: Statistiques détaillées du cache de langue"""
+    """🚨 VERSION SÉCURISÉE: Statistiques détaillées du cache de langue"""
     if not _LANGUAGE_CACHE:
         return {
             "total_entries": 0,
-            "cache_empty": True
+            "cache_empty": True,
+            "memory_safe_mode": True
         }
     
     # Analyser les langues en cache
@@ -504,130 +532,32 @@ def get_language_cache_stats() -> Dict[str, Any]:
     return {
         "total_entries": len(_LANGUAGE_CACHE),
         "max_capacity": _LANGUAGE_CACHE_MAX_SIZE,
-        "utilization_percent": (len(_LANGUAGE_CACHE) / _LANGUAGE_CACHE_MAX_SIZE) * 100,
+        "utilization_percent": (len(_LANGUAGE_CACHE) / _LANGUAGE_CACHE_MAX_SIZE) * 100 if _LANGUAGE_CACHE_MAX_SIZE > 0 else 0,
         "languages_cached": language_counts,
         "most_common_language": max(language_counts, key=language_counts.get) if language_counts else None,
         "oldest_entry_age_seconds": current_time - oldest_entry if oldest_entry else 0,
         "newest_entry_age_seconds": current_time - newest_entry if newest_entry else 0,
         "ttl_seconds": _LANGUAGE_CACHE_TTL,
-        "memory_usage_estimate_kb": len(_LANGUAGE_CACHE) * 0.2,  # Estimation rough
+        "cache_enabled": LANGUAGE_CACHE_ENABLED,
+        "memory_safe_mode": True,  # 🚨 NOUVEAU
+        "emergency_threshold": 30,  # 🚨 NOUVEAU
+        "memory_usage_estimate_kb": len(_LANGUAGE_CACHE) * 0.05,  # Estimation très conservative
         "performance_impact": {
             "openai_calls_avoided": len(_LANGUAGE_CACHE),
-            "estimated_time_saved_seconds": len(_LANGUAGE_CACHE) * 1.5,  # ~1.5s par appel OpenAI évité
-            "cost_savings_estimate": f"${len(_LANGUAGE_CACHE) * 0.001:.3f}"  # Estimation coût OpenAI évité
+            "estimated_time_saved_seconds": len(_LANGUAGE_CACHE) * 1.0,  # ~1s par appel OpenAI évité
+            "cost_savings_estimate": f"${len(_LANGUAGE_CACHE) * 0.0008:.4f}"  # Estimation coût OpenAI évité
         }
     }
 
-def clear_language_cache(language_code: Optional[str] = None):
-    """🚀 NOUVEAU: Vide le cache de langue (optionnellement par langue)"""
-    global _LANGUAGE_CACHE
-    
-    if language_code is None:
-        # Vider tout le cache
-        cleared_count = len(_LANGUAGE_CACHE)
-        _LANGUAGE_CACHE.clear()
-        logger.info(f"🧹 [LANG_CACHE] Cache entièrement vidé: {cleared_count} entrées supprimées")
-    else:
-        # Vider seulement une langue spécifique
-        keys_to_remove = [key for key, (lang, _) in _LANGUAGE_CACHE.items() if lang == language_code]
-        for key in keys_to_remove:
-            _LANGUAGE_CACHE.pop(key, None)
-        logger.info(f"🧹 [LANG_CACHE] Cache {language_code} vidé: {len(keys_to_remove)} entrées supprimées")
-
-def warm_language_cache(questions: List[str]):
-    """🚀 NOUVEAU: Pré-chauffe le cache avec une liste de questions communes"""
-    logger.info(f"🔥 [LANG_CACHE] Pré-chauffage avec {len(questions)} questions...")
-    
-    warmed_count = 0
-    for question in questions:
-        if not question or not question.strip():
-            continue
-            
-        # Effectuer la détection pour mettre en cache (mais sans contexte conversationnel)
-        detected_lang = detect_question_language(question, None)
-        
-        if detected_lang and detected_lang != "auto":
-            warmed_count += 1
-    
-    logger.info(f"🔥 [LANG_CACHE] Pré-chauffage terminé: {warmed_count} questions traitées, cache: {len(_LANGUAGE_CACHE)} entrées")
-
-def benchmark_language_detection_performance(test_questions: List[str], iterations: int = 3) -> Dict[str, Any]:
-    """🚀 NOUVEAU: Benchmark de performance avec/sans cache pour la détection de langue"""
-    if not OPENAI_AVAILABLE:
-        return {
-            "error": "OpenAI non disponible pour benchmark",
-            "openai_available": False
-        }
-    
-    logger.info(f"⚡ [LANG_BENCHMARK] Test performance avec {len(test_questions)} questions, {iterations} itérations")
-    
-    # Test sans cache (première exécution)
-    clear_language_cache()
-    start_time = time.time()
-    
-    for _ in range(iterations):
-        for question in test_questions:
-            # Forcer la détection sans cache
-            clear_language_cache()
-            detect_question_language(question, None)
-    
-    no_cache_time = time.time() - start_time
-    
-    # Test avec cache (exécutions suivantes)
-    clear_language_cache()
-    # Pré-chauffer le cache avec une itération
-    for question in test_questions:
-        detect_question_language(question, None)
-    
-    start_time = time.time()
-    
-    for _ in range(iterations):
-        for question in test_questions:
-            detect_question_language(question, None)  # Devrait utiliser le cache
-    
-    with_cache_time = time.time() - start_time
-    
-    # Calculer les gains
-    speedup = no_cache_time / with_cache_time if with_cache_time > 0 else float('inf')
-    cache_efficiency = ((no_cache_time - with_cache_time) / no_cache_time) * 100 if no_cache_time > 0 else 0
-    
-    results = {
-        "test_config": {
-            "questions_count": len(test_questions),
-            "iterations": iterations,
-            "total_detections": len(test_questions) * iterations
-        },
-        "performance": {
-            "without_cache_seconds": round(no_cache_time, 3),
-            "with_cache_seconds": round(with_cache_time, 3),
-            "speedup_factor": round(speedup, 2),
-            "cache_efficiency_percent": round(cache_efficiency, 1),
-            "avg_openai_call_time": round(no_cache_time / (len(test_questions) * iterations), 3),
-            "avg_cache_hit_time": round(with_cache_time / (len(test_questions) * iterations), 3)
-        },
-        "cost_analysis": {
-            "openai_calls_without_cache": len(test_questions) * iterations,
-            "openai_calls_with_cache": len(test_questions),  # Seulement le premier cycle
-            "calls_saved": (len(test_questions) * iterations) - len(test_questions),
-            "estimated_cost_saved_usd": round(((len(test_questions) * iterations) - len(test_questions)) * 0.001, 4)
-        },
-        "cache_stats": get_language_cache_stats()
-    }
-    
-    logger.info(f"⚡ [LANG_BENCHMARK] Résultats: Speedup {speedup:.1f}x, Efficacité {cache_efficiency:.1f}%, Calls évités: {results['cost_analysis']['calls_saved']}")
-    return results
+# 🚨 FONCTIONS SIMPLIFIÉES POUR ÉVITER SURCHARGE MÉMOIRE
 
 def debug_language_detection(question: str, with_context: bool = False) -> Dict[str, Any]:
-    """🚀 NOUVEAU: Debug complet de la détection de langue avec informations cache"""
-    logger.info(f"🔬 [LANG_DEBUG] Test détection sur: '{question}'")
+    """🚨 VERSION SIMPLIFIÉE: Debug de la détection de langue avec informations cache minimales"""
+    logger.info(f"🔬 [LANG_DEBUG] Test détection sur: '{question[:50]}...'")
     
-    # Test sans cache d'abord
+    # Test simple sans surcharge mémoire
     question_hash = _get_question_hash(question)
     was_cached = question_hash in _LANGUAGE_CACHE
-    
-    if was_cached:
-        cached_result = _LANGUAGE_CACHE[question_hash]
-        logger.info(f"🔬 [LANG_DEBUG] Résultat en cache trouvé: {cached_result}")
     
     # Test avec détection complète
     start_time = time.time()
@@ -637,39 +567,15 @@ def debug_language_detection(question: str, with_context: bool = False) -> Dict[
     
     detection_time = time.time() - start_time
     
-    # Test fallback
-    fallback_lang = detect_language_simple_fallback(question)
-    
-    # Informations sur l'ignore logic si contexte fourni
-    ignore_info = None
-    if with_context and context:
-        ignore_info = {
-            "would_ignore": should_ignore_language_detection(question, detected_lang, context["language"]),
-            "conversation_language": context["language"],
-            "detected_language": detected_lang
-        }
-    
+    # Retour minimal pour éviter surcharge mémoire
     results = {
-        "question": question,
         "question_hash": question_hash,
-        "results": {
-            "detected_language": detected_lang,
-            "fallback_language": fallback_lang,
-            "final_language": detected_lang
-        },
-        "cache_info": {
-            "was_cached": was_cached,
-            "now_cached": question_hash in _LANGUAGE_CACHE,
-            "detection_time_ms": round(detection_time * 1000, 2),
-            "used_openai": detection_time > 0.1,  # Si > 100ms, probablement OpenAI
-        },
-        "context_info": ignore_info,
-        "analysis": {
-            "question_length": len(question),
-            "normalized_text": re.sub(r'\s+', ' ', question.strip().lower())[:50],
-            "openai_available": OPENAI_AVAILABLE
-        }
+        "detected_language": detected_lang,
+        "was_cached": was_cached,
+        "detection_time_ms": round(detection_time * 1000, 2),
+        "cache_enabled": LANGUAGE_CACHE_ENABLED,
+        "memory_safe_mode": True
     }
     
-    logger.info(f"🔬 [LANG_DEBUG] Résultats complets: {results}")
+    logger.info(f"🔬 [LANG_DEBUG] Résultats: {detected_lang} ({'cache' if was_cached else 'openai'})")
     return results
