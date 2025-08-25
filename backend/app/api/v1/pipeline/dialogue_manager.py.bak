@@ -257,18 +257,18 @@ def _prepare_confidence_inputs(
     
     return intent_analysis, completeness_analysis, validation_analysis
 
-def _apply_unified_confidence(
+
+
+def _apply_unified_confidence_FIXED(
     response: Dict[str, Any],
     intent_analysis: Optional[Dict[str, Any]] = None,
     completeness_analysis: Optional[Dict[str, Any]] = None,
     validation_result: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
-    Applique le système de confidence unifié à une réponse
-    Retourne la réponse enrichie avec le score de confiance
+    Version corrigée de _apply_unified_confidence qui fix le bug du score 1.0%
     """
     if not UNIFIED_CONFIDENCE_AVAILABLE:
-        # Fallback simple si système indisponible
         response["confidence"] = {
             "score": 75.0,
             "level": "medium", 
@@ -285,27 +285,84 @@ def _apply_unified_confidence(
             validation_result=validation_result
         )
         
-        # Ajouter le résumé à la réponse
-        response["confidence"] = get_confidence_summary(confidence_breakdown)
+        # 🐛 FIX: Vérifier que le score n'est pas aberrant
+        if confidence_breakdown is None:
+            logger.warning("⚠️ confidence_breakdown est None, utilisation fallback")
+            response["confidence"] = {
+                "score": 75.0,
+                "level": "medium",
+                "explanation": "Erreur calcul confidence, score par défaut"
+            }
+            return response
+        
+        # Récupérer le score unifié
+        unified_score = getattr(confidence_breakdown, 'unified_score', None)
+        confidence_level = getattr(confidence_breakdown, 'level', None)
+        
+        # 🐛 FIX: Vérifications de cohérence
+        if unified_score is None or unified_score < 0 or unified_score > 100:
+            logger.error(f"❌ Score de confidence invalide: {unified_score}")
+            response["confidence"] = {
+                "score": 50.0,
+                "level": "medium",
+                "explanation": f"Score invalide détecté: {unified_score}, utilisation fallback"
+            }
+            return response
+        
+        # 🐛 FIX: Vérifier cohérence score/niveau
+        expected_level = _get_level_from_score(unified_score)
+        actual_level = confidence_level.value if hasattr(confidence_level, 'value') else str(confidence_level)
+        
+        if expected_level != actual_level:
+            logger.warning(f"⚠️ Incohérence détectée - Score: {unified_score}% → Niveau attendu: {expected_level}, reçu: {actual_level}")
+            # Utiliser le niveau calculé à partir du score
+            actual_level = expected_level
+        
+        # Générer le résumé
+        confidence_summary = get_confidence_summary(confidence_breakdown)
+        
+        # 🐛 FIX: Double vérification du résumé
+        summary_score = confidence_summary.get("score", 0)
+        if abs(summary_score - unified_score) > 1.0:  # Tolérance de 1%
+            logger.error(f"❌ Incohérence score summary vs breakdown: {summary_score} vs {unified_score}")
+            confidence_summary["score"] = unified_score
+            confidence_summary["level"] = actual_level
+        
+        response["confidence"] = confidence_summary
         
         # Ajouter les détails complets en mode debug si activé
         debug_confidence = str(os.getenv("DEBUG_CONFIDENCE", "false")).lower() in ("1", "true", "yes", "on")
         if debug_confidence:
             response["confidence_debug"] = get_detailed_confidence(confidence_breakdown)
         
-        logger.info(f"🎯 Confidence unifié calculé: {confidence_breakdown.unified_score}% ({confidence_breakdown.level.value})")
+        logger.info(f"🎯 Confidence unifié calculé: {unified_score:.1f}% ({actual_level})")
         
         return response
         
     except Exception as e:
         logger.error(f"❌ Erreur calcul confidence unifié: {e}")
-        # Fallback en cas d'erreur
         response["confidence"] = {
             "score": 50.0,
             "level": "medium",
             "explanation": f"Erreur calcul confidence: {str(e)}"
         }
         return response
+
+def _get_level_from_score(score: float) -> str:
+    """Calcule le niveau de confiance basé sur le score"""
+    if score >= 90:
+        return "very_high"
+    elif score >= 70:
+        return "high" 
+    elif score >= 50:
+        return "medium"
+    elif score >= 30:
+        return "low"
+    else:
+        return "very_low"
+
+
+
 
 # ---------------------------------------------------------------------------
 # FONCTION PRINCIPALE HANDLE - VERSION AVEC CONFIDENCE UNIFIÉ
