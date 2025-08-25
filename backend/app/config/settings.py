@@ -117,7 +117,7 @@ class Settings:
     @property
     def embedding_model(self) -> str:
         """Get embedding model."""
-        return self._get_secret("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002")
+        return self._get_secret("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
     
     @property
     def fallback_model(self) -> str:
