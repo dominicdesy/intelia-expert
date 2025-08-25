@@ -295,7 +295,9 @@ def _apply_unified_confidence(
         if debug_confidence:
             response["confidence_debug"] = get_detailed_confidence(confidence_breakdown)
         
-        logger.info(f"🎯 Confidence unifié calculé: {confidence_breakdown.unified_score}% ({confidence_breakdown.level.value})")
+        unified_score_percent = confidence_breakdown.unified_score * 100 if confidence_breakdown.unified_score <= 1.0 else confidence_breakdown.unified_score
+        logger.info(f"🎯 Confidence unifié calculé: {unified_score_percent:.1f}% ({confidence_breakdown.level.value})")
+
         
         return response
         
