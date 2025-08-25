@@ -3,7 +3,7 @@ FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PORT=8000
+    PORT=8080
 
 # non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
@@ -41,5 +41,5 @@ EXPOSE $PORT
 HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 \
   CMD curl -fsS http://localhost:$PORT/api/v1/health || exit 1
 
-# Start API
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start API - Utilise la variable PORT dynamiquement
+CMD ["sh", "-c", "python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
