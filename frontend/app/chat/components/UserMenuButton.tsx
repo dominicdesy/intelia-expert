@@ -57,16 +57,20 @@ export const UserMenuButton = React.memo(() => {
     return 'U'
   }, [])
 
-  // 🛠️ CORRECTION MAJEURE : Mémoisation des initiales et debug conditionnel
+  // 🛠️ CORRECTION MAJEURE : Mémoisation des initiales et debug conditionnel CORRIGÉ
   const userInitials = useMemo(() => {
     const initials = getUserInitials(user)
     
     // 🛠️ DEBUG CONDITIONNEL : Ne loguer que si les valeurs changent vraiment
     const debugId = `${user?.name}-${user?.email}`
-    const lastDebugId = UserMenuButton.lastDebugId || ''
     
-    if (debugId !== lastDebugId) {
-      UserMenuButton.lastDebugId = debugId
+    // Utiliser une variable globale pour éviter l'erreur TypeScript
+    if (!window.userMenuLastDebugId) {
+      window.userMenuLastDebugId = ''
+    }
+    
+    if (debugId !== window.userMenuLastDebugId) {
+      window.userMenuLastDebugId = debugId
       
       console.log('🔄 [UserMenu] Changement détecté:', {
         user_name: user?.name,
@@ -350,6 +354,12 @@ export const UserMenuButton = React.memo(() => {
   )
 })
 
-// 🛠️ CORRECTION : Ajout du displayName et propriété statique pour le debug
+// 🛠️ CORRECTION : Ajout du displayName
 UserMenuButton.displayName = 'UserMenuButton'
-UserMenuButton.lastDebugId = ''
+
+// 🛠️ CORRECTION : Déclaration TypeScript pour window
+declare global {
+  interface Window {
+    userMenuLastDebugId?: string
+  }
+}
