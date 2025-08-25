@@ -316,7 +316,7 @@ async def lifespan(app: FastAPI):
         global_path = rag_paths["global"]
         logger.info(f"🔍 Chargement RAG Global: {global_path}")
         if os.path.exists(global_path):
-            global_embedder = FastRAGEmbedder(debug=True)
+            global_embedder = FastRAGEmbedder(debug=True, cache_embeddings=True, max_workers=2)
             if global_embedder.load_index(global_path) and global_embedder.has_search_engine():
                 app.state.rag = global_embedder
                 _log_loaded("global", global_path, global_embedder)
@@ -330,7 +330,7 @@ async def lifespan(app: FastAPI):
         logger.info(f"🔍 Chargement RAG Broiler: {broiler_path}")
         if os.path.exists(broiler_path):
             try:
-                broiler_embedder = FastRAGEmbedder(debug=False)
+                broiler_embedder = FastRAGEmbedder(debug=False, cache_embeddings=True, max_workers=2)
                 if broiler_embedder.load_index(broiler_path) and broiler_embedder.has_search_engine():
                     app.state.rag_broiler = broiler_embedder
                     _log_loaded("broiler", broiler_path, broiler_embedder)
@@ -346,7 +346,7 @@ async def lifespan(app: FastAPI):
         logger.info(f"🔍 Chargement RAG Layer: {layer_path}")
         if os.path.exists(layer_path):
             try:
-                layer_embedder   = FastRAGEmbedder(debug=False)
+                layer_embedder = FastRAGEmbedder(debug=False, cache_embeddings=True, max_workers=2)
                 if layer_embedder.load_index(layer_path) and layer_embedder.has_search_engine():
                     app.state.rag_layer = layer_embedder
                     _log_loaded("layer", layer_path, layer_embedder)

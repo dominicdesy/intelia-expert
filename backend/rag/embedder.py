@@ -99,10 +99,27 @@ class FastRAGEmbedder:
         model_name: Optional[str] = None,
         enhanced_query_normalization: bool = True,
         debug: bool = True,
+        # 👇 compat rétro : on accepte ces options si l’app les passe (même si non utilisées)
+        cache_embeddings: Optional[bool] = None,
+        cache_max_entries: Optional[int] = None,
+        max_workers: Optional[int] = None,
+        # 👇 on accepte silencieusement tout autre kwarg inconnu pour ne pas casser l’appelant
+        **_ignored_kwargs,
     ) -> None:
         self.index_dir = Path(index_dir)
         self.debug = bool(debug)
         self.enhanced_query_normalization = bool(enhanced_query_normalization)
+
+        # Compat : on accepte/ignore ces options (évite "unexpected keyword argument")
+        self._cache_embeddings = bool(cache_embeddings) if cache_embeddings is not None else False
+        self._cache_max_entries = int(cache_max_entries) if cache_max_entries is not None else 0
+        self._max_workers = int(max_workers) if max_workers is not None else 0
+
+        if _ignored_kwargs:
+            try:
+                logger.info("ℹ️ FastRAGEmbedder: options ignorées: %s", sorted(_ignored_kwargs.keys()))
+            except Exception:
+                pass
 
         # Flags & handles
         self._dependencies_ok: bool = False  # FAISS + numpy OK ?
