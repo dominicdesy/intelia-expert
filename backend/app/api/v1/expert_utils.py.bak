@@ -3,11 +3,6 @@
 """
 Utilitaires et fonctions helper pour expert.py
 Extraction des fonctions de support technique
-
-🔧 CORRECTIONS APPLIQUÉES:
-- Fix signature log_question_to_analytics (confidence_score parameter)
-- Amélioration gestion des erreurs analytics
-- Optimisation performance background tasks
 """
 
 import logging
@@ -180,69 +175,6 @@ def extract_age_from_text(text: str) -> Optional[int]:
                 continue
     return None
 
-# ===== 🔧 CORRECTION CRITIQUE: Function signature compatible =====
-def log_question_to_analytics(
-    current_user: Optional[Dict[str, Any]],
-    payload: Any,
-    result: Dict[str, Any],
-    response_text: str = "",
-    processing_time_ms: int = 0,
-    confidence_score: Optional[float] = None,  # ← AJOUT DU PARAMÈTRE MANQUANT
-    confidence_level: Optional[str] = None,    # ← AJOUT DU PARAMÈTRE MANQUANT
-    error_info: Optional[Dict[str, Any]] = None
-) -> None:
-    """
-    🔧 FONCTION CORRIGÉE - Wrapper pour compatibilité avec la nouvelle signature
-    
-    Cette fonction était celle qui causait l'erreur:
-    "log_question_to_analytics() got an unexpected keyword argument 'confidence_score'"
-    """
-    try:
-        # Import de la vraie fonction de logging
-        from app.api.v1.logging import log_question_to_analytics as log_impl
-        
-        # Extraire les informations nécessaires
-        user_email = current_user.get('email') if current_user else None
-        session_id = getattr(payload, 'session_id', 'unknown')
-        question = getattr(payload, 'question', '')
-        
-        # Déterminer la source et le statut
-        if error_info:
-            status = "error"
-            source = "error"
-        elif result.get("type") == "quota_exceeded":
-            status = "quota_exceeded"
-            source = "quota_exceeded"
-        elif result.get("type") == "validation_rejected":
-            status = "validation_rejected" 
-            source = "validation_rejected"
-        else:
-            status = "success"
-            answer = result.get("answer", {})
-            source = answer.get("source", "unknown")
-        
-        # 🔧 CORRECTION: Appel avec les bons paramètres
-        log_impl(
-            user_email=user_email,
-            session_id=session_id,
-            question=question,
-            response_text=response_text,
-            response_source=source,
-            status=status,
-            processing_time_ms=processing_time_ms,
-            confidence=confidence_score,  # ← Utilise le nouveau paramètre
-            entities=getattr(payload, 'entities', {}),
-            error_info=error_info,
-            completeness_score=getattr(result, 'completeness_score', None),
-            language=getattr(payload, 'language', 'fr'),
-            intent=getattr(result, 'intent', None)
-        )
-        
-    except Exception as e:
-        logger.error(f"⛔ Erreur log question to analytics (wrapper): {e}")
-        # Ne pas faire échouer la requête principale
-        pass
-
 # ===== Fonctions async optimisées =====
 async def increment_quota_async(user_email: str) -> bool:
     """Version async pour l'incrémentation du quota"""
@@ -263,8 +195,10 @@ async def log_analytics_async(
     result: Dict[str, Any], 
     start_time: float
 ) -> bool:
-    """🔧 Version async CORRIGÉE pour le logging analytics"""
+    """Version async pour le logging analytics"""
     try:
+        from app.api.v1.logging import log_question_to_analytics
+        
         # Calculer le temps de traitement
         processing_time = int((time.time() - start_time) * 1000)
         
@@ -279,35 +213,28 @@ async def log_analytics_async(
         else:
             response_text = str(result.get("message", ""))
         
-        # 🔧 CORRECTION: Extraire correctement les scores de confidence
-        confidence_data = result.get("confidence", {})
-        if isinstance(confidence_data, dict):
-            confidence_score = confidence_data.get("score")
-            confidence_level = confidence_data.get("level")
-        else:
-            # Fallback si confidence n'est pas un dict
-            confidence_score = confidence_data if isinstance(confidence_data, (int, float)) else None
-            confidence_level = None
+        # Extraire le score de confidence dans les analytics
+        confidence_score = result.get("confidence", {}).get("score")
+        confidence_level = result.get("confidence", {}).get("level")
         
-        # 🔧 CORRECTION: Appel avec la nouvelle signature compatible
+        # Pour l'instant, wrapper la fonction sync en thread
+        # TODO: Remplacer par vrai async quand logging.py sera optimisé
         await asyncio.to_thread(
-            log_question_to_analytics,  # ← Utilise notre wrapper corrigé
+            log_question_to_analytics,
             current_user=current_user,
             payload=payload,
             result=result,
             response_text=response_text[:500],  # Limiter la taille pour analytics
             processing_time_ms=processing_time,
-            confidence_score=confidence_score,  # ← Paramètre maintenant supporté
-            confidence_level=confidence_level   # ← Paramètre maintenant supporté
+            # Paramètres de confidence pour analytics
+            confidence_score=confidence_score,
+            confidence_level=confidence_level
         )
         logger.info("📊 Question loggée dans analytics avec confidence")
         return True
         
     except Exception as e:
         logger.error(f"❌ Erreur logging analytics: {e}")
-        # 🔧 AMÉLIORATION: Log plus détaillé pour debug
-        logger.error(f"❌ Analytics error details - result keys: {list(result.keys()) if isinstance(result, dict) else 'not dict'}")
-        logger.error(f"❌ Analytics error details - confidence: {result.get('confidence', 'missing') if isinstance(result, dict) else 'n/a'}")
         raise
 
 async def execute_background_tasks_async(
@@ -320,7 +247,6 @@ async def execute_background_tasks_async(
     """
     🚀 OPTIMISATION PERFORMANCE: Exécute les tâches de fond en parallèle
     
-    🔧 VERSION AMÉLIORÉE avec gestion d'erreurs renforcée
     Gain estimé: 1-1.5 secondes par requête
     """
     tasks = []
@@ -339,7 +265,7 @@ async def execute_background_tasks_async(
     # return_exceptions=True évite qu'une erreur interrompe les autres
     results = await asyncio.gather(*tasks, return_exceptions=True)
     
-    # 🔧 AMÉLIORATION: Traiter les erreurs individuellement avec plus de détails
+    # Traiter les erreurs individuellement (ne pas faire échouer la requête)
     task_names = []
     if user_email:
         task_names.append("quota_increment")
@@ -349,53 +275,4 @@ async def execute_background_tasks_async(
         if isinstance(task_result, Exception):
             task_name = task_names[i] if i < len(task_names) else f"task_{i}"
             logger.error(f"❌ Erreur tâche {task_name}: {task_result}")
-            logger.error(f"❌ Task {task_name} error type: {type(task_result).__name__}")
         # Les succès sont déjà loggés dans les fonctions individuelles
-
-# ===== 🆕 NOUVELLES FONCTIONS DE DIAGNOSTIC =====
-
-def validate_analytics_compatibility() -> Dict[str, Any]:
-    """🔧 Fonction de diagnostic pour valider la compatibilité analytics"""
-    try:
-        from app.api.v1.logging import log_question_to_analytics as log_impl
-        import inspect
-        
-        # Analyser la signature de la vraie fonction
-        sig = inspect.signature(log_impl)
-        params = list(sig.parameters.keys())
-        
-        return {
-            "status": "compatible",
-            "function_found": True,
-            "parameters": params,
-            "has_confidence": "confidence" in params,
-            "has_confidence_score": "confidence_score" in params,
-            "signature": str(sig)
-        }
-        
-    except ImportError as e:
-        return {
-            "status": "import_error",
-            "function_found": False,
-            "error": str(e)
-        }
-    except Exception as e:
-        return {
-            "status": "analysis_error", 
-            "function_found": True,
-            "error": str(e)
-        }
-
-def get_expert_utils_status() -> Dict[str, Any]:
-    """🔧 Fonction de diagnostic pour vérifier l'état des utils"""
-    return {
-        "version": "corrected_2025_08_25",
-        "numpy_available": HAS_NUMPY,
-        "store_cache_size": len(_store_cache),
-        "analytics_compatibility": validate_analytics_compatibility(),
-        "functions_count": {
-            "total": 12,
-            "async": 3,
-            "helpers": 9
-        }
-    }
