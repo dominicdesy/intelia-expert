@@ -145,10 +145,19 @@ def get_retriever(*args, **kwargs):
 
 def get_embedder(*args, **kwargs):
     """
-    Fabrique l'embedder si disponible. Retourne None sinon.
+    Fabrique l'embedder si disponible en gérant la compatibilité avec les nouveaux paramètres.
+    Retourne None si l'embedder n'est pas disponible.
+    
+    Accepte et transmet les paramètres de compatibilité :
+    - cache_embeddings
+    - cache_max_entries  
+    - max_workers
     """
     if _Embedder is None:
         return None
-    # Exemple si votre implé accepte un param `method` :
-    # kwargs.setdefault("method", current_embedding_method())
+    
+    # Gestion de la compatibilité : on passe tous les kwargs à l'embedder
+    # qui se chargera de gérer les paramètres de compatibilité via **_ignored_kwargs
+    kwargs.setdefault("method_override", current_embedding_method())
+    
     return _Embedder(*args, **kwargs)  # type: ignore
