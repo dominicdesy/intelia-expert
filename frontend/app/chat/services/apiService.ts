@@ -18,128 +18,90 @@ const getApiConfig = () => {
 
 const API_BASE_URL = getApiConfig()
 
-// ✅ Fonction auth Supabase native MISE À JOUR avec singleton ET DEBUG DÉTAILLÉ
+// 🔧 FONCTION getAuthToken() CORRIGÉE - SEULE MODIFICATION DANS TOUT LE FICHIER
 const getAuthToken = async (): Promise<string | null> => {
+  console.log('[apiService] 🔍 getAuthToken() appelée...');
+  
   try {
-    console.log('[apiService] 🔐 Initializing authentication...')
+    // MÉTHODE 1: Récupérer depuis intelia-expert-auth (PRIORITÉ)
+    console.log('[apiService] 🔍 Tentative récupération depuis intelia-expert-auth...');
+    const authData = localStorage.getItem('intelia-expert-auth');
+    if (authData) {
+      const parsed = JSON.parse(authData);
+      if (parsed.access_token) {
+        console.log('[apiService] ✅ Token récupéré depuis intelia-expert-auth');
+        console.log('[apiService] 📋 Token preview:', parsed.access_token.substring(0, 30) + '...');
+        
+        // Vérifier que le token n'est pas expiré
+        try {
+          const tokenParts = parsed.access_token.split('.');
+          if (tokenParts.length === 3) {
+            const payload = JSON.parse(atob(tokenParts[1]));
+            const now = Math.floor(Date.now() / 1000);
+            const isExpired = payload.exp < now;
+            
+            if (isExpired) {
+              console.warn('[apiService] ⚠️ Token expiré dans intelia-expert-auth');
+            } else {
+              console.log('[apiService] ✅ Token valide, expire dans:', Math.floor((payload.exp - now) / 60), 'minutes');
+              return parsed.access_token;
+            }
+          }
+        } catch (decodeError) {
+          console.log('[apiService] 📋 Token JWT non décodable, utilisation directe');
+          return parsed.access_token;
+        }
+      }
+    }
     
-    // 🔍 DEBUG: Vérifier la disponibilité de getSupabaseClient
-    console.log('[apiService] 🔍 Étape 1: Récupération client Supabase...')
+    // MÉTHODE 2: Fallback vers Supabase store (si intelia-expert-auth échoue)
+    console.log('[apiService] 🔍 Tentative fallback vers supabase-auth-store...');
+    const supabaseStore = localStorage.getItem('supabase-auth-store');
+    if (supabaseStore) {
+      const parsed = JSON.parse(supabaseStore);
+      const possibleTokens = [
+        parsed.state?.session?.access_token,
+        parsed.state?.user?.access_token,
+        parsed.access_token
+      ];
+      
+      for (const token of possibleTokens) {
+        if (token && typeof token === 'string' && token.length > 20) {
+          console.log('[apiService] ✅ Token fallback trouvé dans supabase-auth-store');
+          return token;
+        }
+      }
+    }
     
-    let supabase
-    try {
-      supabase = getSupabaseClient()
-      console.log('[apiService] ✅ Client Supabase obtenu:', !!supabase)
-    } catch (clientError) {
-      console.error('[apiService] ❌ Erreur getSupabaseClient:', clientError)
-      return null
+    // MÉTHODE 3: Dernière chance avec les cookies
+    console.log('[apiService] 🔍 Tentative dernière chance avec cookies...');
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+      if (cookie.includes('sb-') && cookie.includes('auth-token')) {
+        try {
+          const cookieValue = cookie.split('=')[1];
+          const decoded = decodeURIComponent(cookieValue);
+          const parsed = JSON.parse(decoded);
+          if (Array.isArray(parsed) && parsed[0] && typeof parsed[0] === 'string') {
+            console.log('[apiService] ✅ Token trouvé dans cookies');
+            return parsed[0];
+          }
+        } catch (e) {
+          continue;
+        }
+      }
     }
-
-    if (!supabase) {
-      console.error('[apiService] ❌ Supabase client est null/undefined')
-      return null
-    }
-
-    // 🔍 DEBUG: Vérifier si supabase.auth existe
-    console.log('[apiService] 🔍 Étape 2: Vérification supabase.auth...')
-    if (!supabase.auth) {
-      console.error('[apiService] ❌ supabase.auth est undefined')
-      return null
-    }
-    console.log('[apiService] ✅ supabase.auth disponible')
-
-    // 🔍 DEBUG: Tentative getSession avec timeout
-    console.log('[apiService] 🔍 Étape 3: Appel getSession()...')
     
-    // Ajouter un timeout pour éviter les blocages infinis
-    const sessionPromise = supabase.auth.getSession()
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('getSession timeout après 5 secondes')), 5000)
-    })
-
-    let sessionResult
-    try {
-      sessionResult = await Promise.race([sessionPromise, timeoutPromise]) as any
-      console.log('[apiService] ✅ getSession() réussi')
-    } catch (sessionError) {
-      console.error('[apiService] ❌ Erreur ou timeout getSession:', sessionError)
-      return null
-    }
-
-    // 🔍 DEBUG: Analyser le résultat de getSession
-    console.log('[apiService] 🔍 Étape 4: Analyse résultat getSession...')
-    
-    if (!sessionResult) {
-      console.error('[apiService] ❌ sessionResult est null/undefined')
-      return null
-    }
-
-    console.log('[apiService] 📋 Structure sessionResult:', {
-      has_data: !!sessionResult.data,
-      has_error: !!sessionResult.error,
-      data_type: typeof sessionResult.data,
-      error_message: sessionResult.error?.message
-    })
-
-    // 🔍 DEBUG: Vérifier les erreurs
-    if (sessionResult.error) {
-      console.error('[apiService] ❌ Erreur dans sessionResult:', sessionResult.error)
-      return null
-    }
-
-    // 🔍 DEBUG: Analyser la session
-    const { data: { session } } = sessionResult
-    
-    console.log('[apiService] 🔍 Étape 5: Analyse session...')
-    console.log('[apiService] 📋 Détails session:', {
-      session_exists: !!session,
-      session_type: typeof session,
-      has_access_token: !!session?.access_token,
-      has_user: !!session?.user,
-      user_id: session?.user?.id,
-      user_email: session?.user?.email,
-      expires_at: session?.expires_at,
-      token_type: session?.token_type
-    })
-
-    if (!session) {
-      console.warn('[apiService] ⚠️ Pas de session active')
-      return null
-    }
-
-    // 🔍 DEBUG: Analyser le token
-    const token = session.access_token
-    
-    console.log('[apiService] 🔍 Étape 6: Analyse token...')
-    console.log('[apiService] 📋 Token info:', {
-      token_exists: !!token,
-      token_type: typeof token,
-      token_length: token?.length,
-      token_preview: token ? `${token.substring(0, 20)}...` : 'ABSENT',
-      is_not_string_null: token !== 'null',
-      is_not_string_undefined: token !== 'undefined'
-    })
-    
-    if (token && token !== 'null' && token !== 'undefined') {
-      console.log('[apiService] ✅ Token valide obtenu - Authentication initialized')
-      return token
-    }
-
-    console.warn('[apiService] ⚠️ Aucun token Supabase trouvé (singleton)')
-    return null
+    console.error('[apiService] ❌ Aucun token trouvé dans aucune source');
+    return null;
     
   } catch (error) {
-    console.error('[apiService] ❌ ERREUR CRITIQUE dans getAuthToken:', error)
-    console.error('[apiService] 📋 Détails erreur:', {
-      name: error?.name,
-      message: error?.message,
-      stack: error?.stack?.substring(0, 200) + '...'
-    })
-    return null
+    console.error('[apiService] ❌ Erreur récupération token:', error);
+    return null;
   }
 }
 
-// 🔧 getAuthHeaders avec logs de debug détaillés
+// 🔧 getAuthHeaders avec logs de debug détaillés - CODE ORIGINAL CONSERVÉ
 const getAuthHeaders = async (): Promise<Record<string, string>> => {
   console.log('[apiService] 🔍 getAuthHeaders() appelée...')
   
@@ -283,7 +245,7 @@ interface APIError {
 }
 
 /**
- * FONCTION PRINCIPALE - Expert API avec Supabase natif (singleton) + DEBUG DÉTAILLÉ
+ * FONCTION PRINCIPALE - Expert API avec Supabase natif (singleton) + DEBUG DÉTAILLÉ - CODE ORIGINAL CONSERVÉ
  */
 export const generateAIResponse = async (
   question: string,
@@ -1051,6 +1013,7 @@ export const debugEnhancedAPI = () => {
   console.log('  - SUPABASE SINGLETON: Headers avec Origin + Authorization')
   console.log('  - ✅ SINGLETON: Une seule instance GoTrueClient')
   console.log('  - 🔧 DEBUG DÉTAILLÉ: Logs étape par étape')
+  console.log('  - 🔧 FIX: getAuthToken() utilise localStorage directement')
   console.log('FONCTIONNALITES PRESERVEES:')
   console.log('  - Authentification JWT (Supabase SINGLETON)')
   console.log('  - Feedback, conversations, topics')
@@ -1104,7 +1067,7 @@ export const testEnhancedConversationContinuity = async (
       second_conversation_id: secondResponse.conversation_id,
       same_id: sameId,
       success: true,
-      enhancements_used: ['DialogueManager', 'expert.py', 'ConversationService', 'DeleteFix', 'HeureLocale', 'Supabase', 'SINGLETON', 'DEBUG_DETAILED']
+      enhancements_used: ['DialogueManager', 'expert.py', 'ConversationService', 'DeleteFix', 'HeureLocale', 'Supabase', 'SINGLETON', 'DEBUG_DETAILED', 'LOCALSTORAGE_FIX']
     }
     
   } catch (error) {
@@ -1144,7 +1107,7 @@ export const detectAPIVersion = async (): Promise<'dialoguemanager' | 'legacy' |
 
 export const logEnhancedAPIInfo = () => {
   console.group('[apiService] DialogueManager + expert.py Integration + SUPABASE SINGLETON + DEBUG')
-  console.log('Version:', 'DialogueManager v1.0 - SUPABASE SINGLETON FIXED + DEBUG DETAILED')
+  console.log('Version:', 'DialogueManager v1.0 - SUPABASE SINGLETON FIXED + DEBUG DETAILED + LOCALSTORAGE FIX')
   console.log('Base URL:', API_BASE_URL)
   console.log('Backend: expert.py + DialogueManager + Agricultural Validator')
   console.log('Auth System: Supabase SINGLETON')
@@ -1167,6 +1130,7 @@ export const logEnhancedAPIInfo = () => {
   console.log('  - SUPABASE SINGLETON: JWT token authentique + profil utilisateur')
   console.log('  - ✅ SINGLETON: Elimination Multiple GoTrueClient instances')
   console.log('  - 🔧 DEBUG: Logs détaillés pour identifier les blocages')
+  console.log('  - 🔧 FIX MAJEUR: getAuthToken() utilise localStorage directement (pas de timeout)')
   console.log('FONCTIONNALITES:')
   console.log('  - Clarification intelligente automatique')
   console.log('  - Gestion memoire conversation Postgres')
@@ -1181,6 +1145,7 @@ export const logEnhancedAPIInfo = () => {
   console.log('  - Supabase SINGLETON: Auth moderne + profils utilisateur')
   console.log('  - ✅ Une seule instance GoTrueClient dans toute l\'application')
   console.log('  - 🔧 Debugging avancé avec timeouts et logs détaillés')
+  console.log('  - 🔧 Authentification robuste via localStorage (évite les timeouts)')
   console.groupEnd()
 }
 
