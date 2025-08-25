@@ -1,4 +1,5 @@
-# Requirements for Intelia Expert API - Digital Ocean App Platform
+# Requirements for Intelia Expert API - Runtime optimisé pour DigitalOcean
+# Taille estimée: 1-2GB au lieu de 6GB
 
 # Core FastAPI Framework
 fastapi==0.104.1
@@ -25,31 +26,24 @@ openai==1.51.0
 # HTTP Client - Resolves Supabase/OpenAI compatibility
 httpx>=0.26.0,<0.28.0
 
-# RAG System
-torch==2.2.2
-torchvision==0.17.2
-transformers==4.40.0
-sentence-transformers==2.7.0
-faiss-cpu==1.8.0
-numpy==1.26.4
-huggingface_hub>=0.24.0
-safetensors==0.4.3
+# RAG System Runtime (optimisé)
+sentence-transformers==2.7.0  # Pour charger les embeddings pré-calculés
+faiss-cpu==1.8.0              # Pour les recherches vectorielles
+numpy==1.26.4                 # Dépendance essentielle
+huggingface_hub>=0.24.0       # Pour charger les modèles
+safetensors==0.4.3            # Format de modèles optimisé
 
-# Document Processing
-langchain==0.2.16
-langchain-community==0.2.16
+# SUPPRIMÉ: torch, torchvision (1.8GB économisés)
+# SUPPRIMÉ: transformers (500MB économisés) - sentence-transformers suffit
+# SUPPRIMÉ: langchain (~700MB économisés) - si vous utilisez FAISS directement
+
+# Document Processing (minimal)
 pandas==2.2.2
 
 # Utilities
 python-dotenv==1.0.0
 aiofiles==23.2.1
 toml==0.10.2
-
-# Machine Learning
-scikit-learn==1.4.2
-scipy==1.13.0
-tqdm==4.66.1
-pillow==10.3.0
 
 # HTTP Requests
 requests==2.31.0
@@ -63,3 +57,9 @@ typing-extensions>=4.8.0
 # Vector Database & Retry Logic
 tenacity>=8.2.2
 pinecone>=3.0.0
+
+# OPTIONNEL: Décommentez si nécessaire pour votre RAG
+# scikit-learn==1.4.2    # Seulement si vous faites de la classification
+# scipy==1.13.0          # Seulement si calculs mathématiques avancés
+# tqdm==4.66.1           # Seulement pour les barres de progression
+# pillow==10.3.0         # Seulement si traitement d'images
