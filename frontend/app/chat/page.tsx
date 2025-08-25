@@ -1112,19 +1112,22 @@ export default function ChatInterface() {
     return [answerText, []]
   }
 
-  // 🛠️ CORRECTION : handleSendMessage avec mémoisation et cleanup
+  // 🛠️ CORRECTION : handleSendMessage avec mémoisation et cleanup + FIX trim error
   const handleSendMessage = useCallback(async (text: string = inputMessage) => {
-    if (!text.trim() || !isMountedRef.current) return
+    // 🛠️ CORRECTION CRITIQUE : Sécuriser le paramètre text pour éviter l'erreur s.trim is not a function
+    const safeText = typeof text === 'string' ? text : String(text || '')
+    
+    if (!safeText.trim() || !isMountedRef.current) return
 
     console.log('[ChatInterface] Envoi message:', {
-      text: text.substring(0, 50) + '...',
+      text: safeText.substring(0, 50) + '...',
       hasClarificationState: !!clarificationState,
       concisionLevel: config.level
     })
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      content: text.trim(),
+      content: safeText.trim(),
       isUser: true,
       timestamp: new Date()
     }
@@ -1154,14 +1157,14 @@ export default function ChatInterface() {
         console.log('[handleSendMessage] Mode clarification')
 
         response = await generateAIResponse(
-          clarificationState.originalQuestion + " " + text.trim(),
+          clarificationState.originalQuestion + " " + safeText.trim(),
           user,
           currentLanguage,
           conversationIdToSend,
           optimalLevel,
           true,
           clarificationState.originalQuestion,
-          { answer: text.trim() }
+          { answer: safeText.trim() }
         )
 
         setClarificationState(null)
@@ -1169,7 +1172,7 @@ export default function ChatInterface() {
 
       } else {
         response = await generateAIResponse(
-          text.trim(),
+          safeText.trim(),
           user,
           currentLanguage,
           conversationIdToSend,
@@ -1203,7 +1206,7 @@ export default function ChatInterface() {
         addMessage(clarificationMessage)
         setClarificationState({
           messageId: clarificationMessage.id,
-          originalQuestion: text.trim(),
+          originalQuestion: safeText.trim(),
           clarificationQuestions: response.clarification_questions || []
         })
 
