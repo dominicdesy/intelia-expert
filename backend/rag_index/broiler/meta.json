@@ -1,10 +1,10 @@
 {
   "species": "broiler",
-  "model_name": "sentence-transformers/all-MiniLM-L6-v2",
-  "embedding_dim": 384,
-  "files_indexed": 19,
-  "n_docs": 19,
-  "chunks_indexed": 1188,
+  "model_name": "text-embedding-3-small",
+  "embedding_dim": 1536,
+  "files_indexed": 18,
+  "n_docs": 18,
+  "chunks_indexed": 1179,
   "files_sample": [
     "C:\\intelia_gpt\\documents\\public\\species\\broiler\\biosecurity\\biosec-poultry-farms.pdf",
     "C:\\intelia_gpt\\documents\\public\\species\\broiler\\breeds\\cobb\\Breeder-Management-Guide.pdf",
