@@ -1,4 +1,4 @@
-// app/chat/services/apiService.ts - VERSION SUPABASE NATIVE COMPLETE AVEC DEBUG
+// app/chat/services/apiService.ts - VERSION SUPABASE NATIVE COMPLETE
 
 import { conversationService } from './conversationService'
 // ✅ CHANGEMENT CRITIQUE: Utiliser le singleton au lieu d'importer directement
@@ -18,152 +18,47 @@ const getApiConfig = () => {
 
 const API_BASE_URL = getApiConfig()
 
-// ✅ Fonction auth Supabase native MISE À JOUR avec singleton ET DEBUG DÉTAILLÉ
+// ✅ Fonction auth Supabase native MISE À JOUR avec singleton
 const getAuthToken = async (): Promise<string | null> => {
   try {
-    console.log('[apiService] 🔐 Initializing authentication...')
+    console.log('[apiService] Initializing authentication...')
     
-    // 🔍 DEBUG: Vérifier la disponibilité de getSupabaseClient
-    console.log('[apiService] 🔍 Étape 1: Récupération client Supabase...')
-    
-    let supabase
-    try {
-      supabase = getSupabaseClient()
-      console.log('[apiService] ✅ Client Supabase obtenu:', !!supabase)
-    } catch (clientError) {
-      console.error('[apiService] ❌ Erreur getSupabaseClient:', clientError)
-      return null
-    }
-
-    if (!supabase) {
-      console.error('[apiService] ❌ Supabase client est null/undefined')
-      return null
-    }
-
-    // 🔍 DEBUG: Vérifier si supabase.auth existe
-    console.log('[apiService] 🔍 Étape 2: Vérification supabase.auth...')
-    if (!supabase.auth) {
-      console.error('[apiService] ❌ supabase.auth est undefined')
-      return null
-    }
-    console.log('[apiService] ✅ supabase.auth disponible')
-
-    // 🔍 DEBUG: Tentative getSession avec timeout
-    console.log('[apiService] 🔍 Étape 3: Appel getSession()...')
-    
-    // Ajouter un timeout pour éviter les blocages infinis
-    const sessionPromise = supabase.auth.getSession()
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('getSession timeout après 5 secondes')), 5000)
-    })
-
-    let sessionResult
-    try {
-      sessionResult = await Promise.race([sessionPromise, timeoutPromise]) as any
-      console.log('[apiService] ✅ getSession() réussi')
-    } catch (sessionError) {
-      console.error('[apiService] ❌ Erreur ou timeout getSession:', sessionError)
-      return null
-    }
-
-    // 🔍 DEBUG: Analyser le résultat de getSession
-    console.log('[apiService] 🔍 Étape 4: Analyse résultat getSession...')
-    
-    if (!sessionResult) {
-      console.error('[apiService] ❌ sessionResult est null/undefined')
-      return null
-    }
-
-    console.log('[apiService] 📋 Structure sessionResult:', {
-      has_data: !!sessionResult.data,
-      has_error: !!sessionResult.error,
-      data_type: typeof sessionResult.data,
-      error_message: sessionResult.error?.message
-    })
-
-    // 🔍 DEBUG: Vérifier les erreurs
-    if (sessionResult.error) {
-      console.error('[apiService] ❌ Erreur dans sessionResult:', sessionResult.error)
-      return null
-    }
-
-    // 🔍 DEBUG: Analyser la session
-    const { data: { session } } = sessionResult
-    
-    console.log('[apiService] 🔍 Étape 5: Analyse session...')
-    console.log('[apiService] 📋 Détails session:', {
-      session_exists: !!session,
-      session_type: typeof session,
-      has_access_token: !!session?.access_token,
-      has_user: !!session?.user,
-      user_id: session?.user?.id,
-      user_email: session?.user?.email,
-      expires_at: session?.expires_at,
-      token_type: session?.token_type
-    })
-
-    if (!session) {
-      console.warn('[apiService] ⚠️ Pas de session active')
-      return null
-    }
-
-    // 🔍 DEBUG: Analyser le token
-    const token = session.access_token
-    
-    console.log('[apiService] 🔍 Étape 6: Analyse token...')
-    console.log('[apiService] 📋 Token info:', {
-      token_exists: !!token,
-      token_type: typeof token,
-      token_length: token?.length,
-      token_preview: token ? `${token.substring(0, 20)}...` : 'ABSENT',
-      is_not_string_null: token !== 'null',
-      is_not_string_undefined: token !== 'undefined'
-    })
+    // 🎯 CHANGEMENT: Utiliser getSupabaseClient() au lieu de supabase direct
+    const supabase = getSupabaseClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
     
     if (token && token !== 'null' && token !== 'undefined') {
-      console.log('[apiService] ✅ Token valide obtenu - Authentication initialized')
+      console.log('[apiService] Authentication initialized')
       return token
     }
 
-    console.warn('[apiService] ⚠️ Aucun token Supabase trouvé (singleton)')
+    console.warn('[apiService] Aucun token Supabase trouve (singleton)')
     return null
-    
   } catch (error) {
-    console.error('[apiService] ❌ ERREUR CRITIQUE dans getAuthToken:', error)
-    console.error('[apiService] 📋 Détails erreur:', {
-      name: error?.name,
-      message: error?.message,
-      stack: error?.stack?.substring(0, 200) + '...'
-    })
+    console.error('[apiService] Erreur recuperation token Supabase (singleton):', error)
     return null
   }
 }
 
-// 🔧 getAuthHeaders avec logs de debug détaillés
 const getAuthHeaders = async (): Promise<Record<string, string>> => {
-  console.log('[apiService] 🔍 getAuthHeaders() appelée...')
-  
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Origin': 'https://expert.intelia.com',
   }
 
-  console.log('[apiService] 🔍 Appel getAuthToken()...')
   const authToken = await getAuthToken()
-  console.log('[apiService] 📋 getAuthToken() résultat:', !!authToken)
-
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`
-    console.log('[apiService] ✅ Headers avec Authorization configurés')
+    console.log('[apiService] Authentication initialized')
   } else {
-    console.warn('[apiService] ⚠️ Headers sans authentification - pas de token Supabase (singleton)')
+    console.warn('[apiService] Requete sans authentification - pas de token Supabase (singleton)')
   }
 
-  console.log('[apiService] 📋 Headers finaux:', Object.keys(headers))
   return headers
 }
 
-// UUID Generation - CODE ORIGINAL CONSERVÉ
+// UUID Generation
 const generateUUID = (): string => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID()
@@ -176,7 +71,7 @@ const generateUUID = (): string => {
   })
 }
 
-// Formatage heure locale - CODE ORIGINAL CONSERVÉ
+// Formatage heure locale
 export const formatToLocalTime = (utcTimestamp: string): string => {
   try {
     const date = new Date(utcTimestamp);
@@ -213,7 +108,7 @@ export const simpleLocalTime = (utcTimestamp: string): string => {
   }
 }
 
-// Interface pour les reponses IA - CODE ORIGINAL CONSERVÉ
+// Interface pour les reponses IA
 interface EnhancedAIResponse {
   response?: string
   conversation_id: string
@@ -283,7 +178,7 @@ interface APIError {
 }
 
 /**
- * FONCTION PRINCIPALE - Expert API avec Supabase natif (singleton) + DEBUG DÉTAILLÉ
+ * FONCTION PRINCIPALE - Expert API avec Supabase natif (singleton)
  */
 export const generateAIResponse = async (
   question: string,
@@ -314,7 +209,7 @@ export const generateAIResponse = async (
   try {
     const endpoint = `${API_BASE_URL}/expert/ask`
     
-    // Enrichissement clarification conservé - CODE ORIGINAL CONSERVÉ
+    // Enrichissement clarification conserve
     let finalQuestion = question.trim()
     
     if (isClarificationResponse && originalQuestion) {
@@ -337,21 +232,9 @@ export const generateAIResponse = async (
       question: finalQuestion
     }
 
-    // 🔍 DEBUG: Appel getAuthHeaders avec logs détaillés
-    console.log('[apiService] 🔍 Récupération des headers d\'authentification...')
     const headers = await getAuthHeaders()
 
     console.log('[apiService] Requete Expert API (Supabase singleton):', requestBody)
-    console.log('[apiService] 🔍 Préparation de la requête fetch...')
-
-    // 🔍 DEBUG: Ajouter des logs avant et après le fetch
-    console.log('[apiService] 🚀 Envoi de la requête vers:', endpoint)
-    console.log('[apiService] 📋 Détails de la requête:', {
-      method: 'POST',
-      headers_keys: Object.keys(headers),
-      body_size: JSON.stringify(requestBody).length,
-      has_auth_header: !!headers['Authorization']
-    })
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -359,12 +242,11 @@ export const generateAIResponse = async (
       body: JSON.stringify(requestBody)
     })
 
-    console.log('[apiService] ✅ Réponse reçue du serveur')
     console.log('[apiService] Expert API status (Supabase singleton):', response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('[apiService] ❌ Erreur Expert API (Supabase singleton):', errorText)
+      console.error('[apiService] Erreur Expert API (Supabase singleton):', errorText)
       
       if (response.status === 401) {
         throw new Error('Session expiree. Veuillez vous reconnecter.')
@@ -385,7 +267,6 @@ export const generateAIResponse = async (
       throw new Error(errorMessage)
     }
 
-    console.log('[apiService] 🔍 Lecture du JSON de la réponse...')
     const data = await response.json()
     
     console.log('[apiService] Reponse Expert API recue (Supabase singleton):', {
@@ -399,7 +280,7 @@ export const generateAIResponse = async (
       documents_used: data.documents_used
     })
 
-    // Extraction du texte selon le type - CODE ORIGINAL CONSERVÉ
+    // Extraction du texte selon le type
     let responseText = ''
     if (data.type === 'answer' && data.answer?.text) {
       responseText = data.answer.text
@@ -414,7 +295,7 @@ export const generateAIResponse = async (
       console.warn('[apiService] Aucun texte trouve dans la reponse!')
     }
 
-    // Construction des donnees de reponse - CODE ORIGINAL CONSERVÉ
+    // Construction des donnees de reponse
     const processedData: EnhancedAIResponse = {
       conversation_id: finalConversationId,
       language: language,
@@ -482,7 +363,7 @@ export const generateAIResponse = async (
       } : {})
     }
 
-    // Generation automatique des versions de reponse - CODE ORIGINAL CONSERVÉ
+    // Generation automatique des versions de reponse
     if (processedData.response && !processedData.response_versions) {
       console.log('[apiService] Generation automatique response_versions')
       
@@ -499,7 +380,7 @@ export const generateAIResponse = async (
       }
     }
 
-    // Stocker le session ID pour l'historique - CODE ORIGINAL CONSERVÉ
+    // Stocker le session ID pour l'historique
     try {
       conversationService.storeRecentSessionId(finalConversationId)
       console.log('[apiService] Session ID stocke pour historique (singleton)')
@@ -518,12 +399,10 @@ export const generateAIResponse = async (
       validation_rejected: processedData.type === 'validation_rejected'
     })
 
-    console.log('[apiService] 🎉 SUCCÈS: Retour de la réponse traitée')
     return processedData
 
   } catch (error) {
-    console.error('[apiService] ❌ ERREUR CRITIQUE dans generateAIResponse:', error)
-    console.error('[apiService] 📋 Stack trace:', error?.stack?.substring(0, 500))
+    console.error('[apiService] Erreur Expert API (Supabase singleton):', error)
     
     if (error instanceof Error) {
       throw error
@@ -534,7 +413,7 @@ export const generateAIResponse = async (
 }
 
 /**
- * VERSION PUBLIQUE avec Supabase (singleton) - CODE ORIGINAL CONSERVÉ
+ * VERSION PUBLIQUE avec Supabase (singleton)
  */
 export const generateAIResponsePublic = async (
   question: string,
@@ -693,7 +572,7 @@ export const generateAIResponsePublic = async (
 }
 
 /**
- * Chargement des conversations utilisateur (singleton) - CODE ORIGINAL CONSERVÉ
+ * Chargement des conversations utilisateur (singleton)
  */
 export const loadUserConversations = async (userId: string): Promise<any> => {
   if (!userId) {
@@ -762,7 +641,7 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
 }
 
 /**
- * ENVOI DE FEEDBACK (singleton) - CODE ORIGINAL CONSERVÉ
+ * ENVOI DE FEEDBACK (singleton)
  */
 export const sendFeedback = async (
   conversationId: string,
@@ -810,7 +689,7 @@ export const sendFeedback = async (
 }
 
 /**
- * SUPPRESSION DE CONVERSATION (singleton) - CODE ORIGINAL CONSERVÉ
+ * SUPPRESSION DE CONVERSATION (singleton)
  */
 export const deleteConversation = async (conversationId: string): Promise<void> => {
   if (!conversationId) {
@@ -855,7 +734,7 @@ export const deleteConversation = async (conversationId: string): Promise<void> 
 }
 
 /**
- * SUPPRESSION DE TOUTES LES CONVERSATIONS (singleton) - CODE ORIGINAL CONSERVÉ
+ * SUPPRESSION DE TOUTES LES CONVERSATIONS (singleton)
  */
 export const clearAllUserConversations = async (userId: string): Promise<void> => {
   if (!userId) {
@@ -898,7 +777,7 @@ export const clearAllUserConversations = async (userId: string): Promise<void> =
 }
 
 /**
- * SUGGESTIONS DE SUJETS (singleton) - CODE ORIGINAL CONSERVÉ
+ * SUGGESTIONS DE SUJETS (singleton)
  */
 export const getTopicSuggestions = async (language: string = 'fr'): Promise<string[]> => {
   console.log('[apiService] Recuperation suggestions sujets (Supabase singleton):', language)
@@ -944,7 +823,7 @@ export const getTopicSuggestions = async (language: string = 'fr'): Promise<stri
 }
 
 /**
- * HEALTH CHECK (singleton) - CODE ORIGINAL CONSERVÉ
+ * HEALTH CHECK (singleton)
  */
 export const checkAPIHealth = async (): Promise<boolean> => {
   try {
@@ -968,7 +847,7 @@ export const checkAPIHealth = async (): Promise<boolean> => {
 }
 
 /**
- * UTILITAIRES CLARIFICATION - CODE ORIGINAL CONSERVÉ
+ * UTILITAIRES CLARIFICATION
  */
 export const buildClarificationEntities = (
   clarificationAnswers: Record<string, string>,
@@ -1026,7 +905,7 @@ export const handleEnhancedNetworkError = (error: any): string => {
 }
 
 /**
- * FONCTIONS DE DEBUG ET TEST (singleton) - CODE ORIGINAL CONSERVÉ
+ * FONCTIONS DE DEBUG ET TEST (singleton)
  */
 export const debugEnhancedAPI = () => {
   console.group('[apiService] Configuration DialogueManager + expert.py + SUPABASE SINGLETON')
@@ -1050,7 +929,6 @@ export const debugEnhancedAPI = () => {
   console.log('  - Formatage heure locale')
   console.log('  - SUPABASE SINGLETON: Headers avec Origin + Authorization')
   console.log('  - ✅ SINGLETON: Une seule instance GoTrueClient')
-  console.log('  - 🔧 DEBUG DÉTAILLÉ: Logs étape par étape')
   console.log('FONCTIONNALITES PRESERVEES:')
   console.log('  - Authentification JWT (Supabase SINGLETON)')
   console.log('  - Feedback, conversations, topics')
@@ -1104,7 +982,7 @@ export const testEnhancedConversationContinuity = async (
       second_conversation_id: secondResponse.conversation_id,
       same_id: sameId,
       success: true,
-      enhancements_used: ['DialogueManager', 'expert.py', 'ConversationService', 'DeleteFix', 'HeureLocale', 'Supabase', 'SINGLETON', 'DEBUG_DETAILED']
+      enhancements_used: ['DialogueManager', 'expert.py', 'ConversationService', 'DeleteFix', 'HeureLocale', 'Supabase', 'SINGLETON']
     }
     
   } catch (error) {
@@ -1143,12 +1021,11 @@ export const detectAPIVersion = async (): Promise<'dialoguemanager' | 'legacy' |
 }
 
 export const logEnhancedAPIInfo = () => {
-  console.group('[apiService] DialogueManager + expert.py Integration + SUPABASE SINGLETON + DEBUG')
-  console.log('Version:', 'DialogueManager v1.0 - SUPABASE SINGLETON FIXED + DEBUG DETAILED')
+  console.group('[apiService] DialogueManager + expert.py Integration + SUPABASE SINGLETON')
+  console.log('Version:', 'DialogueManager v1.0 - SUPABASE SINGLETON FIXED')
   console.log('Base URL:', API_BASE_URL)
   console.log('Backend: expert.py + DialogueManager + Agricultural Validator')
   console.log('Auth System: Supabase SINGLETON')
-  console.log('Debug System: LOGS DÉTAILLÉS ÉTAPE PAR ÉTAPE')
   console.log('CHANGEMENTS MAJEURS CORRIGES:')
   console.log('  - Utilisation endpoint /ask simplifie')
   console.log('  - Session ID dans le BODY (corrige !)')
@@ -1166,7 +1043,6 @@ export const logEnhancedAPIInfo = () => {
   console.log('  - Conversion automatique format')
   console.log('  - SUPABASE SINGLETON: JWT token authentique + profil utilisateur')
   console.log('  - ✅ SINGLETON: Elimination Multiple GoTrueClient instances')
-  console.log('  - 🔧 DEBUG: Logs détaillés pour identifier les blocages')
   console.log('FONCTIONNALITES:')
   console.log('  - Clarification intelligente automatique')
   console.log('  - Gestion memoire conversation Postgres')
@@ -1180,7 +1056,6 @@ export const logEnhancedAPIInfo = () => {
   console.log('  - Formatage heure locale automatique')
   console.log('  - Supabase SINGLETON: Auth moderne + profils utilisateur')
   console.log('  - ✅ Une seule instance GoTrueClient dans toute l\'application')
-  console.log('  - 🔧 Debugging avancé avec timeouts et logs détaillés')
   console.groupEnd()
 }
 

@@ -72,6 +72,226 @@ class PageLoadingCircuitBreaker {
 // Instance globale du circuit breaker pour la page - CODE ORIGINAL CONSERVÉ
 const pageLoadingBreaker = new PageLoadingCircuitBreaker()
 
+// 🛠️ CORRECTION MAJEURE : Composant ChatInput isolé avec React.memo
+const ChatInput = React.memo(({ 
+  inputMessage, 
+  setInputMessage, 
+  onSendMessage, 
+  isLoadingChat, 
+  clarificationState,
+  isMobileDevice,
+  inputRef,
+  t 
+}: {
+  inputMessage: string
+  setInputMessage: (value: string) => void
+  onSendMessage: () => void
+  isLoadingChat: boolean
+  clarificationState: any
+  isMobileDevice: boolean
+  inputRef: React.RefObject<HTMLInputElement>
+  t: (key: string) => string
+}) => {
+  return (
+    <div className={`flex items-center min-h-[48px] w-full ${isMobileDevice ? 'mobile-input-container' : 'space-x-3'}`}>
+      <div className={`flex-1 ${isMobileDevice ? 'mobile-input-wrapper' : ''}`}>
+        <input
+          ref={inputRef}
+          type="text"
+          value={inputMessage}
+          onChange={(e) => setInputMessage(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              onSendMessage()
+            }
+          }}
+          placeholder={clarificationState ? "Répondez à la question ci-dessus..." : t('chat.placeholder')}
+          className={`w-full h-12 px-4 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm flex items-center ${isMobileDevice ? 'ios-input-fix' : ''}`}
+          disabled={isLoadingChat}
+          aria-label={t('chat.placeholder')}
+          style={{
+            fontSize: isMobileDevice ? '16px' : '14px',
+            WebkitAppearance: 'none',
+            borderRadius: isMobileDevice ? '25px' : '9999px'
+          }}
+        />
+      </div>
+
+      <button
+        onClick={onSendMessage}
+        disabled={isLoadingChat || !inputMessage.trim()}
+        className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 ${isMobileDevice ? 'mobile-send-button' : ''}`}
+        title={isLoadingChat ? 'Envoi en cours...' : 'Envoyer le message'}
+        aria-label={isLoadingChat ? 'Envoi en cours...' : 'Envoyer le message'}
+        style={{
+          minWidth: '48px',
+          width: '48px',
+          height: '48px'
+        }}
+      >
+        <PaperAirplaneIcon />
+      </button>
+    </div>
+  )
+})
+
+ChatInput.displayName = 'ChatInput'
+
+// 🛠️ CORRECTION MAJEURE : Composant MessageList isolé avec React.memo
+const MessageList = React.memo(({ 
+  processedMessages, 
+  isLoadingChat, 
+  handleFeedbackClick, 
+  getUserInitials, 
+  user,
+  t
+}: {
+  processedMessages: any[]
+  isLoadingChat: boolean
+  handleFeedbackClick: (messageId: string, feedback: 'positive' | 'negative') => void
+  getUserInitials: (user: any) => string
+  user: any
+  t: (key: string) => string
+}) => {
+  // 🛠️ CORRECTION : Mémoisation des composants de messages pour éviter les re-rendus
+  const messageComponents = useMemo(() => {
+    return processedMessages.map((message, index) => (
+      <div key={`${message.id}-${index}`}>
+        <div className={`flex items-start space-x-3 min-w-0 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
+          {!message.isUser && (
+            <div className="flex-shrink-0 w-10 h-10 grid place-items-center">
+              <InteliaLogo className="h-8 w-auto" />
+            </div>
+          )}
+
+          <div className={`px-3 sm:px-4 py-2 rounded-2xl max-w-[85%] sm:max-w-none break-words ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
+            {message.isUser ? (
+              <p className="whitespace-pre-wrap leading-relaxed text-sm">
+                {message.content}
+              </p>
+            ) : (
+              <ReactMarkdown
+                className="prose prose-sm max-w-none break-words prose-p:my-3 prose-li:my-1 prose-ul:my-4 prose-strong:text-gray-900 prose-headings:font-bold prose-headings:text-gray-900"
+                components={{
+                  h2: ({node, ...props}) => (
+                    <h2 className="text-xl font-bold text-blue-900 mt-8 mb-6 border-b-2 border-blue-200 pb-3 bg-blue-50 px-4 py-2 rounded-t-lg" {...props} />
+                  ),
+                  h3: ({node, ...props}) => (
+                    <h3 className="text-lg font-semibold text-gray-800 mt-6 mb-4 border-l-4 border-blue-400 pl-4 bg-gray-50 py-2" {...props} />
+                  ),
+                  p: ({node, ...props}) => (
+                    <p className="leading-relaxed text-gray-800 my-4 text-justify" {...props} />
+                  ),
+                  ul: ({node, ...props}) => (
+                    <ul className="list-disc list-outside space-y-3 text-gray-800 my-6 ml-6 pl-2" {...props} />
+                  ),
+                  li: ({node, ...props}) => (
+                    <li className="leading-relaxed pl-2 my-2" {...props} />
+                  ),
+                  strong: ({node, ...props}) => (
+                    <strong className="font-bold text-blue-800 bg-blue-50 px-1 rounded" {...props} />
+                  ),
+                  table: ({node, ...props}) => (
+                    <div className="overflow-x-auto my-6 -mx-1 sm:mx-0">
+                      <table className="min-w-full border border-gray-300 rounded-lg shadow-sm" {...props} />
+                    </div>
+                  ),
+                  th: ({node, ...props}) => (
+                    <th className="border border-gray-300 px-4 py-3 bg-blue-100 font-bold text-left text-blue-900" {...props} />
+                  ),
+                  td: ({node, ...props}) => (
+                    <td className="border border-gray-300 px-4 py-3 hover:bg-gray-50" {...props} />
+                  ),
+                }}
+              >
+                {message.processedContent}
+              </ReactMarkdown>
+            )}
+          </div>
+
+          {!message.isUser &&
+          index > 0 &&
+          message.conversation_id && (
+            <div className="flex items-center space-x-2 mt-2 ml-2">
+              <button
+                onClick={() => handleFeedbackClick(message.id, 'positive')}
+                className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
+                  message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'
+                }`}
+                title={t('chat.helpfulResponse')}
+                aria-label={t('chat.helpfulResponse')}
+              >
+                <ThumbUpIcon />
+              </button>
+              <button
+                onClick={() => handleFeedbackClick(message.id, 'negative')}
+                className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
+                  message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'
+                }`}
+                title={t('chat.notHelpfulResponse')}
+                aria-label={t('chat.notHelpfulResponse')}
+              >
+                <ThumbDownIcon />
+              </button>
+
+              {message.feedback && (
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs text-gray-500">
+                    Merci pour votre retour !
+                  </span>
+                  {message.feedbackComment && (
+                    <span className="text-xs text-blue-600" title={`Commentaire: ${message.feedbackComment}`}>
+                      💬
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {message.isUser && (
+            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+              <span className="text-white text-sm font-medium">
+                {getUserInitials(user)}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    ))
+  }, [processedMessages, handleFeedbackClick, getUserInitials, user, t])
+
+  return (
+    <>
+      {processedMessages.length === 0 ? (
+        <div className="text-center text-gray-500 py-8">
+          <div className="text-sm">Aucun message à afficher</div>
+        </div>
+      ) : (
+        messageComponents
+      )}
+
+      {isLoadingChat && (
+        <div className="flex items-start space-x-3">
+          <div className="w-10 h-10 grid place-items-center flex-shrink-0">
+            <InteliaLogo className="h-8 w-auto" />
+          </div>
+          <div className="bg-white border border-gray-200 rounded-2xl px-3 sm:px-4 py-3 max-w-[85%] sm:max-w-none break-words">
+            <div className="flex space-x-1">
+              <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+              <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+              <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+})
+
+MessageList.displayName = 'MessageList'
+
 export default function ChatInterface() {
   const router = useRouter()
   const { user, isAuthenticated, isLoading, hasHydrated, initializeSession } = useAuthStore()
@@ -144,6 +364,21 @@ export default function ChatInterface() {
   const hasMessages = useMemo(() => {
     return messages.length > 0
   }, [messages.length])
+
+  // 🛠️ CORRECTION : Log de debug CONDITIONNEL pour éviter le spam
+  const debugRenderCount = useRef(0)
+  useMemo(() => {
+    debugRenderCount.current++
+    // Ne loguer que les 5 premiers rendus, puis tous les 10 rendus
+    if (debugRenderCount.current <= 5 || debugRenderCount.current % 10 === 0) {
+      console.log(`🔄 [ChatInterface] Rendu #${debugRenderCount.current}:`, {
+        messages_count: messages.length,
+        clarification_active: !!clarificationState,
+        concision: config.level,
+        input_length: inputMessage.length
+      })
+    }
+  }, [messages.length, clarificationState, config.level, inputMessage.length])
 
   // 🛠️ CORRECTION : Mémoisation des fonctions pour éviter les re-créations
   const handleAuthError = useCallback((error: any) => {
@@ -1198,9 +1433,9 @@ export default function ChatInterface() {
                 <PlusIcon className="w-5 h-5" />
               </button>
 
-              {/* History rendu directement (plus de proxy/hidden) */}
+              {/* 🛠️ CORRECTION : History avec clé stable pour éviter les re-créations */}
               <div className="header-icon-container history-menu-container">
-                <HistoryMenu />
+                <HistoryMenu key="history-stable" />
               </div>
             </div>
 
@@ -1214,9 +1449,9 @@ export default function ChatInterface() {
 
             {/* Droite – Bouton DD */}
             <div className="flex items-center space-x-2">
-              {/* UserMenu rendu directement (plus de proxy/hidden) */}
+              {/* 🛠️ CORRECTION : UserMenu avec clé stable pour éviter les re-créations */}
               <div className="header-icon-container user-menu-container">
-                <UserMenuButton />
+                <UserMenuButton key="user-stable" />
               </div>
             </div>
           </div>
@@ -1238,131 +1473,15 @@ export default function ChatInterface() {
                 </div>
               )}
 
-              {processedMessages.length === 0 ? (
-                <div className="text-center text-gray-500 py-8">
-                  <div className="text-sm">Aucun message à afficher</div>
-                </div>
-              ) : (
-                processedMessages.map((message, index) => (
-                  <div key={`${message.id}-${index}`}>
-                    <div className={`flex items-start space-x-3 min-w-0 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
-                      {!message.isUser && (
-                        <div className="flex-shrink-0 w-10 h-10 grid place-items-center">
-                          <InteliaLogo className="h-8 w-auto" />
-                        </div>
-                      )}
-
-                      <div className={`px-3 sm:px-4 py-2 rounded-2xl max-w-[85%] sm:max-w-none break-words ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
-                        {message.isUser ? (
-                          <p className="whitespace-pre-wrap leading-relaxed text-sm">
-                            {message.content}
-                          </p>
-                        ) : (
-                          <ReactMarkdown
-                            className="prose prose-sm max-w-none break-words prose-p:my-3 prose-li:my-1 prose-ul:my-4 prose-strong:text-gray-900 prose-headings:font-bold prose-headings:text-gray-900"
-                            components={{
-                              h2: ({node, ...props}) => (
-                                <h2 className="text-xl font-bold text-blue-900 mt-8 mb-6 border-b-2 border-blue-200 pb-3 bg-blue-50 px-4 py-2 rounded-t-lg" {...props} />
-                              ),
-                              h3: ({node, ...props}) => (
-                                <h3 className="text-lg font-semibold text-gray-800 mt-6 mb-4 border-l-4 border-blue-400 pl-4 bg-gray-50 py-2" {...props} />
-                              ),
-                              p: ({node, ...props}) => (
-                                <p className="leading-relaxed text-gray-800 my-4 text-justify" {...props} />
-                              ),
-                              ul: ({node, ...props}) => (
-                                <ul className="list-disc list-outside space-y-3 text-gray-800 my-6 ml-6 pl-2" {...props} />
-                              ),
-                              li: ({node, ...props}) => (
-                                <li className="leading-relaxed pl-2 my-2" {...props} />
-                              ),
-                              strong: ({node, ...props}) => (
-                                <strong className="font-bold text-blue-800 bg-blue-50 px-1 rounded" {...props} />
-                              ),
-                              table: ({node, ...props}) => (
-                                <div className="overflow-x-auto my-6 -mx-1 sm:mx-0">
-                                  <table className="min-w-full border border-gray-300 rounded-lg shadow-sm" {...props} />
-                                </div>
-                              ),
-                              th: ({node, ...props}) => (
-                                <th className="border border-gray-300 px-4 py-3 bg-blue-100 font-bold text-left text-blue-900" {...props} />
-                              ),
-                              td: ({node, ...props}) => (
-                                <td className="border border-gray-300 px-4 py-3 hover:bg-gray-50" {...props} />
-                              ),
-                            }}
-                          >
-                            {message.processedContent}
-                          </ReactMarkdown>
-                        )}
-                      </div>
-
-                      {!message.isUser &&
-                      index > 0 &&
-                      message.conversation_id && (
-                        <div className="flex items-center space-x-2 mt-2 ml-2">
-                          <button
-                            onClick={() => handleFeedbackClick(message.id, 'positive')}
-                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
-                              message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'
-                            }`}
-                            title={t('chat.helpfulResponse')}
-                            aria-label={t('chat.helpfulResponse')}
-                          >
-                            <ThumbUpIcon />
-                          </button>
-                          <button
-                            onClick={() => handleFeedbackClick(message.id, 'negative')}
-                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
-                              message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'
-                            }`}
-                            title={t('chat.notHelpfulResponse')}
-                            aria-label={t('chat.notHelpfulResponse')}
-                          >
-                            <ThumbDownIcon />
-                          </button>
-
-                          {message.feedback && (
-                            <div className="flex items-center space-x-2">
-                              <span className="text-xs text-gray-500">
-                                Merci pour votre retour !
-                              </span>
-                              {message.feedbackComment && (
-                                <span className="text-xs text-blue-600" title={`Commentaire: ${message.feedbackComment}`}>
-                                  💬
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {message.isUser && (
-                        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                          <span className="text-white text-sm font-medium">
-                            {getUserInitials(user)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-
-              {isLoadingChat && (
-                <div className="flex items-start space-x-3">
-                  <div className="w-10 h-10 grid place-items-center flex-shrink-0">
-                    <InteliaLogo className="h-8 w-auto" />
-                  </div>
-                  <div className="bg-white border border-gray-200 rounded-2xl px-3 sm:px-4 py-3 max-w-[85%] sm:max-w-none break-words">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {/* 🛠️ CORRECTION MAJEURE : Utilisation du composant MessageList isolé */}
+              <MessageList 
+                processedMessages={processedMessages}
+                isLoadingChat={isLoadingChat}
+                handleFeedbackClick={handleFeedbackClick}
+                getUserInitials={getUserInitials}
+                user={user}
+                t={t}
+              />
 
               <div ref={messagesEndRef} />
             </div>
@@ -1425,48 +1544,17 @@ export default function ChatInterface() {
                 </div>
               )}
 
-              {/* CONTAINER INPUT MOBILE CORRIGÉ avec largeur élargie - CODE ORIGINAL CONSERVÉ */}
-              <div className={`flex items-center min-h-[48px] w-full ${isMobileDevice ? 'mobile-input-container' : 'space-x-3'}`}>
-              
-                <div className={`flex-1 ${isMobileDevice ? 'mobile-input-wrapper' : ''}`}>
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        handleSendMessage()
-                      }
-                    }}
-                    placeholder={clarificationState ? "Répondez à la question ci-dessus..." : t('chat.placeholder')}
-                    className={`w-full h-12 px-4 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm flex items-center ${isMobileDevice ? 'ios-input-fix' : ''}`}
-                    disabled={isLoadingChat}
-                    aria-label={t('chat.placeholder')}
-                    style={{
-                      fontSize: isMobileDevice ? '16px' : '14px', // Évite le zoom iOS
-                      WebkitAppearance: 'none', // Supprime le style iOS par défaut
-                      borderRadius: isMobileDevice ? '25px' : '9999px'
-                    }}
-                  />
-                </div>
-
-                <button
-                  onClick={() => handleSendMessage()}
-                  disabled={isLoadingChat || !inputMessage.trim()}
-                  className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 ${isMobileDevice ? 'mobile-send-button' : ''}`}
-                  title={isLoadingChat ? 'Envoi en cours...' : 'Envoyer le message'}
-                  aria-label={isLoadingChat ? 'Envoi en cours...' : 'Envoyer le message'}
-                  style={{
-                    minWidth: '48px',
-                    width: '48px',
-                    height: '48px'
-                  }}
-                >
-                  <PaperAirplaneIcon />
-                </button>
-              </div>
+              {/* 🛠️ CORRECTION MAJEURE : Utilisation du composant ChatInput isolé */}
+              <ChatInput
+                inputMessage={inputMessage}
+                setInputMessage={setInputMessage}
+                onSendMessage={handleSendMessage}
+                isLoadingChat={isLoadingChat}
+                clarificationState={clarificationState}
+                isMobileDevice={isMobileDevice}
+                inputRef={inputRef}
+                t={t}
+              />
 
               <div className="text-center mt-2">
                 <p className="text-xs text-gray-500">
