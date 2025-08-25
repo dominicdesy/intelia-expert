@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 import { useTranslation } from '../../hooks/useTranslation'
 import { useAuthStore } from '@/lib/stores/auth' 
 import { CheckIcon } from '../../utils/icons'
@@ -30,33 +30,32 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     }
   ]
 
-  const handleLanguageChange = async (languageCode: string) => {
+  const handleLanguageChange = useCallback(async (languageCode: string) => {
     if (languageCode === currentLanguage || isUpdating) return
 
     setIsUpdating(true)
+    
     try {
       console.log('🔄 [LanguageModal] Début changement langue:', currentLanguage, '→', languageCode)
       
-      // 1. Sauvegarder dans le profil utilisateur d'abord
+      // Sauvegarder dans le profil utilisateur seulement
       await updateProfile({ language: languageCode } as any)
       console.log('✅ [LanguageModal] updateProfile() terminé')
       
-      // 2. Changer la langue dans le hook après la sauvegarde
-      changeLanguage(languageCode)
-      console.log('✅ [LanguageModal] changeLanguage() appelée avec:', languageCode)
+      // Fermer immédiatement sans appeler changeLanguage
+      onClose()
       
-      // 3. Fermer la modal après un court délai
+      // Changer la langue après fermeture de la modal
       setTimeout(() => {
-        console.log('📊 [LanguageModal] Langue finale:', languageCode)
-        setIsUpdating(false)
-        onClose()
-      }, 300)
+        changeLanguage(languageCode)
+        console.log('✅ [LanguageModal] changeLanguage() appelée avec:', languageCode)
+      }, 100)
       
     } catch (error) {
       console.error('❌ [LanguageModal] Erreur changement langue:', error)
       setIsUpdating(false)
     }
-  }
+  }, [currentLanguage, isUpdating, updateProfile, onClose, changeLanguage])
 
   return (
     <>
