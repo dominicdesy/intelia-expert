@@ -1,4 +1,4 @@
--# app/api/v1/expert_core.py
+# app/api/v1/expert_core.py
 # -*- coding: utf-8 -*-
 """
 Fonctions métier et validation pour expert.py
