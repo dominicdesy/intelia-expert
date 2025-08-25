@@ -2,14 +2,11 @@
 """
 openai_utils.py — GPT‑5 safe, backwards‑compatible utilities
 
-🔧 VERSION CORRIGÉE - Ajout de test_cot_pipeline manquant pour résoudre l'erreur d'import
-
 This module preserves original public function names and behavior while fixing:
 - Temperature handling for models that only support the default temperature (e.g., GPT‑5 families)
 - Auto‑mapping between max_tokens and max_completion_tokens (and retry on API hint)
 - HTTPX + SDK paths, both hardened with targeted retries
 - More tolerant parsing for Chat Completions output
-- 🆕 AJOUT: test_cot_pipeline function (was missing and causing ImportError)
 
 Public API (kept):
 - _get_api_key() -> str
@@ -28,9 +25,6 @@ Public API (kept):
 - test_openai_connection() -> Dict[str, Any]
 - synthesize_rag_content(question, raw_content, max_length) -> str  ✨ AJOUTÉ
 - generate_clarification_response(intent, missing_fields, general_info) -> str  ✨ AJOUTÉ
-- get_openai_status() -> Dict[str, Any]  ✨ AJOUTÉ
-- test_cot_pipeline() -> Dict[str, Any]  ✨ AJOUTÉ (FIX CRITIQUE)
-- test_synthesis_pipeline() -> Dict[str, Any]  ✨ AJOUTÉ
 
 Drop‑in: other modules can import unchanged symbols.
 """
@@ -351,6 +345,7 @@ def complete_text(
 
     choice = (response.get("choices") or [{}])[0]
     content = ((choice.get("message") or {}).get("content")) or choice.get("text") or ""
+
 
     if not content:
             finish_reason = choice.get("finish_reason", "unknown")
@@ -748,113 +743,13 @@ def get_openai_status() -> Dict[str, Any]:
         "new_functions_available": {
             "synthesize_rag_content": True,
             "generate_clarification_response": True,
-            "test_synthesis_pipeline": True,
-            "test_cot_pipeline": True  # ← AJOUTÉ
+            "test_synthesis_pipeline": True
         },
         "retry_config": {
             "max_retries": 2,
             "base_delay": 1.0
         }
     }
-
-
-# ----------------------------------------------------------------------------
-# 🔧 FONCTION CRITIQUE MANQUANTE - FIX IMPORT ERROR
-# ----------------------------------------------------------------------------
-
-def test_cot_pipeline() -> Dict[str, Any]:
-    """
-    🆕 NOUVEAU: Test complet du pipeline Chain-of-Thought
-    
-    🔧 CORRECTION CRITIQUE: Cette fonction était manquante et causait l'erreur d'import:
-    "cannot import name 'test_cot_pipeline' from 'app.api.v1.utils.openai_utils'"
-    
-    Utilisée par cot_fallback_processor.py pour valider le système CoT.
-    """
-    try:
-        # Test prompt CoT avec structure XML
-        test_cot_prompt = """<thinking>
-Analyse de la question : Il s'agit d'un test du système CoT.
-Je dois valider que le parsing fonctionne correctement.
-</thinking>
-
-<analysis>
-Le système doit parser cette structure XML et extraire chaque section.
-Les balises thinking, analysis et recommendations doivent être identifiées.
-</analysis>
-
-<recommendations>
-Le test CoT fonctionne correctement si ce texte est parsé sans erreur.
-Toutes les sections doivent être extraites proprement.
-</recommendations>
-
-Réponse finale : Test CoT réussi avec parsing des sections."""
-
-        # Test complete_with_cot avec parsing activé
-        cot_result = complete_with_cot(
-            prompt=test_cot_prompt,
-            temperature=0.2,
-            max_tokens=200,
-            parse_cot=True
-        )
-        
-        # Analyser les résultats du parsing
-        sections_found = len(cot_result.get("parsed_sections", {}))
-        has_final_answer = bool(cot_result.get("final_answer"))
-        raw_length = len(cot_result.get("raw_response", ""))
-        
-        # Test complete_text() avec détection automatique de structure CoT
-        auto_cot_result = complete_text(
-            prompt="<thinking>Test automatique du système</thinking>\n\nRéponse automatique CoT simple.",
-            temperature=0.2,
-            max_tokens=100
-        )
-        
-        # Test de robustesse avec prompt sans structure
-        no_structure_result = complete_with_cot(
-            prompt="Simple question : quel est le poids d'un poulet ?",
-            temperature=0.2,
-            max_tokens=100,
-            parse_cot=True
-        )
-        
-        return {
-            "status": "success",
-            "message": "Pipeline CoT entièrement fonctionnel",
-            "cot_structured_test": {
-                "success": True,
-                "sections_parsed": sections_found,
-                "final_answer_extracted": has_final_answer,
-                "raw_response_length": raw_length,
-                "temperature_used": cot_result.get("temperature", "unknown")
-            },
-            "cot_auto_detection": {
-                "success": True,
-                "response_length": len(auto_cot_result),
-                "detected_structure": "<thinking>" in auto_cot_result.lower()
-            },
-            "cot_no_structure": {
-                "success": True,
-                "handled_gracefully": bool(no_structure_result.get("final_answer"))
-            },
-            "functions_tested": [
-                "complete_with_cot",
-                "complete_text", 
-                "_parse_cot_sections",
-                "_extract_final_answer"
-            ]
-        }
-        
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Échec test pipeline CoT: {str(e)}",
-            "error_type": type(e).__name__,
-            "error_details": {
-                "function": "test_cot_pipeline",
-                "step": "cot_pipeline_validation"
-            }
-        }
 
 
 # ----------------------------------------------------------------------------
@@ -911,4 +806,67 @@ def test_openai_connection() -> Dict[str, Any]:
             "status": "error",
             "message": f"Échec connexion OpenAI: {e}",
             "error_type": type(e).__name__,
+        }
+        
+        
+def test_cot_pipeline() -> Dict[str, Any]:
+    """
+    🆕 NOUVEAU: Test complet du pipeline Chain-of-Thought
+    Cette fonction était manquante et causait l'erreur d'import !
+    """
+    try:
+        # Test prompt CoT simple
+        test_cot_prompt = """<thinking>
+Analyse de la question : Il s'agit d'un test du système CoT.
+</thinking>
+
+<analysis>
+Le système doit parser cette structure et extraire les sections.
+</analysis>
+
+<recommendations>
+Le test CoT fonctionne correctement si ce texte est parsé.
+</recommendations>
+
+Réponse finale : Test CoT réussi."""
+
+        # Test complete_with_cot
+        cot_result = complete_with_cot(
+            prompt=test_cot_prompt,
+            temperature=0.2,
+            max_tokens=200,
+            parse_cot=True
+        )
+        
+        # Test parsing
+        sections_found = len(cot_result.get("parsed_sections", {}))
+        has_final_answer = bool(cot_result.get("final_answer"))
+        
+        # Test complete_text() avec détection automatique
+        auto_cot_result = complete_text(
+            prompt="<thinking>Test automatique</thinking>\n\nRéponse automatique CoT.",
+            temperature=0.2,
+            max_tokens=100
+        )
+        
+        return {
+            "status": "success",
+            "cot_direct_test": {
+                "success": True,
+                "sections_parsed": sections_found,
+                "final_answer_extracted": has_final_answer,
+                "raw_length": len(cot_result.get("raw_response", ""))
+            },
+            "cot_auto_detection": {
+                "success": True,
+                "response_length": len(auto_cot_result)
+            },
+            "message": "Pipeline CoT entièrement fonctionnel"
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Échec test pipeline CoT: {str(e)}",
+            "error_type": type(e).__name__
         }
