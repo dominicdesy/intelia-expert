@@ -1,6 +1,7 @@
 # app/api/v1/stats_cache.py
 # -*- coding: utf-8 -*-
 """
+
 🚀 SYSTÈME DE CACHE STATISTIQUES OPTIMISÉ - VERSION MEMORY-SAFE CORRIGÉE
 Tables de cache SQL + Gestionnaire pour performances ultra-rapides
 SAFE: N'interfère pas avec logging.py et billing.py existants
@@ -9,6 +10,7 @@ SAFE: N'interfère pas avec logging.py et billing.py existants
 🛡️ MEMORY-SAFE: Pool de connexions, limites de taille, nettoyage automatique
 🆕 NOUVEAU: Migration automatique des colonnes manquantes (data_size_kb, feedback)
 🔧 FIXED: Création complète de toutes les tables manquantes
+
 """
 
 import json
