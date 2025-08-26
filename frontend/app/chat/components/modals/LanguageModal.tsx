@@ -2,9 +2,9 @@ import React, { useState } from 'react'
 import { useTranslation } from '../../hooks/useTranslation'
 import { CheckIcon } from '../../utils/icons'
 
-// ==================== MODAL LANGUE - VERSION CORRIGÉE ====================
+// ==================== MODAL LANGUE - SANS RELOAD ====================
 export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
-  const { t, currentLanguage, setLanguage } = useTranslation()
+  const { t, currentLanguage } = useTranslation()
   const [isUpdating, setIsUpdating] = useState(false)
   
   const languages = [
@@ -39,24 +39,20 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
       // 1. Sauvegarder dans localStorage
       localStorage.setItem('intelia-preferred-language', languageCode)
       
-      // 2. Utiliser la fonction setLanguage du hook si elle existe
-      if (typeof setLanguage === 'function') {
-        await setLanguage(languageCode)
-      }
+      // 2. Forcer un re-render global via un event custom
+      window.dispatchEvent(new CustomEvent('languageChanged', { 
+        detail: { language: languageCode } 
+      }))
       
-      // 3. Attendre un court délai pour que React finisse ses updates
-      await new Promise(resolve => setTimeout(resolve, 100))
+      // 3. Attendre que les composants se re-rendent
+      await new Promise(resolve => setTimeout(resolve, 300))
       
       // 4. Fermer la modal
       onClose()
       
-      // 5. Recharger de manière plus propre avec un délai
-      setTimeout(() => {
-        window.location.reload()
-      }, 200)
-      
     } catch (error) {
       console.error('❌ [LanguageModal] Erreur changement langue:', error)
+    } finally {
       setIsUpdating(false)
     }
   }
@@ -85,6 +81,7 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
               className="text-gray-400 hover:text-gray-600 text-2xl"
               aria-label="Fermer la modal"
               title="Fermer"
+              disabled={isUpdating}
             >
               ×
             </button>
