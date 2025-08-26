@@ -44,9 +44,12 @@ def get_memory_usage_percent():
     """CORRIGÉ: Mesure mémoire réaliste"""
     try:
         memory = psutil.virtual_memory()
-        return round(memory.percent, 1)
+        result = round(memory.percent, 1)
+        logger.info(f"🔥 DEBUG MEMORY FIX ACTIVE: {result}% RAM, Available: {memory.available/1024/1024/1024:.1f}GB")
+        return result
     except Exception as e:
         logger.warning(f"Erreur mesure mémoire: {e}")
+        logger.info("🔥 DEBUG MEMORY FIX FALLBACK: Retour 50.0% par défaut")
         return 50.0  # Valeur par défaut réaliste au lieu de 0
 
 def decimal_safe_json_encoder(obj):
@@ -122,11 +125,13 @@ class MemoryMonitor:
     def __init__(self):
         self.last_cleanup = datetime.now().timestamp()
         self.cleanup_lock = threading.Lock()
+        logger.info("🔥 DEBUG TIMESTAMP FIX ACTIVE: Using datetime.now().timestamp()")
         
     def should_cleanup(self):
         """Détermine si un cleanup est nécessaire"""
         memory_percent = get_memory_usage_percent()
         time_since_cleanup = datetime.now().timestamp() - self.last_cleanup
+        logger.info(f"🔥 DEBUG TIMESTAMP CALC: current={datetime.now().timestamp()}, last={self.last_cleanup}, diff={time_since_cleanup}")
         
         if memory_percent > MEMORY_CONFIG["FORCE_CLEANUP_AT_PERCENT"]:
             return True, f"Mémoire critique: {memory_percent}%"
@@ -1132,6 +1137,7 @@ class StatisticsCache:
                     
                     for table_name, stat_key in other_tables:
                         try:
+                            logger.info(f"🔥 DEBUG SQL FIX ACTIVE: Querying table {table_name} for stat_key {stat_key}")
                             # CORRIGÉ: Utiliser le bon nom de table dans la requête
                             cur.execute(f"""
                                 SELECT 
@@ -1144,8 +1150,9 @@ class StatisticsCache:
                             result = cur.fetchone()
                             if result:
                                 stats[stat_key] = dict(result)
+                                logger.info(f"🔥 DEBUG SQL SUCCESS: {stat_key} = {dict(result)}")
                         except Exception as table_error:
-                            logger.info(f"Table {table_name} non disponible: {table_error}")
+                            logger.info(f"🔥 DEBUG SQL ERROR: Table {table_name} non disponible: {table_error}")
                             stats[stat_key] = {
                                 'total': 0, 'valid': 0, 'avg_size_kb': 0,
                                 'note': f'Table {table_name} non disponible'
