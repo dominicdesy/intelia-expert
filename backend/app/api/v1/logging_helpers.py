@@ -117,7 +117,7 @@ def log_question_to_analytics(
             source = answer.get("source", "unknown")
         
         analytics.log_question_response(
-            email=user_email,
+            user_email=user_email,
             session_id=session_id,
             question=question,
             response_text=response_text,
