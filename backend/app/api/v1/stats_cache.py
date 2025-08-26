@@ -373,7 +373,7 @@ class StatisticsCache:
                             -- TTL agressif pour économie mémoire
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '30 minutes'),
+                            expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '4 hours'),
                             
                             -- Métadonnées allégées
                             source VARCHAR(50) DEFAULT 'computed',
@@ -809,7 +809,7 @@ class StatisticsCache:
                 return False
             
             # 5. Stockage avec TTL court
-            expires_at = datetime.now() + timedelta(hours=min(ttl_hours, 1))  # Max 1h TTL
+            expires_at = datetime.now() + timedelta(hours=min(ttl_hours, 12))  # Max 12h TTL
             
             conn = self._get_connection()
             try:
