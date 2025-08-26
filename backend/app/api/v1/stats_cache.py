@@ -57,9 +57,12 @@ def decimal_safe_json_encoder(obj):
     Converter JSON pour gérer les types Decimal de PostgreSQL
     Résout l'erreur: "Object of type Decimal is not JSON serializable"
     MEMORY-SAFE: Limite la profondeur de conversion
+    FIXED: Normalise tous les décimaux vers float pour cohérence
     """
     if isinstance(obj, decimal.Decimal):
-        return float(obj)
+        result = float(obj)
+        logger.info(f"DECIMAL FIX: Converted Decimal({obj}) to float({result})")
+        return result
     raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 def safe_json_dumps(data, max_depth=MEMORY_CONFIG["MAX_JSON_DEPTH"]):
@@ -159,6 +162,17 @@ class StatisticsCache:
         self.dsn = dsn or os.getenv("DATABASE_URL")
         if not self.dsn:
             raise ValueError("DATABASE_URL manquant pour le cache statistiques")
+        
+        # LOG DE DÉPLOIEMENT - Confirme que la nouvelle version est active
+        print("=" * 80)
+        print("STATS_CACHE.PY - NOUVELLE VERSION DEPLOYÉE")
+        print("Version: 2025-08-26 v2.1 - Corrections types mixtes + cache legacy")
+        print("Corrections actives:")
+        print("  ✓ Types Decimal → Float normalisés")
+        print("  ✓ Debug cache legacy isolé")
+        print("  ✓ Investigation dashboard_stats_snapshot")
+        print("=" * 80)
+        logger.info("DEPLOYMENT CONFIRMATION: stats_cache.py v2.1 active with decimal/legacy fixes")
         
         # MEMORY-SAFE: Pool de connexions limité
         try:
@@ -1120,11 +1134,16 @@ class StatisticsCache:
                         """)
                         result = cur.fetchone()
                         if result:
-                            stats['dashboard_snapshots'] = dict(result)
+                            # FIXED: Normaliser tous les types vers float
+                            stats['dashboard_snapshots'] = {
+                                'total': int(result['total']),
+                                'current': int(result['current']),
+                                'avg_size_kb': float(result['avg_size_kb'])
+                            }
                     except Exception as dashboard_error:
                         logger.warning(f"Erreur stats dashboard: {dashboard_error}")
                         stats['dashboard_snapshots'] = {
-                            'total': 0, 'current': 0, 'avg_size_kb': 0,
+                            'total': 0, 'current': 0, 'avg_size_kb': 0.0,
                             'note': 'Table dashboard_stats_lite non disponible'
                         }
                     
@@ -1137,7 +1156,7 @@ class StatisticsCache:
                     
                     for table_name, stat_key in other_tables:
                         try:
-                            logger.info(f"🔥 DEBUG SQL FIX ACTIVE: Querying table {table_name} for stat_key {stat_key}")
+                            logger.info(f"DEBUG SQL FIX ACTIVE: Querying table {table_name} for stat_key {stat_key}")
                             # CORRIGÉ: Utiliser le bon nom de table dans la requête
                             cur.execute(f"""
                                 SELECT 
@@ -1149,12 +1168,34 @@ class StatisticsCache:
                             """)                            
                             result = cur.fetchone()
                             if result:
-                                stats[stat_key] = dict(result)
-                                logger.info(f"🔥 DEBUG SQL SUCCESS: {stat_key} = {dict(result)}")
+                                # FIXED: Normaliser tous les types vers float et ajouter debug pour cache legacy
+                                stats[stat_key] = {
+                                    'total': int(result['total']),
+                                    'valid': int(result['valid']),
+                                    'avg_size_kb': float(result['avg_size_kb'])
+                                }
+                                logger.info(f"DEBUG SQL SUCCESS: {stat_key} = {stats[stat_key]}")
+                                
+                                # FIXED: Debug spécial pour cache legacy isolé
+                                if stat_key == 'legacy_dashboard' and stats[stat_key]['valid'] > 0:
+                                    # Vérifier pourquoi cette table a des données alors que les autres sont vides
+                                    cur.execute(f"""
+                                        SELECT created_at, expires_at, 
+                                               NOW() as current_time,
+                                               expires_at > NOW() as is_valid
+                                        FROM {table_name} 
+                                        WHERE created_at > NOW() - INTERVAL '24 hours'
+                                        ORDER BY created_at DESC LIMIT 3
+                                    """)
+                                    recent_entries = cur.fetchall()
+                                    logger.info(f"CACHE LEGACY ISOLATION DEBUG: {table_name} recent entries:")
+                                    for entry in recent_entries:
+                                        logger.info(f"  - Created: {entry[0]}, Expires: {entry[1]}, Valid: {entry[3]}")
+                                        
                         except Exception as table_error:
-                            logger.info(f"🔥 DEBUG SQL ERROR: Table {table_name} non disponible: {table_error}")
+                            logger.info(f"DEBUG SQL ERROR: Table {table_name} non disponible: {table_error}")
                             stats[stat_key] = {
-                                'total': 0, 'valid': 0, 'avg_size_kb': 0,
+                                'total': 0, 'valid': 0, 'avg_size_kb': 0.0,
                                 'note': f'Table {table_name} non disponible'
                             }
                     
