@@ -3,6 +3,7 @@ import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '../../hooks/useTranslation'
 import { UserInfoModalProps } from '@/types'
 import { PhoneInput, usePhoneValidation } from '../PhoneInput'
+import { CountrySelect } from './CountrySelect' // ✅ Import du nouveau composant
 
 // ==================== CONFIGURATION DES PAYS AVEC FALLBACK ====================
 // Pays de fallback (les plus communs) en cas d'échec de l'API
@@ -40,11 +41,10 @@ interface Country {
 // ✅ Hook personnalisé ULTRA-SIMPLIFIÉ pour debug
 const useCountries = () => {
   const [countries, setCountries] = useState<Country[]>(fallbackCountries)
-  const [loading, setLoading] = useState(false) // ✅ Pas de loading pour éviter les problèmes
+  const [loading, setLoading] = useState(false)
   const [usingFallback, setUsingFallback] = useState(true)
 
   useEffect(() => {
-    // ✅ APPROCHE ULTRA-DIRECTE : Remplacer immédiatement
     console.log('🌍 [UserInfoModal] Hook démarré avec', fallbackCountries.length, 'pays fallback')
     
     const fetchCountries = async () => {
@@ -80,7 +80,6 @@ const useCountries = () => {
         
         if (formattedCountries.length >= 50) {
           console.log('✅ [UserInfoModal Countries] REMPLACEMENT par', formattedCountries.length, 'pays API')
-          // ✅ FORCER le remplacement complet
           setCountries([...formattedCountries])
           setUsingFallback(false)
           console.log('✅ [UserInfoModal Countries] API REST Countries utilisée avec succès')
@@ -91,7 +90,6 @@ const useCountries = () => {
       }
     }
 
-    // ✅ Démarrer immédiatement
     fetchCountries()
   }, [])
 
@@ -108,10 +106,9 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('profile')
   
-  // ✅ Hook pour charger les pays avec la correction ULTRA-SIMPLE
+  // ✅ Hook pour charger les pays
   const { countries, loading: countriesLoading, usingFallback } = useCountries()
   
-  // ✅ Debug console pour tracer le problème
   console.log('🎯 [UserInfoModal] Rendu principal avec', countries.length, 'pays')
   
   // ✅ Créer le mapping des codes téléphoniques dynamiquement
@@ -259,7 +256,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     try {
       console.log('🔐 [Password] Login backend pour obtenir token...')
       
-      // 1. Login avec l'email de l'utilisateur connecté pour obtenir un token backend
       const loginResponse = await fetch('/api/v1/auth/login', {
         method: 'POST',
         headers: {
@@ -282,7 +278,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       const backendToken = loginData.access_token
       console.log('✅ [Password] Token backend obtenu')
 
-      // 2. Maintenant changer le mot de passe avec le token backend valide
       const response = await fetch('/api/v1/auth/change-password', {
         method: 'POST',
         headers: {
@@ -305,7 +300,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       
       console.log('✅ [Password] Mot de passe changé avec succès via backend')
       
-      // Réinitialiser les champs et fermer
       setPasswordData({
         currentPassword: '',
         newPassword: '',
@@ -313,10 +307,8 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       })
       setPasswordErrors([])
       
-      // Fermer d'abord la modal
       onClose()
       
-      // Puis afficher le message de succès
       setTimeout(() => {
         alert('Mot de passe changé avec succès!')
       }, 100)
@@ -331,7 +323,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
 
   const tabs = [
     { id: 'profile', label: t('nav.profile'), icon: '👤' },
-    { id: 'password', label: t('profile.password'), icon: '🔐' }
+    { id: 'password', label: t('profile.password'), icon: '🔒' }
   ]
 
   return (
@@ -342,7 +334,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
         onClick={onClose}
       />
       
-      {/* Modal Container - Taille fixe optimisée */}
+      {/* Modal Container */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div 
           className="bg-white rounded-xl shadow-2xl w-full max-w-2xl h-[85vh] flex flex-col"
@@ -398,7 +390,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                 </div>
               )}
 
-              {/* ✅ STATUT DU CHARGEMENT DES PAYS - Amélioration du message */}
+              {/* Statut du chargement des pays */}
               {usingFallback && !countriesLoading && (
                 <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <div className="flex items-center space-x-2">
@@ -463,7 +455,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                       />
                     </div>
 
-                    {/* Téléphone - Composant simplifié intégré */}
+                    {/* Téléphone */}
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-gray-700 mb-3">
                         {t('profile.phone')} <span className="text-gray-500 text-sm">(optionnel)</span>
@@ -476,51 +468,20 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                       />
                     </div>
 
-                    {/* ✅ SÉLECTION PAYS VERSION FINALE PROPRE */}
+                    {/* ✅ NOUVEAU COMPOSANT COUNTRYSELECT AVEC RECHERCHE */}
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         {t('profile.country')} <span className="text-gray-500 text-sm">(optionnel)</span>
                       </label>
-
-                      <select
+                      <CountrySelect
+                        countries={countries}
                         value={formData.country}
-                        onChange={(e) => {
-                          console.log('🔄 Pays sélectionné:', e.target.value)
-                          setFormData(prev => ({ ...prev, country: e.target.value }))
+                        onChange={(countryValue) => {
+                          console.log('🔄 Pays sélectionné:', countryValue)
+                          setFormData(prev => ({ ...prev, country: countryValue }))
                         }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                        style={{
-                          backgroundColor: 'white',
-                          color: 'black',
-                          fontSize: '14px',
-                          lineHeight: '1.5'
-                        }}
-                      >
-                        <option 
-                          value=""
-                          style={{
-                            backgroundColor: 'white',
-                            color: 'black',
-                            padding: '8px'
-                          }}
-                        >
-                          Sélectionner un pays
-                        </option>
-                        {countries.map((country, index) => (
-                          <option 
-                            key={country.value} 
-                            value={country.value}
-                            style={{
-                              backgroundColor: 'white',
-                              color: 'black',
-                              padding: '8px',
-                              fontSize: '14px'
-                            }}
-                          >
-                            {country.flag} {country.label}
-                          </option>
-                        ))}
-                      </select>
+                        placeholder="Sélectionner un pays ou rechercher..."
+                      />
                     </div>
                   </div>
 
