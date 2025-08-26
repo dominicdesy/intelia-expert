@@ -314,13 +314,26 @@ class StatisticsCache:
                             """, (table_name,))
                             
                             if cur.fetchone()[0]:
-                                # Table existe - ajouter data_size_kb si manquante
-                                cur.execute(f"""
-                                    ALTER TABLE {table_name} 
-                                    ADD COLUMN IF NOT EXISTS data_size_kb INTEGER DEFAULT 0
-                                """)
-                                migrations_applied.append(table_name)
-                                logger.info(f"🔧 Colonne data_size_kb ajoutée à {table_name}")
+                                # Vérifier si data_size_kb existe déjà
+                                cur.execute("""
+                                    SELECT EXISTS (
+                                        SELECT FROM information_schema.columns 
+                                        WHERE table_name = %s AND column_name = 'data_size_kb'
+                                    )
+                                """, (table_name,))
+                                
+                                column_exists = cur.fetchone()[0]
+                                
+                                if not column_exists:
+                                    # Table existe - ajouter data_size_kb si manquante
+                                    cur.execute(f"""
+                                        ALTER TABLE {table_name} 
+                                        ADD COLUMN data_size_kb INTEGER DEFAULT 0
+                                    """)
+                                    migrations_applied.append(table_name)
+                                    logger.info(f"🔧 Colonne data_size_kb ajoutée à {table_name}")
+                                else:
+                                    logger.info(f"ℹ️ Colonne data_size_kb existe déjà dans {table_name}")
                         except Exception as table_error:
                             logger.info(f"ℹ️ Table {table_name} skip: {table_error}")
                     
@@ -429,23 +442,42 @@ class StatisticsCache:
                     
                     # 🔧 MIGRATION: Ajouter expires_at aux tables existantes si manquante
                     try:
+                        # Vérifier d'abord si created_at existe avant de l'utiliser
+                        cur.execute("""
+                            SELECT EXISTS (
+                                SELECT FROM information_schema.columns 
+                                WHERE table_name = 'dashboard_stats_snapshot' 
+                                AND column_name = 'created_at'
+                            )
+                        """)
+                        has_created_at = cur.fetchone()[0]
+                        
                         cur.execute("""
                             ALTER TABLE dashboard_stats_snapshot 
                             ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '24 hours')
                         """)
                         
-                        # Mettre à jour les entrées existantes sans expires_at
-                        cur.execute("""
-                            UPDATE dashboard_stats_snapshot 
-                            SET expires_at = COALESCE(created_at, CURRENT_TIMESTAMP) + INTERVAL '24 hours' 
-                            WHERE expires_at IS NULL
-                        """)
+                        # Mettre à jour seulement si created_at existe
+                        if has_created_at:
+                            cur.execute("""
+                                UPDATE dashboard_stats_snapshot 
+                                SET expires_at = created_at + INTERVAL '24 hours' 
+                                WHERE expires_at IS NULL
+                            """)
+                        else:
+                            cur.execute("""
+                                UPDATE dashboard_stats_snapshot 
+                                SET expires_at = CURRENT_TIMESTAMP + INTERVAL '24 hours' 
+                                WHERE expires_at IS NULL
+                            """)
                         
-                        logger.info("✅ Colonne expires_at ajoutée à dashboard_stats_snapshot")
+                        conn.commit()  # Commit après chaque migration réussie
+                        logger.info("Migration expires_at dashboard_stats_snapshot réussie")
                     except Exception as migration_error:
-                        logger.warning(f"Migration expires_at: {migration_error}")
+                        conn.rollback()  # Rollback en cas d'erreur
+                        logger.warning(f"Migration expires_at dashboard_stats_snapshot: {migration_error}")
                     
-                    # Migration similaire pour les autres tables si nécessaire
+                    # Migration similaire pour les autres tables
                     other_tables_to_migrate = [
                         ('questions_cache', '1 hour'),
                         ('openai_costs_cache', '4 hours')
@@ -453,17 +485,37 @@ class StatisticsCache:
                     
                     for table_name, interval in other_tables_to_migrate:
                         try:
+                            # Vérifier si created_at existe pour cette table
+                            cur.execute("""
+                                SELECT EXISTS (
+                                    SELECT FROM information_schema.columns 
+                                    WHERE table_name = %s AND column_name = 'created_at'
+                                )
+                            """, (table_name,))
+                            has_created_at = cur.fetchone()[0]
+                            
                             cur.execute(f"""
                                 ALTER TABLE {table_name} 
                                 ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '{interval}')
                             """)
                             
-                            cur.execute(f"""
-                                UPDATE {table_name} 
-                                SET expires_at = COALESCE(created_at, CURRENT_TIMESTAMP) + INTERVAL '{interval}' 
-                                WHERE expires_at IS NULL
-                            """)
+                            if has_created_at:
+                                cur.execute(f"""
+                                    UPDATE {table_name} 
+                                    SET expires_at = created_at + INTERVAL '{interval}' 
+                                    WHERE expires_at IS NULL
+                                """)
+                            else:
+                                cur.execute(f"""
+                                    UPDATE {table_name} 
+                                    SET expires_at = CURRENT_TIMESTAMP + INTERVAL '{interval}' 
+                                    WHERE expires_at IS NULL
+                                """)
+                            
+                            conn.commit()
+                            logger.info(f"Migration expires_at {table_name} réussie")
                         except Exception as table_migration_error:
+                            conn.rollback()
                             logger.info(f"Migration {table_name} expires_at: {table_migration_error}")
                     
                     # 🛡️ TABLE SIMPLIFIÉE: Snapshots dashboard légers (CONSERVÉE DE L'ORIGINAL)
