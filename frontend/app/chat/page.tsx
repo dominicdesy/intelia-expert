@@ -71,7 +71,7 @@ class PageLoadingCircuitBreaker {
 // Instance globale du circuit breaker pour la page
 const pageLoadingBreaker = new PageLoadingCircuitBreaker()
 
-// CORRECTION: Circuit breaker pour les re-renders
+// Circuit breaker pour les re-renders
 class RenderCircuitBreaker {
   private renderCount = 0
   private lastReset = Date.now()
@@ -320,7 +320,7 @@ const MessageList = React.memo(({
 MessageList.displayName = 'MessageList'
 
 export default function ChatInterface() {
-  // CORRECTION: Vérifier les re-renders excessifs
+  // Vérifier les re-renders excessifs
   if (!renderBreaker.checkRender()) {
     return null
   }
@@ -338,7 +338,7 @@ export default function ChatInterface() {
 
   const config = { level: 'standard' }
 
-  // CORRECTION: Regrouper les états UI liés
+  // Regrouper les états UI liés
   const [uiState, setUiState] = useState({
     inputMessage: '',
     isLoadingChat: false,
@@ -379,8 +379,9 @@ export default function ChatInterface() {
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const conversationLoadingAttemptsRef = useRef(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const isRedirectingRef = useRef(false)
 
-  // CORRECTION: Mémoisation stable des données
+  // Mémoisation stable des données
   const messages: Message[] = useMemo(() => {
     return currentConversation?.messages || []
   }, [currentConversation?.messages])
@@ -389,16 +390,26 @@ export default function ChatInterface() {
     return messages.length > 0
   }, [messages.length])
 
-  // CORRECTION: Fonctions stables définies en dehors des useCallback
-  const redirectToLogin = (reason: string = 'Session expirée') => {
+  // CORRECTION: redirectToLogin avec protection contre les appels multiples
+  const redirectToLogin = useCallback((reason: string = 'Session expirée') => {
+    // Protection contre les appels multiples
+    if (isRedirectingRef.current) {
+      console.log('Redirection déjà en cours, ignore:', reason)
+      return
+    }
+
+    isRedirectingRef.current = true
     console.log('Redirection vers login:', reason)
     
+    // Nettoyer les timeouts existants
     if (redirectTimeoutRef.current) clearTimeout(redirectTimeoutRef.current)
     if (authCheckTimeoutRef.current) clearTimeout(authCheckTimeoutRef.current)
     
     try {
       router.push('/')
-      setTimeout(() => {
+      
+      // Fallback au cas où router.push échoue
+      redirectTimeoutRef.current = setTimeout(() => {
         if (window.location.pathname === '/chat') {
           window.location.href = '/'
         }
@@ -407,9 +418,9 @@ export default function ChatInterface() {
       console.error('Erreur redirection router, fallback immédiat')
       window.location.href = '/'
     }
-  }
+  }, [router])
 
-  const handleAuthError = (error: any) => {
+  const handleAuthError = useCallback((error: any) => {
     console.log('Gestion erreur auth:', error)
     
     if (error?.status === 403 || 
@@ -419,10 +430,10 @@ export default function ChatInterface() {
       console.log('Session expirée détectée, redirection')
       redirectToLogin('Session expirée')
     }
-  }
+  }, [redirectToLogin])
 
-  // CORRECTION: Fonctions simplifiées sans useCallback complexes
-  const getUserInitials = (user: any): string => {
+  // Fonctions simplifiées
+  const getUserInitials = useCallback((user: any): string => {
     if (!user) return 'U'
 
     if (user.name) {
@@ -443,9 +454,9 @@ export default function ChatInterface() {
     }
 
     return 'U'
-  }
+  }, [])
 
-  const preprocessMarkdown = (content: string): string => {
+  const preprocessMarkdown = useCallback((content: string): string => {
     if (!content) return ""
 
     let processed = content
@@ -466,16 +477,16 @@ export default function ChatInterface() {
     processed = processed.trim()
 
     return processed
-  }
+  }, [])
 
   const processedMessages = useMemo(() => {
     return messages.map(message => ({
       ...message,
       processedContent: message.isUser ? message.content : preprocessMarkdown(message.content)
     }))
-  }, [messages])
+  }, [messages, preprocessMarkdown])
 
-  const cleanResponseText = (text: string): string => {
+  const cleanResponseText = useCallback((text: string): string => {
     if (!text) return ""
 
     if (text.length < 100) {
@@ -484,13 +495,11 @@ export default function ChatInterface() {
 
     let cleaned = text
 
-    // Nettoyage des références aux sources
+    // Nettoyage des références aux sources et autres éléments indésirables
     cleaned = cleaned.replace(/\*\*Source:\s*[^*]+\*\*/g, '')
     cleaned = cleaned.replace(/\*\*ource:\s*[^*]+\*\*/g, '')
     cleaned = cleaned.replace(/\*\*Source[^*]*\*\*/g, '')
     cleaned = cleaned.replace(/Source:\s*[^\n]+/g, '')
-
-    // Autres nettoyages
     cleaned = cleaned.replace(/protection, regardless of the species involved[^.]+\./g, '')
     cleaned = cleaned.replace(/bird ages, from the adverse effects[^.]+\./g, '')
     cleaned = cleaned.replace(/oocyst production reaches a maximum[^.]+\./g, '')
@@ -529,10 +538,10 @@ export default function ChatInterface() {
     cleaned = cleaned.replace(/\n+\s*$/, '')
 
     return cleaned.trim()
-  }
+  }, [])
 
-  // CORRECTION: loadConversationsWithBreaker simplifiée
-  const loadConversationsWithBreaker = async (userId: string) => {
+  // loadConversationsWithBreaker simplifiée
+  const loadConversationsWithBreaker = useCallback(async (userId: string) => {
     if (!pageLoadingBreaker.canAttempt() || hasLoadedConversationsRef.current) {
       return
     }
@@ -556,25 +565,26 @@ export default function ChatInterface() {
       
       throw error
     }
-  }
+  }, [handleAuthError])
 
-  // CORRECTION: useEffect simplifié pour auth backend
+  // CORRECTION: useEffect pour auth backend avec cleanup approprié
   useEffect(() => {
     let isInitializing = false
+    let isCancelled = false
     
     const initAuth = async () => {
-      if (isInitializing || !hasHydrated) return
+      if (isInitializing || !hasHydrated || isCancelled) return
       isInitializing = true
       
       try {
         const sessionValid = await initializeSession()
         
-        if (!sessionValid && isMountedRef.current) {
+        if (!sessionValid && isMountedRef.current && !isCancelled) {
           redirectToLogin('Session expirée')
         }
       } catch (error) {
         console.error('Erreur initialisation:', error)
-        if (isMountedRef.current) {
+        if (isMountedRef.current && !isCancelled) {
           handleAuthError(error)
         }
       } finally {
@@ -585,23 +595,45 @@ export default function ChatInterface() {
     if (hasHydrated && isAuthenticated !== false) {
       initAuth()
     }
-  }, [hasHydrated, isAuthenticated])
 
-  // useEffect pour gérer la déconnexion
-  useEffect(() => {
-    if (hasHydrated && isAuthenticated === false && !isLoading) {
-      redirectToLogin('Déconnexion')
+    return () => {
+      isCancelled = true
     }
-  }, [hasHydrated, isAuthenticated, isLoading])
+  }, [hasHydrated, isAuthenticated, initializeSession, redirectToLogin, handleAuthError])
 
-  // useEffect pour gestion clavier mobile
+  // CORRECTION: useEffect pour gestion de la déconnexion avec protection
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout | null = null
+
+    if (hasHydrated && isAuthenticated === false && !isLoading) {
+      timeoutId = setTimeout(() => {
+        if (isMountedRef.current) {
+          redirectToLogin('Déconnexion')
+        }
+      }, 100)
+    }
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+    }
+  }, [hasHydrated, isAuthenticated, isLoading, redirectToLogin])
+
+  // CORRECTION: useEffect pour gestion clavier mobile avec cleanup complet
   useEffect(() => {
     if (!uiState.isMobileDevice) return
 
     let initialViewportHeight = window.visualViewport?.height || window.innerHeight
-    setUiState(prev => ({ ...prev, viewportHeight: initialViewportHeight }))
+    let isCancelled = false
+
+    if (isMountedRef.current && !isCancelled) {
+      setUiState(prev => ({ ...prev, viewportHeight: initialViewportHeight }))
+    }
     
     const handleViewportChange = () => {
+      if (isCancelled || !isMountedRef.current) return
+      
       if (window.visualViewport) {
         const currentHeight = window.visualViewport.height
         const heightDifference = initialViewportHeight - currentHeight
@@ -616,7 +648,7 @@ export default function ChatInterface() {
         if (heightDifference > 150) {
           document.body.classList.add('keyboard-open')
           setTimeout(() => {
-            if (messagesEndRef.current && isMountedRef.current) {
+            if (messagesEndRef.current && isMountedRef.current && !isCancelled) {
               messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" })
             }
           }, 100)
@@ -627,6 +659,8 @@ export default function ChatInterface() {
     }
 
     const handleResize = () => {
+      if (isCancelled || !isMountedRef.current) return
+      
       const currentHeight = window.innerHeight
       const heightDifference = initialViewportHeight - currentHeight
       
@@ -653,11 +687,13 @@ export default function ChatInterface() {
     const inputElement = inputRef.current
     
     const handleFocus = () => {
+      if (isCancelled || !isMountedRef.current) return
+      
       setUiState(prev => ({ ...prev, isKeyboardVisible: true }))
       document.body.classList.add('keyboard-open')
       
       setTimeout(() => {
-        if (messagesEndRef.current && isMountedRef.current) {
+        if (messagesEndRef.current && isMountedRef.current && !isCancelled) {
           messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" })
         }
       }, 300)
@@ -665,7 +701,7 @@ export default function ChatInterface() {
 
     const handleBlur = () => {
       setTimeout(() => {
-        if (isMountedRef.current) {
+        if (isMountedRef.current && !isCancelled) {
           setUiState(prev => ({ 
             ...prev, 
             isKeyboardVisible: false,
@@ -682,6 +718,8 @@ export default function ChatInterface() {
     }
 
     return () => {
+      isCancelled = true
+      
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', handleViewportChange)
       } else {
@@ -697,11 +735,15 @@ export default function ChatInterface() {
     }
   }, [uiState.isMobileDevice])
 
-  // useEffect de montage avec cleanup complet
+  // CORRECTION: useEffect de montage avec cleanup complet
   useEffect(() => {
     isMountedRef.current = true
+    
     return () => {
       isMountedRef.current = false
+      isRedirectingRef.current = false
+      
+      // Nettoyer TOUS les timeouts
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current)
       }
@@ -711,6 +753,14 @@ export default function ChatInterface() {
       if (authCheckTimeoutRef.current) {
         clearTimeout(authCheckTimeoutRef.current)
       }
+      
+      // Nettoyer les classes CSS
+      document.body.classList.remove('keyboard-open')
+      
+      // Réinitialiser les refs
+      hasLoadedConversationsRef.current = false
+      conversationLoadingAttemptsRef.current = 0
+      pageLoadingBreaker.reset()
     }
   }, [])
 
@@ -727,7 +777,9 @@ export default function ChatInterface() {
       return (isMobileUA || isIPadOS || (isTabletScreen && hasTouchScreen)) && !isDesktopTouchscreen
     }
 
-    setUiState(prev => ({ ...prev, isMobileDevice: detectMobileDevice() }))
+    if (isMountedRef.current) {
+      setUiState(prev => ({ ...prev, isMobileDevice: detectMobileDevice() }))
+    }
 
     const handleResize = () => {
       if (isMountedRef.current) {
@@ -739,31 +791,42 @@ export default function ChatInterface() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Auto-scroll avec dépendances optimisées
+  // CORRECTION: Auto-scroll avec protection complète
   useEffect(() => {
-    if (isMountedRef.current && messages.length > lastMessageCountRef.current && uiState.shouldAutoScroll && !uiState.isUserScrolling) {
-      const scrollTimeout = setTimeout(() => {
-        if (isMountedRef.current) {
-          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    let timeoutId: NodeJS.Timeout | null = null
+
+    if (isMountedRef.current && 
+        messages.length > lastMessageCountRef.current && 
+        uiState.shouldAutoScroll && 
+        !uiState.isUserScrolling) {
+      
+      timeoutId = setTimeout(() => {
+        if (isMountedRef.current && messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
         }
       }, 100)
-      
-      return () => clearTimeout(scrollTimeout)
     }
 
     lastMessageCountRef.current = messages.length
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+    }
   }, [messages.length, uiState.shouldAutoScroll, uiState.isUserScrolling])
 
-  // Gestion du scroll avec cleanup approprié
+  // CORRECTION: Gestion du scroll avec cleanup approprié et protection
   useEffect(() => {
     const chatContainer = chatContainerRef.current
     if (!chatContainer) return
 
     let scrollTimeout: NodeJS.Timeout
     let isScrolling = false
+    let isCancelled = false
 
     const handleScroll = () => {
-      if (!isMountedRef.current) return
+      if (!isMountedRef.current || isCancelled) return
 
       const { scrollTop, scrollHeight, clientHeight } = chatContainer
       const isAtBottom = Math.abs(scrollHeight - scrollTop - clientHeight) < 50
@@ -784,7 +847,7 @@ export default function ChatInterface() {
 
       clearTimeout(scrollTimeout)
       scrollTimeout = setTimeout(() => {
-        if (isMountedRef.current) {
+        if (isMountedRef.current && !isCancelled) {
           setUiState(prev => ({ ...prev, isUserScrolling: false }))
           isScrolling = false
         }
@@ -792,7 +855,9 @@ export default function ChatInterface() {
     }
 
     chatContainer.addEventListener('scroll', handleScroll, { passive: true })
+    
     return () => {
+      isCancelled = true
       chatContainer.removeEventListener('scroll', handleScroll)
       clearTimeout(scrollTimeout)
     }
@@ -875,7 +940,7 @@ export default function ChatInterface() {
         }
       }
     }
-  }, [isAuthenticated, user?.id])
+  }, [isAuthenticated, user?.id, loadConversationsWithBreaker])
 
   // Reset circuit breaker
   useEffect(() => {
@@ -899,7 +964,9 @@ export default function ChatInterface() {
   }
 
   if (!isAuthenticated) {
-    redirectToLogin('Non authentifié')
+    if (!isRedirectingRef.current) {
+      redirectToLogin('Non authentifié')
+    }
     
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
@@ -912,7 +979,9 @@ export default function ChatInterface() {
   }
 
   if (!user) {
-    redirectToLogin('Utilisateur manquant')
+    if (!isRedirectingRef.current) {
+      redirectToLogin('Utilisateur manquant')
+    }
     
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
@@ -983,8 +1052,8 @@ export default function ChatInterface() {
     return [answerText, []]
   }
 
-  // CORRECTION: handleSendMessage simplifié
-  const handleSendMessage = async (text?: string) => {
+  // handleSendMessage simplifiée
+  const handleSendMessage = useCallback(async (text?: string) => {
     const safeText = text || uiState.inputMessage
     
     if (!safeText.trim() || !isMountedRef.current) return
@@ -1094,10 +1163,10 @@ export default function ChatInterface() {
         setUiState(prev => ({ ...prev, isLoadingChat: false }))
       }
     }
-  }
+  }, [uiState.inputMessage, currentConversation, addMessage, clarificationState, user, currentLanguage, cleanResponseText, handleAuthError, t])
 
   // Fonctions de feedback simplifiées
-  const handleFeedbackClick = (messageId: string, feedback: 'positive' | 'negative') => {
+  const handleFeedbackClick = useCallback((messageId: string, feedback: 'positive' | 'negative') => {
     if (!isMountedRef.current) return
 
     setFeedbackModal({
@@ -1105,9 +1174,10 @@ export default function ChatInterface() {
       messageId,
       feedbackType: feedback
     })
-  }
+  }, [])
 
-  const handleFeedbackSubmit = async (feedback: 'positive' | 'negative', comment?: string) => {
+  // CORRECTION: handleFeedbackSubmit avec protection complète
+  const handleFeedbackSubmit = useCallback(async (feedback: 'positive' | 'negative', comment?: string) => {
     const { messageId } = feedbackModal
     if (!messageId || !isMountedRef.current) return
 
@@ -1153,13 +1223,14 @@ export default function ChatInterface() {
       console.error('Erreur générale feedback:', error)
       throw error
     } finally {
+      // CORRECTION: Vérifier que le composant est encore monté
       if (isMountedRef.current) {
         setUiState(prev => ({ ...prev, isSubmittingFeedback: false }))
       }
     }
-  }
+  }, [feedbackModal, messages, updateMessage, handleAuthError])
 
-  const handleFeedbackModalClose = () => {
+  const handleFeedbackModalClose = useCallback(() => {
     if (!isMountedRef.current) return
 
     setFeedbackModal({
@@ -1167,9 +1238,9 @@ export default function ChatInterface() {
       messageId: null,
       feedbackType: null
     })
-  }
+  }, [])
 
-  const handleNewConversation = () => {
+  const handleNewConversation = useCallback(() => {
     if (!isMountedRef.current) return
 
     createNewConversation()
@@ -1203,9 +1274,9 @@ export default function ChatInterface() {
       isUserScrolling: false,
       showScrollButton: false
     }))
-  }
+  }, [createNewConversation, t, currentLanguage, setCurrentConversation])
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     if (!isMountedRef.current) return
 
     setUiState(prev => ({
@@ -1215,9 +1286,9 @@ export default function ChatInterface() {
       showScrollButton: false
     }))
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+  }, [])
 
-  // CORRECTION: Calcul des styles dynamiques pour mobile
+  // Calcul des styles dynamiques pour mobile
   const containerStyle = useMemo(() => {
     return uiState.isMobileDevice ? {
       height: '100vh',

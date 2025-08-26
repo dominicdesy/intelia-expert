@@ -290,12 +290,11 @@ class AnalyticsManager:
                     """, (
                         user_email, session_id, question_id, question[:2000], response_text[:5000],
                         response_source, status, processing_time_ms, confidence,
-                        completeness_score, language, intent, json.dumps(entities or {}),  # CORRIGÉ: JSON string
+                        completeness_score, language, intent, json.dumps(entities or {}),
                         error_info.get("type") if error_info else None,
                         error_info.get("message") if error_info else None,
                         error_info.get("traceback") if error_info else None
-                    ))                    
-                   
+                    ))
                     conn.commit()
                     
             # Nettoyer le cache après écriture
