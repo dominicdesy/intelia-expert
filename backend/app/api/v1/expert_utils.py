@@ -1,12 +1,9 @@
 # app/api/v1/expert_utils.py
 # -*- coding: utf-8 -*-
 """
-
 Utilitaires et fonctions helper pour expert.py
 VERSION SÉCURISÉE MÉMOIRE - Cache PerfStore drastiquement limité pour éviter OOM
 FIXED: Correction du paramètre analytics user_email -> email
-FIXED
-
 """
 
 import logging
@@ -246,21 +243,14 @@ def log_question_to_analytics(
             answer = result.get("answer", {})
             source = answer.get("source", "unknown")
         
-        # CORRECTION CRITIQUE: Appel avec le bon paramètre 'email' au lieu de 'user_email'
+        # CORRECTION CRITIQUE: Utiliser uniquement les paramètres acceptés par log_question_to_analytics
         log_impl(
-            email=user_email,                                    # ← CORRIGÉ: email au lieu de user_email
-            session_id=session_id,
-            question=question,
-            response_text=response_text,
-            response_source=source,
-            status=status,
+            current_user=current_user,
+            payload=payload,
+            result=result,
+            response_text=response_text[:500],  # Limiter la taille
             processing_time_ms=processing_time_ms,
-            confidence=confidence_score,
-            entities=getattr(payload, 'entities', {}),
-            error_info=error_info,
-            completeness_score=getattr(result, 'completeness_score', None),
-            language=getattr(payload, 'language', 'fr'),
-            intent=getattr(result, 'intent', None)
+            error_info=error_info
         )
         
     except Exception as e:
