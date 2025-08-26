@@ -62,7 +62,7 @@ from .logging_helpers import (
 )
 
 # Router pour les endpoints
-from .logging_endpoints import router, questions_final
+from .logging_endpoints import router
 
 logger = logging.getLogger(__name__)
 
@@ -105,8 +105,7 @@ __all__ = [
     'track_openai_call',
     
     # Router
-    'router',
-    'questions_final'
+    'router'
 ]
 
 # ============================================================================
