@@ -40,11 +40,13 @@ MEMORY_CONFIG = {
 }
 
 def get_memory_usage_percent():
-    """Retourne le pourcentage d'utilisation mémoire système"""
     try:
-        return psutil.virtual_memory().percent
-    except Exception:
-        return 0
+        memory = psutil.virtual_memory()
+        return round(memory.percent, 1)
+    except Exception as e:
+        logger.warning(f"Erreur mesure mémoire: {e}")
+        return 50.0  # Valeur par défaut réaliste au lieu de 0
+
 
 def decimal_safe_json_encoder(obj):
     """
@@ -1157,8 +1159,9 @@ class StatisticsCache:
                                     COUNT(*) as total,
                                     COUNT(*) FILTER (WHERE expires_at > NOW()) as valid,
                                     COALESCE(AVG(data_size_kb), 0) as avg_size_kb
-                                FROM {table_name}
-                            """)
+                                FROM dashboard_stats_snapshot
+                                WHERE created_at > NOW() - INTERVAL '24 hours'
+                            """)                            
                             result = cur.fetchone()
                             if result:
                                 stats[stat_key] = dict(result)
