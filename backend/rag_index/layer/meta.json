@@ -5,6 +5,7 @@
   "files_indexed": 12,
   "n_docs": 12,
   "chunks_indexed": 391,
+  "csv_files_processed": 0,
   "files_sample": [
     "C:\\intelia_gpt\\documents\\public\\species\\layer\\breeds\\hy_line_brown\\Hyline Brown - Alternative - Performance Sell Sheet ENG.pdf",
     "C:\\intelia_gpt\\documents\\public\\species\\layer\\breeds\\hy_line_brown\\Hyline Brown - Conventional - Performance Sell Sheet ENG.pdf",
@@ -18,12 +19,12 @@
     "redactions": 0
   },
   "quality_stats": {
-    "removed": 3,
-    "kept": 50
+    "removed": 8,
+    "kept": 391
   },
   "enhanced_features": true,
   "tables_found": 163,
   "perf_targets_tables": 0,
   "metadata_coverage": 0.0,
-  "version": "1.4"
+  "version": "1.5"
 }

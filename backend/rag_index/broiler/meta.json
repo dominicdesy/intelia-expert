@@ -2,9 +2,10 @@
   "species": "broiler",
   "model_name": "text-embedding-3-small",
   "embedding_dim": 1536,
-  "files_indexed": 18,
-  "n_docs": 18,
-  "chunks_indexed": 1179,
+  "files_indexed": 19,
+  "n_docs": 19,
+  "chunks_indexed": 1178,
+  "csv_files_processed": 1,
   "files_sample": [
     "C:\\intelia_gpt\\documents\\public\\species\\broiler\\biosecurity\\biosec-poultry-farms.pdf",
     "C:\\intelia_gpt\\documents\\public\\species\\broiler\\breeds\\cobb\\Breeder-Management-Guide.pdf",
@@ -18,12 +19,12 @@
     "redactions": 0
   },
   "quality_stats": {
-    "removed": 15,
-    "kept": 56
+    "removed": 23,
+    "kept": 1177
   },
   "enhanced_features": true,
-  "tables_found": 514,
-  "perf_targets_tables": 0,
+  "tables_found": 519,
+  "perf_targets_tables": 8,
   "metadata_coverage": 0.0,
-  "version": "1.4"
+  "version": "1.5"
 }

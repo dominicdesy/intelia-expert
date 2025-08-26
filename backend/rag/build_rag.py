@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 Enhanced RAG Index Builder (CLI)
-v1.4 — CSV perf_targets → rag_index/<species>/tables + manifest
-v1.3+ — PyMuPDF words-based table detection + optional table split + OCR provider (Tesseract)
-🆕 ENHANCED: Garantie métadonnées complètes (species/line/sex) + table_type="perf_targets" automatique
+v1.5 - Perfect CSV Integration + Enhanced Performance Targets Detection
+- All CSV files are properly indexed in RAG while maintaining tables/ structure
+- Improved performance targets detection with multiple heuristics
+- Enhanced metadata guarantees with complete species/line/sex inference
+- Comprehensive table detection with auto-tagging
+- Quality filtering and validation
 
 Exemple (Ross 308, avec OCR):
   python -m rag.build_rag `
@@ -34,7 +37,7 @@ from dataclasses import dataclass
 from typing import List, Tuple, Dict, Any, Optional, Iterable
 
 import numpy as np
-import csv  # NEW
+import csv
 
 # ----------------------------- Logging --------------------------------- #
 def log(msg: str) -> None:
@@ -42,9 +45,9 @@ def log(msg: str) -> None:
 
 # ------------------------ Normalisation util --------------------------- #
 def _normalize_text(txt: str) -> str:
-    # déhyphénation "brood-\n ing" → "brooding"
+    # déhyphénation "brood-\n ing" -> "brooding"
     txt = re.sub(r"-\s*\n", "", txt)
-    # lignes → phrase
+    # lignes -> phrase
     txt = re.sub(r"\s*\n\s*", " ", txt)
     # espaces multiples
     txt = re.sub(r"\s{2,}", " ", txt).strip()
@@ -86,19 +89,19 @@ def _iter_files_local(root: str, allowed_exts: Tuple[str, ...], recursive: bool 
     for fp in sorted(results):
         yield fp
 
-# --------- 🆕 ENHANCED Metadata enrichment with validation ------------- #
+# --------- Enhanced Metadata enrichment with validation ------------- #
 try:
     from rag.metadata_enrichment import enhanced_enrich_metadata, validate_required_metadata, analyze_table_detection
     ENHANCED_METADATA_AVAILABLE = True
-    log("✅ Enhanced metadata enrichment available")
+    log("Enhanced metadata enrichment available")
 except Exception:
     try:
         from rag.parsers.metadata_enrichment import enhanced_enrich_metadata, validate_required_metadata, analyze_table_detection
         ENHANCED_METADATA_AVAILABLE = True
-        log("✅ Enhanced metadata enrichment available (from parsers)")
+        log("Enhanced metadata enrichment available (from parsers)")
     except Exception:
         ENHANCED_METADATA_AVAILABLE = False
-        log("⚠️ Enhanced metadata enrichment not available, using fallbacks")
+        log("Enhanced metadata enrichment not available, using fallbacks")
         def enhanced_enrich_metadata(chunks: List[Dict[str, Any]], species: str = None, additional_context: Dict = None) -> List[Dict[str, Any]]:
             return chunks
         def validate_required_metadata(chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -106,7 +109,7 @@ except Exception:
         def analyze_table_detection(chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
             return {"tables_detected": 0, "total_chunks": len(chunks), "perf_targets_tables": 0}
 
-# --------------------- 🆕 ENHANCED Table-first chunker -------------------- #
+# --------------------- Enhanced Table-first chunker -------------------- #
 def _enhanced_chunk_text_with_metadata_guarantee(
     txt: str,
     chunk_size: int,
@@ -115,18 +118,18 @@ def _enhanced_chunk_text_with_metadata_guarantee(
     species: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
-    🆕 Table-first (heuristique fallback sur texte brut) avec garantie métadonnées:
+    Table-first (heuristique fallback sur texte brut) avec garantie métadonnées:
       - Détecte les blocs tabulaires (≥3 colonnes sur ≥40% des lignes via 2+ espaces, tab, ou pipes)
-      - 🆕 Détection avancée tables de performance avec auto-taggage table_type="perf_targets"
+      - Détection avancée tables de performance avec auto-taggage table_type="perf_targets"
       - Si table → conserve la mise en page (retours ligne, espaces multiples), CHUNK UNIQUE, meta['chunk_type']="table"
       - Sinon → normalisation légère puis découpe par ~chunk_size mots
-      - 🆕 Garantie métadonnées species/line/sex si détectable
+      - Garantie métadonnées species/line/sex si détectable
     """
     raw = txt or ""
     if not raw.strip():
         return []
 
-    # --- 🆕 DÉTECTION AVANCÉE DE TABLEAU AVANT NORMALISATION ---
+    # --- DÉTECTION AVANCÉE DE TABLEAU AVANT NORMALISATION ---
     lines = [L.rstrip() for L in raw.splitlines() if L.strip()]
     is_table = False
     table_type = None
@@ -146,7 +149,14 @@ def _enhanced_chunk_text_with_metadata_guarantee(
             if pipe_lines >= max(2, len(lines) // 3):
                 is_table = True
         
-        # 🆕 Méthode 3: Patterns spécifiques aux tables de performance
+        # Méthode 3: CSV structure detection
+        if not is_table:
+            # Detect CSV-like structure (commas as separators)
+            comma_lines = sum(1 for L in lines if L.count(',') >= 2)
+            if comma_lines >= max(3, int(0.6 * len(lines))):
+                is_table = True
+        
+        # Méthode 4: Patterns spécifiques aux tables de performance
         if not is_table:
             text_lower = raw.lower()
             perf_patterns = [
@@ -157,11 +167,32 @@ def _enhanced_chunk_text_with_metadata_guarantee(
                 r"body\s*weight\s*(?:target|objective|standard)",
                 r"weekly\s*(?:weight|gain|poids)",
                 r"\d+\s*(?:days?|jours?|weeks?|semaines?)\s*\d+",
+                r"(?:daily|cum)_(?:gain|fcr|feed)",
+                r"age_days.*weight_[gl]",
             ]
             pattern_matches = sum(1 for pattern in perf_patterns 
                                 if _re.search(pattern, text_lower, _re.IGNORECASE))
-            if pattern_matches >= 2 and (multi_col_lines >= 2 or pipe_lines >= 1):
+            if pattern_matches >= 2 and (multi_col_lines >= 2 or pipe_lines >= 1 or comma_lines >= 3):
                 is_table = True
+                table_type = "perf_targets"
+
+        # Enhanced performance target detection for CSV content
+        if base_meta.get("extraction") == "csv" or base_meta.get("source_file", "").endswith('.csv'):
+            # For CSV files, always consider as table and check for performance indicators
+            is_table = True
+            text_lower = raw.lower()
+            
+            # Enhanced CSV performance detection
+            csv_perf_indicators = [
+                "age_days", "weight_g", "weight_lb", "daily_gain", "cum_fcr", 
+                "feed_intake", "line", "sex", "unit", "performance", "target",
+                "broiler", "layer", "cobb", "ross", "hubbard"
+            ]
+            
+            csv_matches = sum(1 for indicator in csv_perf_indicators 
+                            if indicator in text_lower)
+            
+            if csv_matches >= 4:  # Strong indicator of performance CSV
                 table_type = "perf_targets"
 
     if is_table:
@@ -173,6 +204,18 @@ def _enhanced_chunk_text_with_metadata_guarantee(
             meta["table_type"] = table_type
         if species:
             meta["species"] = species
+        
+        # Enhanced metadata extraction for CSV tables
+        if table_type == "perf_targets":
+            # Try to extract line information from content
+            line_match = _re.search(r"(cobb\s*\d+|ross\s*\d+|hubbard\s*\w+)", table_txt, _re.IGNORECASE)
+            if line_match:
+                meta["line"] = line_match.group(1).lower().replace(" ", "")
+            
+            # Try to extract sex information
+            if _re.search(r"\b(?:male|female|mixed|as\s*hatched)\b", table_txt, _re.IGNORECASE):
+                meta["contains_sex_data"] = True
+        
         return [{"text": table_txt, "metadata": meta}]
     else:
         norm = _normalize_text(raw)
@@ -358,7 +401,7 @@ def _extract_pypdfium2(fp: str, chunk_size: int, max_pages: int = 0, min_chunk_l
                     continue
                 page_meta = {
                     "source_file": fp,
-                    "page_number": i + 1,  # 🆕 Utiliser page_number
+                    "page_number": i + 1,
                     "total_pages": len(doc),
                     "extraction": "pypdfium2"
                 }
@@ -373,11 +416,11 @@ def _extract_pypdfium2(fp: str, chunk_size: int, max_pages: int = 0, min_chunk_l
         pass
     return chunks or []
 
-# ---------------------- 🆕 ENHANCED Provider: pymupdf (words-based) ----------------- #
+# ---------------------- Enhanced Provider: pymupdf (words-based) ----------------- #
 def _extract_pymupdf_with_enhanced_table_detection(fp: str, chunk_size: int, max_pages: int = 0,
                      min_chunk_length: int = 80, max_table_lines: int = 0, species: Optional[str] = None) -> Optional[List[Dict[str, Any]]]:
     """
-    🆕 Détection de tableaux basée sur les mots (x,y) avec auto-taggage table_type="perf_targets".
+    Détection de tableaux basée sur les mots (x,y) avec auto-taggage table_type="perf_targets".
     Si table ⇒ texte tabulé (un ou plusieurs chunks si split), sinon texte brut (blocks/text) + chunker.
     """
     if not _pdf_available():
@@ -396,6 +439,8 @@ def _extract_pymupdf_with_enhanced_table_detection(fp: str, chunk_size: int, max
         r"body\s*weight.*(?:target|objective|standard)",
         r"weekly\s*(?:weight|gain|poids)",
         r"performance\s*(?:standard|objective|target)",
+        r"daily.*gain",
+        r"cum.*fcr",
     ]
 
     def _group_words_into_lines(words, y_tol=Y_LINE_TOL):
@@ -734,7 +779,7 @@ def _load_model(name: str):
         from sentence_transformers import SentenceTransformer
         return SentenceTransformer(name, device="cpu")
     except Exception as e:
-        log(f"❌ Cannot load embedding model '{name}': {e}")
+        log(f"Cannot load embedding model '{name}': {e}")
         sys.exit(1)
 
 def _have_faiss() -> bool:
@@ -743,7 +788,6 @@ def _have_faiss() -> bool:
         return True
     except Exception:
         return False
-
 
 # ---- OpenAI (API) ----
 def _embed_openai(texts: List[str], model_name: str) -> np.ndarray:
@@ -763,7 +807,6 @@ def _embed_fastembed(texts: List[str], model_name: str, batch_size: int = 64) ->
     emb = TextEmbedding(model_name=model_name)
     vectors = list(emb.embed(texts, batch_size=batch_size))
     return np.asarray(vectors, dtype="float32")
-
 
 def _embed(model, texts: List[str], batch_size: int = 64) -> np.ndarray:
     embs = model.encode(
@@ -791,23 +834,26 @@ def _enhanced_save_meta(
     tables_found: int = 0,
     perf_tables_found: int = 0,
     metadata_coverage: float = 0.0,
-    embedding_dim: int = 0,            # 🆕
-    n_docs: int = 0                    # 🆕
+    embedding_dim: int = 0,
+    n_docs: int = 0,
+    csv_files_processed: int = 0
 ) -> None:
     """
-    ⬆️ Ajout d'un manifest riche, lisible par le loader:
+    Ajout d'un manifest riche, lisible par le loader:
     - n_chunks (total d'items/chunks)
     - n_docs (nombre de fichiers sources distincts)
     - embedding_dim
     - model_name
+    - csv_files_processed
     """
     meta = {
         "species": species,
         "model_name": model_name,
-        "embedding_dim": embedding_dim,          # 🆕
+        "embedding_dim": embedding_dim,
         "files_indexed": n_files,
-        "n_docs": n_docs,                        # 🆕
+        "n_docs": n_docs,
         "chunks_indexed": n_chunks,
+        "csv_files_processed": csv_files_processed,
         "files_sample": files_sample,
         "pdf_scan_summary": pdf_scan_summary or {},
         "quality_stats": quality_stats or {},
@@ -815,7 +861,7 @@ def _enhanced_save_meta(
         "tables_found": tables_found,
         "perf_targets_tables": perf_tables_found,
         "metadata_coverage": metadata_coverage,
-        "version": "1.4",
+        "version": "1.5",
     }
     with open(out_dir / "meta.json", "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)
@@ -833,44 +879,109 @@ def _quality_filter(chunks: List[Dict[str, Any]], min_len: int = 80) -> Tuple[Li
     stats = {"removed": removed, "kept": len(kept)}
     return kept, stats
 
-# --------------------------- CSV perf utils (NEW) ---------------------- #
+# --------------------------- Enhanced CSV utils ---------------------- #
 def _is_perf_targets_csv(path: Path) -> bool:
-    """Heuristique simple: fichier .csv contenant 'perf' et 'target' ou 'performance' dans le nom."""
+    """
+    Enhanced heuristics to detect performance target CSV files:
+    1. Direct naming patterns (perf + target/performance)
+    2. Path-based detection (breeds folder + known breed names)
+    3. Content-based sampling for CSV structure
+    """
     if path.suffix.lower() != ".csv":
         return False
+    
     name = path.name.lower()
-    return ("perf" in name and ("target" in name or "targets" in name or "performance" in name))
+    path_str = str(path).lower()
+    
+    # Method 1: Direct naming patterns
+    if "perf" in name and ("target" in name or "targets" in name or "performance" in name):
+        return True
+    
+    # Method 2: Path-based detection
+    if "breeds" in path_str and any(breed in path_str for breed in ["cobb", "ross", "hubbard"]):
+        return True
+    
+    # Method 3: Generic performance indicators in path or name
+    perf_indicators = ["performance", "targets", "objectives", "standards", "spec", "specification"]
+    if any(indicator in path_str for indicator in perf_indicators):
+        return True
+    
+    # Method 4: Content sampling (peek at first few lines)
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            sample = f.read(1024).lower()  # First 1KB
+            csv_perf_headers = [
+                "age_days", "weight_g", "weight_lb", "daily_gain", "cum_fcr", 
+                "feed_intake", "line", "sex", "unit", "target", "performance"
+            ]
+            matches = sum(1 for header in csv_perf_headers if header in sample)
+            if matches >= 4:  # Strong indication of performance data
+                return True
+    except Exception:
+        pass
+    
+    return False
 
-def _infer_line_from_filename(name: str) -> str:
+def _infer_line_from_path_and_content(path: Path, content_sample: str = "") -> str:
     """
-    Déduit la lignée ('cobb500', 'ross308', ...) à partir du nom de fichier.
-    Heuristique: token avant '_perf' ou premier token alpha-num collé.
+    Enhanced line inference from both path and content
     """
-    n = name.lower()
-    n = n.replace("-", "_")
-    m = re.search(r"([a-z0-9]+)\s*[_-]?perf", n)
-    if m:
-        return m.group(1)
-    # fallback: prendre le premier token alpha-num
-    m = re.search(r"([a-z0-9]+)", n)
-    return m.group(1) if m else "unknown"
+    full_path = str(path).lower()
+    name = path.name.lower()
+    content = content_sample.lower()
+    
+    # Known breed patterns
+    breed_patterns = {
+        r"cobb\s*500": "cobb500",
+        r"cobb\s*700": "cobb700", 
+        r"ross\s*308": "ross308",
+        r"ross\s*708": "ross708",
+        r"hubbard\s*flex": "hubbardflex",
+        r"isa\s*brown": "isabrown",
+        r"lohmann\s*brown": "lohmannbrown"
+    }
+    
+    # Search in path first
+    for pattern, breed in breed_patterns.items():
+        if re.search(pattern, full_path):
+            return breed
+    
+    # Search in content sample
+    for pattern, breed in breed_patterns.items():
+        if re.search(pattern, content):
+            return breed
+    
+    # Fallback: extract first alphanumeric token from filename
+    match = re.search(r"([a-z0-9]+)", name)
+    return match.group(1) if match else "unknown"
 
-def _read_csv_header(csv_path: Path) -> List[str]:
+def _read_csv_header_enhanced(csv_path: Path) -> Tuple[List[str], str]:
+    """
+    Read CSV headers and a content sample for analysis
+    Returns (headers, content_sample)
+    """
     try:
         with open(csv_path, "r", encoding="utf-8", newline="") as f:
-            dialect = csv.Sniffer().sniff(f.read(1024))
+            content = f.read(2048)  # Read first 2KB for analysis
+            f.seek(0)
+            
+            dialect = csv.Sniffer().sniff(content[:1024])
             f.seek(0)
             reader = csv.reader(f, dialect)
             headers = next(reader, [])
-            return [h.strip() for h in headers if h is not None]
+            clean_headers = [h.strip() for h in headers if h is not None]
+            
+            return clean_headers, content
     except Exception:
-        # fallback simple: split par virgule
+        # Fallback: simple split
         try:
             with open(csv_path, "r", encoding="utf-8") as f:
-                first = f.readline()
-                return [h.strip() for h in first.split(",")]
+                content = f.read(2048)
+                first_line = content.split('\n')[0] if content else ""
+                headers = [h.strip() for h in first_line.split(",")]
+                return headers, content
         except Exception:
-            return []
+            return [], ""
 
 def _ensure_tables_dir(out_dir: Path) -> Path:
     tables_dir = out_dir / "tables"
@@ -879,34 +990,40 @@ def _ensure_tables_dir(out_dir: Path) -> Path:
 
 def _copy_perf_csv_and_manifest(src_csv: Path, tables_dir: Path, species: str) -> None:
     """
-    Copie le CSV dans rag_index/<species>/tables/ et génère un manifest JSON à côté.
+    Enhanced CSV copy with better manifest generation
     """
     dst_csv = tables_dir / src_csv.name
     try:
         shutil.copy2(src_csv, dst_csv)
     except Exception as e:
-        log(f"   • ⚠️ Copy failed for {src_csv}: {e}")
+        log(f"   · Warning: Copy failed for {src_csv}: {e}")
         return
 
-    headers = _read_csv_header(src_csv)
-    line = _infer_line_from_filename(src_csv.name)
+    headers, content_sample = _read_csv_header_enhanced(src_csv)
+    line = _infer_line_from_path_and_content(src_csv, content_sample)
+    
+    # Enhanced manifest with better metadata
     manifest = {
         "type": "perf_targets",
         "species": species,
         "line": line,
         "csv": dst_csv.name,
-        "columns": headers or ["line","sex","unit","age_days","weight_g","weight_lb","daily_gain_g","cum_fcr","source_doc","page"]
+        "source_path": str(src_csv),
+        "columns": headers or ["line","sex","unit","age_days","weight_g","weight_lb","daily_gain_g","cum_fcr","source_doc","page"],
+        "total_columns": len(headers) if headers else 10,
+        "inferred_from": "path_and_content" if line != "unknown" else "filename"
     }
+    
     manifest_path = tables_dir / f"{line}_perf_targets.manifest.json"
     try:
         with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        log(f"   • ⚠️ Manifest write failed for {manifest_path}: {e}")
+        log(f"   · Warning: Manifest write failed for {manifest_path}: {e}")
 
 # ------------------------------ CLI parse ------------------------------ #
 def _parse_args():
-    p = argparse.ArgumentParser(description="Enhanced RAG vector index builder with table-first parsing and metadata.")
+    p = argparse.ArgumentParser(description="Enhanced RAG vector index builder v1.5 with perfect CSV integration.")
     p.add_argument("--src", required=True, help="Document file or directory")
     p.add_argument("--out", required=True, help="Output root directory (indexes saved under <out>/<species>/)")
     p.add_argument("--species", required=True, help="global|broiler|layer|... (free text)")
@@ -980,47 +1097,114 @@ def main() -> int:
     out_dir = (out_root / species)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    log(f"🔎 Enhanced RAG Index Builder v1.4")
-    log(f"🔎 Source root: {src}")
-    log(f"💾 Output root: {out_root}")
-    log(f"🐔 Species to build: {species}")
-    log(f"🧠 Embeddings provider: {provider}")
-    log(f"🧠 Embedding model: {model_name}")
-    log(f"⚡ Enhanced metadata: {args.enhanced_metadata}")
-    log(f"🔍 Quality filtering: {args.enable_quality_filter}")
-    log(f"🔧 Providers order: {args.pdf_providers}")
+    log(f"Enhanced RAG Index Builder v1.5 - Perfect CSV Integration")
+    log(f"Source root: {src}")
+    log(f"Output root: {out_root}")
+    log(f"Species to build: {species}")
+    log(f"Embeddings provider: {provider}")
+    log(f"Embedding model: {model_name}")
+    log(f"Enhanced metadata: {args.enhanced_metadata}")
+    log(f"Quality filtering: {args.enable_quality_filter}")
+    log(f"Providers order: {args.pdf_providers}")
     if args.enable_ocr:
-        log(f"🔠 OCR: enabled (dpi={args.ocr_dpi}, lang={args.ocr_lang})")
-    log(f"\n— Building enhanced '{species}' index with metadata guarantees")
-    log(f"   • src: {src}")
-    log(f"   • out: {out_dir}")
+        log(f"OCR: enabled (dpi={args.ocr_dpi}, lang={args.ocr_lang})")
+    log(f"\n--- Building enhanced '{species}' index with perfect CSV integration")
+    log(f"   · src: {src}")
+    log(f"   · out: {out_dir}")
 
     if not src.exists():
-        log(f"❌ Source path not found: {src}")
+        log(f"ERROR: Source path not found: {src}")
         return 1
 
     files = sorted(_iter_files_local(str(src), exts, recursive=args.recursive))
     if not files:
-        log("   • no files detected")
-        log("\n✅ Build completed. Total chunks indexed: 0")
+        log("   · no files detected")
+        log("\nBuild completed. Total chunks indexed: 0")
         return 0
 
-    # === NEW: copy perf_targets CSVs to rag_index/<species>/tables + manifest
+    # === ENHANCED CSV PROCESSING: Both table structure AND RAG indexing ===
     tables_dir = _ensure_tables_dir(out_dir)
     perf_csvs = [Path(f) for f in files if _is_perf_targets_csv(Path(f))]
+    all_csvs = [Path(f) for f in files if Path(f).suffix.lower() == ".csv"]
+    
+    csv_chunks_for_indexing: List[Dict[str, Any]] = []
+    csv_files_processed = 0
+    
+    log(f"\nProcessing CSV files: {len(all_csvs)} total, {len(perf_csvs)} detected as performance targets")
+    
+    # Process performance target CSV files (dual processing)
     if perf_csvs:
-        log(f"\n📦 Preparing perf_targets tables → {tables_dir}")
+        log(f"Preparing perf_targets tables -> {tables_dir}")
         for csv_fp in perf_csvs:
+            # 1. Copy to tables/ directory (existing functionality)
             _copy_perf_csv_and_manifest(csv_fp, tables_dir, species)
-        log(f"   • perf CSV copied: {len(perf_csvs)}")
+            
+            # 2. ALSO index in RAG for searchability
+            try:
+                with open(csv_fp, "r", encoding="utf-8", errors="ignore") as f:
+                    csv_content = f.read()
+                
+                if csv_content.strip():
+                    # Create enhanced chunks with performance target metadata
+                    base_meta = {
+                        "source_file": str(csv_fp),
+                        "extraction": "csv",
+                        "file_type": "csv_perf_targets",
+                        "table_type": "perf_targets",
+                        "chunk_type": "table"
+                    }
+                    
+                    csv_chunks = _enhanced_chunk_text_with_metadata_guarantee(
+                        csv_content, args.chunk_size, base_meta, args.min_chunk_length, species
+                    )
+                    
+                    csv_chunks_for_indexing.extend(csv_chunks)
+                    csv_files_processed += 1
+                    
+                    if args.verbose:
+                        log(f"   · {csv_fp.name}: copied to tables/ + indexed {len(csv_chunks)} chunks")
+                
+            except Exception as e:
+                log(f"   · Warning: Error processing perf CSV {csv_fp.name}: {e}")
+    
+    # Process other CSV files (RAG indexing only)
+    other_csvs = [csv for csv in all_csvs if csv not in perf_csvs]
+    if other_csvs:
+        log(f"Processing other CSV files: {len(other_csvs)}")
+        for csv_fp in other_csvs:
+            try:
+                with open(csv_fp, "r", encoding="utf-8", errors="ignore") as f:
+                    csv_content = f.read()
+                
+                if csv_content.strip():
+                    base_meta = {
+                        "source_file": str(csv_fp),
+                        "extraction": "csv",
+                        "file_type": "csv_data"
+                    }
+                    
+                    csv_chunks = _enhanced_chunk_text_with_metadata_guarantee(
+                        csv_content, args.chunk_size, base_meta, args.min_chunk_length, species
+                    )
+                    
+                    csv_chunks_for_indexing.extend(csv_chunks)
+                    csv_files_processed += 1
+                    
+                    if args.verbose:
+                        log(f"   · {csv_fp.name}: indexed {len(csv_chunks)} chunks")
+            
+            except Exception as e:
+                log(f"   · Warning: Error processing CSV {csv_fp.name}: {e}")
+    
+    log(f"CSV processing complete: {csv_files_processed} files, {len(csv_chunks_for_indexing)} chunks for indexing")
 
     # Optional PDF health scan
     scan_summary: Dict[str, int] = {"scanned": 0, "copy_restricted": 0, "redactions": 0}
     pdf_health_rows: List[Dict[str, Any]] = []
     if args.scan_pdf:
-        for f in files:
-            if Path(f).suffix.lower() != ".pdf":
-                continue
+        pdf_files = [f for f in files if Path(f).suffix.lower() == ".pdf"]
+        log(f"\nScanning PDF health: {len(pdf_files)} files")
+        for f in pdf_files:
             scan = _scan_pdf_health(f)
             if not scan:
                 continue
@@ -1042,22 +1226,28 @@ def main() -> int:
                     writer = csv.DictWriter(f, fieldnames=list(pdf_health_rows[0].keys()))
                     writer.writeheader()
                     writer.writerows(pdf_health_rows)
+                log(f"   · PDF health report saved: {len(pdf_health_rows)} entries")
             except Exception:
                 pass
 
-    # ENHANCED Process files
+    # Process non-CSV files
+    log(f"\nProcessing non-CSV files...")
     items: List[Dict[str, Any]] = []
     n_chunks = 0
     providers = [p.strip().lower() for p in (args.pdf_providers or "").split(",") if p.strip()]
+    
+    # Add CSV chunks first
+    items.extend(csv_chunks_for_indexing)
+    n_chunks += len(csv_chunks_for_indexing)
 
     qstats: Dict[str, Any] = {}
+    non_csv_files = [f for f in files if Path(f).suffix.lower() != ".csv"]
 
-    for i, fp in enumerate(files, start=1):
+    for i, fp in enumerate(non_csv_files, start=1):
         suf = Path(fp).suffix.lower()
         if args.verbose:
-            log(f"   • [{i}/{len(files)}] {fp}")
+            log(f"   · [{i}/{len(non_csv_files)}] {fp}")
 
-        # NOTE: on traite les CSV en texte (pour qu'ils restent aussi consultables par le RAG)
         if suf == ".pdf":
             if args.auto_clean_redactions and args.scan_pdf:
                 scan = next((row for row in pdf_health_rows if row["path"] == fp), None)
@@ -1089,7 +1279,7 @@ def main() -> int:
                 if last_err and not chunks:
                     log(f"       · last_error={last_err}")
         else:
-            # .csv, .txt, .md, .html, ...
+            # Other text files: .txt, .md, .html, etc.
             try:
                 with open(fp, "r", encoding="utf-8", errors="ignore") as f:
                     txt = f.read()
@@ -1101,6 +1291,7 @@ def main() -> int:
                 last_err = str(e)
                 chunks = []
 
+        # Enhanced metadata enrichment
         if chunks and ENHANCED_METADATA_AVAILABLE:
             try:
                 additional_context = {"species": species}
@@ -1115,11 +1306,16 @@ def main() -> int:
                 if args.verbose:
                     log(f"       · metadata enrichment failed: {e}")
 
+        # Quality filtering
         if args.enable_quality_filter and chunks:
-            chunks, qstats = _quality_filter(chunks, min_len=args.min_chunk_length)
-        else:
-            qstats = {}
+            chunks, file_qstats = _quality_filter(chunks, min_len=args.min_chunk_length)
+            if not qstats:
+                qstats = file_qstats
+            else:
+                qstats["removed"] = qstats.get("removed", 0) + file_qstats.get("removed", 0)
+                qstats["kept"] = qstats.get("kept", 0) + file_qstats.get("kept", 0)
 
+        # Add chunks to items
         for ch in chunks:
             text = (ch.get("text") or "").strip()
             meta = dict(ch.get("metadata", {}) or {})
@@ -1138,28 +1334,32 @@ def main() -> int:
             else:
                 log(f"       · no chunks extracted")
 
-    log(f"   • files detected: {len(files)}")
-    log(f"   • chunks indexed: {n_chunks}")
+    log(f"\nProcessing summary:")
+    log(f"   · Total files detected: {len(files)}")
+    log(f"   · CSV files processed: {csv_files_processed}")
+    log(f"   · Non-CSV files processed: {len(non_csv_files)}")
+    log(f"   · Total chunks indexed: {n_chunks}")
 
     if not items:
-        log("\n✅ Build completed. Total chunks indexed: 0")
+        log("\nBuild completed. Total chunks indexed: 0")
         return 0
 
-    # 🆕 Validation / stats
+    # Enhanced validation & statistics
     metadata_coverage = 0.0
     if items and ENHANCED_METADATA_AVAILABLE:
-        log(f"\n🔍 Validating metadata coverage...")
+        log(f"\nValidating metadata coverage...")
         metadata_stats = validate_required_metadata(items)
-        log(f"   • Metadata coverage:")
+        log(f"   · Metadata coverage:")
         for field, stats in metadata_stats["coverage"].items():
             log(f"     - {field}: {stats['count']}/{metadata_stats['total_chunks']} ({stats['percentage']:.1f}%)")
         metadata_coverage = metadata_stats["critical_coverage"]
         if metadata_coverage < 90:
-            log(f"   ⚠️ Warning: Critical metadata coverage only {metadata_coverage:.1f}%")
+            log(f"   Warning: Critical metadata coverage only {metadata_coverage:.1f}%")
         else:
-            log(f"   ✅ Critical metadata coverage: {metadata_coverage:.1f}%")
+            log(f"   Critical metadata coverage: {metadata_coverage:.1f}%")
+        
         table_stats = analyze_table_detection(items)
-        log(f"   • Table detection:")
+        log(f"   · Table detection:")
         log(f"     - Tables detected: {table_stats['tables_detected']}/{table_stats['total_chunks']} ({table_stats['table_percentage']:.1f}%)")
         log(f"     - Performance tables: {table_stats['perf_targets_tables']}")
         qstats.update({
@@ -1168,9 +1368,11 @@ def main() -> int:
             "perf_targets_tables": table_stats["perf_targets_tables"]
         })
 
-    # Embeddings
+    # Generate embeddings
     texts = [it["text"] for it in items]
-    log(f"\n🧠 Generating embeddings with provider={provider} model={model_name} (batch={args.embed_batch_size})")
+    log(f"\nGenerating embeddings with provider={provider} model={model_name} (batch={args.embed_batch_size})")
+    log(f"   · Processing {len(texts)} text chunks...")
+    
     if provider == "openai":
         embs = _embed_openai(texts, model_name)
         embedding_method = "OpenAI"
@@ -1183,17 +1385,20 @@ def main() -> int:
         embedding_method = "SentenceTransformers"
 
     if not _have_faiss():
-        log("❌ FAISS not available (pip install faiss-cpu).")
+        log("ERROR: FAISS not available (pip install faiss-cpu).")
         return 1
 
     # Save index
+    log(f"Saving FAISS index and embeddings...")
     _write_faiss(embs, out_dir / "index.faiss")
     np.save(out_dir / "embeddings.npy", embs)
 
+    # Calculate final statistics
     tables_found = sum(1 for it in items if (it.get("metadata", {}).get("chunk_type") == "table"))
     perf_tables_found = sum(1 for it in items if (it.get("metadata", {}).get("table_type") == "perf_targets"))
 
-    # 🆕 index.pkl riche
+    # Enhanced index.pkl with complete data
+    log(f"Saving enhanced index data...")
     with open(out_dir / "index.pkl", "wb") as f:
         index_data = {
             "documents": items,
@@ -1201,16 +1406,19 @@ def main() -> int:
             "embedding_method": embedding_method,
             "model_name": model_name,
             "embedding_dim": int(embs.shape[1]),
-            "enhanced_version": "v1.4",
+            "enhanced_version": "v1.5",
             "processing_stats": {
+                "total_files": len(files),
+                "csv_files_processed": csv_files_processed,
                 "tables_found": tables_found,
                 "perf_targets_tables": perf_tables_found,
-                "metadata_coverage": metadata_coverage
+                "metadata_coverage": metadata_coverage,
+                "quality_stats": qstats
             }
         }
         pickle.dump(index_data, f)
 
-    # 🆕 manifest riche
+    # Enhanced manifest
     _enhanced_save_meta(
         out_dir, species, model_name,
         n_files=len(files),
@@ -1223,14 +1431,44 @@ def main() -> int:
         perf_tables_found=perf_tables_found,
         metadata_coverage=metadata_coverage,
         embedding_dim=int(embs.shape[1]),
-        n_docs=len(files)
+        n_docs=len(files),
+        csv_files_processed=csv_files_processed
     )
 
-    log(f"\n🧾 Tables detected: {tables_found}")
-    log(f"🎯 Performance tables: {perf_tables_found}")
+    # Final summary
+    log(f"\n" + "="*60)
+    log(f"BUILD COMPLETED SUCCESSFULLY")
+    log(f"="*60)
+    log(f"Final statistics:")
+    log(f"   · Total files processed: {len(files)}")
+    log(f"   · CSV files processed: {csv_files_processed}")
+    log(f"   · Total chunks indexed: {n_chunks}")
+    log(f"   · Tables detected: {tables_found}")
+    log(f"   · Performance tables: {perf_tables_found}")
+    log(f"   · Embedding dimensions: {embs.shape[1]}")
+    log(f"   · Embedding method: {embedding_method}")
     if ENHANCED_METADATA_AVAILABLE:
-        log(f"📊 Metadata coverage: {metadata_coverage:.1f}%")
-    log("\n✅ Build completed successfully with enhanced metadata guarantees.")
+        log(f"   · Metadata coverage: {metadata_coverage:.1f}%")
+    if qstats:
+        total_processed = qstats.get('kept', 0) + qstats.get('removed', 0)
+        if total_processed > 0:
+            log(f"   · Quality filter: {qstats.get('kept', 0)}/{total_processed} chunks kept ({100 * qstats.get('kept', 0) / total_processed:.1f}%)")
+    
+    log(f"\nGenerated files:")
+    log(f"   · {out_dir}/index.faiss (FAISS vector index)")
+    log(f"   · {out_dir}/embeddings.npy (NumPy embeddings array)")
+    log(f"   · {out_dir}/index.pkl (complete index with documents + metadata)")
+    log(f"   · {out_dir}/meta.json (build manifest with statistics)")
+    if perf_csvs:
+        log(f"   · {out_dir}/tables/ (performance CSV files + JSON manifests)")
+    if pdf_health_rows:
+        log(f"   · {out_dir}/pdf_health.csv (PDF health analysis)")
+
+    log(f"\n" + "="*60)
+    log(f"Enhanced RAG index for '{species}' is ready for queries!")
+    log(f"Index location: {out_dir}")
+    log(f"="*60)
+    
     return 0
 
 if __name__ == "__main__":
