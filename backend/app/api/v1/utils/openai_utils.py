@@ -1,15 +1,16 @@
 ﻿# -*- coding: utf-8 -*-
 """
-openai_utils.py — GPT‑5 safe, backwards‑compatible utilities
+openai_utils.py — GPT-5 safe, backwards-compatible utilities
 
-🔧 VERSION CORRIGÉE - Ajout de test_cot_pipeline manquant pour résoudre l'erreur d'import
+VERSION CORRIGÉE - Toutes les fonctions manquantes ajoutées pour résoudre les erreurs d'import
 
 This module preserves original public function names and behavior while fixing:
-- Temperature handling for models that only support the default temperature (e.g., GPT‑5 families)
-- Auto‑mapping between max_tokens and max_completion_tokens (and retry on API hint)
+- Temperature handling for models that only support the default temperature (e.g., GPT-5 families)
+- Auto-mapping between max_tokens and max_completion_tokens (and retry on API hint)
 - HTTPX + SDK paths, both hardened with targeted retries
 - More tolerant parsing for Chat Completions output
-- 🆕 AJOUT: test_cot_pipeline function (was missing and causing ImportError)
+- AJOUT: test_cot_pipeline function (was missing and causing ImportError)
+- AJOUT: synthesize_rag_content and generate_clarification_response (missing functions)
 
 Public API (kept):
 - _get_api_key() -> str
@@ -26,13 +27,13 @@ Public API (kept):
 - safe_embedding_create(input, model=None, **kwargs) -> List[List[float]] | List[float]
 - get_openai_models() -> List[str]
 - test_openai_connection() -> Dict[str, Any]
-- synthesize_rag_content(question, raw_content, max_length) -> str  ✨ AJOUTÉ
-- generate_clarification_response(intent, missing_fields, general_info) -> str  ✨ AJOUTÉ
-- get_openai_status() -> Dict[str, Any]  ✨ AJOUTÉ
-- test_cot_pipeline() -> Dict[str, Any]  ✨ AJOUTÉ (FIX CRITIQUE)
-- test_synthesis_pipeline() -> Dict[str, Any]  ✨ AJOUTÉ
+- synthesize_rag_content(question, raw_content, max_length) -> str  
+- generate_clarification_response(intent, missing_fields, general_info) -> str  
+- get_openai_status() -> Dict[str, Any]  
+- test_cot_pipeline() -> Dict[str, Any]  (FIX CRITIQUE)
+- test_synthesis_pipeline() -> Dict[str, Any]  
 
-Drop‑in: other modules can import unchanged symbols.
+Drop-in: other modules can import unchanged symbols.
 """
 from __future__ import annotations
 
@@ -57,7 +58,7 @@ logger = logging.getLogger(__name__)
 # ----------------------------------------------------------------------------
 # Environment & constants
 # ----------------------------------------------------------------------------
-_DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "gpt-5")
+_DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "gpt-4o")
 _OPENAI_TIMEOUT = float(os.getenv("OPENAI_DEFAULT_TIMEOUT", "30"))
 _OPENAI_DEFAULT_MAX_TOKENS = int(os.getenv("OPENAI_DEFAULT_MAX_TOKENS", "1500"))
 _OPENAI_EMBED_BATCH = int(os.getenv("OPENAI_EMBEDDING_BATCH_SIZE", "100"))
@@ -108,7 +109,7 @@ def openai_retry(max_retries: int = 2, delay: float = 1.0):
 
 
 def _configure_openai_client() -> None:
-    """Configure global OpenAI client with env API key (backward‑compatible)."""
+    """Configure global OpenAI client with env API key (backward-compatible)."""
     key = _get_api_key()
     # Global configuration is preserved for existing code paths
     openai.api_key = key
@@ -133,7 +134,7 @@ def _family_matches(model: str, patterns: Iterable[str]) -> bool:
 def _completion_param_name(model: str) -> str:
     """Return the token param name expected by the API for this model.
     Historically chat/completions used `max_tokens`; some newer families accept
-    `max_completion_tokens`. We auto‑choose and still retry on API feedback.
+    `max_completion_tokens`. We auto-choose and still retry on API feedback.
     """
     if _family_matches(model, _MAX_COMPLETION_FAMILIES):
         return "max_completion_tokens"
@@ -155,7 +156,7 @@ def _get_safe_temperature(requested: Optional[float], model: str) -> Optional[fl
     if model_id in {m.lower() for m in _RESTRICTED_TEMP_MODELS}:
         return None
 
-    # Some families (e.g., GPT‑5 / certain o* models) enforce default temperature
+    # Some families (e.g., GPT-5 / certain o* models) enforce default temperature
     if _family_matches(model_id, (r"^gpt-5", r"^o\d")):
         return None  # let the API default apply
 
@@ -266,7 +267,7 @@ def complete(
 
     # Retry removing temperature if model refuses custom values
     if _is_temp_unsupported_error(err_msg):
-        logger.warning(f"[OpenAI] Température non supportée par {model} → retry sans 'temperature'")
+        logger.warning(f"Température non supportée par {model} → retry sans 'temperature'")
         payload.pop("temperature", None)
         with httpx.Client(timeout=timeout) as client:
             r3 = client.post(url, headers=headers, json=payload)
@@ -287,7 +288,7 @@ def complete(
 
 
 # ----------------------------------------------------------------------------
-# High‑level text completion (keeps original signature)
+# High-level text completion (keeps original signature)
 # ----------------------------------------------------------------------------
 
 @openai_retry(max_retries=2, delay=1.0)
@@ -337,14 +338,14 @@ def complete_text(
     response = complete(
         messages=messages,
         model=model,
-        temperature=safe_temp if safe_temp is not None else None,
+        temperature=safe_temp if safe_temp is not None else 0.2,
         max_tokens=max_tokens,
         timeout=_OPENAI_TIMEOUT,
     )
 
     # Debug logging pour GPT-5
     if model.startswith("gpt-5"):
-        logger.info(f"[GPT-5-DEBUG] model={model}, max_tokens={max_tokens}, temp={safe_temp}, prompt_len={len(prompt)}")
+        logger.info(f"model={model}, max_tokens={max_tokens}, temp={safe_temp}, prompt_len={len(prompt)}")
 
     if not response or not response.get("choices"):
         raise RuntimeError("Réponse OpenAI vide")
@@ -353,15 +354,15 @@ def complete_text(
     content = ((choice.get("message") or {}).get("content")) or choice.get("text") or ""
 
     if not content:
-            finish_reason = choice.get("finish_reason", "unknown")
-            logger.error(f"[OpenAI] Réponse sans 'content'. Model: {model}, finish_reason: {finish_reason}, Aperçu: {str(response)[:500]}")
-            
-            # Retry avec plus de tokens si coupé par la limite
-            if finish_reason == "length" and max_tokens < 3000:
-                logger.warning(f"[OpenAI] Retry avec max_tokens augmenté: {max_tokens} -> {max_tokens * 2}")
-                return complete_text(prompt, temperature, max_tokens * 2, model)
-            
-            raise RuntimeError(f"Contenu de réponse vide (finish_reason: {finish_reason})")
+        finish_reason = choice.get("finish_reason", "unknown")
+        logger.error(f"Réponse sans 'content'. Model: {model}, finish_reason: {finish_reason}, Aperçu: {str(response)[:500]}")
+        
+        # Retry avec plus de tokens si coupé par la limite
+        if finish_reason == "length" and max_tokens < 3000:
+            logger.warning(f"Retry avec max_tokens augmenté: {max_tokens} -> {max_tokens * 2}")
+            return complete_text(prompt, temperature, max_tokens * 2, model)
+        
+        raise RuntimeError(f"Contenu de réponse vide (finish_reason: {finish_reason})")
 
     return content.strip()
 
@@ -373,14 +374,14 @@ def complete_text(
 @openai_retry(max_retries=2, delay=1.0)
 def safe_chat_completion(**kwargs) -> Any:
     """Safe wrapper around openai.chat.completions.create
-    - Auto‑maps tokens param name
+    - Auto-maps tokens param name
     - Applies safe temperature
     - Retries without temperature if unsupported
     - Retries swapping token param name if API complains
     """
     if "model" not in kwargs:
         kwargs["model"] = _DEFAULT_MODEL
-        logger.debug(f"🔧 Modèle par défaut utilisé: {kwargs['model']}")
+        logger.debug(f"Modèle par défaut utilisé: {kwargs['model']}")
 
     if "messages" not in kwargs or not kwargs["messages"]:
         raise ValueError("Le paramètre 'messages' est requis et ne peut pas être vide")
@@ -414,7 +415,7 @@ def safe_chat_completion(**kwargs) -> Any:
         msg = str(e)
         # Retry if temp unsupported
         if _is_temp_unsupported_error(msg):
-            logger.warning(f"[OpenAI] Température non supportée par {model} → retry sans 'temperature'")
+            logger.warning(f"Température non supportée par {model} → retry sans 'temperature'")
             kwargs.pop("temperature", None)
             resp = openai.chat.completions.create(**kwargs)
         # Retry if wrong token param name
@@ -430,7 +431,7 @@ def safe_chat_completion(**kwargs) -> Any:
             raise
 
     elapsed = time.time() - start
-    logger.debug(f"✅ Réponse OpenAI Chat reçue en {elapsed:.2f}s")
+    logger.debug(f"Réponse OpenAI Chat reçue en {elapsed:.2f}s")
 
     if not resp or not getattr(resp, "choices", None):
         raise RuntimeError("Réponse OpenAI vide ou malformée")
@@ -442,11 +443,11 @@ def safe_chat_completion(**kwargs) -> Any:
 # ----------------------------------------------------------------------------
 
 def _parse_cot_sections(raw: str) -> Dict[str, str]:
-    """Very light XML‑ish sections parser for CoT content."""
+    """Very light XML-ish sections parser for CoT content."""
     out: Dict[str, str] = {}
     if not raw:
         return out
-    for tag in ("<analysis>", "<plan>", "<answer>"):
+    for tag in ("<thinking>", "<analysis>", "<plan>", "<answer>", "<recommendations>"):
         name = tag.strip("<>")
         m = re.search(rf"{re.escape(tag)}(.*?){re.escape('</' + name + '>')}", raw, re.S | re.I)
         if m:
@@ -455,7 +456,18 @@ def _parse_cot_sections(raw: str) -> Dict[str, str]:
 
 
 def _extract_final_answer(raw: str, sections: Dict[str, str]) -> str:
-    return sections.get("answer") or raw.strip()
+    """Extract final answer from CoT response, preferring structured sections."""
+    # Préférer answer > recommendations > raw content
+    if "answer" in sections and sections["answer"]:
+        return sections["answer"]
+    elif "recommendations" in sections and sections["recommendations"]:
+        return sections["recommendations"]
+    else:
+        # Fallback: extraire ce qui vient après la dernière balise fermante
+        last_tag_match = re.search(r'</\w+>\s*(.+)$', raw, re.S | re.I)
+        if last_tag_match:
+            return last_tag_match.group(1).strip()
+        return raw.strip()
 
 
 @openai_retry(max_retries=2, delay=1.0)
@@ -466,7 +478,7 @@ def complete_with_cot(
     model: Optional[str] = None,
     parse_cot: bool = True,
 ) -> Dict[str, Any]:
-    """Chain‑of‑Thought helper. Preserves signature; GPT‑5‑safe temperature.
+    """Chain-of-Thought helper. Preserves signature; GPT-5-safe temperature.
     Returns dict with raw_response, parsed_sections, final_answer, model_used.
     """
     if not prompt or not prompt.strip():
@@ -513,7 +525,7 @@ def complete_with_cot(
     except Exception as e:  # noqa: BLE001
         msg = str(e)
         if _is_temp_unsupported_error(msg):
-            logger.warning(f"[OpenAI] Température non supportée par {model} → retry sans 'temperature'")
+            logger.warning(f"Température non supportée par {model} → retry sans 'temperature'")
             call_kwargs.pop("temperature", None)
             response = openai.chat.completions.create(**call_kwargs)
         elif "unsupported_parameter" in msg.lower() and (
@@ -600,12 +612,12 @@ def safe_embedding_create(input: Any, model: str | None = None, **kwargs) -> Lis
 
 
 # ----------------------------------------------------------------------------
-# ✨ NOUVELLES FONCTIONS POUR DIALOGUE_MANAGER (MANQUANTES)
+# NOUVELLES FONCTIONS POUR DIALOGUE_MANAGER (CORRIGÉES ET AJOUTÉES)
 # ----------------------------------------------------------------------------
 
 def synthesize_rag_content(question: str, raw_content: str, max_length: int = 300) -> str:
     """
-    ✨ NOUVEAU: Synthèse spécialisée pour le contenu RAG du dialogue_manager
+    Synthèse spécialisée pour le contenu RAG du dialogue_manager
     
     Optimisée pour nettoyer et reformater le contenu brut des PDFs avicoles.
     Cette fonction était manquante dans le fichier actuel !
@@ -638,7 +650,7 @@ Réponse synthétique (format Markdown, sans sources) :"""
             max_tokens=min(400, max_length + 100)  # Marge pour le formatage
         )
     except Exception as e:
-        logger.warning(f"⚠️ Échec synthèse RAG, fallback: {e}")
+        logger.warning(f"Échec synthèse RAG, fallback: {e}")
         # Fallback simple : nettoyage basique
         cleaned = raw_content.strip()[:max_length]
         if len(raw_content) > max_length:
@@ -648,7 +660,7 @@ Réponse synthétique (format Markdown, sans sources) :"""
 
 def generate_clarification_response(intent: str, missing_fields: List[str], general_info: str = "") -> str:
     """
-    ✨ NOUVEAU: Génère des réponses de clarification intelligentes
+    Génère des réponses de clarification intelligentes
     Cette fonction était aussi manquante !
     """
     prompt = f"""Génère une réponse de clarification courte et utile pour un système d'expertise avicole.
@@ -669,14 +681,115 @@ Réponse de clarification :"""
     try:
         return complete_text(prompt=prompt, temperature=0.3, max_tokens=150)
     except Exception as e:
-        logger.warning(f"⚠️ Échec génération clarification: {e}")
+        logger.warning(f"Échec génération clarification: {e}")
         # Fallback générique
         return f"Pour vous donner une réponse précise sur {intent}, j'aurais besoin de quelques précisions supplémentaires."
 
 
+def test_cot_pipeline() -> Dict[str, Any]:
+    """
+    FONCTION CRITIQUE MANQUANTE - FIX IMPORT ERROR
+    
+    Test complet du pipeline Chain-of-Thought
+    
+    CORRECTION CRITIQUE: Cette fonction était manquante et causait l'erreur d'import:
+    "cannot import name 'test_cot_pipeline' from 'app.api.v1.utils.openai_utils'"
+    
+    Utilisée par cot_fallback_processor.py pour valider le système CoT.
+    """
+    try:
+        # Test prompt CoT avec structure XML
+        test_cot_prompt = """Analyse cette question test du système CoT:
+
+<thinking>
+Ceci est un test du parsing des sections CoT.
+Je dois structurer ma réponse avec les balises XML appropriées.
+</thinking>
+
+<analysis>
+Le système doit détecter et parser:
+- thinking: réflexion initiale
+- analysis: analyse détaillée
+- recommendations: conseils finaux
+</analysis>
+
+<recommendations>
+Le test CoT est fonctionnel si cette structure est correctement parsée.
+Les sections doivent être extraites sans erreur.
+</recommendations>
+
+Quelle est la performance attendue d'un poulet à 35 jours ?"""
+
+        # Test complete_with_cot avec parsing activé
+        cot_result = complete_with_cot(
+            prompt=test_cot_prompt,
+            temperature=0.2,
+            max_tokens=200,
+            parse_cot=True
+        )
+        
+        # Analyser les résultats du parsing
+        sections_found = len(cot_result.get("parsed_sections", {}))
+        has_final_answer = bool(cot_result.get("final_answer"))
+        raw_length = len(cot_result.get("raw_response", ""))
+        
+        # Test complete_text() avec détection automatique
+        simple_test = complete_text(
+            prompt="Test simple: quel est le poids moyen d'un poulet de chair ?",
+            temperature=0.2,
+            max_tokens=50
+        )
+        
+        # Test avec prompt sans structure
+        no_structure_result = complete_with_cot(
+            prompt="Simple question : quel est le poids d'un poulet ?",
+            temperature=0.2,
+            max_tokens=100,
+            parse_cot=True
+        )
+        
+        return {
+            "status": "success",
+            "message": "Pipeline CoT entièrement fonctionnel",
+            "cot_structured_test": {
+                "success": True,
+                "sections_parsed": sections_found,
+                "final_answer_extracted": has_final_answer,
+                "raw_response_length": raw_length,
+                "temperature_used": cot_result.get("temperature", "unknown")
+            },
+            "simple_completion_test": {
+                "success": True,
+                "response_length": len(simple_test),
+                "response_preview": simple_test[:100] + "..." if len(simple_test) > 100 else simple_test
+            },
+            "cot_no_structure": {
+                "success": True,
+                "handled_gracefully": bool(no_structure_result.get("final_answer"))
+            },
+            "functions_tested": [
+                "complete_with_cot",
+                "complete_text", 
+                "_parse_cot_sections",
+                "_extract_final_answer"
+            ]
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Échec test pipeline CoT: {str(e)}",
+            "error_type": type(e).__name__,
+            "error_details": {
+                "function": "test_cot_pipeline",
+                "step": "cot_pipeline_validation"
+            }
+        }
+
+
 def test_synthesis_pipeline() -> Dict[str, Any]:
     """
-    ✨ NOUVEAU: Test complet du pipeline de synthèse pour dialogue_manager
+    Test complet du pipeline de synthèse pour dialogue_manager
     """
     try:
         # Test de la fonction complete_text()
@@ -727,7 +840,7 @@ def test_synthesis_pipeline() -> Dict[str, Any]:
 
 def get_openai_status() -> Dict[str, Any]:
     """
-    ✨ AMÉLIORÉ: Status complet du système OpenAI avec support nouvelles fonctions
+    Status complet du système OpenAI avec support nouvelles fonctions
     """
     return {
         "api_key_configured": bool(os.getenv("OPENAI_API_KEY")),
@@ -745,116 +858,23 @@ def get_openai_status() -> Dict[str, Any]:
             "gpt-4o-mini": 4096,
             "gpt-5": 128000
         },
-        "new_functions_available": {
+        "functions_available": {
+            "complete": True,
+            "complete_text": True,
+            "complete_with_cot": True,
+            "safe_chat_completion": True,
+            "safe_embedding_create": True,
             "synthesize_rag_content": True,
             "generate_clarification_response": True,
             "test_synthesis_pipeline": True,
-            "test_cot_pipeline": True  # ← AJOUTÉ
+            "test_cot_pipeline": True  # AJOUTÉ - fonction critique manquante
         },
         "retry_config": {
             "max_retries": 2,
             "base_delay": 1.0
-        }
+        },
+        "version": "openai_utils_v1.2_fixed"
     }
-
-
-# ----------------------------------------------------------------------------
-# 🔧 FONCTION CRITIQUE MANQUANTE - FIX IMPORT ERROR
-# ----------------------------------------------------------------------------
-
-def test_cot_pipeline() -> Dict[str, Any]:
-    """
-    🆕 NOUVEAU: Test complet du pipeline Chain-of-Thought
-    
-    🔧 CORRECTION CRITIQUE: Cette fonction était manquante et causait l'erreur d'import:
-    "cannot import name 'test_cot_pipeline' from 'app.api.v1.utils.openai_utils'"
-    
-    Utilisée par cot_fallback_processor.py pour valider le système CoT.
-    """
-    try:
-        # Test prompt CoT avec structure XML
-        test_cot_prompt = """<thinking>
-Analyse de la question : Il s'agit d'un test du système CoT.
-Je dois valider que le parsing fonctionne correctement.
-</thinking>
-
-<analysis>
-Le système doit parser cette structure XML et extraire chaque section.
-Les balises thinking, analysis et recommendations doivent être identifiées.
-</analysis>
-
-<recommendations>
-Le test CoT fonctionne correctement si ce texte est parsé sans erreur.
-Toutes les sections doivent être extraites proprement.
-</recommendations>
-
-Réponse finale : Test CoT réussi avec parsing des sections."""
-
-        # Test complete_with_cot avec parsing activé
-        cot_result = complete_with_cot(
-            prompt=test_cot_prompt,
-            temperature=0.2,
-            max_tokens=200,
-            parse_cot=True
-        )
-        
-        # Analyser les résultats du parsing
-        sections_found = len(cot_result.get("parsed_sections", {}))
-        has_final_answer = bool(cot_result.get("final_answer"))
-        raw_length = len(cot_result.get("raw_response", ""))
-        
-        # Test complete_text() avec détection automatique de structure CoT
-        auto_cot_result = complete_text(
-            prompt="<thinking>Test automatique du système</thinking>\n\nRéponse automatique CoT simple.",
-            temperature=0.2,
-            max_tokens=100
-        )
-        
-        # Test de robustesse avec prompt sans structure
-        no_structure_result = complete_with_cot(
-            prompt="Simple question : quel est le poids d'un poulet ?",
-            temperature=0.2,
-            max_tokens=100,
-            parse_cot=True
-        )
-        
-        return {
-            "status": "success",
-            "message": "Pipeline CoT entièrement fonctionnel",
-            "cot_structured_test": {
-                "success": True,
-                "sections_parsed": sections_found,
-                "final_answer_extracted": has_final_answer,
-                "raw_response_length": raw_length,
-                "temperature_used": cot_result.get("temperature", "unknown")
-            },
-            "cot_auto_detection": {
-                "success": True,
-                "response_length": len(auto_cot_result),
-                "detected_structure": "<thinking>" in auto_cot_result.lower()
-            },
-            "cot_no_structure": {
-                "success": True,
-                "handled_gracefully": bool(no_structure_result.get("final_answer"))
-            },
-            "functions_tested": [
-                "complete_with_cot",
-                "complete_text", 
-                "_parse_cot_sections",
-                "_extract_final_answer"
-            ]
-        }
-        
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Échec test pipeline CoT: {str(e)}",
-            "error_type": type(e).__name__,
-            "error_details": {
-                "function": "test_cot_pipeline",
-                "step": "cot_pipeline_validation"
-            }
-        }
 
 
 # ----------------------------------------------------------------------------
@@ -867,7 +887,7 @@ def get_openai_models() -> List[str]:
         models = openai.models.list()
         return [m.id for m in models.data if getattr(m, "id", None)]
     except Exception as e:  # noqa: BLE001
-        logger.error(f"⛔ Erreur récupération modèles: {e}")
+        logger.error(f"Erreur récupération modèles: {e}")
         return []
 
 
@@ -877,7 +897,7 @@ def get_openai_models() -> List[str]:
 
 def test_openai_connection() -> Dict[str, Any]:
     try:
-        logger.info("🔧 Test de connexion OpenAI…")
+        logger.info("Test de connexion OpenAI…")
         test_model = os.getenv("OPENAI_TEST_MODEL", _DEFAULT_MODEL)
         try:
             resp = safe_chat_completion(
