@@ -1,9 +1,12 @@
 # app/api/v1/expert_utils.py
 # -*- coding: utf-8 -*-
 """
+
 Utilitaires et fonctions helper pour expert.py
 VERSION SÉCURISÉE MÉMOIRE - Cache PerfStore drastiquement limité pour éviter OOM
 FIXED: Correction du paramètre analytics user_email -> email
+FIXED
+
 """
 
 import logging
