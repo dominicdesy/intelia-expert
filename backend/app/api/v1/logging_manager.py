@@ -46,8 +46,7 @@ class AnalyticsManager:
         if auto_init is None:
             # Utiliser les variables d'environnement
             should_auto_init = (
-                os.getenv("FORCE_ANALYTICS_INIT", "false").lower() == "true" and
-                os.getenv("DISABLE_ANALYTICS_AUTO_INIT", "false").lower() != "true"
+                os.getenv("ANALYTICS_INIT_DISABLED", "false").lower() != "true"
             )
         
         if should_auto_init:
