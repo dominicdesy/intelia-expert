@@ -1,14 +1,15 @@
 # app/api/v1/stats_cache.py
 # -*- coding: utf-8 -*-
 """
-🚀 SYSTÈME DE CACHE STATISTIQUES OPTIMISÉ - VERSION MEMORY-SAFE CORRIGÉE
+SYSTÈME DE CACHE STATISTIQUES OPTIMISÉ - VERSION MEMORY-SAFE CORRIGÉE
 Tables de cache SQL + Gestionnaire pour performances ultra-rapides
 SAFE: N'interfère pas avec logging.py et billing.py existants
-✨ OPTIMISÉ: Gestion mémoire drastiquement améliorée pour DigitalOcean App Platform
-🔧 CORRECTIF: Sérialisation JSON sécurisée pour les objets Decimal de PostgreSQL
-🛡️ MEMORY-SAFE: Pool de connexions, limites de taille, nettoyage automatique
-🆕 NOUVEAU: Migration automatique des colonnes manquantes (data_size_kb, feedback)
-🔧 FIXED: Création complète de toutes les tables manquantes
+OPTIMISÉ: Gestion mémoire drastiquement améliorée pour DigitalOcean App Platform
+CORRECTIF: Sérialisation JSON sécurisée pour les objets Decimal de PostgreSQL
+MEMORY-SAFE: Pool de connexions, limites de taille, nettoyage automatique
+NOUVEAU: Migration automatique des colonnes manquantes (data_size_kb, feedback)
+FIXED: Création complète de toutes les tables manquantes
+CORRECTED: Gestion robuste des transactions SQL et corrections de requêtes
 """
 
 import json
@@ -26,7 +27,7 @@ from psycopg2 import pool
 
 logger = logging.getLogger(__name__)
 
-# 🛡️ CONFIGURATION MEMORY-SAFE
+# CONFIGURATION MEMORY-SAFE
 MEMORY_CONFIG = {
     "MAX_CACHE_ENTRY_SIZE_KB": 100,  # Maximum 100KB par entrée cache
     "MAX_JSON_DEPTH": 10,            # Limite profondeur JSON
@@ -40,6 +41,7 @@ MEMORY_CONFIG = {
 }
 
 def get_memory_usage_percent():
+    """CORRIGÉ: Mesure mémoire réaliste"""
     try:
         memory = psutil.virtual_memory()
         return round(memory.percent, 1)
@@ -47,12 +49,11 @@ def get_memory_usage_percent():
         logger.warning(f"Erreur mesure mémoire: {e}")
         return 50.0  # Valeur par défaut réaliste au lieu de 0
 
-
 def decimal_safe_json_encoder(obj):
     """
     Converter JSON pour gérer les types Decimal de PostgreSQL
     Résout l'erreur: "Object of type Decimal is not JSON serializable"
-    🛡️ MEMORY-SAFE: Limite la profondeur de conversion
+    MEMORY-SAFE: Limite la profondeur de conversion
     """
     if isinstance(obj, decimal.Decimal):
         return float(obj)
@@ -60,7 +61,7 @@ def decimal_safe_json_encoder(obj):
 
 def safe_json_dumps(data, max_depth=MEMORY_CONFIG["MAX_JSON_DEPTH"]):
     """
-    🛡️ Sérialisation JSON sécurisée avec limites de mémoire
+    Sérialisation JSON sécurisée avec limites de mémoire
     """
     def truncate_deep_structure(obj, current_depth=0):
         if current_depth > max_depth:
@@ -96,7 +97,7 @@ def safe_json_dumps(data, max_depth=MEMORY_CONFIG["MAX_JSON_DEPTH"]):
         # Vérifier la taille finale
         size_kb = len(json_str.encode('utf-8')) / 1024
         if size_kb > MEMORY_CONFIG["MAX_CACHE_ENTRY_SIZE_KB"]:
-            logger.warning(f"⚠️ Cache entry trop large ({size_kb:.1f}KB), truncation forcée")
+            logger.warning(f"Cache entry trop large ({size_kb:.1f}KB), truncation forcée")
             return json.dumps({
                 "error": "CACHE_ENTRY_TOO_LARGE",
                 "original_size_kb": round(size_kb, 1),
@@ -107,7 +108,7 @@ def safe_json_dumps(data, max_depth=MEMORY_CONFIG["MAX_JSON_DEPTH"]):
         return json_str
         
     except Exception as e:
-        logger.error(f"❌ Erreur sérialisation JSON safe: {e}")
+        logger.error(f"Erreur sérialisation JSON safe: {e}")
         return json.dumps({
             "error": "JSON_SERIALIZATION_ERROR",
             "message": str(e)[:200],
@@ -116,7 +117,7 @@ def safe_json_dumps(data, max_depth=MEMORY_CONFIG["MAX_JSON_DEPTH"]):
 
 class MemoryMonitor:
     """
-    🛡️ Moniteur de mémoire pour prévenir les fuites
+    Moniteur de mémoire pour prévenir les fuites
     """
     def __init__(self):
         self.last_cleanup = datetime.now().timestamp()
@@ -138,14 +139,15 @@ class MemoryMonitor:
 
 class StatisticsCache:
     """
-    🛡️ Gestionnaire de cache intelligent MEMORY-SAFE pour toutes les statistiques
+    Gestionnaire de cache intelligent MEMORY-SAFE pour toutes les statistiques
     - Pool de connexions limité pour éviter les fuites
     - Limites strictes sur la taille des données
     - Nettoyage automatique agressif
     - Monitoring mémoire en temps réel
     - Tables optimisées avec TTL court
     - Migration automatique des colonnes manquantes
-    🔧 FIXED: Création complète de toutes les tables manquantes
+    FIXED: Création complète de toutes les tables manquantes
+    CORRECTED: Gestion robuste des transactions SQL
     """
     
     def __init__(self, dsn: str = None):
@@ -153,16 +155,16 @@ class StatisticsCache:
         if not self.dsn:
             raise ValueError("DATABASE_URL manquant pour le cache statistiques")
         
-        # 🛡️ MEMORY-SAFE: Pool de connexions limité
+        # MEMORY-SAFE: Pool de connexions limité
         try:
             self.connection_pool = psycopg2.pool.SimpleConnectionPool(
                 minconn=2,
                 maxconn=MEMORY_CONFIG["MAX_POOL_CONNECTIONS"],
                 dsn=self.dsn
             )
-            logger.info(f"✅ Pool de connexions créé: {MEMORY_CONFIG['MAX_POOL_CONNECTIONS']} max")
+            logger.info(f"Pool de connexions créé: {MEMORY_CONFIG['MAX_POOL_CONNECTIONS']} max")
         except Exception as pool_error:
-            logger.error(f"❌ Erreur création pool: {pool_error}")
+            logger.error(f"Erreur création pool: {pool_error}")
             self.connection_pool = None
         
         # Moniteur de mémoire
@@ -171,45 +173,50 @@ class StatisticsCache:
         # Compteur d'entrées cache pour limite
         self._cache_count = 0
         
-        # 🔧 FIXED: Créer les tables de cache (version complète corrigée)
+        # FIXED: Créer les tables de cache (version complète corrigée)
         self._ensure_cache_tables()
         
-        # 🔧 NOUVELLES FONCTIONNALITÉS: Migration automatique des colonnes
+        # NOUVELLES FONCTIONNALITÉS: Migration automatique des colonnes
         self._migration_feedback_success = self._ensure_user_questions_feedback_columns()
         self._migration_cache_stats_success = self._ensure_existing_tables_migration()
         
         if self._migration_feedback_success:
-            logger.info("✅ Tables de cache memory-safe créées")
-            logger.info("✅ Migration feedback terminée (version allégée)")
+            logger.info("Tables de cache memory-safe créées")
+            logger.info("Migration feedback terminée (version allégée)")
         else:
-            logger.warning("⚠️ Système de cache initialisé en mode dégradé (pas de feedback)")
+            logger.warning("Système de cache initialisé en mode dégradé (pas de feedback)")
         
-        logger.info("✅ Système de cache statistiques initialisé avec support feedback (MEMORY-SAFE)")
+        logger.info("Système de cache statistiques initialisé avec support feedback (MEMORY-SAFE)")
     
     def _get_connection(self):
-        """🛡️ Récupère une connexion du pool de manière sécurisée"""
+        """Récupère une connexion du pool de manière sécurisée"""
         if self.connection_pool:
             try:
-                return self.connection_pool.getconn()
+                conn = self.connection_pool.getconn()
+                # CORRIGÉ: Rollback systématique pour éviter les transactions aborted
+                conn.rollback()
+                return conn
             except Exception as e:
-                logger.warning(f"⚠️ Pool épuisé, connexion directe: {e}")
+                logger.warning(f"Pool épuisé, connexion directe: {e}")
         
         # Fallback: connexion directe
-        return psycopg2.connect(self.dsn)
+        conn = psycopg2.connect(self.dsn)
+        conn.rollback()  # CORRIGÉ: Rollback pour nouvelle connexion aussi
+        return conn
     
     def _return_connection(self, conn, from_pool=True):
-        """🛡️ Retourne une connexion au pool"""
+        """Retourne une connexion au pool"""
         try:
             if from_pool and self.connection_pool:
                 self.connection_pool.putconn(conn)
             else:
                 conn.close()
         except Exception as e:
-            logger.warning(f"⚠️ Erreur retour connexion: {e}")
+            logger.warning(f"Erreur retour connexion: {e}")
 
     def _ensure_user_questions_feedback_columns(self):
         """
-        🔧 MIGRATION AUTOMATIQUE: Version allégée pour économie mémoire
+        MIGRATION AUTOMATIQUE: Version allégée pour économie mémoire
         Compatible avec le code original - assure la rétrocompatibilité
         """
         try:
@@ -252,7 +259,7 @@ class StatisticsCache:
                         cur.execute("CREATE INDEX IF NOT EXISTS idx_user_questions_feedback ON user_questions_complete(feedback) WHERE feedback IS NOT NULL")
                         
                         conn.commit()
-                        logger.info("✅ Table user_questions_complete créée avec colonnes feedback")
+                        logger.info("Table user_questions_complete créée avec colonnes feedback")
                         return True
                     
                     # Migration minimale des colonnes feedback
@@ -272,19 +279,19 @@ class StatisticsCache:
                     """)
                     
                     conn.commit()
-                    logger.info("✅ Migration feedback terminée (version allégée)")
+                    logger.info("Migration feedback terminée (version allégée)")
                     return True
                     
             finally:
                 self._return_connection(conn)
                 
         except Exception as e:
-            logger.error(f"❌ Erreur migration feedback: {e}")
+            logger.error(f"Erreur migration feedback: {e}")
             return False
 
     def _ensure_existing_tables_migration(self):
         """
-        🔧 MIGRATION AUTOMATIQUE: Ajoute data_size_kb aux tables existantes
+        MIGRATION AUTOMATIQUE: Ajoute data_size_kb aux tables existantes
         Résout l'erreur: column "data_size_kb" does not exist
         Compatible avec toutes les versions existantes
         CORRECTIF: Inclut statistics_cache dans la migration
@@ -296,7 +303,7 @@ class StatisticsCache:
                     # Tables à vérifier pour la colonne data_size_kb
                     # CORRECTIF: Ajouter statistics_cache à la liste !
                     tables_to_migrate = [
-                        'statistics_cache',           # ← TABLE PRINCIPALE MANQUANTE !
+                        'statistics_cache',           # TABLE PRINCIPALE MANQUANTE !
                         'dashboard_stats_snapshot',
                         'questions_cache', 
                         'openai_costs_cache',
@@ -316,7 +323,7 @@ class StatisticsCache:
                             """, (table_name,))
                             
                             if cur.fetchone()[0]:
-                                # Vérifier si data_size_kb existe déjà
+                                # Vérifier si data_size_kb existe déjà 
                                 cur.execute("""
                                     SELECT EXISTS (
                                         SELECT FROM information_schema.columns 
@@ -333,18 +340,18 @@ class StatisticsCache:
                                         ADD COLUMN data_size_kb INTEGER DEFAULT 0
                                     """)
                                     migrations_applied.append(table_name)
-                                    logger.info(f"🔧 Colonne data_size_kb ajoutée à {table_name}")
+                                    logger.info(f"Colonne data_size_kb ajoutée à {table_name}")
                                 else:
-                                    logger.info(f"ℹ️ Colonne data_size_kb existe déjà dans {table_name}")
+                                    logger.info(f"Colonne data_size_kb existe déjà dans {table_name}")
                         except Exception as table_error:
-                            logger.info(f"ℹ️ Table {table_name} skip: {table_error}")
+                            logger.info(f"Table {table_name} skip: {table_error}")
                     
                     conn.commit()
                     
                     if migrations_applied:
-                        logger.info(f"✅ Migration data_size_kb terminée: {migrations_applied}")
+                        logger.info(f"Migration data_size_kb terminée: {migrations_applied}")
                     else:
-                        logger.info("✅ Colonnes data_size_kb déjà présentes ou tables inexistantes")
+                        logger.info("Colonnes data_size_kb déjà présentes ou tables inexistantes")
                     
                     return True
                     
@@ -352,12 +359,12 @@ class StatisticsCache:
                 self._return_connection(conn)
                 
         except Exception as e:
-            logger.error(f"❌ Erreur migration data_size_kb: {e}")
+            logger.error(f"Erreur migration data_size_kb: {e}")
             return False
     
     def _ensure_cache_tables(self):
         """
-        🔧 FIXED: Crée TOUTES les tables de cache nécessaires MEMORY-OPTIMIZED
+        FIXED: Crée TOUTES les tables de cache nécessaires MEMORY-OPTIMIZED
         Version complète qui crée toutes les tables utilisées par le code
         """
         try:
@@ -365,7 +372,7 @@ class StatisticsCache:
             try:
                 with conn.cursor() as cur:
                     
-                    # 🛡️ TABLE PRINCIPALE: Cache générique avec limites strictes
+                    # TABLE PRINCIPALE: Cache générique avec limites strictes
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS statistics_cache (
                             id SERIAL PRIMARY KEY,
@@ -375,7 +382,7 @@ class StatisticsCache:
                             -- TTL agressif pour économie mémoire
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '4 hours'),
+                            expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '12 hours'),
                             
                             -- Métadonnées allégées
                             source VARCHAR(50) DEFAULT 'computed',
@@ -387,7 +394,7 @@ class StatisticsCache:
                         );
                     """)
                     
-                    # 🔧 FIXED: Table questions_cache (MANQUANTE DANS L'ORIGINAL)
+                    # FIXED: Table questions_cache (MANQUANTE DANS L'ORIGINAL)
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS questions_cache (
                             id SERIAL PRIMARY KEY,
@@ -397,7 +404,7 @@ class StatisticsCache:
                             data_size_kb INTEGER DEFAULT 0,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '1 hour'),
+                            expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '12 hours'),
                             hit_count INTEGER DEFAULT 1,
                             language VARCHAR(10) DEFAULT 'fr',
                             user_id VARCHAR(255),
@@ -405,7 +412,7 @@ class StatisticsCache:
                         );
                     """)
                     
-                    # 🔧 FIXED: Table openai_costs_cache (MANQUANTE DANS L'ORIGINAL)
+                    # FIXED: Table openai_costs_cache (MANQUANTE DANS L'ORIGINAL)
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS openai_costs_cache (
                             id SERIAL PRIMARY KEY,
@@ -417,13 +424,13 @@ class StatisticsCache:
                             estimated_cost_usd DECIMAL(10, 6) NOT NULL,
                             data_size_kb INTEGER DEFAULT 0,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '4 hours'),
+                            expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '12 hours'),
                             user_id VARCHAR(255),
                             endpoint VARCHAR(100)
                         );
                     """)
                     
-                    # 🔧 FIXED: Table dashboard_stats_snapshot (MANQUANTE DANS L'ORIGINAL)
+                    # FIXED: Table dashboard_stats_snapshot (MANQUANTE DANS L'ORIGINAL)
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS dashboard_stats_snapshot (
                             id SERIAL PRIMARY KEY,
@@ -442,50 +449,14 @@ class StatisticsCache:
                         );
                     """)
                     
-                    # 🔧 MIGRATION: Ajouter expires_at aux tables existantes si manquante
-                    try:
-                        # Vérifier d'abord si created_at existe avant de l'utiliser
-                        cur.execute("""
-                            SELECT EXISTS (
-                                SELECT FROM information_schema.columns 
-                                WHERE table_name = 'dashboard_stats_snapshot' 
-                                AND column_name = 'created_at'
-                            )
-                        """)
-                        has_created_at = cur.fetchone()[0]
-                        
-                        cur.execute("""
-                            ALTER TABLE dashboard_stats_snapshot 
-                            ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '24 hours')
-                        """)
-                        
-                        # Mettre à jour seulement si created_at existe
-                        if has_created_at:
-                            cur.execute("""
-                                UPDATE dashboard_stats_snapshot 
-                                SET expires_at = created_at + INTERVAL '24 hours' 
-                                WHERE expires_at IS NULL
-                            """)
-                        else:
-                            cur.execute("""
-                                UPDATE dashboard_stats_snapshot 
-                                SET expires_at = CURRENT_TIMESTAMP + INTERVAL '24 hours' 
-                                WHERE expires_at IS NULL
-                            """)
-                        
-                        conn.commit()  # Commit après chaque migration réussie
-                        logger.info("Migration expires_at dashboard_stats_snapshot réussie")
-                    except Exception as migration_error:
-                        conn.rollback()  # Rollback en cas d'erreur
-                        logger.warning(f"Migration expires_at dashboard_stats_snapshot: {migration_error}")
-                    
-                    # Migration similaire pour les autres tables
-                    other_tables_to_migrate = [
-                        ('questions_cache', '1 hour'),
-                        ('openai_costs_cache', '4 hours')
+                    # MIGRATION: Ajouter expires_at aux tables existantes si manquante
+                    migration_tables = [
+                        ('dashboard_stats_snapshot', '24 hours'),
+                        ('questions_cache', '12 hours'),
+                        ('openai_costs_cache', '12 hours')
                     ]
                     
-                    for table_name, interval in other_tables_to_migrate:
+                    for table_name, interval in migration_tables:
                         try:
                             # Vérifier si created_at existe pour cette table
                             cur.execute("""
@@ -520,7 +491,7 @@ class StatisticsCache:
                             conn.rollback()
                             logger.info(f"Migration {table_name} expires_at: {table_migration_error}")
                     
-                    # 🛡️ TABLE SIMPLIFIÉE: Snapshots dashboard légers (CONSERVÉE DE L'ORIGINAL)
+                    # TABLE SIMPLIFIÉE: Snapshots dashboard légers (CONSERVÉE DE L'ORIGINAL)
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS dashboard_stats_lite (
                             id SERIAL PRIMARY KEY,
@@ -545,10 +516,10 @@ class StatisticsCache:
                         );
                     """)
                     
-                    conn.commit()  # ← COMMIT APRÈS CRÉATION DES TABLES
-                    logger.info("✅ Tables de cache créées, création des index...")
+                    conn.commit()  # COMMIT APRÈS CRÉATION DES TABLES
+                    logger.info("Tables de cache créées, création des index...")
                     
-                    # 🛡️ INDEX MINIMAUX pour performance (APRÈS commit des tables)
+                    # INDEX MINIMAUX pour performance (APRÈS commit des tables)
                     index_queries = [
                         "CREATE INDEX IF NOT EXISTS idx_stats_cache_expires ON statistics_cache(expires_at);",
                         "CREATE INDEX IF NOT EXISTS idx_stats_cache_key ON statistics_cache(cache_key);",
@@ -568,19 +539,19 @@ class StatisticsCache:
                             conn.commit()  # Commit chaque index individuellement
                         except Exception as idx_error:
                             conn.rollback()  # Rollback en cas d'erreur d'index
-                            logger.warning(f"⚠️ Index ignoré: {idx_error}")
+                            logger.warning(f"Index ignoré: {idx_error}")
                     
-                    logger.info("✅ TOUTES les tables de cache créées avec succès (VERSION CORRIGÉE)")
+                    logger.info("TOUTES les tables de cache créées avec succès (VERSION CORRIGÉE)")
                     
             finally:
                 self._return_connection(conn)
                 
         except Exception as e:
-            logger.error(f"❌ Erreur création tables cache CORRIGÉE: {e}")
+            logger.error(f"Erreur création tables cache CORRIGÉE: {e}")
 
     def diagnose_database_connection(self) -> Dict[str, Any]:
         """
-        🔧 CONSERVÉ: Diagnostique complet de la connection base de données
+        CONSERVÉ: Diagnostique complet de la connection base de données
         """
         try:
             diagnosis = {
@@ -665,7 +636,7 @@ class StatisticsCache:
 
     async def create_missing_tables(self) -> Dict[str, Any]:
         """
-        🛠️ CONSERVÉ: Crée automatiquement les tables manquantes
+        CONSERVÉ: Crée automatiquement les tables manquantes
         """
         try:
             if not self.dsn:
@@ -693,7 +664,7 @@ class StatisticsCache:
                     """)
                     
                     if not cur.fetchone()[0]:
-                        logger.info("🔧 Création table user_questions_complete...")
+                        logger.info("Création table user_questions_complete...")
                         
                         create_table_sql = """
                         CREATE TABLE user_questions_complete (
@@ -731,7 +702,7 @@ class StatisticsCache:
                         
                         conn.commit()
                         results["tables_created"].append("user_questions_complete")
-                        logger.info("✅ Table user_questions_complete créée avec succès")
+                        logger.info("Table user_questions_complete créée avec succès")
                     
                     else:
                         # Vérifier si colonnes feedback existent, les ajouter si nécessaire
@@ -750,7 +721,7 @@ class StatisticsCache:
                                 ADD COLUMN feedback INTEGER CHECK (feedback IN (-1, 0, 1))
                             """)
                             results["tables_updated"].append("user_questions_complete: ajout colonne feedback")
-                            logger.info("✅ Colonne feedback ajoutée")
+                            logger.info("Colonne feedback ajoutée")
                         
                         if "feedback_comment" not in existing_feedback_cols:
                             cur.execute("""
@@ -758,7 +729,7 @@ class StatisticsCache:
                                 ADD COLUMN feedback_comment TEXT
                             """)
                             results["tables_updated"].append("user_questions_complete: ajout colonne feedback_comment")
-                            logger.info("✅ Colonne feedback_comment ajoutée")
+                            logger.info("Colonne feedback_comment ajoutée")
                             
                         if "data_size_kb" not in existing_feedback_cols:
                             cur.execute("""
@@ -766,7 +737,7 @@ class StatisticsCache:
                                 ADD COLUMN data_size_kb INTEGER DEFAULT NULL
                             """)
                             results["tables_updated"].append("user_questions_complete: ajout colonne data_size_kb")
-                            logger.info("✅ Colonne data_size_kb ajoutée")
+                            logger.info("Colonne data_size_kb ajoutée")
                         
                         if results["tables_updated"]:
                             conn.commit()
@@ -782,23 +753,23 @@ class StatisticsCache:
             }
             
         except Exception as e:
-            logger.error(f"❌ Erreur création tables: {e}")
+            logger.error(f"Erreur création tables: {e}")
             return {"status": "error", "error": str(e)}
 
     # ==================== MÉTHODES GÉNÉRIQUES (MEMORY-SAFE) - CONSERVÉES ====================
     
-    def set_cache(self, key: str, data: Any, ttl_hours: int = 0.5, source: str = "computed") -> bool:
-        """🛡️ CONSERVÉ: Stocke des données dans le cache générique - MEMORY-SAFE"""
+    def set_cache(self, key: str, data: Any, ttl_hours: int = 12, source: str = "computed") -> bool:
+        """CONSERVÉ: Stocke des données dans le cache générique - MEMORY-SAFE"""
         try:
             # 1. Vérifier le monitoring mémoire AVANT stockage
             should_cleanup, reason = self.memory_monitor.should_cleanup()
             if should_cleanup:
-                logger.info(f"🧹 Cleanup auto déclenché: {reason}")
+                logger.info(f"Cleanup auto déclenché: {reason}")
                 self.cleanup_expired_cache()
             
             # 2. Vérifier limite nombre d'entrées
             if self._cache_count > MEMORY_CONFIG["MAX_CACHE_ENTRIES"]:
-                logger.warning(f"⚠️ Limite cache atteinte ({self._cache_count}), nettoyage forcé")
+                logger.warning(f"Limite cache atteinte ({self._cache_count}), nettoyage forcé")
                 self.cleanup_expired_cache()
             
             # 3. Sérialisation memory-safe
@@ -807,10 +778,10 @@ class StatisticsCache:
             
             # 4. Vérification taille
             if data_size_kb > MEMORY_CONFIG["MAX_CACHE_ENTRY_SIZE_KB"]:
-                logger.warning(f"⚠️ Cache entry trop large ({data_size_kb:.1f}KB) pour {key}")
+                logger.warning(f"Cache entry trop large ({data_size_kb:.1f}KB) pour {key}")
                 return False
             
-            # 5. Stockage avec TTL court
+            # 5. Stockage avec TTL corrigé (12h par défaut)
             expires_at = datetime.now() + timedelta(hours=min(ttl_hours, 12))  # Max 12h TTL
             
             conn = self._get_connection()
@@ -835,15 +806,15 @@ class StatisticsCache:
             finally:
                 self._return_connection(conn)
                     
-            logger.info(f"✅ Cache SET (SAFE): {key} ({data_size_kb:.1f}KB, TTL: {ttl_hours}h)")
+            logger.info(f"Cache SET (SAFE): {key} ({data_size_kb:.1f}KB, TTL: {ttl_hours}h)")
             return True
             
         except Exception as e:
-            logger.error(f"❌ Erreur set cache safe {key}: {e}")
+            logger.error(f"Erreur set cache safe {key}: {e}")
             return False
     
     def get_cache(self, key: str, include_expired: bool = False) -> Optional[Dict[str, Any]]:
-        """🛡️ CONSERVÉ: Récupère des données depuis le cache générique - MEMORY-SAFE"""
+        """CONSERVÉ: Récupère des données depuis le cache générique - MEMORY-SAFE"""
         try:
             conn = self._get_connection()
             try:
@@ -868,10 +839,10 @@ class StatisticsCache:
                         # Vérification taille en mémoire
                         size_kb = result.get("data_size_kb", 0)
                         if size_kb > MEMORY_CONFIG["MAX_CACHE_ENTRY_SIZE_KB"] * 2:
-                            logger.warning(f"⚠️ Cache entry {key} trop large ({size_kb}KB), ignoré")
+                            logger.warning(f"Cache entry {key} trop large ({size_kb}KB), ignoré")
                             return None
                         
-                        logger.info(f"📦 Cache HIT (SAFE): {key} ({size_kb}KB)")
+                        logger.info(f"Cache HIT (SAFE): {key} ({size_kb}KB)")
                         return {
                             "data": result["data"],
                             "cached_at": result["created_at"].isoformat(),
@@ -882,18 +853,18 @@ class StatisticsCache:
                             "size_kb": size_kb
                         }
                     else:
-                        logger.info(f"🔍 Cache MISS: {key}")
+                        logger.info(f"Cache MISS: {key}")
                         return None
                         
             finally:
                 self._return_connection(conn)
                         
         except Exception as e:
-            logger.error(f"❌ Erreur get cache safe {key}: {e}")
+            logger.error(f"Erreur get cache safe {key}: {e}")
             return None
     
     def invalidate_cache(self, pattern: str = None, key: str = None) -> int:
-        """🛡️ CONSERVÉ: Invalide le cache (memory-safe)"""
+        """CONSERVÉ: Invalide le cache (memory-safe)"""
         try:
             conn = self._get_connection()
             try:
@@ -913,20 +884,20 @@ class StatisticsCache:
                     # Mise à jour compteur
                     self._cache_count = max(0, self._cache_count - deleted_count)
                     
-                    logger.info(f"🗑️ Cache invalidé (SAFE): {deleted_count} entrées supprimées")
+                    logger.info(f"Cache invalidé (SAFE): {deleted_count} entrées supprimées")
                     return deleted_count
                     
             finally:
                 self._return_connection(conn)
                     
         except Exception as e:
-            logger.error(f"❌ Erreur invalidation cache safe: {e}")
+            logger.error(f"Erreur invalidation cache safe: {e}")
             return 0
 
     # ==================== MÉTHODES SPÉCIALISÉES (MEMORY-SAFE) - CONSERVÉES ====================
     
     def set_dashboard_snapshot(self, stats: Dict[str, Any], period_hours: int = 24) -> bool:
-        """🛡️ CONSERVÉ: Stocke un snapshot dashboard LÉGER - MEMORY-SAFE"""
+        """CONSERVÉ: Stocke un snapshot dashboard LÉGER - MEMORY-SAFE"""
         try:
             conn = self._get_connection()
             try:
@@ -979,15 +950,15 @@ class StatisticsCache:
             finally:
                 self._return_connection(conn)
                     
-            logger.info("✅ Dashboard snapshot LIGHT sauvegardé (MEMORY-SAFE)")
+            logger.info("Dashboard snapshot LIGHT sauvegardé (MEMORY-SAFE)")
             return True
             
         except Exception as e:
-            logger.error(f"❌ Erreur sauvegarde dashboard snapshot safe: {e}")
+            logger.error(f"Erreur sauvegarde dashboard snapshot safe: {e}")
             return False
     
     def get_dashboard_snapshot(self) -> Optional[Dict[str, Any]]:
-        """🛡️ CONSERVÉ: Récupère le snapshot dashboard LIGHT"""
+        """CONSERVÉ: Récupère le snapshot dashboard LIGHT"""
         try:
             conn = self._get_connection()
             try:
@@ -1009,7 +980,7 @@ class StatisticsCache:
                             if snapshot.get(field):
                                 snapshot[field] = snapshot[field].isoformat()
                         
-                        logger.info("📊 Dashboard snapshot LIGHT récupéré")
+                        logger.info("Dashboard snapshot LIGHT récupéré")
                         return snapshot
                         
                     return None
@@ -1018,11 +989,11 @@ class StatisticsCache:
                 self._return_connection(conn)
                     
         except Exception as e:
-            logger.error(f"❌ Erreur récupération dashboard snapshot safe: {e}")
+            logger.error(f"Erreur récupération dashboard snapshot safe: {e}")
             return None
 
     def cleanup_expired_cache(self) -> int:
-        """🛡️ CONSERVÉ: Nettoie automatiquement le cache AGRESSIVEMENT"""
+        """CONSERVÉ: Nettoie automatiquement le cache AGRESSIVEMENT"""
         with self.memory_monitor.cleanup_lock:
             try:
                 conn = self._get_connection()
@@ -1064,26 +1035,29 @@ class StatisticsCache:
                             cur.execute("DELETE FROM statistics_cache WHERE data_size_kb > 10")
                             aggressive_cleaned = cur.rowcount
                             total_cleaned += aggressive_cleaned
-                            logger.warning(f"🚨 Cleanup agressif: {aggressive_cleaned} grandes entrées supprimées")
+                            logger.warning(f"Cleanup agressif: {aggressive_cleaned} grandes entrées supprimées")
                         
                         conn.commit()
                         
                         # Mise à jour compteur
                         self._cache_count = max(0, self._cache_count - total_cleaned)
-                        self.memory_monitor.last_cleanup = time.time()
+                        self.memory_monitor.last_cleanup = datetime.now().timestamp()
                         
-                        logger.info(f"🧹 Cache cleanup (SAFE): {total_cleaned} entrées supprimées, mémoire: {memory_percent}%")
+                        logger.info(f"Cache cleanup (SAFE): {total_cleaned} entrées supprimées, mémoire: {memory_percent}%")
                         return total_cleaned
                         
                 finally:
                     self._return_connection(conn)
                         
             except Exception as e:
-                logger.error(f"❌ Erreur cleanup cache safe: {e}")
+                logger.error(f"Erreur cleanup cache safe: {e}")
                 return 0
 
     def get_cache_stats(self) -> Dict[str, Any]:
-        """🛡️ CONSERVÉ: Statistiques du système de cache MEMORY-SAFE avec gestion d'erreur robuste"""
+        """
+        CORRIGÉ: Statistiques du système de cache MEMORY-SAFE avec gestion d'erreur robuste
+        Fixed: Requêtes SQL corrigées et gestion de transaction améliorée
+        """
         try:
             conn = self._get_connection()
             try:
@@ -1106,22 +1080,29 @@ class StatisticsCache:
                         if result:
                             stats['general_cache'] = dict(result)
                     except Exception as cache_stats_error:
-                        logger.warning(f"⚠️ Erreur stats cache générique: {cache_stats_error}")
+                        logger.warning(f"Erreur stats cache générique: {cache_stats_error}")
                         # Fallback sans data_size_kb
-                        cur.execute("""
-                            SELECT 
-                                COUNT(*) as total,
-                                COUNT(*) FILTER (WHERE expires_at > NOW()) as valid,
-                                COUNT(*) FILTER (WHERE expires_at <= NOW()) as expired
-                            FROM statistics_cache
-                        """)
-                        result = cur.fetchone()
-                        stats['general_cache'] = dict(result) if result else {}
-                        stats['general_cache'].update({
-                            'avg_size_kb': 0,
-                            'total_size_kb': 0,
-                            'note': 'data_size_kb non disponible - migration en cours'
-                        })
+                        try:
+                            cur.execute("""
+                                SELECT 
+                                    COUNT(*) as total,
+                                    COUNT(*) FILTER (WHERE expires_at > NOW()) as valid,
+                                    COUNT(*) FILTER (WHERE expires_at <= NOW()) as expired
+                                FROM statistics_cache
+                            """)
+                            result = cur.fetchone()
+                            stats['general_cache'] = dict(result) if result else {}
+                            stats['general_cache'].update({
+                                'avg_size_kb': 0,
+                                'total_size_kb': 0,
+                                'note': 'data_size_kb non disponible - migration en cours'
+                            })
+                        except Exception as fallback_error:
+                            stats['general_cache'] = {
+                                'total': 0, 'valid': 0, 'expired': 0, 
+                                'avg_size_kb': 0, 'total_size_kb': 0,
+                                'note': f'Table statistics_cache non disponible: {fallback_error}'
+                            }
                     
                     # Dashboard snapshots light avec gestion d'erreur
                     try:
@@ -1136,16 +1117,13 @@ class StatisticsCache:
                         if result:
                             stats['dashboard_snapshots'] = dict(result)
                     except Exception as dashboard_error:
-                        logger.warning(f"⚠️ Erreur stats dashboard: {dashboard_error}")
-                        # Fallback basique
+                        logger.warning(f"Erreur stats dashboard: {dashboard_error}")
                         stats['dashboard_snapshots'] = {
-                            'total': 0, 
-                            'current': 0, 
-                            'avg_size_kb': 0,
+                            'total': 0, 'current': 0, 'avg_size_kb': 0,
                             'note': 'Table dashboard_stats_lite non disponible'
                         }
                     
-                    # Vérifier les autres tables avec gestion gracieuse des erreurs
+                    # CORRIGÉ: Vérifier les autres tables avec requêtes SQL correctes
                     other_tables = [
                         ('questions_cache', 'questions_cache'),
                         ('openai_costs_cache', 'openai_costs'), 
@@ -1154,27 +1132,26 @@ class StatisticsCache:
                     
                     for table_name, stat_key in other_tables:
                         try:
+                            # CORRIGÉ: Utiliser le bon nom de table dans la requête
                             cur.execute(f"""
                                 SELECT 
                                     COUNT(*) as total,
                                     COUNT(*) FILTER (WHERE expires_at > NOW()) as valid,
                                     COALESCE(AVG(data_size_kb), 0) as avg_size_kb
-                                FROM dashboard_stats_snapshot
+                                FROM {table_name}
                                 WHERE created_at > NOW() - INTERVAL '24 hours'
                             """)                            
                             result = cur.fetchone()
                             if result:
                                 stats[stat_key] = dict(result)
                         except Exception as table_error:
-                            logger.info(f"ℹ️ Table {table_name} non disponible: {table_error}")
+                            logger.info(f"Table {table_name} non disponible: {table_error}")
                             stats[stat_key] = {
-                                'total': 0,
-                                'valid': 0, 
-                                'avg_size_kb': 0,
+                                'total': 0, 'valid': 0, 'avg_size_kb': 0,
                                 'note': f'Table {table_name} non disponible'
                             }
                     
-                    # Ajout des métriques mémoire
+                    # Ajout des métriques mémoire avec timestamp corrigé
                     stats['memory_info'] = {
                         'system_memory_percent': get_memory_usage_percent(),
                         'cache_entries_count': self._cache_count,
@@ -1194,7 +1171,7 @@ class StatisticsCache:
                         'max_entry_size_kb': MEMORY_CONFIG["MAX_CACHE_ENTRY_SIZE_KB"],
                         'connection_pool_enabled': self.connection_pool is not None,
                         'feedback_migration_success': self._migration_feedback_success,
-                        'all_tables_created': True  # Nouveau flag pour version corrigée
+                        'all_tables_created': True
                     }
                     
                     stats['last_updated'] = datetime.now().isoformat()
@@ -1205,7 +1182,7 @@ class StatisticsCache:
                 self._return_connection(conn)
                     
         except Exception as e:
-            logger.error(f"❌ Erreur stats cache safe: {e}")
+            logger.error(f"Erreur stats cache safe: {e}")
             return {
                 "error": str(e), 
                 "memory_percent": get_memory_usage_percent(),
@@ -1214,13 +1191,13 @@ class StatisticsCache:
             }
 
     def __del__(self):
-        """🛡️ CONSERVÉ: Fermeture propre du pool de connexions"""
+        """CONSERVÉ: Fermeture propre du pool de connexions"""
         try:
             if hasattr(self, 'connection_pool') and self.connection_pool:
                 self.connection_pool.closeall()
-                logger.info("🔒 Pool de connexions fermé proprement")
+                logger.info("Pool de connexions fermé proprement")
         except Exception as e:
-            logger.warning(f"⚠️ Erreur fermeture pool: {e}")
+            logger.warning(f"Erreur fermeture pool: {e}")
 
     # ==================== MÉTHODES CONSERVÉES POUR COMPATIBILITÉ ====================
 
@@ -1239,10 +1216,10 @@ class StatisticsCache:
                 "data_source": costs_data.get('data_source', 'openai_api')
             }
             
-            return self.set_cache(cache_key, essential_costs, ttl_hours=4, source="openai_costs")
+            return self.set_cache(cache_key, essential_costs, ttl_hours=12, source="openai_costs")
             
         except Exception as e:
-            logger.error(f"❌ Erreur cache coûts OpenAI safe: {e}")
+            logger.error(f"Erreur cache coûts OpenAI safe: {e}")
             return False
 
     def get_openai_costs(self, start_date: str, end_date: str, period_type: str) -> Optional[Dict[str, Any]]:
@@ -1296,5 +1273,5 @@ def force_cache_refresh() -> Dict[str, Any]:
         }
         
     except Exception as e:
-        logger.error(f"❌ Erreur force refresh cache safe: {e}")
+        logger.error(f"Erreur force refresh cache safe: {e}")
         return {"status": "error", "error": str(e)}
