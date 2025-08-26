@@ -38,18 +38,24 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     try {
       console.log('🔄 [LanguageModal] Début changement langue:', currentLanguage, '→', languageCode)
       
-      // 1. Sauvegarder d'abord dans le profil
-      await updateProfile({ language: languageCode } as any)
-      console.log('✅ [LanguageModal] updateProfile() terminé')
+      // 1. Sauvegarder dans le localStorage d'abord (fallback immédiat)
+      localStorage.setItem('intelia-preferred-language', languageCode)
       
-      // 2. Fermer la modal immédiatement
+      // 2. Essayer de sauvegarder dans le profil (optionnel)
+      try {
+        await updateProfile({ language: languageCode } as any)
+        console.log('✅ [LanguageModal] updateProfile() terminé')
+      } catch (profileError) {
+        console.warn('⚠️ [LanguageModal] updateProfile échoué (colonne manquante), utilisation localStorage:', profileError)
+      }
+      
+      // 3. Fermer la modal
       onClose()
       
-      // 3. Changer la langue après un micro-délai pour éviter la boucle
-      requestAnimationFrame(() => {
-        changeLanguage(languageCode)
-        console.log('✅ [LanguageModal] changeLanguage() appelée avec:', languageCode)
-      })
+      // 4. Recharger la page pour appliquer la nouvelle langue
+      setTimeout(() => {
+        window.location.reload()
+      }, 100)
       
     } catch (error) {
       console.error('❌ [LanguageModal] Erreur changement langue:', error)
