@@ -32,7 +32,7 @@ MEMORY_CONFIG = {
     "MAX_JSON_DEPTH": 10,            # Limite profondeur JSON
     "MAX_ARRAY_LENGTH": 1000,        # Limite taille arrays
     "CACHE_CLEANUP_INTERVAL": 300,   # Nettoyage auto toutes les 5min
-    "MAX_POOL_CONNECTIONS": 3,       # Pool DB limité
+    "MAX_POOL_CONNECTIONS": 8,       # Pool DB limité
     "MEMORY_THRESHOLD_PERCENT": 80,  # Alert si > 80% RAM
     "ENABLE_MEMORY_MONITORING": True,
     "MAX_CACHE_ENTRIES": 500,        # Maximum 500 entrées en cache
@@ -117,13 +117,13 @@ class MemoryMonitor:
     🛡️ Moniteur de mémoire pour prévenir les fuites
     """
     def __init__(self):
-        self.last_cleanup = time.time()
+        self.last_cleanup = datetime.now().timestamp()
         self.cleanup_lock = threading.Lock()
         
     def should_cleanup(self):
         """Détermine si un cleanup est nécessaire"""
         memory_percent = get_memory_usage_percent()
-        time_since_cleanup = time.time() - self.last_cleanup
+        time_since_cleanup = datetime.now().timestamp() - self.last_cleanup
         
         if memory_percent > MEMORY_CONFIG["FORCE_CLEANUP_AT_PERCENT"]:
             return True, f"Mémoire critique: {memory_percent}%"
@@ -154,7 +154,7 @@ class StatisticsCache:
         # 🛡️ MEMORY-SAFE: Pool de connexions limité
         try:
             self.connection_pool = psycopg2.pool.SimpleConnectionPool(
-                minconn=1,
+                minconn=2,
                 maxconn=MEMORY_CONFIG["MAX_POOL_CONNECTIONS"],
                 dsn=self.dsn
             )
