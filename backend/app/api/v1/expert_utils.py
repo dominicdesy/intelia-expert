@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Utilitaires et fonctions helper pour expert.py
-🚨 VERSION SÉCURISÉE MÉMOIRE - Cache PerfStore drastiquement limité pour éviter OOM
+VERSION SÉCURISÉE MÉMOIRE - Cache PerfStore drastiquement limité pour éviter OOM
+FIXED: Correction du paramètre analytics user_email -> email
 """
 
 import logging
@@ -17,7 +18,7 @@ from fastapi import Request
 
 logger = logging.getLogger(__name__)
 
-# ===== Import numpy sécurisé =====
+# Import numpy sécurisé
 try:
     import numpy as np
     HAS_NUMPY = True
@@ -25,30 +26,30 @@ except ImportError:
     HAS_NUMPY = False
     np = None
 
-# 🚨 CORRECTION URGENTE: Cache PerfStore drastiquement limité pour éviter OOM
+# CORRECTION URGENTE: Cache PerfStore drastiquement limité pour éviter OOM
 _store_cache = {}
-_MAX_STORE_CACHE = int(os.getenv("MAX_STORE_CACHE", "1"))  # ⚠️ RÉDUIT - Maximum 1 store au lieu de illimité
-_STORE_CACHE_ENABLED = str(os.getenv("ENABLE_STORE_CACHE", "false")).lower() in ("1", "true", "yes")  # ⚠️ DÉSACTIVÉ par défaut
+_MAX_STORE_CACHE = int(os.getenv("MAX_STORE_CACHE", "1"))  # Réduit - Maximum 1 store au lieu d'illimité
+_STORE_CACHE_ENABLED = str(os.getenv("ENABLE_STORE_CACHE", "false")).lower() in ("1", "true", "yes")  # Désactivé par défaut
 
 def _memory_emergency_cleanup_stores():
-    """🚨 NOUVEAU: Nettoyage d'urgence des stores en mémoire"""
+    """Nettoyage d'urgence des stores en mémoire"""
     global _store_cache
     try:
         if len(_store_cache) > 0:
             cleared_count = len(_store_cache)
             _store_cache.clear()
             gc.collect()  # Force garbage collection
-            logger.warning(f"🚨 [EMERGENCY] Store cache vidé: {cleared_count} stores - protection mémoire")
+            logger.warning(f"[EMERGENCY] Store cache vidé: {cleared_count} stores - protection mémoire")
             return True
     except Exception as e:
-        logger.error(f"❌ Erreur nettoyage urgence stores: {e}")
+        logger.error(f"Erreur nettoyage urgence stores: {e}")
     return False
 
 def get_cached_store(species: str):
-    """🚨 VERSION SÉCURISÉE: Cache simple pour éviter de recharger le même store avec limite stricte"""
-    # 🚨 SÉCURITÉ: Vérifier si cache autorisé et limite
+    """VERSION SÉCURISÉE: Cache simple pour éviter de recharger le même store avec limite stricte"""
+    # SÉCURITÉ: Vérifier si cache autorisé et limite
     if not _STORE_CACHE_ENABLED:
-        logger.debug("⚠️ Store cache désactivé, création directe")
+        logger.debug("Store cache désactivé, création directe")
         try:
             from .pipeline.perf_store import PerfStore  # type: ignore
             return PerfStore(root=os.environ.get("RAG_INDEX_ROOT", "./rag_index"), species=species)
@@ -58,25 +59,24 @@ def get_cached_store(species: str):
     
     # Si trop de stores en cache, vider complètement
     if len(_store_cache) >= _MAX_STORE_CACHE:
-        logger.warning(f"🚨 Store cache plein ({len(_store_cache)}/{_MAX_STORE_CACHE}), vidage complet")
+        logger.warning(f"Store cache plein ({len(_store_cache)}/{_MAX_STORE_CACHE}), vidage complet")
         _memory_emergency_cleanup_stores()
     
     if species not in _store_cache:
         try:
             from .pipeline.perf_store import PerfStore  # type: ignore
-            logger.info(f"📁 Création PerfStore pour {species} (cache: {len(_store_cache)}/{_MAX_STORE_CACHE})")
+            logger.info(f"Création PerfStore pour {species} (cache: {len(_store_cache)}/{_MAX_STORE_CACHE})")
             _store_cache[species] = PerfStore(root=os.environ.get("RAG_INDEX_ROOT", "./rag_index"), species=species)
         except Exception as e:
             logger.error(f"Failed to create PerfStore for {species}: {e}")
             return None
     else:
-        logger.debug(f"💾 PerfStore {species} récupéré depuis cache")
+        logger.debug(f"PerfStore {species} récupéré depuis cache")
     
     return _store_cache[species]
 
-# ===== Fonction locale pour normalisation des entités (CONSERVÉE) =====
 def normalize_entities_soft_local(entities: Dict[str, Any]) -> Dict[str, Any]:
-    """CONSERVATION INTÉGRALE: Version locale de normalisation des entités"""
+    """Version locale de normalisation des entités"""
     result = {}
     
     # Species
@@ -122,9 +122,8 @@ def normalize_entities_soft_local(entities: Dict[str, Any]) -> Dict[str, Any]:
     
     return result
 
-# ===== Extraction user info (CONSERVÉE) =====
 def get_user_info_for_validation(request: Request, current_user: Optional[Dict[str, Any]] = None) -> tuple[str, str]:
-    """CONSERVATION INTÉGRALE: Extrait les informations utilisateur pour la validation"""
+    """Extrait les informations utilisateur pour la validation"""
     if current_user:
         user_id = current_user.get('email', current_user.get('user_id', 'authenticated_user'))
     else:
@@ -139,7 +138,7 @@ def get_user_info_for_validation(request: Request, current_user: Optional[Dict[s
     return str(user_id), str(request_ip)
 
 def extract_user_id_for_persistence(current_user: Optional[Dict[str, Any]] = None) -> Optional[str]:
-    """CONSERVATION INTÉGRALE"""
+    """Extrait l'ID utilisateur pour la persistance"""
     if not current_user:
         return None
     
@@ -150,9 +149,8 @@ def extract_user_id_for_persistence(current_user: Optional[Dict[str, Any]] = Non
     
     return "authenticated_unknown"
 
-# ===== Fonction de nettoyage JSON améliorée (CONSERVÉE) =====
 def clean_for_json(value):
-    """CONSERVATION INTÉGRALE: Nettoie seulement les valeurs problématiques pour JSON avec protection robuste"""
+    """Nettoie seulement les valeurs problématiques pour JSON avec protection robuste"""
     if value is None:
         return None
     if isinstance(value, (int, str, bool)):
@@ -175,7 +173,7 @@ def clean_for_json(value):
     return str(value)  # Fallback général
 
 def clean_dict_for_json(obj):
-    """CONSERVATION INTÉGRALE: Nettoie récursivement seulement les valeurs problématiques"""
+    """Nettoie récursivement seulement les valeurs problématiques"""
     if isinstance(obj, dict):
         return {k: clean_dict_for_json(v) for k, v in obj.items()}
     elif isinstance(obj, list):
@@ -183,9 +181,8 @@ def clean_dict_for_json(obj):
     else:
         return clean_for_json(obj)
 
-# ===== Parsing d'âge amélioré (CONSERVÉE) =====
 def extract_age_from_text(text: str) -> Optional[int]:
-    """CONSERVATION INTÉGRALE: Extraction d'âge plus robuste avec support semaines/années"""
+    """Extraction d'âge plus robuste avec support semaines/années"""
     text_lower = text.lower()
     
     # Patterns par ordre de priorité
@@ -208,18 +205,20 @@ def extract_age_from_text(text: str) -> Optional[int]:
                 continue
     return None
 
-# ===== 🔧 CORRECTION CRITIQUE: Function signature compatible (CONSERVÉE) =====
 def log_question_to_analytics(
     current_user: Optional[Dict[str, Any]],
     payload: Any,
     result: Dict[str, Any],
     response_text: str = "",
     processing_time_ms: int = 0,
-    confidence_score: Optional[float] = None,  # CONSERVÉ: Paramètre critique
-    confidence_level: Optional[str] = None,    # CONSERVÉ: Paramètre critique
+    confidence_score: Optional[float] = None,
+    confidence_level: Optional[str] = None,
     error_info: Optional[Dict[str, Any]] = None
 ) -> None:
-    """🔧 CONSERVATION INTÉGRALE: Fonction corrigée - Wrapper pour compatibilité avec la nouvelle signature"""
+    """
+    CORRIGÉ: Wrapper pour compatibilité avec la nouvelle signature analytics
+    Correction du paramètre user_email -> email
+    """
     try:
         # Import de la vraie fonction de logging
         from app.api.v1.logging import log_question_to_analytics as log_impl
@@ -244,16 +243,16 @@ def log_question_to_analytics(
             answer = result.get("answer", {})
             source = answer.get("source", "unknown")
         
-        # 🔧 CORRECTION: Appel avec les bons paramètres
+        # CORRECTION CRITIQUE: Appel avec le bon paramètre 'email' au lieu de 'user_email'
         log_impl(
-            email=user_email,
+            email=user_email,                                    # ← CORRIGÉ: email au lieu de user_email
             session_id=session_id,
             question=question,
             response_text=response_text,
             response_source=source,
             status=status,
             processing_time_ms=processing_time_ms,
-            confidence=confidence_score,  # ← Utilise le nouveau paramètre
+            confidence=confidence_score,
             entities=getattr(payload, 'entities', {}),
             error_info=error_info,
             completeness_score=getattr(result, 'completeness_score', None),
@@ -262,22 +261,21 @@ def log_question_to_analytics(
         )
         
     except Exception as e:
-        logger.error(f"⛔ Erreur log question to analytics (wrapper): {e}")
+        logger.error(f"Erreur log question to analytics (wrapper): {e}")
         # Ne pas faire échouer la requête principale
         pass
 
-# ===== Fonctions async optimisées (CONSERVÉES) =====
 async def increment_quota_async(user_email: str) -> bool:
-    """CONSERVATION INTÉGRALE: Version async pour l'incrémentation du quota"""
+    """Version async pour l'incrémentation du quota"""
     try:
         from app.api.v1.billing import increment_quota_usage
         # Pour l'instant, wrapper la fonction sync en thread
         # TODO: Remplacer par vrai async quand billing.py sera optimisé
         await asyncio.to_thread(increment_quota_usage, user_email, success=True)
-        logger.info(f"📊 Usage incrémenté pour {user_email}")
+        logger.info(f"Usage incrémenté pour {user_email}")
         return True
     except Exception as e:
-        logger.error(f"❌ Erreur incrémentation quota (success): {e}")
+        logger.error(f"Erreur incrémentation quota (success): {e}")
         raise
 
 async def log_analytics_async(
@@ -286,7 +284,7 @@ async def log_analytics_async(
     result: Dict[str, Any], 
     start_time: float
 ) -> bool:
-    """🔧 CONSERVATION INTÉGRALE: Version async CORRIGÉE pour le logging analytics"""
+    """Version async CORRIGÉE pour le logging analytics"""
     try:
         # Calculer le temps de traitement
         processing_time = int((time.time() - start_time) * 1000)
@@ -302,7 +300,7 @@ async def log_analytics_async(
         else:
             response_text = str(result.get("message", ""))
         
-        # 🔧 CORRECTION: Extraire correctement les scores de confidence
+        # Extraire correctement les scores de confidence
         confidence_data = result.get("confidence", {})
         if isinstance(confidence_data, dict):
             confidence_score = confidence_data.get("score")
@@ -312,25 +310,25 @@ async def log_analytics_async(
             confidence_score = confidence_data if isinstance(confidence_data, (int, float)) else None
             confidence_level = None
         
-        # 🔧 CORRECTION: Appel avec la nouvelle signature compatible
+        # Appel avec la nouvelle signature compatible
         await asyncio.to_thread(
-            log_question_to_analytics,  # ← Utilise notre wrapper corrigé
+            log_question_to_analytics,  # Utilise notre wrapper corrigé
             current_user=current_user,
             payload=payload,
             result=result,
             response_text=response_text[:500],  # Limiter la taille pour analytics
             processing_time_ms=processing_time,
-            confidence_score=confidence_score,  # ← Paramètre maintenant supporté
-            confidence_level=confidence_level   # ← Paramètre maintenant supporté
+            confidence_score=confidence_score,
+            confidence_level=confidence_level
         )
-        logger.info("📊 Question loggée dans analytics avec confidence")
+        logger.info("Question loggée dans analytics avec confidence")
         return True
         
     except Exception as e:
-        logger.error(f"❌ Erreur logging analytics: {e}")
-        # 🔧 AMÉLIORATION: Log plus détaillé pour debug
-        logger.error(f"❌ Analytics error details - result keys: {list(result.keys()) if isinstance(result, dict) else 'not dict'}")
-        logger.error(f"❌ Analytics error details - confidence: {result.get('confidence', 'missing') if isinstance(result, dict) else 'n/a'}")
+        logger.error(f"Erreur logging analytics: {e}")
+        # Log plus détaillé pour debug
+        logger.error(f"Analytics error details - result keys: {list(result.keys()) if isinstance(result, dict) else 'not dict'}")
+        logger.error(f"Analytics error details - confidence: {result.get('confidence', 'missing') if isinstance(result, dict) else 'n/a'}")
         raise
 
 async def execute_background_tasks_async(
@@ -340,7 +338,7 @@ async def execute_background_tasks_async(
     result: Dict[str, Any],
     start_time: float
 ) -> None:
-    """🚀 CONSERVATION INTÉGRALE: Exécute les tâches de fond en parallèle avec gestion d'erreurs renforcée"""
+    """Exécute les tâches de fond en parallèle avec gestion d'erreurs renforcée"""
     tasks = []
     
     # Tâche 1: Incrément quota (si utilisateur authentifié)
@@ -357,7 +355,7 @@ async def execute_background_tasks_async(
     # return_exceptions=True évite qu'une erreur interrompe les autres
     results = await asyncio.gather(*tasks, return_exceptions=True)
     
-    # 🔧 AMÉLIORATION: Traiter les erreurs individuellement avec plus de détails
+    # Traiter les erreurs individuellement avec plus de détails
     task_names = []
     if user_email:
         task_names.append("quota_increment")
@@ -366,14 +364,12 @@ async def execute_background_tasks_async(
     for i, task_result in enumerate(results):
         if isinstance(task_result, Exception):
             task_name = task_names[i] if i < len(task_names) else f"task_{i}"
-            logger.error(f"❌ Erreur tâche {task_name}: {task_result}")
-            logger.error(f"❌ Task {task_name} error type: {type(task_result).__name__}")
+            logger.error(f"Erreur tâche {task_name}: {task_result}")
+            logger.error(f"Task {task_name} error type: {type(task_result).__name__}")
         # Les succès sont déjà loggés dans les fonctions individuelles
 
-# ===== 🆕 NOUVELLES FONCTIONS DE DIAGNOSTIC (CONSERVÉES MAIS SIMPLIFIÉES) =====
-
 def validate_analytics_compatibility() -> Dict[str, Any]:
-    """CONSERVATION INTÉGRALE: Fonction de diagnostic pour valider la compatibilité analytics"""
+    """Fonction de diagnostic pour valider la compatibilité analytics"""
     try:
         from app.api.v1.logging import log_question_to_analytics as log_impl
         import inspect
@@ -388,6 +384,8 @@ def validate_analytics_compatibility() -> Dict[str, Any]:
             "parameters": params,
             "has_confidence": "confidence" in params,
             "has_confidence_score": "confidence_score" in params,
+            "has_email_param": "email" in params,  # AJOUT: Vérification du paramètre email
+            "has_user_email_param": "user_email" in params,  # AJOUT: Vérification de l'ancien paramètre
             "signature": str(sig)
         }
         
@@ -405,9 +403,9 @@ def validate_analytics_compatibility() -> Dict[str, Any]:
         }
 
 def get_expert_utils_status() -> Dict[str, Any]:
-    """🚨 VERSION SÉCURISÉE: Fonction de diagnostic pour vérifier l'état des utils avec info mémoire"""
+    """VERSION SÉCURISÉE: Fonction de diagnostic pour vérifier l'état des utils avec info mémoire"""
     return {
-        "version": "memory_safe_v1.0",
+        "version": "memory_safe_v1.1_fixed",  # Version mise à jour
         "numpy_available": HAS_NUMPY,
         "store_cache_size": len(_store_cache),
         "store_cache_enabled": _STORE_CACHE_ENABLED,
@@ -418,27 +416,32 @@ def get_expert_utils_status() -> Dict[str, Any]:
             "async": 3,
             "helpers": 9
         },
-        # 🚨 NOUVEAU: Informations mémoire sécurisées
+        # Informations mémoire sécurisées
         "memory_optimizations": [
             "store_cache_limited_to_1",
             "store_cache_disabled_by_default",
             "emergency_cleanup_enabled",
             "garbage_collection_forced"
-        ]
+        ],
+        # NOUVEAU: Informations sur la correction analytics
+        "analytics_fix": {
+            "parameter_corrected": "user_email -> email",
+            "fixed_in_version": "v1.1_fixed",
+            "expected_log_message": "Question loggée dans analytics avec confidence"
+        }
     }
 
-# 🚨 NOUVELLES FONCTIONS DE SÉCURITÉ MÉMOIRE
-
+# NOUVELLES FONCTIONS DE SÉCURITÉ MÉMOIRE
 def clear_store_cache():
-    """🚨 NOUVEAU: Vide le cache des PerfStore avec garbage collection"""
+    """Vide le cache des PerfStore avec garbage collection"""
     global _store_cache
     cleared_count = len(_store_cache)
     _store_cache.clear()
     gc.collect()  # Force garbage collection
-    logger.info(f"🧹 Store cache vidé: {cleared_count} stores supprimés")
+    logger.info(f"Store cache vidé: {cleared_count} stores supprimés")
 
 def get_store_cache_stats() -> Dict[str, Any]:
-    """🚨 NOUVEAU: Statistiques du cache PerfStore"""
+    """Statistiques du cache PerfStore"""
     return {
         "total_stores": len(_store_cache),
         "max_capacity": _MAX_STORE_CACHE,
