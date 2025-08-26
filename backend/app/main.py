@@ -373,20 +373,25 @@ async def lifespan(app: FastAPI):
                 logger.debug(f"📂 {name.upper()} dir entries ({len(entries)}): {entries[:10]}")
                 
                 # Chercher les fichiers requis
-                required_files = ["index.faiss", "metadata.pkl"]
+                required_files = ["index.faiss"]
                 missing_files = [f for f in required_files if f not in entries]
                 if missing_files:
                     logger.warning(f"⚠️ RAG {name.capitalize()}: Fichiers manquants {missing_files}")
                 
-                # Créer l'embedder avec la méthode corrigée
-                embedder = FastRAGEmbedder(debug=debug)
+                # CORRECTION PRINCIPALE: Utiliser index_dir dans le constructeur (comme dans les logs qui fonctionnaient)
+                embedder = FastRAGEmbedder(
+                    index_dir=path,  # RETOUR À LA MÉTHODE QUI FONCTIONNAIT
+                    debug=debug,
+                    cache_embeddings=True,
+                    max_workers=2,
+                )
                 
-                # Charger l'index
-                if embedder.load_index(path) and is_rag_functional(embedder):
+                # Tester la fonctionnalité avec notre fonction améliorée
+                if is_rag_functional(embedder):
                     _log_loaded(name, path, embedder)
                     return embedder
                 else:
-                    logger.warning(f"⚠️ RAG {name.capitalize()}: Échec chargement depuis {path}")
+                    logger.warning(f"⚠️ RAG {name.capitalize()}: Instance créée mais non fonctionnelle")
                     # Log des détails pour debug
                     if hasattr(embedder, "get_index_stats"):
                         stats = embedder.get_index_stats()
