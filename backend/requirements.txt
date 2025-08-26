@@ -1,34 +1,33 @@
-# FastAPI & HTTP
+# Core FastAPI Framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
-httpx>=0.26.0,<0.28.0
-
-# Pydantic & utilitaires
-pydantic==2.5.0
 python-multipart==0.0.6
-email-validator==2.1.0.post1
-python-dotenv==1.0.0
-typing-extensions>=4.8.0
-tenacity>=8.2.2
-psutil==5.9.5
-requests==2.31.0
-aiofiles==23.2.1
-toml==0.10.2
+pydantic==2.5.0
 
-# DB
+# Database
 psycopg2-binary>=2.9
-asyncpg>=0.29.0
-
-# OpenAI SDK v1
-openai==1.51.0
-
-# RAG
-faiss-cpu==1.8.0
-numpy==1.26.4
-
-# Supabase
 supabase==2.9.1
 
-# OPTIONNEL (ne mets que si utiles en prod)
-# pinecone>=3.0.0
-# pandas==2.2.2
+# DATA PROCESSING - CRITICAL FIX
+pandas==2.2.2  # ← CETTE LIGNE DOIT ÊTRE PRÉSENTE
+numpy==1.26.4
+
+# ML/RAG
+torch==2.2.2
+transformers==4.40.0
+sentence-transformers==2.7.0
+faiss-cpu==1.8.0
+
+# Auth/Security  
+PyJWT==2.8.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# HTTP/API
+httpx>=0.26.0,<0.28.0
+openai==1.51.0
+requests==2.31.0
+
+# Utils
+python-dotenv==1.0.0
+aiofiles==23.2.1
