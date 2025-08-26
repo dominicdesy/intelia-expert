@@ -344,20 +344,47 @@ async def lifespan(app: FastAPI):
 
         def _log_loaded(name: str, path: str, emb) -> None:
             try:
-                stats = emb.get_index_stats() if hasattr(emb, "get_index_stats") else {}
+                # Essayer différentes méthodes pour obtenir les stats
+                stats = {}
+                if hasattr(emb, "get_index_stats"):
+                    stats = emb.get_index_stats() or {}
+                elif hasattr(emb, "get_stats"):
+                    stats = emb.get_stats() or {}
+                
+                # Essayer d'obtenir les infos directement des attributs
                 n_docs = stats.get("n_docs")
+                if n_docs is None and hasattr(emb, "documents") and emb.documents:
+                    n_docs = len(emb.documents)
+                
                 faiss_total = stats.get("faiss_total")
+                if faiss_total is None and hasattr(emb, "index") and emb.index:
+                    faiss_total = emb.index.ntotal if hasattr(emb.index, "ntotal") else None
+                
                 chunks_loaded = stats.get("chunks_loaded", faiss_total)
-                dim = stats.get("embedding_dim", "unknown")
-                model = stats.get("model_name", "unknown")
+                dim = stats.get("embedding_dim", stats.get("dim"))
+                if dim is None and hasattr(emb, "embedding_dim"):
+                    dim = emb.embedding_dim
+                
+                model = stats.get("model_name", stats.get("model"))
+                if model is None and hasattr(emb, "model_name"):
+                    model = emb.model_name
+                
                 logger.info(
                     f"✅ RAG {name.capitalize()} chargé: {path} "
                     f"(docs={n_docs if n_docs is not None else 'unknown'}, "
                     f"chunks={chunks_loaded if chunks_loaded is not None else 'unknown'}, "
-                    f"dim={dim}, model={model})"
+                    f"dim={dim if dim is not None else 'unknown'}, "
+                    f"model={model if model is not None else 'unknown'})"
                 )
-            except Exception:
+                
+                # Debug : afficher les attributs disponibles si stats vides
+                if not any([n_docs, faiss_total, dim, model]):
+                    available_attrs = [attr for attr in dir(emb) if not attr.startswith('_')][:10]
+                    logger.debug(f"📊 Attributs disponibles sur {name}: {available_attrs}")
+                    
+            except Exception as e:
                 logger.info(f"✅ RAG {name.capitalize()} chargé: {path}")
+                logger.debug(f"Erreur récupération stats {name}: {e}")
 
         def _load_rag(name: str, path: str, debug: bool = False):
             """Fonction helper pour charger un RAG avec gestion d'erreurs améliorée."""
