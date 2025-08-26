@@ -1,12 +1,10 @@
 import React, { useState } from 'react'
 import { useTranslation } from '../../hooks/useTranslation'
-import { useAuthStore } from '@/lib/stores/auth' 
 import { CheckIcon } from '../../utils/icons'
 
-// ==================== MODAL LANGUE AVEC CORRECTION COMPLETE ====================
+// ==================== MODAL LANGUE - VERSION FINALE ====================
 export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
-  const { t, changeLanguage, currentLanguage } = useTranslation()
-  const { updateProfile } = useAuthStore() 
+  const { t, currentLanguage } = useTranslation()
   const [isUpdating, setIsUpdating] = useState(false)
   
   const languages = [
@@ -30,48 +28,33 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     }
   ]
 
-  const handleLanguageChange = async (languageCode: string) => {
+  const handleLanguageChange = (languageCode: string) => {
     if (languageCode === currentLanguage || isUpdating) return
 
     setIsUpdating(true)
     
-    try {
-      console.log('🔄 [LanguageModal] Début changement langue:', currentLanguage, '→', languageCode)
-      
-      // 1. Sauvegarder dans le localStorage d'abord (fallback immédiat)
-      localStorage.setItem('intelia-preferred-language', languageCode)
-      
-      // 2. Essayer de sauvegarder dans le profil (optionnel)
-      try {
-        await updateProfile({ language: languageCode } as any)
-        console.log('✅ [LanguageModal] updateProfile() terminé')
-      } catch (profileError) {
-        console.warn('⚠️ [LanguageModal] updateProfile échoué (colonne manquante), utilisation localStorage:', profileError)
-      }
-      
-      // 3. Fermer la modal
-      onClose()
-      
-      // 4. Recharger la page pour appliquer la nouvelle langue
-      setTimeout(() => {
-        window.location.reload()
-      }, 100)
-      
-    } catch (error) {
-      console.error('❌ [LanguageModal] Erreur changement langue:', error)
-      setIsUpdating(false)
-    }
+    console.log('🔄 [LanguageModal] Changement de langue:', currentLanguage, '→', languageCode)
+    
+    // 1. Sauvegarder dans localStorage (méthode la plus fiable)
+    localStorage.setItem('intelia-preferred-language', languageCode)
+    
+    // 2. Fermer la modal
+    onClose()
+    
+    // 3. Recharger la page pour appliquer la nouvelle langue
+    // C'est la seule méthode qui évite 100% des boucles React
+    window.location.reload()
   }
 
   return (
     <>
-      {/* Overlay - même style que UserInfoModal */}
+      {/* Overlay */}
       <div 
         className="fixed inset-0 bg-black bg-opacity-50 z-50" 
         onClick={onClose}
       />
       
-      {/* Modal Container - même style que UserInfoModal */}
+      {/* Modal Container */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div 
           className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
@@ -132,7 +115,7 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
                             <CheckIcon className="w-6 h-6 text-blue-600" />
                           )}
                           <span className="text-sm font-medium text-blue-600">
-                            {isUpdating ? 'Updating...' : 'Active'}
+                            {isUpdating ? 'Mise à jour...' : 'Active'}
                           </span>
                         </div>
                       )}

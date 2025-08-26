@@ -1,13 +1,13 @@
 # app/api/v1/stats_updater.py
 # -*- coding: utf-8 -*-
 """
-🚀 COLLECTEUR INTELLIGENT DE STATISTIQUES - VERSION MEMORY-SAFE
+Collecteur intelligent de statistiques - Version corrigée
 Utilise les gestionnaires existants SANS les modifier
 Collecte périodique + cache optimisé
 SAFE: Aucune rupture avec logging.py et billing.py
-✨ OPTIMISÉ: Gestion mémoire drastiquement améliorée pour DigitalOcean App Platform
-🛡️ MEMORY-SAFE: Collecte séquentielle, limites strictes, monitoring temps réel
-🔧 FIXED: Correction erreur retour 0 dans _check_feedback_columns_availability
+Optimisé: Gestion mémoire drastiquement améliorée pour DigitalOcean App Platform
+Memory-safe: Collecte séquentielle, limites strictes, monitoring temps réel
+FIXED: Correction erreur feedback columns et gestion robuste des exceptions
 """
 
 import asyncio
@@ -30,10 +30,10 @@ from app.api.v1.billing_openai import get_openai_usage_data_safe
 
 logger = logging.getLogger(__name__)
 
-# 🛡️ CONFIGURATION MEMORY-SAFE POUR UPDATER
+# Configuration memory-safe pour updater
 UPDATER_CONFIG = {
     "ENABLE_PARALLEL_COLLECTION": os.getenv("ENABLE_PARALLEL_STATS", "false").lower() == "true",
-    "MAX_MEMORY_PERCENT_COLLECTION": 70,    # Arrête si > 70% RAM pendant collecte
+    "MAX_MEMORY_PERCENT_COLLECTION": 85,    # Augmentation du seuil de 70% à 85%
     "SEQUENTIAL_DELAY_MS": 500,             # 500ms entre chaque collecteur séquentiel
     "MAX_COLLECTION_TIME_SECONDS": 120,     # Timeout global 2min
     "ENABLE_MEMORY_MONITORING": True,       # Monitoring mémoire temps réel
@@ -54,7 +54,7 @@ def should_abort_collection():
     """Détermine si la collecte doit être abandonnée pour préserver la mémoire"""
     memory_percent = get_memory_usage_percent()
     if memory_percent > UPDATER_CONFIG["MAX_MEMORY_PERCENT_COLLECTION"]:
-        logger.warning(f"🚨 Collecte abandonnée: mémoire critique ({memory_percent}%)")
+        logger.warning(f"Collecte abandonnée: mémoire critique ({memory_percent}%)")
         return True, f"Mémoire critique: {memory_percent}%"
     return False, None
 
@@ -62,15 +62,15 @@ def force_garbage_collection():
     """Force le garbage collection pour libérer la mémoire"""
     if UPDATER_CONFIG["FORCE_GC_AFTER_COLLECTION"]:
         gc.collect()
-        logger.debug("🧹 Garbage collection forcé")
+        logger.debug("Garbage collection forcé")
 
 class StatisticsUpdater:
     """
-    🛡️ Collecteur intelligent MEMORY-SAFE qui utilise les gestionnaires existants
+    Collecteur intelligent memory-safe qui utilise les gestionnaires existants
     - Met à jour le cache périodiquement avec gestion mémoire
     - Gère les erreurs et fallbacks
-    - NOUVEAU: Collecte séquentielle au lieu de parallèle (économie RAM)
-    - Support défensif pour colonnes feedback
+    - Collecte séquentielle au lieu de parallèle (économie RAM)
+    - Support défensif pour colonnes feedback CORRIGÉ
     - Monitoring mémoire temps réel
     """
     
@@ -81,7 +81,7 @@ class StatisticsUpdater:
         self.last_update = None
         self.update_in_progress = False
         
-        # 🛡️ NOUVEAU: Compteurs de performance pour monitoring
+        # Compteurs de performance pour monitoring
         self.collection_stats = {
             "total_collections": 0,
             "successful_collections": 0,
@@ -89,9 +89,9 @@ class StatisticsUpdater:
             "last_memory_peak": 0
         }
         
-        # ✅ CONSERVÉ: Vérification analytics manager
+        # Vérification analytics manager avec gestion d'erreur robuste
         if not self.analytics:
-            logger.error("❌ Analytics manager non disponible")
+            logger.error("Analytics manager non disponible")
             self._feedback_columns_available = {
                 "table_exists": False, 
                 "feedback": False, 
@@ -99,12 +99,12 @@ class StatisticsUpdater:
                 "error": "no_analytics_manager"
             }
         else:
-            # ✅ CONSERVÉ: Détection des colonnes feedback au démarrage
+            # Détection des colonnes feedback au démarrage avec exception handling
             try:
                 self._feedback_columns_available = self._check_feedback_columns_availability()
-                logger.info(f"🔍 Détection feedback au démarrage: {self._feedback_columns_available}")
+                logger.info(f"Détection feedback au démarrage: {self._feedback_columns_available}")
             except Exception as e:
-                logger.error(f"❌ Erreur détection feedback au démarrage: {e}")
+                logger.error(f"Erreur détection feedback au démarrage: {e}")
                 self._feedback_columns_available = {
                     "table_exists": False, 
                     "feedback": False, 
@@ -112,22 +112,26 @@ class StatisticsUpdater:
                     "error": str(e)
                 }
     
-    # ==================== MÉTHODES CONSERVÉES INTÉGRALEMENT ====================
-    
-    def _check_feedback_columns_availability(self) -> Dict[str, bool]:
+    def _check_feedback_columns_availability(self) -> Dict[str, Any]:
         """
-        🔍 CONSERVÉ: Vérifie la disponibilité des colonnes feedback au démarrage.
+        CORRIGÉ: Vérifie la disponibilité des colonnes feedback au démarrage.
         Cache le résultat pour éviter les vérifications répétées.
-        ✅ CORRIGÉ: Retourne toujours un dictionnaire valide
+        Retourne TOUJOURS un dictionnaire valide, jamais 0 ou autre
         """
+        default_result = {
+            "table_exists": False, 
+            "feedback": False, 
+            "feedback_comment": False
+        }
+        
         try:
             import psycopg2
             from psycopg2.extras import RealDictCursor
             
-            # ✅ CONSERVÉ: Vérifier que l'analytics manager existe et a un DSN
+            # Vérifier que l'analytics manager existe et a un DSN
             if not hasattr(self.analytics, 'dsn') or not self.analytics.dsn:
-                logger.warning("⚠️ DSN analytics non disponible - utilisation valeurs par défaut")
-                return {"table_exists": False, "feedback": False, "feedback_comment": False}
+                logger.warning("DSN analytics non disponible - utilisation valeurs par défaut")
+                return {**default_result, "error": "no_dsn"}
             
             with psycopg2.connect(self.analytics.dsn) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -144,8 +148,8 @@ class StatisticsUpdater:
                     table_exists = cur.fetchone()[0]
                     
                     if not table_exists:
-                        logger.warning("⚠️ Table user_questions_complete n'existe pas")
-                        return {"table_exists": False, "feedback": False, "feedback_comment": False}
+                        logger.warning("Table user_questions_complete n'existe pas")
+                        return {**default_result, "error": "table_missing"}
                     
                     # Vérifier les colonnes feedback
                     cur.execute("""
@@ -163,31 +167,27 @@ class StatisticsUpdater:
                         "feedback_comment": "feedback_comment" in available_columns
                     }
                     
-                    logger.info(f"🔍 Détection colonnes feedback: {result}")
+                    logger.info(f"Détection colonnes feedback: {result}")
                     return result
                     
         except ImportError as import_err:
-            logger.error(f"❌ Module psycopg2 non disponible: {import_err}")
+            logger.error(f"Module psycopg2 non disponible: {import_err}")
             return {
-                "table_exists": False, 
-                "feedback": False, 
-                "feedback_comment": False, 
+                **default_result,
                 "error": "psycopg2_missing"
             }
             
         except Exception as e:
-            # ✅ CORRIGÉ: Retourner un dictionnaire valide au lieu de 0
-            logger.error(f"❌ Erreur vérification colonnes feedback: {e}")
+            # CORRIGÉ: Retourner un dictionnaire valide au lieu de 0
+            logger.error(f"Erreur vérification colonnes feedback: {e}")
             return {
-                "table_exists": False, 
-                "feedback": False, 
-                "feedback_comment": False,
+                **default_result,
                 "error": str(e)[:100]  # Limiter la taille de l'erreur
             }
     
     def diagnose_database_connection(self) -> Dict[str, Any]:
         """
-        🔧 CONSERVÉ: Diagnostique complet de la connection base de données
+        Diagnostique complet de la connection base de données
         """
         try:
             diagnosis = {
@@ -272,7 +272,7 @@ class StatisticsUpdater:
 
     async def create_missing_tables(self) -> Dict[str, Any]:
         """
-        🛠️ CONSERVÉ: Crée automatiquement les tables manquantes
+        Crée automatiquement les tables manquantes
         """
         try:
             if not hasattr(self.analytics, 'dsn') or not self.analytics.dsn:
@@ -300,7 +300,7 @@ class StatisticsUpdater:
                     """)
                     
                     if not cur.fetchone()[0]:
-                        logger.info("🔧 Création table user_questions_complete...")
+                        logger.info("Création table user_questions_complete...")
                         
                         create_table_sql = """
                         CREATE TABLE user_questions_complete (
@@ -337,7 +337,7 @@ class StatisticsUpdater:
                         
                         conn.commit()
                         results["tables_created"].append("user_questions_complete")
-                        logger.info("✅ Table user_questions_complete créée avec succès")
+                        logger.info("Table user_questions_complete créée avec succès")
                     
                     else:
                         # Vérifier si colonnes feedback existent, les ajouter si nécessaire
@@ -356,7 +356,7 @@ class StatisticsUpdater:
                                 ADD COLUMN feedback INTEGER CHECK (feedback IN (-1, 0, 1))
                             """)
                             results["tables_updated"].append("user_questions_complete: ajout colonne feedback")
-                            logger.info("✅ Colonne feedback ajoutée")
+                            logger.info("Colonne feedback ajoutée")
                         
                         if "feedback_comment" not in existing_feedback_cols:
                             cur.execute("""
@@ -364,7 +364,7 @@ class StatisticsUpdater:
                                 ADD COLUMN feedback_comment TEXT
                             """)
                             results["tables_updated"].append("user_questions_complete: ajout colonne feedback_comment")
-                            logger.info("✅ Colonne feedback_comment ajoutée")
+                            logger.info("Colonne feedback_comment ajoutée")
                         
                         if results["tables_updated"]:
                             conn.commit()
@@ -380,19 +380,17 @@ class StatisticsUpdater:
             }
             
         except Exception as e:
-            logger.error(f"❌ Erreur création tables: {e}")
+            logger.error(f"Erreur création tables: {e}")
             return {"status": "error", "error": str(e)}
-
-    # ==================== FONCTION PRINCIPALE OPTIMISÉE ====================
 
     async def update_all_statistics(self) -> Dict[str, Any]:
         """
-        🎯 FONCTION PRINCIPALE - MEMORY-SAFE VERSION
+        Fonction principale - memory-safe version
         Met à jour toutes les statistiques avec gestion mémoire optimisée
-        🛡️ NOUVEAU: Collecte séquentielle au lieu de parallèle pour économiser RAM
+        Collecte séquentielle au lieu de parallèle pour économiser RAM
         """
         if self.update_in_progress:
-            logger.warning("⏳ Mise à jour déjà en cours, skip")
+            logger.warning("Mise à jour déjà en cours, skip")
             return {"status": "skipped", "reason": "update_in_progress"}
         
         start_time = time.time()
@@ -400,9 +398,9 @@ class StatisticsUpdater:
         self.update_in_progress = True
         
         try:
-            logger.info(f"🚀 Début mise à jour MEMORY-SAFE (RAM: {start_memory}%)")
+            logger.info(f"Début mise à jour memory-safe (RAM: {start_memory}%)")
             
-            # 🛡️ Vérification mémoire préliminaire
+            # Vérification mémoire préliminaire
             should_abort, abort_reason = should_abort_collection()
             if should_abort:
                 self.collection_stats["memory_aborts"] += 1
@@ -412,7 +410,7 @@ class StatisticsUpdater:
                     "memory_percent": start_memory
                 }
             
-            # 🔄 COLLECTE SÉQUENTIELLE OPTIMISÉE (au lieu de parallèle)
+            # Collecte séquentielle optimisée (au lieu de parallèle)
             results = []
             successful_updates = 0
             errors = []
@@ -429,21 +427,21 @@ class StatisticsUpdater:
                     # Vérification mémoire avant chaque collecteur
                     current_memory = get_memory_usage_percent()
                     if current_memory > UPDATER_CONFIG["MAX_MEMORY_PERCENT_COLLECTION"]:
-                        logger.warning(f"🚨 Arrêt anticipé à {update_name}: mémoire {current_memory}%")
+                        logger.warning(f"Arrêt anticipé à {update_name}: mémoire {current_memory}%")
                         errors.append(f"{update_name}: Arrêt mémoire critique ({current_memory}%)")
                         break
                     
-                    logger.info(f"🔄 Collecte {update_name}... (RAM: {current_memory}%)")
+                    logger.info(f"Collecte {update_name}... (RAM: {current_memory}%)")
                     
                     result = await update_method()
                     
                     if isinstance(result, Exception):
                         error_msg = f"{update_name}: {str(result)}"
                         errors.append(error_msg)
-                        logger.error(f"❌ Erreur {update_name}: {result}")
+                        logger.error(f"Erreur {update_name}: {result}")
                     elif result.get("status") == "success":
                         successful_updates += 1
-                        logger.info(f"✅ {update_name}: OK")
+                        logger.info(f"{update_name}: OK")
                     else:
                         errors.append(f"{update_name}: {result.get('error', 'Unknown error')}")
                     
@@ -458,15 +456,15 @@ class StatisticsUpdater:
                 except Exception as method_error:
                     error_msg = f"{update_name}: Exception {str(method_error)}"
                     errors.append(error_msg)
-                    logger.error(f"❌ Exception {update_name}: {method_error}")
+                    logger.error(f"Exception {update_name}: {method_error}")
                     results.append({"status": "error", "error": str(method_error)})
             
             # Nettoyer le cache expiré
             try:
                 cleaned_entries = self.cache.cleanup_expired_cache()
-                logger.info(f"🧹 Cache nettoyé: {cleaned_entries} entrées supprimées")
+                logger.info(f"Cache nettoyé: {cleaned_entries} entrées supprimées")
             except Exception as cleanup_error:
-                logger.warning(f"⚠️ Erreur cleanup cache: {cleanup_error}")
+                logger.warning(f"Erreur cleanup cache: {cleanup_error}")
             
             # Garbage collection final
             force_garbage_collection()
@@ -508,13 +506,13 @@ class StatisticsUpdater:
                 source="stats_updater_safe"
             )
             
-            logger.info(f"✅ Mise à jour terminée SAFE: {successful_updates}/{len(update_methods)} succès en {duration_ms}ms (RAM: {start_memory}%→{end_memory}%)")
+            logger.info(f"Mise à jour terminée safe: {successful_updates}/{len(update_methods)} succès en {duration_ms}ms (RAM: {start_memory}%→{end_memory}%)")
             return result
             
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
             end_memory = get_memory_usage_percent()
-            logger.error(f"💥 Erreur critique mise à jour SAFE: {e}")
+            logger.error(f"Erreur critique mise à jour safe: {e}")
             
             return {
                 "status": "failed",
@@ -531,35 +529,66 @@ class StatisticsUpdater:
         finally:
             self.update_in_progress = False
 
-    # ==================== MÉTHODES DE COLLECTE OPTIMISÉES ====================
-
     async def _get_feedback_stats_safe(self, cur) -> Dict[str, Any]:
         """
-        🛡️ CONSERVÉ: Collecte feedback stats avec vérification défensive des colonnes
+        CORRIGÉ: Collecte feedback stats avec vérification défensive stricte des colonnes
         Compatible avec toutes les configurations de base de données
+        Ne doit JAMAIS exécuter de requête SQL avec colonnes manquantes
         """
+        default_feedback_result = {
+            "total": 0, 
+            "positive": 0, 
+            "negative": 0, 
+            "with_comments": 0, 
+            "satisfaction_rate": 0.0
+        }
+        
         try:
-            # Utiliser le cache de détection des colonnes
-            if not self._feedback_columns_available["table_exists"]:
-                logger.warning("⚠️ Table user_questions_complete manquante - pas de feedback")
+            # VALIDATION 1: Vérifier que la table existe
+            if not self._feedback_columns_available.get("table_exists", False):
+                logger.warning("Table user_questions_complete manquante - pas de feedback")
                 return {
-                    "total": 0, "positive": 0, "negative": 0, 
-                    "with_comments": 0, "satisfaction_rate": 0.0,
+                    **default_feedback_result,
                     "note": "Table user_questions_complete manquante"
                 }
             
-            has_feedback = self._feedback_columns_available["feedback"]
-            has_feedback_comment = self._feedback_columns_available["feedback_comment"]
+            # VALIDATION 2: Vérifier que la colonne feedback existe
+            has_feedback = self._feedback_columns_available.get("feedback", False)
+            has_feedback_comment = self._feedback_columns_available.get("feedback_comment", False)
             
             if not has_feedback:
-                logger.info("ℹ️ Colonne feedback non disponible - stats feedback désactivées")
+                logger.info("Colonne feedback non disponible - stats feedback désactivées")
                 return {
-                    "total": 0, "positive": 0, "negative": 0, 
-                    "with_comments": 0, "satisfaction_rate": 0.0,
-                    "note": "Migration feedback requise - colonnes manquantes"
+                    **default_feedback_result,
+                    "note": "Migration feedback requise - colonne feedback manquante"
                 }
             
-            # ✅ Colonnes feedback disponibles - construire requête dynamique
+            # VALIDATION 3: Double vérification avant requête SQL
+            # Re-vérifier en temps réel la disponibilité des colonnes
+            try:
+                cur.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'user_questions_complete' 
+                    AND column_name = 'feedback'
+                """)
+                
+                column_check = cur.fetchall()
+                if not column_check:
+                    logger.warning("Double vérification: colonne feedback non trouvée")
+                    return {
+                        **default_feedback_result,
+                        "note": "Colonne feedback non trouvée lors de la double vérification"
+                    }
+                
+            except Exception as double_check_error:
+                logger.error(f"Erreur double vérification colonnes: {double_check_error}")
+                return {
+                    **default_feedback_result,
+                    "error": f"Double vérification échouée: {str(double_check_error)[:50]}"
+                }
+            
+            # REQUÊTE SQL SÉCURISÉE: Colonnes feedback disponibles confirmées
             query = """
                 SELECT 
                     COUNT(*) FILTER (WHERE feedback = 1) as positive_feedback,
@@ -572,7 +601,7 @@ class StatisticsUpdater:
             else:
                 query += ",\n                    0 as feedback_with_comments"
                 
-            # 🛡️ OPTIMISÉ: Limiter la plage de dates pour économiser mémoire
+            # Limiter la plage de dates pour économiser mémoire
             query += f"""
                 FROM user_questions_complete 
                 WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
@@ -595,23 +624,22 @@ class StatisticsUpdater:
                     "satisfaction_rate": round(satisfaction_rate, 1)
                 }
                 
-                logger.info(f"📊 Feedback stats collectées SAFE: {total_fb} total, {satisfaction_rate}% satisfaction")
+                logger.info(f"Feedback stats collectées safe: {total_fb} total, {satisfaction_rate}% satisfaction")
                 return feedback_stats
             
-            return {"total": 0, "positive": 0, "negative": 0, "with_comments": 0, "satisfaction_rate": 0.0}
+            return default_feedback_result
             
         except Exception as e:
-            logger.error(f"❌ Erreur collecte feedback safe: {e}")
+            logger.error(f"Erreur collecte feedback safe: {e}")
             return {
-                "total": 0, "positive": 0, "negative": 0, 
-                "with_comments": 0, "satisfaction_rate": 0.0,
+                **default_feedback_result,
                 "error": str(e)[:100]  # Limiter la longueur de l'erreur
             }
 
     async def _update_dashboard_stats_safe(self) -> Dict[str, Any]:
-        """🛡️ OPTIMISÉ: Collecte dashboard stats avec gestion mémoire"""
+        """Collecte dashboard stats avec gestion mémoire optimisée"""
         try:
-            logger.info("📊 Collecte dashboard stats SAFE...")
+            logger.info("Collecte dashboard stats safe...")
             
             # Vérification mémoire avant requêtes lourdes
             memory_before = get_memory_usage_percent()
@@ -623,7 +651,7 @@ class StatisticsUpdater:
             
             dashboard_data = {}
             
-            # 🛡️ OPTIMISÉ: Analytics serveur via logging.py (si pas skip)
+            # Analytics serveur via logging.py (si pas skip)
             if not UPDATER_CONFIG["SKIP_HEAVY_ANALYTICS"]:
                 try:
                     from app.api.v1.logging import get_server_analytics
@@ -637,116 +665,133 @@ class StatisticsUpdater:
                         })
                     
                 except Exception as server_error:
-                    logger.warning(f"⚠️ Erreur récupération server stats SAFE: {server_error}")
+                    logger.warning(f"Erreur récupération server stats safe: {server_error}")
             
-            # 🛡️ OPTIMISÉ: Requêtes DB avec limites strictes
-            import psycopg2
-            from psycopg2.extras import RealDictCursor
-            
-            with psycopg2.connect(self.analytics.dsn) as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    
-                    # 🛡️ Requête principale avec LIMIT pour économie mémoire
-                    limit = UPDATER_CONFIG["MAX_SQL_ROWS_PER_QUERY"]
-                    cur.execute(f"""
-                        SELECT 
-                            COUNT(DISTINCT user_email) FILTER (WHERE user_email IS NOT NULL AND user_email != '') as total_users,
-                            COUNT(*) as total_questions,
-                            COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE) as questions_today,
-                            COUNT(*) FILTER (WHERE created_at >= DATE_TRUNC('week', CURRENT_DATE)) as questions_this_week,
-                            COUNT(*) FILTER (WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)) as questions_this_month,
-                            AVG(processing_time_ms) FILTER (WHERE processing_time_ms > 0) / 1000 as avg_response_time_calc,
-                            AVG(response_confidence) FILTER (WHERE response_confidence IS NOT NULL) * 100 as avg_confidence
-                        FROM (
-                            SELECT * FROM user_questions_complete 
-                            WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
-                            ORDER BY created_at DESC
-                            LIMIT {limit}
-                        ) recent_questions
-                    """)
-                    
-                    stats_result = cur.fetchone()
-                    if stats_result:
-                        dashboard_data.update({
-                            "total_users": min(stats_result["total_users"] or 0, 10000),  # Cap arbitraire
-                            "unique_active_users": min(stats_result["total_users"] or 0, 10000),
-                            "total_questions": min(stats_result["total_questions"] or 0, 50000),
-                            "questions_today": stats_result["questions_today"] or 0,
-                            "questions_this_week": stats_result["questions_this_week"] or 0,
-                            "questions_this_month": stats_result["questions_this_month"] or 0,
-                            "avg_confidence": round(stats_result["avg_confidence"] or 0, 1)
-                        })
+            # Requêtes DB avec limites strictes et gestion d'erreur robuste
+            try:
+                import psycopg2
+                from psycopg2.extras import RealDictCursor
+                
+                with psycopg2.connect(self.analytics.dsn) as conn:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cur:
                         
-                        if not dashboard_data.get("avg_response_time"):
-                            dashboard_data["avg_response_time"] = round(stats_result["avg_response_time_calc"] or 0, 3)
-                    
-                    # 🛡️ Distribution sources (version limitée)
-                    if UPDATER_CONFIG["REDUCE_DATASET_SIZE"]:
+                        # Requête principale avec LIMIT pour économie mémoire
+                        limit = UPDATER_CONFIG["MAX_SQL_ROWS_PER_QUERY"]
                         cur.execute(f"""
-                            SELECT response_source, COUNT(*) as count
+                            SELECT 
+                                COUNT(DISTINCT user_email) FILTER (WHERE user_email IS NOT NULL AND user_email != '') as total_users,
+                                COUNT(*) as total_questions,
+                                COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE) as questions_today,
+                                COUNT(*) FILTER (WHERE created_at >= DATE_TRUNC('week', CURRENT_DATE)) as questions_this_week,
+                                COUNT(*) FILTER (WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)) as questions_this_month,
+                                AVG(processing_time_ms) FILTER (WHERE processing_time_ms > 0) / 1000 as avg_response_time_calc,
+                                AVG(response_confidence) FILTER (WHERE response_confidence IS NOT NULL) * 100 as avg_confidence
                             FROM (
-                                SELECT response_source FROM user_questions_complete 
-                                WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
-                                LIMIT {limit // 2}
-                            ) recent_sources
-                            GROUP BY response_source
-                            ORDER BY count DESC
+                                SELECT * FROM user_questions_complete 
+                                WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+                                ORDER BY created_at DESC
+                                LIMIT {limit}
+                            ) recent_questions
+                        """)
+                        
+                        stats_result = cur.fetchone()
+                        if stats_result:
+                            dashboard_data.update({
+                                "total_users": min(stats_result["total_users"] or 0, 10000),  # Cap arbitraire
+                                "unique_active_users": min(stats_result["total_users"] or 0, 10000),
+                                "total_questions": min(stats_result["total_questions"] or 0, 50000),
+                                "questions_today": stats_result["questions_today"] or 0,
+                                "questions_this_week": stats_result["questions_this_week"] or 0,
+                                "questions_this_month": stats_result["questions_this_month"] or 0,
+                                "avg_confidence": round(stats_result["avg_confidence"] or 0, 1)
+                            })
+                            
+                            if not dashboard_data.get("avg_response_time"):
+                                dashboard_data["avg_response_time"] = round(stats_result["avg_response_time_calc"] or 0, 3)
+                        
+                        # Distribution sources (version limitée)
+                        if UPDATER_CONFIG["REDUCE_DATASET_SIZE"]:
+                            cur.execute(f"""
+                                SELECT response_source, COUNT(*) as count
+                                FROM (
+                                    SELECT response_source FROM user_questions_complete 
+                                    WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
+                                    LIMIT {limit // 2}
+                                ) recent_sources
+                                GROUP BY response_source
+                                ORDER BY count DESC
+                                LIMIT 10
+                            """)
+                        else:
+                            # Version originale conservée
+                            cur.execute("""
+                                SELECT response_source, COUNT(*) as count
+                                FROM user_questions_complete 
+                                WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+                                GROUP BY response_source
+                                ORDER BY count DESC
+                            """)
+                        
+                        source_dist = {}
+                        for row in cur.fetchall():
+                            source_name = row["response_source"] or "unknown"
+                            if source_name == "rag":
+                                source_dist["rag_retriever"] = row["count"]
+                            elif source_name == "openai_fallback":
+                                source_dist["openai_fallback"] = row["count"]
+                            elif source_name in ["table_lookup", "perfstore"]:
+                                source_dist["perfstore"] = source_dist.get("perfstore", 0) + row["count"]
+                            else:
+                                source_dist[source_name] = row["count"]
+                        
+                        dashboard_data["source_distribution"] = source_dist
+                        
+                        # Top utilisateurs (version limitée)
+                        cur.execute(f"""
+                            SELECT 
+                                user_email,
+                                COUNT(*) as question_count,
+                                'free' as plan
+                            FROM (
+                                SELECT user_email FROM user_questions_complete 
+                                WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+                                    AND user_email IS NOT NULL 
+                                    AND user_email != ''
+                                LIMIT {limit}
+                            ) recent_users
+                            GROUP BY user_email
+                            ORDER BY question_count DESC
                             LIMIT 10
                         """)
-                    else:
-                        # Version originale conservée
-                        cur.execute("""
-                            SELECT response_source, COUNT(*) as count
-                            FROM user_questions_complete 
-                            WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
-                            GROUP BY response_source
-                            ORDER BY count DESC
-                        """)
-                    
-                    source_dist = {}
-                    for row in cur.fetchall():
-                        source_name = row["response_source"] or "unknown"
-                        if source_name == "rag":
-                            source_dist["rag_retriever"] = row["count"]
-                        elif source_name == "openai_fallback":
-                            source_dist["openai_fallback"] = row["count"]
-                        elif source_name in ["table_lookup", "perfstore"]:
-                            source_dist["perfstore"] = source_dist.get("perfstore", 0) + row["count"]
-                        else:
-                            source_dist[source_name] = row["count"]
-                    
-                    dashboard_data["source_distribution"] = source_dist
-                    
-                    # 🛡️ Top utilisateurs (version limitée)
-                    cur.execute(f"""
-                        SELECT 
-                            user_email,
-                            COUNT(*) as question_count,
-                            'free' as plan
-                        FROM (
-                            SELECT user_email FROM user_questions_complete 
-                            WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
-                                AND user_email IS NOT NULL 
-                                AND user_email != ''
-                            LIMIT {limit}
-                        ) recent_users
-                        GROUP BY user_email
-                        ORDER BY question_count DESC
-                        LIMIT 10
-                    """)
-                    
-                    top_users = []
-                    for row in cur.fetchall()[:5]:  # Max 5 pour économiser mémoire
-                        top_users.append({
-                            "email": row["user_email"][:50],  # Tronquer email long
-                            "question_count": row["question_count"],
-                            "plan": row["plan"]
-                        })
-                    
-                    dashboard_data["top_users"] = top_users
-                    
-                    # 🛡️ Stats feedback défensives
-                    dashboard_data["feedback_stats"] = await self._get_feedback_stats_safe(cur)
+                        
+                        top_users = []
+                        for row in cur.fetchall()[:5]:  # Max 5 pour économiser mémoire
+                            top_users.append({
+                                "email": row["user_email"][:50],  # Tronquer email long
+                                "question_count": row["question_count"],
+                                "plan": row["plan"]
+                            })
+                        
+                        dashboard_data["top_users"] = top_users
+                        
+                        # Stats feedback défensives CORRIGÉES
+                        dashboard_data["feedback_stats"] = await self._get_feedback_stats_safe(cur)
+                
+            except Exception as db_error:
+                logger.error(f"Erreur requêtes base de données dashboard: {db_error}")
+                # Continuer avec des valeurs par défaut
+                dashboard_data.update({
+                    "total_users": 0,
+                    "unique_active_users": 0, 
+                    "total_questions": 0,
+                    "questions_today": 0,
+                    "questions_this_week": 0,
+                    "questions_this_month": 0,
+                    "avg_confidence": 0,
+                    "source_distribution": {},
+                    "top_users": [],
+                    "feedback_stats": {"total": 0, "positive": 0, "negative": 0, "with_comments": 0, "satisfaction_rate": 0.0}
+                })
             
             # Données billing (version simplifiée)
             billing_summary = {
@@ -772,17 +817,17 @@ class StatisticsUpdater:
             self.cache.set_cache("dashboard:main", dashboard_data, ttl_hours=1, source="analytics_computed_safe")
             
             memory_after = get_memory_usage_percent()
-            logger.info(f"✅ Dashboard stats collectées SAFE: {len(dashboard_data)} métriques (RAM: {memory_before}%→{memory_after}%)")
+            logger.info(f"Dashboard stats collectées safe: {len(dashboard_data)} métriques (RAM: {memory_before}%→{memory_after}%)")
             return {"status": "success", "metrics_collected": len(dashboard_data)}
             
         except Exception as e:
-            logger.error(f"❌ Erreur collecte dashboard stats SAFE: {e}")
+            logger.error(f"Erreur collecte dashboard stats safe: {e}")
             return {"status": "error", "error": str(e)}
 
     async def _update_openai_costs_safe(self) -> Dict[str, Any]:
-        """🛡️ OPTIMISÉ: Collecte coûts OpenAI avec gestion mémoire"""
+        """Collecte coûts OpenAI avec gestion mémoire"""
         try:
-            logger.info("💰 Collecte coûts OpenAI SAFE...")
+            logger.info("Collecte coûts OpenAI safe...")
             
             # Période plus courte pour économiser API calls
             end_date = datetime.now()
@@ -808,7 +853,7 @@ class StatisticsUpdater:
             self.cache.set_openai_costs(start_str, end_str, "week", costs_data)
             self.cache.set_cache("openai:costs:current", costs_data, ttl_hours=4, source="openai_api_safe")
             
-            logger.info(f"💰 Coûts OpenAI collectés SAFE: ${costs_data.get('total_cost', 0):.2f}")
+            logger.info(f"Coûts OpenAI collectés safe: ${costs_data.get('total_cost', 0):.2f}")
             return {
                 "status": "success", 
                 "total_cost": costs_data.get('total_cost', 0),
@@ -817,7 +862,7 @@ class StatisticsUpdater:
             }
             
         except Exception as e:
-            logger.error(f"❌ Erreur collecte coûts OpenAI SAFE: {e}")
+            logger.error(f"Erreur collecte coûts OpenAI safe: {e}")
             
             # Fallback
             fallback_data = {
@@ -826,16 +871,16 @@ class StatisticsUpdater:
                 "api_calls": 250,
                 "models_usage": {"gpt-4": {"cost": 4.20}, "gpt-3.5-turbo": {"cost": 2.10}},
                 "data_source": "fallback_safe",
-                "note": f"Erreur API OpenAI SAFE: {str(e)[:100]}"
+                "note": f"Erreur API OpenAI safe: {str(e)[:100]}"
             }
             
             self.cache.set_cache("openai:costs:fallback", fallback_data, ttl_hours=1, source="fallback_safe")
             return {"status": "fallback", "error": str(e)[:100], "fallback_cost": 6.30}
 
     async def _update_invitation_stats_safe(self) -> Dict[str, Any]:
-        """🛡️ OPTIMISÉ: Collecte stats invitations avec gestion mémoire"""
+        """Collecte stats invitations avec gestion mémoire"""
         try:
-            logger.info("📧 Collecte stats invitations SAFE...")
+            logger.info("Collecte stats invitations safe...")
             
             import psycopg2
             from psycopg2.extras import RealDictCursor
@@ -859,10 +904,10 @@ class StatisticsUpdater:
                             "unique_inviters": 0,
                             "top_inviters_by_sent": [],
                             "top_inviters_by_accepted": [],
-                            "note": "Table invitations non trouvée SAFE"
+                            "note": "Table invitations non trouvée safe"
                         }
                     else:
-                        # 🛡️ Requêtes avec LIMIT pour économie mémoire
+                        # Requêtes avec LIMIT pour économie mémoire
                         limit = UPDATER_CONFIG["MAX_SQL_ROWS_PER_QUERY"]
                         
                         cur.execute(f"""
@@ -914,17 +959,17 @@ class StatisticsUpdater:
             
             self.cache.set_cache("invitations:global_stats", invitation_data, ttl_hours=2, source="computed_safe")
             
-            logger.info(f"📧 Stats invitations collectées SAFE: {invitation_data['total_invitations_sent']} sent")
+            logger.info(f"Stats invitations collectées safe: {invitation_data['total_invitations_sent']} sent")
             return {"status": "success", "invitations_processed": invitation_data["total_invitations_sent"]}
             
         except Exception as e:
-            logger.error(f"❌ Erreur collecte stats invitations SAFE: {e}")
+            logger.error(f"Erreur collecte stats invitations safe: {e}")
             return {"status": "error", "error": str(e)[:100]}
 
     async def _update_server_performance_safe(self) -> Dict[str, Any]:
-        """🛡️ OPTIMISÉ: Collecte performance serveur avec gestion mémoire"""
+        """Collecte performance serveur avec gestion mémoire"""
         try:
-            logger.info("⚡ Collecte performance serveur SAFE...")
+            logger.info("Collecte performance serveur safe...")
             
             performance_data = {}
             
@@ -993,7 +1038,7 @@ class StatisticsUpdater:
             
             self.cache.set_cache("server:performance:24h", performance_data, ttl_hours=1, source="computed_safe")
             
-            logger.info(f"⚡ Performance serveur collectée SAFE: {performance_data['current_status']['overall_health']}")
+            logger.info(f"Performance serveur collectée safe: {performance_data['current_status']['overall_health']}")
             return {
                 "status": "success", 
                 "health": performance_data["current_status"]["overall_health"],
@@ -1001,13 +1046,11 @@ class StatisticsUpdater:
             }
             
         except Exception as e:
-            logger.error(f"❌ Erreur collecte performance SAFE: {e}")
+            logger.error(f"Erreur collecte performance safe: {e}")
             return {"status": "error", "error": str(e)[:100]}
 
-    # ==================== MÉTHODES CONSERVÉES INTÉGRALEMENT ====================
-    
     def get_update_status(self) -> Dict[str, Any]:
-        """CONSERVÉ: Retourne le statut de la dernière mise à jour"""
+        """Retourne le statut de la dernière mise à jour"""
         try:
             # Récupérer depuis le cache
             cached_summary = self.cache.get_cache("system:last_update_summary")
@@ -1026,13 +1069,13 @@ class StatisticsUpdater:
                 }
                 
         except Exception as e:
-            logger.error(f"❌ Erreur récupération statut: {e}")
+            logger.error(f"Erreur récupération statut: {e}")
             return {"status": "error", "error": str(e)}
 
     async def force_update_specific(self, component: str) -> Dict[str, Any]:
-        """CONSERVÉ: Force la mise à jour d'un composant spécifique"""
+        """Force la mise à jour d'un composant spécifique"""
         try:
-            logger.info(f"🔄 Force update SAFE: {component}")
+            logger.info(f"Force update safe: {component}")
             
             if component == "dashboard":
                 result = await self._update_dashboard_stats_safe()
@@ -1045,20 +1088,20 @@ class StatisticsUpdater:
             else:
                 return {"status": "error", "error": f"Composant '{component}' inconnu"}
             
-            logger.info(f"✅ Force update SAFE {component}: {result['status']}")
+            logger.info(f"Force update safe {component}: {result['status']}")
             return result
             
         except Exception as e:
-            logger.error(f"❌ Erreur force update SAFE {component}: {e}")
+            logger.error(f"Erreur force update safe {component}: {e}")
             return {"status": "error", "error": str(e)}
 
     def refresh_feedback_detection(self) -> Dict[str, Any]:
         """
-        CONSERVÉ: Actualise la détection des colonnes feedback
+        Actualise la détection des colonnes feedback
         Utile après une migration ou modification de schéma
         """
         try:
-            logger.info("🔄 Actualisation détection colonnes feedback...")
+            logger.info("Actualisation détection colonnes feedback...")
             old_status = self._feedback_columns_available.copy()
             self._feedback_columns_available = self._check_feedback_columns_availability()
             
@@ -1071,20 +1114,18 @@ class StatisticsUpdater:
             }
             
             if result["changes_detected"]:
-                logger.info(f"🔄 Changements détectés dans les colonnes feedback: {result['new_detection']}")
+                logger.info(f"Changements détectés dans les colonnes feedback: {result['new_detection']}")
             else:
-                logger.info("ℹ️ Aucun changement détecté dans les colonnes feedback")
+                logger.info("Aucun changement détecté dans les colonnes feedback")
             
             return result
             
         except Exception as e:
-            logger.error(f"❌ Erreur refresh feedback detection: {e}")
+            logger.error(f"Erreur refresh feedback detection: {e}")
             return {"status": "error", "error": str(e)}
 
-    # 🆕 NOUVELLES MÉTHODES POUR GESTION MÉMOIRE
-    
     def get_memory_stats(self) -> Dict[str, Any]:
-        """🆕 Retourne les statistiques mémoire et de performance"""
+        """Retourne les statistiques mémoire et de performance"""
         try:
             return {
                 "system_memory_percent": get_memory_usage_percent(),
@@ -1097,14 +1138,14 @@ class StatisticsUpdater:
             return {"error": str(e)}
 
     def toggle_parallel_collection(self, enable: bool = None) -> Dict[str, Any]:
-        """🆕 Active/désactive la collecte parallèle"""
+        """Active/désactive la collecte parallèle"""
         try:
             if enable is None:
                 enable = not UPDATER_CONFIG["ENABLE_PARALLEL_COLLECTION"]
             
             UPDATER_CONFIG["ENABLE_PARALLEL_COLLECTION"] = enable
             
-            logger.info(f"🔧 Collecte parallèle: {'activée' if enable else 'désactivée'}")
+            logger.info(f"Collecte parallèle: {'activée' if enable else 'désactivée'}")
             
             return {
                 "status": "success",
@@ -1116,38 +1157,34 @@ class StatisticsUpdater:
             return {"status": "error", "error": str(e)}
 
 
-# ==================== SINGLETON GLOBAL (CONSERVÉ) ====================
-
+# Singleton global 
 _stats_updater_instance = None
 
 def get_stats_updater() -> StatisticsUpdater:
-    """CONSERVÉ: Récupère l'instance singleton du collecteur"""
+    """Récupère l'instance singleton du collecteur"""
     global _stats_updater_instance
     if _stats_updater_instance is None:
         _stats_updater_instance = StatisticsUpdater()
     return _stats_updater_instance
 
-# ==================== FONCTIONS UTILITAIRES (CONSERVÉES) ====================
-
+# Fonctions utilitaires
 async def run_update_cycle():
-    """CONSERVÉ: Fonction helper pour le scheduler"""
+    """Fonction helper pour le scheduler"""
     updater = get_stats_updater()
     return await updater.update_all_statistics()
 
 async def force_update_all():
-    """CONSERVÉ: Force une mise à jour immédiate (pour admin)"""
+    """Force une mise à jour immédiate (pour admin)"""
     updater = get_stats_updater()
     return await updater.update_all_statistics()
 
 def refresh_feedback_columns():
-    """CONSERVÉ: Force la re-détection des colonnes feedback"""
+    """Force la re-détection des colonnes feedback"""
     updater = get_stats_updater()
     return updater.refresh_feedback_detection()
 
-# 🆕 NOUVELLES FONCTIONS UTILITAIRES MEMORY-SAFE
-
 def get_updater_memory_stats():
-    """🆕 Statistiques mémoire globales du updater"""
+    """Statistiques mémoire globales du updater"""
     try:
         updater = get_stats_updater()
         return updater.get_memory_stats()
@@ -1155,12 +1192,12 @@ def get_updater_memory_stats():
         return {"error": str(e), "system_memory_percent": get_memory_usage_percent()}
 
 def toggle_heavy_analytics(skip: bool = None):
-    """🆕 Active/désactive les analytics lourdes"""
+    """Active/désactive les analytics lourdes"""
     if skip is None:
         skip = not UPDATER_CONFIG["SKIP_HEAVY_ANALYTICS"]
     
     UPDATER_CONFIG["SKIP_HEAVY_ANALYTICS"] = skip
-    logger.info(f"🔧 Heavy analytics: {'désactivées' if skip else 'activées'}")
+    logger.info(f"Heavy analytics: {'désactivées' if skip else 'activées'}")
     
     return {
         "status": "success",
