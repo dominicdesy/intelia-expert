@@ -1179,18 +1179,28 @@ class StatisticsCache:
                                 # FIXED: Debug spécial pour cache legacy isolé
                                 if stat_key == 'legacy_dashboard' and stats[stat_key]['valid'] > 0:
                                     # Vérifier pourquoi cette table a des données alors que les autres sont vides
-                                    cur.execute(f"""
-                                        SELECT created_at, expires_at, 
-                                               NOW() as current_time,
-                                               expires_at > NOW() as is_valid
-                                        FROM {table_name} 
-                                        WHERE created_at > NOW() - INTERVAL '24 hours'
-                                        ORDER BY created_at DESC LIMIT 3
-                                    """)
-                                    recent_entries = cur.fetchall()
-                                    logger.info(f"CACHE LEGACY ISOLATION DEBUG: {table_name} recent entries:")
-                                    for entry in recent_entries:
-                                        logger.info(f"  - Created: {entry[0]}, Expires: {entry[1]}, Valid: {entry[3]}")
+                                    try:
+                                        cur.execute(f"""
+                                            SELECT created_at, expires_at, 
+                                                   NOW() as current_time,
+                                                   expires_at > NOW() as is_valid
+                                            FROM {table_name} 
+                                            WHERE created_at > NOW() - INTERVAL '24 hours'
+                                            ORDER BY created_at DESC LIMIT 3
+                                        """)
+                                        recent_entries = cur.fetchall()
+                                        logger.info(f"CACHE LEGACY ISOLATION DEBUG: {table_name} recent entries:")
+                                        for i, entry in enumerate(recent_entries):
+                                            logger.info(f"  Entry {i+1}: Created={entry[0]}, Expires={entry[1]}, Valid={entry[3]}")
+                                    except Exception as debug_error:
+                                        logger.warning(f"CACHE LEGACY DEBUG FAILED: {debug_error}")
+                                        # Essayer une requête plus simple
+                                        try:
+                                            cur.execute(f"SELECT COUNT(*) FROM {table_name}")
+                                            count_result = cur.fetchone()
+                                            logger.info(f"CACHE LEGACY FALLBACK: {table_name} has {count_result[0]} total entries")
+                                        except Exception as fallback_error:
+                                            logger.error(f"CACHE LEGACY FALLBACK FAILED: {fallback_error}")
                                         
                         except Exception as table_error:
                             logger.info(f"DEBUG SQL ERROR: Table {table_name} non disponible: {table_error}")
