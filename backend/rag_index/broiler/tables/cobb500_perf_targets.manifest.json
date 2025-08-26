@@ -1,0 +1,27 @@
+{
+  "type": "perf_targets",
+  "species": "broiler",
+  "line": "cobb500",
+  "csv": "cobb500_perf_targets.csv",
+  "source_path": "C:\\intelia_gpt\\documents\\public\\species\\broiler\\breeds\\cobb\\cobb500_perf_targets.csv",
+  "columns": [
+    "﻿line",
+    "sex",
+    "unit",
+    "age_days",
+    "weight_g",
+    "weight_lb",
+    "daily_gain_g",
+    "daily_gain_lb",
+    "avg_daily_gain_g",
+    "avg_daily_gain_lb",
+    "cum_fcr",
+    "daily_feed_intake_g",
+    "daily_feed_intake_lb",
+    "cum_feed_intake_g",
+    "cum_feed_intake_lb",
+    "source_doc"
+  ],
+  "total_columns": 16,
+  "inferred_from": "path_and_content"
+}

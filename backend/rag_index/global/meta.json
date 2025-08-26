@@ -2,9 +2,10 @@
   "species": "global",
   "model_name": "text-embedding-3-small",
   "embedding_dim": 1536,
-  "files_indexed": 21,
-  "n_docs": 21,
-  "chunks_indexed": 222,
+  "files_indexed": 52,
+  "n_docs": 52,
+  "chunks_indexed": 1791,
+  "csv_files_processed": 1,
   "files_sample": [
     "C:\\intelia_gpt\\documents\\public\\common\\health\\AviaTech_Staph.pdf",
     "C:\\intelia_gpt\\documents\\public\\common\\health\\COCCIDIOSIS_CONTROL_Ken_Bafundo.pdf",
@@ -13,17 +14,17 @@
     "C:\\intelia_gpt\\documents\\public\\common\\health\\TU COL ENG.pdf"
   ],
   "pdf_scan_summary": {
-    "scanned": 21,
+    "scanned": 51,
     "copy_restricted": 0,
     "redactions": 0
   },
   "quality_stats": {
-    "removed": 0,
-    "kept": 11
+    "removed": 37,
+    "kept": 1790
   },
   "enhanced_features": true,
-  "tables_found": 106,
-  "perf_targets_tables": 0,
+  "tables_found": 788,
+  "perf_targets_tables": 8,
   "metadata_coverage": 0.0,
-  "version": "1.4"
+  "version": "1.5"
 }
