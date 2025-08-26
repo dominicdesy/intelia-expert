@@ -2,9 +2,9 @@ import React, { useState } from 'react'
 import { useTranslation } from '../../hooks/useTranslation'
 import { CheckIcon } from '../../utils/icons'
 
-// ==================== MODAL LANGUE - VERSION FINALE ====================
+// ==================== MODAL LANGUE - VERSION CORRIGÉE ====================
 export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
-  const { t, currentLanguage } = useTranslation()
+  const { t, currentLanguage, setLanguage } = useTranslation()
   const [isUpdating, setIsUpdating] = useState(false)
   
   const languages = [
@@ -28,22 +28,37 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     }
   ]
 
-  const handleLanguageChange = (languageCode: string) => {
+  const handleLanguageChange = async (languageCode: string) => {
     if (languageCode === currentLanguage || isUpdating) return
 
     setIsUpdating(true)
     
     console.log('🔄 [LanguageModal] Changement de langue:', currentLanguage, '→', languageCode)
     
-    // 1. Sauvegarder dans localStorage (méthode la plus fiable)
-    localStorage.setItem('intelia-preferred-language', languageCode)
-    
-    // 2. Fermer la modal
-    onClose()
-    
-    // 3. Recharger la page pour appliquer la nouvelle langue
-    // C'est la seule méthode qui évite 100% des boucles React
-    window.location.reload()
+    try {
+      // 1. Sauvegarder dans localStorage
+      localStorage.setItem('intelia-preferred-language', languageCode)
+      
+      // 2. Utiliser la fonction setLanguage du hook si elle existe
+      if (typeof setLanguage === 'function') {
+        await setLanguage(languageCode)
+      }
+      
+      // 3. Attendre un court délai pour que React finisse ses updates
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // 4. Fermer la modal
+      onClose()
+      
+      // 5. Recharger de manière plus propre avec un délai
+      setTimeout(() => {
+        window.location.reload()
+      }, 200)
+      
+    } catch (error) {
+      console.error('❌ [LanguageModal] Erreur changement langue:', error)
+      setIsUpdating(false)
+    }
   }
 
   return (

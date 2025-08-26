@@ -1,11 +1,10 @@
-// lib/stores/auth.ts – Store d'auth SUPABASE NATIF (VERSION FINALE CORRIGÉE + SINGLETON + API EXPERT)
+// lib/stores/auth.ts — Store d'auth SUPABASE NATIF (VERSION FINALE CORRIGÉE + SINGLETON + API EXPERT)
 'use client'
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import toast from 'react-hot-toast'
 import type { User as AppUser, RGPDConsent } from '@/types'
-// ✅ CHANGEMENT CRITIQUE: Utiliser le singleton au lieu d'importer directement
 import { getSupabaseClient } from '@/lib/supabase/singleton'
 
 // ---- DEBUG ----
@@ -16,9 +15,23 @@ const alog = (...args: any[]) => {
   }
 }
 
-alog('✅ Store Auth Supabase NATIF chargé (singleton)')
+alog('Store Auth Supabase NATIF chargé (singleton)')
 
-// ---- Types d'état du store ----
+// CORRECTION: Variable globale pour gérer l'état de montage
+let isStoreActive = true
+
+// CORRECTION: Fonctions pour contrôler l'état du store
+export const markStoreUnmounted = () => {
+  isStoreActive = false
+  console.log('[AuthStore] Marqué comme démonté')
+}
+
+export const markStoreMounted = () => {
+  isStoreActive = true
+  console.log('[AuthStore] Marqué comme monté')
+}
+
+// Types d'état du store
 interface AuthState {
   user: AppUser | null
   isLoading: boolean
@@ -40,11 +53,10 @@ interface AuthState {
   updateConsent: (consent: RGPDConsent) => Promise<void>
   deleteUserData: () => Promise<void>
   exportUserData: () => Promise<any>
-  // 🆕 AJOUT: Méthode pour récupérer le token pour l'API Expert
   getAuthToken: () => Promise<string | null>
 }
 
-// ✅ CORRECTION: Adapter utilisateur Supabase vers AppUser COMPLET
+// Adapter utilisateur Supabase vers AppUser COMPLET
 function adaptSupabaseUser(supabaseUser: any, additionalData?: any): AppUser {
   // Construire le nom complet
   const fullName = additionalData?.full_name || 
@@ -58,7 +70,7 @@ function adaptSupabaseUser(supabaseUser: any, additionalData?: any): AppUser {
   const lastName = nameParts.slice(1).join(' ') || ''
 
   return {
-    // ✅ Champs obligatoires de l'interface User
+    // Champs obligatoires de l'interface User
     id: supabaseUser.id,
     email: supabaseUser.email,
     name: fullName,
@@ -75,7 +87,7 @@ function adaptSupabaseUser(supabaseUser: any, additionalData?: any): AppUser {
     created_at: additionalData?.created_at || new Date().toISOString(),
     plan: additionalData?.plan || 'essential',
 
-    // ✅ Champs optionnels
+    // Champs optionnels
     country_code: additionalData?.country_code,
     area_code: additionalData?.area_code,
     phone_number: additionalData?.phone_number,
@@ -91,7 +103,7 @@ function adaptSupabaseUser(supabaseUser: any, additionalData?: any): AppUser {
   }
 }
 
-// ---- Store Supabase NATIF (avec singleton) ----
+// Store Supabase NATIF (avec singleton et protection démontage)
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -102,37 +114,59 @@ export const useAuthStore = create<AuthState>()(
       lastAuthCheck: 0,
       authErrors: [],
 
-      setHasHydrated: (v: boolean) => set({ hasHydrated: v }),
+      // CORRECTION: Wrapper sécurisé pour setState
+      safeSetState: (updates: Partial<AuthState>) => {
+        if (!isStoreActive) {
+          console.warn('[AuthStore] setState ignoré - store démonté')
+          return
+        }
+        set(updates)
+      },
+
+      setHasHydrated: (v: boolean) => {
+        if (!isStoreActive) return
+        set({ hasHydrated: v })
+      },
 
       handleAuthError: (error: any, ctx?: string) => {
+        if (!isStoreActive) return
+        
         const msg = (error?.message || 'Authentication error').toString()
-        console.error('⚠️ [SupabaseAuth/Singleton]', ctx || '', error)
+        console.error('[SupabaseAuth/Singleton]', ctx || '', error)
         set((s) => ({ authErrors: [...s.authErrors, msg] }))
       },
 
-      clearAuthErrors: () => set({ authErrors: [] }),
+      clearAuthErrors: () => {
+        if (!isStoreActive) return
+        set({ authErrors: [] })
+      },
 
       initializeSession: async () => {
+        if (!isStoreActive) return false
+        
         try {
-          alog('🔄 initializeSession via Supabase natif (singleton)')
+          alog('initializeSession via Supabase natif (singleton)')
           
-          // ✅ CHANGEMENT: Utiliser le singleton
           const supabase = getSupabaseClient()
           const { data: { session }, error } = await supabase.auth.getSession()
           
           if (error) {
-            alog('❌ Erreur session Supabase (singleton):', error)
-            set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() })
+            alog('Erreur session Supabase (singleton):', error)
+            if (isStoreActive) {
+              set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() })
+            }
             return false
           }
 
           if (!session || !session.user) {
-            alog('❌ Pas de session Supabase (singleton)')
-            set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() })
+            alog('Pas de session Supabase (singleton)')
+            if (isStoreActive) {
+              set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() })
+            }
             return false
           }
 
-          alog('✅ Session Supabase trouvée (singleton):', session.user.email)
+          alog('Session Supabase trouvée (singleton):', session.user.email)
 
           // Récupérer le profil utilisateur depuis Supabase
           let profileData = {}
@@ -145,9 +179,9 @@ export const useAuthStore = create<AuthState>()(
             
             if (profile) {
               profileData = profile
-              alog('✅ Profil utilisateur trouvé (singleton):', profile.user_type)
+              alog('Profil utilisateur trouvé (singleton):', profile.user_type)
             } else {
-              alog('⚠️ Pas de profil utilisateur, création automatique (singleton)...')
+              alog('Pas de profil utilisateur, création automatique (singleton)...')
               // Créer un profil de base
               const { error: insertError } = await supabase
                 .from('users')
@@ -161,13 +195,15 @@ export const useAuthStore = create<AuthState>()(
               
               if (!insertError) {
                 profileData = { user_type: 'producer', language: 'fr' }
-                alog('✅ Profil créé automatiquement (singleton)')
+                alog('Profil créé automatiquement (singleton)')
               }
             }
           } catch (profileError) {
-            alog('⚠️ Erreur profil, utilisation valeurs par défaut (singleton):', profileError)
+            alog('Erreur profil, utilisation valeurs par défaut (singleton):', profileError)
             profileData = { user_type: 'producer', language: 'fr' }
           }
+
+          if (!isStoreActive) return false
 
           const appUser = adaptSupabaseUser(session.user, profileData)
 
@@ -177,24 +213,29 @@ export const useAuthStore = create<AuthState>()(
             lastAuthCheck: Date.now()
           })
           
-          alog('✅ initializeSession réussi (singleton):', appUser.email)
+          alog('initializeSession réussi (singleton):', appUser.email)
           return true
           
         } catch (e) {
-          get().handleAuthError(e, 'initializeSession')
-          set({ isAuthenticated: false, user: null })
+          if (isStoreActive) {
+            get().handleAuthError(e, 'initializeSession')
+            set({ isAuthenticated: false, user: null })
+          }
           return false
         }
       },
 
       checkAuth: async () => {
+        if (!isStoreActive) return
+        
         try {
-          // ✅ CHANGEMENT: Utiliser le singleton
           const supabase = getSupabaseClient()
           const { data: { session } } = await supabase.auth.getSession()
           
           if (!session || !session.user) {
-            set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() })
+            if (isStoreActive) {
+              set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() })
+            }
             return
           }
 
@@ -211,8 +252,10 @@ export const useAuthStore = create<AuthState>()(
               profileData = profile
             }
           } catch (profileError) {
-            alog('⚠️ Erreur récupération profil lors du checkAuth (singleton)')
+            alog('Erreur récupération profil lors du checkAuth (singleton)')
           }
+
+          if (!isStoreActive) return
 
           const appUser = adaptSupabaseUser(session.user, profileData)
 
@@ -222,20 +265,23 @@ export const useAuthStore = create<AuthState>()(
             lastAuthCheck: Date.now()
           })
           
-          alog('✅ checkAuth réussi (singleton)')
+          alog('checkAuth réussi (singleton)')
           
         } catch (e) {
-          get().handleAuthError(e, 'checkAuth')
-          set({ isAuthenticated: false, user: null })
+          if (isStoreActive) {
+            get().handleAuthError(e, 'checkAuth')
+            set({ isAuthenticated: false, user: null })
+          }
         }
       },
 
       login: async (email: string, password: string) => {
+        if (!isStoreActive) return
+        
         set({ isLoading: true, authErrors: [] })
-        alog('🔄 login via Supabase natif (singleton):', email)
+        alog('login via Supabase natif (singleton):', email)
         
         try {
-          // ✅ CHANGEMENT: Utiliser le singleton
           const supabase = getSupabaseClient()
           const { data, error } = await supabase.auth.signInWithPassword({
             email,
@@ -250,34 +296,39 @@ export const useAuthStore = create<AuthState>()(
             throw new Error('Aucun utilisateur retourné')
           }
 
-          alog('✅ Login Supabase réussi (singleton):', data.user.email)
+          alog('Login Supabase réussi (singleton):', data.user.email)
 
-          // Le profil sera récupéré automatiquement par initializeSession
-          // qui sera appelé par le AuthProvider via onAuthStateChange
-          
-          set({ isLoading: false })
-          
-        } catch (e: any) {
-          get().handleAuthError(e, 'login')
-          alog('❌ Erreur login (singleton):', e?.message)
-          
-          // Messages d'erreur Supabase spécifiques
-          let userMessage = e?.message || 'Erreur de connexion'
-          if (userMessage.includes('Invalid login credentials')) {
-            userMessage = 'Email ou mot de passe incorrect'
-          } else if (userMessage.includes('Email not confirmed')) {
-            userMessage = 'Veuillez confirmer votre email avant de vous connecter'
+          if (isStoreActive) {
+            set({ isLoading: false })
           }
           
-          throw new Error(userMessage)
+        } catch (e: any) {
+          if (isStoreActive) {
+            get().handleAuthError(e, 'login')
+            alog('Erreur login (singleton):', e?.message)
+            
+            // Messages d'erreur Supabase spécifiques
+            let userMessage = e?.message || 'Erreur de connexion'
+            if (userMessage.includes('Invalid login credentials')) {
+              userMessage = 'Email ou mot de passe incorrect'
+            } else if (userMessage.includes('Email not confirmed')) {
+              userMessage = 'Veuillez confirmer votre email avant de vous connecter'
+            }
+            
+            throw new Error(userMessage)
+          }
         } finally {
-          set({ isLoading: false })
+          if (isStoreActive) {
+            set({ isLoading: false })
+          }
         }
       },
 
       register: async (email: string, password: string, userData: Partial<AppUser>) => {
+        if (!isStoreActive) return
+        
         set({ isLoading: true, authErrors: [] })
-        alog('🔄 register via Supabase natif (singleton):', email)
+        alog('register via Supabase natif (singleton):', email)
         
         try {
           const fullName = (userData?.name || '').toString().trim()
@@ -285,7 +336,6 @@ export const useAuthStore = create<AuthState>()(
             throw new Error('Le nom doit contenir au moins 2 caractères')
           }
 
-          // ✅ CHANGEMENT: Utiliser le singleton
           const supabase = getSupabaseClient()
           
           // Inscription Supabase
@@ -309,7 +359,7 @@ export const useAuthStore = create<AuthState>()(
             throw new Error('Erreur lors de la création du compte')
           }
 
-          alog('✅ Inscription Supabase réussie (singleton):', data.user.email)
+          alog('Inscription Supabase réussie (singleton):', data.user.email)
 
           // Créer le profil utilisateur dans la table users
           if (data.user.id) {
@@ -325,50 +375,58 @@ export const useAuthStore = create<AuthState>()(
                 })
 
               if (profileError) {
-                alog('⚠️ Erreur création profil (singleton):', profileError)
+                alog('Erreur création profil (singleton):', profileError)
               } else {
-                alog('✅ Profil utilisateur créé (singleton)')
+                alog('Profil utilisateur créé (singleton)')
               }
             } catch (profileError) {
-              alog('⚠️ Erreur création profil (singleton):', profileError)
+              alog('Erreur création profil (singleton):', profileError)
             }
           }
 
-          set({ isLoading: false })
+          if (isStoreActive) {
+            set({ isLoading: false })
+          }
           
           if (!data.session) {
             toast.success('Compte créé ! Vérifiez votre email pour confirmer votre inscription.')
           } else {
             // L'utilisateur est directement connecté
-            await get().initializeSession()
+            if (isStoreActive) {
+              await get().initializeSession()
+            }
           }
           
         } catch (e: any) {
-          get().handleAuthError(e, 'register')
-          alog('❌ Erreur register (singleton):', e?.message)
-          
-          let userMessage = e?.message || 'Erreur lors de la création du compte'
-          
-          // Messages d'erreur spécifiques Supabase
-          if (userMessage.includes('already registered')) {
-            userMessage = 'Cette adresse email est déjà utilisée'
-          } else if (userMessage.includes('Password should be at least')) {
-            userMessage = 'Le mot de passe doit contenir au moins 6 caractères'
+          if (isStoreActive) {
+            get().handleAuthError(e, 'register')
+            alog('Erreur register (singleton):', e?.message)
+            
+            let userMessage = e?.message || 'Erreur lors de la création du compte'
+            
+            // Messages d'erreur spécifiques Supabase
+            if (userMessage.includes('already registered')) {
+              userMessage = 'Cette adresse email est déjà utilisée'
+            } else if (userMessage.includes('Password should be at least')) {
+              userMessage = 'Le mot de passe doit contenir au moins 6 caractères'
+            }
+            
+            throw new Error(userMessage)
           }
-          
-          throw new Error(userMessage)
-          
         } finally {
-          set({ isLoading: false })
+          if (isStoreActive) {
+            set({ isLoading: false })
+          }
         }
       },
 
       logout: async () => {
+        if (!isStoreActive) return
+        
         set({ isLoading: true })
-        alog('🔄 logout via Supabase natif (singleton)')
+        alog('logout via Supabase natif (singleton)')
         
         try {
-          // ✅ CHANGEMENT: Utiliser le singleton
           const supabase = getSupabaseClient()
           const { error } = await supabase.auth.signOut()
           
@@ -381,21 +439,29 @@ export const useAuthStore = create<AuthState>()(
             localStorage.removeItem('intelia-chat-storage')
           } catch {}
 
-          set({ user: null, isAuthenticated: false })
-          alog('✅ Logout réussi (singleton)')
+          if (isStoreActive) {
+            set({ user: null, isAuthenticated: false })
+          }
+          alog('Logout réussi (singleton)')
           
         } catch (e: any) {
-          get().handleAuthError(e, 'logout')
-          alog('❌ Erreur logout (singleton):', e?.message)
-          throw new Error(e?.message || 'Erreur lors de la déconnexion')
+          if (isStoreActive) {
+            get().handleAuthError(e, 'logout')
+            alog('Erreur logout (singleton):', e?.message)
+            throw new Error(e?.message || 'Erreur lors de la déconnexion')
+          }
         } finally {
-          set({ isLoading: false })
+          if (isStoreActive) {
+            set({ isLoading: false })
+          }
         }
       },
 
       updateProfile: async (data: Partial<AppUser>) => {
+        if (!isStoreActive) return
+        
         set({ isLoading: true })
-        alog('🔄 updateProfile via Supabase (singleton)')
+        alog('updateProfile via Supabase (singleton)')
         
         try {
           const currentUser = get().user
@@ -403,7 +469,6 @@ export const useAuthStore = create<AuthState>()(
             throw new Error('Utilisateur non connecté')
           }
 
-          // ✅ CHANGEMENT: Utiliser le singleton
           const supabase = getSupabaseClient()
           
           // Mettre à jour le profil dans Supabase
@@ -422,28 +487,35 @@ export const useAuthStore = create<AuthState>()(
             throw new Error(error.message)
           }
 
-          // Mettre à jour localement
-          const updatedUser = { ...currentUser, ...data }
-          set({ user: updatedUser })
+          if (isStoreActive) {
+            // Mettre à jour localement
+            const updatedUser = { ...currentUser, ...data }
+            set({ user: updatedUser })
+          }
           
-          alog('✅ updateProfile réussi (singleton)')
+          alog('updateProfile réussi (singleton)')
           
         } catch (e: any) {
-          get().handleAuthError(e, 'updateProfile')
-          throw new Error(e?.message || 'Erreur de mise à jour du profil')
+          if (isStoreActive) {
+            get().handleAuthError(e, 'updateProfile')
+            throw new Error(e?.message || 'Erreur de mise à jour du profil')
+          }
         } finally {
-          set({ isLoading: false })
+          if (isStoreActive) {
+            set({ isLoading: false })
+          }
         }
       },
 
       updateConsent: async (consent: RGPDConsent) => {
-        alog('🔄 updateConsent via Supabase (singleton)')
+        if (!isStoreActive) return
+        
+        alog('updateConsent via Supabase (singleton)')
         
         try {
           const currentUser = get().user
           if (!currentUser) return
 
-          // ✅ CHANGEMENT: Utiliser le singleton
           const supabase = getSupabaseClient()
           const { error } = await supabase
             .from('users')
@@ -454,17 +526,18 @@ export const useAuthStore = create<AuthState>()(
             throw new Error(error.message)
           }
         } catch (e: any) {
-          alog('❌ updateConsent error (singleton):', e?.message)
+          alog('updateConsent error (singleton):', e?.message)
           throw new Error(e?.message || 'Erreur de mise à jour du consentement')
         }
       },
 
       deleteUserData: async () => {
+        if (!isStoreActive) return
+        
         const currentUser = get().user
         if (!currentUser) throw new Error('Non authentifié')
 
         try {
-          // ✅ CHANGEMENT: Utiliser le singleton
           const supabase = getSupabaseClient()
           
           // Supprimer le profil utilisateur
@@ -474,11 +547,13 @@ export const useAuthStore = create<AuthState>()(
             .eq('auth_user_id', currentUser.id)
 
           if (error) {
-            alog('⚠️ Erreur suppression profil (singleton):', error)
+            alog('Erreur suppression profil (singleton):', error)
           }
 
           // Déconnecter
-          await get().logout()
+          if (isStoreActive) {
+            await get().logout()
+          }
           
         } catch (e: any) {
           throw new Error(e?.message || 'Erreur de suppression des données')
@@ -490,7 +565,6 @@ export const useAuthStore = create<AuthState>()(
         if (!currentUser) throw new Error('Non authentifié')
 
         try {
-          // ✅ CHANGEMENT: Utiliser le singleton
           const supabase = getSupabaseClient()
           const { data: profile } = await supabase
             .from('users')
@@ -509,21 +583,23 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 🆕 NOUVELLE MÉTHODE: Récupérer le token Supabase pour l'API Expert
+      // Nouvelle méthode: Récupérer le token Supabase pour l'API Expert
       getAuthToken: async () => {
+        if (!isStoreActive) return null
+        
         try {
           const supabase = getSupabaseClient()
           const { data: { session } } = await supabase.auth.getSession()
           
           if (session?.access_token) {
-            alog('🎫 Token Supabase récupéré pour API Expert')
+            alog('Token Supabase récupéré pour API Expert')
             return session.access_token
           }
           
-          alog('❌ Pas de token Supabase disponible')
+          alog('Pas de token Supabase disponible')
           return null
         } catch (error) {
-          alog('❌ Erreur récupération token:', error)
+          alog('Erreur récupération token:', error)
           return null
         }
       },
@@ -538,28 +614,32 @@ export const useAuthStore = create<AuthState>()(
         hasHydrated: state.hasHydrated,
       }),
       onRehydrateStorage: () => (state, error) => {
-        if (error) console.error('❌ Erreur rehydrate auth store:', error)
-        state?.setHasHydrated(true)
-        alog('✅ Auth store rehydraté (singleton)')
+        if (error) console.error('Erreur rehydrate auth store:', error)
+        if (state && isStoreActive) {
+          state.setHasHydrated(true)
+          alog('Auth store rehydraté (singleton)')
+        }
       },
     }
   )
 )
 
-// 🆕 FONCTION UTILITAIRE EXPORTÉE: Pour utilisation dans d'autres fichiers
+// Fonction utilitaire exportée: Pour utilisation dans d'autres fichiers
 export const getAuthToken = async (): Promise<string | null> => {
+  if (!isStoreActive) return null
+  
   try {
     const supabase = getSupabaseClient()
     const { data: { session } } = await supabase.auth.getSession()
     
     if (session?.access_token) {
-      alog('🎫 Token Supabase récupéré (fonction utilitaire)')
+      alog('Token Supabase récupéré (fonction utilitaire)')
       return session.access_token
     }
     
     return null
   } catch (error) {
-    alog('❌ Erreur récupération token (fonction utilitaire):', error)
+    alog('Erreur récupération token (fonction utilitaire):', error)
     return null
   }
 }

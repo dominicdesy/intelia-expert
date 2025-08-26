@@ -176,11 +176,15 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
                   <button
                     type="button"
                     onClick={() => handleSelect(country)}
-                    className={`w-full px-3 py-2 text-left flex items-center hover:bg-blue-50 focus:outline-none focus:bg-blue-50 text-gray-900 ${
+                    className={`w-full px-3 py-2 text-left flex items-center hover:bg-blue-50 focus:outline-none focus:bg-blue-50 ${
                       index === highlightedIndex ? 'bg-blue-50' : ''
                     } ${
-                      country.value === value ? 'bg-blue-100 text-blue-900 font-medium' : ''
+                      country.value === value ? 'bg-blue-100 text-blue-900 font-medium' : 'text-gray-900 bg-white'
                     }`}
+                    style={{ 
+                      color: country.value === value ? '#1e3a8a' : '#111827',
+                      backgroundColor: country.value === value ? '#dbeafe' : (index === highlightedIndex ? '#eff6ff' : '#ffffff')
+                    }}
                   >
                     <span className="mr-2 text-base">{country.flag}</span>
                     <span className="flex-1">{country.label}</span>
