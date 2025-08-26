@@ -41,15 +41,12 @@ MEMORY_CONFIG = {
 }
 
 def get_memory_usage_percent():
-    """CORRIGÉ: Mesure mémoire réaliste"""
+    """Mesure mémoire réaliste"""
     try:
         memory = psutil.virtual_memory()
-        result = round(memory.percent, 1)
-        logger.info(f"🔥 DEBUG MEMORY FIX ACTIVE: {result}% RAM, Available: {memory.available/1024/1024/1024:.1f}GB")
-        return result
+        return round(memory.percent, 1)
     except Exception as e:
         logger.warning(f"Erreur mesure mémoire: {e}")
-        logger.info("🔥 DEBUG MEMORY FIX FALLBACK: Retour 50.0% par défaut")
         return 50.0  # Valeur par défaut réaliste au lieu de 0
 
 def decimal_safe_json_encoder(obj):
@@ -128,13 +125,11 @@ class MemoryMonitor:
     def __init__(self):
         self.last_cleanup = datetime.now().timestamp()
         self.cleanup_lock = threading.Lock()
-        logger.info("🔥 DEBUG TIMESTAMP FIX ACTIVE: Using datetime.now().timestamp()")
         
     def should_cleanup(self):
         """Détermine si un cleanup est nécessaire"""
         memory_percent = get_memory_usage_percent()
         time_since_cleanup = datetime.now().timestamp() - self.last_cleanup
-        logger.info(f"🔥 DEBUG TIMESTAMP CALC: current={datetime.now().timestamp()}, last={self.last_cleanup}, diff={time_since_cleanup}")
         
         if memory_percent > MEMORY_CONFIG["FORCE_CLEANUP_AT_PERCENT"]:
             return True, f"Mémoire critique: {memory_percent}%"
@@ -1156,54 +1151,26 @@ class StatisticsCache:
                     
                     for table_name, stat_key in other_tables:
                         try:
-                            logger.info(f"DEBUG SQL FIX ACTIVE: Querying table {table_name} for stat_key {stat_key}")
                             # CORRIGÉ: Utiliser le bon nom de table dans la requête
+                            # SIMPLIFIED: Focus sur les données valides plutôt que recent
                             cur.execute(f"""
                                 SELECT 
                                     COUNT(*) as total,
                                     COUNT(*) FILTER (WHERE expires_at > NOW()) as valid,
                                     COALESCE(AVG(data_size_kb), 0) as avg_size_kb
                                 FROM {table_name}
-                                WHERE created_at > NOW() - INTERVAL '24 hours'
                             """)                            
                             result = cur.fetchone()
                             if result:
-                                # FIXED: Normaliser tous les types vers float et ajouter debug pour cache legacy
+                                # FIXED: Normaliser tous les types vers float
                                 stats[stat_key] = {
                                     'total': int(result['total']),
                                     'valid': int(result['valid']),
                                     'avg_size_kb': float(result['avg_size_kb'])
                                 }
-                                logger.info(f"DEBUG SQL SUCCESS: {stat_key} = {stats[stat_key]}")
                                 
-                                # FIXED: Debug spécial pour cache legacy isolé
-                                if stat_key == 'legacy_dashboard' and stats[stat_key]['valid'] > 0:
-                                    # Vérifier pourquoi cette table a des données alors que les autres sont vides
-                                    try:
-                                        cur.execute(f"""
-                                            SELECT created_at, expires_at, 
-                                                   NOW() as current_time,
-                                                   expires_at > NOW() as is_valid
-                                            FROM {table_name} 
-                                            WHERE created_at > NOW() - INTERVAL '24 hours'
-                                            ORDER BY created_at DESC LIMIT 3
-                                        """)
-                                        recent_entries = cur.fetchall()
-                                        logger.info(f"CACHE LEGACY ISOLATION DEBUG: {table_name} recent entries:")
-                                        for i, entry in enumerate(recent_entries):
-                                            logger.info(f"  Entry {i+1}: Created={entry[0]}, Expires={entry[1]}, Valid={entry[3]}")
-                                    except Exception as debug_error:
-                                        logger.warning(f"CACHE LEGACY DEBUG FAILED: {debug_error}")
-                                        # Essayer une requête plus simple
-                                        try:
-                                            cur.execute(f"SELECT COUNT(*) FROM {table_name}")
-                                            count_result = cur.fetchone()
-                                            logger.info(f"CACHE LEGACY FALLBACK: {table_name} has {count_result[0]} total entries")
-                                        except Exception as fallback_error:
-                                            logger.error(f"CACHE LEGACY FALLBACK FAILED: {fallback_error}")
-                                        
                         except Exception as table_error:
-                            logger.info(f"DEBUG SQL ERROR: Table {table_name} non disponible: {table_error}")
+                            logger.info(f"Table {table_name} non disponible: {table_error}")
                             stats[stat_key] = {
                                 'total': 0, 'valid': 0, 'avg_size_kb': 0.0,
                                 'note': f'Table {table_name} non disponible'
