@@ -127,7 +127,7 @@ def safe_import_module(module_name: str, lazy: bool = True):
             from app.api.v1.stats_cache import get_stats_cache
             module = get_stats_cache
         elif module_name == "logging":
-            from app.api.v1.logging_endpoints import questions_final
+            from app.api.v1.logging import questions_final
             module = {"questions_final": questions_final}
         else:
             return None
