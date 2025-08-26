@@ -2,7 +2,7 @@
 # ✅ CONSERVATION INTÉGRALE DU CODE ORIGINAL + AJOUTS CACHE SAFE
 # 🚀 NOUVEAU: Système de cache statistiques automatique
 # 🔧 CORRECTION CORS POUR CREDENTIALS: 'INCLUDE' - VERSION FINALE CONSERVÉE
-# 🎯 FIX: Ajout du router stats_admin manquant
+# 🎯 FIX: Ajout du router stats_admin manquant + lifespan corrigé
 
 # tout en haut du fichier
 import os
@@ -68,7 +68,7 @@ try:
 except Exception as e:
     logger.warning(f"⚠️ Router stats indisponible: {e}")
 
-# Ajout du router d’admin statistiques si présent (conservé)
+# Ajout du router d'admin statistiques si présent (conservé)
 try:
     from app.api.v1.stats_admin import router as stats_admin_router
     app.include_router(stats_admin_router, prefix="/v1/stats-admin", tags=["stats-admin"])
@@ -85,7 +85,7 @@ except Exception as e:
 
 # === OUTILS SUPPLÉMENTAIRES (inchangés) ===
 def get_rag_paths() -> Dict[str, str]:
-    """Conserve l’implémentation originale pour ne rien casser ailleurs."""
+    """Conserve l'implémentation originale pour ne rien casser ailleurs."""
     base_path = "/workspace/backend/rag_index"
     return {
         "global": f"{base_path}/global",
@@ -112,7 +112,7 @@ async def periodic_stats_update():
             logger.warning(f"⚠️ Échec régénération cache stats: {e}")
         await asyncio.sleep(3600)
 
-# === LIFESPAN ===
+# === LIFESPAN CORRIGÉ ===
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
@@ -255,7 +255,7 @@ async def lifespan(app: FastAPI):
         logger.info(f"🔍 Chargement RAG Layer: {layer_path}")
         if os.path.exists(layer_path):
             try:
-                layer_embedder   = FastRAGEmbedder(index_dir=layer_path, debug=False, cache_embeddings=True, max_workers=2)
+                layer_embedder = FastRAGEmbedder(index_dir=layer_path, debug=False, cache_embeddings=True, max_workers=2)
                 if hasattr(layer_embedder, "has_search_engine") and layer_embedder.has_search_engine():
                     app.state.rag_layer = layer_embedder
                     _log_loaded("layer", layer_path, layer_embedder)
@@ -289,19 +289,20 @@ async def lifespan(app: FastAPI):
 
     # ========== DÉMARRAGE DU MONITORING & SCHEDULER (inchangé) ==========
     monitoring_task = None
+    stats_scheduler_task = None
+    
     try:
         monitoring_task = asyncio.create_task(periodic_monitoring())
         logger.info("📊 Monitoring périodique démarré")
     except Exception as e:
         logger.error(f"⌛ Erreur démarrage monitoring: {e}")
 
-    global stats_scheduler_task
     if STATS_CACHE_AVAILABLE:
         try:
             stats_scheduler_task = asyncio.create_task(periodic_stats_update())
             logger.info("🔄 Scheduler cache statistiques démarré (mise à jour toutes les heures)")
         except Exception as e:
-            logger.error(f"❌ Erreur démarrage scheduler cache: {e}")
+            logger.error(f"⌛ Erreur démarrage scheduler cache: {e}")
     else:
         logger.info("ℹ️ Scheduler cache statistiques désactivé (module non disponible)")
 
@@ -321,12 +322,12 @@ async def lifespan(app: FastAPI):
             logger.info("📊 Monitoring périodique arrêté")
         except Exception as e:
             logger.error(f"⌛ Erreur arrêt monitoring: {e}")
-    if STATS_CACHE_AVAILABLE:
+    if stats_scheduler_task:
         try:
             stats_scheduler_task.cancel()
             logger.info("🔄 Scheduler cache statistiques arrêté")
         except Exception as e:
-            logger.error(f"❌ Erreur arrêt scheduler cache: {e}")
+            logger.error(f"⌛ Erreur arrêt scheduler cache: {e}")
 
 # === REGISTRATION DU LIFESPAN ===
 app.router.lifespan_context = lifespan
