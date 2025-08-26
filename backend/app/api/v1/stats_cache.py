@@ -1,7 +1,6 @@
 # app/api/v1/stats_cache.py
 # -*- coding: utf-8 -*-
 """
-
 🚀 SYSTÈME DE CACHE STATISTIQUES OPTIMISÉ - VERSION MEMORY-SAFE CORRIGÉE
 Tables de cache SQL + Gestionnaire pour performances ultra-rapides
 SAFE: N'interfère pas avec logging.py et billing.py existants
@@ -10,7 +9,6 @@ SAFE: N'interfère pas avec logging.py et billing.py existants
 🛡️ MEMORY-SAFE: Pool de connexions, limites de taille, nettoyage automatique
 🆕 NOUVEAU: Migration automatique des colonnes manquantes (data_size_kb, feedback)
 🔧 FIXED: Création complète de toutes les tables manquantes
-
 """
 
 import json
@@ -429,6 +427,45 @@ class StatisticsCache:
                         );
                     """)
                     
+                    # 🔧 MIGRATION: Ajouter expires_at aux tables existantes si manquante
+                    try:
+                        cur.execute("""
+                            ALTER TABLE dashboard_stats_snapshot 
+                            ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '24 hours')
+                        """)
+                        
+                        # Mettre à jour les entrées existantes sans expires_at
+                        cur.execute("""
+                            UPDATE dashboard_stats_snapshot 
+                            SET expires_at = COALESCE(created_at, CURRENT_TIMESTAMP) + INTERVAL '24 hours' 
+                            WHERE expires_at IS NULL
+                        """)
+                        
+                        logger.info("✅ Colonne expires_at ajoutée à dashboard_stats_snapshot")
+                    except Exception as migration_error:
+                        logger.warning(f"Migration expires_at: {migration_error}")
+                    
+                    # Migration similaire pour les autres tables si nécessaire
+                    other_tables_to_migrate = [
+                        ('questions_cache', '1 hour'),
+                        ('openai_costs_cache', '4 hours')
+                    ]
+                    
+                    for table_name, interval in other_tables_to_migrate:
+                        try:
+                            cur.execute(f"""
+                                ALTER TABLE {table_name} 
+                                ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '{interval}')
+                            """)
+                            
+                            cur.execute(f"""
+                                UPDATE {table_name} 
+                                SET expires_at = COALESCE(created_at, CURRENT_TIMESTAMP) + INTERVAL '{interval}' 
+                                WHERE expires_at IS NULL
+                            """)
+                        except Exception as table_migration_error:
+                            logger.info(f"Migration {table_name} expires_at: {table_migration_error}")
+                    
                     # 🛡️ TABLE SIMPLIFIÉE: Snapshots dashboard légers (CONSERVÉE DE L'ORIGINAL)
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS dashboard_stats_lite (
@@ -454,7 +491,10 @@ class StatisticsCache:
                         );
                     """)
                     
-                    # 🛡️ INDEX MINIMAUX pour performance (ÉTENDUS POUR NOUVELLES TABLES)
+                    conn.commit()  # ← COMMIT APRÈS CRÉATION DES TABLES
+                    logger.info("✅ Tables de cache créées, création des index...")
+                    
+                    # 🛡️ INDEX MINIMAUX pour performance (APRÈS commit des tables)
                     index_queries = [
                         "CREATE INDEX IF NOT EXISTS idx_stats_cache_expires ON statistics_cache(expires_at);",
                         "CREATE INDEX IF NOT EXISTS idx_stats_cache_key ON statistics_cache(cache_key);",
@@ -467,13 +507,15 @@ class StatisticsCache:
                         "CREATE INDEX IF NOT EXISTS idx_dashboard_current ON dashboard_stats_lite(is_current, generated_at);",
                     ]
                     
+                    # Créer les index dans une transaction séparée
                     for idx_query in index_queries:
                         try:
                             cur.execute(idx_query)
+                            conn.commit()  # Commit chaque index individuellement
                         except Exception as idx_error:
+                            conn.rollback()  # Rollback en cas d'erreur d'index
                             logger.warning(f"⚠️ Index ignoré: {idx_error}")
                     
-                    conn.commit()
                     logger.info("✅ TOUTES les tables de cache créées avec succès (VERSION CORRIGÉE)")
                     
             finally:
