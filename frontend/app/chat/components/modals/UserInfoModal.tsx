@@ -3,7 +3,7 @@ import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '../../hooks/useTranslation'
 import { UserInfoModalProps } from '@/types'
 import { PhoneInput, usePhoneValidation } from '../PhoneInput'
-import { CountrySelect } from './CountrySelect' // ✅ Import du nouveau composant
+import { CountrySelect } from '../CountrySelect' // ✅ Import du nouveau composant
 
 // ==================== CONFIGURATION DES PAYS AVEC FALLBACK ====================
 // Pays de fallback (les plus communs) en cas d'échec de l'API
