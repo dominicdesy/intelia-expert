@@ -1,7 +1,6 @@
 # app/api/v1/stats_updater.py
 # -*- coding: utf-8 -*-
 """
-
 Collecteur intelligent de statistiques - Version corrigée
 Utilise les gestionnaires existants SANS les modifier
 Collecte périodique + cache optimisé
@@ -9,8 +8,6 @@ SAFE: Aucune rupture avec logging.py et billing.py
 Optimisé: Gestion mémoire drastiquement améliorée pour DigitalOcean App Platform
 Memory-safe: Collecte séquentielle, limites strictes, monitoring temps réel
 FIXED: Correction erreur feedback columns et gestion robuste des exceptions
-Rebuild
-
 """
 
 import asyncio
@@ -121,6 +118,8 @@ class StatisticsUpdater:
         Cache le résultat pour éviter les vérifications répétées.
         Retourne TOUJOURS un dictionnaire valide, jamais 0 ou autre
         """
+        logger.error("PROOF-OF-DEPLOY: Version corrigée feedback detection - 2025-08-26-22:35")
+        
         default_result = {
             "table_exists": False, 
             "feedback": False, 
