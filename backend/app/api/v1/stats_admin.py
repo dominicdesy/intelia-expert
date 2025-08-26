@@ -20,7 +20,7 @@ from app.api.v1.stats_updater import get_stats_updater, run_update_cycle, force_
 # Import des permissions
 from app.api.v1.logging import has_permission, Permission
 
-router = APIRouter(prefix="/stats-admin", tags=["statistics-admin"])
+router = APIRouter(tags=["statistics-admin"])
 logger = logging.getLogger(__name__)
 
 # ==================== ENDPOINTS DE CONTRÔLE ====================
