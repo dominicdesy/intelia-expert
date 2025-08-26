@@ -430,7 +430,7 @@ async def lifespan(app: FastAPI):
                 return None
 
         # 🚀 Chargement des 3 RAG
-        app.state.rag = _load_rag("global", rag_paths["global"], debug=True)
+        app.state.rag = _load_rag("global", rag_paths["global"], debug=False)
         app.state.rag_broiler = _load_rag("broiler", rag_paths["broiler"])
         app.state.rag_layer = _load_rag("layer", rag_paths["layer"])
 
