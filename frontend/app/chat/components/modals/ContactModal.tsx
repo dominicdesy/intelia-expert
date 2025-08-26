@@ -3,7 +3,24 @@ import { useTranslation } from '../../hooks/useTranslation'
 
 // ==================== MODAL CONTACT AVEC POSITIONNEMENT CORRIGÉ ====================
 export const ContactModal = ({ onClose }: { onClose: () => void }) => {
-  const { t } = useTranslation()
+  const { t, currentLanguage } = useTranslation()
+  
+  // Générer l'URL en fonction de la langue
+  const getWebsiteUrl = () => {
+    const baseUrl = 'https://intelia.com'
+    
+    switch (currentLanguage) {
+      case 'fr':
+        return `${baseUrl}/fr/`
+      case 'es':
+        return `${baseUrl}/es/`
+      case 'en':
+      default:
+        return baseUrl
+    }
+  }
+
+  const websiteUrl = getWebsiteUrl()
   
   return (
     <>
@@ -92,12 +109,12 @@ export const ContactModal = ({ onClose }: { onClose: () => void }) => {
                     {t('contact.websiteDescription')}
                   </p>
                   <a 
-                    href="https://www.intelia.com"
+                    href={websiteUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:text-blue-700 font-medium text-sm"
                   >
-                    www.intelia.com
+                    {websiteUrl}
                   </a>
                 </div>
               </div>
