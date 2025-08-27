@@ -512,17 +512,11 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   console.log('[DEBUG-UserInfoModal] Render - isMounted:', isMountedRef.current, 'isLoading:', isLoading)
 
   return (
-    <>
+    <div className="user-info-modal" onClick={safeClose}>
       <div 
-        className="fixed inset-0 bg-black bg-opacity-50 z-50" 
-        onClick={safeClose}
-      />
-      
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div 
-          className="bg-white rounded-xl shadow-2xl w-full max-w-2xl h-[85vh] flex flex-col"
-          onClick={(e) => e.stopPropagation()}
-        >
+        className="user-info-modal-content"
+        onClick={(e) => e.stopPropagation()}
+      >
           <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
             <h2 className="text-xl font-semibold text-gray-900">
               {t('profile.title')}
@@ -896,6 +890,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }

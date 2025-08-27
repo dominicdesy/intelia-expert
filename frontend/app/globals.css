@@ -1,4 +1,4 @@
-/* app/globals.css - VERSION FINALE AVEC CORRECTIONS HEADER + ZOHO + TEXTE */
+/* app/globals.css - VERSION FINALE AVEC CORRECTIONS HEADER + ZOHO + TEXTE + MODAL */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -189,7 +189,7 @@
     @apply animate-spin rounded-full border-2 border-gray-300 border-t-blue-600;
   }
   
-  /* === NOUVEAUX STYLES POUR LE HEADER === */
+  /* === STYLES POUR LE HEADER === */
   
   /* Boutons header uniformes */
   .header-button {
@@ -244,6 +244,96 @@
   .header-icon-container {
     @apply relative;
     isolation: isolate;
+  }
+  
+  /* === STYLES MODALS - CORRECTION POSITIONNEMENT === */
+  
+  /* Modal overlay générique */
+  .modal-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 9998 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background-color: rgba(0, 0, 0, 0.5) !important;
+  }
+  
+  /* Modal container générique */
+  .modal-container {
+    position: relative !important;
+    z-index: 9999 !important;
+    max-width: 90vw !important;
+    max-height: 90vh !important;
+    margin: auto !important;
+    background: white !important;
+    border-radius: 0.75rem !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+    overflow: hidden !important;
+  }
+  
+  /* UserInfoModal spécifique - Force le centrage */
+  .user-info-modal {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 9999 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 1rem !important;
+    background-color: rgba(0, 0, 0, 0.5) !important;
+  }
+  
+  .user-info-modal-content {
+    position: relative !important;
+    width: 100% !important;
+    max-width: 42rem !important; /* max-w-2xl */
+    max-height: 85vh !important;
+    background: white !important;
+    border-radius: 0.75rem !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+  
+  /* Fix pour mobile - Assure une bonne visibilité */
+  @media (max-width: 640px) {
+    .user-info-modal {
+      padding: 0.5rem !important;
+    }
+    
+    .user-info-modal-content {
+      max-width: 95vw !important;
+      max-height: 95vh !important;
+    }
+  }
+  
+  /* Reset des styles qui pourraient interférer */
+  .user-info-modal * {
+    box-sizing: border-box;
+  }
+  
+  /* Assure que les overlays sont au-dessus de tout */
+  .modal-overlay,
+  .user-info-modal {
+    z-index: 9999 !important;
+    position: fixed !important;
+  }
+  
+  /* Alternative rapide si les classes above ne marchent pas - Force le style inline */
+  .force-modal-center {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 9999 !important;
   }
 }
 
