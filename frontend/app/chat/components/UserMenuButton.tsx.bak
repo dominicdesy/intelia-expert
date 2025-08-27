@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback, useMemo } from 'react'
 import { useAuthStore } from '@/lib/stores/auth' 
 import { useTranslation } from '../hooks/useTranslation'
 import { Modal } from './Modal'
@@ -9,8 +9,8 @@ import { ContactModal } from './modals/ContactModal'
 import { InviteFriendModal } from './modals/InviteFriendModal'
 import { PLAN_CONFIGS } from '@/types'
 
-// ==================== MENU UTILISATEUR AVEC INVITATIONS ====================
-export const UserMenuButton = () => {
+// ==================== MENU UTILISATEUR AVEC INVITATIONS - OPTIMISÉ ====================
+export const UserMenuButton = React.memo(() => {
   const { user, logout } = useAuthStore()
   const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
@@ -20,8 +20,8 @@ export const UserMenuButton = () => {
   const [showLanguageModal, setShowLanguageModal] = useState(false)
   const [showInviteFriendModal, setShowInviteFriendModal] = useState(false)
 
-  // ✅ CORRECTION: Fonction pour obtenir les initiales (corrigée pour gérer les emails)
-  const getUserInitials = (user: any): string => {
+  // ✅ CORRECTION: Fonction pour obtenir les initiales (corrigée pour gérer les emails) - MÉMORISÉE
+  const getUserInitials = useCallback((user: any): string => {
     if (!user) return 'U'
 
     // Vérifier si user.name est un email (contient @)
@@ -55,68 +55,77 @@ export const UserMenuButton = () => {
     }
 
     return 'U'
-  }
+  }, [])
 
-  const userInitials = getUserInitials(user)
-  
-  // DEBUG - à supprimer après diagnostic
-  console.log('=== DEBUG UserMenu ===')
-  console.log('user?.name:', user?.name)
-  console.log('user?.email:', user?.email)
-  console.log('calculated_initials:', userInitials)
-  console.log('has_name:', !!user?.name)
-  if (user?.name) {
-    const names = user.name.trim().split(' ')
-    console.log('name_split:', names)
-    console.log('name_length:', names.length)
-    console.log('first_char:', names[0][0])
-    if (names.length >= 2) {
-      console.log('last_char:', names[names.length - 1][0])
+  // 🛠️ CORRECTION MAJEURE : Mémoisation des initiales et debug conditionnel CORRIGÉ
+  const userInitials = useMemo(() => {
+    const initials = getUserInitials(user)
+    
+    // 🛠️ DEBUG CONDITIONNEL : Ne loguer que si les valeurs changent vraiment
+    const debugId = `${user?.name}-${user?.email}`
+    
+    // Utiliser une variable globale pour éviter l'erreur TypeScript
+    if (!window.userMenuLastDebugId) {
+      window.userMenuLastDebugId = ''
     }
-  }
-  console.log('===================')
-  
-  // ✅ RESTAURÉ: Variables de plan
-  const currentPlan = user?.plan || 'essential'
-  const plan = PLAN_CONFIGS[currentPlan as keyof typeof PLAN_CONFIGS] || PLAN_CONFIGS.essential
+    
+    if (debugId !== window.userMenuLastDebugId) {
+      window.userMenuLastDebugId = debugId
+      
+      console.log('🔄 [UserMenu] Changement détecté:', {
+        user_name: user?.name,
+        user_email: user?.email,
+        calculated_initials: initials,
+        has_name: !!user?.name
+      })
+    }
+    
+    return initials
+  }, [user?.name, user?.email, getUserInitials])
 
-  // ✅ RESTAURÉ: Vérifier si l'utilisateur est super_admin
-  const isSuperAdmin = user?.user_type === 'super_admin'
+  // 🛠️ CORRECTION : Mémoisation des variables de plan
+  const { currentPlan, plan, isSuperAdmin } = useMemo(() => {
+    const currentPlan = user?.plan || 'essential'
+    const plan = PLAN_CONFIGS[currentPlan as keyof typeof PLAN_CONFIGS] || PLAN_CONFIGS.essential
+    const isSuperAdmin = user?.user_type === 'super_admin'
+    
+    return { currentPlan, plan, isSuperAdmin }
+  }, [user?.plan, user?.user_type])
 
-  const handleContactClick = () => {
+  // 🛠️ CORRECTION : Mémoisation de tous les handlers
+  const handleContactClick = useCallback(() => {
     setIsOpen(false)
     setShowContactModal(true)
-  }
+  }, [])
 
-  const handleUserInfoClick = () => {
+  const handleUserInfoClick = useCallback(() => {
     setIsOpen(false)
     setShowUserInfoModal(true)
-  }
+  }, [])
 
-  const handleAccountClick = () => {
+  const handleAccountClick = useCallback(() => {
     setIsOpen(false)
     setShowAccountModal(true)
-  }
+  }, [])
 
-  const handleLanguageClick = () => {
+  const handleLanguageClick = useCallback(() => {
     setIsOpen(false)
     setShowLanguageModal(true)
-  }
+  }, [])
 
-  const handleInviteFriendClick = () => {
+  const handleInviteFriendClick = useCallback(() => {
     setIsOpen(false)
     setShowInviteFriendModal(true)
-  }
+  }, [])
 
-  // ✅ RESTAURÉ: Fonction pour les statistiques (super_admin uniquement)
-  const handleStatisticsClick = () => {
+  const handleStatisticsClick = useCallback(() => {
     setIsOpen(false)
     // Rediriger vers la page des statistiques
     window.open('/admin/statistics', '_blank')
-  }
+  }, [])
 
-  // ✅ NOUVELLE FONCTION DE DÉCONNEXION CORRIGÉE
-  const handleLogout = async () => {
+  // ✅ NOUVELLE FONCTION DE DÉCONNEXION CORRIGÉE - MÉMORISÉE
+  const handleLogout = useCallback(async () => {
     try {
       console.log('🔄 [UserMenu] Démarrage déconnexion')
       setIsOpen(false)
@@ -133,14 +142,33 @@ export const UserMenuButton = () => {
       // En cas d'erreur, forcer quand même la redirection
       window.location.href = '/'
     }
-  }
+  }, [logout])
+
+  const toggleOpen = useCallback(() => {
+    setIsOpen(prev => !prev)
+  }, [])
+
+  const closeMenu = useCallback(() => {
+    setIsOpen(false)
+  }, [])
+
+  // 🛠️ CORRECTION : Mémoisation des fonctions de fermeture de modales
+  const closeUserInfoModal = useCallback(() => setShowUserInfoModal(false), [])
+  const closeContactModal = useCallback(() => setShowContactModal(false), [])
+  const closeAccountModal = useCallback(() => setShowAccountModal(false), [])
+  const closeLanguageModal = useCallback(() => setShowLanguageModal(false), [])
+  const closeInviteFriendModal = useCallback(() => setShowInviteFriendModal(false), [])
+
+  const openPrivacyPolicy = useCallback(() => {
+    window.open('https://intelia.com/privacy-policy/', '_blank')
+  }, [])
 
   return (
     <>
       <div className="relative">
         {/* ✅ CONSERVÉ: Style carré avec coins arrondis */}
         <button
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={toggleOpen}
           className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors"
         >
           <span className="text-white text-xs font-medium">{userInitials}</span>
@@ -150,7 +178,7 @@ export const UserMenuButton = () => {
           <>
             <div 
               className="fixed inset-0 z-40" 
-              onClick={() => setIsOpen(false)}
+              onClick={closeMenu}
             />
             
             <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
@@ -162,13 +190,13 @@ export const UserMenuButton = () => {
                 {user?.user_type && (
                   <div className="mt-2">
                     {/* ✅ AFFICHAGE DU PLAN POUR LES UTILISATEURS NORMAUX SEULEMENT */}
-                    {user.user_type !== 'super_admin' && (
+                    {!isSuperAdmin && (
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${plan.bgColor} ${plan.color} border ${plan.borderColor}`}>
                         {plan.name}
                       </span>
                     )}
                     {/* ✅ AFFICHAGE DU RÔLE SUPER ADMIN */}
-                    {user.user_type === 'super_admin' && (
+                    {isSuperAdmin && (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
                         Super Admin
                       </span>
@@ -251,7 +279,7 @@ export const UserMenuButton = () => {
 
                 {/* ✅ RESTAURÉ: Mentions légales */}
                 <button
-                  onClick={() => window.open('https://intelia.com/privacy-policy/', '_blank')}
+                  onClick={openPrivacyPolicy}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                 >
                   <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -283,45 +311,55 @@ export const UserMenuButton = () => {
       {!isSuperAdmin && (
         <Modal
           isOpen={showAccountModal}
-          onClose={() => setShowAccountModal(false)}
+          onClose={closeAccountModal}
           title={t('subscription.title')}
         >
-          <AccountModal user={user as any} onClose={() => setShowAccountModal(false)} />
+          <AccountModal user={user as any} onClose={closeAccountModal} />
         </Modal>
       )}
 
       <Modal
         isOpen={showUserInfoModal}
-        onClose={() => setShowUserInfoModal(false)}
+        onClose={closeUserInfoModal}
         title={t('profile.title')}
       >
-        <UserInfoModal user={user as any} onClose={() => setShowUserInfoModal(false)} />
+        <UserInfoModal user={user as any} onClose={closeUserInfoModal} />
       </Modal>
 
       <Modal
         isOpen={showLanguageModal}
-        onClose={() => setShowLanguageModal(false)}
+        onClose={closeLanguageModal}
         title={t('language.title')}
       >
-        <LanguageModal onClose={() => setShowLanguageModal(false)} />
+        <LanguageModal onClose={closeLanguageModal} />
       </Modal>
 
       <Modal
         isOpen={showContactModal}
-        onClose={() => setShowContactModal(false)}
+        onClose={closeContactModal}
         title={t('contact.title')}
       >
-        <ContactModal onClose={() => setShowContactModal(false)} />
+        <ContactModal onClose={closeContactModal} />
       </Modal>
 
       {/* ✅ MODAL INVITER UN AMI */}
       <Modal
         isOpen={showInviteFriendModal}
-        onClose={() => setShowInviteFriendModal(false)}
+        onClose={closeInviteFriendModal}
         title="Inviter des amis"
       >
-        <InviteFriendModal onClose={() => setShowInviteFriendModal(false)} />
+        <InviteFriendModal onClose={closeInviteFriendModal} />
       </Modal>
     </>
   )
+})
+
+// 🛠️ CORRECTION : Ajout du displayName
+UserMenuButton.displayName = 'UserMenuButton'
+
+// 🛠️ CORRECTION : Déclaration TypeScript pour window
+declare global {
+  interface Window {
+    userMenuLastDebugId?: string
+  }
 }
