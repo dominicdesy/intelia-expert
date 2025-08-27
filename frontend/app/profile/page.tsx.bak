@@ -4,9 +4,8 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
 import Link from 'next/link'
-import { getSafeName, getSafeEmail, getSafeUserType, getSafeCreatedDate, getBadgeColor, getUserTypeLabel } from '../chat/utils/safeUserHelpers'
 
-// Icônes SVG (inchangées)
+// Icônes SVG
 const UserIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
@@ -32,51 +31,37 @@ const ArrowLeftIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
-// Fonction sécurisée pour les initiales
-const getSecureInitials = (name: string): string => {
-  if (!name || typeof name !== 'string') return 'U'
-  const cleanName = name.trim()
-  if (cleanName.length === 0) return 'U'
-  
-  return cleanName.split(' ')
-    .map(word => word[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) || 'U'
-}
-
-// Contenu de la page profil
+// 🔧 1. Votre contenu existant devient ProfilePageContent
 function ProfilePageContent() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const { user, isLoading } = useAuthStore()
-  const { updateProfile, exportUserData, deleteUserData } = useAuthStore()
+  const searchParams = useSearchParams() // ✅ Maintenant autorisé dans Suspense
+  const { user, isLoading } = useAuthStore() // Données utilisateur
+  const { updateProfile, exportUserData, deleteUserData, logout } = useAuthStore() // Actions
 
   const [activeTab, setActiveTab] = useState('profile')
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
-    userType: 'producer' as 'producer' | 'professional'
+    userType: 'producer' as 'producer' | 'professional' // CORRIGÉ: Retiré 'admin' pour correspondre à l'interface User
   })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  // Initialisation sécurisée avec les données utilisateur
+  // Initialiser avec les données utilisateur
   useEffect(() => {
     if (!user) {
       router.push('/auth/login')
       return
     }
 
-    // Initialisation sécurisée avec fallbacks
     setFormData({
-      fullName: getSafeName(user),
-      email: getSafeEmail(user),
-      userType: getSafeUserType(user) as 'producer' | 'professional'
+      fullName: user.name,           // CORRIGÉ: user.name au lieu de user.fullName
+      email: user.email,
+      userType: (user.user_type as 'producer' | 'professional')       // CORRIGÉ: user.user_type au lieu de user.userType
     })
 
-    // Gestion de l'onglet depuis l'URL
+    // Gérer l'onglet depuis l'URL
     const tab = searchParams.get('tab')
     if (tab && ['profile', 'settings', 'privacy'].includes(tab)) {
       setActiveTab(tab)
@@ -93,37 +78,22 @@ function ProfilePageContent() {
     setSuccess('')
   }
 
-  // Fonction de soumission sécurisée avec validation
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setSuccess('')
 
-    // Validation côté client AVANT d'envoyer
-    const trimmedName = formData.fullName.trim()
-    if (!trimmedName || trimmedName.length < 2) {
-      setError('Le nom complet doit contenir au moins 2 caractères')
-      return
-    }
-
-    if (!['producer', 'professional'].includes(formData.userType)) {
-      setError('Type de compte invalide')
+    if (!formData.fullName.trim()) {
+      setError('Le nom complet est requis')
       return
     }
 
     try {
-      // Données validées à envoyer
-      const dataToUpdate = {
-        name: trimmedName,
-        user_type: formData.userType
-      }
-      
-      await updateProfile(dataToUpdate)
+      await updateProfile({
+        name: formData.fullName,      // CORRIGÉ: name au lieu de fullName
+        user_type: formData.userType  // CORRIGÉ: user_type au lieu de userType
+      })
       setSuccess('Profil mis à jour avec succès')
-      
-      // Laisser le temps à l'UI de se stabiliser
-      // Pas de redirection immédiate
-      
     } catch (error: any) {
       setError(error.message || 'Erreur lors de la mise à jour')
     }
@@ -170,12 +140,25 @@ function ProfilePageContent() {
     )
   }
 
-  // Variables sécurisées pour l'affichage
-  const userName = getSafeName(user)
-  const userEmail = getSafeEmail(user)
-  const userType = getSafeUserType(user)
-  const createdDate = getSafeCreatedDate(user)
-  const userInitials = getSecureInitials(userName)
+  const getInitials = (name: string) => {
+    return name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2)
+  }
+
+  const getBadgeColor = (userType: string) => {
+    switch (userType) {
+      case 'professional': return 'bg-blue-100 text-blue-800'
+      case 'producer': return 'bg-green-100 text-green-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getUserTypeLabel = (userType: string) => {
+    switch (userType) {
+      case 'professional': return 'Professionnel'
+      case 'producer': return 'Producteur'
+      default: return userType
+    }
+  }
 
   const tabs = [
     { id: 'profile', label: 'Profil', icon: UserIcon },
@@ -206,17 +189,17 @@ function ProfilePageContent() {
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-lg shadow">
-          {/* Header du profil avec avatar sécurisé */}
+          {/* Header du profil avec avatar */}
           <div className="px-6 py-8 border-b border-gray-200">
             <div className="flex items-center space-x-6">
               <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-2xl">
-                {userInitials}
+                {getInitials(user.name)}  {/* CORRIGÉ: user.name au lieu de user.fullName */}
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">{userName}</h2>
-                <p className="text-gray-600">{userEmail}</p>
-                <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium mt-2 ${getBadgeColor(userType)}`}>
-                  {getUserTypeLabel(userType)}
+                <h2 className="text-2xl font-bold text-gray-900">{user.name}</h2>  {/* CORRIGÉ: user.name */}
+                <p className="text-gray-600">{user.email}</p>
+                <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium mt-2 ${getBadgeColor(user.user_type)}`}>
+                  {getUserTypeLabel(user.user_type)}  {/* CORRIGÉ: user.user_type */}
                 </div>
               </div>
             </div>
@@ -273,7 +256,7 @@ function ProfilePageContent() {
                         type="text"
                         id="fullName"
                         name="fullName"
-                        value={formData.fullName || ''}
+                        value={formData.fullName}
                         onChange={handleInputChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         required
@@ -288,7 +271,7 @@ function ProfilePageContent() {
                         type="email"
                         id="email"
                         name="email"
-                        value={formData.email || ''}
+                        value={formData.email}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
                         disabled
                       />
@@ -414,7 +397,7 @@ function ProfilePageContent() {
                       <h4 className="font-medium text-gray-900 mb-2">Politique de conservation</h4>
                       <p className="text-sm text-gray-600">
                         Vos données de conversation sont automatiquement supprimées après 30 jours.
-                        Membre depuis : {createdDate ? createdDate.toLocaleDateString('fr-FR') : 'N/A'}
+                        Dernière connexion : {new Date(user.created_at).toLocaleString('fr-FR')}  {/* CORRIGÉ: user.created_at au lieu de user.lastLogin */}
                       </p>
                     </div>
                   </div>
@@ -428,7 +411,7 @@ function ProfilePageContent() {
   )
 }
 
-// Export principal avec Suspense
+// 🔧 2. Export principal avec Suspense
 export default function ProfilePage() {
   return (
     <Suspense fallback={
