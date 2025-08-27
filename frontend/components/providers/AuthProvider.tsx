@@ -121,11 +121,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
               // Garder le blocage pendant 5 secondes pour éviter les états de course
               if (logoutTimeoutRef.current) {
                 clearTimeout(logoutTimeoutRef.current)
-              }
-              logoutTimeoutRef.current = setTimeout(() => {
-                console.log('🔥 [DEBUG-AUTH] Fin du blocage après 5s')
-                // Ne pas remettre isLoggingOutRef à false - laisser le démontage s'occuper
-              }, 5000)
+
+			  logoutTimeoutRef.current = setTimeout(() => {
+			    console.log('🕒 [DEBUG-TIMEOUT-AUTH] Execution timeout 5s - isMounted:', isMountedRef.current)
+			    if (isMountedRef.current) {
+			  	  console.log('🔥 [DEBUG-AUTH] Fin du blocage après 5s')
+			    } else {
+				  console.log('⚠️ [DEBUG-TIMEOUT-AUTH] Timeout 5s ignoré - AuthProvider démonté')
+			    }
+			  }, 5000)
               
               break
               
