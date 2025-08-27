@@ -390,38 +390,75 @@ export default function ChatInterface() {
     return messages.length > 0
   }, [messages.length])
 
-  // CORRECTION: redirectToLogin avec protection contre les appels multiples
+  // CORRECTION: redirectToLogin améliorée avec nettoyage complet
   const redirectToLogin = useCallback((reason: string = 'Session expirée') => {
-    // Protection contre les appels multiples
+    // Protection contre les appels multiples RENFORCÉE
     if (isRedirectingRef.current) {
       console.log('Redirection déjà en cours, ignore:', reason)
-      return
+      return Promise.resolve()
     }
 
     isRedirectingRef.current = true
     console.log('Redirection vers login:', reason)
     
-    // Nettoyer les timeouts existants
-    if (redirectTimeoutRef.current) clearTimeout(redirectTimeoutRef.current)
-    if (authCheckTimeoutRef.current) clearTimeout(authCheckTimeoutRef.current)
+    // Nettoyer immédiatement TOUS les timeouts
+    [redirectTimeoutRef, authCheckTimeoutRef, loadingTimeoutRef].forEach(ref => {
+      if (ref.current) {
+        clearTimeout(ref.current)
+        ref.current = null
+      }
+    })
+    
+    // Marquer le composant comme démonté pour empêcher les setState
+    isMountedRef.current = false
+    
+    // Nettoyer les stores avant la redirection
+    try {
+      // Reset du store de chat pour éviter les états incohérents
+      const chatStore = useChatStore.getState()
+      if (chatStore.reset) {
+        chatStore.reset()
+      } else {
+        // Reset manuel si pas de méthode reset
+        useChatStore.setState({
+          currentConversation: null,
+          conversations: [],
+          isLoading: false
+        })
+      }
+    } catch (error) {
+      console.warn('Erreur nettoyage stores:', error)
+    }
+    
+    // Nettoyer les classes CSS
+    document.body.classList.remove('keyboard-open')
     
     try {
       router.push('/')
       
-      // Fallback au cas où router.push échoue
+      // Fallback plus court et plus robuste
       redirectTimeoutRef.current = setTimeout(() => {
         if (window.location.pathname === '/chat') {
           window.location.href = '/'
         }
-      }, 1000)
+      }, 500) // Réduit de 1000ms à 500ms
+      
     } catch (error) {
       console.error('Erreur redirection router, fallback immédiat')
       window.location.href = '/'
     }
+    
+    return Promise.resolve()
   }, [router])
 
   const handleAuthError = useCallback((error: any) => {
     console.log('Gestion erreur auth:', error)
+    
+    // Empêcher les opérations si le composant n'est plus monté
+    if (!isMountedRef.current) {
+      console.log('Composant démonté, ignore erreur auth')
+      return
+    }
     
     if (error?.status === 403 || 
         error?.message?.includes('Auth session missing') ||
@@ -542,7 +579,7 @@ export default function ChatInterface() {
 
   // loadConversationsWithBreaker simplifiée
   const loadConversationsWithBreaker = useCallback(async (userId: string) => {
-    if (!pageLoadingBreaker.canAttempt() || hasLoadedConversationsRef.current) {
+    if (!pageLoadingBreaker.canAttempt() || hasLoadedConversationsRef.current || !isMountedRef.current) {
       return
     }
 
@@ -551,29 +588,35 @@ export default function ChatInterface() {
 
     try {
       await useChatStore.getState().loadConversations(userId)
-      hasLoadedConversationsRef.current = true
-      conversationLoadingAttemptsRef.current = 0
-      pageLoadingBreaker.recordSuccess()
+      
+      if (isMountedRef.current) {
+        hasLoadedConversationsRef.current = true
+        conversationLoadingAttemptsRef.current = 0
+        pageLoadingBreaker.recordSuccess()
+      }
     } catch (error) {
       pageLoadingBreaker.recordFailure()
-      handleAuthError(error)
-      hasLoadedConversationsRef.current = false
       
-      if (conversationLoadingAttemptsRef.current >= 3) {
-        hasLoadedConversationsRef.current = true
+      if (isMountedRef.current) {
+        handleAuthError(error)
+        hasLoadedConversationsRef.current = false
+        
+        if (conversationLoadingAttemptsRef.current >= 3) {
+          hasLoadedConversationsRef.current = true
+        }
       }
       
       throw error
     }
   }, [handleAuthError])
 
-  // CORRECTION: useEffect pour auth backend avec cleanup approprié
+  // CORRECTION: useEffect pour auth backend avec nettoyage approprié
   useEffect(() => {
     let isInitializing = false
     let isCancelled = false
     
     const initAuth = async () => {
-      if (isInitializing || !hasHydrated || isCancelled) return
+      if (isInitializing || !hasHydrated || isCancelled || !isMountedRef.current) return
       isInitializing = true
       
       try {
@@ -605,7 +648,7 @@ export default function ChatInterface() {
   useEffect(() => {
     let timeoutId: NodeJS.Timeout | null = null
 
-    if (hasHydrated && isAuthenticated === false && !isLoading) {
+    if (hasHydrated && isAuthenticated === false && !isLoading && isMountedRef.current) {
       timeoutId = setTimeout(() => {
         if (isMountedRef.current) {
           redirectToLogin('Déconnexion')
@@ -622,7 +665,7 @@ export default function ChatInterface() {
 
   // CORRECTION: useEffect pour gestion clavier mobile avec cleanup complet
   useEffect(() => {
-    if (!uiState.isMobileDevice) return
+    if (!uiState.isMobileDevice || !isMountedRef.current) return
 
     let initialViewportHeight = window.visualViewport?.height || window.innerHeight
     let isCancelled = false
@@ -740,19 +783,17 @@ export default function ChatInterface() {
     isMountedRef.current = true
     
     return () => {
+      console.log('ChatInterface: Nettoyage complet au démontage')
       isMountedRef.current = false
       isRedirectingRef.current = false
       
       // Nettoyer TOUS les timeouts
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current)
-      }
-      if (redirectTimeoutRef.current) {
-        clearTimeout(redirectTimeoutRef.current)
-      }
-      if (authCheckTimeoutRef.current) {
-        clearTimeout(authCheckTimeoutRef.current)
-      }
+      [loadingTimeoutRef, redirectTimeoutRef, authCheckTimeoutRef].forEach(ref => {
+        if (ref.current) {
+          clearTimeout(ref.current)
+          ref.current = null
+        }
+      })
       
       // Nettoyer les classes CSS
       document.body.classList.remove('keyboard-open')
@@ -766,6 +807,8 @@ export default function ChatInterface() {
 
   // Détection de device mobile
   useEffect(() => {
+    if (!isMountedRef.current) return
+
     const detectMobileDevice = () => {
       const userAgent = navigator.userAgent.toLowerCase()
       const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
@@ -793,10 +836,11 @@ export default function ChatInterface() {
 
   // CORRECTION: Auto-scroll avec protection complète
   useEffect(() => {
+    if (!isMountedRef.current) return
+
     let timeoutId: NodeJS.Timeout | null = null
 
-    if (isMountedRef.current && 
-        messages.length > lastMessageCountRef.current && 
+    if (messages.length > lastMessageCountRef.current && 
         uiState.shouldAutoScroll && 
         !uiState.isUserScrolling) {
       
@@ -819,7 +863,7 @@ export default function ChatInterface() {
   // CORRECTION: Gestion du scroll avec cleanup approprié et protection
   useEffect(() => {
     const chatContainer = chatContainerRef.current
-    if (!chatContainer) return
+    if (!chatContainer || !isMountedRef.current) return
 
     let scrollTimeout: NodeJS.Timeout
     let isScrolling = false
@@ -911,7 +955,7 @@ export default function ChatInterface() {
     }
   }, [currentLanguage, t, currentConversation, setCurrentConversation])
 
-  // Chargement des conversations avec timeout
+  // Chargement des conversations avec timeout et protection
   useEffect(() => {
     if (isAuthenticated && user?.id && isMountedRef.current && !hasLoadedConversationsRef.current) {
       if (loadingTimeoutRef.current) {
@@ -937,6 +981,7 @@ export default function ChatInterface() {
       return () => {
         if (loadingTimeoutRef.current) {
           clearTimeout(loadingTimeoutRef.current)
+          loadingTimeoutRef.current = null
         }
       }
     }
@@ -944,14 +989,14 @@ export default function ChatInterface() {
 
   // Reset circuit breaker
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && isMountedRef.current) {
       hasLoadedConversationsRef.current = false
       conversationLoadingAttemptsRef.current = 0
       pageLoadingBreaker.reset()
     }
   }, [user?.id])
 
-  // États de chargement
+  // États de chargement avec protection
   if (isLoading || !hasHydrated) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
@@ -1052,7 +1097,7 @@ export default function ChatInterface() {
     return [answerText, []]
   }
 
-  // handleSendMessage simplifiée
+  // handleSendMessage avec protection renforcée
   const handleSendMessage = useCallback(async (text?: string) => {
     const safeText = text || uiState.inputMessage
     
@@ -1165,7 +1210,7 @@ export default function ChatInterface() {
     }
   }, [uiState.inputMessage, currentConversation, addMessage, clarificationState, user, currentLanguage, cleanResponseText, handleAuthError, t])
 
-  // Fonctions de feedback simplifiées
+  // Fonctions de feedback avec protection
   const handleFeedbackClick = useCallback((messageId: string, feedback: 'positive' | 'negative') => {
     if (!isMountedRef.current) return
 
