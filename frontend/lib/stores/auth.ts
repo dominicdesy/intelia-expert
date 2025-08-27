@@ -1,4 +1,4 @@
-// lib/stores/auth.ts – Store d'auth SUPABASE NATIF (VERSION FINALE CORRIGÉE + SINGLETON + API EXPERT)
+// lib/stores/auth.ts — Store d'auth SUPABASE NATIF (VERSION FINALE CORRIGÉE + SINGLETON + API EXPERT)
 'use client'
 
 import { create } from 'zustand'
@@ -17,18 +17,39 @@ const alog = (...args: any[]) => {
 
 alog('Store Auth Supabase NATIF chargé (singleton)')
 
-// CORRECTION: Variable globale pour gérer l'état de montage
+// CORRECTION CRITIQUE: Variable globale pour gérer l'état de montage avec logs debug
 let isStoreActive = true
 
-// CORRECTION: Fonctions pour contrôler l'état du store
+// CORRECTION: Fonctions pour contrôler l'état du store avec logs debug
 export const markStoreUnmounted = () => {
+  console.log('🕒 [DEBUG-TIMEOUT-STORE] Execution markStoreUnmounted - isStoreActive:', isStoreActive)
   isStoreActive = false
-  console.log('[AuthStore] Marqué comme démonté')
+  console.log('⚠️ [DEBUG-TIMEOUT-STORE] Store marqué comme démonté')
 }
 
 export const markStoreMounted = () => {
+  console.log('🕒 [DEBUG-TIMEOUT-STORE] Execution markStoreMounted - isStoreActive:', isStoreActive)
   isStoreActive = true
-  console.log('[AuthStore] Marqué comme monté')
+  console.log('✅ [DEBUG-TIMEOUT-STORE] Store marqué comme monté')
+}
+
+// CORRECTION: Wrapper sécurisé pour tous les setState du store
+const safeSetState = (setFn: any, stateName: string) => {
+  console.log('🕒 [DEBUG-TIMEOUT-STORE-SET] Tentative setState:', stateName, '- isStoreActive:', isStoreActive)
+  if (isStoreActive) {
+    // Différer le setState avec setTimeout pour éviter les setState synchrones pendant démontage
+    setTimeout(() => {
+      console.log('🕒 [DEBUG-TIMEOUT-STORE-SET] Execution setState différé:', stateName, '- isStoreActive:', isStoreActive)
+      if (isStoreActive) {
+        setFn()
+        console.log('✅ [DEBUG-TIMEOUT-STORE-SET] setState appliqué:', stateName)
+      } else {
+        console.log('⚠️ [DEBUG-TIMEOUT-STORE-SET] setState différé ignoré - store démonté:', stateName)
+      }
+    }, 0)
+  } else {
+    console.log('⚠️ [DEBUG-TIMEOUT-STORE-SET] setState ignoré - store démonté:', stateName)
+  }
 }
 
 // Types d'état du store
@@ -105,7 +126,7 @@ function adaptSupabaseUser(supabaseUser: any, additionalData?: any): AppUser {
   }
 }
 
-// Store Supabase NATIF (avec singleton et protection démontage)
+// Store Supabase NATIF (avec singleton et protection démontage RENFORCÉE)
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -117,25 +138,24 @@ export const useAuthStore = create<AuthState>()(
       authErrors: [],
 
       setHasHydrated: (v: boolean) => {
-        if (!isStoreActive) return
-        set({ hasHydrated: v })
+        safeSetState(() => set({ hasHydrated: v }), 'setHasHydrated')
       },
 
       handleAuthError: (error: any, ctx?: string) => {
-        if (!isStoreActive) return
-        
         const msg = (error?.message || 'Authentication error').toString()
         console.error('[SupabaseAuth/Singleton]', ctx || '', error)
-        set((s) => ({ authErrors: [...s.authErrors, msg] }))
+        safeSetState(() => set((s) => ({ authErrors: [...s.authErrors, msg] })), 'handleAuthError')
       },
 
       clearAuthErrors: () => {
-        if (!isStoreActive) return
-        set({ authErrors: [] })
+        safeSetState(() => set({ authErrors: [] }), 'clearAuthErrors')
       },
 
       initializeSession: async () => {
-        if (!isStoreActive) return false
+        if (!isStoreActive) {
+          console.log('⚠️ [DEBUG-TIMEOUT-STORE] initializeSession ignoré - store démonté')
+          return false
+        }
         
         try {
           alog('initializeSession via Supabase natif (singleton)')
@@ -145,17 +165,13 @@ export const useAuthStore = create<AuthState>()(
           
           if (error) {
             alog('Erreur session Supabase (singleton):', error)
-            if (isStoreActive) {
-              set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() })
-            }
+            safeSetState(() => set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() }), 'initializeSession-error')
             return false
           }
 
           if (!session || !session.user) {
             alog('Pas de session Supabase (singleton)')
-            if (isStoreActive) {
-              set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() })
-            }
+            safeSetState(() => set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() }), 'initializeSession-no-session')
             return false
           }
 
@@ -195,15 +211,18 @@ export const useAuthStore = create<AuthState>()(
             profileData = { user_type: 'producer', language: 'fr' }
           }
 
-          if (!isStoreActive) return false
+          if (!isStoreActive) {
+            console.log('⚠️ [DEBUG-TIMEOUT-STORE] initializeSession interrompu - store démonté')
+            return false
+          }
 
           const appUser = adaptSupabaseUser(session.user, profileData)
 
-          set({ 
+          safeSetState(() => set({ 
             user: appUser, 
             isAuthenticated: true, 
             lastAuthCheck: Date.now()
-          })
+          }), 'initializeSession-success')
           
           alog('initializeSession réussi (singleton):', appUser.email)
           return true
@@ -211,23 +230,24 @@ export const useAuthStore = create<AuthState>()(
         } catch (e) {
           if (isStoreActive) {
             get().handleAuthError(e, 'initializeSession')
-            set({ isAuthenticated: false, user: null })
+            safeSetState(() => set({ isAuthenticated: false, user: null }), 'initializeSession-catch')
           }
           return false
         }
       },
 
       checkAuth: async () => {
-        if (!isStoreActive) return
+        if (!isStoreActive) {
+          console.log('⚠️ [DEBUG-TIMEOUT-STORE] checkAuth ignoré - store démonté')
+          return
+        }
         
         try {
           const supabase = getSupabaseClient()
           const { data: { session } } = await supabase.auth.getSession()
           
           if (!session || !session.user) {
-            if (isStoreActive) {
-              set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() })
-            }
+            safeSetState(() => set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() }), 'checkAuth-no-session')
             return
           }
 
@@ -247,30 +267,36 @@ export const useAuthStore = create<AuthState>()(
             alog('Erreur récupération profil lors du checkAuth (singleton)')
           }
 
-          if (!isStoreActive) return
+          if (!isStoreActive) {
+            console.log('⚠️ [DEBUG-TIMEOUT-STORE] checkAuth interrompu - store démonté')
+            return
+          }
 
           const appUser = adaptSupabaseUser(session.user, profileData)
 
-          set({
+          safeSetState(() => set({
             user: appUser,
             isAuthenticated: true,
             lastAuthCheck: Date.now()
-          })
+          }), 'checkAuth-success')
           
           alog('checkAuth réussi (singleton)')
           
         } catch (e) {
           if (isStoreActive) {
             get().handleAuthError(e, 'checkAuth')
-            set({ isAuthenticated: false, user: null })
+            safeSetState(() => set({ isAuthenticated: false, user: null }), 'checkAuth-error')
           }
         }
       },
 
       login: async (email: string, password: string) => {
-        if (!isStoreActive) return
+        if (!isStoreActive) {
+          console.log('⚠️ [DEBUG-TIMEOUT-STORE] login ignoré - store démonté')
+          return
+        }
         
-        set({ isLoading: true, authErrors: [] })
+        safeSetState(() => set({ isLoading: true, authErrors: [] }), 'login-start')
         alog('login via Supabase natif (singleton):', email)
         
         try {
@@ -290,9 +316,7 @@ export const useAuthStore = create<AuthState>()(
 
           alog('Login Supabase réussi (singleton):', data.user.email)
 
-          if (isStoreActive) {
-            set({ isLoading: false })
-          }
+          safeSetState(() => set({ isLoading: false }), 'login-success')
           
         } catch (e: any) {
           if (isStoreActive) {
@@ -309,16 +333,17 @@ export const useAuthStore = create<AuthState>()(
             throw new Error(userMessage)
           }
         } finally {
-          if (isStoreActive) {
-            set({ isLoading: false })
-          }
+          safeSetState(() => set({ isLoading: false }), 'login-finally')
         }
       },
 
       register: async (email: string, password: string, userData: Partial<AppUser>) => {
-        if (!isStoreActive) return
+        if (!isStoreActive) {
+          console.log('⚠️ [DEBUG-TIMEOUT-STORE] register ignoré - store démonté')
+          return
+        }
         
-        set({ isLoading: true, authErrors: [] })
+        safeSetState(() => set({ isLoading: true, authErrors: [] }), 'register-start')
         alog('register via Supabase natif (singleton):', email)
         
         try {
@@ -373,9 +398,7 @@ export const useAuthStore = create<AuthState>()(
             }
           }
 
-          if (isStoreActive) {
-            set({ isLoading: false })
-          }
+          safeSetState(() => set({ isLoading: false }), 'register-profile-done')
           
           if (!data.session) {
             toast.success('Compte créé ! Vérifiez votre email pour confirmer votre inscription.')
@@ -401,16 +424,17 @@ export const useAuthStore = create<AuthState>()(
             throw new Error(userMessage)
           }
         } finally {
-          if (isStoreActive) {
-            set({ isLoading: false })
-          }
+          safeSetState(() => set({ isLoading: false }), 'register-finally')
         }
       },
 
       logout: async () => {
-        if (!isStoreActive) return
+        if (!isStoreActive) {
+          console.log('⚠️ [DEBUG-TIMEOUT-STORE] logout ignoré - store démonté')
+          return
+        }
         
-        set({ isLoading: true })
+        safeSetState(() => set({ isLoading: true }), 'logout-start')
         alog('logout via Supabase natif (singleton)')
         
         try {
@@ -440,14 +464,12 @@ export const useAuthStore = create<AuthState>()(
             console.warn('Erreur nettoyage localStorage:', storageError)
           }
 
-          // Nettoyer l'état APRÈS le nettoyage storage
-          if (isStoreActive) {
-            set({ 
-              user: null, 
-              isAuthenticated: false,
-              lastAuthCheck: Date.now()
-            })
-          }
+          // CORRECTION CRITIQUE: Nettoyer l'état APRÈS le nettoyage storage avec protection
+          safeSetState(() => set({ 
+            user: null, 
+            isAuthenticated: false,
+            lastAuthCheck: Date.now()
+          }), 'logout-clear-state')
           
           alog('Logout réussi (singleton)')
           
@@ -456,26 +478,27 @@ export const useAuthStore = create<AuthState>()(
             get().handleAuthError(e, 'logout')
             alog('Erreur logout (singleton):', e?.message)
             
-            // Même en cas d'erreur, nettoyer l'état local
-            set({ 
+            // Même en cas d'erreur, nettoyer l'état local avec protection
+            safeSetState(() => set({ 
               user: null, 
               isAuthenticated: false,
               lastAuthCheck: Date.now()
-            })
+            }), 'logout-error-clear-state')
             
             throw new Error(e?.message || 'Erreur lors de la déconnexion')
           }
         } finally {
-          if (isStoreActive) {
-            set({ isLoading: false })
-          }
+          safeSetState(() => set({ isLoading: false }), 'logout-finally')
         }
       },
 
       updateProfile: async (data: Partial<AppUser>) => {
-        if (!isStoreActive) return
+        if (!isStoreActive) {
+          console.log('⚠️ [DEBUG-TIMEOUT-STORE] updateProfile ignoré - store démonté')
+          return
+        }
         
-        set({ isLoading: true })
+        safeSetState(() => set({ isLoading: true }), 'updateProfile-start')
         alog('updateProfile via Supabase (singleton)')
         
         try {
@@ -531,7 +554,7 @@ export const useAuthStore = create<AuthState>()(
               email: currentUser.email, // L'email ne change jamais
               user_type: data.user_type || currentUser.user_type
             }
-            set({ user: updatedUser })
+            safeSetState(() => set({ user: updatedUser }), 'updateProfile-success')
           }
           
           alog('updateProfile réussi (singleton)')
@@ -542,14 +565,15 @@ export const useAuthStore = create<AuthState>()(
             throw new Error(e?.message || 'Erreur de mise à jour du profil')
           }
         } finally {
-          if (isStoreActive) {
-            set({ isLoading: false })
-          }
+          safeSetState(() => set({ isLoading: false }), 'updateProfile-finally')
         }
       },
 
       updateConsent: async (consent: RGPDConsent) => {
-        if (!isStoreActive) return
+        if (!isStoreActive) {
+          console.log('⚠️ [DEBUG-TIMEOUT-STORE] updateConsent ignoré - store démonté')
+          return
+        }
         
         alog('updateConsent via Supabase (singleton)')
         
@@ -573,7 +597,10 @@ export const useAuthStore = create<AuthState>()(
       },
 
       deleteUserData: async () => {
-        if (!isStoreActive) return
+        if (!isStoreActive) {
+          console.log('⚠️ [DEBUG-TIMEOUT-STORE] deleteUserData ignoré - store démonté')
+          return
+        }
         
         const currentUser = get().user
         if (!currentUser) throw new Error('Non authentifié')
@@ -626,7 +653,10 @@ export const useAuthStore = create<AuthState>()(
 
       // Nouvelle méthode: Récupérer le token Supabase pour l'API Expert
       getAuthToken: async () => {
-        if (!isStoreActive) return null
+        if (!isStoreActive) {
+          console.log('⚠️ [DEBUG-TIMEOUT-STORE] getAuthToken ignoré - store démonté')
+          return null
+        }
         
         try {
           const supabase = getSupabaseClient()
@@ -667,7 +697,10 @@ export const useAuthStore = create<AuthState>()(
 
 // Fonction utilitaire exportée: Pour utilisation dans d'autres fichiers
 export const getAuthToken = async (): Promise<string | null> => {
-  if (!isStoreActive) return null
+  if (!isStoreActive) {
+    console.log('⚠️ [DEBUG-TIMEOUT-STORE] getAuthToken utilitaire ignoré - store démonté')
+    return null
+  }
   
   try {
     const supabase = getSupabaseClient()

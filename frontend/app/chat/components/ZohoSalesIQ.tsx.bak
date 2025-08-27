@@ -31,7 +31,7 @@ const CONFIG = {
   DOM_OBSERVER_DELAY: 500
 } as const
 
-// Fonction utilitaire sécurisée pour éviter l'erreur includes
+// 🛡️ NOUVELLE FONCTION UTILITAIRE SÉCURISÉE pour éviter l'erreur includes
 const hasZohoClass = (element: Element): boolean => {
   try {
     // Approche plus simple et robuste pour TypeScript
@@ -44,17 +44,17 @@ const hasZohoClass = (element: Element): boolean => {
     
     return classString.includes('zsiq') || classString.includes('siq-')
   } catch (error) {
-    console.warn('Erreur vérification classe:', error)
+    console.warn('⚠️ [ZohoSalesIQ] Erreur vérification classe:', error)
     return false
   }
 }
 
-// Fonction utilitaire pour vérifier les IDs Zoho
+// 🛡️ FONCTION UTILITAIRE pour vérifier les IDs Zoho
 const hasZohoId = (element: Element): boolean => {
   try {
     return element.id?.includes('zsiq') || false
   } catch (error) {
-    console.warn('Erreur vérification ID:', error)
+    console.warn('⚠️ [ZohoSalesIQ] Erreur vérification ID:', error)
     return false
   }
 }
@@ -95,7 +95,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       }
       
       if (this.isOpen) {
-        console.warn('Circuit breaker ouvert - opération bloquée')
+        console.warn('🚫 [ZohoSalesIQ] Circuit breaker ouvert - opération bloquée')
         return false
       }
       
@@ -108,7 +108,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       
       if (this.failures >= CONFIG.CIRCUIT_BREAKER_THRESHOLD) {
         this.isOpen = true
-        console.error('Circuit breaker activé après', this.failures, 'échecs')
+        console.error('🚫 [ZohoSalesIQ] Circuit breaker activé après', this.failures, 'échecs')
       }
     },
     
@@ -118,15 +118,12 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     }
   })
 
-  // CORRECTION CRITIQUE: Fonction utilitaire sécurisée pour gérer les timeouts avec tracking et logs debug
+  // Fonction utilitaire pour gérer les timeouts avec tracking
   const createTimeout = useCallback((callback: () => void, delay: number): NodeJS.Timeout => {
     const timeout = setTimeout(() => {
-      console.log('🕒 [DEBUG-TIMEOUT-ZOHO] Execution createTimeout - isMounted:', isMountedRef.current)
       timeoutsRef.current.delete(timeout)
       if (isMountedRef.current) {
         callback()
-      } else {
-        console.log('⚠️ [DEBUG-TIMEOUT-ZOHO] createTimeout ignoré - composant démonté')
       }
     }, delay)
     timeoutsRef.current.add(timeout)
@@ -136,11 +133,8 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
   // Fonction utilitaire pour gérer les intervals avec tracking
   const createInterval = useCallback((callback: () => void, delay: number): NodeJS.Timeout => {
     const interval = setInterval(() => {
-      console.log('🕒 [DEBUG-TIMEOUT-ZOHO-INTERVAL] Execution createInterval - isMounted:', isMountedRef.current)
       if (isMountedRef.current) {
         callback()
-      } else {
-        console.log('⚠️ [DEBUG-TIMEOUT-ZOHO-INTERVAL] createInterval ignoré - composant démonté')
       }
     }, delay)
     intervalsRef.current.add(interval)
@@ -169,7 +163,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
   const setGlobalSessionLanguage = useCallback((lang: string) => {
     if (typeof window !== 'undefined') {
       ;(window as any).ZOHO_SESSION_LANGUAGE = lang
-      console.log('Variable globale stockée:', lang)
+      console.log('🌐 [ZohoSalesIQ] Variable globale stockée:', lang)
     }
   }, [])
 
@@ -180,14 +174,14 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     try {
       const floatButton = document.querySelector('#zsiq_float') as HTMLElement
       if (floatButton && floatButton.classList.contains('zsiq-hide')) {
-        console.log('Retrait classe zsiq-hide pour rendre visible')
+        console.log('🔌 [ZohoSalesIQ] Retrait classe zsiq-hide pour rendre visible')
         floatButton.classList.remove('zsiq-hide')
-        console.log('Bouton flottant maintenant visible')
+        console.log('✅ [ZohoSalesIQ] Bouton flottant maintenant visible')
         return true
       }
       return false
     } catch (error) {
-      console.error('Erreur visibilité bouton:', error)
+      console.error('🔧 [ZohoSalesIQ] Erreur visibilité bouton:', error)
       circuitBreaker.current.recordFailure()
       return false
     }
@@ -210,9 +204,9 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
           if ((window as any).$zoho?.salesiq?.floatwindow) {
             try {
               ;(window as any).$zoho.salesiq.floatwindow.visible('hide')
-              console.log('Fenêtre fermée via API Zoho')
+              console.log('✅ [ZohoSalesIQ] Fenêtre fermée via API Zoho')
             } catch (error) {
-              console.warn('Impossible de fermer via API:', error)
+              console.warn('⚠️ [ZohoSalesIQ] Impossible de fermer via API:', error)
             }
           }
           
@@ -224,12 +218,12 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       })
 
       if (hasChanges) {
-        console.log('Fenêtre chat masquée')
+        console.log('✅ [ZohoSalesIQ] Fenêtre chat masquée')
       }
 
       return hasChanges
     } catch (error) {
-      console.error('Erreur masquage chat:', error)
+      console.error('🔧 [ZohoSalesIQ] Erreur masquage chat:', error)
       circuitBreaker.current.recordFailure()
       return false
     }
@@ -256,7 +250,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
           })
           
           if (hasChanges) {
-            console.log('Contrôle imbriqué corrigé')
+            console.log('✅ [ZohoSalesIQ] Contrôle imbriqué corrigé')
           }
         }
 
@@ -283,7 +277,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       const interactiveElements = document.querySelectorAll('#zsiq_float [role="button"], .siqico-close, [class*="zsiq"][onclick]')
       interactiveElements.forEach(element => {
         if (!element.getAttribute('aria-label') && !element.getAttribute('aria-labelledby')) {
-          // CORRECTION : Utiliser la fonction sécurisée pour className
+          // ✅ CORRECTION : Utiliser la fonction sécurisée pour className
           let label = 'Élément interactif du chat'
           
           try {
@@ -298,7 +292,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
               label = 'Agrandir le chat'
             }
           } catch (error) {
-            console.warn('Erreur détection classe bouton:', error)
+            console.warn('⚠️ [ZohoSalesIQ] Erreur détection classe bouton:', error)
           }
           
           element.setAttribute('aria-label', label)
@@ -317,12 +311,12 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       })
 
       if (hasChanges) {
-        console.log('Fixes accessibilité appliqués')
+        console.log('✅ [ZohoSalesIQ] Fixes accessibilité appliqués')
       }
 
       return hasChanges
     } catch (error) {
-      console.error('Erreur fixes accessibilité:', error)
+      console.error('🔧 [ZohoSalesIQ] Erreur fixes accessibilité:', error)
       circuitBreaker.current.recordFailure()
       return false
     }
@@ -340,7 +334,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
 
     // Limiter le nombre de vérifications
     if (state.verificationCount >= CONFIG.MAX_VERIFICATION_ATTEMPTS) {
-      console.log('Limite vérifications atteinte')
+      console.log('🛑 [ZohoSalesIQ] Limite vérifications atteinte')
       return
     }
 
@@ -356,7 +350,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       if (fixZohoAccessibility()) hasChanges = true
 
       if (hasChanges) {
-        console.log('Vérification consolidée terminée avec modifications')
+        console.log('✅ [ZohoSalesIQ] Vérification consolidée terminée avec modifications')
         circuitBreaker.current.recordSuccess()
         
         // Reset du compteur de vérifications après succès
@@ -364,12 +358,12 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       }
 
     } catch (error) {
-      console.error('Erreur vérification consolidée:', error)
+      console.error('🔧 [ZohoSalesIQ] Erreur vérification consolidée:', error)
       circuitBreaker.current.recordFailure()
     }
   }, [ensureFloatButtonVisible, hideZohoChatWindow, fixZohoAccessibility])
 
-  // CORRECTION CRITIQUE: Vérification avec debouncing optimisé et logs debug
+  // Vérification avec debouncing optimisé
   const debouncedVerification = useCallback(() => {
     if (!isMountedRef.current) return
 
@@ -378,22 +372,16 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       clearTimeout(verificationTimeoutRef.current)
     }
 
-    // CORRECTION: setTimeout avec logs debug pour identifier le timeout coupable
-    verificationTimeoutRef.current = setTimeout(() => {
-      console.log('🕒 [DEBUG-TIMEOUT-ZOHO-VERIFICATION] Execution debouncedVerification - isMounted:', isMountedRef.current)
-      if (isMountedRef.current) {
-        performConsolidatedVerification()
-      } else {
-        console.log('⚠️ [DEBUG-TIMEOUT-ZOHO-VERIFICATION] debouncedVerification ignoré - composant démonté')
-      }
+    verificationTimeoutRef.current = createTimeout(() => {
+      performConsolidatedVerification()
     }, CONFIG.VERIFICATION_DEBOUNCE)
-  }, [performConsolidatedVerification])
+  }, [performConsolidatedVerification, createTimeout])
 
   // Initialisation optimisée de l'objet Zoho
   const initializeZohoObject = useCallback(() => {
     if (typeof window === 'undefined') return
 
-    console.log('Initialisation objet $zoho')
+    console.log('🔧 [ZohoSalesIQ] Initialisation objet $zoho')
 
     if (!document.querySelector('#zoho-init-script')) {
       const initScript = document.createElement('script')
@@ -401,7 +389,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       initScript.innerHTML = `
         window.$zoho = window.$zoho || {};
         $zoho.salesiq = $zoho.salesiq || {ready: function(){}};
-        console.log('Objet $zoho initialisé');
+        console.log('✅ [ZohoSalesIQ] Objet $zoho initialisé');
       `
       document.head.appendChild(initScript)
     }
@@ -415,14 +403,14 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     configurationLockRef.current = true
 
     try {
-      console.log(`Tentative de configuration ${attempt}/${CONFIG.MAX_CONFIG_ATTEMPTS}`)
+      console.log(`🔧 [ZohoSalesIQ] Tentative de configuration ${attempt}/${CONFIG.MAX_CONFIG_ATTEMPTS}`)
 
       const $zoho = (window as any).$zoho
       if (!$zoho?.salesiq?.visitor?.info || !$zoho?.salesiq?.floatwindow?.visible) {
         throw new Error('API Zoho incomplète')
       }
 
-      console.log('Objet Zoho complet disponible, configuration...')
+      console.log('✅ [ZohoSalesIQ] Objet Zoho complet disponible, configuration...')
 
       // Configuration des informations utilisateur
       if (user?.email) {
@@ -435,21 +423,16 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
         }
         
         $zoho.salesiq.visitor.info(visitorInfo)
-        console.log('Info utilisateur configurée avec langue:', lang)
+        console.log('👤 [ZohoSalesIQ] Info utilisateur configurée avec langue:', lang)
       }
 
-      console.log('Widget configuré - BOUTON FLOTTANT UNIQUEMENT')
+      console.log('👁️ [ZohoSalesIQ] Widget configuré - BOUTON FLOTTANT UNIQUEMENT')
 
-      // CORRECTION: Planifier les vérifications avec des délais optimisés et logs debug
+      // Planifier les vérifications avec des délais optimisés
       const verificationDelays = [1000, 3000, 8000]
-      verificationDelays.forEach((delay, index) => {
+      verificationDelays.forEach(delay => {
         createTimeout(() => {
-          console.log(`🕒 [DEBUG-TIMEOUT-ZOHO-CONFIG-${index}] Execution verification delay ${delay}ms - isMounted:`, isMountedRef.current)
-          if (isMountedRef.current) {
-            debouncedVerification()
-          } else {
-            console.log(`⚠️ [DEBUG-TIMEOUT-ZOHO-CONFIG-${index}] Verification delay ignorée - composant démonté`)
-          }
+          debouncedVerification()
         }, delay)
       })
 
@@ -459,28 +442,23 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       state.sessionLanguage = lang
       state.verificationCount = 0
 
-      console.log('Configuration terminée - Bouton flottant uniquement')
+      console.log('✅ [ZohoSalesIQ] Configuration terminée - Bouton flottant uniquement')
 
       return true
 
     } catch (error) {
-      console.error(`Erreur configuration tentative ${attempt}:`, error)
+      console.error(`🔧 [ZohoSalesIQ] Erreur configuration tentative ${attempt}:`, error)
 
       if (attempt < CONFIG.MAX_CONFIG_ATTEMPTS && isMountedRef.current) {
-        // CORRECTION: Retry avec backoff exponentiel et logs debug
+        // Retry avec backoff exponentiel
         const delay = CONFIG.CONFIG_RETRY_DELAY * Math.pow(CONFIG.BACKOFF_MULTIPLIER, attempt - 1)
-        console.log(`Nouvelle tentative dans ${delay}ms`)
+        console.log(`🔄 [ZohoSalesIQ] Nouvelle tentative dans ${delay}ms`)
         
         createTimeout(() => {
-          console.log(`🕒 [DEBUG-TIMEOUT-ZOHO-RETRY-${attempt}] Execution retry config - isMounted:`, isMountedRef.current)
-          if (isMountedRef.current) {
-            configureWidget(lang, attempt + 1)
-          } else {
-            console.log(`⚠️ [DEBUG-TIMEOUT-ZOHO-RETRY-${attempt}] Retry config ignoré - composant démonté`)
-          }
+          configureWidget(lang, attempt + 1)
         }, delay)
       } else {
-        console.error('Échec configuration après', CONFIG.MAX_CONFIG_ATTEMPTS, 'tentatives')
+        console.error('🚫 [ZohoSalesIQ] Échec configuration après', CONFIG.MAX_CONFIG_ATTEMPTS, 'tentatives')
         circuitBreaker.current.recordFailure()
       }
 
@@ -495,14 +473,14 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
   const loadZohoScript = useCallback(async (lang: string): Promise<void> => {
     if (!isMountedRef.current || typeof window === 'undefined') return
 
-    console.log('Chargement widget avec langue de session:', lang)
+    console.log('🚀 [ZohoSalesIQ] Chargement widget avec langue de session:', lang)
 
     // Vérification des variables d'environnement
     const widgetBaseUrl = process.env.NEXT_PUBLIC_ZOHO_WIDGET_BASE_URL
     const widgetId = process.env.NEXT_PUBLIC_ZOHO_WIDGET_ID
     
     if (!widgetBaseUrl || !widgetId) {
-      console.error('Variables Zoho manquantes:', {
+      console.error('❌ [ZohoSalesIQ] Variables Zoho manquantes:', {
         baseUrl: !!widgetBaseUrl,
         widgetId: !!widgetId
       })
@@ -519,33 +497,22 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       script.defer = true
       script.src = `${widgetBaseUrl}?wc=${widgetId}&locale=${lang}`
 
-      console.log('Chargement script principal depuis env vars')
+      console.log('📡 [ZohoSalesIQ] Chargement script principal depuis env vars')
 
-      // CORRECTION: Timeout avec logs debug
       const timeout = createTimeout(() => {
-        console.log('🕒 [DEBUG-TIMEOUT-ZOHO-SCRIPT] Execution script timeout - isMounted:', isMountedRef.current)
-        if (isMountedRef.current) {
-          console.error('Timeout chargement script')
-          script.remove()
-          reject(new Error('Timeout chargement script'))
-        } else {
-          console.log('⚠️ [DEBUG-TIMEOUT-ZOHO-SCRIPT] Script timeout ignoré - composant démonté')
-        }
+        console.error('⏰ [ZohoSalesIQ] Timeout chargement script')
+        script.remove()
+        reject(new Error('Timeout chargement script'))
       }, CONFIG.SCRIPT_TIMEOUT)
 
       script.onload = () => {
         clearTimeout(timeout)
-        console.log('Script principal chargé avec succès')
+        console.log('✅ [ZohoSalesIQ] Script principal chargé avec succès')
         widgetStateRef.current.scriptLoaded = true
         
-        // CORRECTION: Attendre l'initialisation complète avant configuration avec logs debug
+        // Attendre l'initialisation complète avant configuration
         createTimeout(() => {
-          console.log('🕒 [DEBUG-TIMEOUT-ZOHO-INIT] Execution script onload config - isMounted:', isMountedRef.current)
-          if (isMountedRef.current) {
-            configureWidget(lang)
-          } else {
-            console.log('⚠️ [DEBUG-TIMEOUT-ZOHO-INIT] Script onload config ignoré - composant démonté')
-          }
+          configureWidget(lang)
         }, 2000)
         
         resolve()
@@ -553,7 +520,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
 
       script.onerror = () => {
         clearTimeout(timeout)
-        console.error('Erreur chargement script principal')
+        console.error('❌ [ZohoSalesIQ] Erreur chargement script principal')
         script.remove()
         reject(new Error('Erreur chargement script'))
       }
@@ -562,7 +529,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     })
   }, [initializeZohoObject, createTimeout, configureWidget])
 
-  // Observer DOM CORRIGÉ avec gestion sécurisée des className
+  // 🛡️ Observer DOM CORRIGÉ avec gestion sécurisée des className
   const setupDOMObserver = useCallback(() => {
     if (!isMountedRef.current || domObserverRef.current) return
 
@@ -576,7 +543,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
             const hasZohoElements = Array.from(mutation.addedNodes).some(node => {
               if (!(node instanceof Element)) return false
               
-              // CORRECTION : Utiliser les fonctions sécurisées
+              // ✅ CORRECTION : Utiliser les fonctions sécurisées
               return hasZohoId(node) || hasZohoClass(node)
             })
             
@@ -585,7 +552,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
           
           // Vérifier si des attributs ont changé sur des éléments Zoho
           if (mutation.type === 'attributes' && mutation.target instanceof Element) {
-            // CORRECTION : Utiliser les fonctions sécurisées
+            // ✅ CORRECTION : Utiliser les fonctions sécurisées
             if (hasZohoId(mutation.target) || hasZohoClass(mutation.target)) {
               shouldCheck = true
             }
@@ -597,7 +564,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
           debouncedVerification()
         }
       } catch (error) {
-        console.error('Erreur dans MutationObserver:', error)
+        console.error('🚨 [ZohoSalesIQ] Erreur dans MutationObserver:', error)
         // Ne pas faire planter l'observateur, juste logger l'erreur
       }
     })
@@ -610,7 +577,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     })
 
     domObserverRef.current = observer
-    console.log('Observer DOM configuré avec protection d\'erreurs')
+    console.log('👁️ [ZohoSalesIQ] Observer DOM configuré avec protection d\'erreurs')
   }, [debouncedVerification])
 
   // Processus d'initialisation principal optimisé
@@ -619,13 +586,13 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
 
     const state = widgetStateRef.current
 
-    console.log('PREMIÈRE INITIALISATION - Fixation langue session à :', lang)
+    console.log('🎯 [ZohoSalesIQ] PREMIÈRE INITIALISATION - Fixation langue session à:', lang)
 
     try {
       // 1. Fixer la langue de session
       state.sessionLanguage = lang
       setGlobalSessionLanguage(lang)
-      console.log('Langue de session fixée:', lang)
+      console.log('🔌 [ZohoSalesIQ] Langue de session fixée:', lang)
 
       // 2. Charger le script Zoho
       await loadZohoScript(lang)
@@ -635,10 +602,10 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
 
       // Marquer comme initialisé
       state.isInitialized = true
-      console.log('Initialisation complète')
+      console.log('✅ [ZohoSalesIQ] Initialisation complète')
 
     } catch (error) {
-      console.error('Erreur initialisation:', error)
+      console.error('🔧 [ZohoSalesIQ] Erreur initialisation:', error)
       circuitBreaker.current.recordFailure()
     }
   }, [user, setGlobalSessionLanguage, loadZohoScript, setupDOMObserver])
@@ -648,14 +615,14 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     const state = widgetStateRef.current
 
     if (state.sessionLanguage === newLang) {
-      console.log('Langue inchangée, widget stable')
+      console.log('👍 [ZohoSalesIQ] Langue inchangée, widget stable')
       return
     }
 
     if (state.sessionLanguage) {
-      console.log('CHANGEMENT DE LANGUE IGNORÉ:', state.sessionLanguage, '→', newLang)
-      console.log('Widget reste en:', state.sessionLanguage)
-      console.log('Nouvelle langue sera effective à la prochaine session')
+      console.log('🚫 [ZohoSalesIQ] CHANGEMENT DE LANGUE IGNORÉ:', state.sessionLanguage, '→', newLang)
+      console.log('🔌 [ZohoSalesIQ] Widget reste en:', state.sessionLanguage)
+      console.log('💡 [ZohoSalesIQ] Nouvelle langue sera effective à la prochaine session')
     }
   }, [])
 
@@ -663,7 +630,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
   useEffect(() => {
     if (!user?.email || !language) return
 
-    console.log('Effet déclenché - Langue courante:', language, 'User:', !!user.email)
+    console.log('🌐 [ZohoSalesIQ] Effet déclenché - Langue courante:', language, 'User:', !!user.email)
 
     const state = widgetStateRef.current
 
