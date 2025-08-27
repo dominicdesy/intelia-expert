@@ -5,6 +5,18 @@ import { UserInfoModalProps } from '@/types'
 import { PhoneInput, usePhoneValidation } from '../PhoneInput'
 import { CountrySelect } from '../CountrySelect'
 
+// Debug utility
+const debugLog = (category: string, message: string, data?: any) => {
+  const timestamp = new Date().toISOString().split('T')[1].split('.')[0]
+  const logMessage = `[${timestamp}] [UserInfoModal-${category}] ${message}`
+  
+  if (data !== undefined) {
+    console.log(logMessage, data)
+  } else {
+    console.log(logMessage)
+  }
+}
+
 const fallbackCountries = [
   { value: 'CA', label: 'Canada', phoneCode: '+1', flag: '🇨🇦' },
   { value: 'US', label: 'États-Unis', phoneCode: '+1', flag: '🇺🇸' },
@@ -35,7 +47,6 @@ interface Country {
   flag?: string
 }
 
-// Countries hook with AbortController
 const useCountries = () => {
   const [countries, setCountries] = useState<Country[]>(fallbackCountries)
   const [loading, setLoading] = useState(false)
@@ -43,8 +54,11 @@ const useCountries = () => {
   const abortControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
+    debugLog('COUNTRIES', 'Hook initialized')
+    
     const fetchCountries = async () => {
       if (abortControllerRef.current) {
+        debugLog('COUNTRIES', 'Aborting previous request')
         abortControllerRef.current.abort()
       }
       
@@ -52,15 +66,20 @@ const useCountries = () => {
       const signal = abortControllerRef.current.signal
 
       try {
+        debugLog('COUNTRIES', 'Starting fetch')
         setLoading(true)
         const response = await fetch(
           'https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations',
           { signal }
         )
         
+        debugLog('COUNTRIES', 'Fetch response', { ok: response.ok, status: response.status })
+        
         if (!response.ok || signal.aborted) return
         
         const data = await response.json()
+        debugLog('COUNTRIES', 'Data received', { count: data?.length })
+        
         if (signal.aborted) return
         
         const formattedCountries = data
@@ -79,18 +98,22 @@ const useCountries = () => {
           )
           .sort((a: Country, b: Country) => a.label.localeCompare(b.label))
         
+        debugLog('COUNTRIES', 'Countries processed', { count: formattedCountries.length })
+        
         if (formattedCountries.length >= 50 && !signal.aborted) {
           setCountries(formattedCountries)
           setUsingFallback(false)
+          debugLog('COUNTRIES', 'Using API countries')
         }
         
       } catch (error) {
         if (error instanceof Error && error.name !== 'AbortError') {
-          console.warn('Countries API failed, using fallback:', error)
+          debugLog('COUNTRIES', 'Fetch error', error.message)
         }
       } finally {
         if (!signal.aborted) {
           setLoading(false)
+          debugLog('COUNTRIES', 'Loading finished')
         }
       }
     }
@@ -98,6 +121,7 @@ const useCountries = () => {
     fetchCountries()
     
     return () => {
+      debugLog('COUNTRIES', 'Cleanup')
       if (abortControllerRef.current) {
         abortControllerRef.current.abort()
       }
@@ -152,6 +176,8 @@ const PasswordInput: React.FC<{
   showPassword: boolean
   onToggleShow: () => void
 }> = ({ id, label, value, onChange, placeholder, autoComplete, required, showStrength, showPassword, onToggleShow }) => {
+  debugLog('COMPONENT', `PasswordInput rendered for ${id}`)
+  
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -164,14 +190,20 @@ const PasswordInput: React.FC<{
           name={id}
           autoComplete={autoComplete}
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            debugLog('INPUT', `Password ${id} changed`, { length: e.target.value.length })
+            onChange(e.target.value)
+          }}
           className="input-primary pr-10"
           placeholder={placeholder}
           required={required}
         />
         <button
           type="button"
-          onClick={onToggleShow}
+          onClick={() => {
+            debugLog('INTERACTION', `Toggle password visibility for ${id}`)
+            onToggleShow()
+          }}
           className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
         >
           {showPassword ? (
@@ -195,6 +227,8 @@ const PasswordInput: React.FC<{
 const ErrorDisplay: React.FC<{ errors: string[]; title: string }> = ({ errors, title }) => {
   if (errors.length === 0) return null
 
+  debugLog('ERROR', `Displaying ${errors.length} errors`, errors)
+
   return (
     <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
       <div className="text-sm text-red-800">
@@ -209,35 +243,42 @@ const ErrorDisplay: React.FC<{ errors: string[]; title: string }> = ({ errors, t
   )
 }
 
-// Main component - SAME STRUCTURE AS AccountModal and ContactModal
+// Main component
 export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) => {
-  console.log('[DEBUG-UserInfoModal] MONTAGE - user:', !!user, 'email:', user?.email)
+  debugLog('LIFECYCLE', 'Component mounting', { 
+    hasUser: !!user, 
+    userEmail: user?.email,
+    timestamp: Date.now()
+  })
   
   if (!user) {
-    console.log('[DEBUG-UserInfoModal] PAS D\'UTILISATEUR - pas de rendu')
+    debugLog('LIFECYCLE', 'No user provided - returning null')
     return null
   }
-  
-  console.log('[DEBUG-UserInfoModal] RENDU DU MODAL COMPLET')
 
   const { updateProfile } = useAuthStore()
   const { t } = useTranslation()
   const { validatePhoneFields } = usePhoneValidation()
   
   // Memoized user data
-  const userDataMemo = useMemo(() => ({
-    firstName: user?.firstName || '',
-    lastName: user?.lastName || '',
-    email: user?.email || '',
-    country_code: user?.country_code || '',
-    area_code: user?.area_code || '',
-    phone_number: user?.phone_number || '',
-    country: user?.country || '',
-    linkedinProfile: user?.linkedinProfile || '',
-    companyName: user?.companyName || '',
-    companyWebsite: user?.companyWebsite || '',
-    linkedinCorporate: user?.linkedinCorporate || ''
-  }), [
+  const userDataMemo = useMemo(() => {
+    const memo = {
+      firstName: user?.firstName || '',
+      lastName: user?.lastName || '',
+      email: user?.email || '',
+      country_code: user?.country_code || '',
+      area_code: user?.area_code || '',
+      phone_number: user?.phone_number || '',
+      country: user?.country || '',
+      linkedinProfile: user?.linkedinProfile || '',
+      companyName: user?.companyName || '',
+      companyWebsite: user?.companyWebsite || '',
+      linkedinCorporate: user?.linkedinCorporate || ''
+    }
+    
+    debugLog('DATA', 'User data memo updated', memo)
+    return memo
+  }, [
     user?.firstName,
     user?.lastName,
     user?.email,
@@ -268,6 +309,13 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     confirmPassword: false
   })
 
+  debugLog('STATE', 'Component states initialized', {
+    isLoading,
+    activeTab,
+    formErrorsCount: formErrors.length,
+    passwordErrorsCount: passwordErrors.length
+  })
+
   // Sync form data
   useEffect(() => {
     const needsSync = Object.keys(userDataMemo).some(key => 
@@ -275,7 +323,10 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     )
     
     if (needsSync) {
+      debugLog('SYNC', 'Form data needs sync - updating', { userDataMemo, currentFormData: formData })
       setFormData(userDataMemo)
+    } else {
+      debugLog('SYNC', 'Form data in sync')
     }
   }, [userDataMemo, formData])
 
@@ -301,6 +352,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       errors.push('Le mot de passe doit contenir au moins un caractère spécial')
     }
     
+    debugLog('VALIDATION', 'Password validation', { errors, passwordLength: password.length })
     return errors
   }, [])
 
@@ -316,6 +368,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       errors.push('L\'email est trop long (maximum 254 caractères)')
     }
     
+    debugLog('VALIDATION', 'Email validation', { email, errors })
     return errors
   }, [])
 
@@ -333,6 +386,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       }
     }
     
+    debugLog('VALIDATION', 'URL validation', { url, fieldName, errors })
     return errors
   }, [])
 
@@ -353,29 +407,35 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       }
     }
     
+    debugLog('VALIDATION', 'LinkedIn URL validation', { url, fieldName, errors })
     return errors
   }, [validateUrl])
 
   // Event handlers
   const handleClose = useCallback(() => {
+    debugLog('INTERACTION', 'Close button clicked', { isLoading })
     if (!isLoading) {
       onClose()
     }
   }, [isLoading, onClose])
 
   const handleFormDataChange = useCallback((field: string, value: string) => {
+    debugLog('INTERACTION', 'Form data changed', { field, value: value.substring(0, 20) + '...' })
     setFormData(prev => ({ ...prev, [field]: value }))
   }, [])
 
   const handlePasswordDataChange = useCallback((field: string, value: string) => {
+    debugLog('INTERACTION', 'Password data changed', { field, valueLength: value.length })
     setPasswordData(prev => ({ ...prev, [field]: value }))
   }, [])
 
   const handleShowPasswordToggle = useCallback((field: keyof typeof showPasswords) => {
+    debugLog('INTERACTION', 'Password visibility toggled', { field })
     setShowPasswords(prev => ({ ...prev, [field]: !prev[field] }))
   }, [])
 
   const handlePhoneChange = useCallback((phoneData: { country_code: string; area_code: string; phone_number: string }) => {
+    debugLog('INTERACTION', 'Phone data changed', phoneData)
     setFormData(prev => ({
       ...prev,
       country_code: phoneData.country_code,
@@ -385,6 +445,8 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
   }, [])
 
   const handleProfileSave = useCallback(async () => {
+    debugLog('API', 'Profile save started', { isLoading })
+    
     if (isLoading) return
     
     setIsLoading(true)
@@ -444,23 +506,31 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       }
       
       if (errors.length > 0) {
+        debugLog('API', 'Profile save validation failed', { errors })
         setFormErrors(errors)
         return
       }
 
+      debugLog('API', 'Calling updateProfile', { formData })
       await updateProfile(formData)
+      debugLog('API', 'Profile save successful')
+      
       alert(t('profile.title') + ' mis à jour avec succès!')
       handleClose()
       
     } catch (error: any) {
+      debugLog('API', 'Profile save error', { error: error?.message })
       console.error('Erreur mise à jour profil:', error)
       alert('Erreur lors de la mise à jour: ' + (error?.message || 'Erreur inconnue'))
     } finally {
+      debugLog('API', 'Profile save finished')
       setIsLoading(false)
     }
   }, [formData, validateEmail, validateUrl, validateLinkedInUrl, validatePhoneFields, updateProfile, t, handleClose, isLoading])
 
   const handlePasswordChange = useCallback(async () => {
+    debugLog('API', 'Password change started')
+    
     if (isLoading) return
     
     const errors: string[] = []
@@ -484,12 +554,14 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     setPasswordErrors(errors)
     
     if (errors.length > 0) {
+      debugLog('API', 'Password change validation failed', { errors })
       return
     }
 
     setIsLoading(true)
     
     try {
+      debugLog('API', 'Verifying current password')
       const loginResponse = await fetch('/api/v1/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -499,6 +571,8 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         })
       })
 
+      debugLog('API', 'Login response', { ok: loginResponse.ok, status: loginResponse.status })
+
       if (!loginResponse.ok) {
         setPasswordErrors(['Le mot de passe actuel est incorrect'])
         return
@@ -507,6 +581,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       const loginData = await loginResponse.json()
       const backendToken = loginData.access_token
 
+      debugLog('API', 'Changing password')
       const response = await fetch('/api/v1/auth/change-password', {
         method: 'POST',
         headers: {
@@ -519,6 +594,8 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         })
       })
 
+      debugLog('API', 'Change password response', { ok: response.ok, status: response.status })
+
       let result: any = null
       try {
         result = await response.json()
@@ -528,6 +605,8 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         setPasswordErrors([result?.detail || result?.message || 'Erreur lors du changement de mot de passe'])
         return
       }
+      
+      debugLog('API', 'Password changed successfully')
       
       setPasswordData({
         currentPassword: '',
@@ -539,9 +618,11 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       handleClose()
       
     } catch (error: any) {
+      debugLog('API', 'Password change error', { error: error?.message })
       console.error('Erreur technique:', error)
       setPasswordErrors(['Erreur de connexion au serveur. Veuillez réessayer.'])
     } finally {
+      debugLog('API', 'Password change finished')
       setIsLoading(false)
     }
   }, [passwordData, validatePassword, user?.email, handleClose, isLoading])
@@ -555,13 +636,35 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !isLoading) {
+        debugLog('INTERACTION', 'Escape key pressed')
         handleClose()
       }
     }
 
+    debugLog('EVENTS', 'Adding keyboard listener')
     document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      debugLog('EVENTS', 'Removing keyboard listener')
+      document.removeEventListener('keydown', handleKeyDown)
+    }
   }, [handleClose, isLoading])
+
+  // Debug DOM state
+  useEffect(() => {
+    debugLog('DOM', 'Modal rendered', {
+      bodyOverflow: document.body.style.overflow,
+      documentHeight: document.documentElement.scrollHeight,
+      viewportHeight: window.innerHeight,
+      modalExists: !!document.querySelector('[data-modal="user-info"]')
+    })
+  })
+
+  debugLog('RENDER', 'Component rendering', {
+    activeTab,
+    hasCountries: countries.length,
+    usingFallback,
+    countriesLoading
+  })
 
   return (
     <>
@@ -569,13 +672,19 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       <div 
         className="fixed inset-0 bg-black bg-opacity-50 z-50" 
         onClick={handleClose}
+        data-debug="modal-overlay"
       />
       
       {/* Modal Container - EXACT SAME STRUCTURE AS AccountModal/ContactModal */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div 
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        data-debug="modal-container"
+      >
         <div 
           className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
+          data-modal="user-info"
+          data-debug="modal-content"
         >
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -588,6 +697,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
               aria-label="Fermer la modal"
               title="Fermer"
               disabled={isLoading}
+              data-debug="close-button"
             >
               ×
             </button>
@@ -595,16 +705,20 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
 
           {/* Tabs */}
           <div className="border-b border-gray-200">
-            <nav className="flex px-6">
+            <nav className="flex px-6" data-debug="tabs-nav">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => {
+                    debugLog('INTERACTION', `Tab clicked: ${tab.id}`)
+                    setActiveTab(tab.id)
+                  }}
                   className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors ${
                     activeTab === tab.id
                       ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
+                  data-debug={`tab-${tab.id}`}
                 >
                   <span className="mr-2">{tab.icon}</span>
                   {tab.label}
@@ -614,7 +728,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
           </div>
 
           {/* Content */}
-          <div className="p-6">
+          <div className="p-6" data-debug="modal-body">
             <div className="space-y-6">
               
               {/* Errors */}
@@ -636,7 +750,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
 
               {/* Profile Tab */}
               {activeTab === 'profile' && (
-                <div className="space-y-6">
+                <div className="space-y-6" data-debug="profile-tab">
                   
                   {/* Personal Info */}
                   <div>
@@ -657,6 +771,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
                           onChange={(e) => handleFormDataChange('firstName', e.target.value)}
                           className="input-primary"
                           required
+                          data-debug="firstName-input"
                         />
                       </div>
                       
@@ -670,6 +785,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
                           onChange={(e) => handleFormDataChange('lastName', e.target.value)}
                           className="input-primary"
                           required
+                          data-debug="lastName-input"
                         />
                       </div>
                     </div>
@@ -684,6 +800,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
                         onChange={(e) => handleFormDataChange('email', e.target.value)}
                         className="input-primary"
                         required
+                        data-debug="email-input"
                       />
                     </div>
 
@@ -691,24 +808,28 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
                       <label className="block text-sm font-medium text-gray-700 mb-3">
                         {t('profile.phone')} <span className="text-gray-500 text-sm">(optionnel)</span>
                       </label>
-                      <PhoneInput
-                        countryCode={formData.country_code}
-                        areaCode={formData.area_code}
-                        phoneNumber={formData.phone_number}
-                        onChange={handlePhoneChange}
-                      />
+                      <div data-debug="phone-input">
+                        <PhoneInput
+                          countryCode={formData.country_code}
+                          areaCode={formData.area_code}
+                          phoneNumber={formData.phone_number}
+                          onChange={handlePhoneChange}
+                        />
+                      </div>
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         {t('profile.country')} <span className="text-gray-500 text-sm">(optionnel)</span>
                       </label>
-                      <CountrySelect
-                        countries={countries}
-                        value={formData.country}
-                        onChange={(countryValue: string) => handleFormDataChange('country', countryValue)}
-                        placeholder="Sélectionner un pays ou rechercher..."
-                      />
+                      <div data-debug="country-select">
+                        <CountrySelect
+                          countries={countries}
+                          value={formData.country}
+                          onChange={(countryValue: string) => handleFormDataChange('country', countryValue)}
+                          placeholder="Sélectionner un pays ou rechercher..."
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -731,6 +852,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
                           onChange={(e) => handleFormDataChange('linkedinProfile', e.target.value)}
                           placeholder="https://linkedin.com/in/votre-profil"
                           className="input-primary"
+                          data-debug="linkedin-input"
                         />
                       </div>
 
@@ -744,6 +866,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
                           onChange={(e) => handleFormDataChange('companyName', e.target.value)}
                           placeholder="Nom de votre entreprise ou exploitation"
                           className="input-primary"
+                          data-debug="company-name-input"
                         />
                       </div>
 
@@ -757,6 +880,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
                           onChange={(e) => handleFormDataChange('companyWebsite', e.target.value)}
                           placeholder="https://www.votre-entreprise.com"
                           className="input-primary"
+                          data-debug="company-website-input"
                         />
                       </div>
 
@@ -770,6 +894,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
                           onChange={(e) => handleFormDataChange('linkedinCorporate', e.target.value)}
                           placeholder="https://linkedin.com/company/votre-entreprise"
                           className="input-primary"
+                          data-debug="linkedin-corporate-input"
                         />
                       </div>
                     </div>
@@ -779,7 +904,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
 
               {/* Password Tab */}
               {activeTab === 'password' && (
-                <div className="space-y-6">
+                <div className="space-y-6" data-debug="password-tab">
                   <div>
                     <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
                       <span className="w-2 h-2 bg-orange-500 rounded-full mr-2"></span>
@@ -831,11 +956,12 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
               )}
 
               {/* Footer Buttons */}
-              <div className="flex justify-end space-x-3 pt-4">
+              <div className="flex justify-end space-x-3 pt-4" data-debug="footer">
                 <button
                   onClick={handleClose}
                   className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
                   disabled={isLoading}
+                  data-debug="cancel-button"
                 >
                   Annuler
                 </button>
@@ -843,6 +969,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
                   onClick={activeTab === 'profile' ? handleProfileSave : handlePasswordChange}
                   disabled={isLoading}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors flex items-center"
+                  data-debug="save-button"
                 >
                   {isLoading && (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
