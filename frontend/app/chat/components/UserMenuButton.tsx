@@ -11,7 +11,7 @@ import { InviteFriendModal } from './modals/InviteFriendModal'
 import { PLAN_CONFIGS } from '../../../types'
 import { getSafeName, getSafeEmail, getSafeUserType, getSafePlan, getSafeInitials } from '../utils/safeUserHelpers'
 
-// ==================== MENU UTILISATEUR AVEC INVITATIONS - VERSION SÉCURISÉE ====================
+// ==================== MENU UTILISATEUR - VERSION DEBUG POUR REACT #300 ====================
 export const UserMenuButton = React.memo(() => {
   const router = useRouter()
   const { user, logout } = useAuthStore()
@@ -28,13 +28,16 @@ export const UserMenuButton = React.memo(() => {
   
   useEffect(() => {
     isMountedRef.current = true
+    console.log('🏗️ [DEBUG-UserMenu] Composant monté')
     return () => {
+      console.log('🧹 [DEBUG-UserMenu] Composant en cours de démontage')
       isMountedRef.current = false
     }
   }, [])
 
   // Mémoisation sécurisée des données utilisateur
   const { safeName, safeEmail, safeUserType, userInitials } = useMemo(() => {
+    console.log('🔄 [DEBUG-UserMenu] Recalcul des données utilisateur sécurisées')
     const safeName = getSafeName(user)
     const safeEmail = getSafeEmail(user)
     const safeUserType = getSafeUserType(user)
@@ -55,105 +58,145 @@ export const UserMenuButton = React.memo(() => {
     return { currentPlan, plan, isSuperAdmin }
   }, [user?.plan, user?.user_type])
 
-  // Handlers sécurisés avec protection de montage
+  // Handlers sécurisés avec protection de montage et debug
   const handleContactClick = useCallback(() => {
+    console.log('📞 [DEBUG-UserMenu] handleContactClick - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setIsOpen(false)
     setShowContactModal(true)
   }, [])
 
   const handleUserInfoClick = useCallback(() => {
+    console.log('👤 [DEBUG-UserMenu] handleUserInfoClick - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setIsOpen(false)
     setShowUserInfoModal(true)
   }, [])
 
   const handleAccountClick = useCallback(() => {
+    console.log('💳 [DEBUG-UserMenu] handleAccountClick - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setIsOpen(false)
     setShowAccountModal(true)
   }, [])
 
   const handleLanguageClick = useCallback(() => {
+    console.log('🌐 [DEBUG-UserMenu] handleLanguageClick - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setIsOpen(false)
     setShowLanguageModal(true)
   }, [])
 
   const handleInviteFriendClick = useCallback(() => {
+    console.log('👥 [DEBUG-UserMenu] handleInviteFriendClick - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setIsOpen(false)
     setShowInviteFriendModal(true)
   }, [])
 
   const handleStatisticsClick = useCallback(() => {
+    console.log('📊 [DEBUG-UserMenu] handleStatisticsClick - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setIsOpen(false)
     window.open('/admin/statistics', '_blank')
   }, [])
 
-  // CORRECTION MAJEURE: Déconnexion sécurisée séquentielle
+  // VERSION DEBUG DE LA DÉCONNEXION AVEC LOGS DÉTAILLÉS
   const handleLogout = useCallback(async () => {
-    if (!isMountedRef.current) return
+    console.log('🚨 [DEBUG-LOGOUT] === DÉBUT DÉCONNEXION DÉTAILLÉE ===')
+    console.log('🚨 [DEBUG-LOGOUT] 1. État initial - isMounted:', isMountedRef.current)
+    console.log('🚨 [DEBUG-LOGOUT] 1. User présent:', !!user)
+    console.log('🚨 [DEBUG-LOGOUT] 1. Menu ouvert:', isOpen)
+    
+    if (!isMountedRef.current) {
+      console.log('🚨 [DEBUG-LOGOUT] ABORT - composant déjà démonté')
+      return
+    }
     
     try {
-      console.log('🔄 [UserMenu] Début déconnexion propre')
-      
-      // 1. Fermer le menu AVANT tout autre action
+      console.log('🚨 [DEBUG-LOGOUT] 2. Fermeture immédiate du menu...')
       setIsOpen(false)
       
-      // 2. Attendre que logout() termine complètement  
+      // TECHNIQUE 1: Marquer comme démonté AVANT logout pour éviter les setState
+      console.log('🚨 [DEBUG-LOGOUT] 3. Marquage composant comme démonté AVANT logout...')
+      isMountedRef.current = false
+      
+      // TECHNIQUE 2: Petite attente pour que React traite le setState du menu
+      console.log('🚨 [DEBUG-LOGOUT] 4. Attente traitement React setState...')
+      await new Promise(resolve => setTimeout(resolve, 50))
+      
+      console.log('🚨 [DEBUG-LOGOUT] 5. Appel logout() du store...')
+      const logoutStartTime = performance.now()
+      
       await logout()
       
-      // 3. Navigation propre après nettoyage complet
+      const logoutEndTime = performance.now()
+      console.log('🚨 [DEBUG-LOGOUT] 6. logout() terminé en', Math.round(logoutEndTime - logoutStartTime), 'ms')
+      
+      console.log('🚨 [DEBUG-LOGOUT] 7. Redirection via router.replace...')
       router.replace('/')
       
+      console.log('🚨 [DEBUG-LOGOUT] === FIN DÉCONNEXION RÉUSSIE ===')
+      
     } catch (error) {
-      console.error('Erreur logout:', error)
-      // Forcer la redirection même en cas d'erreur
+      console.error('🚨 [DEBUG-LOGOUT] ERREUR pendant logout:', error)
+      console.error('🚨 [DEBUG-LOGOUT] Stack trace:', error instanceof Error ? error.stack : 'Pas de stack')
+      
+      // Même en cas d'erreur, forcer la redirection
+      console.log('🚨 [DEBUG-LOGOUT] Redirection d\'urgence après erreur...')
       router.replace('/')
     }
-  }, [logout, router])
+  }, [logout, router, user, isOpen])
 
   const toggleOpen = useCallback(() => {
+    console.log('🔀 [DEBUG-UserMenu] toggleOpen - isMounted:', isMountedRef.current, 'current isOpen:', isOpen)
     if (!isMountedRef.current) return
     setIsOpen(prev => !prev)
-  }, [])
+  }, [isOpen])
 
   const closeMenu = useCallback(() => {
+    console.log('❌ [DEBUG-UserMenu] closeMenu - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setIsOpen(false)
   }, [])
 
-  // Fonctions de fermeture de modales avec protection
+  // Fonctions de fermeture de modales avec protection et debug
   const closeUserInfoModal = useCallback(() => {
+    console.log('❌ [DEBUG-UserMenu] closeUserInfoModal - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setShowUserInfoModal(false)
   }, [])
   
   const closeContactModal = useCallback(() => {
+    console.log('❌ [DEBUG-UserMenu] closeContactModal - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setShowContactModal(false)
   }, [])
   
   const closeAccountModal = useCallback(() => {
+    console.log('❌ [DEBUG-UserMenu] closeAccountModal - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setShowAccountModal(false)
   }, [])
   
   const closeLanguageModal = useCallback(() => {
+    console.log('❌ [DEBUG-UserMenu] closeLanguageModal - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setShowLanguageModal(false)
   }, [])
   
   const closeInviteFriendModal = useCallback(() => {
+    console.log('❌ [DEBUG-UserMenu] closeInviteFriendModal - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setShowInviteFriendModal(false)
   }, [])
 
   const openPrivacyPolicy = useCallback(() => {
+    console.log('📜 [DEBUG-UserMenu] openPrivacyPolicy')
     window.open('https://intelia.com/privacy-policy/', '_blank')
   }, [])
+
+  console.log('🔄 [DEBUG-UserMenu] Render - isMounted:', isMountedRef.current, 'user:', !!user)
 
   return (
     <>
