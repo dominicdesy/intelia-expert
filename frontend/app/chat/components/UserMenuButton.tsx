@@ -1,3 +1,5 @@
+// UserMenuButton.tsx
+
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { useAuthStore } from '@/lib/stores/auth' 
 import { useTranslation } from '../hooks/useTranslation'
