@@ -1,5 +1,3 @@
-// UserInfoModal.tsx - STRUCTURE SIMPLIFIÉE AVEC NOUVELLES CLASSES CSS
-
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '../../hooks/useTranslation'
@@ -37,32 +35,35 @@ interface Country {
   flag?: string
 }
 
-// Hook sécurisé useCountries avec protection complète
+// Custom hook for countries with cleanup
 const useCountries = () => {
   const [countries, setCountries] = useState<Country[]>(fallbackCountries)
   const [loading, setLoading] = useState(false)
   const [usingFallback, setUsingFallback] = useState(true)
-  const isMountedRef = useRef(true)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
-    isMountedRef.current = true
-    let isCancelled = false
-    
     const fetchCountries = async () => {
-      if (!isMountedRef.current || isCancelled) return
+      // Cancel previous request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
       
+      abortControllerRef.current = new AbortController()
+      const signal = abortControllerRef.current.signal
+
       try {
-        if (isMountedRef.current && !isCancelled) {
-          setLoading(true)
-        }
+        setLoading(true)
+        const response = await fetch(
+          'https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations',
+          { signal }
+        )
         
-        const response = await fetch('https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations')
-        
-        if (!response.ok || isCancelled || !isMountedRef.current) return
+        if (!response.ok || signal.aborted) return
         
         const data = await response.json()
         
-        if (isCancelled || !isMountedRef.current) return
+        if (signal.aborted) return
         
         const formattedCountries = data
           .map((country: any) => ({
@@ -80,17 +81,17 @@ const useCountries = () => {
           )
           .sort((a: Country, b: Country) => a.label.localeCompare(b.label))
         
-        if (formattedCountries.length >= 50 && !isCancelled && isMountedRef.current) {
+        if (formattedCountries.length >= 50 && !signal.aborted) {
           setCountries(formattedCountries)
           setUsingFallback(false)
         }
         
-      } catch (err) {
-        if (!isCancelled && isMountedRef.current) {
-          console.warn('[UserInfoModal] API échouée, utilisation fallback:', err)
+      } catch (error) {
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.warn('Countries API failed, using fallback:', error)
         }
       } finally {
-        if (!isCancelled && isMountedRef.current) {
+        if (!signal.aborted) {
           setLoading(false)
         }
       }
@@ -99,37 +100,125 @@ const useCountries = () => {
     fetchCountries()
     
     return () => {
-      isCancelled = true
-      isMountedRef.current = false
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
     }
   }, [])
 
   return { countries, loading, usingFallback }
 }
 
-export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
-  // Protection render conditionnel
-  if (!user) {
-    console.log('[DEBUG-UserInfoModal] Pas d\'utilisateur - pas de render')
-    return null
-  }
+// Password strength indicator component
+const PasswordStrengthIndicator: React.FC<{ password: string }> = ({ password }) => {
+  const requirements = [
+    { test: password.length >= 8, label: '8+ caractères' },
+    { test: /[A-Z]/.test(password), label: 'Une majuscule' },
+    { test: /[a-z]/.test(password), label: 'Une minuscule' },
+    { test: /\d/.test(password), label: 'Un chiffre' },
+    { test: /[!@#$%^&*(),.?":{}|<>]/.test(password), label: 'Caractère spécial' }
+  ]
 
-  console.log('[DEBUG-UserInfoModal] Montage du modal')
-  
+  return (
+    <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+      <p className="text-xs font-medium text-gray-700 mb-2">Le mot de passe doit contenir :</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs">
+        {requirements.map((req, index) => (
+          <div
+            key={index}
+            className={`flex items-center ${req.test ? 'text-green-600' : 'text-gray-400'} ${
+              index === requirements.length - 1 ? 'sm:col-span-2' : ''
+            }`}
+          >
+            <span className="mr-1">{req.test ? '✅' : '⭕'}</span>
+            {req.label}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Password input component
+const PasswordInput: React.FC<{
+  id: string
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+  autoComplete: string
+  required?: boolean
+  showStrength?: boolean
+  showPassword: boolean
+  onToggleShow: () => void
+}> = ({ id, label, value, onChange, placeholder, autoComplete, required, showStrength, showPassword, onToggleShow }) => {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <div className="relative">
+        <input
+          id={id}
+          type={showPassword ? "text" : "password"}
+          name={id}
+          autoComplete={autoComplete}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="input-primary pr-10"
+          placeholder={placeholder}
+          required={required}
+        />
+        <button
+          type="button"
+          onClick={onToggleShow}
+          className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          {showPassword ? (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 11-4.243-4.243m4.242 4.242L9.88 9.88" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          )}
+        </button>
+      </div>
+      {showStrength && <PasswordStrengthIndicator password={value} />}
+    </div>
+  )
+}
+
+// Error display component
+const ErrorDisplay: React.FC<{ errors: string[]; title: string }> = ({ errors, title }) => {
+  if (errors.length === 0) return null
+
+  return (
+    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+      <div className="text-sm text-red-800">
+        <p className="font-medium mb-2">{title} :</p>
+        <ul className="list-disc list-inside space-y-1">
+          {errors.map((error, index) => (
+            <li key={index}>{error}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  )
+}
+
+// Main component
+export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) => {
+  // Early return if no user
+  if (!user) return null
+
   const { updateProfile } = useAuthStore()
   const { t } = useTranslation()
   const { validatePhoneFields } = usePhoneValidation()
   
-  // Protection contre setState après unmount - AVANT tous les states
-  const isMountedRef = useRef(true)
-  
-  // States avec valeurs initiales stables
-  const [isLoading, setIsLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState('profile')
-  const [formErrors, setFormErrors] = useState<string[]>([])
-  const [passwordErrors, setPasswordErrors] = useState<string[]>([])
-  
-  // Mémorisation des données user pour éviter re-calculs constants
+  // Memoized user data to avoid constant recalculations
   const userDataMemo = useMemo(() => ({
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
@@ -155,8 +244,14 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     user?.companyWebsite,
     user?.linkedinCorporate
   ])
-
-  // FormData initialisé une seule fois
+  
+  // Core state
+  const [isLoading, setIsLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState('profile')
+  const [formErrors, setFormErrors] = useState<string[]>([])
+  const [passwordErrors, setPasswordErrors] = useState<string[]>([])
+  
+  // Form data with user data initialization
   const [formData, setFormData] = useState(userDataMemo)
 
   const [passwordData, setPasswordData] = useState({
@@ -171,15 +266,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     confirmPassword: false
   })
 
-  const { countries, loading: countriesLoading, usingFallback } = useCountries()
-
-  // Setup/Cleanup cycle - UNE SEULE FOIS
-  useEffect(() => {
-    console.log('[DEBUG-UserInfoModal] Composant monté - initialisation formData')
-    setFormData(userDataMemo)
-  }, []) // AUCUNE dependency pour éviter la boucle
-
-  // Sync formData intelligent - évite la boucle infinie
+  // Sync formData with user data changes
   useEffect(() => {
     const needsSync = (
       formData.firstName !== userDataMemo.firstName ||
@@ -195,36 +282,14 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       formData.linkedinCorporate !== userDataMemo.linkedinCorporate
     )
     
-    if (isMountedRef.current && needsSync) {
-      console.log('[DEBUG-UserInfoModal] Sync nécessaire - mise à jour formData')
+    if (needsSync) {
       setFormData(userDataMemo)
     }
-  }, [userDataMemo])
+  }, [userDataMemo, formData])
 
-  // setState protégé
-  const safeSetState = useCallback((stateFn: () => void, debugLabel: string) => {
-    if (isMountedRef.current) {
-      console.log(`[DEBUG-UserInfoModal] setState ${debugLabel} - isMounted: true`)
-      stateFn()
-    } else {
-      console.log(`[DEBUG-UserInfoModal] setState ${debugLabel} BLOQUÉ - composant démonté`)
-    }
-  }, [])
+  const { countries, loading: countriesLoading, usingFallback } = useCountries()
 
-  // Safe close optimisé
-  const safeClose = useCallback(() => {
-    console.log('[DEBUG-UserInfoModal] safeClose - isMounted:', isMountedRef.current, 'isLoading:', isLoading)
-    
-    if (isMountedRef.current && !isLoading) {
-      setFormErrors([])
-      setPasswordErrors([])
-      onClose()
-    } else if (isLoading) {
-      console.log('[DEBUG-UserInfoModal] safeClose ignoré - operation en cours')
-    }
-  }, [isLoading, onClose])
-
-  // Validation password
+  // Extended validation functions
   const validatePassword = useCallback((password: string): string[] => {
     const errors: string[] = []
     
@@ -247,43 +312,113 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     return errors
   }, [])
 
-  // Handler téléphone
-  const handlePhoneChange = useCallback((phoneData: { country_code: string; area_code: string; phone_number: string }) => {
-    safeSetState(() => {
-      setFormData(prev => ({
-        ...prev,
-        country_code: phoneData.country_code,
-        area_code: phoneData.area_code,
-        phone_number: phoneData.phone_number
-      }))
-    }, 'handlePhoneChange')
-  }, [safeSetState])
-
-  // Handle profile save
-  const handleProfileSave = useCallback(async () => {
-    console.log('[DEBUG-UserInfoModal] handleProfileSave - isMounted:', isMountedRef.current, 'isLoading:', isLoading)
+  const validateEmail = useCallback((email: string): string[] => {
+    const errors: string[] = []
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     
-    if (!isMountedRef.current || isLoading) {
-      console.log('[DEBUG-UserInfoModal] handleProfileSave BLOQUÉ - démonté ou en cours')
-      return
+    if (!email.trim()) {
+      errors.push('L\'email est requis')
+    } else if (!emailRegex.test(email)) {
+      errors.push('Format d\'email invalide')
+    } else if (email.length > 254) {
+      errors.push('L\'email est trop long (maximum 254 caractères)')
     }
     
-    safeSetState(() => setIsLoading(true), 'setIsLoading(true)')
-    safeSetState(() => setFormErrors([]), 'setFormErrors([])')
+    return errors
+  }, [])
+
+  const validateUrl = useCallback((url: string, fieldName: string): string[] => {
+    const errors: string[] = []
+    
+    if (url.trim()) {
+      try {
+        new URL(url)
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          errors.push(`${fieldName} doit commencer par http:// ou https://`)
+        }
+      } catch {
+        errors.push(`${fieldName} n'est pas une URL valide`)
+      }
+    }
+    
+    return errors
+  }, [])
+
+  const validateLinkedInUrl = useCallback((url: string, fieldName: string): string[] => {
+    const errors: string[] = []
+    
+    if (url.trim()) {
+      const urlErrors = validateUrl(url, fieldName)
+      if (urlErrors.length === 0) {
+        const isValidLinkedIn = url.includes('linkedin.com/') && 
+          (url.includes('/in/') || url.includes('/company/'))
+        
+        if (!isValidLinkedIn) {
+          errors.push(`${fieldName} doit être un lien LinkedIn valide`)
+        }
+      } else {
+        errors.push(...urlErrors)
+      }
+    }
+    
+    return errors
+  }, [validateUrl])
+
+  // Event handlers
+  const handleClose = useCallback(() => {
+    if (!isLoading) {
+      onClose()
+    }
+  }, [isLoading, onClose])
+
+  const handleFormDataChange = useCallback((field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }, [])
+
+  const handlePasswordDataChange = useCallback((field: string, value: string) => {
+    setPasswordData(prev => ({ ...prev, [field]: value }))
+  }, [])
+
+  const handleShowPasswordToggle = useCallback((field: keyof typeof showPasswords) => {
+    setShowPasswords(prev => ({ ...prev, [field]: !prev[field] }))
+  }, [])
+
+  const handlePhoneChange = useCallback((phoneData: { country_code: string; area_code: string; phone_number: string }) => {
+    setFormData(prev => ({
+      ...prev,
+      country_code: phoneData.country_code,
+      area_code: phoneData.area_code,
+      phone_number: phoneData.phone_number
+    }))
+  }, [])
+
+  const handleProfileSave = useCallback(async () => {
+    if (isLoading) return
+    
+    setIsLoading(true)
+    setFormErrors([])
     
     try {
       const errors: string[] = []
       
+      // Basic required field validation
       if (!formData.firstName.trim()) {
         errors.push('Le prénom est requis')
-      }
-      if (!formData.lastName.trim()) {
-        errors.push('Le nom est requis')
-      }
-      if (!formData.email.trim()) {
-        errors.push('L\'email est requis')
+      } else if (formData.firstName.length > 50) {
+        errors.push('Le prénom est trop long (maximum 50 caractères)')
       }
       
+      if (!formData.lastName.trim()) {
+        errors.push('Le nom est requis')
+      } else if (formData.lastName.length > 50) {
+        errors.push('Le nom est trop long (maximum 50 caractères)')
+      }
+      
+      // Email validation
+      const emailErrors = validateEmail(formData.email)
+      errors.push(...emailErrors)
+      
+      // Phone validation if provided
       const hasPhoneData = formData.country_code || formData.area_code || formData.phone_number
       if (hasPhoneData) {
         const phoneValidation = validatePhoneFields(
@@ -297,54 +432,50 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
         }
       }
       
+      // URL validations
+      if (formData.linkedinProfile) {
+        const linkedinErrors = validateLinkedInUrl(formData.linkedinProfile, 'Profil LinkedIn personnel')
+        errors.push(...linkedinErrors)
+      }
+      
+      if (formData.companyWebsite) {
+        const websiteErrors = validateUrl(formData.companyWebsite, 'Site web de l\'entreprise')
+        errors.push(...websiteErrors)
+      }
+      
+      if (formData.linkedinCorporate) {
+        const corporateErrors = validateLinkedInUrl(formData.linkedinCorporate, 'Page LinkedIn entreprise')
+        errors.push(...corporateErrors)
+      }
+      
+      // Company name length validation
+      if (formData.companyName && formData.companyName.length > 100) {
+        errors.push('Le nom de l\'entreprise est trop long (maximum 100 caractères)')
+      }
+      
       if (errors.length > 0) {
-        safeSetState(() => setFormErrors(errors), 'setFormErrors(errors)')
+        setFormErrors(errors)
         return
       }
 
-      console.log('[DEBUG-UserInfoModal] Appel updateProfile...')
-      
-      if (!isMountedRef.current) {
-        console.log('[DEBUG-UserInfoModal] Composant démonté avant updateProfile - abandon')
-        return
-      }
-      
       await updateProfile(formData)
-      
-      if (!isMountedRef.current) {
-        console.log('[DEBUG-UserInfoModal] Composant démonté pendant updateProfile - pas de UI update')
-        return
-      }
-      
-      console.log('[DEBUG-UserInfoModal] updateProfile réussi')
-      
       alert(t('profile.title') + ' mis à jour avec succès!')
-      safeClose()
+      handleClose()
       
     } catch (error: any) {
-      console.error('[DEBUG-UserInfoModal] Erreur mise à jour profil:', error)
-      
-      if (isMountedRef.current) {
-        alert('Erreur lors de la mise à jour: ' + (error?.message || 'Erreur inconnue'))
-      }
+      console.error('Erreur mise à jour profil:', error)
+      alert('Erreur lors de la mise à jour: ' + (error?.message || 'Erreur inconnue'))
     } finally {
-      if (isMountedRef.current) {
-        safeSetState(() => setIsLoading(false), 'setIsLoading(false) final')
-      }
+      setIsLoading(false)
     }
-  }, [formData, validatePhoneFields, updateProfile, t, safeClose, isLoading, safeSetState])
+  }, [formData, validateEmail, validateUrl, validateLinkedInUrl, validatePhoneFields, updateProfile, t, handleClose, isLoading])
 
-  // Handle password change avec protections
   const handlePasswordChange = useCallback(async () => {
-    console.log('[DEBUG-UserInfoModal] handlePasswordChange - isMounted:', isMountedRef.current, 'isLoading:', isLoading)
-    
-    if (!isMountedRef.current || isLoading) {
-      console.log('[DEBUG-UserInfoModal] handlePasswordChange BLOQUÉ - démonté ou en cours')
-      return
-    }
+    if (isLoading) return
     
     const errors: string[] = []
     
+    // Basic validation
     if (!passwordData.currentPassword) {
       errors.push('Le mot de passe actuel est requis')
     }
@@ -358,29 +489,23 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       errors.push('Les mots de passe ne correspondent pas')
     }
     
+    // Password strength validation
     const passwordValidationErrors = validatePassword(passwordData.newPassword)
     errors.push(...passwordValidationErrors)
     
-    safeSetState(() => setPasswordErrors(errors), 'setPasswordErrors')
+    setPasswordErrors(errors)
     
     if (errors.length > 0) {
       return
     }
 
-    safeSetState(() => setIsLoading(true), 'setIsLoading(true) password')
+    setIsLoading(true)
     
     try {
-      if (!isMountedRef.current) {
-        return
-      }
-      
-      console.log('[DEBUG-UserInfoModal] Vérification mot de passe actuel...')
-      
+      // Verify current password
       const loginResponse = await fetch('/api/v1/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: user?.email,
           password: passwordData.currentPassword
@@ -388,21 +513,14 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       })
 
       if (!loginResponse.ok) {
-        if (isMountedRef.current) {
-          safeSetState(() => setPasswordErrors(['Le mot de passe actuel est incorrect']), 'setPasswordErrors login fail')
-        }
+        setPasswordErrors(['Le mot de passe actuel est incorrect'])
         return
       }
 
       const loginData = await loginResponse.json()
       const backendToken = loginData.access_token
 
-      if (!isMountedRef.current) {
-        return
-      }
-
-      console.log('[DEBUG-UserInfoModal] Changement mot de passe...')
-      
+      // Change password
       const response = await fetch('/api/v1/auth/change-password', {
         method: 'POST',
         headers: {
@@ -421,719 +539,343 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       } catch {}
       
       if (!response.ok) {
-        if (isMountedRef.current) {
-          safeSetState(() => setPasswordErrors([result?.detail || result?.message || 'Erreur lors du changement de mot de passe']), 'setPasswordErrors change fail')
-        }
+        setPasswordErrors([result?.detail || result?.message || 'Erreur lors du changement de mot de passe'])
         return
       }
       
-      if (!isMountedRef.current) {
-        return
-      }
-      
-      console.log('[DEBUG-UserInfoModal] Mot de passe changé avec succès')
-      
-      safeSetState(() => {
-        setPasswordData({
-          currentPassword: '',
-          newPassword: '',
-          confirmPassword: ''
-        })
-        setPasswordErrors([])
-      }, 'reset password data')
-      
+      // Success
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      })
+      setPasswordErrors([])
       alert('Mot de passe changé avec succès!')
-      safeClose()
+      handleClose()
       
     } catch (error: any) {
-      console.error('[DEBUG-UserInfoModal] Erreur technique:', error)
-      
-      if (isMountedRef.current) {
-        safeSetState(() => setPasswordErrors(['Erreur de connexion au serveur. Veuillez réessayer.']), 'setPasswordErrors catch')
-      }
+      console.error('Erreur technique:', error)
+      setPasswordErrors(['Erreur de connexion au serveur. Veuillez réessayer.'])
     } finally {
-      if (isMountedRef.current) {
-        safeSetState(() => setIsLoading(false), 'setIsLoading(false) password final')
-      }
+      setIsLoading(false)
     }
-  }, [passwordData, validatePassword, user?.email, safeClose, isLoading, safeSetState])
+  }, [passwordData, validatePassword, user?.email, handleClose, isLoading])
 
-  // Tabs configuration
+  // Tab configuration
   const tabs = useMemo(() => [
     { id: 'profile', label: t('nav.profile'), icon: '👤' },
     { id: 'password', label: t('profile.password'), icon: '🔐' }
   ], [t])
 
-  // Handler avec protection pour les changements d'onglets
-  const handleTabChange = useCallback((tabId: string) => {
-    safeSetState(() => setActiveTab(tabId), 'setActiveTab')
-  }, [safeSetState])
+  // Keyboard event handling
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isLoading) {
+        handleClose()
+      }
+    }
 
-  // Handlers de formulaire protégés
-  const handleFormDataChange = useCallback((field: string, value: any) => {
-    safeSetState(() => {
-      setFormData(prev => ({ ...prev, [field]: value }))
-    }, `setFormData ${field}`)
-  }, [safeSetState])
-
-  const handlePasswordDataChange = useCallback((field: string, value: string) => {
-    safeSetState(() => {
-      setPasswordData(prev => ({ ...prev, [field]: value }))
-    }, `setPasswordData ${field}`)
-  }, [safeSetState])
-
-  const handleShowPasswordToggle = useCallback((field: string) => {
-    safeSetState(() => {
-      setShowPasswords(prev => ({ ...prev, [field]: !prev[field as keyof typeof prev] }))
-    }, `toggle show password ${field}`)
-  }, [safeSetState])
-
-  console.log('[DEBUG-UserInfoModal] Render - isMounted:', isMountedRef.current, 'isLoading:', isLoading)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [handleClose, isLoading])
 
   return (
-    <div 
-      onClick={safeClose}
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 9999,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '1rem',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)'
-      }}
-    >
+    <>
+      {/* Backdrop */}
       <div 
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'relative',
-          width: '100%',
-          maxWidth: '42rem',
-          maxHeight: '85vh',
-          background: 'white',
-          borderRadius: '0.75rem',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden'
-        }}
-      >
-        
-        {/* Header */}
-        <div style={{ 
-          padding: '1.5rem', 
-          borderBottom: '1px solid #e5e7eb', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between',
-          flexShrink: 0
-        }}>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', margin: 0 }}>
-            {t('profile.title')}
-          </h2>
-          <button
-            onClick={safeClose}
-            disabled={isLoading}
-            style={{
-              color: '#9ca3af',
-              fontSize: '1.5rem',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '0.5rem',
-              borderRadius: '0.5rem',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = '#4b5563'
-              e.currentTarget.style.backgroundColor = '#f3f4f6'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = '#9ca3af'
-              e.currentTarget.style.backgroundColor = 'transparent'
-            }}
-          >
-            ×
-          </button>
-        </div>
+        className="fixed inset-0 bg-black bg-opacity-50 z-50 transition-opacity" 
+        onClick={handleClose}
+        aria-hidden="true"
+      />
+      
+      {/* Modal */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div 
+          className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-title"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
+            <h2 id="modal-title" className="text-xl font-semibold text-gray-900">
+              {t('profile.title')}
+            </h2>
+            <button
+              onClick={handleClose}
+              className="text-gray-400 hover:text-gray-600 text-2xl font-light w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+              disabled={isLoading}
+              aria-label="Fermer"
+            >
+              ×
+            </button>
+          </div>
 
-        {/* Tabs */}
-        <div style={{ borderBottom: '1px solid #e5e7eb' }}>
-          <nav style={{ display: 'flex', padding: '0 1.5rem' }}>
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                style={{
-                  padding: '0.75rem 1rem',
-                  borderBottom: activeTab === tab.id ? '2px solid #3b82f6' : '2px solid transparent',
-                  color: activeTab === tab.id ? '#2563eb' : '#6b7280',
-                  fontWeight: '500',
-                  fontSize: '0.875rem',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                <span style={{ marginRight: '0.5rem' }}>{tab.icon}</span>
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
+          {/* Tabs */}
+          <div className="border-b border-gray-200 flex-shrink-0">
+            <nav className="flex px-6" role="tablist">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors ${
+                    activeTab === tab.id
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  aria-controls={`${tab.id}-panel`}
+                >
+                  <span className="mr-2">{tab.icon}</span>
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+          </div>
 
-        {/* Content Container */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
-          
-          {/* Error Messages */}
-          {formErrors.length > 0 && (
-            <div style={{
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
-              borderRadius: '0.5rem',
-              padding: '1rem',
-              marginBottom: '1.5rem'
-            }}>
-              <div style={{ color: '#991b1b', fontSize: '0.875rem' }}>
-                <p style={{ fontWeight: '500', marginBottom: '0.5rem', margin: 0 }}>Erreurs de validation :</p>
-                <ul style={{ listStyle: 'disc', paddingLeft: '1.25rem', margin: 0 }}>
-                  {formErrors.map((error, index) => (
-                    <li key={index} style={{ marginBottom: '0.25rem' }}>{error}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
-
-          {/* Fallback Warning */}
-          {usingFallback && !countriesLoading && (
-            <div style={{
-              backgroundColor: '#fffbeb',
-              border: '1px solid #fde68a',
-              borderRadius: '0.5rem',
-              padding: '0.75rem',
-              marginBottom: '1rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <svg style={{ width: '1rem', height: '1rem', color: '#d97706' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
-              <span style={{ fontSize: '0.875rem', color: '#92400e' }}>
-                Liste de pays limitée (service externe temporairement indisponible)
-              </span>
-            </div>
-          )}
-
-          {/* Profile Tab */}
-          {activeTab === 'profile' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-6 space-y-6">
               
-              {/* Personal Info Section */}
-              <div>
-                <h3 style={{ 
-                  fontSize: '1.125rem', 
-                  fontWeight: '500', 
-                  color: '#111827', 
-                  marginBottom: '1rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  margin: '0 0 1rem 0'
-                }}>
-                  <span style={{ 
-                    width: '0.5rem', 
-                    height: '0.5rem', 
-                    backgroundColor: '#ef4444', 
-                    borderRadius: '50%', 
-                    marginRight: '0.5rem' 
-                  }}></span>
-                  {t('profile.personalInfo')}
-                  <span style={{ color: '#ef4444', marginLeft: '0.25rem' }}>*</span>
-                </h3>
-                
-                {/* Name Fields Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
-                      {t('profile.firstName')} <span style={{ color: '#ef4444' }}>*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.firstName}
-                      onChange={(e) => handleFormDataChange('firstName', e.target.value)}
-                      className="input-primary"
-                      required
-                    />
+              {/* Errors */}
+              <ErrorDisplay errors={formErrors} title="Erreurs de validation" />
+
+              {/* Fallback Warning */}
+              {usingFallback && !countriesLoading && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <span className="text-sm text-yellow-800">
+                      Liste de pays limitée (service externe temporairement indisponible)
+                    </span>
                   </div>
+                </div>
+              )}
+
+              {/* Profile Tab */}
+              {activeTab === 'profile' && (
+                <div id="profile-panel" className="space-y-6" role="tabpanel">
                   
+                  {/* Personal Info */}
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
-                      {t('profile.lastName')} <span style={{ color: '#ef4444' }}>*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.lastName}
-                      onChange={(e) => handleFormDataChange('lastName', e.target.value)}
-                      className="input-primary"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Email Field */}
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
-                    {t('profile.email')} <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleFormDataChange('email', e.target.value)}
-                    className="input-primary"
-                    required
-                  />
-                </div>
-
-                {/* Phone Field */}
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.75rem' }}>
-                    {t('profile.phone')} <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>(optionnel)</span>
-                  </label>
-                  <PhoneInput
-                    countryCode={formData.country_code}
-                    areaCode={formData.area_code}
-                    phoneNumber={formData.phone_number}
-                    onChange={handlePhoneChange}
-                  />
-                </div>
-
-                {/* Country Field */}
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
-                    {t('profile.country')} <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>(optionnel)</span>
-                  </label>
-                  <CountrySelect
-                    countries={countries}
-                    value={formData.country}
-                    onChange={(countryValue: string) => handleFormDataChange('country', countryValue)}
-                    placeholder="Sélectionner un pays ou rechercher..."
-                  />
-                </div>
-              </div>
-
-              {/* Professional Info Section */}
-              <div>
-                <h3 style={{ 
-                  fontSize: '1.125rem', 
-                  fontWeight: '500', 
-                  color: '#111827', 
-                  marginBottom: '1rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  margin: '0 0 1rem 0'
-                }}>
-                  <span style={{ 
-                    width: '0.5rem', 
-                    height: '0.5rem', 
-                    backgroundColor: '#3b82f6', 
-                    borderRadius: '50%', 
-                    marginRight: '0.5rem' 
-                  }}></span>
-                  Informations Professionnelles
-                  <span style={{ fontSize: '0.875rem', color: '#6b7280', marginLeft: '0.5rem' }}>(optionnel)</span>
-                </h3>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
-                      Profil LinkedIn Personnel
-                    </label>
-                    <input
-                      type="url"
-                      value={formData.linkedinProfile}
-                      onChange={(e) => handleFormDataChange('linkedinProfile', e.target.value)}
-                      placeholder="https://linkedin.com/in/votre-profil"
-                      className="input-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
-                      {t('profile.companyName')}
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.companyName}
-                      onChange={(e) => handleFormDataChange('companyName', e.target.value)}
-                      placeholder="Nom de votre entreprise ou exploitation"
-                      className="input-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
-                      {t('profile.companyWebsite')}
-                    </label>
-                    <input
-                      type="url"
-                      value={formData.companyWebsite}
-                      onChange={(e) => handleFormDataChange('companyWebsite', e.target.value)}
-                      placeholder="https://www.votre-entreprise.com"
-                      className="input-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
-                      Page LinkedIn Entreprise
-                    </label>
-                    <input
-                      type="url"
-                      value={formData.linkedinCorporate}
-                      onChange={(e) => handleFormDataChange('linkedinCorporate', e.target.value)}
-                      placeholder="https://linkedin.com/company/votre-entreprise"
-                      className="input-primary"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Password Tab */}
-          {activeTab === 'password' && (
-            <div>
-              <h3 style={{ 
-                fontSize: '1.125rem', 
-                fontWeight: '500', 
-                color: '#111827', 
-                marginBottom: '1rem',
-                display: 'flex',
-                alignItems: 'center',
-                margin: '0 0 1rem 0'
-              }}>
-                <span style={{ 
-                  width: '0.5rem', 
-                  height: '0.5rem', 
-                  backgroundColor: '#f59e0b', 
-                  borderRadius: '50%', 
-                  marginRight: '0.5rem' 
-                }}></span>
-                {t('profile.password')}
-              </h3>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                
-                {/* Current Password */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
-                    {t('profile.currentPassword')} <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type={showPasswords.currentPassword ? "text" : "password"}
-                      name="currentPassword"
-                      autoComplete="current-password"
-                      value={passwordData.currentPassword}
-                      onChange={(e) => handlePasswordDataChange('currentPassword', e.target.value)}
-                      className="input-primary"
-                      placeholder="Tapez votre mot de passe actuel"
-                      required
-                      style={{ paddingRight: '2.5rem' }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleShowPasswordToggle('currentPassword')}
-                      style={{
-                        position: 'absolute',
-                        right: '0.75rem',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        color: '#9ca3af',
-                        cursor: 'pointer',
-                        padding: '0.25rem'
-                      }}
-                    >
-                      {showPasswords.currentPassword ? (
-                        <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 11-4.243-4.243m4.242 4.242L9.88 9.88" />
-                        </svg>
-                      ) : (
-                        <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                </div>
-                
-                {/* New Password */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
-                    {t('profile.newPassword')} <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type={showPasswords.newPassword ? "text" : "password"}
-                      name="newPassword"
-                      autoComplete="new-password"
-                      value={passwordData.newPassword}
-                      onChange={(e) => handlePasswordDataChange('newPassword', e.target.value)}
-                      className="input-primary"
-                      placeholder="Tapez votre nouveau mot de passe"
-                      required
-                      style={{ paddingRight: '2.5rem' }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleShowPasswordToggle('newPassword')}
-                      style={{
-                        position: 'absolute',
-                        right: '0.75rem',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        color: '#9ca3af',
-                        cursor: 'pointer',
-                        padding: '0.25rem'
-                      }}
-                    >
-                      {showPasswords.newPassword ? (
-                        <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 11-4.243-4.243m4.242 4.242L9.88 9.88" />
-                        </svg>
-                      ) : (
-                        <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                  
-                  {/* Password Requirements */}
-                  <div style={{ 
-                    marginTop: '0.75rem', 
-                    padding: '0.75rem', 
-                    backgroundColor: '#f9fafb', 
-                    borderRadius: '0.5rem' 
-                  }}>
-                    <p style={{ fontSize: '0.75rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem', margin: 0 }}>
-                      Le mot de passe doit contenir :
-                    </p>
-                    <div style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
-                      gap: '0.25rem', 
-                      fontSize: '0.75rem' 
-                    }}>
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        color: passwordData.newPassword.length >= 8 ? '#059669' : '#9ca3af' 
-                      }}>
-                        <span style={{ marginRight: '0.25rem' }}>
-                          {passwordData.newPassword.length >= 8 ? '✅' : '⭕'}
-                        </span>
-                        8+ caractères
+                    <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                      <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                      {t('profile.personalInfo')}
+                      <span className="text-red-500 ml-1">*</span>
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {t('profile.firstName')} <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.firstName}
+                          onChange={(e) => handleFormDataChange('firstName', e.target.value)}
+                          className="input-primary"
+                          required
+                        />
                       </div>
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        color: /[A-Z]/.test(passwordData.newPassword) ? '#059669' : '#9ca3af' 
-                      }}>
-                        <span style={{ marginRight: '0.25rem' }}>
-                          {/[A-Z]/.test(passwordData.newPassword) ? '✅' : '⭕'}
-                        </span>
-                        Une majuscule
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {t('profile.lastName')} <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.lastName}
+                          onChange={(e) => handleFormDataChange('lastName', e.target.value)}
+                          className="input-primary"
+                          required
+                        />
                       </div>
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        color: /[a-z]/.test(passwordData.newPassword) ? '#059669' : '#9ca3af' 
-                      }}>
-                        <span style={{ marginRight: '0.25rem' }}>
-                          {/[a-z]/.test(passwordData.newPassword) ? '✅' : '⭕'}
-                        </span>
-                        Une minuscule
+                    </div>
+
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('profile.email')} <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => handleFormDataChange('email', e.target.value)}
+                        className="input-primary"
+                        required
+                      />
+                    </div>
+
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        {t('profile.phone')} <span className="text-gray-500 text-sm">(optionnel)</span>
+                      </label>
+                      <PhoneInput
+                        countryCode={formData.country_code}
+                        areaCode={formData.area_code}
+                        phoneNumber={formData.phone_number}
+                        onChange={handlePhoneChange}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('profile.country')} <span className="text-gray-500 text-sm">(optionnel)</span>
+                      </label>
+                      <CountrySelect
+                        countries={countries}
+                        value={formData.country}
+                        onChange={(countryValue: string) => handleFormDataChange('country', countryValue)}
+                        placeholder="Sélectionner un pays ou rechercher..."
+                      />
+                    </div>
+                  </div>
+
+                  {/* Professional Info */}
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                      <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                      Informations Professionnelles
+                      <span className="text-gray-500 text-sm ml-2">(optionnel)</span>
+                    </h3>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Profil LinkedIn Personnel
+                        </label>
+                        <input
+                          type="url"
+                          value={formData.linkedinProfile}
+                          onChange={(e) => handleFormDataChange('linkedinProfile', e.target.value)}
+                          placeholder="https://linkedin.com/in/votre-profil"
+                          className="input-primary"
+                        />
                       </div>
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        color: /\d/.test(passwordData.newPassword) ? '#059669' : '#9ca3af' 
-                      }}>
-                        <span style={{ marginRight: '0.25rem' }}>
-                          {/\d/.test(passwordData.newPassword) ? '✅' : '⭕'}
-                        </span>
-                        Un chiffre
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {t('profile.companyName')}
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.companyName}
+                          onChange={(e) => handleFormDataChange('companyName', e.target.value)}
+                          placeholder="Nom de votre entreprise ou exploitation"
+                          className="input-primary"
+                        />
                       </div>
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        color: /[!@#$%^&*(),.?":{}|<>]/.test(passwordData.newPassword) ? '#059669' : '#9ca3af',
-                        gridColumn: 'span 2'
-                      }}>
-                        <span style={{ marginRight: '0.25rem' }}>
-                          {/[!@#$%^&*(),.?":{}|<>]/.test(passwordData.newPassword) ? '✅' : '⭕'}
-                        </span>
-                        Un caractère spécial (!@#$%^&*...)
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {t('profile.companyWebsite')}
+                        </label>
+                        <input
+                          type="url"
+                          value={formData.companyWebsite}
+                          onChange={(e) => handleFormDataChange('companyWebsite', e.target.value)}
+                          placeholder="https://www.votre-entreprise.com"
+                          className="input-primary"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Page LinkedIn Entreprise
+                        </label>
+                        <input
+                          type="url"
+                          value={formData.linkedinCorporate}
+                          onChange={(e) => handleFormDataChange('linkedinCorporate', e.target.value)}
+                          placeholder="https://linkedin.com/company/votre-entreprise"
+                          className="input-primary"
+                        />
                       </div>
                     </div>
                   </div>
                 </div>
-                
-                {/* Confirm Password */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
-                    {t('profile.confirmPassword')} <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type={showPasswords.confirmPassword ? "text" : "password"}
-                      name="confirmPassword"
-                      autoComplete="new-password"
-                      value={passwordData.confirmPassword}
-                      onChange={(e) => handlePasswordDataChange('confirmPassword', e.target.value)}
-                      className="input-primary"
-                      placeholder="Confirmez votre nouveau mot de passe"
-                      required
-                      style={{ paddingRight: '2.5rem' }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleShowPasswordToggle('confirmPassword')}
-                      style={{
-                        position: 'absolute',
-                        right: '0.75rem',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        color: '#9ca3af',
-                        cursor: 'pointer',
-                        padding: '0.25rem'
-                      }}
-                    >
-                      {showPasswords.confirmPassword ? (
-                        <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 11-4.243-4.243m4.242 4.242L9.88 9.88" />
-                        </svg>
-                      ) : (
-                        <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                </div>
-                
-                {/* Password Error Messages */}
-                {passwordErrors.length > 0 && (
-                  <div style={{
-                    backgroundColor: '#fef2f2',
-                    border: '1px solid #fecaca',
-                    borderRadius: '0.5rem',
-                    padding: '1rem'
-                  }}>
-                    <div style={{ color: '#991b1b', fontSize: '0.875rem' }}>
-                      <p style={{ fontWeight: '500', marginBottom: '0.5rem', margin: 0 }}>Erreurs :</p>
-                      <ul style={{ listStyle: 'disc', paddingLeft: '1.25rem', margin: 0 }}>
-                        {passwordErrors.map((error, index) => (
-                          <li key={index} style={{ marginBottom: '0.25rem' }}>{error}</li>
-                        ))}
-                      </ul>
+              )}
+
+              {/* Password Tab */}
+              {activeTab === 'password' && (
+                <div id="password-panel" className="space-y-6" role="tabpanel">
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                      <span className="w-2 h-2 bg-orange-500 rounded-full mr-2"></span>
+                      {t('profile.password')}
+                    </h3>
+                    
+                    <div className="space-y-4">
+                      <PasswordInput
+                        id="currentPassword"
+                        label={t('profile.currentPassword')}
+                        value={passwordData.currentPassword}
+                        onChange={(value) => handlePasswordDataChange('currentPassword', value)}
+                        placeholder="Tapez votre mot de passe actuel"
+                        autoComplete="current-password"
+                        required
+                        showPassword={showPasswords.currentPassword}
+                        onToggleShow={() => handleShowPasswordToggle('currentPassword')}
+                      />
+                      
+                      <PasswordInput
+                        id="newPassword"
+                        label={t('profile.newPassword')}
+                        value={passwordData.newPassword}
+                        onChange={(value) => handlePasswordDataChange('newPassword', value)}
+                        placeholder="Tapez votre nouveau mot de passe"
+                        autoComplete="new-password"
+                        required
+                        showStrength
+                        showPassword={showPasswords.newPassword}
+                        onToggleShow={() => handleShowPasswordToggle('newPassword')}
+                      />
+                      
+                      <PasswordInput
+                        id="confirmPassword"
+                        label={t('profile.confirmPassword')}
+                        value={passwordData.confirmPassword}
+                        onChange={(value) => handlePasswordDataChange('confirmPassword', value)}
+                        placeholder="Confirmez votre nouveau mot de passe"
+                        autoComplete="new-password"
+                        required
+                        showPassword={showPasswords.confirmPassword}
+                        onToggleShow={() => handleShowPasswordToggle('confirmPassword')}
+                      />
                     </div>
                   </div>
-                )}
-              </div>
+                  
+                  <ErrorDisplay errors={passwordErrors} title="Erreurs" />
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* Footer */}
-        <div style={{ 
-          padding: '1.5rem', 
-          borderTop: '1px solid #e5e7eb', 
-          backgroundColor: '#f9fafb',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: '0.75rem',
-          flexShrink: 0
-        }}>
-          <button
-            onClick={safeClose}
-            disabled={isLoading}
-            style={{
-              padding: '0.5rem 1.25rem',
-              color: '#4b5563',
-              fontWeight: '500',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              borderRadius: '0.375rem',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              if (!isLoading) {
-                e.currentTarget.style.color = '#1f2937'
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = '#4b5563'
-            }}
-          >
-            Annuler
-          </button>
-          <button
-            onClick={activeTab === 'profile' ? handleProfileSave : handlePasswordChange}
-            disabled={isLoading}
-            style={{
-              padding: '0.5rem 1.25rem',
-              backgroundColor: isLoading ? '#9ca3af' : '#2563eb',
-              color: 'white',
-              fontWeight: '500',
-              border: 'none',
-              borderRadius: '0.5rem',
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
-            onMouseEnter={(e) => {
-              if (!isLoading) {
-                e.currentTarget.style.backgroundColor = '#1d4ed8'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isLoading) {
-                e.currentTarget.style.backgroundColor = '#2563eb'
-              }
-            }}
-          >
-            {isLoading && (
-              <div className="spinner" style={{
-                width: '1rem',
-                height: '1rem',
-                borderColor: 'white',
-                borderTopColor: 'transparent'
-              }}></div>
-            )}
-            {isLoading ? 'Chargement...' : 'Sauvegarder'}
-          </button>
+          {/* Footer */}
+          <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 flex-shrink-0 bg-gray-50">
+            <button
+              onClick={handleClose}
+              className="px-5 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
+              disabled={isLoading}
+            >
+              Annuler
+            </button>
+            <button
+              onClick={activeTab === 'profile' ? handleProfileSave : handlePasswordChange}
+              disabled={isLoading}
+              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors flex items-center"
+            >
+              {isLoading && (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+              )}
+              {isLoading ? 'Chargement...' : 'Sauvegarder'}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }
