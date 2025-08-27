@@ -1,4 +1,4 @@
-/* app/globals.css - VERSION FINALE AVEC CORRECTIONS HEADER + ZOHO */
+/* app/globals.css - VERSION FINALE AVEC CORRECTIONS HEADER + ZOHO + TEXTE */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -20,10 +20,18 @@
     min-height: 100%;
   }
   
+  /* FIX PRINCIPAL : Forcer la couleur du texte pour tous les inputs */
   input, textarea, select {
-    @apply text-base;
+    @apply text-base text-gray-900 bg-white;
     -webkit-appearance: none;
     border-radius: 0;
+  }
+  
+  /* Fix spécifique pour les options de select */
+  select option {
+    @apply text-gray-900 bg-white;
+    color: #111827;
+    background-color: #ffffff;
   }
   
   button {
@@ -125,6 +133,17 @@
     isolation: isolate;
     z-index: 20;
   }
+  
+  /* Utility pour forcer la visibilité du texte si nécessaire */
+  .force-text-visible {
+    color: #111827 !important;
+    background-color: #ffffff !important;
+  }
+  
+  .force-text-visible option {
+    color: #111827 !important;
+    background-color: #ffffff !important;
+  }
 }
 
 /* Components personnalisés - SÉPARÉS POUR ÉVITER LES ERREURS */
@@ -142,7 +161,7 @@
   }
   
   .input-primary {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-base;
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-base text-gray-900 bg-white;
   }
   
   .card {
@@ -228,8 +247,6 @@
   }
 }
 
-
-
 /* Animations personnalisées */
 @keyframes slideInBottom {
   from {
@@ -297,6 +314,3 @@
     transition-duration: 0.01ms !important;
   }
 }
-
-
-
