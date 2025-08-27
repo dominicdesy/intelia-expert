@@ -402,7 +402,8 @@ export default function ChatInterface() {
     console.log('Redirection vers login:', reason)
     
     // Nettoyer immédiatement TOUS les timeouts
-    [redirectTimeoutRef, authCheckTimeoutRef, loadingTimeoutRef].forEach(ref => {
+    const timeoutRefs = [redirectTimeoutRef, authCheckTimeoutRef, loadingTimeoutRef]
+    timeoutRefs.forEach(ref => {
       if (ref.current) {
         clearTimeout(ref.current)
         ref.current = null
@@ -788,7 +789,8 @@ export default function ChatInterface() {
       isRedirectingRef.current = false
       
       // Nettoyer TOUS les timeouts
-      [loadingTimeoutRef, redirectTimeoutRef, authCheckTimeoutRef].forEach(ref => {
+      const timeoutRefs = [loadingTimeoutRef, redirectTimeoutRef, authCheckTimeoutRef]
+      timeoutRefs.forEach(ref => {
         if (ref.current) {
           clearTimeout(ref.current)
           ref.current = null
