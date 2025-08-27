@@ -16,10 +16,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isMountedRef = useRef(true)
   const subscriptionRef = useRef<any>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  // NOUVEAU: Flag pour empêcher les setState pendant la déconnexion
+  // Flag pour empêcher les setState pendant la déconnexion
   const isLoggingOutRef = useRef(false)
 
-  // CORRECTION: Wrapper sécurisé pour checkAuth
+  // Wrapper sécurisé pour checkAuth
   const safeCheckAuth = async () => {
     if (!isMountedRef.current || isLoggingOutRef.current) {
       console.log('[AuthProvider] checkAuth ignoré - composant démonté ou déconnexion en cours')
@@ -34,7 +34,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  // CORRECTION: Wrapper sécurisé pour setState avec protection renforcée
+  // CORRECTION: Wrapper sécurisé sans setTimeout pour éviter les race conditions
   const safeSetState = (updates: any) => {
     if (!isMountedRef.current || isLoggingOutRef.current) {
       console.log('[AuthProvider] setState ignoré - composant démonté ou déconnexion en cours')
@@ -42,14 +42,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
     
     try {
-      // Utiliser setTimeout pour éviter les setState synchrones pendant le démontage
-      setTimeout(() => {
-        if (isMountedRef.current && !isLoggingOutRef.current) {
-          useAuthStore.setState(updates)
-        }
-      }, 0)
+      // SUPPRESSION du setTimeout - cause des setState après unmount
+      useAuthStore.setState(updates)
     } catch (error) {
-      console.warn('[AuthProvider] Erreur setState différé:', error)
+      console.warn('[AuthProvider] Erreur setState:', error)
     }
   }
 
@@ -77,7 +73,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [hasHydrated, setHasHydrated, initializeSession])
 
-  // CORRECTION: Listener Supabase avec protection complète et détection de déconnexion
+  // Listener Supabase avec protection complète et détection de déconnexion
   useEffect(() => {
     let isCancelled = false
     
@@ -92,7 +88,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         
         console.log('[AuthProvider] Changement état Supabase:', event, !!session)
         
-        // NOUVEAU: Détecter le début de la déconnexion
+        // Détecter le début de la déconnexion
         if (event === 'SIGNED_OUT' || (event === 'SIGNED_IN' && !session)) {
           isLoggingOutRef.current = true
           console.log('[AuthProvider] Déconnexion détectée - blocage des setState')
@@ -113,7 +109,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
               
             case 'SIGNED_OUT':
               console.log('[AuthProvider] Utilisateur déconnecté')
-              // Pour SIGNED_OUT, on permet un seul setState puis on bloque
+              // Pour SIGNED_OUT, setState direct puis blocage total
               if (isMountedRef.current && !isCancelled) {
                 try {
                   useAuthStore.setState({ 
@@ -121,6 +117,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                     isAuthenticated: false,
                     lastAuthCheck: Date.now()
                   })
+                  console.log('[AuthProvider] État déconnexion appliqué')
                 } catch (error) {
                   console.warn('[AuthProvider] Erreur setState final:', error)
                 }
@@ -157,7 +154,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Stocker la subscription pour nettoyage
     subscriptionRef.current = subscription
 
-    // CORRECTION: Vérification périodique avec protection renforcée
+    // Vérification périodique avec protection renforcée
     const intervalId = setInterval(async () => {
       if (isCancelled || !isMountedRef.current || isLoggingOutRef.current) {
         return
