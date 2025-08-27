@@ -60,7 +60,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [hasHydrated, setHasHydrated, initializeSession])
 
-  // CORRECTION PRINCIPALE: Listener Supabase qui ignore les événements pendant logout
+  // CORRECTION FINALE: Listener Supabase qui NE FAIT PLUS DE setState pour SIGNED_OUT
   useEffect(() => {
     let isCancelled = false
     
@@ -98,27 +98,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
               break;
               
             case 'SIGNED_OUT':
-              console.log('🔥 [DEBUG-AUTH] SIGNED_OUT - DÉBUT BLOCAGE TOTAL')
+              console.log('🔥 [DEBUG-AUTH] SIGNED_OUT - NOUVELLE STRATÉGIE SANS setState')
               
-              // TECHNIQUE CRITIQUE: Bloquer immédiatement tous les setState futurs
+              // CORRECTION FINALE: NE PLUS FAIRE DE setState ICI
+              // Cette ligne causait React #300 car elle s'exécutait pendant le démontage
+              // useAuthStore.setState({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() })
+              
+              // À la place, juste marquer le flag et laisser le store gérer
               isLoggingOutRef.current = true
               
-              // setState UNIQUE et final pour SIGNED_OUT, puis blocage total
-              if (isMountedRef.current && !isCancelled) {
-                try {
-                  console.log('🔥 [DEBUG-AUTH] setState final pour SIGNED_OUT')
-                  useAuthStore.setState({ 
-                    user: null, 
-                    isAuthenticated: false,
-                    lastAuthCheck: Date.now()
-                  })
-                  console.log('🔥 [DEBUG-AUTH] État déconnexion appliqué - BLOCAGE TOTAL ACTIVÉ')
-                } catch (stateError) {
-                  console.error('🔥 [DEBUG-AUTH] Erreur setState final:', stateError)
-                }
-              }
+              console.log('🔥 [DEBUG-AUTH] SIGNED_OUT traité - PAS de setState, juste flag activé')
               
-              // Garder le blocage pendant 5 secondes pour éviter les états de course
+              // Le timeout reste pour débloquer après sécurité
               if (logoutTimeoutRef.current) {
                 clearTimeout(logoutTimeoutRef.current)
               }
