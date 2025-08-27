@@ -27,7 +27,7 @@
     border-radius: 0;
   }
   
-  /* Fix spécifique pour les options de select */
+  /* Fix spÃ©cifique pour les options de select */
   select option {
     @apply text-gray-900 bg-white;
     color: #111827;
@@ -46,7 +46,7 @@
   }
 }
 
-/* Utilities personnalisées */
+/* Utilities personnalisÃ©es */
 @layer utilities {
   .safe-area-top {
     padding-top: env(safe-area-inset-top);
@@ -122,7 +122,7 @@
     animation: fadeInUp 0.4s ease-out;
   }
   
-  /* Force le carré pour les boutons utilisateur qui veulent être ronds */
+  /* Force le carrÃ© pour les boutons utilisateur qui veulent Ãªtre ronds */
   .force-square {
     border-radius: 8px !important;
     border-radius: 0.5rem !important;
@@ -134,7 +134,7 @@
     z-index: 20;
   }
   
-  /* Utility pour forcer la visibilité du texte si nécessaire */
+  /* Utility pour forcer la visibilitÃ© du texte si nÃ©cessaire */
   .force-text-visible {
     color: #111827 !important;
     background-color: #ffffff !important;
@@ -146,7 +146,7 @@
   }
 }
 
-/* Components personnalisés - SÉPARÉS POUR ÉVITER LES ERREURS */
+/* Components personnalisÃ©s - SÃ‰PARÃ‰S POUR Ã‰VITER LES ERREURS */
 @layer components {
   .btn-primary {
     @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors duration-200;
@@ -176,7 +176,7 @@
     @apply bg-white border border-gray-200 text-gray-900 rounded-lg px-4 py-3;
   }
   
-  /* Topic card - SÉPARÉ EN PLUSIEURS CLASSES */
+  /* Topic card - SÃ‰PARÃ‰ EN PLUSIEURS CLASSES */
   .topic-card {
     @apply p-3 sm:p-4 bg-white rounded-lg border border-gray-200 transition-colors text-left;
   }
@@ -204,7 +204,7 @@
     @apply header-button bg-blue-600 text-white hover:bg-blue-700 text-sm;
   }
   
-  /* Style forcé pour HistoryMenu - CORRIGÉ pour cibler seulement le bouton */
+  /* Style forcÃ© pour HistoryMenu - CORRIGÃ‰ pour cibler seulement le bouton */
   .history-menu-container > button {
     width: 40px !important;
     height: 40px !important;
@@ -215,7 +215,7 @@
     justify-content: center !important;
   }
   
-  /* Style forcé pour UserMenuButton - Carré arrondi bleu */
+  /* Style forcÃ© pour UserMenuButton - CarrÃ© arrondi bleu */
   .user-menu-container > * {
     width: 40px !important;
     height: 40px !important;
@@ -240,7 +240,7 @@
     z-index: 10;
   }
   
-  /* Container pour éviter les lignes parasites */
+  /* Container pour Ã©viter les lignes parasites */
   .header-icon-container {
     @apply relative;
     isolation: isolate;
@@ -248,7 +248,7 @@
   
   /* === STYLES MODALS - CORRECTION POSITIONNEMENT === */
   
-  /* Modal overlay générique */
+  /* Modal overlay gÃ©nÃ©rique */
   .modal-overlay {
     position: fixed !important;
     top: 0 !important;
@@ -262,7 +262,7 @@
     background-color: rgba(0, 0, 0, 0.5) !important;
   }
   
-  /* Modal container générique */
+  /* Modal container gÃ©nÃ©rique */
   .modal-container {
     position: relative !important;
     z-index: 9999 !important;
@@ -275,7 +275,7 @@
     overflow: hidden !important;
   }
   
-  /* UserInfoModal spécifique - Force le centrage */
+  /* UserInfoModal spÃ©cifique - Force le centrage */
   .user-info-modal {
     position: fixed !important;
     top: 0 !important;
@@ -303,7 +303,7 @@
     overflow: hidden !important;
   }
   
-  /* Fix pour mobile - Assure une bonne visibilité */
+  /* Fix pour mobile - Assure une bonne visibilitÃ© */
   @media (max-width: 640px) {
     .user-info-modal {
       padding: 0.5rem !important;
@@ -315,7 +315,7 @@
     }
   }
   
-  /* Reset des styles qui pourraient interférer */
+  /* Reset des styles qui pourraient interfÃ©rer */
   .user-info-modal * {
     box-sizing: border-box;
   }
@@ -335,9 +335,43 @@
     transform: translate(-50%, -50%) !important;
     z-index: 9999 !important;
   }
+
+  /* === FIX DÉFINITIF USERINFMODAL === */
+  
+  /* Fix définitif pour UserInfoModal */
+  [data-modal="user-info"] {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 99999 !important;
+    background-color: white !important;
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    max-width: 90vw !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+    border-radius: 12px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+  }
+
+  /* Force l'overlay aussi */
+  [data-debug="modal-overlay"] {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background-color: rgba(0, 0, 0, 0.6) !important;
+    z-index: 99998 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
 }
 
-/* Animations personnalisées */
+/* Animations personnalisÃ©es */
 @keyframes slideInBottom {
   from {
     transform: translateY(100%);
@@ -371,7 +405,7 @@
   }
 }
 
-/* Media queries spécifiques */
+/* Media queries spÃ©cifiques */
 @media (max-width: 640px) {
   .container {
     @apply px-3;
