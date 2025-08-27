@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { useAuthStore } from '@/lib/stores/auth' 
 import { useTranslation } from '../hooks/useTranslation'
 import { Modal } from './Modal'
@@ -19,6 +19,16 @@ export const UserMenuButton = React.memo(() => {
   const [showAccountModal, setShowAccountModal] = useState(false)
   const [showLanguageModal, setShowLanguageModal] = useState(false)
   const [showInviteFriendModal, setShowInviteFriendModal] = useState(false)
+
+  // CORRECTION: Protection contre React #300
+  const isMountedRef = useRef(true)
+  
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
   // ✅ CORRECTION: Fonction pour obtenir les initiales (corrigée pour gérer les emails) - MÉMORISÉE
   const getUserInitials = useCallback((user: any): string => {
@@ -92,49 +102,57 @@ export const UserMenuButton = React.memo(() => {
     return { currentPlan, plan, isSuperAdmin }
   }, [user?.plan, user?.user_type])
 
-  // 🛠️ CORRECTION : Mémoisation de tous les handlers
+  // 🛠️ CORRECTION : Mémoisation de tous les handlers avec protection
   const handleContactClick = useCallback(() => {
+    if (!isMountedRef.current) return
     setIsOpen(false)
     setShowContactModal(true)
   }, [])
 
   const handleUserInfoClick = useCallback(() => {
+    if (!isMountedRef.current) return
     setIsOpen(false)
     setShowUserInfoModal(true)
   }, [])
 
   const handleAccountClick = useCallback(() => {
+    if (!isMountedRef.current) return
     setIsOpen(false)
     setShowAccountModal(true)
   }, [])
 
   const handleLanguageClick = useCallback(() => {
+    if (!isMountedRef.current) return
     setIsOpen(false)
     setShowLanguageModal(true)
   }, [])
 
   const handleInviteFriendClick = useCallback(() => {
+    if (!isMountedRef.current) return
     setIsOpen(false)
     setShowInviteFriendModal(true)
   }, [])
 
   const handleStatisticsClick = useCallback(() => {
+    if (!isMountedRef.current) return
     setIsOpen(false)
     // Rediriger vers la page des statistiques
     window.open('/admin/statistics', '_blank')
   }, [])
 
-  // ✅ NOUVELLE FONCTION DE DÉCONNEXION CORRIGÉE - MÉMORISÉE
+  // ✅ CORRECTION MAJEURE: Fonction de déconnexion sécurisée
   const handleLogout = useCallback(async () => {
     try {
       console.log('🔄 [UserMenu] Démarrage déconnexion')
-      setIsOpen(false)
       
-      // Appel de déconnexion
+      // NE PAS faire de setState ici - laisser logout() gérer le démontage
+      // setIsOpen(false) // ❌ RETIRÉ - cause l'erreur React #300
+      
+      // Appel de déconnexion - ceci va probablement démonter le composant
       await logout()
       
-      // Redirection forcée après déconnexion
-      console.log('✅ [UserMenu] Déconnexion terminée, redirection')
+      // Si nous arrivons ici, forcer la redirection
+      console.log('✅ [UserMenu] Déconnexion terminée, redirection de secours')
       window.location.href = '/'
       
     } catch (error) {
@@ -145,19 +163,40 @@ export const UserMenuButton = React.memo(() => {
   }, [logout])
 
   const toggleOpen = useCallback(() => {
+    if (!isMountedRef.current) return
     setIsOpen(prev => !prev)
   }, [])
 
   const closeMenu = useCallback(() => {
+    if (!isMountedRef.current) return
     setIsOpen(false)
   }, [])
 
-  // 🛠️ CORRECTION : Mémoisation des fonctions de fermeture de modales
-  const closeUserInfoModal = useCallback(() => setShowUserInfoModal(false), [])
-  const closeContactModal = useCallback(() => setShowContactModal(false), [])
-  const closeAccountModal = useCallback(() => setShowAccountModal(false), [])
-  const closeLanguageModal = useCallback(() => setShowLanguageModal(false), [])
-  const closeInviteFriendModal = useCallback(() => setShowInviteFriendModal(false), [])
+  // 🛠️ CORRECTION : Mémoisation des fonctions de fermeture de modales avec protection
+  const closeUserInfoModal = useCallback(() => {
+    if (!isMountedRef.current) return
+    setShowUserInfoModal(false)
+  }, [])
+  
+  const closeContactModal = useCallback(() => {
+    if (!isMountedRef.current) return
+    setShowContactModal(false)
+  }, [])
+  
+  const closeAccountModal = useCallback(() => {
+    if (!isMountedRef.current) return
+    setShowAccountModal(false)
+  }, [])
+  
+  const closeLanguageModal = useCallback(() => {
+    if (!isMountedRef.current) return
+    setShowLanguageModal(false)
+  }, [])
+  
+  const closeInviteFriendModal = useCallback(() => {
+    if (!isMountedRef.current) return
+    setShowInviteFriendModal(false)
+  }, [])
 
   const openPrivacyPolicy = useCallback(() => {
     window.open('https://intelia.com/privacy-policy/', '_blank')
@@ -263,7 +302,7 @@ export const UserMenuButton = React.memo(() => {
                   <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM3 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 019.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
                   </svg>
-                  <span>Inviter un ami</span>
+                  <span>{t('nav.inviteFriend')}</span>
                 </button>
 
                 {/* ✅ RESTAURÉ: Icône correcte pour contact */}
@@ -346,7 +385,7 @@ export const UserMenuButton = React.memo(() => {
       <Modal
         isOpen={showInviteFriendModal}
         onClose={closeInviteFriendModal}
-        title="Inviter des amis"
+        title={t('nav.inviteFriend')}
       >
         <InviteFriendModal onClose={closeInviteFriendModal} />
       </Modal>
