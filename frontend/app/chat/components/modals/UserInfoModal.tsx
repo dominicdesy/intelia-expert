@@ -209,9 +209,16 @@ const ErrorDisplay: React.FC<{ errors: string[]; title: string }> = ({ errors, t
   )
 }
 
-// Main component - Uses global CSS classes
+// Main component - SAME STRUCTURE AS AccountModal and ContactModal
 export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) => {
-  if (!user) return null
+  console.log('[DEBUG-UserInfoModal] MONTAGE - user:', !!user, 'email:', user?.email)
+  
+  if (!user) {
+    console.log('[DEBUG-UserInfoModal] PAS D\'UTILISATEUR - pas de rendu')
+    return null
+  }
+  
+  console.log('[DEBUG-UserInfoModal] RENDU DU MODAL COMPLET')
 
   const { updateProfile } = useAuthStore()
   const { t } = useTranslation()
@@ -557,285 +564,296 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
   }, [handleClose, isLoading])
 
   return (
-    <div className="user-info-modal" onClick={handleClose}>
-      <div
-        className="user-info-modal-content"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
-          <h2 className="text-xl font-semibold text-gray-900">
-            {t('profile.title')}
-          </h2>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl font-light w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
-            disabled={isLoading}
-          >
-            ×
-          </button>
-        </div>
+    <>
+      {/* Overlay - EXACT SAME STRUCTURE AS AccountModal/ContactModal */}
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 z-50" 
+        onClick={handleClose}
+      />
+      
+      {/* Modal Container - EXACT SAME STRUCTURE AS AccountModal/ContactModal */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div 
+          className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900">
+              {t('profile.title')}
+            </h2>
+            <button
+              onClick={handleClose}
+              className="text-gray-400 hover:text-gray-600 text-2xl"
+              aria-label="Fermer la modal"
+              title="Fermer"
+              disabled={isLoading}
+            >
+              ×
+            </button>
+          </div>
 
-        {/* Tabs */}
-        <div className="border-b border-gray-200 flex-shrink-0">
-          <nav className="flex px-6">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <span className="mr-2">{tab.icon}</span>
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
+          {/* Tabs */}
+          <div className="border-b border-gray-200">
+            <nav className="flex px-6">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors ${
+                    activeTab === tab.id
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <span className="mr-2">{tab.icon}</span>
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+          </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-6 space-y-6">
-            
-            {/* Errors */}
-            <ErrorDisplay errors={formErrors} title="Erreurs de validation" />
+          {/* Content */}
+          <div className="p-6">
+            <div className="space-y-6">
+              
+              {/* Errors */}
+              <ErrorDisplay errors={formErrors} title="Erreurs de validation" />
 
-            {/* Fallback Warning */}
-            {usingFallback && !countriesLoading && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-                <div className="flex items-center space-x-2">
-                  <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                  <span className="text-sm text-yellow-800">
-                    Liste de pays limitée (service externe temporairement indisponible)
-                  </span>
+              {/* Fallback Warning */}
+              {usingFallback && !countriesLoading && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <span className="text-sm text-yellow-800">
+                      Liste de pays limitée (service externe temporairement indisponible)
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Profile Tab */}
-            {activeTab === 'profile' && (
-              <div className="space-y-6">
-                
-                {/* Personal Info */}
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                    <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
-                    {t('profile.personalInfo')}
-                    <span className="text-red-500 ml-1">*</span>
-                  </h3>
+              {/* Profile Tab */}
+              {activeTab === 'profile' && (
+                <div className="space-y-6">
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {t('profile.firstName')} <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.firstName}
-                        onChange={(e) => handleFormDataChange('firstName', e.target.value)}
-                        className="input-primary"
-                        required
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {t('profile.lastName')} <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.lastName}
-                        onChange={(e) => handleFormDataChange('lastName', e.target.value)}
-                        className="input-primary"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {t('profile.email')} <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => handleFormDataChange('email', e.target.value)}
-                      className="input-primary"
-                      required
-                    />
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                      {t('profile.phone')} <span className="text-gray-500 text-sm">(optionnel)</span>
-                    </label>
-                    <PhoneInput
-                      countryCode={formData.country_code}
-                      areaCode={formData.area_code}
-                      phoneNumber={formData.phone_number}
-                      onChange={handlePhoneChange}
-                    />
-                  </div>
-
+                  {/* Personal Info */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {t('profile.country')} <span className="text-gray-500 text-sm">(optionnel)</span>
-                    </label>
-                    <CountrySelect
-                      countries={countries}
-                      value={formData.country}
-                      onChange={(countryValue: string) => handleFormDataChange('country', countryValue)}
-                      placeholder="Sélectionner un pays ou rechercher..."
-                    />
-                  </div>
-                </div>
-
-                {/* Professional Info */}
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                    <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                    Informations Professionnelles
-                    <span className="text-gray-500 text-sm ml-2">(optionnel)</span>
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Profil LinkedIn Personnel
-                      </label>
-                      <input
-                        type="url"
-                        value={formData.linkedinProfile}
-                        onChange={(e) => handleFormDataChange('linkedinProfile', e.target.value)}
-                        placeholder="https://linkedin.com/in/votre-profil"
-                        className="input-primary"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {t('profile.companyName')}
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.companyName}
-                        onChange={(e) => handleFormDataChange('companyName', e.target.value)}
-                        placeholder="Nom de votre entreprise ou exploitation"
-                        className="input-primary"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {t('profile.companyWebsite')}
-                      </label>
-                      <input
-                        type="url"
-                        value={formData.companyWebsite}
-                        onChange={(e) => handleFormDataChange('companyWebsite', e.target.value)}
-                        placeholder="https://www.votre-entreprise.com"
-                        className="input-primary"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Page LinkedIn Entreprise
-                      </label>
-                      <input
-                        type="url"
-                        value={formData.linkedinCorporate}
-                        onChange={(e) => handleFormDataChange('linkedinCorporate', e.target.value)}
-                        placeholder="https://linkedin.com/company/votre-entreprise"
-                        className="input-primary"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Password Tab */}
-            {activeTab === 'password' && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                    <span className="w-2 h-2 bg-orange-500 rounded-full mr-2"></span>
-                    {t('profile.password')}
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <PasswordInput
-                      id="currentPassword"
-                      label={t('profile.currentPassword')}
-                      value={passwordData.currentPassword}
-                      onChange={(value) => handlePasswordDataChange('currentPassword', value)}
-                      placeholder="Tapez votre mot de passe actuel"
-                      autoComplete="current-password"
-                      required
-                      showPassword={showPasswords.currentPassword}
-                      onToggleShow={() => handleShowPasswordToggle('currentPassword')}
-                    />
+                    <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                      <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                      {t('profile.personalInfo')}
+                      <span className="text-red-500 ml-1">*</span>
+                    </h3>
                     
-                    <PasswordInput
-                      id="newPassword"
-                      label={t('profile.newPassword')}
-                      value={passwordData.newPassword}
-                      onChange={(value) => handlePasswordDataChange('newPassword', value)}
-                      placeholder="Tapez votre nouveau mot de passe"
-                      autoComplete="new-password"
-                      required
-                      showStrength
-                      showPassword={showPasswords.newPassword}
-                      onToggleShow={() => handleShowPasswordToggle('newPassword')}
-                    />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {t('profile.firstName')} <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.firstName}
+                          onChange={(e) => handleFormDataChange('firstName', e.target.value)}
+                          className="input-primary"
+                          required
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {t('profile.lastName')} <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.lastName}
+                          onChange={(e) => handleFormDataChange('lastName', e.target.value)}
+                          className="input-primary"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('profile.email')} <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => handleFormDataChange('email', e.target.value)}
+                        className="input-primary"
+                        required
+                      />
+                    </div>
+
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        {t('profile.phone')} <span className="text-gray-500 text-sm">(optionnel)</span>
+                      </label>
+                      <PhoneInput
+                        countryCode={formData.country_code}
+                        areaCode={formData.area_code}
+                        phoneNumber={formData.phone_number}
+                        onChange={handlePhoneChange}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('profile.country')} <span className="text-gray-500 text-sm">(optionnel)</span>
+                      </label>
+                      <CountrySelect
+                        countries={countries}
+                        value={formData.country}
+                        onChange={(countryValue: string) => handleFormDataChange('country', countryValue)}
+                        placeholder="Sélectionner un pays ou rechercher..."
+                      />
+                    </div>
+                  </div>
+
+                  {/* Professional Info */}
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                      <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                      Informations Professionnelles
+                      <span className="text-gray-500 text-sm ml-2">(optionnel)</span>
+                    </h3>
                     
-                    <PasswordInput
-                      id="confirmPassword"
-                      label={t('profile.confirmPassword')}
-                      value={passwordData.confirmPassword}
-                      onChange={(value) => handlePasswordDataChange('confirmPassword', value)}
-                      placeholder="Confirmez votre nouveau mot de passe"
-                      autoComplete="new-password"
-                      required
-                      showPassword={showPasswords.confirmPassword}
-                      onToggleShow={() => handleShowPasswordToggle('confirmPassword')}
-                    />
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Profil LinkedIn Personnel
+                        </label>
+                        <input
+                          type="url"
+                          value={formData.linkedinProfile}
+                          onChange={(e) => handleFormDataChange('linkedinProfile', e.target.value)}
+                          placeholder="https://linkedin.com/in/votre-profil"
+                          className="input-primary"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {t('profile.companyName')}
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.companyName}
+                          onChange={(e) => handleFormDataChange('companyName', e.target.value)}
+                          placeholder="Nom de votre entreprise ou exploitation"
+                          className="input-primary"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {t('profile.companyWebsite')}
+                        </label>
+                        <input
+                          type="url"
+                          value={formData.companyWebsite}
+                          onChange={(e) => handleFormDataChange('companyWebsite', e.target.value)}
+                          placeholder="https://www.votre-entreprise.com"
+                          className="input-primary"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Page LinkedIn Entreprise
+                        </label>
+                        <input
+                          type="url"
+                          value={formData.linkedinCorporate}
+                          onChange={(e) => handleFormDataChange('linkedinCorporate', e.target.value)}
+                          placeholder="https://linkedin.com/company/votre-entreprise"
+                          className="input-primary"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
-                
-                <ErrorDisplay errors={passwordErrors} title="Erreurs" />
+              )}
+
+              {/* Password Tab */}
+              {activeTab === 'password' && (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                      <span className="w-2 h-2 bg-orange-500 rounded-full mr-2"></span>
+                      {t('profile.password')}
+                    </h3>
+                    
+                    <div className="space-y-4">
+                      <PasswordInput
+                        id="currentPassword"
+                        label={t('profile.currentPassword')}
+                        value={passwordData.currentPassword}
+                        onChange={(value) => handlePasswordDataChange('currentPassword', value)}
+                        placeholder="Tapez votre mot de passe actuel"
+                        autoComplete="current-password"
+                        required
+                        showPassword={showPasswords.currentPassword}
+                        onToggleShow={() => handleShowPasswordToggle('currentPassword')}
+                      />
+                      
+                      <PasswordInput
+                        id="newPassword"
+                        label={t('profile.newPassword')}
+                        value={passwordData.newPassword}
+                        onChange={(value) => handlePasswordDataChange('newPassword', value)}
+                        placeholder="Tapez votre nouveau mot de passe"
+                        autoComplete="new-password"
+                        required
+                        showStrength
+                        showPassword={showPasswords.newPassword}
+                        onToggleShow={() => handleShowPasswordToggle('newPassword')}
+                      />
+                      
+                      <PasswordInput
+                        id="confirmPassword"
+                        label={t('profile.confirmPassword')}
+                        value={passwordData.confirmPassword}
+                        onChange={(value) => handlePasswordDataChange('confirmPassword', value)}
+                        placeholder="Confirmez votre nouveau mot de passe"
+                        autoComplete="new-password"
+                        required
+                        showPassword={showPasswords.confirmPassword}
+                        onToggleShow={() => handleShowPasswordToggle('confirmPassword')}
+                      />
+                    </div>
+                  </div>
+                  
+                  <ErrorDisplay errors={passwordErrors} title="Erreurs" />
+                </div>
+              )}
+
+              {/* Footer Buttons */}
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  onClick={handleClose}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
+                  disabled={isLoading}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={activeTab === 'profile' ? handleProfileSave : handlePasswordChange}
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors flex items-center"
+                >
+                  {isLoading && (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  )}
+                  {isLoading ? 'Chargement...' : 'Sauvegarder'}
+                </button>
               </div>
-            )}
+            </div>
           </div>
         </div>
-
-        {/* Footer */}
-        <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 flex-shrink-0 bg-gray-50">
-          <button
-            onClick={handleClose}
-            className="px-5 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
-            disabled={isLoading}
-          >
-            Annuler
-          </button>
-          <button
-            onClick={activeTab === 'profile' ? handleProfileSave : handlePasswordChange}
-            disabled={isLoading}
-            className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors flex items-center"
-          >
-            {isLoading && (
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-            )}
-            {isLoading ? 'Chargement...' : 'Sauvegarder'}
-          </button>
-        </div>
       </div>
-    </div>
+    </>
   )
 }
