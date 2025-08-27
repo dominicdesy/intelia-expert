@@ -19,6 +19,28 @@ export const HistoryMenu = React.memo(() => {
     useConversationActions()
   const { currentConversation, loadConversation } = useCurrentConversation()
 
+  // Auto-refresh du compteur quand l'utilisateur change ou qu'une nouvelle conversation est créée
+  React.useEffect(() => {
+    if (user && !isLoadingHistory) {
+      // Charger silencieusement pour mettre à jour le badge
+      loadConversations(user.email || user.id).catch(console.error)
+    }
+  }, [user, loadConversations, isLoadingHistory])
+
+  // Rafraîchir périodiquement le compteur
+  React.useEffect(() => {
+    if (!user) return
+
+    const interval = setInterval(() => {
+      if (!isOpen && !isLoadingHistory) {
+        // Mise à jour silencieuse du badge seulement quand le menu est fermé
+        loadConversations(user.email || user.id).catch(console.error)
+      }
+    }, 30000) // Toutes les 30 secondes
+
+    return () => clearInterval(interval)
+  }, [user, isOpen, isLoadingHistory, loadConversations])
+
   // CORRECTION CRITIQUE: Éviter la boucle infinie dans handleToggle
   const handleToggle = useCallback(async () => {
     console.log('[HistoryMenu] Toggle clicked, isOpen:', isOpen, 'user:', !!user)

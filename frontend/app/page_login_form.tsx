@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { memo, useCallback } from 'react'
 import Link from 'next/link'
 import { AlertMessage, PasswordInput } from './page_components'
 
@@ -12,7 +12,8 @@ interface LoginFormProps {
   toggleMode: () => void
 }
 
-export function LoginForm({ 
+// ✅ CORRECTION : Mémoriser le composant LoginForm
+export const LoginForm = memo(function LoginForm({ 
   authLogic, 
   t, 
   localError, 
@@ -30,7 +31,8 @@ export function LoginForm({
   const [formError, setFormError] = React.useState('')
   const [formSuccess, setFormSuccess] = React.useState('')
 
-  const onSubmit = async (e: React.FormEvent) => {
+  // ✅ Mémoriser les handlers pour éviter les re-renders
+  const onSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     setFormError('')
     setFormSuccess('')
@@ -41,13 +43,30 @@ export function LoginForm({
     } catch (error: any) {
       setFormError(error.message)
     }
-  }
+  }, [handleLogin, t.authSuccess])
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       onSubmit(e as any)
     }
-  }
+  }, [onSubmit])
+
+  // ✅ Mémoriser les handlers d'input pour éviter les cascades de re-renders
+  const handleEmailChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    handleLoginChange('email', e.target.value)
+  }, [handleLoginChange])
+
+  const handlePasswordChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    handleLoginChange('password', e.target.value)
+  }, [handleLoginChange])
+
+  const handleRememberMeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('🛯 [Checkbox] Événement onChange déclenché!')
+    console.log('🛯 [Checkbox] e.target.checked:', e.target.checked)
+    console.log('🛯 [Checkbox] État actuel rememberMe:', loginData.rememberMe)
+    
+    handleLoginChange('rememberMe', e.target.checked)
+  }, [handleLoginChange, loginData.rememberMe])
 
   return (
     <>
@@ -83,7 +102,7 @@ export function LoginForm({
                 autoComplete="email"
                 required
                 value={loginData.email}
-                onChange={(e) => handleLoginChange('email', e.target.value)}
+                onChange={handleEmailChange}
                 className="block w-full rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
               />
             </div>
@@ -99,7 +118,7 @@ export function LoginForm({
                 name="password"
                 ref={passwordInputRef}
                 value={loginData.password}
-                onChange={(e) => handleLoginChange('password', e.target.value)}
+                onChange={handlePasswordChange}
                 autoComplete="current-password"
                 required
               />
@@ -113,13 +132,7 @@ export function LoginForm({
                 name="remember-me"
                 type="checkbox"
                 checked={loginData.rememberMe}
-                onChange={(e) => {
-                  console.log('🛯 [Checkbox] Événement onChange déclenché!')
-                  console.log('🛯 [Checkbox] e.target.checked:', e.target.checked)
-                  console.log('🛯 [Checkbox] État actuel rememberMe:', loginData.rememberMe)
-                  
-                  handleLoginChange('rememberMe', e.target.checked)
-                }}
+                onChange={handleRememberMeChange}
                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 disabled={isLoading}
               />
@@ -171,4 +184,4 @@ export function LoginForm({
       </div>
     </>
   )
-}
+})
