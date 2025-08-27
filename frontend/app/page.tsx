@@ -7,14 +7,14 @@ import { SignupModal } from './page_signup_modal'
 import { usePageInitialization } from './page_initialization'
 import { InteliaLogo, LanguageSelector, LoadingSpinner, AuthFooter } from './page_components'
 
-// 🚀 Mémorisation des composants pour éviter les re-renders
+// Mémorisation des composants pour éviter les re-renders
 const MemoizedLoginForm = memo(LoginForm)
 const MemoizedSignupModal = memo(SignupModal)
 const MemoizedInteliaLogo = memo(InteliaLogo)
 const MemoizedLanguageSelector = memo(LanguageSelector)
 const MemoizedAuthFooter = memo(AuthFooter)
 
-// 🚀 Composant de chargement statique mémorisé
+// Composant de chargement statique mémorisé
 const LoadingContent = memo(() => (
   <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
     <div className="text-center">
@@ -25,11 +25,11 @@ const LoadingContent = memo(() => (
   </div>
 ))
 
-// 🚀 Contenu principal mémorisé
+// Contenu principal mémorisé
 const PageContent = memo(() => {
   console.log('🚀 [PageContent] Composant PageContent rendu')
   
-  // ✅ Récupération des données d'initialisation
+  // Récupération des données d'initialisation
   const initData = usePageInitialization()
   const {
     currentLanguage,
@@ -43,7 +43,7 @@ const PageContent = memo(() => {
     hasInitialized
   } = initData
 
-  // ✅ Mémorisation stable des props pour éviter les re-renders du hook d'auth
+  // Mémorisation stable des props pour éviter les re-renders du hook d'auth
   const authProps = useMemo(() => ({
     currentLanguage,
     t,
@@ -51,16 +51,16 @@ const PageContent = memo(() => {
     setCurrentLanguage
   }), [currentLanguage, t, isSignupMode, setCurrentLanguage])
 
-  // ✅ Hook d'authentification avec props stables
+  // Hook d'authentification avec props stables
   const authLogic = useAuthenticationLogic(authProps)
 
-  // ✅ Gestionnaire de changement de langue mémorisé avec dépendances stables
-  const handleLanguageChange = useCallback((newLanguage: any) => {
+  // Gestionnaire de changement de langue mémorisé
+  const handleLanguageChange = useCallback((newLanguage) => {
     setCurrentLanguage(newLanguage)
     localStorage.setItem('intelia-language', newLanguage)
   }, [setCurrentLanguage])
 
-  // ✅ Mémorisation du contenu de chargement pour éviter les re-renders
+  // Mémorisation du contenu de chargement pour éviter les re-renders
   const loadingContent = useMemo(() => <LoadingContent />, [])
 
   // Affichage conditionnel avec contenu mémorisé
@@ -122,7 +122,7 @@ const PageContent = memo(() => {
   )
 })
 
-// ✅ Ajout du displayName pour le debugging
+// Ajout du displayName pour le debugging
 PageContent.displayName = 'PageContent'
 LoadingContent.displayName = 'LoadingContent'
 
@@ -134,3 +134,4 @@ export default function Page() {
       <PageContent />
     </Suspense>
   )
+}
