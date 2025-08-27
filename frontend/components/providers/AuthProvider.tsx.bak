@@ -16,10 +16,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isMountedRef = useRef(true)
   const subscriptionRef = useRef<any>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  
-  // CORRECTION CRITIQUE: Flag pour bloquer TOUS les setState pendant déconnexion
+  // Flag pour empêcher les setState pendant la déconnexion
   const isLoggingOutRef = useRef(false)
-  const logoutTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Wrapper sécurisé pour checkAuth
   const safeCheckAuth = async () => {
@@ -30,9 +28,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       await checkAuth()
     } catch (error) {
-      if (isMountedRef.current && !isLoggingOutRef.current) {
+      if (isMountedRef.current) {
         console.error('[AuthProvider] Erreur checkAuth sécurisé:', error)
       }
+    }
+  }
+
+  // CORRECTION: Wrapper sécurisé sans setTimeout pour éviter les race conditions
+  const safeSetState = (updates: any) => {
+    if (!isMountedRef.current || isLoggingOutRef.current) {
+      console.log('[AuthProvider] setState ignoré - composant démonté ou déconnexion en cours')
+      return
+    }
+    
+    try {
+      // SUPPRESSION du setTimeout - cause des setState après unmount
+      useAuthStore.setState(updates)
+    } catch (error) {
+      console.warn('[AuthProvider] Erreur setState:', error)
     }
   }
 
@@ -60,7 +73,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [hasHydrated, setHasHydrated, initializeSession])
 
-  // CORRECTION PRINCIPALE: Listener Supabase qui ignore les événements pendant logout
+  // Listener Supabase avec protection complète et détection de déconnexion
   useEffect(() => {
     let isCancelled = false
     
@@ -68,91 +81,71 @@ export function AuthProvider({ children }: AuthProviderProps) {
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔥 [DEBUG-AUTH] === ÉVÉNEMENT SUPABASE ===')
-        console.log('🔥 [DEBUG-AUTH] Event:', event, 'Session:', !!session)
-        console.log('🔥 [DEBUG-AUTH] isMountedRef:', isMountedRef.current)
-        console.log('🔥 [DEBUG-AUTH] isLoggingOutRef:', isLoggingOutRef.current)
-        console.log('🔥 [DEBUG-AUTH] isCancelled:', isCancelled)
-        
-        if (isCancelled || !isMountedRef.current || isLoggingOutRef.current) {
-          console.log('🔥 [DEBUG-AUTH] ÉVÉNEMENT IGNORÉ - composant démonté ou déconnexion active')
+        if (isCancelled || !isMountedRef.current) {
+          console.log('[AuthProvider] Événement Supabase ignoré - composant démonté')
           return
         }
         
-        console.log('🔥 [DEBUG-AUTH] Traitement de l\'événement:', event)
+        console.log('[AuthProvider] Changement état Supabase:', event, !!session)
+        
+        // Détecter le début de la déconnexion
+        if (event === 'SIGNED_OUT' || (event === 'SIGNED_IN' && !session)) {
+          isLoggingOutRef.current = true
+          console.log('[AuthProvider] Déconnexion détectée - blocage des setState')
+        }
         
         try {
           switch (event) {
             case 'INITIAL_SESSION':
-              console.log('🔥 [DEBUG-AUTH] INITIAL_SESSION ignoré')
+              console.log('[AuthProvider] Événement Supabase non géré: INITIAL_SESSION')
               break
               
             case 'SIGNED_IN':
-              console.log('🔥 [DEBUG-AUTH] SIGNED_IN - vérification état...')
               if (!isLoggingOutRef.current) {
-                console.log('🔥 [DEBUG-AUTH] Utilisateur connecté - checkAuth')
+                console.log('[AuthProvider] Utilisateur connecté')
                 await safeCheckAuth()
-              } else {
-                console.log('🔥 [DEBUG-AUTH] SIGNED_IN ignoré - déconnexion en cours')
               }
               break
               
             case 'SIGNED_OUT':
-              console.log('🔥 [DEBUG-AUTH] SIGNED_OUT - DÉBUT BLOCAGE TOTAL')
-              
-              // TECHNIQUE CRITIQUE: Bloquer immédiatement tous les setState futurs
-              isLoggingOutRef.current = true
-              
-              // setState UNIQUE et final pour SIGNED_OUT, puis blocage total
+              console.log('[AuthProvider] Utilisateur déconnecté')
+              // Pour SIGNED_OUT, setState direct puis blocage total
               if (isMountedRef.current && !isCancelled) {
                 try {
-                  console.log('🔥 [DEBUG-AUTH] setState final pour SIGNED_OUT')
                   useAuthStore.setState({ 
                     user: null, 
                     isAuthenticated: false,
                     lastAuthCheck: Date.now()
                   })
-                  console.log('🔥 [DEBUG-AUTH] État déconnexion appliqué - BLOCAGE TOTAL ACTIVÉ')
-                } catch (stateError) {
-                  console.error('🔥 [DEBUG-AUTH] Erreur setState final:', stateError)
+                  console.log('[AuthProvider] État déconnexion appliqué')
+                } catch (error) {
+                  console.warn('[AuthProvider] Erreur setState final:', error)
                 }
               }
-              
-              // Garder le blocage pendant 5 secondes pour éviter les états de course
-              if (logoutTimeoutRef.current) {
-                clearTimeout(logoutTimeoutRef.current)
-              }
-              logoutTimeoutRef.current = setTimeout(() => {
-                console.log('🔥 [DEBUG-AUTH] Fin du blocage après 5s')
-                // Ne pas remettre isLoggingOutRef à false - laisser le démontage s'occuper
-              }, 5000)
-              
+              // Bloquer tous les setState suivants
+              isLoggingOutRef.current = true
               break
               
             case 'TOKEN_REFRESHED':
               if (!isLoggingOutRef.current) {
-                console.log('🔥 [DEBUG-AUTH] Token rafraîchi')
+                console.log('[AuthProvider] Token rafraîchi')
                 await safeCheckAuth()
-              } else {
-                console.log('🔥 [DEBUG-AUTH] TOKEN_REFRESHED ignoré - déconnexion en cours')
               }
               break
               
             case 'USER_UPDATED':
               if (!isLoggingOutRef.current) {
-                console.log('🔥 [DEBUG-AUTH] Utilisateur mis à jour')
+                console.log('[AuthProvider] Utilisateur mis à jour')
                 await safeCheckAuth()
-              } else {
-                console.log('🔥 [DEBUG-AUTH] USER_UPDATED ignoré - déconnexion en cours')
               }
               break
               
             default:
-              console.log('🔥 [DEBUG-AUTH] Événement non géré:', event)
+              console.log('[AuthProvider] Événement Supabase non géré:', event)
           }
         } catch (error) {
           if (isMountedRef.current && !isLoggingOutRef.current) {
-            console.error('🔥 [DEBUG-AUTH] Erreur traitement événement:', event, error)
+            console.error('[AuthProvider] Erreur traitement événement:', event, error)
           }
         }
       }
@@ -212,10 +205,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         clearInterval(intervalRef.current)
       }
       
-      if (logoutTimeoutRef.current) {
-        clearTimeout(logoutTimeoutRef.current)
-      }
-      
       console.log('[AuthProvider] Nettoyage subscription et interval')
     }
   }, [checkAuth])
@@ -244,11 +233,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
         intervalRef.current = null
-      }
-      
-      if (logoutTimeoutRef.current) {
-        clearTimeout(logoutTimeoutRef.current)
-        logoutTimeoutRef.current = null
       }
     }
   }, [])

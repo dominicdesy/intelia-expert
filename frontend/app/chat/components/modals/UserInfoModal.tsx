@@ -1,4 +1,4 @@
-// UserInfoModal.tsx
+// UserInfoModal.tsx - VERSION CORRIGÉE REACT #300
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useAuthStore } from '@/lib/stores/auth'
@@ -37,24 +37,34 @@ interface Country {
   flag?: string
 }
 
+// HOOK SÉCURISÉ useCountries avec protection complète
 const useCountries = () => {
   const [countries, setCountries] = useState<Country[]>(fallbackCountries)
   const [loading, setLoading] = useState(false)
   const [usingFallback, setUsingFallback] = useState(true)
+  
+  // PROTECTION CRITIQUE: Protection contre setState après unmount
+  const isMountedRef = React.useRef(true)
 
   useEffect(() => {
+    isMountedRef.current = true
     let isCancelled = false
     
     const fetchCountries = async () => {
+      if (!isMountedRef.current || isCancelled) return
+      
       try {
-        setLoading(true)
+        if (isMountedRef.current && !isCancelled) {
+          setLoading(true)
+        }
+        
         const response = await fetch('https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations')
         
-        if (!response.ok || isCancelled) return
+        if (!response.ok || isCancelled || !isMountedRef.current) return
         
         const data = await response.json()
         
-        if (isCancelled) return
+        if (isCancelled || !isMountedRef.current) return
         
         const formattedCountries = data
           .map((country: any) => ({
@@ -72,17 +82,17 @@ const useCountries = () => {
           )
           .sort((a: Country, b: Country) => a.label.localeCompare(b.label))
         
-        if (formattedCountries.length >= 50 && !isCancelled) {
+        if (formattedCountries.length >= 50 && !isCancelled && isMountedRef.current) {
           setCountries(formattedCountries)
           setUsingFallback(false)
         }
         
       } catch (err) {
-        if (!isCancelled) {
-          console.warn('API échouée, utilisation fallback:', err)
+        if (!isCancelled && isMountedRef.current) {
+          console.warn('🌍 [UserInfoModal] API échouée, utilisation fallback:', err)
         }
       } finally {
-        if (!isCancelled) {
+        if (!isCancelled && isMountedRef.current) {
           setLoading(false)
         }
       }
@@ -92,6 +102,7 @@ const useCountries = () => {
     
     return () => {
       isCancelled = true
+      isMountedRef.current = false
     }
   }, [])
 
@@ -99,6 +110,8 @@ const useCountries = () => {
 }
 
 export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
+  console.log('🏗️ [DEBUG-UserInfoModal] Montage du modal')
+  
   const { updateProfile } = useAuthStore()
   const { t } = useTranslation()
   const { validatePhoneFields } = usePhoneValidation()
@@ -107,6 +120,19 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   
   const { countries, loading: countriesLoading, usingFallback } = useCountries()
   
+  // PROTECTION CRITIQUE #1: Protection complète contre setState après unmount
+  const isMountedRef = React.useRef(true)
+  
+  React.useEffect(() => {
+    isMountedRef.current = true
+    console.log('✅ [DEBUG-UserInfoModal] Composant monté - isMounted: true')
+    
+    return () => {
+      console.log('🧹 [DEBUG-UserInfoModal] Composant en cours de démontage')
+      isMountedRef.current = false
+    }
+  }, [])
+
   // Initialiser une seule fois avec useMemo
   const initialFormData = useMemo(() => ({
     firstName: user?.firstName || '',
@@ -122,29 +148,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     linkedinCorporate: user?.linkedinCorporate || ''
   }), [user])
 
-  // Fix #1: Prevent setState after unmount + explicit mount state
-  const isMountedRef = React.useRef(true)
-  
-  React.useEffect(() => {
-    isMountedRef.current = true
-    return () => {
-      isMountedRef.current = false
-    }
-  }, [])
-
-  // Fix #4: Sync form data when user changes
-  React.useEffect(() => {
-    if (isMountedRef.current) {
-      setFormData(initialFormData)
-    }
-  }, [initialFormData])
-  
-  // Fix #2: Safe close - prevent closing during operations
-  const safeClose = useCallback(() => {
-    if (!isLoading) {
-      onClose()
-    }
-  }, [isLoading, onClose])
   const [formData, setFormData] = useState(initialFormData)
 
   const [passwordData, setPasswordData] = useState({
@@ -161,6 +164,35 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
 
   const [passwordErrors, setPasswordErrors] = useState<string[]>([])
   const [formErrors, setFormErrors] = useState<string[]>([])
+
+  // CORRECTION CRITIQUE #2: Sync form data avec protection
+  React.useEffect(() => {
+    console.log('🔄 [DEBUG-UserInfoModal] Sync formData - isMounted:', isMountedRef.current)
+    
+    if (isMountedRef.current) {
+      setFormData(initialFormData)
+    }
+  }, [initialFormData])
+  
+  // CORRECTION CRITIQUE #3: Safe close avec protection loading
+  const safeClose = useCallback(() => {
+    console.log('❌ [DEBUG-UserInfoModal] safeClose - isMounted:', isMountedRef.current, 'isLoading:', isLoading)
+    
+    if (!isLoading && isMountedRef.current) {
+      onClose()
+    }
+  }, [isLoading, onClose])
+
+  // CORRECTION CRITIQUE #4: Toutes les fonctions setState protégées
+  const safeSetState = useCallback((updater: any, stateName: string) => {
+    if (!isMountedRef.current) {
+      console.log(`⚠️ [DEBUG-UserInfoModal] setState ${stateName} ignoré - composant démonté`)
+      return
+    }
+    
+    console.log(`🔄 [DEBUG-UserInfoModal] setState ${stateName} - isMounted: true`)
+    updater()
+  }, [])
 
   const validatePassword = useCallback((password: string): string[] => {
     const errors: string[] = []
@@ -185,20 +217,27 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   }, [])
 
   const handlePhoneChange = useCallback((phoneData: { country_code: string; area_code: string; phone_number: string }) => {
-    setFormData(prev => ({
-      ...prev,
-      country_code: phoneData.country_code,
-      area_code: phoneData.area_code,
-      phone_number: phoneData.phone_number
-    }))
-  }, [])
+    safeSetState(() => {
+      setFormData(prev => ({
+        ...prev,
+        country_code: phoneData.country_code,
+        area_code: phoneData.area_code,
+        phone_number: phoneData.phone_number
+      }))
+    }, 'handlePhoneChange')
+  }, [safeSetState])
 
   const handleProfileSave = useCallback(async () => {
-    // Fix #5: Early return if already loading
-    if (!isMountedRef.current || isLoading) return
+    console.log('💾 [DEBUG-UserInfoModal] handleProfileSave - isMounted:', isMountedRef.current, 'isLoading:', isLoading)
     
-    setIsLoading(true)
-    setFormErrors([])
+    // PROTECTION: Early return si déjà en cours ou démonté
+    if (!isMountedRef.current || isLoading) {
+      console.log('⚠️ [DEBUG-UserInfoModal] handleProfileSave abandonné - démonté ou en cours')
+      return
+    }
+    
+    safeSetState(() => setIsLoading(true), 'setIsLoading(true)')
+    safeSetState(() => setFormErrors([]), 'setFormErrors([])') 
     
     try {
       const errors: string[] = []
@@ -213,7 +252,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
         errors.push('L\'email est requis')
       }
       
-      // Fix #4: Only validate phone if at least one field is filled
+      // Validation téléphone uniquement si au moins un champ rempli
       const hasPhoneData = formData.country_code || formData.area_code || formData.phone_number
       if (hasPhoneData) {
         const phoneValidation = validatePhoneFields(
@@ -228,32 +267,35 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       }
       
       if (errors.length > 0) {
-        if (isMountedRef.current) {
-          setFormErrors(errors)
-        }
+        safeSetState(() => setFormErrors(errors), 'setFormErrors(errors)')
         return
       }
 
+      console.log('🔄 [DEBUG-UserInfoModal] Appel updateProfile...')
       await updateProfile(formData)
       
-      // Fix #2: Show alert before closing modal
+      console.log('✅ [DEBUG-UserInfoModal] updateProfile réussi')
+      // Montrer alert avant fermeture
       alert(t('profile.title') + ' mis à jour avec succès!')
       safeClose()
       
     } catch (error: any) {
-      console.error('Erreur mise à jour profil:', error)
+      console.error('❌ [DEBUG-UserInfoModal] Erreur mise à jour profil:', error)
       alert('Erreur lors de la mise à jour: ' + (error?.message || 'Erreur inconnue'))
     } finally {
-      // Fix #1: Only setState if component is still mounted
-      if (isMountedRef.current) {
-        setIsLoading(false)
-      }
+      // CRITIQUE: Protection setState final
+      safeSetState(() => setIsLoading(false), 'setIsLoading(false) final')
     }
-  }, [formData, validatePhoneFields, updateProfile, t, safeClose, isLoading])
+  }, [formData, validatePhoneFields, updateProfile, t, safeClose, isLoading, safeSetState])
 
   const handlePasswordChange = useCallback(async () => {
-    // Fix #5: Early return if already loading or unmounted
-    if (!isMountedRef.current || isLoading) return
+    console.log('🔐 [DEBUG-UserInfoModal] handlePasswordChange - isMounted:', isMountedRef.current, 'isLoading:', isLoading)
+    
+    // PROTECTION: Early return si déjà en cours ou démonté
+    if (!isMountedRef.current || isLoading) {
+      console.log('⚠️ [DEBUG-UserInfoModal] handlePasswordChange abandonné')
+      return
+    }
     
     const errors: string[] = []
     
@@ -273,16 +315,17 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     const passwordValidationErrors = validatePassword(passwordData.newPassword)
     errors.push(...passwordValidationErrors)
     
-    if (isMountedRef.current) {
-      setPasswordErrors(errors)
-    }
+    safeSetState(() => setPasswordErrors(errors), 'setPasswordErrors')
     
     if (errors.length > 0) {
       return
     }
 
-    setIsLoading(true)
+    safeSetState(() => setIsLoading(true), 'setIsLoading(true) password')
+    
     try {
+      console.log('🔄 [DEBUG-UserInfoModal] Vérification mot de passe actuel...')
+      
       const loginResponse = await fetch('/api/v1/auth/login', {
         method: 'POST',
         headers: {
@@ -295,21 +338,20 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       })
 
       if (!loginResponse.ok) {
-        // Fix #7: Safe JSON parsing
         let loginError: any = null
         try {
           loginError = await loginResponse.json()
         } catch {}
         
-        if (isMountedRef.current) {
-          setPasswordErrors(['Le mot de passe actuel est incorrect'])
-        }
+        safeSetState(() => setPasswordErrors(['Le mot de passe actuel est incorrect']), 'setPasswordErrors login fail')
         return
       }
 
       const loginData = await loginResponse.json()
       const backendToken = loginData.access_token
 
+      console.log('🔄 [DEBUG-UserInfoModal] Changement mot de passe...')
+      
       const response = await fetch('/api/v1/auth/change-password', {
         method: 'POST',
         headers: {
@@ -322,49 +364,69 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
         })
       })
 
-      // Fix #7: Safe JSON parsing for error responses
       let result: any = null
       try {
         result = await response.json()
       } catch {}
       
       if (!response.ok) {
-        if (isMountedRef.current) {
-          setPasswordErrors([result?.detail || result?.message || 'Erreur lors du changement de mot de passe'])
-        }
+        safeSetState(() => setPasswordErrors([result?.detail || result?.message || 'Erreur lors du changement de mot de passe']), 'setPasswordErrors change fail')
         return
       }
       
-      if (isMountedRef.current) {
+      console.log('✅ [DEBUG-UserInfoModal] Mot de passe changé avec succès')
+      
+      safeSetState(() => {
         setPasswordData({
           currentPassword: '',
           newPassword: '',
           confirmPassword: ''
         })
         setPasswordErrors([])
-      }
+      }, 'reset password data')
       
-      // Fix #2: Show alert before closing modal
       alert('Mot de passe changé avec succès!')
       safeClose()
       
     } catch (error: any) {
-      console.error('Erreur technique:', error)
-      if (isMountedRef.current) {
-        setPasswordErrors(['Erreur de connexion au serveur. Veuillez réessayer.'])
-      }
+      console.error('❌ [DEBUG-UserInfoModal] Erreur technique:', error)
+      safeSetState(() => setPasswordErrors(['Erreur de connexion au serveur. Veuillez réessayer.']), 'setPasswordErrors catch')
     } finally {
-      // Fix #1: Only setState if component is still mounted
-      if (isMountedRef.current) {
-        setIsLoading(false)
-      }
+      // CRITIQUE: Protection setState final
+      safeSetState(() => setIsLoading(false), 'setIsLoading(false) password final')
     }
-  }, [passwordData, validatePassword, user?.email, safeClose, isLoading])
+  }, [passwordData, validatePassword, user?.email, safeClose, isLoading, safeSetState])
 
   const tabs = useMemo(() => [
     { id: 'profile', label: t('nav.profile'), icon: '👤' },
-    { id: 'password', label: t('profile.password'), icon: '🔒' }
+    { id: 'password', label: t('profile.password'), icon: '🔑' }
   ], [t])
+
+  // PROTECTION: Handler avec protection pour les changements d'onglets
+  const handleTabChange = useCallback((tabId: string) => {
+    safeSetState(() => setActiveTab(tabId), 'setActiveTab')
+  }, [safeSetState])
+
+  // PROTECTION: Handlers de formulaire protégés
+  const handleFormDataChange = useCallback((field: string, value: any) => {
+    safeSetState(() => {
+      setFormData(prev => ({ ...prev, [field]: value }))
+    }, `setFormData ${field}`)
+  }, [safeSetState])
+
+  const handlePasswordDataChange = useCallback((field: string, value: string) => {
+    safeSetState(() => {
+      setPasswordData(prev => ({ ...prev, [field]: value }))
+    }, `setPasswordData ${field}`)
+  }, [safeSetState])
+
+  const handleShowPasswordToggle = useCallback((field: string) => {
+    safeSetState(() => {
+      setShowPasswords(prev => ({ ...prev, [field]: !prev[field as keyof typeof prev] }))
+    }, `toggle show password ${field}`)
+  }, [safeSetState])
+
+  console.log('🔄 [DEBUG-UserInfoModal] Render - isMounted:', isMountedRef.current, 'isLoading:', isLoading)
 
   return (
     <>
@@ -396,7 +458,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => handleTabChange(tab.id)}
                   className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors ${
                     activeTab === tab.id
                       ? 'border-blue-500 text-blue-600'
@@ -455,7 +517,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                         <input
                           type="text"
                           value={formData.firstName}
-                          onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                          onChange={(e) => handleFormDataChange('firstName', e.target.value)}
                           className="input-primary"
                           required
                         />
@@ -468,7 +530,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                         <input
                           type="text"
                           value={formData.lastName}
-                          onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                          onChange={(e) => handleFormDataChange('lastName', e.target.value)}
                           className="input-primary"
                           required
                         />
@@ -482,7 +544,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                       <input
                         type="email"
                         value={formData.email}
-                        onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                        onChange={(e) => handleFormDataChange('email', e.target.value)}
                         className="input-primary"
                         required
                       />
@@ -507,11 +569,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                       <CountrySelect
                         countries={countries}
                         value={formData.country}
-                        onChange={(countryValue: string) => {
-                          if (isMountedRef.current) {
-                            setFormData(prev => ({ ...prev, country: countryValue }))
-                          }
-                        }}
+                        onChange={(countryValue: string) => handleFormDataChange('country', countryValue)}
                         placeholder="Sélectionner un pays ou rechercher..."
                       />
                     </div>
@@ -532,7 +590,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                         <input
                           type="url"
                           value={formData.linkedinProfile}
-                          onChange={(e) => setFormData(prev => ({ ...prev, linkedinProfile: e.target.value }))}
+                          onChange={(e) => handleFormDataChange('linkedinProfile', e.target.value)}
                           placeholder="https://linkedin.com/in/votre-profil"
                           className="input-primary"
                         />
@@ -545,7 +603,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                         <input
                           type="text"
                           value={formData.companyName}
-                          onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+                          onChange={(e) => handleFormDataChange('companyName', e.target.value)}
                           placeholder="Nom de votre entreprise ou exploitation"
                           className="input-primary"
                         />
@@ -558,7 +616,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                         <input
                           type="url"
                           value={formData.companyWebsite}
-                          onChange={(e) => setFormData(prev => ({ ...prev, companyWebsite: e.target.value }))}
+                          onChange={(e) => handleFormDataChange('companyWebsite', e.target.value)}
                           placeholder="https://www.votre-entreprise.com"
                           className="input-primary"
                         />
@@ -571,7 +629,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                         <input
                           type="url"
                           value={formData.linkedinCorporate}
-                          onChange={(e) => setFormData(prev => ({ ...prev, linkedinCorporate: e.target.value }))}
+                          onChange={(e) => handleFormDataChange('linkedinCorporate', e.target.value)}
                           placeholder="https://linkedin.com/company/votre-entreprise"
                           className="input-primary"
                         />
@@ -599,16 +657,14 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                           name="currentPassword"
                           autoComplete="current-password"
                           value={passwordData.currentPassword}
-                          onChange={(e) => {
-                            setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))
-                          }}
+                          onChange={(e) => handlePasswordDataChange('currentPassword', e.target.value)}
                           className="input-primary pr-10"
                           placeholder="Tapez votre mot de passe actuel"
                           required
                         />
                         <button
                           type="button"
-                          onClick={() => setShowPasswords(prev => ({ ...prev, currentPassword: !prev.currentPassword }))}
+                          onClick={() => handleShowPasswordToggle('currentPassword')}
                           className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
                         >
                           {showPasswords.currentPassword ? (
@@ -638,16 +694,14 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                           name="newPassword"
                           autoComplete="new-password"
                           value={passwordData.newPassword}
-                          onChange={(e) => {
-                            setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))
-                          }}
+                          onChange={(e) => handlePasswordDataChange('newPassword', e.target.value)}
                           className="input-primary pr-10"
                           placeholder="Tapez votre nouveau mot de passe"
                           required
                         />
                         <button
                           type="button"
-                          onClick={() => setShowPasswords(prev => ({ ...prev, newPassword: !prev.newPassword }))}
+                          onClick={() => handleShowPasswordToggle('newPassword')}
                           className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
                         >
                           {showPasswords.newPassword ? (
@@ -702,16 +756,14 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                           name="confirmPassword"
                           autoComplete="new-password"
                           value={passwordData.confirmPassword}
-                          onChange={(e) => {
-                            setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))
-                          }}
+                          onChange={(e) => handlePasswordDataChange('confirmPassword', e.target.value)}
                           className="input-primary pr-10"
                           placeholder="Confirmez votre nouveau mot de passe"
                           required
                         />
                         <button
                           type="button"
-                          onClick={() => setShowPasswords(prev => ({ ...prev, confirmPassword: !prev.confirmPassword }))}
+                          onClick={() => handleShowPasswordToggle('confirmPassword')}
                           className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
                         >
                           {showPasswords.confirmPassword ? (
@@ -751,7 +803,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
 
           <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 flex-shrink-0 bg-gray-50">
             <button
-              onClick={onClose}
+              onClick={safeClose}
               className="px-5 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
               disabled={isLoading}
             >
