@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import type { Language } from '@/types'
 import { translations } from './page_translations'
@@ -11,57 +11,81 @@ export function usePageInitialization() {
   
   // Refs pour éviter les doubles appels
   const hasInitialized = useRef(false)
+  const isMounted = useRef(true)
   
   const [currentLanguage, setCurrentLanguage] = useState<Language>('fr')
-  const t = useMemo(() => translations[currentLanguage], [currentLanguage])
-  
   const [isSignupMode, setIsSignupMode] = useState(false)
   const [localError, setLocalError] = useState('')
   const [localSuccess, setLocalSuccess] = useState('')
   const [hasHydrated, setHasHydrated] = useState(false)
 
-  const toggleMode = () => {
+  // ✅ Mémorisation stable des traductions
+  const t = useMemo(() => translations[currentLanguage], [currentLanguage])
+
+  // ✅ Fonction toggleMode mémorisée pour éviter les re-renders
+  const toggleMode = useCallback(() => {
     console.log('🔄 [UI] Basculement mode:', isSignupMode ? 'signup → login' : 'login → signup')
-    setIsSignupMode(!isSignupMode)
+    setIsSignupMode(prev => !prev)
     setLocalError('')
     setLocalSuccess('')
-  }
+  }, [isSignupMode])
 
-  // Effects d'initialisation avec Remember Me
+  // ✅ Fonction setCurrentLanguage stable avec mémorisation
+  const handleSetCurrentLanguage = useCallback((newLanguage: Language) => {
+    if (currentLanguage !== newLanguage) {
+      console.log('🌐 [Language] Changement de langue:', currentLanguage, '→', newLanguage)
+      setCurrentLanguage(newLanguage)
+      localStorage.setItem('intelia-language', newLanguage)
+    }
+  }, [currentLanguage])
+
+  // ✅ Effects d'initialisation optimisés avec Remember Me
   useEffect(() => {
+    if (!isMounted.current) return
+    
     setHasHydrated(true)
     
     if (!hasInitialized.current) {
       hasInitialized.current = true
       console.log('🎯 [Init] Initialisation unique')
       
-      // Charger les préférences utilisateur
+      // Charger les préférences utilisateur de manière synchrone
       const savedLanguage = localStorage.getItem('intelia-language') as Language
-      if (savedLanguage && translations[savedLanguage]) {
+      if (savedLanguage && translations[savedLanguage] && savedLanguage !== currentLanguage) {
         setCurrentLanguage(savedLanguage)
-      } else {
+      } else if (!savedLanguage) {
+        // Détection de langue navigateur seulement si pas de langue sauvée
         const browserLanguage = navigator.language.substring(0, 2) as Language
-        if (translations[browserLanguage]) {
+        if (translations[browserLanguage] && browserLanguage !== currentLanguage) {
           setCurrentLanguage(browserLanguage)
         }
       }
 
-      // Restaurer EMAIL avec fonction utilitaire
+      // Restaurer EMAIL avec fonction utilitaire - Une seule fois
       const { hasRememberedEmail, lastEmail } = rememberMeUtils.load()
       
-      if (hasRememberedEmail) {
+      if (hasRememberedEmail && isMounted.current) {
         setLocalSuccess(`Email restauré : ${lastEmail}. Entrez votre mot de passe.`)
-        setTimeout(() => setLocalSuccess(''), 4000)
+        const timer = setTimeout(() => {
+          if (isMounted.current) {
+            setLocalSuccess('')
+          }
+        }, 4000)
+        
+        // Cleanup timer si démontage
+        return () => clearTimeout(timer)
       }
     }
-  }, [])
+  }, []) // ✅ Dépendances vides - ne s'exécute qu'une fois
 
-  // Gestion URL callback
+  // ✅ Gestion URL callback optimisée
   useEffect(() => {
-    if (!hasInitialized.current) return
+    if (!hasInitialized.current || !isMounted.current) return
 
-    const authStatus = searchParams.get('auth')
+    const authStatus = searchParams?.get('auth')
     if (!authStatus) return
+    
+    console.log('🔗 [URL] Traitement callback auth:', authStatus)
     
     if (authStatus === 'success') {
       setLocalSuccess(t.authSuccess)
@@ -71,40 +95,57 @@ export function usePageInitialization() {
       setLocalError(t.authIncomplete)
     }
     
-    // Nettoyer l'URL
-    const url = new URL(window.location.href)
-    url.searchParams.delete('auth')
-    window.history.replaceState({}, '', url.pathname)
+    // Nettoyer l'URL de manière optimisée
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('auth')
+      window.history.replaceState({}, '', url.pathname)
+    } catch (error) {
+      console.error('❌ [URL] Erreur nettoyage URL:', error)
+    }
     
     // Masquer les messages après 3 secondes
     const timer = setTimeout(() => {
-      setLocalSuccess('')
-      setLocalError('')
+      if (isMounted.current) {
+        setLocalSuccess('')
+        setLocalError('')
+      }
     }, 3000)
     
     return () => clearTimeout(timer)
-  }, [searchParams, t])
+  }, [searchParams, t.authSuccess, t.authError, t.authIncomplete]) // ✅ Dépendances stables
 
-  // Effet pour bloquer le scroll en mode signup
+  // ✅ Effet pour bloquer le scroll en mode signup - Optimisé
   useEffect(() => {
+    const originalBodyOverflow = document.body.style.overflow
+    const originalDocumentOverflow = document.documentElement.style.overflow
+    
     if (isSignupMode) {
       document.body.style.overflow = 'hidden'
       document.documentElement.style.overflow = 'hidden'
     } else {
-      document.body.style.overflow = 'unset'
-      document.documentElement.style.overflow = 'unset'
+      document.body.style.overflow = originalBodyOverflow || 'unset'
+      document.documentElement.style.overflow = originalDocumentOverflow || 'unset'
     }
     
-    // Cleanup au démontage
+    // ✅ Cleanup optimisé au démontage
     return () => {
-      document.body.style.overflow = 'unset'
-      document.documentElement.style.overflow = 'unset'
+      document.body.style.overflow = originalBodyOverflow || 'unset'
+      document.documentElement.style.overflow = originalDocumentOverflow || 'unset'
     }
   }, [isSignupMode])
 
-  return {
+  // ✅ Cleanup général au démontage
+  useEffect(() => {
+    return () => {
+      isMounted.current = false
+    }
+  }, [])
+
+  // ✅ Retour mémorisé pour éviter les re-renders des composants parents
+  return useMemo(() => ({
     currentLanguage,
-    setCurrentLanguage,
+    setCurrentLanguage: handleSetCurrentLanguage,
     t,
     isSignupMode,
     setIsSignupMode,
@@ -115,5 +156,14 @@ export function usePageInitialization() {
     hasHydrated,
     hasInitialized,
     toggleMode
-  }
+  }), [
+    currentLanguage, 
+    handleSetCurrentLanguage,
+    t, 
+    isSignupMode, 
+    localError, 
+    localSuccess, 
+    hasHydrated, 
+    toggleMode
+  ])
 }
