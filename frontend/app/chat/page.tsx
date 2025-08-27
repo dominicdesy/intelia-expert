@@ -407,15 +407,19 @@ export default function ChatInterface() {
     return messages.length > 0
   }, [messages.length])
 
-  // CORRECTION: redirectToLogin complète et robuste avec logs debug
+  // CORRECTION C: redirectToLogin avec fallback fonctionnel
   const redirectToLogin = useCallback((reason: string = 'Session expirée') => {
-    // évite les doubles redirections
+    // Éviter les doubles redirections
     if (isRedirectingRef.current) {
-      console.log('Redirection déjà en cours, ignore:', reason)
+      console.log('🚪 [DEBUG-REDIRECT] Redirection déjà en cours, ignore:', reason)
       return
     }
     isRedirectingRef.current = true
-    console.log('Redirection vers login:', reason)
+    console.log('🚪 [DEBUG-REDIRECT] Redirection forcée -', reason)
+    console.log('🔍 [DEBUG-REDIRECT] État avant:', {
+      currentPath: window.location.pathname,
+      isMounted: isMountedRef.current
+    })
 
     // Nettoyage timeouts
     const timeoutRefs = [redirectTimeoutRef, authCheckTimeoutRef, loadingTimeoutRef]
@@ -425,9 +429,6 @@ export default function ChatInterface() {
         ref.current = null
       }
     })
-
-    // Bloquer tout setState ultérieur
-    isMountedRef.current = false
 
     // Reset du store de chat (défensif)
     try {
@@ -443,20 +444,31 @@ export default function ChatInterface() {
     // Nettoyage CSS
     document.body.classList.remove('keyboard-open')
 
-    // CORRECTION: Redirection avec logs debug
+    // CORRECTION C: Redirection avec fallback fonctionnel
     try {
       router.push('/')
-      // Fallback rapide avec debug
+      console.log('✅ [DEBUG-REDIRECT] router.push executé')
+      
+      // CORRECTION : Fallback fonctionnel - NE PAS définir isMountedRef.current = false maintenant
       redirectTimeoutRef.current = setTimeout(() => {
-        console.log('🕒 [DEBUG-TIMEOUT-REDIRECT] Execution - isMounted:', isMountedRef.current)
+        console.log('🕒 [DEBUG-TIMEOUT-REDIRECT] Execution - isMounted:', isMountedRef.current, 'currentPath:', window.location.pathname)
+        
+        // CORRECTION : Le fallback peut maintenant s'exécuter car isMountedRef est encore true
         if (isMountedRef.current && window.location.pathname !== '/') {
+          console.log('🔄 [DEBUG-TIMEOUT-REDIRECT] Next.js redirect failed, using window.location fallback')
+          
+          // MAINTENANT on peut bloquer les setState car on va quitter la page
+          isMountedRef.current = false
           window.location.href = '/'
         } else if (!isMountedRef.current) {
-          console.log('⚠️ [DEBUG-TIMEOUT-REDIRECT] Ignoré - composant démonté')
+          console.log('⚠️ [DEBUG-TIMEOUT-REDIRECT] Composant démonté - fallback ignoré')
+        } else {
+          console.log('✅ [DEBUG-TIMEOUT-REDIRECT] Next.js redirect successful, timeout cancelled')
         }
       }, 500)
     } catch (err) {
       console.error('Erreur router, fallback immédiat', err)
+      isMountedRef.current = false
       window.location.href = '/'
     }
   }, [router])
@@ -620,7 +632,7 @@ export default function ChatInterface() {
     }
   }, [handleAuthError])
 
-  // CORRECTION: useEffect pour auth backend avec nettoyage approprié
+  // useEffect pour auth backend avec nettoyage approprié
   useEffect(() => {
     let isInitializing = false
     let isCancelled = false
@@ -654,7 +666,7 @@ export default function ChatInterface() {
     }
   }, [hasHydrated, isAuthenticated, initializeSession, redirectToLogin, handleAuthError])
 
-  // CORRECTION: useEffect pour gestion de la déconnexion avec protection
+  // useEffect pour gestion de la déconnexion avec protection
   useEffect(() => {
     let timeoutId: NodeJS.Timeout | null = null
 
@@ -676,7 +688,7 @@ export default function ChatInterface() {
     }
   }, [hasHydrated, isAuthenticated, isLoading, redirectToLogin])
 
-  // CORRECTION: useEffect pour gestion clavier mobile avec cleanup complet et logs debug
+  // useEffect pour gestion clavier mobile avec cleanup complet et logs debug
   useEffect(() => {
     if (!uiState.isMobileDevice || !isMountedRef.current) return
 
@@ -703,7 +715,6 @@ export default function ChatInterface() {
         
         if (heightDifference > 150) {
           document.body.classList.add('keyboard-open')
-          // CORRECTION: setTimeout avec logs debug
           setTimeout(() => {
             console.log('🕒 [DEBUG-TIMEOUT-VIEWPORT] Execution - isMounted:', isMountedRef.current)
             if (messagesEndRef.current && isMountedRef.current && !isCancelled) {
@@ -752,7 +763,6 @@ export default function ChatInterface() {
       setUiState(prev => ({ ...prev, isKeyboardVisible: true }))
       document.body.classList.add('keyboard-open')
       
-      // CORRECTION: setTimeout avec logs debug
       setTimeout(() => {
         console.log('🕒 [DEBUG-TIMEOUT-FOCUS] Execution - isMounted:', isMountedRef.current)
         if (messagesEndRef.current && isMountedRef.current && !isCancelled) {
@@ -802,7 +812,7 @@ export default function ChatInterface() {
     }
   }, [uiState.isMobileDevice])
 
-  // CORRECTION: useEffect de montage avec cleanup complet
+  // useEffect de montage avec cleanup complet
   useEffect(() => {
     isMountedRef.current = true
     
@@ -859,7 +869,7 @@ export default function ChatInterface() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // CORRECTION: Auto-scroll avec protection complète et logs debug
+  // Auto-scroll avec protection complète et logs debug
   useEffect(() => {
     if (!isMountedRef.current) return
 
@@ -869,7 +879,6 @@ export default function ChatInterface() {
         uiState.shouldAutoScroll && 
         !uiState.isUserScrolling) {
       
-      // CORRECTION: setTimeout avec logs debug
       timeoutId = setTimeout(() => {
         console.log('🕒 [DEBUG-TIMEOUT-AUTOSCROLL] Execution - isMounted:', isMountedRef.current)
         if (isMountedRef.current && messagesEndRef.current) {
@@ -889,7 +898,7 @@ export default function ChatInterface() {
     }
   }, [messages.length, uiState.shouldAutoScroll, uiState.isUserScrolling])
 
-  // CORRECTION: Gestion du scroll avec cleanup approprié et protection
+  // Gestion du scroll avec cleanup approprié et protection
   useEffect(() => {
     const chatContainer = chatContainerRef.current
     if (!chatContainer || !isMountedRef.current) return
@@ -987,14 +996,13 @@ export default function ChatInterface() {
     }
   }, [currentLanguage, t, currentConversation, setCurrentConversation])
 
-  // CORRECTION: Chargement des conversations avec timeout et protection et logs debug
+  // Chargement des conversations avec timeout et protection et logs debug
   useEffect(() => {
     if (isAuthenticated && user?.id && isMountedRef.current && !hasLoadedConversationsRef.current) {
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current)
       }
 
-      // CORRECTION: setTimeout avec logs debug
       loadingTimeoutRef.current = setTimeout(() => {
         console.log('🕒 [DEBUG-TIMEOUT-LOADING] Execution - isMounted:', isMountedRef.current)
         if (isMountedRef.current && !hasLoadedConversationsRef.current) {
@@ -1260,7 +1268,7 @@ export default function ChatInterface() {
     })
   }, [])
 
-  // CORRECTION: handleFeedbackSubmit avec protection complète
+  // handleFeedbackSubmit avec protection complète
   const handleFeedbackSubmit = useCallback(async (feedback: 'positive' | 'negative', comment?: string) => {
     const { messageId } = feedbackModal
     if (!messageId || !isMountedRef.current) return
@@ -1307,7 +1315,7 @@ export default function ChatInterface() {
       console.error('Erreur générale feedback:', error)
       throw error
     } finally {
-      // CORRECTION: Vérifier que le composant est encore monté
+      // Vérifier que le composant est encore monté
       if (isMountedRef.current) {
         setUiState(prev => ({ ...prev, isSubmittingFeedback: false }))
       }

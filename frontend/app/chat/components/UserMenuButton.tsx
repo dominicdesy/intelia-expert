@@ -102,15 +102,14 @@ export const UserMenuButton = React.memo(() => {
     window.open('/admin/statistics', '_blank')
   }, [])
 
-  // CORRECTION FINALE: Redirection IMMÉDIATE sans attendre logout
-  const handleLogout = useCallback(() => {
-    // Éviter les appels multiples
+  // CORRECTION DÉFINITIVE: Logout PUIS redirection (ordre correct)
+  const handleLogout = useCallback(async () => {
     if (logoutInProgressRef.current) {
       console.log('🚨 [DEBUG-LOGOUT] Logout déjà en cours, ignoré')
       return
     }
 
-    console.log('🚨 [DEBUG-LOGOUT] === DÉBUT DÉCONNEXION FINALE ===')
+    console.log('🚨 [DEBUG-LOGOUT] === DÉBUT DÉCONNEXION ORDRE CORRECT ===')
     logoutInProgressRef.current = true
 
     try {
@@ -123,33 +122,31 @@ export const UserMenuButton = React.memo(() => {
         return
       }
 
-      // Étape 1: Fermeture immédiate du menu
-      console.log('🚨 [DEBUG-LOGOUT] 2. Fermeture immédiate du menu...')
+      // Étape 1: Fermeture du menu
+      console.log('🚨 [DEBUG-LOGOUT] 2. Fermeture du menu...')
       if (isOpen) {
         setIsOpen(false)
       }
 
-      // CORRECTION FINALE: Redirection IMMÉDIATE avant toute opération
-      console.log('🚨 [DEBUG-LOGOUT] 3. REDIRECTION IMMÉDIATE AVANT LOGOUT')
-      window.location.href = '/'
+      // Étape 2: ATTENDRE la déconnexion pour déclencher SIGNED_OUT proprement
+      console.log('🚨 [DEBUG-LOGOUT] 3. Attente déconnexion Supabase...')
+      await logout()
       
-      // Logout asynchrone sans attendre (peut échouer sans impact)
-      console.log('🚨 [DEBUG-LOGOUT] 4. Logout silencieux en arrière-plan...')
-      logout().catch((error) => {
-        console.log('🚨 [DEBUG-LOGOUT] Erreur logout ignorée (redirection déjà faite):', error)
-      }).finally(() => {
-        logoutInProgressRef.current = false
-      })
+      // Étape 3: Redirection APRÈS stabilisation de l'état
+      console.log('🚨 [DEBUG-LOGOUT] 4. Redirection après logout réussi')
+      router.replace('/')
 
-      console.log('🚨 [DEBUG-LOGOUT] === FIN DÉCONNEXION (REDIRECTION EFFECTIVE) ===')
+      console.log('🚨 [DEBUG-LOGOUT] === DÉCONNEXION RÉUSSIE ===')
 
     } catch (error) {
-      console.error('🚨 [DEBUG-LOGOUT] Erreur critique:', error)
-      // Redirection forcée même en cas d'erreur
-      window.location.href = '/'
+      console.error('🚨 [DEBUG-LOGOUT] Erreur logout:', error)
+      // En cas d'erreur réseau, forcer quand même la sortie
+      console.log('🚨 [DEBUG-LOGOUT] Redirection forcée après erreur')
+      router.replace('/')
+    } finally {
       logoutInProgressRef.current = false
     }
-  }, [user, isOpen, logout])
+  }, [isOpen, logout, router])
 
   const toggleOpen = useCallback(() => {
     console.log('🔀 [DEBUG-UserMenu] toggleOpen - isMounted:', isMountedRef.current, 'current isOpen:', isOpen)

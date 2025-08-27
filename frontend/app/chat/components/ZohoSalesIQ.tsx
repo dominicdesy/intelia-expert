@@ -118,34 +118,90 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     }
   })
 
-  // CORRECTION CRITIQUE: Fonction utilitaire sécurisée pour gérer les timeouts avec tracking et logs debug
-  const createTimeout = useCallback((callback: () => void, delay: number): NodeJS.Timeout => {
-    const timeout = setTimeout(() => {
-      console.log('🕒 [DEBUG-TIMEOUT-ZOHO] Execution createTimeout - isMounted:', isMountedRef.current)
-      timeoutsRef.current.delete(timeout)
-      if (isMountedRef.current) {
-        callback()
-      } else {
-        console.log('⚠️ [DEBUG-TIMEOUT-ZOHO] createTimeout ignoré - composant démonté')
+  // CORRECTION B: Fonction utilitaire pour vérifier si on doit créer des timers
+  const shouldCreateTimers = useCallback((): boolean => {
+    // Ne pas créer de timers si le document n'est pas visible
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      console.log('⏸️ [DEBUG-TIMERS-ZOHO] Timers bloqués - document caché')
+      return false
+    }
+
+    // Ne pas créer de timers si le composant n'est pas monté
+    if (!isMountedRef.current) {
+      console.log('⏸️ [DEBUG-TIMERS-ZOHO] Timers bloqués - composant démonté')
+      return false
+    }
+
+    // Ne pas créer de timers si on est en cours de redirection
+    // (détection basique via window.location en cours de changement)
+    if (typeof window !== 'undefined') {
+      try {
+        // Vérifier si on est en cours de navigation
+        const isNavigating = document.readyState === 'loading'
+        if (isNavigating) {
+          console.log('⏸️ [DEBUG-TIMERS-ZOHO] Timers bloqués - navigation en cours')
+          return false
+        }
+      } catch (error) {
+        console.warn('Erreur vérification navigation:', error)
       }
-    }, delay)
-    timeoutsRef.current.add(timeout)
-    return timeout
+    }
+
+    return true
   }, [])
 
-  // Fonction utilitaire pour gérer les intervals avec tracking
-  const createInterval = useCallback((callback: () => void, delay: number): NodeJS.Timeout => {
-    const interval = setInterval(() => {
-      console.log('🕒 [DEBUG-TIMEOUT-ZOHO-INTERVAL] Execution createInterval - isMounted:', isMountedRef.current)
-      if (isMountedRef.current) {
+  // CORRECTION B: Fonction utilitaire sécurisée pour gérer les timeouts avec tracking et logs debug
+  const createTimeout = useCallback((callback: () => void, delay: number): NodeJS.Timeout => {
+    // Vérification préalable avant création du timeout
+    if (!shouldCreateTimers()) {
+      console.log('❌ [DEBUG-TIMEOUT-ZOHO] createTimeout bloqué - conditions non remplies')
+      // Retourner un timeout factice qui ne fait rien
+      return setTimeout(() => {}, 0)
+    }
+
+    const timeout = setTimeout(() => {
+      console.log('🕒 [DEBUG-TIMEOUT-ZOHO] Execution createTimeout - isMounted:', isMountedRef.current, 'visible:', document.visibilityState)
+      
+      timeoutsRef.current.delete(timeout)
+      
+      // Double vérification au moment d'exécution
+      if (isMountedRef.current && shouldCreateTimers()) {
         callback()
       } else {
-        console.log('⚠️ [DEBUG-TIMEOUT-ZOHO-INTERVAL] createInterval ignoré - composant démonté')
+        console.log('⚠️ [DEBUG-TIMEOUT-ZOHO] createTimeout ignoré - composant démonté ou navigation')
       }
     }, delay)
+    
+    timeoutsRef.current.add(timeout)
+    return timeout
+  }, [shouldCreateTimers])
+
+  // CORRECTION B: Fonction utilitaire pour gérer les intervals avec tracking
+  const createInterval = useCallback((callback: () => void, delay: number): NodeJS.Timeout => {
+    // Vérification préalable avant création de l'interval
+    if (!shouldCreateTimers()) {
+      console.log('❌ [DEBUG-INTERVAL-ZOHO] createInterval bloqué - conditions non remplies')
+      // Retourner un interval factice qui ne fait rien
+      return setInterval(() => {}, delay)
+    }
+
+    const interval = setInterval(() => {
+      console.log('🕒 [DEBUG-INTERVAL-ZOHO] Execution createInterval - isMounted:', isMountedRef.current, 'visible:', document.visibilityState)
+      
+      // Vérification à chaque exécution
+      if (isMountedRef.current && shouldCreateTimers()) {
+        callback()
+      } else {
+        console.log('⚠️ [DEBUG-INTERVAL-ZOHO] createInterval ignoré - composant démonté ou navigation')
+        // Auto-nettoyage si conditions plus remplies
+        clearInterval(interval)
+        intervalsRef.current.delete(interval)
+      }
+    }, delay)
+    
     intervalsRef.current.add(interval)
     return interval
-  }, [])
+  }, [shouldCreateTimers])
 
   // Nettoyage optimisé de tous les timers
   const clearAllTimers = useCallback(() => {
@@ -283,7 +339,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       const interactiveElements = document.querySelectorAll('#zsiq_float [role="button"], .siqico-close, [class*="zsiq"][onclick]')
       interactiveElements.forEach(element => {
         if (!element.getAttribute('aria-label') && !element.getAttribute('aria-labelledby')) {
-          // CORRECTION : Utiliser la fonction sécurisée pour className
+          // Utiliser la fonction sécurisée pour className
           let label = 'Élément interactif du chat'
           
           try {
@@ -369,7 +425,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     }
   }, [ensureFloatButtonVisible, hideZohoChatWindow, fixZohoAccessibility])
 
-  // CORRECTION CRITIQUE: Vérification avec debouncing optimisé et logs debug
+  // Vérification avec debouncing optimisé et logs debug
   const debouncedVerification = useCallback(() => {
     if (!isMountedRef.current) return
 
@@ -378,7 +434,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       clearTimeout(verificationTimeoutRef.current)
     }
 
-    // CORRECTION: setTimeout avec logs debug pour identifier le timeout coupable
+    // CORRECTION B: setTimeout avec logs debug pour identifier le timeout coupable
     verificationTimeoutRef.current = setTimeout(() => {
       console.log('🕒 [DEBUG-TIMEOUT-ZOHO-VERIFICATION] Execution debouncedVerification - isMounted:', isMountedRef.current)
       if (isMountedRef.current) {
@@ -440,7 +496,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
 
       console.log('Widget configuré - BOUTON FLOTTANT UNIQUEMENT')
 
-      // CORRECTION: Planifier les vérifications avec des délais optimisés et logs debug
+      // CORRECTION B: Planifier les vérifications avec des délais optimisés et logs debug
       const verificationDelays = [1000, 3000, 8000]
       verificationDelays.forEach((delay, index) => {
         createTimeout(() => {
@@ -467,7 +523,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       console.error(`Erreur configuration tentative ${attempt}:`, error)
 
       if (attempt < CONFIG.MAX_CONFIG_ATTEMPTS && isMountedRef.current) {
-        // CORRECTION: Retry avec backoff exponentiel et logs debug
+        // CORRECTION B: Retry avec backoff exponentiel et logs debug
         const delay = CONFIG.CONFIG_RETRY_DELAY * Math.pow(CONFIG.BACKOFF_MULTIPLIER, attempt - 1)
         console.log(`Nouvelle tentative dans ${delay}ms`)
         
@@ -521,7 +577,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
 
       console.log('Chargement script principal depuis env vars')
 
-      // CORRECTION: Timeout avec logs debug
+      // CORRECTION B: Timeout avec logs debug
       const timeout = createTimeout(() => {
         console.log('🕒 [DEBUG-TIMEOUT-ZOHO-SCRIPT] Execution script timeout - isMounted:', isMountedRef.current)
         if (isMountedRef.current) {
@@ -538,7 +594,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
         console.log('Script principal chargé avec succès')
         widgetStateRef.current.scriptLoaded = true
         
-        // CORRECTION: Attendre l'initialisation complète avant configuration avec logs debug
+        // CORRECTION B: Attendre l'initialisation complète avant configuration avec logs debug
         createTimeout(() => {
           console.log('🕒 [DEBUG-TIMEOUT-ZOHO-INIT] Execution script onload config - isMounted:', isMountedRef.current)
           if (isMountedRef.current) {
@@ -576,7 +632,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
             const hasZohoElements = Array.from(mutation.addedNodes).some(node => {
               if (!(node instanceof Element)) return false
               
-              // CORRECTION : Utiliser les fonctions sécurisées
+              // Utiliser les fonctions sécurisées
               return hasZohoId(node) || hasZohoClass(node)
             })
             
@@ -585,7 +641,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
           
           // Vérifier si des attributs ont changé sur des éléments Zoho
           if (mutation.type === 'attributes' && mutation.target instanceof Element) {
-            // CORRECTION : Utiliser les fonctions sécurisées
+            // Utiliser les fonctions sécurisées
             if (hasZohoId(mutation.target) || hasZohoClass(mutation.target)) {
               shouldCheck = true
             }
@@ -658,6 +714,32 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       console.log('Nouvelle langue sera effective à la prochaine session')
     }
   }, [])
+
+  // CORRECTION B: Gestionnaire d'événements pour détecter les changements de visibilité
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      console.log('👁️ [DEBUG-VISIBILITY] Document visibility:', document.visibilityState)
+      
+      if (document.visibilityState === 'hidden') {
+        console.log('🛑 [DEBUG-VISIBILITY] Page cachée - pause des opérations Zoho')
+        // Optionnel : mettre en pause les vérifications actives
+        if (verificationTimeoutRef.current) {
+          clearTimeout(verificationTimeoutRef.current)
+          verificationTimeoutRef.current = null
+        }
+      } else if (document.visibilityState === 'visible' && isMountedRef.current) {
+        console.log('▶️ [DEBUG-VISIBILITY] Page visible - reprise des opérations Zoho')
+        // Optionnel : reprendre les vérifications si nécessaire
+        debouncedVerification()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [debouncedVerification])
 
   // Effect principal optimisé
   useEffect(() => {
