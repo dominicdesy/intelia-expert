@@ -1,7 +1,7 @@
 // UserInfoModal.tsx - VERSION CORRIGÉE REACT #300
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { useAuthStore } from '@/lib/stores/auth'
+import { useAuthStore, markStoreUnmounted, markStoreMounted } from '@/lib/stores/auth'
 import { useTranslation } from '../../hooks/useTranslation'
 import { UserInfoModalProps } from '@/types'
 import { PhoneInput, usePhoneValidation } from '../PhoneInput'
@@ -120,16 +120,20 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   
   const { countries, loading: countriesLoading, usingFallback } = useCountries()
   
-  // PROTECTION CRITIQUE #1: Protection complète contre setState après unmount
+  // CORRECTION CRITIQUE #1: Protection complète contre setState après unmount
   const isMountedRef = React.useRef(true)
   
+  // CORRECTION CRITIQUE #2: Contrôle du store auth
   React.useEffect(() => {
     isMountedRef.current = true
-    console.log('✅ [DEBUG-UserInfoModal] Composant monté - isMounted: true')
+    markStoreMounted()
+    console.log('✅ [DEBUG-UserInfoModal] Composant monté - store marqué comme actif')
     
     return () => {
       console.log('🧹 [DEBUG-UserInfoModal] Composant en cours de démontage')
       isMountedRef.current = false
+      markStoreUnmounted()
+      console.log('🛑 [DEBUG-UserInfoModal] Store marqué comme inactif - TOUS les setState bloqués')
     }
   }, [])
 
@@ -165,7 +169,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   const [passwordErrors, setPasswordErrors] = useState<string[]>([])
   const [formErrors, setFormErrors] = useState<string[]>([])
 
-  // CORRECTION CRITIQUE #2: Sync form data avec protection
+  // CORRECTION CRITIQUE #3: Sync form data avec protection
   React.useEffect(() => {
     console.log('🔄 [DEBUG-UserInfoModal] Sync formData - isMounted:', isMountedRef.current)
     
@@ -174,7 +178,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     }
   }, [initialFormData])
   
-  // CORRECTION CRITIQUE #3: Safe close avec protection loading
+  // CORRECTION CRITIQUE #4: Safe close avec protection loading
   const safeClose = useCallback(() => {
     console.log('❌ [DEBUG-UserInfoModal] safeClose - isMounted:', isMountedRef.current, 'isLoading:', isLoading)
     
@@ -183,7 +187,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     }
   }, [isLoading, onClose])
 
-  // CORRECTION CRITIQUE #4: Toutes les fonctions setState protégées
+  // CORRECTION CRITIQUE #5: Toutes les fonctions setState protégées
   const safeSetState = useCallback((updater: any, stateName: string) => {
     if (!isMountedRef.current) {
       console.log(`⚠️ [DEBUG-UserInfoModal] setState ${stateName} ignoré - composant démonté`)
@@ -227,6 +231,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     }, 'handlePhoneChange')
   }, [safeSetState])
 
+  // CORRECTION CRITIQUE #6: handleProfileSave avec protections renforcées
   const handleProfileSave = useCallback(async () => {
     console.log('💾 [DEBUG-UserInfoModal] handleProfileSave - isMounted:', isMountedRef.current, 'isLoading:', isLoading)
     
@@ -272,7 +277,20 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       }
 
       console.log('🔄 [DEBUG-UserInfoModal] Appel updateProfile...')
+      
+      // PROTECTION: Vérification avant l'appel async
+      if (!isMountedRef.current) {
+        console.log('⚠️ [DEBUG-UserInfoModal] Composant démonté avant updateProfile - abandon')
+        return
+      }
+      
       await updateProfile(formData)
+      
+      // PROTECTION: Vérification APRÈS l'appel async
+      if (!isMountedRef.current) {
+        console.log('⚠️ [DEBUG-UserInfoModal] Composant démonté pendant updateProfile - pas de UI update')
+        return
+      }
       
       console.log('✅ [DEBUG-UserInfoModal] updateProfile réussi')
       // Montrer alert avant fermeture
@@ -281,13 +299,22 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       
     } catch (error: any) {
       console.error('❌ [DEBUG-UserInfoModal] Erreur mise à jour profil:', error)
-      alert('Erreur lors de la mise à jour: ' + (error?.message || 'Erreur inconnue'))
+      
+      // PROTECTION: Vérifier avant alert
+      if (isMountedRef.current) {
+        alert('Erreur lors de la mise à jour: ' + (error?.message || 'Erreur inconnue'))
+      }
     } finally {
-      // CRITIQUE: Protection setState final
-      safeSetState(() => setIsLoading(false), 'setIsLoading(false) final')
+      // PROTECTION: Double protection setState final
+      if (isMountedRef.current) {
+        safeSetState(() => setIsLoading(false), 'setIsLoading(false) final')
+      } else {
+        console.log('⚠️ [DEBUG-UserInfoModal] setState setIsLoading(false) final ignoré - composant démonté')
+      }
     }
   }, [formData, validatePhoneFields, updateProfile, t, safeClose, isLoading, safeSetState])
 
+  // CORRECTION CRITIQUE #7: handlePasswordChange avec protections renforcées
   const handlePasswordChange = useCallback(async () => {
     console.log('🔐 [DEBUG-UserInfoModal] handlePasswordChange - isMounted:', isMountedRef.current, 'isLoading:', isLoading)
     
@@ -324,6 +351,12 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     safeSetState(() => setIsLoading(true), 'setIsLoading(true) password')
     
     try {
+      // PROTECTION: Vérification avant operations async
+      if (!isMountedRef.current) {
+        console.log('⚠️ [DEBUG-UserInfoModal] Composant démonté avant password change - abandon')
+        return
+      }
+      
       console.log('🔄 [DEBUG-UserInfoModal] Vérification mot de passe actuel...')
       
       const loginResponse = await fetch('/api/v1/auth/login', {
@@ -343,12 +376,20 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
           loginError = await loginResponse.json()
         } catch {}
         
-        safeSetState(() => setPasswordErrors(['Le mot de passe actuel est incorrect']), 'setPasswordErrors login fail')
+        if (isMountedRef.current) {
+          safeSetState(() => setPasswordErrors(['Le mot de passe actuel est incorrect']), 'setPasswordErrors login fail')
+        }
         return
       }
 
       const loginData = await loginResponse.json()
       const backendToken = loginData.access_token
+
+      // PROTECTION: Vérification après première async operation
+      if (!isMountedRef.current) {
+        console.log('⚠️ [DEBUG-UserInfoModal] Composant démonté après login check')
+        return
+      }
 
       console.log('🔄 [DEBUG-UserInfoModal] Changement mot de passe...')
       
@@ -370,7 +411,15 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       } catch {}
       
       if (!response.ok) {
-        safeSetState(() => setPasswordErrors([result?.detail || result?.message || 'Erreur lors du changement de mot de passe']), 'setPasswordErrors change fail')
+        if (isMountedRef.current) {
+          safeSetState(() => setPasswordErrors([result?.detail || result?.message || 'Erreur lors du changement de mot de passe']), 'setPasswordErrors change fail')
+        }
+        return
+      }
+      
+      // PROTECTION: Vérification finale avant UI updates
+      if (!isMountedRef.current) {
+        console.log('⚠️ [DEBUG-UserInfoModal] Composant démonté après password change')
         return
       }
       
@@ -390,16 +439,23 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       
     } catch (error: any) {
       console.error('❌ [DEBUG-UserInfoModal] Erreur technique:', error)
-      safeSetState(() => setPasswordErrors(['Erreur de connexion au serveur. Veuillez réessayer.']), 'setPasswordErrors catch')
+      
+      if (isMountedRef.current) {
+        safeSetState(() => setPasswordErrors(['Erreur de connexion au serveur. Veuillez réessayer.']), 'setPasswordErrors catch')
+      }
     } finally {
-      // CRITIQUE: Protection setState final
-      safeSetState(() => setIsLoading(false), 'setIsLoading(false) password final')
+      // PROTECTION: Double protection setState final
+      if (isMountedRef.current) {
+        safeSetState(() => setIsLoading(false), 'setIsLoading(false) password final')
+      } else {
+        console.log('⚠️ [DEBUG-UserInfoModal] setState setIsLoading(false) password final ignoré - composant démonté')
+      }
     }
   }, [passwordData, validatePassword, user?.email, safeClose, isLoading, safeSetState])
 
   const tabs = useMemo(() => [
     { id: 'profile', label: t('nav.profile'), icon: '👤' },
-    { id: 'password', label: t('profile.password'), icon: '🔑' }
+    { id: 'password', label: t('profile.password'), icon: '🔐' }
   ], [t])
 
   // PROTECTION: Handler avec protection pour les changements d'onglets
