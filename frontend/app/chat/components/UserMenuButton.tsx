@@ -1,212 +1,191 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
+// UserMenuButton.tsx - VERSION CORRIGÉE React #300
+
+import React, { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/lib/stores/auth' // SUPPRIMÉ markStoreUnmounted
-import { useTranslation } from '../hooks/useTranslation'
-import { Modal } from './Modal'
+import { useAuthStore, markStoreUnmounted } from '@/lib/stores/auth'
+import { useTranslation } from '../../hooks/useTranslation'
 import { UserInfoModal } from './modals/UserInfoModal'
 import { AccountModal } from './modals/AccountModal'
-import { LanguageModal } from './modals/LanguageModal'
 import { ContactModal } from './modals/ContactModal'
+import { LanguageModal } from './modals/LanguageModal'
 import { InviteFriendModal } from './modals/InviteFriendModal'
-import { PLAN_CONFIGS } from '../../../types'
-import { getSafeName, getSafeEmail, getSafeUserType, getSafePlan, getSafeInitials } from '../utils/safeUserHelpers'
 
-// ==================== MENU UTILISATEUR - VERSION FINALE CORRIGÉE REACT #300 ====================
-export const UserMenuButton = React.memo(() => {
+// Configuration des plans avec mémoisation
+const PLAN_CONFIGS = {
+  essential: { name: 'Essential', color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200', features: ['Questions illimitées', 'Support par email'] },
+  standard: { name: 'Standard', color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200', features: ['Tout Essential', 'Analyses avancées', 'Priorité support'] },
+  premium: { name: 'Premium', color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200', features: ['Tout Standard', 'Consultations directes', 'Support 24/7'] },
+  enterprise: { name: 'Enterprise', color: 'text-gray-800', bgColor: 'bg-gray-50', borderColor: 'border-gray-300', features: ['Solutions personnalisées', 'Équipe dédiée', 'SLA garanti'] }
+} as const
+
+export const UserMenuButton = () => {
+  console.log('🔄 [DEBUG-UserMenu] Render - isMounted: true user: true')
+  
   const router = useRouter()
   const { user, logout } = useAuthStore()
   const { t } = useTranslation()
+
+  // États des modales
   const [isOpen, setIsOpen] = useState(false)
   const [showUserInfoModal, setShowUserInfoModal] = useState(false)
-  const [showContactModal, setShowContactModal] = useState(false)
   const [showAccountModal, setShowAccountModal] = useState(false)
+  const [showContactModal, setShowContactModal] = useState(false)
   const [showLanguageModal, setShowLanguageModal] = useState(false)
   const [showInviteFriendModal, setShowInviteFriendModal] = useState(false)
 
-  // Protection contre React #300
-  const isMountedRef = useRef(true)
-  const logoutInProgressRef = useRef(false)
-  
-  useEffect(() => {
+  // PROTECTION CRITIQUE: Ref pour éviter les double logout
+  const logoutInProgressRef = React.useRef(false)
+  const isMountedRef = React.useRef(true)
+
+  // Cleanup au démontage
+  React.useEffect(() => {
     isMountedRef.current = true
-    console.log('🗝️ [DEBUG-UserMenu] Composant monté')
     return () => {
       console.log('🧹 [DEBUG-UserMenu] Composant en cours de démontage')
       isMountedRef.current = false
     }
   }, [])
 
-  // Mémoisation sécurisée des données utilisateur
-  const { safeName, safeEmail, safeUserType, userInitials } = useMemo(() => {
-    console.log('🔄 [DEBUG-UserMenu] Recalcul des données utilisateur sécurisées')
-    const safeName = getSafeName(user)
-    const safeEmail = getSafeEmail(user)
-    const safeUserType = getSafeUserType(user)
-    const userInitials = getSafeInitials(user)
+  // Mémoisation des initiales utilisateur
+  const userInitials = useMemo(() => {
+    if (!user?.name) return 'U'
     
-    return { safeName, safeEmail, safeUserType, userInitials }
-  }, [user?.name, user?.email, user?.user_type])
+    const nameParts = user.name.trim().split(' ')
+    let initials = ''
+    
+    if (nameParts.length >= 2) {
+      initials = nameParts[0][0] + nameParts[nameParts.length - 1][0]
+    } else if (nameParts.length === 1) {
+      initials = nameParts[0].substring(0, 2)
+    } else if (user?.email) {
+      const emailParts = user.email.split('@')[0].split('.')
+      if (emailParts.length >= 2) {
+        initials = emailParts[0][0] + emailParts[1][0]
+      } else {
+        initials = user.email.substring(0, 2)
+      }
+    }
+    
+    return initials.toUpperCase()
+  }, [user?.name, user?.email])
 
-  // Mémoisation des variables de plan avec protection
+  // Mémoisation des variables de plan
   const { currentPlan, plan, isSuperAdmin } = useMemo(() => {
-    const safePlan = getSafePlan(user)
-    const safeUserType = getSafeUserType(user)
-    
-    const currentPlan = safePlan
+    const currentPlan = user?.plan || 'essential'
     const plan = PLAN_CONFIGS[currentPlan as keyof typeof PLAN_CONFIGS] || PLAN_CONFIGS.essential
-    const isSuperAdmin = safeUserType === 'super_admin'
+    const isSuperAdmin = user?.user_type === 'super_admin'
     
     return { currentPlan, plan, isSuperAdmin }
   }, [user?.plan, user?.user_type])
 
-  // Handlers sécurisés avec protection de montage et debug
+  // Handlers des modales mémorisés
   const handleContactClick = useCallback(() => {
     console.log('📞 [DEBUG-UserMenu] handleContactClick - isMounted:', isMountedRef.current)
-    if (!isMountedRef.current) return
     setIsOpen(false)
     setShowContactModal(true)
   }, [])
 
   const handleUserInfoClick = useCallback(() => {
     console.log('👤 [DEBUG-UserMenu] handleUserInfoClick - isMounted:', isMountedRef.current)
-    if (!isMountedRef.current) return
     setIsOpen(false)
     setShowUserInfoModal(true)
   }, [])
 
   const handleAccountClick = useCallback(() => {
     console.log('💳 [DEBUG-UserMenu] handleAccountClick - isMounted:', isMountedRef.current)
-    if (!isMountedRef.current) return
     setIsOpen(false)
     setShowAccountModal(true)
   }, [])
 
   const handleLanguageClick = useCallback(() => {
-    console.log('🌐 [DEBUG-UserMenu] handleLanguageClick - isMounted:', isMountedRef.current)
-    if (!isMountedRef.current) return
+    console.log('🌍 [DEBUG-UserMenu] handleLanguageClick - isMounted:', isMountedRef.current)
     setIsOpen(false)
     setShowLanguageModal(true)
   }, [])
 
   const handleInviteFriendClick = useCallback(() => {
     console.log('👥 [DEBUG-UserMenu] handleInviteFriendClick - isMounted:', isMountedRef.current)
-    if (!isMountedRef.current) return
     setIsOpen(false)
     setShowInviteFriendModal(true)
   }, [])
 
   const handleStatisticsClick = useCallback(() => {
     console.log('📊 [DEBUG-UserMenu] handleStatisticsClick - isMounted:', isMountedRef.current)
-    if (!isMountedRef.current) return
     setIsOpen(false)
     window.open('/admin/statistics', '_blank')
   }, [])
 
-  // CORRECTION DÉFINITIVE: Logout PUIS redirection (ordre correct)
+  // CORRECTION FINALE: handleLogout avec markStoreUnmounted AVANT logout
   const handleLogout = useCallback(async () => {
+    console.log('🚨 [DEBUG-LOGOUT] === DÉBUT DÉCONNEXION ORDRE CORRECT ===')
+    console.log('🚨 [DEBUG-LOGOUT] 1. État initial - isMounted:', isMountedRef.current)
+    console.log('🚨 [DEBUG-LOGOUT] 1. User présent:', !!user)
+    console.log('🚨 [DEBUG-LOGOUT] 1. Menu ouvert:', isOpen)
+    
+    // PROTECTION: Éviter les doubles logout
     if (logoutInProgressRef.current) {
       console.log('🚨 [DEBUG-LOGOUT] Logout déjà en cours, ignoré')
       return
     }
 
-    console.log('🚨 [DEBUG-LOGOUT] === DÉBUT DÉCONNEXION ORDRE CORRECT ===')
     logoutInProgressRef.current = true
+    console.log('🚨 [DEBUG-LOGOUT] Marquage début logout')
 
     try {
-      console.log('🚨 [DEBUG-LOGOUT] 1. État initial - isMounted:', isMountedRef.current)
-      console.log('🚨 [DEBUG-LOGOUT] 1. User présent:', !!user)
-      console.log('🚨 [DEBUG-LOGOUT] 1. Menu ouvert:', isOpen)
-      
-      if (!isMountedRef.current) {
-        console.log('🚨 [DEBUG-LOGOUT] ABORT - composant déjà démonté')
-        return
-      }
-
-      // Étape 1: Fermeture du menu
       console.log('🚨 [DEBUG-LOGOUT] 2. Fermeture du menu...')
-      if (isOpen) {
-        setIsOpen(false)
-      }
+      setIsOpen(false)
 
-      // Étape 2: ATTENDRE la déconnexion pour déclencher SIGNED_OUT proprement
+      // CORRECTION CRITIQUE: Marquer le store comme inactif AVANT l'appel logout
+      console.log('🚨 [DEBUG-LOGOUT] 2.5. Marquage store inactif AVANT logout...')
+      markStoreUnmounted()
+
       console.log('🚨 [DEBUG-LOGOUT] 3. Attente déconnexion Supabase...')
       await logout()
-      
-      // Étape 3: Redirection APRÈS stabilisation de l'état
+
       console.log('🚨 [DEBUG-LOGOUT] 4. Redirection après logout réussi')
       router.replace('/')
-
+      
       console.log('🚨 [DEBUG-LOGOUT] === DÉCONNEXION RÉUSSIE ===')
-
+      
     } catch (error) {
       console.error('🚨 [DEBUG-LOGOUT] Erreur logout:', error)
-      // En cas d'erreur réseau, forcer quand même la sortie
-      console.log('🚨 [DEBUG-LOGOUT] Redirection forcée après erreur')
+      
+      // En cas d'erreur, s'assurer que le store reste inactif et forcer la redirection
+      markStoreUnmounted()
       router.replace('/')
-    } finally {
-      logoutInProgressRef.current = false
+      
+      console.log('🚨 [DEBUG-LOGOUT] === DÉCONNEXION FORCÉE APRÈS ERREUR ===')
     }
-  }, [isOpen, logout, router])
+  }, [user, isOpen, logout, router])
 
   const toggleOpen = useCallback(() => {
     console.log('🔀 [DEBUG-UserMenu] toggleOpen - isMounted:', isMountedRef.current, 'current isOpen:', isOpen)
-    if (!isMountedRef.current) return
     setIsOpen(prev => !prev)
   }, [isOpen])
 
   const closeMenu = useCallback(() => {
-    console.log('❌ [DEBUG-UserMenu] closeMenu - isMounted:', isMountedRef.current)
-    if (!isMountedRef.current) return
     setIsOpen(false)
   }, [])
 
-  // Fonctions de fermeture de modales avec protection et debug
-  const closeUserInfoModal = useCallback(() => {
-    console.log('❌ [DEBUG-UserMenu] closeUserInfoModal - isMounted:', isMountedRef.current)
-    if (!isMountedRef.current) return
-    setShowUserInfoModal(false)
-  }, [])
-  
-  const closeContactModal = useCallback(() => {
-    console.log('❌ [DEBUG-UserMenu] closeContactModal - isMounted:', isMountedRef.current)
-    if (!isMountedRef.current) return
-    setShowContactModal(false)
-  }, [])
-  
-  const closeAccountModal = useCallback(() => {
-    console.log('❌ [DEBUG-UserMenu] closeAccountModal - isMounted:', isMountedRef.current)
-    if (!isMountedRef.current) return
-    setShowAccountModal(false)
-  }, [])
-  
-  const closeLanguageModal = useCallback(() => {
-    console.log('❌ [DEBUG-UserMenu] closeLanguageModal - isMounted:', isMountedRef.current)
-    if (!isMountedRef.current) return
-    setShowLanguageModal(false)
-  }, [])
-  
-  const closeInviteFriendModal = useCallback(() => {
-    console.log('❌ [DEBUG-UserMenu] closeInviteFriendModal - isMounted:', isMountedRef.current)
-    if (!isMountedRef.current) return
-    setShowInviteFriendModal(false)
-  }, [])
+  // Fonctions de fermeture des modales mémorisées
+  const closeUserInfoModal = useCallback(() => setShowUserInfoModal(false), [])
+  const closeAccountModal = useCallback(() => setShowAccountModal(false), [])
+  const closeContactModal = useCallback(() => setShowContactModal(false), [])
+  const closeLanguageModal = useCallback(() => setShowLanguageModal(false), [])
+  const closeInviteFriendModal = useCallback(() => setShowInviteFriendModal(false), [])
 
-  const openPrivacyPolicy = useCallback(() => {
-    console.log('📜 [DEBUG-UserMenu] openPrivacyPolicy')
-    window.open('https://intelia.com/privacy-policy/', '_blank')
-  }, [])
-
-  console.log('🔄 [DEBUG-UserMenu] Render - isMounted:', isMountedRef.current, 'user:', !!user)
+  if (!user) return null
 
   return (
     <>
       <div className="relative">
-        {/* Bouton utilisateur avec affichage sécurisé */}
         <button
           onClick={toggleOpen}
-          className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors"
+          className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors font-medium text-sm"
+          title={user.name || user.email}
+          aria-label="Menu utilisateur"
         >
-          <span className="text-white text-xs font-medium">{userInitials}</span>
+          {userInitials}
         </button>
 
         {isOpen && (
@@ -216,117 +195,102 @@ export const UserMenuButton = React.memo(() => {
               onClick={closeMenu}
             />
             
-            <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-              {/* En-tête enrichi avec badges sécurisés */}
-              <div className="px-4 py-3 border-b border-gray-100">
-                <p className="text-sm font-medium text-gray-900">{safeName}</p>
-                <p className="text-xs text-gray-500">{safeEmail}</p>
-                {/* Affichage conditionnel sécurisé du plan et du rôle */}
-                {user && (
-                  <div className="mt-2">
-                    {/* Affichage du plan pour les utilisateurs normaux seulement */}
-                    {!isSuperAdmin && (
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${plan.bgColor} ${plan.color} border ${plan.borderColor}`}>
-                        {plan.name}
-                      </span>
-                    )}
-                    {/* Affichage du rôle super admin */}
-                    {isSuperAdmin && (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
-                        Super Admin
-                      </span>
-                    )}
+            <div className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-50">
+              <div className="p-4 border-b border-gray-100">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center font-medium">
+                    {userInitials}
                   </div>
-                )}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-900 truncate">
+                      {user.name || 'Utilisateur'}
+                    </div>
+                    <div className="text-sm text-gray-500 truncate">
+                      {user.email}
+                    </div>
+                    <div className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${plan.color} ${plan.bgColor} ${plan.borderColor} border`}>
+                      {plan.name}
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Actions */}
-              <div className="py-1">
-                {/* Menu statistiques - Super admin uniquement */}
-                {isSuperAdmin && (
-                  <button
-                    onClick={handleStatisticsClick}
-                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                  >
-                    <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-                    </svg>
-                    <span>Statistiques</span>
-                  </button>
-                )}
-
-                {/* Menu abonnement - masqué pour super admin */}
-                {!isSuperAdmin && (
-                  <button
-                    onClick={handleAccountClick}
-                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                  >
-                    <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
-                    </svg>
-                    <span>{t('subscription.title')}</span>
-                  </button>
-                )}
-
+              <div className="py-2">
                 <button
                   onClick={handleUserInfoClick}
-                  className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                  className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center space-x-3"
                 >
-                  <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                   <span>{t('nav.profile')}</span>
                 </button>
 
                 <button
-                  onClick={handleLanguageClick}
-                  className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                  onClick={handleAccountClick}
+                  className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center space-x-3"
                 >
-                  <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m10.5 21 5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 0 1 6-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 0 1-3.827-5.802" />
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                  </svg>
+                  <span>{t('nav.account')}</span>
+                </button>
+
+                <button
+                  onClick={handleLanguageClick}
+                  className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center space-x-3"
+                >
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
                   </svg>
                   <span>{t('nav.language')}</span>
                 </button>
 
+                <div className="border-t border-gray-100 my-2"></div>
+
                 <button
                   onClick={handleInviteFriendClick}
-                  className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                  className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center space-x-3"
                 >
-                  <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM3 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 019.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                   </svg>
-                  <span>{t('nav.inviteFriend')}</span>
+                  <span>Inviter un ami</span>
                 </button>
 
                 <button
                   onClick={handleContactClick}
-                  className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                  className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center space-x-3"
                 >
-                  <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
                   <span>{t('nav.contact')}</span>
                 </button>
 
-                <button
-                  onClick={openPrivacyPolicy}
-                  className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25M16.5 7.5V18a2.25 2.25 0 002.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875v12.75c0 .621.504 1.125 1.125 1.125h2.25" />
-                  </svg>
-                  <span>{t('nav.legal')}</span>
-                </button>
-              </div>
+                {isSuperAdmin && (
+                  <>
+                    <div className="border-t border-gray-100 my-2"></div>
+                    <button
+                      onClick={handleStatisticsClick}
+                      className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center space-x-3"
+                    >
+                      <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      <span>Statistiques Admin</span>
+                    </button>
+                  </>
+                )}
 
-              {/* Footer */}
-              <div className="border-t border-gray-100 pt-1">
+                <div className="border-t border-gray-100 my-2"></div>
+
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center space-x-3"
                 >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                  <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                   </svg>
                   <span>{t('nav.logout')}</span>
                 </button>
@@ -336,50 +300,37 @@ export const UserMenuButton = React.memo(() => {
         )}
       </div>
 
-      {/* Modal abonnement - seulement si pas super admin */}
-      {!isSuperAdmin && (
-        <Modal
-          isOpen={showAccountModal}
-          onClose={closeAccountModal}
-          title={t('subscription.title')}
-        >
-          <AccountModal user={user as any} onClose={closeAccountModal} />
-        </Modal>
+      {showUserInfoModal && (
+        <UserInfoModal 
+          user={user} 
+          onClose={closeUserInfoModal}
+        />
       )}
 
-      <Modal
-        isOpen={showUserInfoModal}
-        onClose={closeUserInfoModal}
-        title={t('profile.title')}
-      >
-        <UserInfoModal user={user as any} onClose={closeUserInfoModal} />
-      </Modal>
+      {showAccountModal && (
+        <AccountModal 
+          user={user} 
+          onClose={closeAccountModal}
+        />
+      )}
 
-      <Modal
-        isOpen={showLanguageModal}
-        onClose={closeLanguageModal}
-        title={t('language.title')}
-      >
-        <LanguageModal onClose={closeLanguageModal} />
-      </Modal>
+      {showContactModal && (
+        <ContactModal 
+          onClose={closeContactModal}
+        />
+      )}
 
-      <Modal
-        isOpen={showContactModal}
-        onClose={closeContactModal}
-        title={t('contact.title')}
-      >
-        <ContactModal onClose={closeContactModal} />
-      </Modal>
+      {showLanguageModal && (
+        <LanguageModal 
+          onClose={closeLanguageModal}
+        />
+      )}
 
-      <Modal
-        isOpen={showInviteFriendModal}
-        onClose={closeInviteFriendModal}
-        title={t('nav.inviteFriend')}
-      >
-        <InviteFriendModal onClose={closeInviteFriendModal} />
-      </Modal>
+      {showInviteFriendModal && (
+        <InviteFriendModal 
+          onClose={closeInviteFriendModal}
+        />
+      )}
     </>
   )
-})
-
-UserMenuButton.displayName = 'UserMenuButton'
+}
