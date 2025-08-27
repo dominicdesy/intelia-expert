@@ -5,7 +5,6 @@ import { UserInfoModalProps } from '@/types'
 import { PhoneInput, usePhoneValidation } from '../PhoneInput'
 import { CountrySelect } from '../CountrySelect'
 
-// Configuration des pays avec fallback
 const fallbackCountries = [
   { value: 'CA', label: 'Canada', phoneCode: '+1', flag: '🇨🇦' },
   { value: 'US', label: 'États-Unis', phoneCode: '+1', flag: '🇺🇸' },
@@ -36,7 +35,6 @@ interface Country {
   flag?: string
 }
 
-// Hook amélioré avec gestion d'erreur et cache
 const useCountries = () => {
   const [countries, setCountries] = useState<Country[]>(fallbackCountries)
   const [loading, setLoading] = useState(false)
@@ -93,7 +91,7 @@ const useCountries = () => {
     return () => {
       isCancelled = true
     }
-  }, []) // Dépendances vides pour éviter les re-fetches
+  }, [])
 
   return { countries, loading, usingFallback }
 }
@@ -107,7 +105,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   
   const { countries, loading: countriesLoading, usingFallback } = useCountries()
   
-  // Memoize le mapping pour éviter les recalculs
   const countryCodeMap = useMemo(() => {
     return countries.reduce((acc, country) => {
       acc[country.value] = country.phoneCode
@@ -115,7 +112,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     }, {} as Record<string, string>)
   }, [countries])
   
-  // Initialiser une seule fois avec useMemo
   const initialFormData = useMemo(() => ({
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
@@ -147,7 +143,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   const [passwordErrors, setPasswordErrors] = useState<string[]>([])
   const [formErrors, setFormErrors] = useState<string[]>([])
 
-  // Memoize la fonction de validation
   const validatePassword = useCallback((password: string): string[] => {
     const errors: string[] = []
     
@@ -564,4 +559,158 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                           ) : (
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                              <path
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Caractères tapés: {passwordData.currentPassword.length}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('profile.newPassword')} <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPasswords.newPassword ? "text" : "password"}
+                          name="newPassword"
+                          autoComplete="new-password"
+                          value={passwordData.newPassword}
+                          onChange={(e) => {
+                            setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))
+                          }}
+                          className="input-primary pr-10"
+                          placeholder="Tapez votre nouveau mot de passe"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPasswords(prev => ({ ...prev, newPassword: !prev.newPassword }))}
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                        >
+                          {showPasswords.newPassword ? (
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 11-4.243-4.243m4.242 4.242L9.88 9.88" />
+                            </svg>
+                          ) : (
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Caractères tapés: {passwordData.newPassword.length}
+                      </div>
+                      <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                        <p className="text-xs font-medium text-gray-700 mb-2">Le mot de passe doit contenir :</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs">
+                          <div className={`flex items-center ${passwordData.newPassword.length >= 8 ? 'text-green-600' : 'text-gray-400'}`}>
+                            <span className="mr-1">{passwordData.newPassword.length >= 8 ? '✅' : '⭕'}</span>
+                            8+ caractères
+                          </div>
+                          <div className={`flex items-center ${/[A-Z]/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-400'}`}>
+                            <span className="mr-1">{/[A-Z]/.test(passwordData.newPassword) ? '✅' : '⭕'}</span>
+                            Une majuscule
+                          </div>
+                          <div className={`flex items-center ${/[a-z]/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-400'}`}>
+                            <span className="mr-1">{/[a-z]/.test(passwordData.newPassword) ? '✅' : '⭕'}</span>
+                            Une minuscule
+                          </div>
+                          <div className={`flex items-center ${/\d/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-400'}`}>
+                            <span className="mr-1">{/\d/.test(passwordData.newPassword) ? '✅' : '⭕'}</span>
+                            Un chiffre
+                          </div>
+                          <div className={`flex items-center ${/[!@#$%^&*(),.?":{}|<>]/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-400'} sm:col-span-2`}>
+                            <span className="mr-1">{/[!@#$%^&*(),.?":{}|<>]/.test(passwordData.newPassword) ? '✅' : '⭕'}</span>
+                            Un caractère spécial (!@#$%^&*...)
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('profile.confirmPassword')} <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPasswords.confirmPassword ? "text" : "password"}
+                          name="confirmPassword"
+                          autoComplete="new-password"
+                          value={passwordData.confirmPassword}
+                          onChange={(e) => {
+                            setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))
+                          }}
+                          className="input-primary pr-10"
+                          placeholder="Confirmez votre nouveau mot de passe"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPasswords(prev => ({ ...prev, confirmPassword: !prev.confirmPassword }))}
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                        >
+                          {showPasswords.confirmPassword ? (
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 11-4.243-4.243m4.242 4.242L9.88 9.88" />
+                            </svg>
+                          ) : (
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Caractères tapés: {passwordData.confirmPassword.length}
+                      </div>
+                    </div>
+                    
+                    {passwordErrors.length > 0 && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div className="text-sm text-red-800">
+                          <p className="font-medium mb-2">Erreurs :</p>
+                          <ul className="list-disc list-inside space-y-1">
+                            {passwordErrors.map((error, index) => (
+                              <li key={index}>{error}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 flex-shrink-0 bg-gray-50">
+            <button
+              onClick={onClose}
+              className="px-5 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
+              disabled={isLoading}
+            >
+              {t('modal.cancel')}
+            </button>
+            <button
+              onClick={activeTab === 'profile' ? handleProfileSave : handlePasswordChange}
+              disabled={isLoading}
+              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors flex items-center"
+            >
+              {isLoading && (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+              )}
+              {isLoading ? t('modal.loading') : t('modal.save')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
