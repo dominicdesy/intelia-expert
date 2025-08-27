@@ -16,32 +16,46 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isMountedRef = useRef(true)
   const subscriptionRef = useRef<any>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  // NOUVEAU: Flag pour empêcher les setState pendant la déconnexion
+  const isLoggingOutRef = useRef(false)
 
-  // Wrapper sécurisé pour checkAuth
+  // CORRECTION: Wrapper sécurisé pour checkAuth
   const safeCheckAuth = async () => {
-    if (!isMountedRef.current) {
-      console.log('[AuthProvider] checkAuth ignoré - composant démonté')
+    if (!isMountedRef.current || isLoggingOutRef.current) {
+      console.log('[AuthProvider] checkAuth ignoré - composant démonté ou déconnexion en cours')
       return
     }
     try {
       await checkAuth()
     } catch (error) {
-      console.error('[AuthProvider] Erreur checkAuth sécurisé:', error)
+      if (isMountedRef.current) {
+        console.error('[AuthProvider] Erreur checkAuth sécurisé:', error)
+      }
     }
   }
 
-  // Wrapper sécurisé pour setState
+  // CORRECTION: Wrapper sécurisé pour setState avec protection renforcée
   const safeSetState = (updates: any) => {
-    if (!isMountedRef.current) {
-      console.log('[AuthProvider] setState ignoré - composant démonté')
+    if (!isMountedRef.current || isLoggingOutRef.current) {
+      console.log('[AuthProvider] setState ignoré - composant démonté ou déconnexion en cours')
       return
     }
-    useAuthStore.setState(updates)
+    
+    try {
+      // Utiliser setTimeout pour éviter les setState synchrones pendant le démontage
+      setTimeout(() => {
+        if (isMountedRef.current && !isLoggingOutRef.current) {
+          useAuthStore.setState(updates)
+        }
+      }, 0)
+    } catch (error) {
+      console.warn('[AuthProvider] Erreur setState différé:', error)
+    }
   }
 
   // Logique d'hydratation avec protection
   useEffect(() => {
-    if (!hasHydrated && isMountedRef.current) {
+    if (!hasHydrated && isMountedRef.current && !isLoggingOutRef.current) {
       setHasHydrated(true)
       console.log('[AuthProvider] Store hydraté - Supabase auth')
       
@@ -49,12 +63,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         isInitializingRef.current = true
         
         initializeSession().then((success) => {
-          if (isMountedRef.current) {
+          if (isMountedRef.current && !isLoggingOutRef.current) {
             console.log('[AuthProvider] Session initialisée:', success ? 'succès' : 'échec')
           }
           isInitializingRef.current = false
         }).catch((error) => {
-          if (isMountedRef.current) {
+          if (isMountedRef.current && !isLoggingOutRef.current) {
             console.error('[AuthProvider] Erreur initialisation session:', error)
           }
           isInitializingRef.current = false
@@ -63,7 +77,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [hasHydrated, setHasHydrated, initializeSession])
 
-  // Listener Supabase avec protection complète
+  // CORRECTION: Listener Supabase avec protection complète et détection de déconnexion
   useEffect(() => {
     let isCancelled = false
     
@@ -78,6 +92,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         
         console.log('[AuthProvider] Changement état Supabase:', event, !!session)
         
+        // NOUVEAU: Détecter le début de la déconnexion
+        if (event === 'SIGNED_OUT' || (event === 'SIGNED_IN' && !session)) {
+          isLoggingOutRef.current = true
+          console.log('[AuthProvider] Déconnexion détectée - blocage des setState')
+        }
+        
         try {
           switch (event) {
             case 'INITIAL_SESSION':
@@ -85,36 +105,49 @@ export function AuthProvider({ children }: AuthProviderProps) {
               break
               
             case 'SIGNED_IN':
-              console.log('[AuthProvider] Utilisateur connecté')
-              await safeCheckAuth()
+              if (!isLoggingOutRef.current) {
+                console.log('[AuthProvider] Utilisateur connecté')
+                await safeCheckAuth()
+              }
               break
               
             case 'SIGNED_OUT':
               console.log('[AuthProvider] Utilisateur déconnecté')
+              // Pour SIGNED_OUT, on permet un seul setState puis on bloque
               if (isMountedRef.current && !isCancelled) {
-                safeSetState({ 
-                  user: null, 
-                  isAuthenticated: false,
-                  lastAuthCheck: Date.now()
-                })
+                try {
+                  useAuthStore.setState({ 
+                    user: null, 
+                    isAuthenticated: false,
+                    lastAuthCheck: Date.now()
+                  })
+                } catch (error) {
+                  console.warn('[AuthProvider] Erreur setState final:', error)
+                }
               }
+              // Bloquer tous les setState suivants
+              isLoggingOutRef.current = true
               break
               
             case 'TOKEN_REFRESHED':
-              console.log('[AuthProvider] Token rafraîchi')
-              await safeCheckAuth()
+              if (!isLoggingOutRef.current) {
+                console.log('[AuthProvider] Token rafraîchi')
+                await safeCheckAuth()
+              }
               break
               
             case 'USER_UPDATED':
-              console.log('[AuthProvider] Utilisateur mis à jour')
-              await safeCheckAuth()
+              if (!isLoggingOutRef.current) {
+                console.log('[AuthProvider] Utilisateur mis à jour')
+                await safeCheckAuth()
+              }
               break
               
             default:
               console.log('[AuthProvider] Événement Supabase non géré:', event)
           }
         } catch (error) {
-          if (isMountedRef.current) {
+          if (isMountedRef.current && !isLoggingOutRef.current) {
             console.error('[AuthProvider] Erreur traitement événement:', event, error)
           }
         }
@@ -124,9 +157,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Stocker la subscription pour nettoyage
     subscriptionRef.current = subscription
 
-    // Vérification périodique avec protection
+    // CORRECTION: Vérification périodique avec protection renforcée
     const intervalId = setInterval(async () => {
-      if (isCancelled || !isMountedRef.current) {
+      if (isCancelled || !isMountedRef.current || isLoggingOutRef.current) {
         return
       }
       
@@ -139,7 +172,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return
         }
         
-        if (!isMountedRef.current || isCancelled) {
+        if (!isMountedRef.current || isCancelled || isLoggingOutRef.current) {
           return
         }
         
@@ -151,7 +184,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           await safeCheckAuth()
         }
       } catch (error) {
-        if (isMountedRef.current) {
+        if (isMountedRef.current && !isLoggingOutRef.current) {
           console.warn('[AuthProvider] Erreur vérification périodique:', error)
         }
       }
@@ -182,11 +215,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Effect de démontage pour nettoyer les refs
   useEffect(() => {
     isMountedRef.current = true
+    isLoggingOutRef.current = false
     
     return () => {
       console.log('[AuthProvider] Démontage - nettoyage des refs')
       isMountedRef.current = false
       isInitializingRef.current = false
+      isLoggingOutRef.current = true // Bloquer définitivement les setState
       
       // Nettoyage final des ressources
       if (subscriptionRef.current) {
