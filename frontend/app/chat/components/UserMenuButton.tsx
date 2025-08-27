@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/lib/stores/auth' 
+import { useAuthStore, markStoreUnmounted } from '@/lib/stores/auth' 
 import { useTranslation } from '../hooks/useTranslation'
 import { Modal } from './Modal'
 import { UserInfoModal } from './modals/UserInfoModal'
@@ -11,7 +11,7 @@ import { InviteFriendModal } from './modals/InviteFriendModal'
 import { PLAN_CONFIGS } from '../../../types'
 import { getSafeName, getSafeEmail, getSafeUserType, getSafePlan, getSafeInitials } from '../utils/safeUserHelpers'
 
-// ==================== MENU UTILISATEUR - VERSION DEBUG POUR REACT #300 ====================
+// ==================== MENU UTILISATEUR - VERSION CORRIGÉE REACT #300 ====================
 export const UserMenuButton = React.memo(() => {
   const router = useRouter()
   const { user, logout } = useAuthStore()
@@ -28,7 +28,7 @@ export const UserMenuButton = React.memo(() => {
   
   useEffect(() => {
     isMountedRef.current = true
-    console.log('🏗️ [DEBUG-UserMenu] Composant monté')
+    console.log('🗝️ [DEBUG-UserMenu] Composant monté')
     return () => {
       console.log('🧹 [DEBUG-UserMenu] Composant en cours de démontage')
       isMountedRef.current = false
@@ -81,7 +81,7 @@ export const UserMenuButton = React.memo(() => {
   }, [])
 
   const handleLanguageClick = useCallback(() => {
-    console.log('🌐 [DEBUG-UserMenu] handleLanguageClick - isMounted:', isMountedRef.current)
+    console.log('🌍 [DEBUG-UserMenu] handleLanguageClick - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setIsOpen(false)
     setShowLanguageModal(true)
@@ -101,7 +101,7 @@ export const UserMenuButton = React.memo(() => {
     window.open('/admin/statistics', '_blank')
   }, [])
 
-  // VERSION DEBUG DE LA DÉCONNEXION AVEC LOGS DÉTAILLÉS
+  // CORRECTION CRITIQUE: VERSION CORRIGÉE DE LA DÉCONNEXION avec markStoreUnmounted
   const handleLogout = useCallback(async () => {
     console.log('🚨 [DEBUG-LOGOUT] === DÉBUT DÉCONNEXION DÉTAILLÉE ===')
     console.log('🚨 [DEBUG-LOGOUT] 1. État initial - isMounted:', isMountedRef.current)
@@ -121,19 +121,23 @@ export const UserMenuButton = React.memo(() => {
       console.log('🚨 [DEBUG-LOGOUT] 3. Marquage composant comme démonté AVANT logout...')
       isMountedRef.current = false
       
+      // CORRECTION CRITIQUE: Marquer le store comme démonté AVANT logout()
+      console.log('🚨 [DEBUG-LOGOUT] 4. Marquage store comme démonté AVANT logout...')
+      markStoreUnmounted()
+      
       // TECHNIQUE 2: Petite attente pour que React traite le setState du menu
-      console.log('🚨 [DEBUG-LOGOUT] 4. Attente traitement React setState...')
+      console.log('🚨 [DEBUG-LOGOUT] 5. Attente traitement React setState...')
       await new Promise(resolve => setTimeout(resolve, 50))
       
-      console.log('🚨 [DEBUG-LOGOUT] 5. Appel logout() du store...')
+      console.log('🚨 [DEBUG-LOGOUT] 6. Appel logout() du store...')
       const logoutStartTime = performance.now()
       
       await logout()
       
       const logoutEndTime = performance.now()
-      console.log('🚨 [DEBUG-LOGOUT] 6. logout() terminé en', Math.round(logoutEndTime - logoutStartTime), 'ms')
+      console.log('🚨 [DEBUG-LOGOUT] 7. logout() terminé en', Math.round(logoutEndTime - logoutStartTime), 'ms')
       
-      console.log('🚨 [DEBUG-LOGOUT] 7. Redirection via router.replace...')
+      console.log('🚨 [DEBUG-LOGOUT] 8. Redirection via router.replace...')
       router.replace('/')
       
       console.log('🚨 [DEBUG-LOGOUT] === FIN DÉCONNEXION RÉUSSIE ===')
