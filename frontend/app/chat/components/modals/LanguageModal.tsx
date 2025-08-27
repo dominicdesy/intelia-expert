@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useTranslation } from '../../hooks/useTranslation'
 import { CheckIcon } from '../../utils/icons'
 
-// ==================== MODAL LANGUE - SANS RELOAD ====================
+// ==================== VERSION DEBUG ====================
 export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
   const { t, currentLanguage } = useTranslation()
   const [isUpdating, setIsUpdating] = useState(false)
@@ -33,29 +33,81 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
 
     setIsUpdating(true)
     
-    console.log('🔄 [LanguageModal] Changement de langue:', currentLanguage, '→', languageCode)
+    console.log('🔄 [DEBUG] Changement de langue demandé:', { 
+      from: currentLanguage, 
+      to: languageCode 
+    })
     
     try {
-      // 1. Sauvegarder dans localStorage
-      localStorage.setItem('intelia-preferred-language', languageCode)
+      // 1. Vérifier toutes les clés possibles dans localStorage
+      console.log('📊 [DEBUG] État localStorage AVANT:', {
+        'intelia-preferred-language': localStorage.getItem('intelia-preferred-language'),
+        'intelia_language': localStorage.getItem('intelia_language'),
+        'language': localStorage.getItem('language'),
+        'user_language': localStorage.getItem('user_language')
+      })
       
-      // 2. Forcer un re-render global via un event custom
+      // 2. Sauvegarder dans toutes les clés possibles pour être sûr
+      localStorage.setItem('intelia-preferred-language', languageCode)
+      localStorage.setItem('intelia_language', languageCode)
+      localStorage.setItem('language', languageCode)
+      localStorage.setItem('user_language', languageCode)
+      
+      console.log('💾 [DEBUG] Langues sauvegardées dans localStorage')
+      
+      // 3. Vérifier si le hook useTranslation a une fonction de changement
+      console.log('🔍 [DEBUG] Hook useTranslation disponible:', {
+        t: typeof t,
+        currentLanguage,
+        hookKeys: Object.keys({ t, currentLanguage })
+      })
+      
+      // 4. Émettre tous les événements possibles
       window.dispatchEvent(new CustomEvent('languageChanged', { 
         detail: { language: languageCode } 
       }))
+      window.dispatchEvent(new CustomEvent('language-changed', { 
+        detail: { language: languageCode } 
+      }))
+      window.dispatchEvent(new Event('storageChanged'))
       
-      // 3. Attendre que les composants se re-rendent
-      await new Promise(resolve => setTimeout(resolve, 300))
+      console.log('📡 [DEBUG] Événements émis')
       
-      // 4. Fermer la modal
+      // 5. Attendre et vérifier l'état
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      console.log('📊 [DEBUG] État localStorage APRÈS:', {
+        'intelia-preferred-language': localStorage.getItem('intelia-preferred-language'),
+        'intelia_language': localStorage.getItem('intelia_language'),
+        'language': localStorage.getItem('language'),
+        'user_language': localStorage.getItem('user_language')
+      })
+      
+      // 6. Fermer la modal
       onClose()
       
+      // 7. Reload en dernier recours
+      console.log('🔄 [DEBUG] Reload dans 1 seconde...')
+      setTimeout(() => {
+        console.log('🔄 [DEBUG] Exécution du reload')
+        window.location.reload()
+      }, 1000)
+      
     } catch (error) {
-      console.error('❌ [LanguageModal] Erreur changement langue:', error)
-    } finally {
+      console.error('❌ [DEBUG] Erreur changement langue:', error)
       setIsUpdating(false)
     }
   }
+
+  // Debug: log de l'état actuel au render
+  console.log('🎨 [DEBUG] Render LanguageModal:', { 
+    currentLanguage,
+    tFunction: typeof t,
+    languageFromStorage: {
+      'intelia-preferred-language': localStorage.getItem('intelia-preferred-language'),
+      'intelia_language': localStorage.getItem('intelia_language'),
+    }
+  })
 
   return (
     <>
@@ -81,10 +133,17 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
               className="text-gray-400 hover:text-gray-600 text-2xl"
               aria-label="Fermer la modal"
               title="Fermer"
-              disabled={isUpdating}
             >
               ×
             </button>
+          </div>
+          
+          {/* DEBUG INFO */}
+          <div className="p-4 bg-gray-50 border-b text-sm">
+            <div className="font-mono text-xs">
+              <div>🔍 DEBUG: currentLanguage = "{currentLanguage}"</div>
+              <div>📁 localStorage keys: {Object.keys(localStorage).filter(k => k.includes('lang')).join(', ')}</div>
+            </div>
           </div>
           
           {/* Content */}
