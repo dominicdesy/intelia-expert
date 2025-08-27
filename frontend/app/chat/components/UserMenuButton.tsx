@@ -10,7 +10,7 @@ import { LanguageModal } from './modals/LanguageModal'
 import { InviteFriendModal } from './modals/InviteFriendModal'
 import { PLAN_CONFIGS } from '@/types'
 
-// ==================== MENU UTILISATEUR - SOLUTION FINALE REACT #300 ====================
+// UserMenuButton - Version corrigée pour éliminer React #300
 export const UserMenuButton = React.memo(() => {
   const router = useRouter()
   const { user, logout } = useAuthStore()
@@ -31,7 +31,7 @@ export const UserMenuButton = React.memo(() => {
   useEffect(() => {
     isMountedRef.current = true
     return () => {
-      console.log('🧹 [DEBUG-UserMenu] Composant en cours de démontage')
+      console.log('[DEBUG-UserMenu] Composant en cours de démontage')
       isMountedRef.current = false
     }
   }, [])
@@ -83,7 +83,7 @@ export const UserMenuButton = React.memo(() => {
     
     if (debugId !== window.userMenuLastDebugId) {
       window.userMenuLastDebugId = debugId
-      console.log('🔄 [UserMenu] Changement détecté:', {
+      console.log('[UserMenu] Changement détecté:', {
         user_name: user?.name,
         user_email: user?.email,
         calculated_initials: initials,
@@ -94,7 +94,7 @@ export const UserMenuButton = React.memo(() => {
     return initials
   }, [user?.name, user?.email, getUserInitials])
 
-  // Mémoisation des variables de plan
+  // Mémorisation des variables de plan
   const { currentPlan, plan, isSuperAdmin } = useMemo(() => {
     const currentPlan = user?.plan || 'essential'
     const plan = PLAN_CONFIGS[currentPlan as keyof typeof PLAN_CONFIGS] || PLAN_CONFIGS.essential
@@ -103,23 +103,23 @@ export const UserMenuButton = React.memo(() => {
     return { currentPlan, plan, isSuperAdmin }
   }, [user?.plan, user?.user_type])
 
-  // ✅ SOLUTION FINALE : Déconnexion coordonnée avec AuthProvider
+  // Solution finale : Déconnexion coordonnée avec AuthProvider
   const handleLogout = useCallback(() => {
     // Protection contre les clics multiples
     if (logoutInProgressRef.current || !isMountedRef.current) return
     
-    console.log('🚨 [DEBUG-LOGOUT] Début déconnexion coordonnée')
+    console.log('[DEBUG-LOGOUT] Début déconnexion coordonnée')
     logoutInProgressRef.current = true
     setIsOpen(false)
 
     try {
-      // STRATÉGIE FINALE : Nettoyer localStorage ET rediriger immédiatement
+      // Stratégie finale : Nettoyer localStorage ET rediriger immédiatement
       // Cela évite complètement les callbacks Supabase dans AuthProvider
       
-      console.log('🚨 [DEBUG-LOGOUT] Nettoyage localStorage complet')
+      console.log('[DEBUG-LOGOUT] Nettoyage localStorage complet')
       localStorage.clear()
       
-      console.log('🚨 [DEBUG-LOGOUT] Redirection immédiate pour éviter callbacks')
+      console.log('[DEBUG-LOGOUT] Redirection immédiate pour éviter callbacks')
       window.location.href = '/'
       
       // Cleanup Supabase en arrière-plan (optionnel car page change)
@@ -179,7 +179,7 @@ export const UserMenuButton = React.memo(() => {
 
   const toggleOpen = useCallback(() => {
     if (!isMountedRef.current) return
-    console.log('🔀 [DEBUG-UserMenu] toggleOpen - isMounted:', isMountedRef.current, 'current isOpen:', isOpen)
+    console.log('[DEBUG-UserMenu] toggleOpen - isMounted:', isMountedRef.current, 'current isOpen:', isOpen)
     setIsOpen(prev => !prev)
   }, [isOpen])
 
@@ -362,14 +362,16 @@ export const UserMenuButton = React.memo(() => {
         </Modal>
       )}
 
-      <Modal
-        isOpen={showUserInfoModal}
-        onClose={closeUserInfoModal}
-        title={t('profile.title')}
-      >
-        <UserInfoModal user={user as any} onClose={closeUserInfoModal} />
-      </Modal>
+      {/* CORRECTION CRITIQUE : UserInfoModal directement SANS wrapper Modal 
+          pour éviter les conflits DOM qui causent React #300 */}
+      {showUserInfoModal && (
+        <UserInfoModal 
+          user={user as any} 
+          onClose={closeUserInfoModal} 
+        />
+      )}
 
+      {/* Autres modals gardent leur wrapper Modal car ils n'ont pas leur propre structure complète */}
       <Modal
         isOpen={showLanguageModal}
         onClose={closeLanguageModal}
