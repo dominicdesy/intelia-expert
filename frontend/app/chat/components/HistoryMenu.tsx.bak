@@ -9,6 +9,7 @@ import { useAuthStore } from '@/lib/stores/auth'
 import { TrashIcon, PlusIcon, MessageCircleIcon } from '../utils/icons'
 import type { Conversation, ConversationGroup } from '../../../types'
 
+// 🛠️ CORRECTION MAJEURE : Enveloppement avec React.memo pour éviter les re-rendus
 export const HistoryMenu = React.memo(() => {
   const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
@@ -19,7 +20,7 @@ export const HistoryMenu = React.memo(() => {
     useConversationActions()
   const { currentConversation, loadConversation } = useCurrentConversation()
 
-  // CORRECTION CRITIQUE: Éviter la boucle infinie dans handleToggle
+  // 🔧 CORRECTION : Éviter la boucle infinie dans handleToggle avec useCallback
   const handleToggle = useCallback(async () => {
     console.log('[HistoryMenu] Toggle clicked, isOpen:', isOpen, 'user:', !!user)
     
@@ -39,7 +40,7 @@ export const HistoryMenu = React.memo(() => {
     }
   }, [isOpen, user, isLoadingHistory, loadConversations])
 
-  // Mémoisation des handlers pour éviter les re-créations
+  // 🛠️ CORRECTION : Mémoisation des handlers pour éviter les re-créations
   const handleRefresh = useCallback(async (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -65,7 +66,7 @@ export const HistoryMenu = React.memo(() => {
   const handleConversationClick = useCallback(async (conv: Conversation, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    await loadConversation(conv.id)
+    await loadConversation(conv.id) // charge la conversation complète (avec messages)
     setIsOpen(false)
   }, [loadConversation])
 
@@ -76,7 +77,7 @@ export const HistoryMenu = React.memo(() => {
     setIsOpen(false)
   }, [createNewConversation])
 
-  // Mémoisation de la fonction de formatage
+  // 🛠️ CORRECTION : Mémoisation de la fonction de formatage
   const formatConversationTime = useCallback((timestamp: string): string => {
     try {
       let ts = timestamp
@@ -91,7 +92,7 @@ export const HistoryMenu = React.memo(() => {
     }
   }, [])
 
-  // Mémoisation du calcul du total de conversations
+  // 🛠️ CORRECTION : Mémoisation du calcul du total de conversations
   const totalConversations = useMemo(() => {
     return conversationGroups.reduce(
       (acc: number, g: ConversationGroup) => acc + g.conversations.length,
@@ -99,7 +100,8 @@ export const HistoryMenu = React.memo(() => {
     )
   }, [conversationGroups])
 
-  // Réduire la fréquence des logs de debug
+  // 🛠️ CORRECTION CRITIQUE : Réduire la fréquence des logs de debug
+  // Utilisez useMemo pour éviter que les logs se déclenchent à chaque re-rendu
   const debugState = useMemo(() => {
     const state = {
       isOpen,
@@ -109,12 +111,13 @@ export const HistoryMenu = React.memo(() => {
       hasUser: !!user
     }
     
+    // 🔧 LOGS CONDITIONNELS : Ne loguer que si l'état a vraiment changé
     console.log('[HistoryMenu] Render state:', state)
     
     return state
   }, [isOpen, totalConversations, conversationGroups.length, isLoadingHistory, user])
 
-  // Mémoisation du rendu des conversations pour optimiser les performances
+  // 🛠️ CORRECTION : Mémoisation du rendu des conversations pour optimiser les performances
   const conversationsList = useMemo(() => {
     if (isLoadingHistory) {
       return (
@@ -207,7 +210,7 @@ export const HistoryMenu = React.memo(() => {
     ))
   }, [isLoadingHistory, conversationGroups, user, currentConversation?.id, handleNewConversation, handleRefresh, handleConversationClick, handleDeleteSingle, formatConversationTime])
 
-  // Mémoisation du badge de notification
+  // 🛠️ CORRECTION : Mémoisation du badge de notification
   const notificationBadge = useMemo(() => {
     if (totalConversations <= 0) return null
     
@@ -216,7 +219,7 @@ export const HistoryMenu = React.memo(() => {
     )
   }, [totalConversations])
 
-  // Callback pour fermer le menu
+  // 🛠️ CORRECTION : Callback pour fermer le menu
   const handleCloseMenu = useCallback(() => {
     setIsOpen(false)
   }, [])
@@ -246,7 +249,7 @@ export const HistoryMenu = React.memo(() => {
 
       {notificationBadge}
 
-      {/* S'assurer que le menu s'affiche quand isOpen=true */}
+      {/* 🔧 CORRECTION CRITIQUE : S'assurer que le menu s'affiche quand isOpen=true */}
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={handleCloseMenu} />
@@ -263,5 +266,5 @@ export const HistoryMenu = React.memo(() => {
   )
 })
 
-// Ajouter le displayName pour le debugging
+// 🛠️ CORRECTION : Ajouter le displayName pour le debugging
 HistoryMenu.displayName = 'HistoryMenu'

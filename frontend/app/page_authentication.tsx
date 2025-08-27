@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
 import type { User } from '@/types'
@@ -35,16 +35,18 @@ export function useAuthenticationLogic({
   const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore()
   const { login, register, initializeSession } = useAuthStore()
 
-  // Hooks pour les pays
+  // ✅ Hooks pour les pays - optimisés
   console.log('🎯 [PageContent] Appel du hook useCountries...')
-  const { countries, loading: countriesLoading, usingFallback } = useCountries()
+  const countriesData = useCountries()
+  const { countries, loading: countriesLoading, usingFallback } = countriesData
   const countryCodeMap = useCountryCodeMap(countries)
 
-  // Refs pour éviter les doubles appels
+  // Refs pour éviter les doubles appels et les re-renders
   const hasCheckedAuth = useRef(false)
   const redirectLock = useRef(false)
   const sessionInitialized = useRef(false)
   const passwordInputRef = useRef<HTMLInputElement>(null)
+  const isMounted = useRef(true)
 
   // États pour les formulaires
   const [showPassword, setShowPassword] = useState(false)
@@ -72,10 +74,10 @@ export function useAuthenticationLogic({
     companyLinkedin: ''
   })
 
-  // Fonction de redirection sécurisée
+  // ✅ Fonction de redirection sécurisée mémorisée
   const safeRedirectToChat = useCallback(() => {
-    if (redirectLock.current) {
-      console.log('🔒 [Redirect] Déjà en cours de redirection, ignoré')
+    if (redirectLock.current || !isMounted.current) {
+      console.log('🔒 [Redirect] Déjà en cours de redirection ou démontage, ignoré')
       return
     }
     
@@ -89,8 +91,8 @@ export function useAuthenticationLogic({
     router.replace('/chat')
   }, [pathname, router])
 
-  // Gestion des changements de formulaires
-  const handleLoginChange = (field: keyof LoginData, value: string | boolean) => {
+  // ✅ Gestion des changements de formulaires optimisée
+  const handleLoginChange = useCallback((field: keyof LoginData, value: string | boolean) => {
     setLoginData(prev => {
       const newData = { ...prev, [field]: value }
       
@@ -119,9 +121,9 @@ export function useAuthenticationLogic({
       
       return newData
     })
-  }
+  }, [])
 
-  const handleSignupChange = (field: keyof SignupData, value: string) => {
+  const handleSignupChange = useCallback((field: keyof SignupData, value: string) => {
     setSignupData(prev => {
       const newData = { ...prev, [field]: value }
       
@@ -133,9 +135,10 @@ export function useAuthenticationLogic({
       
       return newData
     })
-  }
+  }, [countryCodeMap])
 
-  const validateSignupForm = (): string | null => {
+  // ✅ Validation du formulaire d'inscription mémorisée
+  const validateSignupForm = useCallback((): string | null => {
     const { 
       email, password, confirmPassword, firstName, lastName, country, 
       countryCode, areaCode, phoneNumber,
@@ -163,10 +166,10 @@ export function useAuthenticationLogic({
     if (companyLinkedin && !validateLinkedIn(companyLinkedin)) return 'Format LinkedIn entreprise invalide'
     
     return null
-  }
+  }, [signupData, t])
 
-  // Gestion de la connexion
-  const handleLogin = async (e: React.FormEvent) => {
+  // ✅ Gestion de la connexion mémorisée
+  const handleLogin = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!loginData.email.trim()) {
@@ -210,10 +213,10 @@ export function useAuthenticationLogic({
         throw new Error(error.message || 'Erreur de connexion')
       }
     }
-  }
+  }, [loginData, t, login])
 
-  // Gestion de l'inscription
-  const handleSignup = async (e: React.FormEvent) => {
+  // ✅ Gestion de l'inscription mémorisée
+  const handleSignup = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
 
     const validationError = validateSignupForm()
@@ -246,11 +249,11 @@ export function useAuthenticationLogic({
       console.error('❌ [Signup] Erreur création compte:', error)
       throw new Error(error.message || 'Erreur lors de la création du compte')
     }
-  }
+  }, [signupData, currentLanguage, register, validateSignupForm])
 
-  // Initialisation de la session
+  // ✅ Initialisation de la session optimisée
   useEffect(() => {
-    if (!hasHydrated) return
+    if (!hasHydrated || !isMounted.current) return
     
     if (!sessionInitialized.current) {
       sessionInitialized.current = true
@@ -259,9 +262,9 @@ export function useAuthenticationLogic({
     }
   }, [hasHydrated, initializeSession])
 
-  // Vérification authentification
+  // ✅ Vérification authentification optimisée
   useEffect(() => {
-    if (!hasHydrated || hasCheckedAuth.current) {
+    if (!hasHydrated || hasCheckedAuth.current || !isMounted.current) {
       return
     }
 
@@ -279,9 +282,9 @@ export function useAuthenticationLogic({
       console.log('🔄 [Session] Initialisation unique de la session')
       
       initializeSession().then((sessionFound) => {
-        if (sessionFound) {
+        if (sessionFound && isMounted.current) {
           console.log('✅ [Session] Session trouvée, redirection automatique')
-        } else {
+        } else if (isMounted.current) {
           console.log('❌ [Session] Aucune session trouvée')
         }
       }).catch(error => {
@@ -290,9 +293,9 @@ export function useAuthenticationLogic({
     }
   }, [hasHydrated, isAuthenticated, initializeSession, safeRedirectToChat])
 
-  // Surveillance changement AUTH
+  // ✅ Surveillance changement AUTH optimisée
   useEffect(() => {
-    if (!hasHydrated || !hasCheckedAuth.current) {
+    if (!hasHydrated || !hasCheckedAuth.current || !isMounted.current) {
       return
     }
 
@@ -302,18 +305,20 @@ export function useAuthenticationLogic({
     }
   }, [isAuthenticated, isLoading, hasHydrated, safeRedirectToChat])
 
-  // Focus automatique sur mot de passe si email pré-rempli
+  // ✅ Focus automatique sur mot de passe si email pré-rempli
   useEffect(() => {
     const { rememberMe, lastEmail } = rememberMeUtils.load()
     
     if (rememberMe && lastEmail && loginData.email && !loginData.password && passwordInputRef.current) {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         passwordInputRef.current?.focus()
       }, 500)
+      
+      return () => clearTimeout(timer)
     }
   }, [loginData.email, loginData.password])
 
-  // Restaurer email lors du retour en mode login
+  // ✅ Restaurer email lors du retour en mode login
   useEffect(() => {
     if (!isSignupMode) {
       const { rememberMe, lastEmail } = rememberMeUtils.load()
@@ -328,7 +333,15 @@ export function useAuthenticationLogic({
     }
   }, [isSignupMode])
 
-  return {
+  // ✅ Cleanup au démontage
+  useEffect(() => {
+    return () => {
+      isMounted.current = false
+    }
+  }, [])
+
+  // ✅ Retour mémorisé pour éviter les re-renders des composants parents
+  return useMemo(() => ({
     // États
     loginData,
     signupData,
@@ -360,5 +373,20 @@ export function useAuthenticationLogic({
     validatePhone,
     validateLinkedIn,
     validateWebsite
-  }
+  }), [
+    loginData,
+    signupData, 
+    showPassword, 
+    showConfirmPassword,
+    isLoading,
+    countries,
+    countriesLoading,
+    usingFallback,
+    countryCodeMap,
+    handleLoginChange,
+    handleSignupChange,
+    handleLogin,
+    handleSignup,
+    validateSignupForm
+  ])
 }
