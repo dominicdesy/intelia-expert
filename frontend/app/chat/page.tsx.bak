@@ -407,7 +407,7 @@ export default function ChatInterface() {
     return messages.length > 0
   }, [messages.length])
 
-  // CORRECTION: redirectToLogin complète et robuste avec logs debug
+  // CORRECTION: redirectToLogin complète et robuste
   const redirectToLogin = useCallback((reason: string = 'Session expirée') => {
     // évite les doubles redirections
     if (isRedirectingRef.current) {
@@ -443,16 +443,13 @@ export default function ChatInterface() {
     // Nettoyage CSS
     document.body.classList.remove('keyboard-open')
 
-    // CORRECTION: Redirection avec logs debug
+    // Redirection via router, avec fallback dur si Next rate
     try {
       router.push('/')
-      // Fallback rapide avec debug
+      // Fallback rapide
       redirectTimeoutRef.current = setTimeout(() => {
-        console.log('🕒 [DEBUG-TIMEOUT-REDIRECT] Execution - isMounted:', isMountedRef.current)
-        if (isMountedRef.current && window.location.pathname !== '/') {
+        if (window.location.pathname !== '/') {
           window.location.href = '/'
-        } else if (!isMountedRef.current) {
-          console.log('⚠️ [DEBUG-TIMEOUT-REDIRECT] Ignoré - composant démonté')
         }
       }, 500)
     } catch (err) {
@@ -660,11 +657,8 @@ export default function ChatInterface() {
 
     if (hasHydrated && isAuthenticated === false && !isLoading && isMountedRef.current) {
       timeoutId = setTimeout(() => {
-        console.log('🕒 [DEBUG-TIMEOUT-AUTH-LOGOUT] Execution - isMounted:', isMountedRef.current)
         if (isMountedRef.current) {
           redirectToLogin('Déconnexion')
-        } else {
-          console.log('⚠️ [DEBUG-TIMEOUT-AUTH-LOGOUT] Ignoré - composant démonté')
         }
       }, 100)
     }
@@ -676,7 +670,7 @@ export default function ChatInterface() {
     }
   }, [hasHydrated, isAuthenticated, isLoading, redirectToLogin])
 
-  // CORRECTION: useEffect pour gestion clavier mobile avec cleanup complet et logs debug
+  // CORRECTION: useEffect pour gestion clavier mobile avec cleanup complet
   useEffect(() => {
     if (!uiState.isMobileDevice || !isMountedRef.current) return
 
@@ -703,13 +697,9 @@ export default function ChatInterface() {
         
         if (heightDifference > 150) {
           document.body.classList.add('keyboard-open')
-          // CORRECTION: setTimeout avec logs debug
           setTimeout(() => {
-            console.log('🕒 [DEBUG-TIMEOUT-VIEWPORT] Execution - isMounted:', isMountedRef.current)
             if (messagesEndRef.current && isMountedRef.current && !isCancelled) {
               messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" })
-            } else {
-              console.log('⚠️ [DEBUG-TIMEOUT-VIEWPORT] Ignoré - composant démonté ou annulé')
             }
           }, 100)
         } else {
@@ -752,20 +742,15 @@ export default function ChatInterface() {
       setUiState(prev => ({ ...prev, isKeyboardVisible: true }))
       document.body.classList.add('keyboard-open')
       
-      // CORRECTION: setTimeout avec logs debug
       setTimeout(() => {
-        console.log('🕒 [DEBUG-TIMEOUT-FOCUS] Execution - isMounted:', isMountedRef.current)
         if (messagesEndRef.current && isMountedRef.current && !isCancelled) {
           messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" })
-        } else {
-          console.log('⚠️ [DEBUG-TIMEOUT-FOCUS] Ignoré - composant démonté')
         }
       }, 300)
     }
 
     const handleBlur = () => {
       setTimeout(() => {
-        console.log('🕒 [DEBUG-TIMEOUT-BLUR] Execution - isMounted:', isMountedRef.current)
         if (isMountedRef.current && !isCancelled) {
           setUiState(prev => ({ 
             ...prev, 
@@ -773,8 +758,6 @@ export default function ChatInterface() {
             keyboardHeight: 0
           }))
           document.body.classList.remove('keyboard-open')
-        } else {
-          console.log('⚠️ [DEBUG-TIMEOUT-BLUR] Ignoré - composant démonté')
         }
       }, 100)
     }
@@ -859,7 +842,7 @@ export default function ChatInterface() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // CORRECTION: Auto-scroll avec protection complète et logs debug
+  // CORRECTION: Auto-scroll avec protection complète
   useEffect(() => {
     if (!isMountedRef.current) return
 
@@ -869,13 +852,9 @@ export default function ChatInterface() {
         uiState.shouldAutoScroll && 
         !uiState.isUserScrolling) {
       
-      // CORRECTION: setTimeout avec logs debug
       timeoutId = setTimeout(() => {
-        console.log('🕒 [DEBUG-TIMEOUT-AUTOSCROLL] Execution - isMounted:', isMountedRef.current)
         if (isMountedRef.current && messagesEndRef.current) {
           messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
-        } else {
-          console.log('⚠️ [DEBUG-TIMEOUT-AUTOSCROLL] Ignoré - composant démonté')
         }
       }, 100)
     }
@@ -920,12 +899,9 @@ export default function ChatInterface() {
 
       clearTimeout(scrollTimeout)
       scrollTimeout = setTimeout(() => {
-        console.log('🕒 [DEBUG-TIMEOUT-SCROLL] Execution - isMounted:', isMountedRef.current)
         if (isMountedRef.current && !isCancelled) {
           setUiState(prev => ({ ...prev, isUserScrolling: false }))
           isScrolling = false
-        } else {
-          console.log('⚠️ [DEBUG-TIMEOUT-SCROLL] Ignoré - composant démonté')
         }
       }, 150)
     }
@@ -987,30 +963,26 @@ export default function ChatInterface() {
     }
   }, [currentLanguage, t, currentConversation, setCurrentConversation])
 
-  // CORRECTION: Chargement des conversations avec timeout et protection et logs debug
+  // Chargement des conversations avec timeout et protection
   useEffect(() => {
     if (isAuthenticated && user?.id && isMountedRef.current && !hasLoadedConversationsRef.current) {
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current)
       }
 
-      // CORRECTION: setTimeout avec logs debug
       loadingTimeoutRef.current = setTimeout(() => {
-        console.log('🕒 [DEBUG-TIMEOUT-LOADING] Execution - isMounted:', isMountedRef.current)
         if (isMountedRef.current && !hasLoadedConversationsRef.current) {
           loadConversationsWithBreaker(user.email || user.id)
             .then(() => {
               if (isMountedRef.current) {
-                console.log('✅ [DEBUG-LOADING] Historique chargé avec succès')
+                console.log('Historique conversations chargé avec succès')
               }
             })
             .catch(err => {
               if (isMountedRef.current) {
-                console.error('❌ [DEBUG-LOADING] Erreur chargement historique:', err)
+                console.error('Erreur chargement historique:', err)
               }
             })
-        } else {
-          console.log('⚠️ [DEBUG-TIMEOUT-LOADING] Ignoré - composant démonté ou déjà chargé')
         }
       }, 800)
 
