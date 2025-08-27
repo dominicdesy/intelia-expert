@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore, markStoreUnmounted } from '@/lib/stores/auth'
-import { useTranslation } from '../../hooks/useTranslation'
+import { useTranslation } from '../hooks/useTranslation'
 import { UserInfoModal } from './modals/UserInfoModal'
 import { AccountModal } from './modals/AccountModal'
 import { ContactModal } from './modals/ContactModal'
