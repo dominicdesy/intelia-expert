@@ -1,5 +1,3 @@
-// UserMenuButton.tsx
-
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { useAuthStore } from '@/lib/stores/auth' 
 import { useTranslation } from '../hooks/useTranslation'
@@ -142,20 +140,34 @@ export const UserMenuButton = React.memo(() => {
     window.open('/admin/statistics', '_blank')
   }, [])
 
-  // ✅ CORRECTION MAJEURE: Fonction de déconnexion sécurisée
+  // ✅ CORRECTION DRASTIQUE: Fonction de déconnexion avec protection globale
   const handleLogout = useCallback(async () => {
     try {
       console.log('🔄 [UserMenu] Démarrage déconnexion')
       
-      // NE PAS faire de setState ici - laisser logout() gérer le démontage
-      // setIsOpen(false) // ❌ RETIRÉ - cause l'erreur React #300
+      // NOUVEAU: Marquer immédiatement comme déconnecté dans le store
+      // pour empêcher tous les setState pendant le processus
+      const store = useAuthStore.getState()
+      if (store.setIsLoggingOut) {
+        store.setIsLoggingOut(true)
+      }
+      
+      // Marquer immédiatement le composant comme démonté
+      isMountedRef.current = false
       
       // Appel de déconnexion - ceci va probablement démonter le composant
       await logout()
       
       // Si nous arrivons ici, forcer la redirection
       console.log('✅ [UserMenu] Déconnexion terminée, redirection de secours')
-      window.location.href = '/'
+      
+      // Redirection immédiate sans délai
+      try {
+        window.location.href = '/'
+      } catch (err) {
+        // Fallback ultime
+        setTimeout(() => window.location.reload(), 100)
+      }
       
     } catch (error) {
       console.error('❌ [UserMenu] Erreur déconnexion:', error)
