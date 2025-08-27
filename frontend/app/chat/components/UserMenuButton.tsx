@@ -9,20 +9,9 @@ import { ContactModal } from './modals/ContactModal'
 import { LanguageModal } from './modals/LanguageModal'
 import { InviteFriendModal } from './modals/InviteFriendModal'
 import { PLAN_CONFIGS } from '@/types'
-import { getSafeName, getSafeEmail, getSafeUserType, getSafePlan, getSafeInitials } from '../utils/safeUserHelpers'
 
-// Configuration des plans avec mémoisation
-const PLAN_CONFIGS = {
-  essential: { name: 'Essential', color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200', features: ['Questions illimitées', 'Support par email'] },
-  standard: { name: 'Standard', color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200', features: ['Tout Essential', 'Analyses avancées', 'Priorité support'] },
-  premium: { name: 'Premium', color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200', features: ['Tout Standard', 'Consultations directes', 'Support 24/7'] },
-  enterprise: { name: 'Enterprise', color: 'text-gray-800', bgColor: 'bg-gray-50', borderColor: 'border-gray-300', features: ['Solutions personnalisées', 'Équipe dédiée', 'SLA garanti'] }
-} as const
-
-// ==================== MENU UTILISATEUR AVEC INVITATIONS - OPTIMISÉ ====================
+// ==================== MENU UTILISATEUR - SOLUTION FINALE REACT #300 ====================
 export const UserMenuButton = React.memo(() => {
-  console.log('🔄 [DEBUG-UserMenu] Render - isMounted: true user: true')
-  
   const router = useRouter()
   const { user, logout } = useAuthStore()
   const { t } = useTranslation()
@@ -35,12 +24,11 @@ export const UserMenuButton = React.memo(() => {
   const [showLanguageModal, setShowLanguageModal] = useState(false)
   const [showInviteFriendModal, setShowInviteFriendModal] = useState(false)
 
-  // PROTECTION CRITIQUE: Ref pour éviter les double logout
-  const logoutInProgressRef = React.useRef(false)
-  const isMountedRef = React.useRef(true)
+  // Protection contre React #300
+  const isMountedRef = useRef(true)
+  const logoutInProgressRef = useRef(false)
 
-  // Cleanup au démontage
-  React.useEffect(() => {
+  useEffect(() => {
     isMountedRef.current = true
     return () => {
       console.log('🧹 [DEBUG-UserMenu] Composant en cours de démontage')
@@ -48,7 +36,7 @@ export const UserMenuButton = React.memo(() => {
     }
   }, [])
 
-  // Mémoisation des initiales utilisateur avec fonction robuste
+  // Fonction robuste pour obtenir les initiales utilisateur
   const getUserInitials = useCallback((user: any): string => {
     if (!user) return 'U'
 
@@ -87,7 +75,7 @@ export const UserMenuButton = React.memo(() => {
   const userInitials = useMemo(() => {
     const initials = getUserInitials(user)
     
-    // Debug conditionnel pour éviter les logs répétitifs
+    // Debug conditionnel
     const debugId = `${user?.name}-${user?.email}`
     if (!window.userMenuLastDebugId) {
       window.userMenuLastDebugId = ''
@@ -115,76 +103,29 @@ export const UserMenuButton = React.memo(() => {
     return { currentPlan, plan, isSuperAdmin }
   }, [user?.plan, user?.user_type])
 
-  // Handlers des modales mémorisés avec protection
-  const handleContactClick = useCallback(() => {
-    if (!isMountedRef.current) return
-    console.log('📞 [DEBUG-UserMenu] handleContactClick - isMounted:', isMountedRef.current)
-    setIsOpen(false)
-    setShowContactModal(true)
-  }, [])
-
-  const handleUserInfoClick = useCallback(() => {
-    if (!isMountedRef.current) return
-    console.log('👤 [DEBUG-UserMenu] handleUserInfoClick - isMounted:', isMountedRef.current)
-    setIsOpen(false)
-    setShowUserInfoModal(true)
-  }, [])
-
-  const handleAccountClick = useCallback(() => {
-    if (!isMountedRef.current) return
-    console.log('💳 [DEBUG-UserMenu] handleAccountClick - isMounted:', isMountedRef.current)
-    setIsOpen(false)
-    setShowAccountModal(true)
-  }, [])
-
-  const handleLanguageClick = useCallback(() => {
-    if (!isMountedRef.current) return
-    console.log('🌍 [DEBUG-UserMenu] handleLanguageClick - isMounted:', isMountedRef.current)
-    setIsOpen(false)
-    setShowLanguageModal(true)
-  }, [])
-
-  const handleInviteFriendClick = useCallback(() => {
-    if (!isMountedRef.current) return
-    console.log('👥 [DEBUG-UserMenu] handleInviteFriendClick - isMounted:', isMountedRef.current)
-    setIsOpen(false)
-    setShowInviteFriendModal(true)
-  }, [])
-
-  const handleStatisticsClick = useCallback(() => {
-    if (!isMountedRef.current) return
-    console.log('📊 [DEBUG-UserMenu] handleStatisticsClick - isMounted:', isMountedRef.current)
-    setIsOpen(false)
-    window.open('/admin/statistics', '_blank')
-  }, [])
-
-  const openPrivacyPolicy = useCallback(() => {
-    window.open('https://intelia.com/privacy-policy/', '_blank')
-  }, [])
-
-  // ✅ SOLUTION DÉFINITIVE: Logout avec redirection immédiate
+  // ✅ SOLUTION FINALE : Déconnexion coordonnée avec AuthProvider
   const handleLogout = useCallback(() => {
-    console.log('🚨 [DEBUG-LOGOUT] Début logout avec redirection immédiate')
-    
     // Protection contre les clics multiples
-    if (logoutInProgressRef.current) {
-      console.log('🚨 [DEBUG-LOGOUT] Logout déjà en cours, ignoré')
-      return
-    }
-
+    if (logoutInProgressRef.current || !isMountedRef.current) return
+    
+    console.log('🚨 [DEBUG-LOGOUT] Début déconnexion coordonnée')
     logoutInProgressRef.current = true
     setIsOpen(false)
 
     try {
-      // 1. REDIRECTION IMMÉDIATE - avant tout setState/callback
-      console.log('🚨 [DEBUG-LOGOUT] Redirection immédiate AVANT logout')
+      // STRATÉGIE FINALE : Nettoyer localStorage ET rediriger immédiatement
+      // Cela évite complètement les callbacks Supabase dans AuthProvider
+      
+      console.log('🚨 [DEBUG-LOGOUT] Nettoyage localStorage complet')
+      localStorage.clear()
+      
+      console.log('🚨 [DEBUG-LOGOUT] Redirection immédiate pour éviter callbacks')
       window.location.href = '/'
       
-      // 2. Logout en arrière-plan (la page sera déjà partie)
+      // Cleanup Supabase en arrière-plan (optionnel car page change)
       setTimeout(() => {
         logout().catch((error) => {
-          console.error('Erreur logout async:', error)
-          // Même en cas d'erreur, on est déjà sur la page d'accueil
+          console.error('Logout async error (ignoré):', error)
         })
       }, 100)
       
@@ -194,6 +135,47 @@ export const UserMenuButton = React.memo(() => {
       window.location.href = '/'
     }
   }, [logout])
+
+  // Handlers des modales avec protection
+  const handleContactClick = useCallback(() => {
+    if (!isMountedRef.current) return
+    setIsOpen(false)
+    setShowContactModal(true)
+  }, [])
+
+  const handleUserInfoClick = useCallback(() => {
+    if (!isMountedRef.current) return
+    setIsOpen(false)
+    setShowUserInfoModal(true)
+  }, [])
+
+  const handleAccountClick = useCallback(() => {
+    if (!isMountedRef.current) return
+    setIsOpen(false)
+    setShowAccountModal(true)
+  }, [])
+
+  const handleLanguageClick = useCallback(() => {
+    if (!isMountedRef.current) return
+    setIsOpen(false)
+    setShowLanguageModal(true)
+  }, [])
+
+  const handleInviteFriendClick = useCallback(() => {
+    if (!isMountedRef.current) return
+    setIsOpen(false)
+    setShowInviteFriendModal(true)
+  }, [])
+
+  const handleStatisticsClick = useCallback(() => {
+    if (!isMountedRef.current) return
+    setIsOpen(false)
+    window.open('/admin/statistics', '_blank')
+  }, [])
+
+  const openPrivacyPolicy = useCallback(() => {
+    window.open('https://intelia.com/privacy-policy/', '_blank')
+  }, [])
 
   const toggleOpen = useCallback(() => {
     if (!isMountedRef.current) return
@@ -206,7 +188,7 @@ export const UserMenuButton = React.memo(() => {
     setIsOpen(false)
   }, [])
 
-  // Fonctions de fermeture des modales mémorisées avec protection
+  // Fonctions de fermeture des modales avec protection
   const closeUserInfoModal = useCallback(() => {
     if (!isMountedRef.current) return
     setShowUserInfoModal(false)
@@ -237,7 +219,7 @@ export const UserMenuButton = React.memo(() => {
   return (
     <>
       <div className="relative">
-        {/* Style carré avec coins arrondis comme dans le backup */}
+        {/* Style carré avec coins arrondis */}
         <button
           onClick={toggleOpen}
           className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors"
@@ -257,16 +239,13 @@ export const UserMenuButton = React.memo(() => {
               <div className="px-4 py-3 border-b border-gray-100">
                 <p className="text-sm font-medium text-gray-900">{user?.name}</p>
                 <p className="text-xs text-gray-500">{user?.email}</p>
-                {/* Affichage conditionnel du plan et du rôle */}
                 {user?.user_type && (
                   <div className="mt-2">
-                    {/* Affichage du plan pour les utilisateurs normaux seulement */}
                     {!isSuperAdmin && (
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${plan.bgColor} ${plan.color} border ${plan.borderColor}`}>
                         {plan.name}
                       </span>
                     )}
-                    {/* Affichage du rôle super admin */}
                     {isSuperAdmin && (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
                         Super Admin
@@ -304,7 +283,6 @@ export const UserMenuButton = React.memo(() => {
                   </button>
                 )}
 
-                {/* Icône correcte pour le profil */}
                 <button
                   onClick={handleUserInfoClick}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -315,7 +293,6 @@ export const UserMenuButton = React.memo(() => {
                   <span>{t('nav.profile')}</span>
                 </button>
 
-                {/* Icône correcte pour la langue */}
                 <button
                   onClick={handleLanguageClick}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -326,7 +303,6 @@ export const UserMenuButton = React.memo(() => {
                   <span>{t('nav.language')}</span>
                 </button>
 
-                {/* Icône correcte pour inviter un ami */}
                 <button
                   onClick={handleInviteFriendClick}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -337,7 +313,6 @@ export const UserMenuButton = React.memo(() => {
                   <span>{t('nav.inviteFriend')}</span>
                 </button>
 
-                {/* Icône correcte pour contact */}
                 <button
                   onClick={handleContactClick}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -348,7 +323,6 @@ export const UserMenuButton = React.memo(() => {
                   <span>{t('nav.contact')}</span>
                 </button>
 
-                {/* Mentions légales */}
                 <button
                   onClick={openPrivacyPolicy}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -360,9 +334,8 @@ export const UserMenuButton = React.memo(() => {
                 </button>
               </div>
 
-              {/* Footer */}
+              {/* Footer avec déconnexion */}
               <div className="border-t border-gray-100 pt-1">
-                {/* Gestion de déconnexion corrigée contre React #300 */}
                 <button
                   onClick={handleLogout}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
@@ -413,7 +386,6 @@ export const UserMenuButton = React.memo(() => {
         <ContactModal onClose={closeContactModal} />
       </Modal>
 
-      {/* Modal inviter un ami */}
       <Modal
         isOpen={showInviteFriendModal}
         onClose={closeInviteFriendModal}
@@ -425,12 +397,10 @@ export const UserMenuButton = React.memo(() => {
   )
 })
 
-// Ajout du displayName et déclarations TypeScript
 UserMenuButton.displayName = 'UserMenuButton'
 
 declare global {
   interface Window {
     userMenuLastDebugId?: string
   }
-}
 }
