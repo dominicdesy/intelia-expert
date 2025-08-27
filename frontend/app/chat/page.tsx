@@ -415,18 +415,12 @@ export default function ChatInterface() {
     
     // Nettoyer les stores avant la redirection
     try {
-      // Reset du store de chat pour éviter les états incohérents
-      const chatStore = useChatStore.getState()
-      if (chatStore.reset) {
-        chatStore.reset()
-      } else {
-        // Reset manuel si pas de méthode reset
-        useChatStore.setState({
-          currentConversation: null,
-          conversations: [],
-          isLoading: false
-        })
-      }
+      // Reset manuel du store de chat pour éviter les états incohérents
+      useChatStore.setState({
+        currentConversation: null,
+        conversations: [],
+        isLoading: false
+      })
     } catch (error) {
       console.warn('Erreur nettoyage stores:', error)
     }
