@@ -85,7 +85,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           switch (event) {
             case 'INITIAL_SESSION':
               console.log('🔥 [DEBUG-AUTH] INITIAL_SESSION ignoré')
-              break
+              break;
               
             case 'SIGNED_IN':
               console.log('🔥 [DEBUG-AUTH] SIGNED_IN - vérification état...')
@@ -95,7 +95,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
               } else {
                 console.log('🔥 [DEBUG-AUTH] SIGNED_IN ignoré - déconnexion en cours')
               }
-              break
+              break;
               
             case 'SIGNED_OUT':
               console.log('🔥 [DEBUG-AUTH] SIGNED_OUT - DÉBUT BLOCAGE TOTAL')
@@ -121,17 +121,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
               // Garder le blocage pendant 5 secondes pour éviter les états de course
               if (logoutTimeoutRef.current) {
                 clearTimeout(logoutTimeoutRef.current)
+              }
 
-			  logoutTimeoutRef.current = setTimeout(() => {
-			    console.log('🕒 [DEBUG-TIMEOUT-AUTH] Execution timeout 5s - isMounted:', isMountedRef.current)
-			    if (isMountedRef.current) {
-			  	  console.log('🔥 [DEBUG-AUTH] Fin du blocage après 5s')
-			    } else {
-				  console.log('⚠️ [DEBUG-TIMEOUT-AUTH] Timeout 5s ignoré - AuthProvider démonté')
-			    }
-			  }, 5000)
+              logoutTimeoutRef.current = setTimeout(() => {
+                console.log('🕒 [DEBUG-TIMEOUT-AUTH] Execution timeout 5s - isMounted:', isMountedRef.current)
+                if (isMountedRef.current) {
+                  console.log('🔥 [DEBUG-AUTH] Fin du blocage après 5s')
+                } else {
+                  console.log('⚠️ [DEBUG-TIMEOUT-AUTH] Timeout 5s ignoré - AuthProvider démonté')
+                }
+              }, 5000)
               
-              break
+              break;
               
             case 'TOKEN_REFRESHED':
               if (!isLoggingOutRef.current) {
@@ -140,7 +141,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
               } else {
                 console.log('🔥 [DEBUG-AUTH] TOKEN_REFRESHED ignoré - déconnexion en cours')
               }
-              break
+              break;
               
             case 'USER_UPDATED':
               if (!isLoggingOutRef.current) {
@@ -149,7 +150,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
               } else {
                 console.log('🔥 [DEBUG-AUTH] USER_UPDATED ignoré - déconnexion en cours')
               }
-              break
+              break;
               
             default:
               console.log('🔥 [DEBUG-AUTH] Événement non géré:', event)
