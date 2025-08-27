@@ -1,7 +1,7 @@
-// UserInfoModal.tsx - VERSION CORRIGÉE REACT #300
+// UserInfoModal.tsx - VERSION CORRIGÉE REACT #300 COHÉRENTE
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { useAuthStore, markStoreUnmounted, markStoreMounted } from '@/lib/stores/auth'
+import { useAuthStore } from '@/lib/stores/auth' // SUPPRIMÉ markStoreUnmounted/markStoreMounted
 import { useTranslation } from '../../hooks/useTranslation'
 import { UserInfoModalProps } from '@/types'
 import { PhoneInput, usePhoneValidation } from '../PhoneInput'
@@ -110,7 +110,7 @@ const useCountries = () => {
 }
 
 export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
-  console.log('🏗️ [DEBUG-UserInfoModal] Montage du modal')
+  console.log('🗃️ [DEBUG-UserInfoModal] Montage du modal')
   
   const { updateProfile } = useAuthStore()
   const { t } = useTranslation()
@@ -120,20 +120,17 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   
   const { countries, loading: countriesLoading, usingFallback } = useCountries()
   
-  // CORRECTION CRITIQUE #1: Protection complète contre setState après unmount
+  // ✅ CORRECTION CRITIQUE: Protection uniquement contre setState après unmount
   const isMountedRef = React.useRef(true)
   
-  // CORRECTION CRITIQUE #2: Contrôle du store auth
+  // ✅ CORRECTION: Pas de manipulation store - juste protection composant
   React.useEffect(() => {
     isMountedRef.current = true
-    markStoreMounted()
-    console.log('✅ [DEBUG-UserInfoModal] Composant monté - store marqué comme actif')
+    console.log('✅ [DEBUG-UserInfoModal] Composant monté avec protection setState')
     
     return () => {
       console.log('🧹 [DEBUG-UserInfoModal] Composant en cours de démontage')
       isMountedRef.current = false
-      markStoreUnmounted()
-      console.log('🛑 [DEBUG-UserInfoModal] Store marqué comme inactif - TOUS les setState bloqués')
     }
   }, [])
 
@@ -169,7 +166,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   const [passwordErrors, setPasswordErrors] = useState<string[]>([])
   const [formErrors, setFormErrors] = useState<string[]>([])
 
-  // CORRECTION CRITIQUE #3: Sync form data avec protection
+  // Sync form data avec protection
   React.useEffect(() => {
     console.log('🔄 [DEBUG-UserInfoModal] Sync formData - isMounted:', isMountedRef.current)
     
@@ -178,7 +175,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     }
   }, [initialFormData])
   
-  // CORRECTION CRITIQUE #4: Safe close avec protection loading
+  // Safe close avec protection loading
   const safeClose = useCallback(() => {
     console.log('❌ [DEBUG-UserInfoModal] safeClose - isMounted:', isMountedRef.current, 'isLoading:', isLoading)
     
@@ -187,7 +184,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     }
   }, [isLoading, onClose])
 
-  // CORRECTION CRITIQUE #5: Toutes les fonctions setState protégées
+  // ✅ Fonction setState protégée simple
   const safeSetState = useCallback((updater: any, stateName: string) => {
     if (!isMountedRef.current) {
       console.log(`⚠️ [DEBUG-UserInfoModal] setState ${stateName} ignoré - composant démonté`)
@@ -231,18 +228,18 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     }, 'handlePhoneChange')
   }, [safeSetState])
 
-  // CORRECTION CRITIQUE #6: handleProfileSave avec protections renforcées
+  // ✅ CORRECTION: handleProfileSave sans manipulation store
   const handleProfileSave = useCallback(async () => {
     console.log('💾 [DEBUG-UserInfoModal] handleProfileSave - isMounted:', isMountedRef.current, 'isLoading:', isLoading)
     
-    // PROTECTION: Early return si déjà en cours ou démonté
+    // Protection: Early return si déjà en cours ou démonté
     if (!isMountedRef.current || isLoading) {
       console.log('⚠️ [DEBUG-UserInfoModal] handleProfileSave abandonné - démonté ou en cours')
       return
     }
     
     safeSetState(() => setIsLoading(true), 'setIsLoading(true)')
-    safeSetState(() => setFormErrors([]), 'setFormErrors([])') 
+    safeSetState(() => setFormErrors([]), 'setFormErrors([])')
     
     try {
       const errors: string[] = []
@@ -278,47 +275,44 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
 
       console.log('🔄 [DEBUG-UserInfoModal] Appel updateProfile...')
       
-      // PROTECTION: Vérification avant l'appel async
+      // Protection: Vérification avant l'appel async
       if (!isMountedRef.current) {
         console.log('⚠️ [DEBUG-UserInfoModal] Composant démonté avant updateProfile - abandon')
         return
       }
       
+      // ✅ CRITIQUE: Appel updateProfile sans manipulation store
       await updateProfile(formData)
       
-      // PROTECTION: Vérification APRÈS l'appel async
+      // Protection: Vérification APRÈS l'appel async
       if (!isMountedRef.current) {
         console.log('⚠️ [DEBUG-UserInfoModal] Composant démonté pendant updateProfile - pas de UI update')
         return
       }
       
       console.log('✅ [DEBUG-UserInfoModal] updateProfile réussi')
-      // Montrer alert avant fermeture
+      
+      // Interface notification et fermeture
       alert(t('profile.title') + ' mis à jour avec succès!')
       safeClose()
       
     } catch (error: any) {
       console.error('❌ [DEBUG-UserInfoModal] Erreur mise à jour profil:', error)
       
-      // PROTECTION: Vérifier avant alert
       if (isMountedRef.current) {
         alert('Erreur lors de la mise à jour: ' + (error?.message || 'Erreur inconnue'))
       }
     } finally {
-      // PROTECTION: Double protection setState final
       if (isMountedRef.current) {
         safeSetState(() => setIsLoading(false), 'setIsLoading(false) final')
-      } else {
-        console.log('⚠️ [DEBUG-UserInfoModal] setState setIsLoading(false) final ignoré - composant démonté')
       }
     }
   }, [formData, validatePhoneFields, updateProfile, t, safeClose, isLoading, safeSetState])
 
-  // CORRECTION CRITIQUE #7: handlePasswordChange avec protections renforcées
+  // handlePasswordChange avec protections mais sans manipulation store
   const handlePasswordChange = useCallback(async () => {
     console.log('🔐 [DEBUG-UserInfoModal] handlePasswordChange - isMounted:', isMountedRef.current, 'isLoading:', isLoading)
     
-    // PROTECTION: Early return si déjà en cours ou démonté
     if (!isMountedRef.current || isLoading) {
       console.log('⚠️ [DEBUG-UserInfoModal] handlePasswordChange abandonné')
       return
@@ -351,9 +345,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     safeSetState(() => setIsLoading(true), 'setIsLoading(true) password')
     
     try {
-      // PROTECTION: Vérification avant operations async
       if (!isMountedRef.current) {
-        console.log('⚠️ [DEBUG-UserInfoModal] Composant démonté avant password change - abandon')
         return
       }
       
@@ -385,9 +377,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       const loginData = await loginResponse.json()
       const backendToken = loginData.access_token
 
-      // PROTECTION: Vérification après première async operation
       if (!isMountedRef.current) {
-        console.log('⚠️ [DEBUG-UserInfoModal] Composant démonté après login check')
         return
       }
 
@@ -417,9 +407,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
         return
       }
       
-      // PROTECTION: Vérification finale avant UI updates
       if (!isMountedRef.current) {
-        console.log('⚠️ [DEBUG-UserInfoModal] Composant démonté après password change')
         return
       }
       
@@ -444,26 +432,23 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
         safeSetState(() => setPasswordErrors(['Erreur de connexion au serveur. Veuillez réessayer.']), 'setPasswordErrors catch')
       }
     } finally {
-      // PROTECTION: Double protection setState final
       if (isMountedRef.current) {
         safeSetState(() => setIsLoading(false), 'setIsLoading(false) password final')
-      } else {
-        console.log('⚠️ [DEBUG-UserInfoModal] setState setIsLoading(false) password final ignoré - composant démonté')
       }
     }
   }, [passwordData, validatePassword, user?.email, safeClose, isLoading, safeSetState])
 
   const tabs = useMemo(() => [
     { id: 'profile', label: t('nav.profile'), icon: '👤' },
-    { id: 'password', label: t('profile.password'), icon: '🔐' }
+    { id: 'password', label: t('profile.password'), icon: '🔒' }
   ], [t])
 
-  // PROTECTION: Handler avec protection pour les changements d'onglets
+  // Handler avec protection pour les changements d'onglets
   const handleTabChange = useCallback((tabId: string) => {
     safeSetState(() => setActiveTab(tabId), 'setActiveTab')
   }, [safeSetState])
 
-  // PROTECTION: Handlers de formulaire protégés
+  // Handlers de formulaire protégés
   const handleFormDataChange = useCallback((field: string, value: any) => {
     safeSetState(() => {
       setFormData(prev => ({ ...prev, [field]: value }))
@@ -735,9 +720,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                           )}
                         </button>
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        Caractères tapés: {passwordData.currentPassword.length}
-                      </div>
                     </div>
                     
                     <div>
@@ -771,9 +753,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                             </svg>
                           )}
                         </button>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        Caractères tapés: {passwordData.newPassword.length}
                       </div>
                       <div className="mt-3 p-3 bg-gray-50 rounded-lg">
                         <p className="text-xs font-medium text-gray-700 mb-2">Le mot de passe doit contenir :</p>
@@ -833,9 +812,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                             </svg>
                           )}
                         </button>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        Caractères tapés: {passwordData.confirmPassword.length}
                       </div>
                     </div>
                     
