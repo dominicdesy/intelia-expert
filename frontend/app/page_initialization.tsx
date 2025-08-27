@@ -22,22 +22,28 @@ export function usePageInitialization() {
   // ✅ Mémorisation stable des traductions
   const t = useMemo(() => translations[currentLanguage], [currentLanguage])
 
-  // ✅ Fonction toggleMode mémorisée pour éviter les re-renders
+  // ✅ CORRECTION : toggleMode sans dépendances changeantes
   const toggleMode = useCallback(() => {
-    console.log('🔄 [UI] Basculement mode:', isSignupMode ? 'signup → login' : 'login → signup')
-    setIsSignupMode(prev => !prev)
+    console.log('🔄 [UI] Basculement mode')
+    setIsSignupMode(prev => {
+      console.log('🔄 [UI] Mode:', !prev ? 'login → signup' : 'signup → login')
+      return !prev
+    })
     setLocalError('')
     setLocalSuccess('')
-  }, [isSignupMode])
+  }, []) // ✅ Pas de dépendances - fonction stable
 
-  // ✅ Fonction setCurrentLanguage stable avec mémorisation
+  // ✅ CORRECTION : setCurrentLanguage stable sans dépendances changeantes
   const handleSetCurrentLanguage = useCallback((newLanguage: Language) => {
-    if (currentLanguage !== newLanguage) {
-      console.log('🌐 [Language] Changement de langue:', currentLanguage, '→', newLanguage)
-      setCurrentLanguage(newLanguage)
-      localStorage.setItem('intelia-language', newLanguage)
-    }
-  }, [currentLanguage])
+    setCurrentLanguage(prev => {
+      if (prev !== newLanguage) {
+        console.log('🌐 [Language] Changement de langue:', prev, '→', newLanguage)
+        localStorage.setItem('intelia-language', newLanguage)
+        return newLanguage
+      }
+      return prev
+    })
+  }, []) // ✅ Pas de dépendances - fonction stable
 
   // ✅ Effects d'initialisation optimisés avec Remember Me
   useEffect(() => {
@@ -51,12 +57,12 @@ export function usePageInitialization() {
       
       // Charger les préférences utilisateur de manière synchrone
       const savedLanguage = localStorage.getItem('intelia-language') as Language
-      if (savedLanguage && translations[savedLanguage] && savedLanguage !== currentLanguage) {
+      if (savedLanguage && translations[savedLanguage]) {
         setCurrentLanguage(savedLanguage)
-      } else if (!savedLanguage) {
+      } else {
         // Détection de langue navigateur seulement si pas de langue sauvée
         const browserLanguage = navigator.language.substring(0, 2) as Language
-        if (translations[browserLanguage] && browserLanguage !== currentLanguage) {
+        if (translations[browserLanguage]) {
           setCurrentLanguage(browserLanguage)
         }
       }
@@ -142,10 +148,10 @@ export function usePageInitialization() {
     }
   }, [])
 
-  // ✅ Retour mémorisé pour éviter les re-renders des composants parents
+  // ✅ CORRECTION : Retour avec fonctions stables
   return useMemo(() => ({
     currentLanguage,
-    setCurrentLanguage: handleSetCurrentLanguage,
+    setCurrentLanguage: handleSetCurrentLanguage, // ✅ Fonction stable
     t,
     isSignupMode,
     setIsSignupMode,
@@ -155,15 +161,15 @@ export function usePageInitialization() {
     setLocalSuccess,
     hasHydrated,
     hasInitialized,
-    toggleMode
+    toggleMode // ✅ Fonction stable
   }), [
     currentLanguage, 
-    handleSetCurrentLanguage,
     t, 
     isSignupMode, 
     localError, 
     localSuccess, 
-    hasHydrated, 
-    toggleMode
+    hasHydrated,
+    handleSetCurrentLanguage, // ✅ Stable
+    toggleMode // ✅ Stable
   ])
 }
