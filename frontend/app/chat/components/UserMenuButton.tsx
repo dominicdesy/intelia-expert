@@ -140,8 +140,22 @@ export const UserMenuButton = React.memo(() => {
     window.open('/admin/statistics', '_blank')
   }, [])
 
-  // ✅ CORRECTION DRASTIQUE: Fonction de déconnexion avec protection globale
-  const handleLogout = useCallback(async () => {
+  // ✅ SOLUTION RADICALE: Déconnexion immédiate sans attendre
+  const handleLogout = useCallback(() => {
+    console.log('🔄 [UserMenu] Déconnexion immédiate sans attendre')
+    
+    // Marquer immédiatement comme démonté
+    isMountedRef.current = false
+    
+    // Déconnecter en arrière-plan SANS attendre
+    logout().catch(err => {
+      console.warn('[UserMenu] Erreur logout background:', err)
+    })
+    
+    // Redirection immédiate
+    window.location.href = '/'
+    
+  }, [logout]) handleLogout = useCallback(async () => {
     try {
       console.log('🔄 [UserMenu] Démarrage déconnexion')
       
