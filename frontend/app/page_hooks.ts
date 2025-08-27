@@ -1,5 +1,5 @@
-// page_hooks.ts
-import { useState, useEffect, useMemo } from 'react'
+// page_hooks.ts - Version optimisée complète
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import type { Country } from './page_types'
 
 // Fallback countries
@@ -26,25 +26,66 @@ const fallbackCountries: Country[] = [
   { value: 'FI', label: 'Finlande', phoneCode: '+358', flag: '🇫🇮' }
 ]
 
-// Hook pour charger les pays depuis l'API REST Countries avec debug complet
+// 🚀 Cache global pour éviter les multiples appels API
+let countriesCache: Country[] | null = null
+let isLoadingGlobal = false
+let loadingPromise: Promise<Country[]> | null = null
+
+// Hook pour charger les pays depuis l'API REST Countries - VERSION OPTIMISÉE
 export const useCountries = () => {
   console.log('🎯 [Countries] Hook useCountries appelé!')
   
-  const [countries, setCountries] = useState<Country[]>(fallbackCountries)
-  const [loading, setLoading] = useState(true)
-  const [usingFallback, setUsingFallback] = useState(true)
+  // ✅ État initial basé sur le cache
+  const [countries, setCountries] = useState<Country[]>(() => 
+    countriesCache || fallbackCountries
+  )
+  const [loading, setLoading] = useState(() => countriesCache === null)
+  const [usingFallback, setUsingFallback] = useState(() => countriesCache === null)
+  
+  // ✅ Références pour éviter les re-renders
+  const hasFetched = useRef(false)
+  const isMounted = useRef(true)
 
-  useEffect(() => {
-    console.log('🚀 [Countries] DÉMARRAGE du processus de chargement des pays')
-    
-    const fetchCountries = async () => {
+  // ✅ Fonction de fetch optimisée avec cache global
+  const fetchCountriesOptimized = useCallback(async (): Promise<void> => {
+    // Si on a déjà les données en cache, pas besoin de refetch
+    if (countriesCache) {
+      console.log('📦 [Countries] Données déjà en cache')
+      if (isMounted.current) {
+        setCountries(countriesCache)
+        setUsingFallback(false)
+        setLoading(false)
+      }
+      return
+    }
+
+    // Si un chargement est déjà en cours ailleurs, l'attendre
+    if (loadingPromise) {
+      console.log('⏳ [Countries] Chargement en cours, attente...')
       try {
-        console.log('🌍 [Countries] Début du chargement depuis l\'API REST Countries...')
+        const result = await loadingPromise
+        if (isMounted.current) {
+          setCountries(result)
+          setUsingFallback(result === fallbackCountries)
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error('❌ [Countries] Erreur lors de l\'attente:', error)
+      }
+      return
+    }
+
+    // Créer une nouvelle promesse de chargement
+    loadingPromise = new Promise(async (resolve) => {
+      try {
+        console.log('🌐 [Countries] Début du chargement depuis l\'API REST Countries...')
         console.log('📡 [Countries] URL: https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations')
+        
+        isLoadingGlobal = true
         
         const controller = new AbortController()
         const timeoutId = setTimeout(() => {
-          console.log('⏱️ [Countries] Timeout atteint (10s)')
+          console.log('⏰ [Countries] Timeout atteint (10s)')
           controller.abort()
         }, 10000)
         
@@ -131,8 +172,15 @@ export const useCountries = () => {
         if (formattedCountries.length >= 50) {
           console.log('🎉 [Countries] API validée! Utilisation des données complètes')
           console.log(`📈 [Countries] Transition: fallback(${fallbackCountries.length}) → API(${formattedCountries.length})`)
-          setCountries(formattedCountries)
-          setUsingFallback(false)
+          
+          // ✅ Mise en cache globale
+          countriesCache = formattedCountries
+          
+          if (isMounted.current) {
+            setCountries(formattedCountries)
+            setUsingFallback(false)
+          }
+          resolve(formattedCountries)
         } else {
           console.warn(`⚠️ [Countries] Pas assez de pays valides: ${formattedCountries.length}/50`)
           throw new Error(`Qualité insuffisante: ${formattedCountries.length}/50 pays`)
@@ -143,34 +191,79 @@ export const useCountries = () => {
         console.warn('🔄 [Countries] Passage en mode fallback')
         
         if (err.name === 'AbortError') {
-          console.warn('⏱️ [Countries] Cause: Timeout de l\'API (10s)')
+          console.warn('⏰ [Countries] Cause: Timeout de l\'API (10s)')
         } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
-          console.warn('🌍 [Countries] Cause: Problème de connexion réseau')
+          console.warn('🌐 [Countries] Cause: Problème de connexion réseau')
         } else {
           console.warn('🐛 [Countries] Cause:', err.message)
         }
         
-        setCountries(fallbackCountries)
-        setUsingFallback(true)
+        // ✅ Même le fallback va en cache pour éviter les re-fetch
+        countriesCache = fallbackCountries
+        
+        if (isMounted.current) {
+          setCountries(fallbackCountries)
+          setUsingFallback(true)
+        }
+        resolve(fallbackCountries)
       } finally {
         console.log('🏁 [Countries] Chargement terminé')
-        setLoading(false)
+        isLoadingGlobal = false
+        if (isMounted.current) {
+          setLoading(false)
+        }
+        // ✅ Nettoyer la promesse après utilisation
+        loadingPromise = null
       }
-    }
+    })
 
+    await loadingPromise
+  }, [])
+
+  // ✅ useEffect optimisé - ne se déclenche qu'une seule fois
+  useEffect(() => {
+    // Éviter les doubles appels en mode strict
+    if (hasFetched.current) {
+      console.log('🚫 [Countries] Fetch déjà effectué, skip')
+      return
+    }
+    
+    hasFetched.current = true
+    console.log('🚀 [Countries] DÉMARRAGE du processus de chargement des pays')
+    
+    // Délai pour éviter les conflits avec l'hydratation
     const timer = setTimeout(() => {
-      console.log('⏰ [Countries] Démarrage après délai de 100ms')
-      fetchCountries()
+      if (isMounted.current) {
+        console.log('⏰ [Countries] Démarrage après délai de 100ms')
+        fetchCountriesOptimized()
+      }
     }, 100)
     
-    return () => clearTimeout(timer)
+    // ✅ Cleanup function
+    return () => {
+      clearTimeout(timer)
+      isMounted.current = false
+    }
+  }, [fetchCountriesOptimized])
+
+  // ✅ Cleanup au démontage
+  useEffect(() => {
+    return () => {
+      isMounted.current = false
+    }
   }, [])
 
   console.log(`🔄 [Countries] Render - ${countries.length} pays, loading:${loading}, fallback:${usingFallback}`)
-  return { countries, loading, usingFallback }
+  
+  // ✅ Mémoisation du retour pour éviter les re-renders des composants parents
+  return useMemo(() => ({
+    countries,
+    loading,
+    usingFallback
+  }), [countries, loading, usingFallback])
 }
 
-// Hook pour créer le mapping des codes téléphoniques
+// Hook pour créer le mapping des codes téléphoniques - OPTIMISÉ
 export const useCountryCodeMap = (countries: Country[]) => {
   return useMemo(() => {
     const mapping = countries.reduce((acc, country) => {
@@ -187,7 +280,7 @@ export const useCountryCodeMap = (countries: Country[]) => {
   }, [countries])
 }
 
-// Fonctions de validation
+// Fonctions de validation - INCHANGÉES
 export const validateEmail = (email: string): boolean => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
@@ -233,7 +326,7 @@ export const validatePhone = (countryCode: string, areaCode: string, phoneNumber
   return true
 }
 
-// Nouvelles fonctions de validation ajoutées du backup
+// Nouvelles fonctions de validation ajoutées du backup - INCHANGÉES
 export const validateLinkedIn = (url: string): boolean => {
   if (!url.trim()) return true
   return /^(https?:\/\/)?(www\.)?linkedin\.com\/(in|company)\/[\w\-]+\/?$/.test(url)
@@ -244,7 +337,7 @@ export const validateWebsite = (url: string): boolean => {
   return /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/.test(url)
 }
 
-// Utilitaires pour Remember Me
+// Utilitaires pour Remember Me - INCHANGÉS
 export const rememberMeUtils = {
   save: (email: string, remember = true) => {
     try {
