@@ -1,13 +1,12 @@
-// components/UserMenu.tsx - VERSION CORRIGÉE AVEC TYPES FIXES ET SÉCURITÉ REACT #300
+// components/UserMenu.tsx - VERSION CORRIGÉE AVEC TYPES FIXES
 'use client'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
-import type { User } from '@/types'
-import { getSafeName, getSafeEmail, getSafeUserType, getSafeCreatedDate, getBadgeColor, getUserTypeLabel } from '../app/chat/utils/safeUserHelpers'
+import type { User } from '@/types' // ✅ Import du bon type
 
-// Icônes SVG (inchangées)
+// Icônes (inchangées)
 const ChevronDownIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
@@ -53,19 +52,6 @@ const TrashIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
-// Fonction utilitaire sécurisée pour les initiales
-const getSecureInitials = (name: string): string => {
-  if (!name || typeof name !== 'string') return 'U'
-  const cleanName = name.trim()
-  if (cleanName.length === 0) return 'U'
-  
-  return cleanName.split(' ')
-    .map(word => word[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) || 'U'
-}
-
 interface UserMenuProps {
   className?: string
 }
@@ -80,28 +66,16 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [activeModal, setActiveModal] = useState<'profile' | 'settings' | 'legal' | null>(null)
 
-  // Variables sécurisées
-  const userName = getSafeName(user)
-  const userEmail = getSafeEmail(user)
-  const userType = getSafeUserType(user)
-  const userInitials = getSecureInitials(userName)
+  const userName = user?.name || user?.email || 'Utilisateur'
+  const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
-  // Fonction de déconnexion sécurisée
   const handleLogout = async () => {
     try {
-      // Fermer le menu avant la déconnexion
-      setIsOpen(false)
-      
-      // Attendre la déconnexion complète
       await logout()
-      
-      // Redirection propre
-      router.replace('/')
-      
+      window.location.href = '/'
     } catch (error) {
       console.error('Erreur déconnexion:', error)
-      // Forcer la redirection même en cas d'erreur
-      router.replace('/')
+      window.location.href = '/'
     }
   }
 
@@ -115,34 +89,21 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
     setActiveModal('legal')
   }
 
-  // Fonction de suppression sécurisée
   const handleDeleteData = async () => {
-    if (!showDeleteConfirm) {
-      setShowDeleteConfirm(true)
-      return
-    }
-
     try {
-      // Fermer tous les modals
+      await deleteUserData()
       setShowDeleteConfirm(false)
       setIsOpen(false)
-      
-      // Effectuer la suppression
-      await deleteUserData()
-      
-      // Redirection après suppression
-      router.replace('/')
-      
+      window.location.href = '/'
     } catch (error) {
       console.error('Erreur suppression:', error)
       alert('Erreur lors de la suppression du compte')
-      setShowDeleteConfirm(false)
     }
   }
 
   return (
     <div className={`relative ${className}`}>
-      {/* Bouton utilisateur avec affichage sécurisé */}
+      {/* Bouton utilisateur */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
@@ -165,7 +126,7 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
           
           {/* Menu */}
           <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
-            {/* Header utilisateur sécurisé */}
+            {/* Header utilisateur */}
             <div className="px-4 py-3 border-b border-gray-100">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
@@ -173,8 +134,8 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{userName}</p>
-                  <p className="text-xs text-gray-500 truncate">{userEmail}</p>
-                  <p className="text-xs text-green-600 capitalize">{getUserTypeLabel(userType)}</p>
+                  <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                  <p className="text-xs text-green-600 capitalize">{user?.user_type || 'Producteur'}</p>
                 </div>
               </div>
             </div>
@@ -241,7 +202,7 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
               {/* Séparateur */}
               <div className="my-2 border-t border-gray-100" />
 
-              {/* Déconnexion sécurisée */}
+              {/* Déconnexion */}
               <button
                 onClick={handleLogout}
                 className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -261,7 +222,7 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
         </>
       )}
 
-      {/* Modal Mon Profil sécurisé */}
+      {/* Modal Mon Profil */}
       {activeModal === 'profile' && user && (
         <ProfileModal 
           user={user}
@@ -284,7 +245,7 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
         />
       )}
 
-      {/* Modal Suppression sécurisé */}
+      {/* Modal Suppression */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
@@ -323,19 +284,19 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
   )
 }
 
-// Modal Mon Profil avec type User correct et sécurisé
+// ✅ CORRECTION: Modal Mon Profil avec type User correct
 interface ProfileModalProps {
-  user: User
+  user: User  // ✅ Utilise le type User correct
   onClose: () => void
-  onSave: (data: Partial<User>) => Promise<void>
+  onSave: (data: Partial<User>) => Promise<void>  // ✅ Type correct
 }
 
 function ProfileModal({ user, onClose, onSave }: ProfileModalProps) {
   const [formData, setFormData] = useState({
-    name: getSafeName(user),
-    email: getSafeEmail(user),
-    user_type: getSafeUserType(user),
-    language: user?.language || 'fr'
+    name: user.name || '',
+    email: user.email || '',
+    user_type: user.user_type || 'producer',
+    language: user.language || 'fr'
   })
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState('')
@@ -347,23 +308,9 @@ function ProfileModal({ user, onClose, onSave }: ProfileModalProps) {
     setError('')
     setSuccess('')
 
-    // Validation côté client
-    const trimmedName = formData.name.trim()
-    if (!trimmedName || trimmedName.length < 2) {
-      setError('Le nom doit contenir au moins 2 caractères')
-      setIsLoading(false)
-      return
-    }
-
     try {
-      await onSave({
-        name: trimmedName,
-        user_type: formData.user_type,
-        language: formData.language
-      })
+      await onSave(formData)
       setSuccess('Profil mis à jour avec succès !')
-      
-      // Fermeture automatique après succès
       setTimeout(() => {
         onClose()
       }, 1500)
@@ -373,8 +320,6 @@ function ProfileModal({ user, onClose, onSave }: ProfileModalProps) {
       setIsLoading(false)
     }
   }
-
-  const createdDate = getSafeCreatedDate(user)
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -389,7 +334,7 @@ function ProfileModal({ user, onClose, onSave }: ProfileModalProps) {
           </button>
         </div>
 
-        {/* Messages sécurisés */}
+        {/* Messages */}
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
             {error}
@@ -402,14 +347,14 @@ function ProfileModal({ user, onClose, onSave }: ProfileModalProps) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Nom complet sécurisé */}
+          {/* Nom complet */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Nom complet
             </label>
             <input
               type="text"
-              value={formData.name || ''}
+              value={formData.name}
               onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
@@ -423,7 +368,7 @@ function ProfileModal({ user, onClose, onSave }: ProfileModalProps) {
             </label>
             <input
               type="email"
-              value={formData.email || ''}
+              value={formData.email}
               disabled
               className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
             />
@@ -432,13 +377,13 @@ function ProfileModal({ user, onClose, onSave }: ProfileModalProps) {
             </p>
           </div>
 
-          {/* Type d'utilisateur sécurisé */}
+          {/* Type d'utilisateur */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Type de profil
             </label>
             <select
-              value={formData.user_type || 'producer'}
+              value={formData.user_type}
               onChange={(e) => setFormData(prev => ({ ...prev, user_type: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
@@ -453,7 +398,7 @@ function ProfileModal({ user, onClose, onSave }: ProfileModalProps) {
               Langue préférée
             </label>
             <select
-              value={formData.language || 'fr'}
+              value={formData.language}
               onChange={(e) => setFormData(prev => ({ ...prev, language: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
@@ -463,11 +408,11 @@ function ProfileModal({ user, onClose, onSave }: ProfileModalProps) {
             </select>
           </div>
 
-          {/* Informations compte sécurisées */}
+          {/* Informations compte */}
           <div className="bg-gray-50 rounded-lg p-4">
             <h4 className="text-sm font-medium text-gray-900 mb-2">Informations du compte</h4>
             <div className="space-y-1 text-xs text-gray-600">
-              <p><strong>Membre depuis :</strong> {createdDate ? createdDate.toLocaleDateString('fr-FR') : 'N/A'}</p>
+              <p><strong>Membre depuis :</strong> {user.created_at ? new Date(user.created_at).toLocaleDateString('fr-FR') : 'N/A'}</p>
               <p><strong>Rétention des données :</strong> 30 jours après la dernière activité</p>
             </div>
           </div>
@@ -496,7 +441,7 @@ function ProfileModal({ user, onClose, onSave }: ProfileModalProps) {
   )
 }
 
-// Modal Paramètres (inchangée mais sécurisée)
+// Modal Paramètres (inchangée)
 interface SettingsModalProps {
   onClose: () => void
 }
@@ -511,13 +456,9 @@ function SettingsModal({ onClose }: SettingsModalProps) {
   })
 
   const handleSave = () => {
-    try {
-      localStorage.setItem('intelia-settings', JSON.stringify(settings))
-      alert('Paramètres sauvegardés avec succès !')
-      onClose()
-    } catch (error) {
-      alert('Erreur lors de la sauvegarde des paramètres')
-    }
+    localStorage.setItem('intelia-settings', JSON.stringify(settings))
+    alert('Paramètres sauvegardés avec succès !')
+    onClose()
   }
 
   return (

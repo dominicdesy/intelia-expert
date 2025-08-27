@@ -1,4 +1,4 @@
-import { ModalProps } from '../../../types'
+import { ModalProps } from '@/types'
 
 // ==================== MODAL SIMPLE - COPIE EXACTE DU STYLE UserInfoModal ====================
 export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
