@@ -33,20 +33,16 @@ export const markStoreMounted = () => {
   console.log('✅ [DEBUG-TIMEOUT-STORE] Store marqué comme monté')
 }
 
-// CORRECTION: Wrapper sécurisé pour tous les setState du store
+// CORRECTION FINALE: Wrapper sécurisé SANS setTimeout pour éviter React #300
 const safeSetState = (setFn: any, stateName: string) => {
   console.log('🕒 [DEBUG-TIMEOUT-STORE-SET] Tentative setState:', stateName, '- isStoreActive:', isStoreActive)
   if (isStoreActive) {
-    // Différer le setState avec setTimeout pour éviter les setState synchrones pendant démontage
-    setTimeout(() => {
-      console.log('🕒 [DEBUG-TIMEOUT-STORE-SET] Execution setState différé:', stateName, '- isStoreActive:', isStoreActive)
-      if (isStoreActive) {
-        setFn()
-        console.log('✅ [DEBUG-TIMEOUT-STORE-SET] setState appliqué:', stateName)
-      } else {
-        console.log('⚠️ [DEBUG-TIMEOUT-STORE-SET] setState différé ignoré - store démonté:', stateName)
-      }
-    }, 0)
+    try {
+      setFn()
+      console.log('✅ [DEBUG-TIMEOUT-STORE-SET] setState appliqué directement:', stateName)
+    } catch (error) {
+      console.error('❌ [DEBUG-TIMEOUT-STORE-SET] Erreur setState:', stateName, error)
+    }
   } else {
     console.log('⚠️ [DEBUG-TIMEOUT-STORE-SET] setState ignoré - store démonté:', stateName)
   }

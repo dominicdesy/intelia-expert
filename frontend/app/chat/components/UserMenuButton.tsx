@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/lib/stores/auth' // RETIRER markStoreUnmounted
+import { useAuthStore } from '@/lib/stores/auth' // SUPPRIMÉ markStoreUnmounted
 import { useTranslation } from '../hooks/useTranslation'
 import { Modal } from './Modal'
 import { UserInfoModal } from './modals/UserInfoModal'
@@ -11,7 +11,7 @@ import { InviteFriendModal } from './modals/InviteFriendModal'
 import { PLAN_CONFIGS } from '../../../types'
 import { getSafeName, getSafeEmail, getSafeUserType, getSafePlan, getSafeInitials } from '../utils/safeUserHelpers'
 
-// ==================== MENU UTILISATEUR - VERSION CORRIGÉE REACT #300 ====================
+// ==================== MENU UTILISATEUR - VERSION FINALE CORRIGÉE REACT #300 ====================
 export const UserMenuButton = React.memo(() => {
   const router = useRouter()
   const { user, logout } = useAuthStore()
@@ -102,15 +102,15 @@ export const UserMenuButton = React.memo(() => {
     window.open('/admin/statistics', '_blank')
   }, [])
 
-  // CORRECTION CRITIQUE: Redirection immédiate AVANT logout
-  const handleLogout = useCallback(async () => {
+  // CORRECTION FINALE: Redirection IMMÉDIATE sans attendre logout
+  const handleLogout = useCallback(() => {
     // Éviter les appels multiples
     if (logoutInProgressRef.current) {
       console.log('🚨 [DEBUG-LOGOUT] Logout déjà en cours, ignoré')
       return
     }
 
-    console.log('🚨 [DEBUG-LOGOUT] === DÉBUT DÉCONNEXION CORRIGÉE ===')
+    console.log('🚨 [DEBUG-LOGOUT] === DÉBUT DÉCONNEXION FINALE ===')
     logoutInProgressRef.current = true
 
     try {
@@ -129,23 +129,19 @@ export const UserMenuButton = React.memo(() => {
         setIsOpen(false)
       }
 
-      // CORRECTION CRITIQUE: Redirection IMMÉDIATE avant logout
-      console.log('🚨 [DEBUG-LOGOUT] 3. REDIRECTION IMMÉDIATE...')
+      // CORRECTION FINALE: Redirection IMMÉDIATE avant toute opération
+      console.log('🚨 [DEBUG-LOGOUT] 3. REDIRECTION IMMÉDIATE AVANT LOGOUT')
       window.location.href = '/'
       
-      // Étape 3: Logout asynchrone en arrière-plan (ne peut plus causer d'erreur React)
-      console.log('🚨 [DEBUG-LOGOUT] 4. Logout en arrière-plan...')
-      setTimeout(async () => {
-        try {
-          await logout()
-          console.log('🚨 [DEBUG-LOGOUT] 5. Logout terminé en arrière-plan')
-        } catch (error) {
-          console.error('🚨 [DEBUG-LOGOUT] Erreur logout arrière-plan:', error)
-        }
+      // Logout asynchrone sans attendre (peut échouer sans impact)
+      console.log('🚨 [DEBUG-LOGOUT] 4. Logout silencieux en arrière-plan...')
+      logout().catch((error) => {
+        console.log('🚨 [DEBUG-LOGOUT] Erreur logout ignorée (redirection déjà faite):', error)
+      }).finally(() => {
         logoutInProgressRef.current = false
-      }, 0)
+      })
 
-      console.log('🚨 [DEBUG-LOGOUT] === FIN DÉCONNEXION (REDIRECTION EN COURS) ===')
+      console.log('🚨 [DEBUG-LOGOUT] === FIN DÉCONNEXION (REDIRECTION EFFECTIVE) ===')
 
     } catch (error) {
       console.error('🚨 [DEBUG-LOGOUT] Erreur critique:', error)
