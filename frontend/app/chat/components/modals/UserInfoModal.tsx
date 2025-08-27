@@ -173,18 +173,11 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
 
   const { countries, loading: countriesLoading, usingFallback } = useCountries()
 
-  // Setup/Cleanup cycle
+  // Setup/Cleanup cycle - UNE SEULE FOIS
   useEffect(() => {
-    isMountedRef.current = true
     console.log('[DEBUG-UserInfoModal] Composant monté - initialisation formData')
-    
     setFormData(userDataMemo)
-    
-    return () => {
-      console.log('[DEBUG-UserInfoModal] Composant en cours de démontage')
-      isMountedRef.current = false
-    }
-  }, [])
+  }, []) // AUCUNE dependency pour éviter la boucle
 
   // Sync formData intelligent - évite la boucle infinie
   useEffect(() => {
@@ -498,8 +491,37 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   console.log('[DEBUG-UserInfoModal] Render - isMounted:', isMountedRef.current, 'isLoading:', isLoading)
 
   return (
-    <div className="user-info-modal" onClick={safeClose}>
-      <div className="user-info-modal-content" onClick={(e) => e.stopPropagation()}>
+    <div 
+      onClick={safeClose}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1rem',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)'
+      }}
+    >
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: '42rem',
+          maxHeight: '85vh',
+          background: 'white',
+          borderRadius: '0.75rem',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
+      >
         
         {/* Header */}
         <div style={{ 
@@ -1071,7 +1093,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
               e.currentTarget.style.color = '#4b5563'
             }}
           >
-            {t('modal.cancel')}
+            Annuler
           </button>
           <button
             onClick={activeTab === 'profile' ? handleProfileSave : handlePasswordChange}
@@ -1101,16 +1123,14 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
             }}
           >
             {isLoading && (
-              <div style={{
+              <div className="spinner" style={{
                 width: '1rem',
                 height: '1rem',
-                border: '2px solid white',
-                borderTop: '2px solid transparent',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite'
+                borderColor: 'white',
+                borderTopColor: 'transparent'
               }}></div>
             )}
-            {isLoading ? t('modal.loading') : t('modal.save')}
+            {isLoading ? 'Chargement...' : 'Sauvegarder'}
           </button>
         </div>
       </div>
