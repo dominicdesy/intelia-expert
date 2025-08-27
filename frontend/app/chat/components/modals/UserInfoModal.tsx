@@ -18,26 +18,26 @@ const debugLog = (category: string, message: string, data?: any) => {
 }
 
 const fallbackCountries = [
-  { value: 'CA', label: 'Canada', phoneCode: '+1', flag: '🇨🇦' },
-  { value: 'US', label: 'États-Unis', phoneCode: '+1', flag: '🇺🇸' },
-  { value: 'FR', label: 'France', phoneCode: '+33', flag: '🇫🇷' },
-  { value: 'GB', label: 'Royaume-Uni', phoneCode: '+44', flag: '🇬🇧' },
-  { value: 'DE', label: 'Allemagne', phoneCode: '+49', flag: '🇩🇪' },
-  { value: 'IT', label: 'Italie', phoneCode: '+39', flag: '🇮🇹' },
-  { value: 'ES', label: 'Espagne', phoneCode: '+34', flag: '🇪🇸' },
-  { value: 'BE', label: 'Belgique', phoneCode: '+32', flag: '🇧🇪' },
-  { value: 'CH', label: 'Suisse', phoneCode: '+41', flag: '🇨🇭' },
-  { value: 'MX', label: 'Mexique', phoneCode: '+52', flag: '🇲🇽' },
-  { value: 'BR', label: 'Brésil', phoneCode: '+55', flag: '🇧🇷' },
-  { value: 'AU', label: 'Australie', phoneCode: '+61', flag: '🇦🇺' },
-  { value: 'JP', label: 'Japon', phoneCode: '+81', flag: '🇯🇵' },
-  { value: 'CN', label: 'Chine', phoneCode: '+86', flag: '🇨🇳' },
-  { value: 'IN', label: 'Inde', phoneCode: '+91', flag: '🇮🇳' },
-  { value: 'NL', label: 'Pays-Bas', phoneCode: '+31', flag: '🇳🇱' },
-  { value: 'SE', label: 'Suède', phoneCode: '+46', flag: '🇸🇪' },
-  { value: 'NO', label: 'Norvège', phoneCode: '+47', flag: '🇳🇴' },
-  { value: 'DK', label: 'Danemark', phoneCode: '+45', flag: '🇩🇰' },
-  { value: 'FI', label: 'Finlande', phoneCode: '+358', flag: '🇫🇮' }
+  { value: 'CA', label: 'Canada', phoneCode: '+1', flag: 'ðŸ‡¨ðŸ‡¦' },
+  { value: 'US', label: 'Ã‰tats-Unis', phoneCode: '+1', flag: 'ðŸ‡ºðŸ‡¸' },
+  { value: 'FR', label: 'France', phoneCode: '+33', flag: 'ðŸ‡«ðŸ‡·' },
+  { value: 'GB', label: 'Royaume-Uni', phoneCode: '+44', flag: 'ðŸ‡¬ðŸ‡§' },
+  { value: 'DE', label: 'Allemagne', phoneCode: '+49', flag: 'ðŸ‡©ðŸ‡ª' },
+  { value: 'IT', label: 'Italie', phoneCode: '+39', flag: 'ðŸ‡®ðŸ‡¹' },
+  { value: 'ES', label: 'Espagne', phoneCode: '+34', flag: 'ðŸ‡ªðŸ‡¸' },
+  { value: 'BE', label: 'Belgique', phoneCode: '+32', flag: 'ðŸ‡§ðŸ‡ª' },
+  { value: 'CH', label: 'Suisse', phoneCode: '+41', flag: 'ðŸ‡¨ðŸ‡­' },
+  { value: 'MX', label: 'Mexique', phoneCode: '+52', flag: 'ðŸ‡²ðŸ‡½' },
+  { value: 'BR', label: 'BrÃ©sil', phoneCode: '+55', flag: 'ðŸ‡§ðŸ‡·' },
+  { value: 'AU', label: 'Australie', phoneCode: '+61', flag: 'ðŸ‡¦ðŸ‡º' },
+  { value: 'JP', label: 'Japon', phoneCode: '+81', flag: 'ðŸ‡¯ðŸ‡µ' },
+  { value: 'CN', label: 'Chine', phoneCode: '+86', flag: 'ðŸ‡¨ðŸ‡³' },
+  { value: 'IN', label: 'Inde', phoneCode: '+91', flag: 'ðŸ‡®ðŸ‡³' },
+  { value: 'NL', label: 'Pays-Bas', phoneCode: '+31', flag: 'ðŸ‡³ðŸ‡±' },
+  { value: 'SE', label: 'SuÃ¨de', phoneCode: '+46', flag: 'ðŸ‡¸ðŸ‡ª' },
+  { value: 'NO', label: 'NorvÃ¨ge', phoneCode: '+47', flag: 'ðŸ‡³ðŸ‡´' },
+  { value: 'DK', label: 'Danemark', phoneCode: '+45', flag: 'ðŸ‡©ðŸ‡°' },
+  { value: 'FI', label: 'Finlande', phoneCode: '+358', flag: 'ðŸ‡«ðŸ‡®' }
 ]
 
 interface Country {
@@ -134,11 +134,11 @@ const useCountries = () => {
 // Password strength component
 const PasswordStrengthIndicator: React.FC<{ password: string }> = ({ password }) => {
   const requirements = [
-    { test: password.length >= 8, label: '8+ caractères' },
+    { test: password.length >= 8, label: '8+ caractÃ¨res' },
     { test: /[A-Z]/.test(password), label: 'Une majuscule' },
     { test: /[a-z]/.test(password), label: 'Une minuscule' },
     { test: /\d/.test(password), label: 'Un chiffre' },
-    { test: /[!@#$%^&*(),.?":{}|<>]/.test(password), label: 'Caractère spécial' }
+    { test: /[!@#$%^&*(),.?":{}|<>]/.test(password), label: 'CaractÃ¨re spÃ©cial' }
   ]
 
   return (
@@ -154,7 +154,7 @@ const PasswordStrengthIndicator: React.FC<{ password: string }> = ({ password })
               index === requirements.length - 1 ? 'sm:col-span-2' : ''
             }`}
           >
-            <span className="mr-1">{req.test ? '✅' : '⭕'}</span>
+            <span className="mr-1">{req.test ? 'âœ…' : 'â­•'}</span>
             {req.label}
           </div>
         ))}
@@ -260,7 +260,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
   const { t } = useTranslation()
   const { validatePhoneFields } = usePhoneValidation()
   
-  // Memoized user data
+  // Memoized user data - STABLE references
   const userDataMemo = useMemo(() => {
     const memo = {
       firstName: user?.firstName || '',
@@ -292,12 +292,18 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     user?.linkedinCorporate
   ])
   
-  // States
+  // States - Initialize with stable data, NO MORE SYNC EFFECT
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('profile')
   const [formErrors, setFormErrors] = useState<string[]>([])
   const [passwordErrors, setPasswordErrors] = useState<string[]>([])
-  const [formData, setFormData] = useState(userDataMemo)
+  
+  // Initialize formData ONCE with the memoized user data
+  const [formData, setFormData] = useState(() => {
+    debugLog('STATE', 'Initializing formData with userDataMemo')
+    return { ...userDataMemo }
+  })
+  
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -316,19 +322,16 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     passwordErrorsCount: passwordErrors.length
   })
 
-  // Sync form data
+  // REMOVED THE PROBLEMATIC SYNC EFFECT
+  // Only update formData if user changes (different email = different user)
+  const userEmailRef = useRef(user?.email)
   useEffect(() => {
-    const needsSync = Object.keys(userDataMemo).some(key => 
-      formData[key as keyof typeof formData] !== userDataMemo[key as keyof typeof userDataMemo]
-    )
-    
-    if (needsSync) {
-      debugLog('SYNC', 'Form data needs sync - updating', { userDataMemo, currentFormData: formData })
-      setFormData(userDataMemo)
-    } else {
-      debugLog('SYNC', 'Form data in sync')
+    if (userEmailRef.current !== user?.email) {
+      debugLog('SYNC', 'User changed - updating form data')
+      setFormData({ ...userDataMemo })
+      userEmailRef.current = user?.email
     }
-  }, [userDataMemo, formData])
+  }, [user?.email, userDataMemo])
 
   const { countries, loading: countriesLoading, usingFallback } = useCountries()
 
@@ -337,7 +340,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     const errors: string[] = []
     
     if (password.length < 8) {
-      errors.push('Le mot de passe doit contenir au moins 8 caractères')
+      errors.push('Le mot de passe doit contenir au moins 8 caractÃ¨res')
     }
     if (!/[A-Z]/.test(password)) {
       errors.push('Le mot de passe doit contenir au moins une majuscule')
@@ -349,7 +352,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       errors.push('Le mot de passe doit contenir au moins un chiffre')
     }
     if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-      errors.push('Le mot de passe doit contenir au moins un caractère spécial')
+      errors.push('Le mot de passe doit contenir au moins un caractÃ¨re spÃ©cial')
     }
     
     debugLog('VALIDATION', 'Password validation', { errors, passwordLength: password.length })
@@ -365,7 +368,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     } else if (!emailRegex.test(email)) {
       errors.push('Format d\'email invalide')
     } else if (email.length > 254) {
-      errors.push('L\'email est trop long (maximum 254 caractères)')
+      errors.push('L\'email est trop long (maximum 254 caractÃ¨res)')
     }
     
     debugLog('VALIDATION', 'Email validation', { email, errors })
@@ -400,7 +403,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
           (url.includes('/in/') || url.includes('/company/'))
         
         if (!isValidLinkedIn) {
-          errors.push(`${fieldName} doit être un lien LinkedIn valide`)
+          errors.push(`${fieldName} doit Ãªtre un lien LinkedIn valide`)
         }
       } else {
         errors.push(...urlErrors)
@@ -457,15 +460,15 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       
       // Validation
       if (!formData.firstName.trim()) {
-        errors.push('Le prénom est requis')
+        errors.push('Le prÃ©nom est requis')
       } else if (formData.firstName.length > 50) {
-        errors.push('Le prénom est trop long (maximum 50 caractères)')
+        errors.push('Le prÃ©nom est trop long (maximum 50 caractÃ¨res)')
       }
       
       if (!formData.lastName.trim()) {
         errors.push('Le nom est requis')
       } else if (formData.lastName.length > 50) {
-        errors.push('Le nom est trop long (maximum 50 caractères)')
+        errors.push('Le nom est trop long (maximum 50 caractÃ¨res)')
       }
       
       const emailErrors = validateEmail(formData.email)
@@ -481,7 +484,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         )
         
         if (!phoneValidation.isValid) {
-          errors.push(...phoneValidation.errors.map(err => `Téléphone: ${err}`))
+          errors.push(...phoneValidation.errors.map(err => `TÃ©lÃ©phone: ${err}`))
         }
       }
       
@@ -502,7 +505,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       }
       
       if (formData.companyName && formData.companyName.length > 100) {
-        errors.push('Le nom de l\'entreprise est trop long (maximum 100 caractères)')
+        errors.push('Le nom de l\'entreprise est trop long (maximum 100 caractÃ¨res)')
       }
       
       if (errors.length > 0) {
@@ -515,13 +518,13 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       await updateProfile(formData)
       debugLog('API', 'Profile save successful')
       
-      alert(t('profile.title') + ' mis à jour avec succès!')
+      alert(t('profile.title') + ' mis Ã  jour avec succÃ¨s!')
       handleClose()
       
     } catch (error: any) {
       debugLog('API', 'Profile save error', { error: error?.message })
-      console.error('Erreur mise à jour profil:', error)
-      alert('Erreur lors de la mise à jour: ' + (error?.message || 'Erreur inconnue'))
+      console.error('Erreur mise Ã  jour profil:', error)
+      alert('Erreur lors de la mise Ã  jour: ' + (error?.message || 'Erreur inconnue'))
     } finally {
       debugLog('API', 'Profile save finished')
       setIsLoading(false)
@@ -614,13 +617,13 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         confirmPassword: ''
       })
       setPasswordErrors([])
-      alert('Mot de passe changé avec succès!')
+      alert('Mot de passe changÃ© avec succÃ¨s!')
       handleClose()
       
     } catch (error: any) {
       debugLog('API', 'Password change error', { error: error?.message })
       console.error('Erreur technique:', error)
-      setPasswordErrors(['Erreur de connexion au serveur. Veuillez réessayer.'])
+      setPasswordErrors(['Erreur de connexion au serveur. Veuillez rÃ©essayer.'])
     } finally {
       debugLog('API', 'Password change finished')
       setIsLoading(false)
@@ -628,8 +631,8 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
   }, [passwordData, validatePassword, user?.email, handleClose, isLoading])
 
   const tabs = useMemo(() => [
-    { id: 'profile', label: t('nav.profile'), icon: '👤' },
-    { id: 'password', label: t('profile.password'), icon: '🔐' }
+    { id: 'profile', label: t('nav.profile'), icon: 'ðŸ'¤' },
+    { id: 'password', label: t('profile.password'), icon: 'ðŸ"' }
   ], [t])
 
   // Keyboard handling
@@ -699,7 +702,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
               disabled={isLoading}
               data-debug="close-button"
             >
-              ×
+              Ã—
             </button>
           </div>
 
@@ -742,7 +745,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
                     </svg>
                     <span className="text-sm text-yellow-800">
-                      Liste de pays limitée (service externe temporairement indisponible)
+                      Liste de pays limitÃ©e (service externe temporairement indisponible)
                     </span>
                   </div>
                 </div>
@@ -827,7 +830,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
                           countries={countries}
                           value={formData.country}
                           onChange={(countryValue: string) => handleFormDataChange('country', countryValue)}
-                          placeholder="Sélectionner un pays ou rechercher..."
+                          placeholder="SÃ©lectionner un pays ou rechercher..."
                         />
                       </div>
                     </div>
