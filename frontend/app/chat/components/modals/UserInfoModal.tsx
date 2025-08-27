@@ -103,6 +103,23 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('profile')
   
+  const { countries, loading: countriesLoading, usingFallback } = useCountries()
+  
+  // Initialiser une seule fois avec useMemo
+  const initialFormData = useMemo(() => ({
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
+    email: user?.email || '',
+    country_code: user?.country_code || '',
+    area_code: user?.area_code || '',
+    phone_number: user?.phone_number || '',
+    country: user?.country || '',
+    linkedinProfile: user?.linkedinProfile || '',
+    companyName: user?.companyName || '',
+    companyWebsite: user?.companyWebsite || '',
+    linkedinCorporate: user?.linkedinCorporate || ''
+  }), [user])
+
   // Fix #1: Prevent setState after unmount + explicit mount state
   const isMountedRef = React.useRef(true)
   
@@ -119,7 +136,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       setFormData(initialFormData)
     }
   }, [initialFormData])
-  const { countries, loading: countriesLoading, usingFallback } = useCountries()
   
   // Fix #2: Safe close - prevent closing during operations
   const safeClose = useCallback(() => {
@@ -127,21 +143,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       onClose()
     }
   }, [isLoading, onClose])
-  
-  const initialFormData = useMemo(() => ({
-    firstName: user?.firstName || '',
-    lastName: user?.lastName || '',
-    email: user?.email || '',
-    country_code: user?.country_code || '',
-    area_code: user?.area_code || '',
-    phone_number: user?.phone_number || '',
-    country: user?.country || '',
-    linkedinProfile: user?.linkedinProfile || '',
-    companyName: user?.companyName || '',
-    companyWebsite: user?.companyWebsite || '',
-    linkedinCorporate: user?.linkedinCorporate || ''
-  }), [user])
-
   const [formData, setFormData] = useState(initialFormData)
 
   const [passwordData, setPasswordData] = useState({
