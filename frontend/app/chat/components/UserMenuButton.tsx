@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore, markStoreUnmounted } from '@/lib/stores/auth' 
+import { useAuthStore } from '@/lib/stores/auth' // RETIRER markStoreUnmounted
 import { useTranslation } from '../hooks/useTranslation'
 import { Modal } from './Modal'
 import { UserInfoModal } from './modals/UserInfoModal'
@@ -25,6 +25,7 @@ export const UserMenuButton = React.memo(() => {
 
   // Protection contre React #300
   const isMountedRef = useRef(true)
+  const logoutInProgressRef = useRef(false)
   
   useEffect(() => {
     isMountedRef.current = true
@@ -81,7 +82,7 @@ export const UserMenuButton = React.memo(() => {
   }, [])
 
   const handleLanguageClick = useCallback(() => {
-    console.log('🌍 [DEBUG-UserMenu] handleLanguageClick - isMounted:', isMountedRef.current)
+    console.log('🌐 [DEBUG-UserMenu] handleLanguageClick - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setIsOpen(false)
     setShowLanguageModal(true)
@@ -101,56 +102,58 @@ export const UserMenuButton = React.memo(() => {
     window.open('/admin/statistics', '_blank')
   }, [])
 
-  // CORRECTION CRITIQUE: VERSION CORRIGÉE DE LA DÉCONNEXION avec markStoreUnmounted
+  // CORRECTION CRITIQUE: Redirection immédiate AVANT logout
   const handleLogout = useCallback(async () => {
-    console.log('🚨 [DEBUG-LOGOUT] === DÉBUT DÉCONNEXION DÉTAILLÉE ===')
-    console.log('🚨 [DEBUG-LOGOUT] 1. État initial - isMounted:', isMountedRef.current)
-    console.log('🚨 [DEBUG-LOGOUT] 1. User présent:', !!user)
-    console.log('🚨 [DEBUG-LOGOUT] 1. Menu ouvert:', isOpen)
-    
-    if (!isMountedRef.current) {
-      console.log('🚨 [DEBUG-LOGOUT] ABORT - composant déjà démonté')
+    // Éviter les appels multiples
+    if (logoutInProgressRef.current) {
+      console.log('🚨 [DEBUG-LOGOUT] Logout déjà en cours, ignoré')
       return
     }
-    
+
+    console.log('🚨 [DEBUG-LOGOUT] === DÉBUT DÉCONNEXION CORRIGÉE ===')
+    logoutInProgressRef.current = true
+
     try {
+      console.log('🚨 [DEBUG-LOGOUT] 1. État initial - isMounted:', isMountedRef.current)
+      console.log('🚨 [DEBUG-LOGOUT] 1. User présent:', !!user)
+      console.log('🚨 [DEBUG-LOGOUT] 1. Menu ouvert:', isOpen)
+      
+      if (!isMountedRef.current) {
+        console.log('🚨 [DEBUG-LOGOUT] ABORT - composant déjà démonté')
+        return
+      }
+
+      // Étape 1: Fermeture immédiate du menu
       console.log('🚨 [DEBUG-LOGOUT] 2. Fermeture immédiate du menu...')
-      setIsOpen(false)
+      if (isOpen) {
+        setIsOpen(false)
+      }
+
+      // CORRECTION CRITIQUE: Redirection IMMÉDIATE avant logout
+      console.log('🚨 [DEBUG-LOGOUT] 3. REDIRECTION IMMÉDIATE...')
+      window.location.href = '/'
       
-      // TECHNIQUE 1: Marquer comme démonté AVANT logout pour éviter les setState
-      console.log('🚨 [DEBUG-LOGOUT] 3. Marquage composant comme démonté AVANT logout...')
-      isMountedRef.current = false
-      
-      // CORRECTION CRITIQUE: Marquer le store comme démonté AVANT logout()
-      console.log('🚨 [DEBUG-LOGOUT] 4. Marquage store comme démonté AVANT logout...')
-      markStoreUnmounted()
-      
-      // TECHNIQUE 2: Petite attente pour que React traite le setState du menu
-      console.log('🚨 [DEBUG-LOGOUT] 5. Attente traitement React setState...')
-      await new Promise(resolve => setTimeout(resolve, 50))
-      
-      console.log('🚨 [DEBUG-LOGOUT] 6. Appel logout() du store...')
-      const logoutStartTime = performance.now()
-      
-      await logout()
-      
-      const logoutEndTime = performance.now()
-      console.log('🚨 [DEBUG-LOGOUT] 7. logout() terminé en', Math.round(logoutEndTime - logoutStartTime), 'ms')
-      
-      console.log('🚨 [DEBUG-LOGOUT] 8. Redirection via router.replace...')
-      router.replace('/')
-      
-      console.log('🚨 [DEBUG-LOGOUT] === FIN DÉCONNEXION RÉUSSIE ===')
-      
+      // Étape 3: Logout asynchrone en arrière-plan (ne peut plus causer d'erreur React)
+      console.log('🚨 [DEBUG-LOGOUT] 4. Logout en arrière-plan...')
+      setTimeout(async () => {
+        try {
+          await logout()
+          console.log('🚨 [DEBUG-LOGOUT] 5. Logout terminé en arrière-plan')
+        } catch (error) {
+          console.error('🚨 [DEBUG-LOGOUT] Erreur logout arrière-plan:', error)
+        }
+        logoutInProgressRef.current = false
+      }, 0)
+
+      console.log('🚨 [DEBUG-LOGOUT] === FIN DÉCONNEXION (REDIRECTION EN COURS) ===')
+
     } catch (error) {
-      console.error('🚨 [DEBUG-LOGOUT] ERREUR pendant logout:', error)
-      console.error('🚨 [DEBUG-LOGOUT] Stack trace:', error instanceof Error ? error.stack : 'Pas de stack')
-      
-      // Même en cas d'erreur, forcer la redirection
-      console.log('🚨 [DEBUG-LOGOUT] Redirection d\'urgence après erreur...')
-      router.replace('/')
+      console.error('🚨 [DEBUG-LOGOUT] Erreur critique:', error)
+      // Redirection forcée même en cas d'erreur
+      window.location.href = '/'
+      logoutInProgressRef.current = false
     }
-  }, [logout, router, user, isOpen])
+  }, [user, isOpen, logout])
 
   const toggleOpen = useCallback(() => {
     console.log('🔀 [DEBUG-UserMenu] toggleOpen - isMounted:', isMountedRef.current, 'current isOpen:', isOpen)

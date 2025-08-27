@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
-import { useAuthStore } from '@/lib/stores/auth' 
+import { useRouter } from 'next/navigation'
+import { useAuthStore, markStoreUnmounted } from '@/lib/stores/auth' 
 import { useTranslation } from '../hooks/useTranslation'
 import { Modal } from './Modal'
 import { UserInfoModal } from './modals/UserInfoModal'
@@ -7,10 +8,12 @@ import { AccountModal } from './modals/AccountModal'
 import { LanguageModal } from './modals/LanguageModal'
 import { ContactModal } from './modals/ContactModal'
 import { InviteFriendModal } from './modals/InviteFriendModal'
-import { PLAN_CONFIGS } from '@/types'
+import { PLAN_CONFIGS } from '../../../types'
+import { getSafeName, getSafeEmail, getSafeUserType, getSafePlan, getSafeInitials } from '../utils/safeUserHelpers'
 
-// ==================== MENU UTILISATEUR AVEC INVITATIONS - OPTIMISÉ ====================
+// ==================== MENU UTILISATEUR - VERSION CORRIGÉE REACT #300 ====================
 export const UserMenuButton = React.memo(() => {
+  const router = useRouter()
   const { user, logout } = useAuthStore()
   const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
@@ -20,192 +23,189 @@ export const UserMenuButton = React.memo(() => {
   const [showLanguageModal, setShowLanguageModal] = useState(false)
   const [showInviteFriendModal, setShowInviteFriendModal] = useState(false)
 
-  // CORRECTION: Protection contre React #300
+  // Protection contre React #300
   const isMountedRef = useRef(true)
   
   useEffect(() => {
     isMountedRef.current = true
+    console.log('🗝️ [DEBUG-UserMenu] Composant monté')
     return () => {
+      console.log('🧹 [DEBUG-UserMenu] Composant en cours de démontage')
       isMountedRef.current = false
     }
   }, [])
 
-  // ✅ CORRECTION: Fonction pour obtenir les initiales (corrigée pour gérer les emails) - MÉMORISÉE
-  const getUserInitials = useCallback((user: any): string => {
-    if (!user) return 'U'
-
-    // Vérifier si user.name est un email (contient @)
-    if (user.name && user.name.includes('@')) {
-      // Traiter comme un email
-      const emailPart = user.name.split('@')[0]
-      if (emailPart.includes('.')) {
-        const parts = emailPart.split('.')
-        return (parts[0][0] + parts[1][0]).toUpperCase()
-      }
-      return emailPart.substring(0, 2).toUpperCase()
-    }
-
-    // Essayer depuis le nom complet (si ce n'est pas un email)
-    if (user.name) {
-      const names = user.name.trim().split(' ')
-      if (names.length >= 2) {
-        return (names[0][0] + names[names.length - 1][0]).toUpperCase()
-      }
-      return names[0][0].toUpperCase()
-    }
-
-    // Essayer depuis l'email
-    if (user.email) {
-      const emailPart = user.email.split('@')[0]
-      if (emailPart.includes('.')) {
-        const parts = emailPart.split('.')
-        return (parts[0][0] + parts[1][0]).toUpperCase()
-      }
-      return emailPart.substring(0, 2).toUpperCase()
-    }
-
-    return 'U'
-  }, [])
-
-  // 🛠️ CORRECTION MAJEURE : Mémoisation des initiales et debug conditionnel CORRIGÉ
-  const userInitials = useMemo(() => {
-    const initials = getUserInitials(user)
+  // Mémoisation sécurisée des données utilisateur
+  const { safeName, safeEmail, safeUserType, userInitials } = useMemo(() => {
+    console.log('🔄 [DEBUG-UserMenu] Recalcul des données utilisateur sécurisées')
+    const safeName = getSafeName(user)
+    const safeEmail = getSafeEmail(user)
+    const safeUserType = getSafeUserType(user)
+    const userInitials = getSafeInitials(user)
     
-    // 🛠️ DEBUG CONDITIONNEL : Ne loguer que si les valeurs changent vraiment
-    const debugId = `${user?.name}-${user?.email}`
-    
-    // Utiliser une variable globale pour éviter l'erreur TypeScript
-    if (!window.userMenuLastDebugId) {
-      window.userMenuLastDebugId = ''
-    }
-    
-    if (debugId !== window.userMenuLastDebugId) {
-      window.userMenuLastDebugId = debugId
-      
-      console.log('🔄 [UserMenu] Changement détecté:', {
-        user_name: user?.name,
-        user_email: user?.email,
-        calculated_initials: initials,
-        has_name: !!user?.name
-      })
-    }
-    
-    return initials
-  }, [user?.name, user?.email, getUserInitials])
+    return { safeName, safeEmail, safeUserType, userInitials }
+  }, [user?.name, user?.email, user?.user_type])
 
-  // 🛠️ CORRECTION : Mémoisation des variables de plan
+  // Mémoisation des variables de plan avec protection
   const { currentPlan, plan, isSuperAdmin } = useMemo(() => {
-    const currentPlan = user?.plan || 'essential'
+    const safePlan = getSafePlan(user)
+    const safeUserType = getSafeUserType(user)
+    
+    const currentPlan = safePlan
     const plan = PLAN_CONFIGS[currentPlan as keyof typeof PLAN_CONFIGS] || PLAN_CONFIGS.essential
-    const isSuperAdmin = user?.user_type === 'super_admin'
+    const isSuperAdmin = safeUserType === 'super_admin'
     
     return { currentPlan, plan, isSuperAdmin }
   }, [user?.plan, user?.user_type])
 
-  // 🛠️ CORRECTION : Mémoisation de tous les handlers avec protection
+  // Handlers sécurisés avec protection de montage et debug
   const handleContactClick = useCallback(() => {
+    console.log('📞 [DEBUG-UserMenu] handleContactClick - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setIsOpen(false)
     setShowContactModal(true)
   }, [])
 
   const handleUserInfoClick = useCallback(() => {
+    console.log('👤 [DEBUG-UserMenu] handleUserInfoClick - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setIsOpen(false)
     setShowUserInfoModal(true)
   }, [])
 
   const handleAccountClick = useCallback(() => {
+    console.log('💳 [DEBUG-UserMenu] handleAccountClick - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setIsOpen(false)
     setShowAccountModal(true)
   }, [])
 
   const handleLanguageClick = useCallback(() => {
+    console.log('🌍 [DEBUG-UserMenu] handleLanguageClick - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setIsOpen(false)
     setShowLanguageModal(true)
   }, [])
 
   const handleInviteFriendClick = useCallback(() => {
+    console.log('👥 [DEBUG-UserMenu] handleInviteFriendClick - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setIsOpen(false)
     setShowInviteFriendModal(true)
   }, [])
 
   const handleStatisticsClick = useCallback(() => {
+    console.log('📊 [DEBUG-UserMenu] handleStatisticsClick - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setIsOpen(false)
-    // Rediriger vers la page des statistiques
     window.open('/admin/statistics', '_blank')
   }, [])
 
-  // SOLUTION DRASTIQUE AMÉLIORÉE: Déconnexion immédiate avec nettoyage complet
-  const handleLogout = useCallback(() => {
+  // CORRECTION CRITIQUE: VERSION CORRIGÉE DE LA DÉCONNEXION avec markStoreUnmounted
+  const handleLogout = useCallback(async () => {
+    console.log('🚨 [DEBUG-LOGOUT] === DÉBUT DÉCONNEXION DÉTAILLÉE ===')
+    console.log('🚨 [DEBUG-LOGOUT] 1. État initial - isMounted:', isMountedRef.current)
+    console.log('🚨 [DEBUG-LOGOUT] 1. User présent:', !!user)
+    console.log('🚨 [DEBUG-LOGOUT] 1. Menu ouvert:', isOpen)
+    
+    if (!isMountedRef.current) {
+      console.log('🚨 [DEBUG-LOGOUT] ABORT - composant déjà démonté')
+      return
+    }
+    
     try {
-      console.log('🔄 [UserMenu] Déconnexion immédiate')
+      console.log('🚨 [DEBUG-LOGOUT] 2. Fermeture immédiate du menu...')
+      setIsOpen(false)
       
-      // Nettoyer localStorage directement
-      localStorage.clear()
+      // TECHNIQUE 1: Marquer comme démonté AVANT logout pour éviter les setState
+      console.log('🚨 [DEBUG-LOGOUT] 3. Marquage composant comme démonté AVANT logout...')
+      isMountedRef.current = false
       
-      // Redirection immédiate SANS attendre logout()
-      window.location.href = '/'
+      // CORRECTION CRITIQUE: Marquer le store comme démonté AVANT logout()
+      console.log('🚨 [DEBUG-LOGOUT] 4. Marquage store comme démonté AVANT logout...')
+      markStoreUnmounted()
       
-      // logout() en arrière-plan pour nettoyer Supabase (sans attendre)
-      logout().catch(() => {
-        // Ignorer les erreurs - on a déjà redirigé
-      })
+      // TECHNIQUE 2: Petite attente pour que React traite le setState du menu
+      console.log('🚨 [DEBUG-LOGOUT] 5. Attente traitement React setState...')
+      await new Promise(resolve => setTimeout(resolve, 50))
+      
+      console.log('🚨 [DEBUG-LOGOUT] 6. Appel logout() du store...')
+      const logoutStartTime = performance.now()
+      
+      await logout()
+      
+      const logoutEndTime = performance.now()
+      console.log('🚨 [DEBUG-LOGOUT] 7. logout() terminé en', Math.round(logoutEndTime - logoutStartTime), 'ms')
+      
+      console.log('🚨 [DEBUG-LOGOUT] 8. Redirection via router.replace...')
+      router.replace('/')
+      
+      console.log('🚨 [DEBUG-LOGOUT] === FIN DÉCONNEXION RÉUSSIE ===')
       
     } catch (error) {
-      // Forcer la redirection même en cas d'erreur
-      window.location.href = '/'
+      console.error('🚨 [DEBUG-LOGOUT] ERREUR pendant logout:', error)
+      console.error('🚨 [DEBUG-LOGOUT] Stack trace:', error instanceof Error ? error.stack : 'Pas de stack')
+      
+      // Même en cas d'erreur, forcer la redirection
+      console.log('🚨 [DEBUG-LOGOUT] Redirection d\'urgence après erreur...')
+      router.replace('/')
     }
-  }, [logout])
+  }, [logout, router, user, isOpen])
 
   const toggleOpen = useCallback(() => {
+    console.log('🔀 [DEBUG-UserMenu] toggleOpen - isMounted:', isMountedRef.current, 'current isOpen:', isOpen)
     if (!isMountedRef.current) return
     setIsOpen(prev => !prev)
-  }, [])
+  }, [isOpen])
 
   const closeMenu = useCallback(() => {
+    console.log('❌ [DEBUG-UserMenu] closeMenu - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setIsOpen(false)
   }, [])
 
-  // 🛠️ CORRECTION : Mémoisation des fonctions de fermeture de modales avec protection
+  // Fonctions de fermeture de modales avec protection et debug
   const closeUserInfoModal = useCallback(() => {
+    console.log('❌ [DEBUG-UserMenu] closeUserInfoModal - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setShowUserInfoModal(false)
   }, [])
   
   const closeContactModal = useCallback(() => {
+    console.log('❌ [DEBUG-UserMenu] closeContactModal - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setShowContactModal(false)
   }, [])
   
   const closeAccountModal = useCallback(() => {
+    console.log('❌ [DEBUG-UserMenu] closeAccountModal - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setShowAccountModal(false)
   }, [])
   
   const closeLanguageModal = useCallback(() => {
+    console.log('❌ [DEBUG-UserMenu] closeLanguageModal - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setShowLanguageModal(false)
   }, [])
   
   const closeInviteFriendModal = useCallback(() => {
+    console.log('❌ [DEBUG-UserMenu] closeInviteFriendModal - isMounted:', isMountedRef.current)
     if (!isMountedRef.current) return
     setShowInviteFriendModal(false)
   }, [])
 
   const openPrivacyPolicy = useCallback(() => {
+    console.log('📜 [DEBUG-UserMenu] openPrivacyPolicy')
     window.open('https://intelia.com/privacy-policy/', '_blank')
   }, [])
+
+  console.log('🔄 [DEBUG-UserMenu] Render - isMounted:', isMountedRef.current, 'user:', !!user)
 
   return (
     <>
       <div className="relative">
-        {/* ✅ CONSERVÉ: Style carré avec coins arrondis */}
+        {/* Bouton utilisateur avec affichage sécurisé */}
         <button
           onClick={toggleOpen}
           className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors"
@@ -221,20 +221,20 @@ export const UserMenuButton = React.memo(() => {
             />
             
             <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-              {/* ✅ RESTAURÉ: En-tête enrichi avec badges */}
+              {/* En-tête enrichi avec badges sécurisés */}
               <div className="px-4 py-3 border-b border-gray-100">
-                <p className="text-sm font-medium text-gray-900">{user?.name}</p>
-                <p className="text-xs text-gray-500">{user?.email}</p>
-                {/* ✅ RESTAURÉ: Affichage conditionnel du plan et du rôle */}
-                {user?.user_type && (
+                <p className="text-sm font-medium text-gray-900">{safeName}</p>
+                <p className="text-xs text-gray-500">{safeEmail}</p>
+                {/* Affichage conditionnel sécurisé du plan et du rôle */}
+                {user && (
                   <div className="mt-2">
-                    {/* ✅ AFFICHAGE DU PLAN POUR LES UTILISATEURS NORMAUX SEULEMENT */}
+                    {/* Affichage du plan pour les utilisateurs normaux seulement */}
                     {!isSuperAdmin && (
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${plan.bgColor} ${plan.color} border ${plan.borderColor}`}>
                         {plan.name}
                       </span>
                     )}
-                    {/* ✅ AFFICHAGE DU RÔLE SUPER ADMIN */}
+                    {/* Affichage du rôle super admin */}
                     {isSuperAdmin && (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
                         Super Admin
@@ -246,7 +246,7 @@ export const UserMenuButton = React.memo(() => {
 
               {/* Actions */}
               <div className="py-1">
-                {/* ✅ RESTAURÉ: MENU STATISTIQUES - SUPER_ADMIN UNIQUEMENT */}
+                {/* Menu statistiques - Super admin uniquement */}
                 {isSuperAdmin && (
                   <button
                     onClick={handleStatisticsClick}
@@ -259,7 +259,7 @@ export const UserMenuButton = React.memo(() => {
                   </button>
                 )}
 
-                {/* ✅ RESTAURÉ: MENU ABONNEMENT - MASQUÉ POUR SUPER_ADMIN */}
+                {/* Menu abonnement - masqué pour super admin */}
                 {!isSuperAdmin && (
                   <button
                     onClick={handleAccountClick}
@@ -272,7 +272,6 @@ export const UserMenuButton = React.memo(() => {
                   </button>
                 )}
 
-                {/* ✅ RESTAURÉ: Icône correcte pour le profil */}
                 <button
                   onClick={handleUserInfoClick}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -283,7 +282,6 @@ export const UserMenuButton = React.memo(() => {
                   <span>{t('nav.profile')}</span>
                 </button>
 
-                {/* ✅ RESTAURÉ: Icône correcte pour la langue */}
                 <button
                   onClick={handleLanguageClick}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -294,7 +292,6 @@ export const UserMenuButton = React.memo(() => {
                   <span>{t('nav.language')}</span>
                 </button>
 
-                {/* ✅ RESTAURÉ: Icône correcte pour inviter un ami */}
                 <button
                   onClick={handleInviteFriendClick}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -305,7 +302,6 @@ export const UserMenuButton = React.memo(() => {
                   <span>{t('nav.inviteFriend')}</span>
                 </button>
 
-                {/* ✅ RESTAURÉ: Icône correcte pour contact */}
                 <button
                   onClick={handleContactClick}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -316,7 +312,6 @@ export const UserMenuButton = React.memo(() => {
                   <span>{t('nav.contact')}</span>
                 </button>
 
-                {/* ✅ RESTAURÉ: Mentions légales */}
                 <button
                   onClick={openPrivacyPolicy}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -330,7 +325,6 @@ export const UserMenuButton = React.memo(() => {
 
               {/* Footer */}
               <div className="border-t border-gray-100 pt-1">
-                {/* ✅ GESTION DE DÉCONNEXION CORRIGÉE CONTRE REACT #300 */}
                 <button
                   onClick={handleLogout}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
@@ -346,7 +340,7 @@ export const UserMenuButton = React.memo(() => {
         )}
       </div>
 
-      {/* ✅ RESTAURÉ: MODAL ABONNEMENT - SEULEMENT SI PAS SUPER_ADMIN */}
+      {/* Modal abonnement - seulement si pas super admin */}
       {!isSuperAdmin && (
         <Modal
           isOpen={showAccountModal}
@@ -381,7 +375,6 @@ export const UserMenuButton = React.memo(() => {
         <ContactModal onClose={closeContactModal} />
       </Modal>
 
-      {/* ✅ MODAL INVITER UN AMI */}
       <Modal
         isOpen={showInviteFriendModal}
         onClose={closeInviteFriendModal}
@@ -393,12 +386,4 @@ export const UserMenuButton = React.memo(() => {
   )
 })
 
-// 🛠️ CORRECTION : Ajout du displayName
 UserMenuButton.displayName = 'UserMenuButton'
-
-// 🛠️ CORRECTION : Déclaration TypeScript pour window
-declare global {
-  interface Window {
-    userMenuLastDebugId?: string
-  }
-}
