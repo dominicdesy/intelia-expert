@@ -140,48 +140,21 @@ export const UserMenuButton = React.memo(() => {
     window.open('/admin/statistics', '_blank')
   }, [])
 
-  // ✅ SOLUTION RADICALE: Déconnexion immédiate sans attendre
+  // ✅ CORRECTION FINALE POUR REACT #300: Fonction de déconnexion sécurisée
   const handleLogout = useCallback(() => {
-    console.log('🔄 [UserMenu] Déconnexion immédiate sans attendre')
-    
-    // Marquer immédiatement comme démonté
-    isMountedRef.current = false
-    
-    // Déconnecter en arrière-plan SANS attendre
-    logout().catch(err => {
-      console.warn('[UserMenu] Erreur logout background:', err)
-    })
-    
-    // Redirection immédiate
-    window.location.href = '/'
-    
-  }, [logout]) handleLogout = useCallback(async () => {
     try {
-      console.log('🔄 [UserMenu] Démarrage déconnexion')
+      console.log('🔄 [UserMenu] Déconnexion immédiate sans attendre')
       
-      // NOUVEAU: Marquer immédiatement comme déconnecté dans le store
-      // pour empêcher tous les setState pendant le processus
-      const store = useAuthStore.getState()
-      if (store.setIsLoggingOut) {
-        store.setIsLoggingOut(true)
-      }
-      
-      // Marquer immédiatement le composant comme démonté
+      // Marquer immédiatement comme démonté pour éviter React #300
       isMountedRef.current = false
       
-      // Appel de déconnexion - ceci va probablement démonter le composant
-      await logout()
+      // Déconnecter en arrière-plan SANS attendre pour éviter les setState
+      logout().catch(err => {
+        console.warn('[UserMenu] Erreur logout background:', err)
+      })
       
-      // Si nous arrivons ici, forcer la redirection
-      console.log('✅ [UserMenu] Déconnexion terminée, redirection de secours')
-      
-      // Redirection immédiate sans délai
-      try {
-        window.location.href = '/'
-      } catch (err) {
-        // Fallback ultime
-        setTimeout(() => window.location.reload(), 100)
-      }
+      // Redirection immédiate pour éviter la fenêtre de temps problématique
+      window.location.href = '/'
       
     } catch (error) {
       console.error('❌ [UserMenu] Erreur déconnexion:', error)
@@ -358,7 +331,7 @@ export const UserMenuButton = React.memo(() => {
 
               {/* Footer */}
               <div className="border-t border-gray-100 pt-1">
-                {/* ✅ GESTION DE DÉCONNEXION CORRIGÉE */}
+                {/* ✅ GESTION DE DÉCONNEXION CORRIGÉE CONTRE REACT #300 */}
                 <button
                   onClick={handleLogout}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
