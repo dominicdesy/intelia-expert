@@ -1,3 +1,5 @@
+// UserInfoModal.tsx
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '../../hooks/useTranslation'
