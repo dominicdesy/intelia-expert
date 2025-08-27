@@ -103,14 +103,30 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('profile')
   
+  // Fix #1: Prevent setState after unmount + explicit mount state
+  const isMountedRef = React.useRef(true)
+  
+  React.useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  // Fix #4: Sync form data when user changes
+  React.useEffect(() => {
+    if (isMountedRef.current) {
+      setFormData(initialFormData)
+    }
+  }, [initialFormData])
   const { countries, loading: countriesLoading, usingFallback } = useCountries()
   
-  const countryCodeMap = useMemo(() => {
-    return countries.reduce((acc, country) => {
-      acc[country.value] = country.phoneCode
-      return acc
-    }, {} as Record<string, string>)
-  }, [countries])
+  // Fix #2: Safe close - prevent closing during operations
+  const safeClose = useCallback(() => {
+    if (!isLoading) {
+      onClose()
+    }
+  }, [isLoading, onClose])
   
   const initialFormData = useMemo(() => ({
     firstName: user?.firstName || '',
@@ -175,6 +191,9 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   }, [])
 
   const handleProfileSave = useCallback(async () => {
+    // Fix #5: Early return if already loading
+    if (!isMountedRef.current || isLoading) return
+    
     setIsLoading(true)
     setFormErrors([])
     
@@ -191,34 +210,48 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
         errors.push('L\'email est requis')
       }
       
-      const phoneValidation = validatePhoneFields(
-        formData.country_code, 
-        formData.area_code, 
-        formData.phone_number
-      )
-      
-      if (!phoneValidation.isValid) {
-        errors.push(...phoneValidation.errors.map(err => `Téléphone: ${err}`))
+      // Fix #4: Only validate phone if at least one field is filled
+      const hasPhoneData = formData.country_code || formData.area_code || formData.phone_number
+      if (hasPhoneData) {
+        const phoneValidation = validatePhoneFields(
+          formData.country_code, 
+          formData.area_code, 
+          formData.phone_number
+        )
+        
+        if (!phoneValidation.isValid) {
+          errors.push(...phoneValidation.errors.map(err => `Téléphone: ${err}`))
+        }
       }
       
       if (errors.length > 0) {
-        setFormErrors(errors)
+        if (isMountedRef.current) {
+          setFormErrors(errors)
+        }
         return
       }
 
       await updateProfile(formData)
+      
+      // Fix #2: Show alert before closing modal
       alert(t('profile.title') + ' mis à jour avec succès!')
-      onClose()
+      safeClose()
       
     } catch (error: any) {
       console.error('Erreur mise à jour profil:', error)
       alert('Erreur lors de la mise à jour: ' + (error?.message || 'Erreur inconnue'))
     } finally {
-      setIsLoading(false)
+      // Fix #1: Only setState if component is still mounted
+      if (isMountedRef.current) {
+        setIsLoading(false)
+      }
     }
-  }, [formData, validatePhoneFields, updateProfile, t, onClose])
+  }, [formData, validatePhoneFields, updateProfile, t, safeClose, isLoading])
 
   const handlePasswordChange = useCallback(async () => {
+    // Fix #5: Early return if already loading or unmounted
+    if (!isMountedRef.current || isLoading) return
+    
     const errors: string[] = []
     
     if (!passwordData.currentPassword) {
@@ -237,7 +270,9 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     const passwordValidationErrors = validatePassword(passwordData.newPassword)
     errors.push(...passwordValidationErrors)
     
-    setPasswordErrors(errors)
+    if (isMountedRef.current) {
+      setPasswordErrors(errors)
+    }
     
     if (errors.length > 0) {
       return
@@ -257,8 +292,15 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       })
 
       if (!loginResponse.ok) {
-        const loginError = await loginResponse.json()
-        setPasswordErrors(['Le mot de passe actuel est incorrect'])
+        // Fix #7: Safe JSON parsing
+        let loginError: any = null
+        try {
+          loginError = await loginResponse.json()
+        } catch {}
+        
+        if (isMountedRef.current) {
+          setPasswordErrors(['Le mot de passe actuel est incorrect'])
+        }
         return
       }
 
@@ -277,33 +319,44 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
         })
       })
 
-      const result = await response.json()
+      // Fix #7: Safe JSON parsing for error responses
+      let result: any = null
+      try {
+        result = await response.json()
+      } catch {}
       
       if (!response.ok) {
-        setPasswordErrors([result.detail || result.message || 'Erreur lors du changement de mot de passe'])
+        if (isMountedRef.current) {
+          setPasswordErrors([result?.detail || result?.message || 'Erreur lors du changement de mot de passe'])
+        }
         return
       }
       
-      setPasswordData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      })
-      setPasswordErrors([])
+      if (isMountedRef.current) {
+        setPasswordData({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        })
+        setPasswordErrors([])
+      }
       
-      onClose()
-      
-      setTimeout(() => {
-        alert('Mot de passe changé avec succès!')
-      }, 100)
+      // Fix #2: Show alert before closing modal
+      alert('Mot de passe changé avec succès!')
+      safeClose()
       
     } catch (error: any) {
       console.error('Erreur technique:', error)
-      setPasswordErrors(['Erreur de connexion au serveur. Veuillez réessayer.'])
+      if (isMountedRef.current) {
+        setPasswordErrors(['Erreur de connexion au serveur. Veuillez réessayer.'])
+      }
     } finally {
-      setIsLoading(false)
+      // Fix #1: Only setState if component is still mounted
+      if (isMountedRef.current) {
+        setIsLoading(false)
+      }
     }
-  }, [passwordData, validatePassword, user?.email, onClose])
+  }, [passwordData, validatePassword, user?.email, safeClose, isLoading])
 
   const tabs = useMemo(() => [
     { id: 'profile', label: t('nav.profile'), icon: '👤' },
@@ -314,7 +367,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     <>
       <div 
         className="fixed inset-0 bg-black bg-opacity-50 z-50" 
-        onClick={onClose}
+        onClick={safeClose}
       />
       
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -327,8 +380,9 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
               {t('profile.title')}
             </h2>
             <button
-              onClick={onClose}
+              onClick={safeClose}
               className="text-gray-400 hover:text-gray-600 text-2xl font-light w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+              disabled={isLoading}
             >
               ×
             </button>
@@ -450,8 +504,10 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                       <CountrySelect
                         countries={countries}
                         value={formData.country}
-                        onChange={(countryValue) => {
-                          setFormData(prev => ({ ...prev, country: countryValue }))
+                        onChange={(countryValue: string) => {
+                          if (isMountedRef.current) {
+                            setFormData(prev => ({ ...prev, country: countryValue }))
+                          }
                         }}
                         placeholder="Sélectionner un pays ou rechercher..."
                       />

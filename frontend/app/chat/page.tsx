@@ -89,8 +89,7 @@ class RenderCircuitBreaker {
     this.renderCount++
     
     if (this.renderCount > this.MAX_RENDERS) {
-      console.error('Trop de re-renders détectés, rechargement de la page')
-      setTimeout(() => window.location.reload(), 1000)
+      console.error('Trop de re-renders détectés')
       return false
     }
 
@@ -320,10 +319,28 @@ const MessageList = React.memo(({
 MessageList.displayName = 'MessageList'
 
 export default function ChatInterface() {
-  // Vérifier les re-renders excessifs
-  if (!renderBreaker.checkRender()) {
-    return null
-  }
+  // Toujours initialiser les hooks avant tout return
+  const [renderOk, setRenderOk] = React.useState(true);
+  const reloadScheduledRef = React.useRef(false)
+
+  // Déplace la vérification dans un effet pour ne pas casser l'ordre des hooks
+  React.useEffect(() => {
+    // On garde la même logique du breaker, mais on n'interrompt plus le cycle des hooks
+    const ok = renderBreaker.checkRender();
+    if (!ok) {
+      console.error("Trop de re-renders détectés, affichage d'un fallback puis reload");
+      setRenderOk(false);
+    }
+  }) // Pas de [] pour vérifier à chaque render
+
+  // planifier un seul reload quand renderOk devient false
+  React.useEffect(() => {
+    if (!renderOk && !reloadScheduledRef.current) {
+      reloadScheduledRef.current = true
+      const id = setTimeout(() => window.location.reload(), 1000)
+      return () => clearTimeout(id)
+    }
+  }, [renderOk])
 
   const router = useRouter()
   const { user, isAuthenticated, isLoading, hasHydrated, initializeSession } = useAuthStore()
@@ -390,18 +407,17 @@ export default function ChatInterface() {
     return messages.length > 0
   }, [messages.length])
 
-  // CORRECTION: redirectToLogin améliorée avec nettoyage complet
+  // CORRECTION: redirectToLogin complète et robuste
   const redirectToLogin = useCallback((reason: string = 'Session expirée') => {
-    // Protection contre les appels multiples RENFORCÉE
+    // évite les doubles redirections
     if (isRedirectingRef.current) {
       console.log('Redirection déjà en cours, ignore:', reason)
-      return Promise.resolve()
+      return
     }
-
     isRedirectingRef.current = true
     console.log('Redirection vers login:', reason)
-    
-    // Nettoyer immédiatement TOUS les timeouts
+
+    // Nettoyage timeouts
     const timeoutRefs = [redirectTimeoutRef, authCheckTimeoutRef, loadingTimeoutRef]
     timeoutRefs.forEach(ref => {
       if (ref.current) {
@@ -409,41 +425,37 @@ export default function ChatInterface() {
         ref.current = null
       }
     })
-    
-    // Marquer le composant comme démonté pour empêcher les setState
+
+    // Bloquer tout setState ultérieur
     isMountedRef.current = false
-    
-    // Nettoyer les stores avant la redirection
+
+    // Reset du store de chat (défensif)
     try {
-      // Reset manuel du store de chat pour éviter les états incohérents
       useChatStore.setState({
         currentConversation: null,
         conversations: [],
         isLoading: false
       })
-    } catch (error) {
-      console.warn('Erreur nettoyage stores:', error)
+    } catch (err) {
+      console.warn('Erreur nettoyage stores:', err)
     }
-    
-    // Nettoyer les classes CSS
+
+    // Nettoyage CSS
     document.body.classList.remove('keyboard-open')
-    
+
+    // Redirection via router, avec fallback dur si Next rate
     try {
       router.push('/')
-      
-      // Fallback plus court et plus robuste
+      // Fallback rapide
       redirectTimeoutRef.current = setTimeout(() => {
-        if (window.location.pathname === '/chat') {
+        if (window.location.pathname !== '/') {
           window.location.href = '/'
         }
-      }, 500) // Réduit de 1000ms à 500ms
-      
-    } catch (error) {
-      console.error('Erreur redirection router, fallback immédiat')
+      }, 500)
+    } catch (err) {
+      console.error('Erreur router, fallback immédiat', err)
       window.location.href = '/'
     }
-    
-    return Promise.resolve()
   }, [router])
 
   const handleAuthError = useCallback((error: any) => {
@@ -1005,10 +1017,6 @@ export default function ChatInterface() {
   }
 
   if (!isAuthenticated) {
-    if (!isRedirectingRef.current) {
-      redirectToLogin('Non authentifié')
-    }
-    
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -1020,10 +1028,6 @@ export default function ChatInterface() {
   }
 
   if (!user) {
-    if (!isRedirectingRef.current) {
-      redirectToLogin('Utilisateur manquant')
-    }
-    
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -1032,6 +1036,17 @@ export default function ChatInterface() {
         </div>
       </div>
     )
+  }
+
+  if (!renderOk) {
+    return (
+      <div className="h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+          <p className="text-gray-600">Rechargement sécurisé de l'interface…</p>
+        </div>
+      </div>
+    );
   }
 
   const getCurrentDate = () => {
@@ -1499,7 +1514,7 @@ export default function ChatInterface() {
         isOpen={feedbackModal.isOpen}
         onClose={handleFeedbackModalClose}
         onSubmit={handleFeedbackSubmit}
-        feedbackType={feedbackModal.feedbackType!}
+        feedbackType={feedbackModal.feedbackType ?? undefined}
         isSubmitting={uiState.isSubmittingFeedback}
       />
     </>
