@@ -140,25 +140,24 @@ export const UserMenuButton = React.memo(() => {
     window.open('/admin/statistics', '_blank')
   }, [])
 
-  // ✅ CORRECTION FINALE POUR REACT #300: Fonction de déconnexion sécurisée
+  // SOLUTION DRASTIQUE AMÉLIORÉE: Déconnexion immédiate avec nettoyage complet
   const handleLogout = useCallback(() => {
     try {
-      console.log('🔄 [UserMenu] Déconnexion immédiate sans attendre')
+      console.log('🔄 [UserMenu] Déconnexion immédiate')
       
-      // Marquer immédiatement comme démonté pour éviter React #300
-      isMountedRef.current = false
+      // Nettoyer localStorage directement
+      localStorage.clear()
       
-      // Déconnecter en arrière-plan SANS attendre pour éviter les setState
-      logout().catch(err => {
-        console.warn('[UserMenu] Erreur logout background:', err)
-      })
-      
-      // Redirection immédiate pour éviter la fenêtre de temps problématique
+      // Redirection immédiate SANS attendre logout()
       window.location.href = '/'
       
+      // logout() en arrière-plan pour nettoyer Supabase (sans attendre)
+      logout().catch(() => {
+        // Ignorer les erreurs - on a déjà redirigé
+      })
+      
     } catch (error) {
-      console.error('❌ [UserMenu] Erreur déconnexion:', error)
-      // En cas d'erreur, forcer quand même la redirection
+      // Forcer la redirection même en cas d'erreur
       window.location.href = '/'
     }
   }, [logout])
