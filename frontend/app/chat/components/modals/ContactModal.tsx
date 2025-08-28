@@ -11,12 +11,28 @@ export const ContactModal = ({ onClose }: { onClose: () => void }) => {
     const overlay = overlayRef.current
     
     if (overlay) {
-      // Seulement l'overlay transparent + centrage flex (comme LanguageModal)
+      // Forcer les dimensions de l'overlay (correction complète)
+      overlay.style.setProperty('width', '100vw', 'important')
+      overlay.style.setProperty('height', '100vh', 'important')
+      overlay.style.setProperty('top', '0', 'important')
+      overlay.style.setProperty('left', '0', 'important')
+      overlay.style.setProperty('right', '0', 'important')
+      overlay.style.setProperty('bottom', '0', 'important')
+      
+      // Overlay transparent + centrage flex
       overlay.style.setProperty('background-color', 'transparent', 'important')
       overlay.style.setProperty('display', 'flex', 'important')
       overlay.style.setProperty('align-items', 'center', 'important')
       overlay.style.setProperty('justify-content', 'center', 'important')
       overlay.style.setProperty('padding', '16px', 'important')
+      
+      // Forcer les dimensions du contenu
+      const content = overlay.querySelector('.bg-white')
+      if (content) {
+        content.style.setProperty('width', '100%', 'important')
+        content.style.setProperty('max-width', '600px', 'important')
+        content.style.setProperty('min-width', '320px', 'important')
+      }
     }
   }, [])
   
