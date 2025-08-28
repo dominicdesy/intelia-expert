@@ -2,15 +2,63 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '../hooks/useTranslation'
-import { Modal } from './Modal'
+import { PLAN_CONFIGS } from '@/types'
+
+// Import des composants INTERNES des modales (sans leur structure overlay)
 import { UserInfoModal } from './modals/UserInfoModal'
 import { AccountModal } from './modals/AccountModal'
 import { ContactModal } from './modals/ContactModal'
 import { LanguageModal } from './modals/LanguageModal'
 import { InviteFriendModal } from './modals/InviteFriendModal'
-import { PLAN_CONFIGS } from '@/types'
 
-// UserMenuButton - Version corrigée pour éliminer React #300
+// Composant Modal unifié et réutilisable
+const UnifiedModal = React.memo<{
+  isOpen: boolean
+  onClose: () => void
+  title?: string
+  children: React.ReactNode
+}>(({ isOpen, onClose, title, children }) => {
+  const handleBackdropClick = useCallback((e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose()
+    }
+  }, [onClose])
+
+  if (!isOpen) return null
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+      onClick={handleBackdropClick}
+    >
+      <div 
+        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {title && (
+          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+        <div className="overflow-y-auto max-h-[calc(90vh-80px)]">
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+})
+
+UnifiedModal.displayName = 'UnifiedModal'
+
+// UserMenuButton - Version corrigée avec système modal unifié
 export const UserMenuButton = React.memo(() => {
   const router = useRouter()
   const { user, logout } = useAuthStore()
@@ -103,9 +151,8 @@ export const UserMenuButton = React.memo(() => {
     return { currentPlan, plan, isSuperAdmin }
   }, [user?.plan, user?.user_type])
 
-  // CORRECTION MAJEURE : Déconnexion avec préservation RememberMe et navigation immédiate
+  // Déconnexion avec préservation RememberMe et navigation immédiate
   const handleLogout = useCallback(async () => {
-    // Protection contre les clics multiples
     if (logoutInProgressRef.current || !isMountedRef.current) return
     
     console.log('[DEBUG-LOGOUT-UserMenu] Début déconnexion coordonnée')
@@ -113,24 +160,19 @@ export const UserMenuButton = React.memo(() => {
     setIsOpen(false)
 
     try {
-      // STRATÉGIE DEFENSIVE : Navigation immédiate pour éviter les callbacks
       console.log('[DEBUG-LOGOUT-UserMenu] Navigation immédiate pour éviter callbacks')
       
-      // Fermer le menu immédiatement
       setIsOpen(false)
       
-      // Lancer le logout en arrière-plan SANS attendre
       logout().catch((error) => {
         console.error('[DEBUG-LOGOUT-UserMenu] Erreur logout async (ignorée):', error)
       })
       
-      // Navigation immédiate pour stopper les re-renders
       console.log('[DEBUG-LOGOUT-UserMenu] Redirection immédiate')
       router.push('/')
       
     } catch (error) {
       console.error('[DEBUG-LOGOUT-UserMenu] Erreur logout:', error)
-      // Fallback de sécurité
       router.push('/')
     } finally {
       logoutInProgressRef.current = false
@@ -220,7 +262,6 @@ export const UserMenuButton = React.memo(() => {
   return (
     <>
       <div className="relative">
-        {/* Style carré avec coins arrondis */}
         <button
           onClick={toggleOpen}
           className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors"
@@ -236,7 +277,6 @@ export const UserMenuButton = React.memo(() => {
             />
             
             <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-              {/* En-tête enrichi avec badges */}
               <div className="px-4 py-3 border-b border-gray-100">
                 <p className="text-sm font-medium text-gray-900">{user?.name}</p>
                 <p className="text-xs text-gray-500">{user?.email}</p>
@@ -256,9 +296,7 @@ export const UserMenuButton = React.memo(() => {
                 )}
               </div>
 
-              {/* Actions */}
               <div className="py-1">
-                {/* Menu statistiques - Super admin uniquement */}
                 {isSuperAdmin && (
                   <button
                     onClick={handleStatisticsClick}
@@ -271,7 +309,6 @@ export const UserMenuButton = React.memo(() => {
                   </button>
                 )}
 
-                {/* Menu abonnement - Masqué pour super admin */}
                 {!isSuperAdmin && (
                   <button
                     onClick={handleAccountClick}
@@ -335,7 +372,6 @@ export const UserMenuButton = React.memo(() => {
                 </button>
               </div>
 
-              {/* Footer avec déconnexion */}
               <div className="border-t border-gray-100 pt-1">
                 <button
                   onClick={handleLogout}
@@ -352,46 +388,54 @@ export const UserMenuButton = React.memo(() => {
         )}
       </div>
 
-      {/* SOLUTION HYBRIDE - Selon la structure réelle de chaque modale */}
+      {/* SYSTÈME MODAL UNIFIÉ - UNE SEULE STRUCTURE POUR TOUTES LES MODALES */}
       
-      {/* UserInfoModal et ContactModal - Ont leur propre structure complète, PAS de wrapper */}
-      {showUserInfoModal && isMountedRef.current && (
-        <UserInfoModal 
-          user={user as any} 
-          onClose={closeUserInfoModal}
-        />
-      )}
-
-      {showContactModal && (
-        <ContactModal onClose={closeContactModal} />
-      )}
-
-      {/* AccountModal, LanguageModal, InviteFriendModal - Ont besoin du wrapper Modal */}
+      {/* Abonnement Modal */}
       {!isSuperAdmin && (
-        <Modal
+        <UnifiedModal
           isOpen={showAccountModal}
           onClose={closeAccountModal}
           title={t('subscription.title')}
         >
           <AccountModal user={user as any} onClose={closeAccountModal} />
-        </Modal>
+        </UnifiedModal>
       )}
 
-      <Modal
+      {/* Profil Modal */}
+      <UnifiedModal
+        isOpen={showUserInfoModal}
+        onClose={closeUserInfoModal}
+        title={t('nav.profile')}
+      >
+        <UserInfoModal user={user as any} onClose={closeUserInfoModal} />
+      </UnifiedModal>
+
+      {/* Langue Modal */}
+      <UnifiedModal
         isOpen={showLanguageModal}
         onClose={closeLanguageModal}
         title={t('language.title')}
       >
         <LanguageModal onClose={closeLanguageModal} />
-      </Modal>
+      </UnifiedModal>
 
-      <Modal
+      {/* Contact Modal */}
+      <UnifiedModal
+        isOpen={showContactModal}
+        onClose={closeContactModal}
+        title={t('contact.title')}
+      >
+        <ContactModal onClose={closeContactModal} />
+      </UnifiedModal>
+
+      {/* Inviter ami Modal */}
+      <UnifiedModal
         isOpen={showInviteFriendModal}
         onClose={closeInviteFriendModal}
         title={t('nav.inviteFriend')}
       >
         <InviteFriendModal onClose={closeInviteFriendModal} />
-      </Modal>
+      </UnifiedModal>
     </>
   )
 })
