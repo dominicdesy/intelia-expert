@@ -5,26 +5,18 @@ import { useTranslation } from '../../hooks/useTranslation'
 export const ContactModal = ({ onClose }: { onClose: () => void }) => {
   const { t, currentLanguage } = useTranslation()
   const overlayRef = useRef<HTMLDivElement>(null)
-  const contentRef = useRef<HTMLDivElement>(null)
   
-  // Forcer les styles au montage pour contourner les problèmes CSS
+  // Forcer les styles au montage pour contourner les problèmes CSS (même approche que LanguageModal)
   useEffect(() => {
     const overlay = overlayRef.current
-    const content = contentRef.current
     
-    if (overlay && content) {
-      // Corriger l'overlay (transparent)
+    if (overlay) {
+      // Seulement l'overlay transparent + centrage flex (comme LanguageModal)
       overlay.style.setProperty('background-color', 'transparent', 'important')
       overlay.style.setProperty('display', 'flex', 'important')
       overlay.style.setProperty('align-items', 'center', 'important')
       overlay.style.setProperty('justify-content', 'center', 'important')
-      
-      // Corriger le contenu (centré)
-      content.style.setProperty('position', 'fixed', 'important')
-      content.style.setProperty('top', '50%', 'important')
-      content.style.setProperty('left', '50%', 'important')
-      content.style.setProperty('transform', 'translate(-50%, -50%)', 'important')
-      content.style.setProperty('z-index', '51', 'important')
+      overlay.style.setProperty('padding', '16px', 'important')
     }
   }, [])
   
@@ -47,19 +39,17 @@ export const ContactModal = ({ onClose }: { onClose: () => void }) => {
   
   return (
     <>
-      {/* Overlay avec styles forcés */}
+      {/* Overlay avec styles forcés - même structure que LanguageModal */}
       <div 
         ref={overlayRef}
         className="fixed inset-0 z-50" 
         onClick={onClose}
-      />
-      
-      {/* Modal Container avec styles forcés */}
-      <div 
-        ref={contentRef}
-        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
       >
+        {/* Modal Container - contenu direct dans l'overlay */}
+        <div 
+          className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
@@ -151,6 +141,7 @@ export const ContactModal = ({ onClose }: { onClose: () => void }) => {
                 {t('modal.close')}
               </button>
             </div>
+          </div>
           </div>
         </div>
       </div>
