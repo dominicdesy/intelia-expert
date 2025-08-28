@@ -36,34 +36,28 @@ export const LoginForm = memo(function LoginForm({
     rememberMe: false
   })
 
-  const [formError, setFormError] = useState('')
-  const [formSuccess, setFormSuccess] = useState('')
+  const [formError, setFormError] = React.useState('')
+  const [formSuccess, setFormSuccess] = React.useState('')
 
   // Gestionnaire local pour les changements de données de connexion
   const handleLoginChange = useCallback((field: keyof LoginData, value: string | boolean) => {
-    console.log(`🔄 [LoginForm] Changement ${field}:`, value)
-    
     setLoginData(prev => {
       const newData = { ...prev, [field]: value }
       
-      // Gestion spéciale pour rememberMe
       if (field === 'rememberMe') {
         const isRememberChecked = value as boolean
         console.log('🛯 [LoginForm] RememberMe changé:', isRememberChecked)
         
-        if (isRememberChecked && newData.email?.trim()) {
-          // Sauvegarder immédiatement si email présent
-          rememberMeUtils.save(newData.email.trim(), true)
-          console.log('✅ [LoginForm] Email sauvegardé immédiatement:', newData.email.trim())
+        if (isRememberChecked && prev.email?.trim()) {
+          rememberMeUtils.save(prev.email.trim(), true)
+          console.log('✅ [LoginForm] Email sauvegardé immédiatement:', prev.email.trim())
         } else if (!isRememberChecked) {
-          // Nettoyer le localStorage si décoché
           rememberMeUtils.save('', false)
-          console.log('🗑️ [LoginForm] Remember Me désactivé - localStorage nettoyé')
+          console.log('🗑️ [LoginForm] Remember Me désactivé')
         }
       }
       
-      // Gestion pour l'email quand rememberMe est activé
-      if (field === 'email' && newData.rememberMe) {
+      if (field === 'email' && prev.rememberMe) {
         const emailValue = (value as string).trim()
         if (emailValue && validateEmail(emailValue)) {
           rememberMeUtils.save(emailValue, true)
@@ -77,18 +71,14 @@ export const LoginForm = memo(function LoginForm({
 
   // Restaurer les données Remember Me à l'initialisation
   useEffect(() => {
-    console.log('🔄 [LoginForm] Initialisation - Restauration Remember Me...')
-    
     const { rememberMe, lastEmail } = rememberMeUtils.load()
-    console.log('📦 [LoginForm] Données chargées:', { rememberMe, lastEmail })
     
     if (rememberMe && lastEmail) {
       setLoginData(prev => ({
         ...prev,
         email: lastEmail,
-        rememberMe: true // S'assurer que la case est cochée
+        rememberMe
       }))
-      console.log('✅ [LoginForm] Email et rememberMe restaurés:', lastEmail)
     }
   }, [])
 
@@ -99,7 +89,6 @@ export const LoginForm = memo(function LoginForm({
     if (rememberMe && lastEmail && loginData.email && !loginData.password && passwordInputRef.current) {
       const timer = setTimeout(() => {
         passwordInputRef.current?.focus()
-        console.log('🎯 [LoginForm] Focus automatique sur le mot de passe')
       }, 500)
       
       return () => clearTimeout(timer)
@@ -112,16 +101,10 @@ export const LoginForm = memo(function LoginForm({
     setFormSuccess('')
 
     try {
-      console.log('🚀 [LoginForm] Soumission avec données:', {
-        email: loginData.email,
-        rememberMe: loginData.rememberMe
-      })
-      
       // Passer les données locales au handler du hook parent
       await handleLogin(e, loginData)
       setFormSuccess(t.authSuccess)
     } catch (error: any) {
-      console.error('❌ [LoginForm] Erreur soumission:', error)
       setFormError(error.message)
     }
   }, [handleLogin, loginData, t.authSuccess])
@@ -132,7 +115,6 @@ export const LoginForm = memo(function LoginForm({
     }
   }, [onSubmit])
 
-  // Gestionnaires d'événements optimisés
   const handleEmailChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     handleLoginChange('email', e.target.value)
   }, [handleLoginChange])
@@ -146,12 +128,8 @@ export const LoginForm = memo(function LoginForm({
     console.log('🛯 [LoginForm] e.target.checked:', e.target.checked)
     console.log('🛯 [LoginForm] État actuel rememberMe:', loginData.rememberMe)
     
-    // Appel direct du gestionnaire de changement
     handleLoginChange('rememberMe', e.target.checked)
   }, [handleLoginChange, loginData.rememberMe])
-
-  // Debug du state actuel
-  console.log('🔍 [LoginForm] État actuel loginData:', loginData)
 
   return (
     <>
@@ -175,7 +153,6 @@ export const LoginForm = memo(function LoginForm({
       {/* FORMULAIRE DE CONNEXION */}
       <form onSubmit={onSubmit} onKeyPress={handleKeyPress}>
         <div className="space-y-6">
-          {/* Champ Email */}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700">
               {t.email}
@@ -190,12 +167,10 @@ export const LoginForm = memo(function LoginForm({
                 value={loginData.email}
                 onChange={handleEmailChange}
                 className="block w-full rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                placeholder="votre@email.com"
               />
             </div>
           </div>
 
-          {/* Champ Mot de passe */}
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700">
               {t.password}
@@ -209,12 +184,10 @@ export const LoginForm = memo(function LoginForm({
                 onChange={handlePasswordChange}
                 autoComplete="current-password"
                 required
-                placeholder="••••••••"
               />
             </div>
           </div>
 
-          {/* Section Remember Me et Mot de passe oublié */}
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <input
@@ -223,13 +196,10 @@ export const LoginForm = memo(function LoginForm({
                 type="checkbox"
                 checked={loginData.rememberMe}
                 onChange={handleRememberMeChange}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 disabled={isLoading}
               />
-              <label 
-                htmlFor="remember-me" 
-                className="ml-2 block text-sm text-gray-900 cursor-pointer select-none"
-              >
+              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
                 {t.rememberMe}
               </label>
             </div>
@@ -244,7 +214,6 @@ export const LoginForm = memo(function LoginForm({
             </div>
           </div>
 
-          {/* Bouton de connexion */}
           <div>
             <button
               type="submit"
@@ -264,44 +233,18 @@ export const LoginForm = memo(function LoginForm({
         </div>
       </form>
 
-      {/* Séparateur */}
-      <div className="mt-6">
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-300" />
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white text-gray-500">ou</span>
-          </div>
-        </div>
-      </div>
-
       {/* Bouton pour ouvrir la modale d'inscription */}
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-600">
           {t.newToIntelia}{' '}
           <button
-            type="button"
             onClick={toggleMode}
-            className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
+            className="font-medium text-blue-600 hover:text-blue-500"
           >
             {t.createAccount}
           </button>
         </p>
       </div>
-
-      {/* Debug info (à retirer en production) */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mt-4 p-2 bg-gray-100 rounded text-xs">
-          <strong>Debug Info:</strong>
-          <br />
-          Email: {loginData.email}
-          <br />
-          RememberMe: {loginData.rememberMe ? 'Oui' : 'Non'}
-          <br />
-          LocalStorage: {localStorage.getItem('intelia-remember-me') ? 'Présent' : 'Absent'}
-        </div>
-      )}
     </>
   )
 })
