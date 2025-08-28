@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { AlertMessage } from './page_components'
+import { useCountries, useCountryCodeMap } from './page_hooks'
 
 interface SignupModalProps {
   authLogic: any
@@ -18,6 +19,10 @@ export function SignupModal({
   localSuccess, 
   toggleMode 
 }: SignupModalProps) {
+  // Chargement des pays uniquement dans SignupModal
+  const { countries, loading: countriesLoading, usingFallback } = useCountries()
+  const countryCodeMap = useCountryCodeMap(countries)
+
   const {
     signupData,
     showPassword,
@@ -25,8 +30,6 @@ export function SignupModal({
     showConfirmPassword,
     setShowConfirmPassword,
     isLoading,
-    countries,
-    countriesLoading,
     handleSignupChange,
     handleSignup,
     validatePassword,
@@ -35,6 +38,18 @@ export function SignupModal({
 
   const [formError, setFormError] = React.useState('')
   const [formSuccess, setFormSuccess] = React.useState('')
+
+  // Gestion locale de l'auto-remplissage country → countryCode
+  const handleCountryChange = React.useCallback((value: string) => {
+    // Mettre à jour le pays
+    handleSignupChange('country', value)
+    
+    // Auto-remplir le code pays si disponible
+    if (value && countryCodeMap[value]) {
+      console.log('🏳️ [Country] Auto-remplissage code pays:', value, '->', countryCodeMap[value])
+      handleSignupChange('countryCode', countryCodeMap[value])
+    }
+  }, [handleSignupChange, countryCodeMap])
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -168,7 +183,7 @@ export function SignupModal({
                   />
                 </div>
 
-                {/* Sélecteur de pays */}
+                {/* Sélecteur de pays avec chargement local */}
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700">
                     {t.country} <span className="text-red-500">{t.required}</span>
@@ -185,7 +200,7 @@ export function SignupModal({
                     <select
                       required
                       value={signupData.country}
-                      onChange={(e) => handleSignupChange('country', e.target.value)}
+                      onChange={(e) => handleCountryChange(e.target.value)}
                       className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
                       disabled={isLoading}
                     >

@@ -5,8 +5,6 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useUser, useAuth, useAuthLoading } from '@/lib/hooks/useAuthStore'
 import type { User } from '@/types'
 import { 
-  useCountries, 
-  useCountryCodeMap, 
   validateEmail, 
   validatePassword, 
   validatePhone,
@@ -35,11 +33,6 @@ export function useAuthenticationLogic({
   const { user, isAuthenticated, hasHydrated } = useUser()
   const { login, register, initializeSession } = useAuth()
   const { isLoading } = useAuthLoading()
-
-  console.log('🎯 [PageContent] Appel du hook useCountries...')
-  const countriesData = useCountries()
-  const { countries, loading: countriesLoading, usingFallback } = countriesData
-  const countryCodeMap = useCountryCodeMap(countries)
 
   const hasCheckedAuth = useRef(false)
   const redirectLock = useRef(false)
@@ -120,15 +113,10 @@ export function useAuthenticationLogic({
   const handleSignupChange = useCallback((field: keyof SignupData, value: string) => {
     setSignupData(prev => {
       const newData = { ...prev, [field]: value }
-      
-      if (field === 'country' && value && countryCodeMap[value]) {
-        console.log('🏳️ [Country] Auto-remplissage code pays:', value, '->', countryCodeMap[value])
-        newData.countryCode = countryCodeMap[value]
-      }
-      
+      // Note: L'auto-remplissage du countryCode sera géré dans SignupModal
       return newData
     })
-  }, [countryCodeMap])
+  }, [])
 
   const validateSignupForm = useCallback((): string | null => {
     const { 
@@ -244,7 +232,7 @@ export function useAuthenticationLogic({
     
     if (!sessionInitialized.current) {
       sessionInitialized.current = true
-      console.log('🔍 [Session] Initialisation unique de la session')
+      console.log('🔄 [Session] Initialisation unique de la session')
       initializeSession()
     }
   }, [hasHydrated, initializeSession])
@@ -255,7 +243,7 @@ export function useAuthenticationLogic({
     }
 
     hasCheckedAuth.current = true
-    console.log('🔍 [Auth] Vérification unique de l\'authentification')
+    console.log('🔒 [Auth] Vérification unique de l\'authentification')
 
     if (isAuthenticated) {
       console.log('✅ [Auth] Déjà connecté, redirection immédiate')
@@ -336,13 +324,6 @@ export function useAuthenticationLogic({
     validateWebsite
   }), [handleLoginChange, handleSignupChange, handleLogin, handleSignup, validateSignupForm])
 
-  const stableCountriesData = useMemo(() => ({
-    countries,
-    countriesLoading,
-    usingFallback,
-    countryCodeMap
-  }), [countries, countriesLoading, usingFallback, countryCodeMap])
-
   const stableFormStates = useMemo(() => ({
     showPassword,
     setShowPassword,
@@ -360,13 +341,11 @@ export function useAuthenticationLogic({
     
     // États stables (ne changent pas souvent)
     ...stableFormStates,
-    ...stableCountriesData,
     ...stableHandlers
   }), [
     loginData,
     signupData,
     stableFormStates,
-    stableCountriesData,
     stableHandlers
   ])
 }
