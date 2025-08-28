@@ -332,36 +332,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     return valid.length
   }
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'N/A'
-    return new Date(dateString).toLocaleDateString('fr-FR', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
-  }
-
-  const getStatusIcon = (status: string, reason?: string) => {
-    switch (status) {
-      case 'sent': return <span className="text-green-600">✅</span>
-      case 'skipped': 
-        if (reason === 'user_exists') return <span className="text-blue-600">👤</span>
-        return <span className="text-yellow-600">⭐</span>
-      case 'failed': return <span className="text-red-600">❌</span>
-      default: return <span className="text-gray-600">⚪</span>
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'sent': return 'bg-green-50 border-green-200 text-green-800'
-      case 'skipped': return 'bg-blue-50 border-blue-200 text-blue-800'
-      case 'failed': return 'bg-red-50 border-red-200 text-red-800'
-      default: return 'bg-gray-50 border-gray-200 text-gray-800'
-    }
-  }
-
-  // ==================== AJOUT: Fonction pour messages simplifiés ====================
+  // Fonction pour messages simplifiés
   const getFriendlyMessage = (result: InvitationResult) => {
     if (result.status === 'sent') {
       return `Invitation envoyée avec succès à ${result.email} ! 🎉`
@@ -398,15 +369,14 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     return result.message
   }
 
-  // Affichage conditionnel si pas d'utilisateur (votre code original conservé)
+  // Affichage conditionnel si pas d'utilisateur
   if (!currentUser?.email) {
     return (
-      <>
-        <div ref={overlayRef} className="fixed inset-0 z-50" onClick={onClose}>
-          <div 
-            className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" 
-            onClick={(e) => e.stopPropagation()}
-          >
+      <div ref={overlayRef} className="fixed inset-0 z-50" onClick={onClose}>
+        <div 
+          className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" 
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">Inviter des amis</h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
@@ -424,20 +394,15 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
                 Fermer
               </button>
             </div>
-                      </div>
           </div>
         </div>
-      )
+      </div>
+    )
   }
 
   return (
-    <>
-      {/* Overlay avec styles forcés */}
-      <div ref={overlayRef} className="fixed inset-0 z-50" onClick={onClose} />
-      
-      {/* Modal Container avec styles forcés */}
+    <div ref={overlayRef} className="fixed inset-0 z-50" onClick={onClose}>
       <div 
-        ref={contentRef}
         className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" 
         onClick={(e) => e.stopPropagation()}
       >
@@ -465,14 +430,14 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
               </p>
             </div>
 
-            {/* ==================== INTERFACE SIMPLIFIÉE POUR LES RÉSULTATS ==================== */}
+            {/* Interface pour les résultats */}
             {results && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
                   État de l'envoi
                 </h3>
 
-                {/* Messages des résultats - Interface simplifiée */}
+                {/* Messages des résultats */}
                 <div className="space-y-3">
                   {results.results.map((result, index) => (
                     <div
@@ -545,7 +510,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
               </div>
             )}
 
-            {/* Formulaire principal (si pas de résultats affichés) */}
+            {/* Formulaire principal */}
             {!results && (
               <div className="space-y-6">
                 {/* Section Email Addresses */}
@@ -612,13 +577,9 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
 
             {/* Boutons d'action */}
             <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-              {/* Bouton d'envoi (seulement si pas de résultats) */}
               {!results && (
                 <button
-                  onClick={() => {
-                    console.log('🖱️ [InviteFriendModal] Bouton "Envoyer" cliqué depuis onClick')
-                    handleSendInvitations()
-                  }}
+                  onClick={handleSendInvitations}
                   disabled={isLoading || getEmailCount() === 0}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center space-x-2"
                 >
@@ -650,6 +611,6 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
