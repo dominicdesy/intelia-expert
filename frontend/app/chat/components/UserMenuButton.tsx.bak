@@ -103,38 +103,39 @@ export const UserMenuButton = React.memo(() => {
     return { currentPlan, plan, isSuperAdmin }
   }, [user?.plan, user?.user_type])
 
-  // Solution finale : Déconnexion coordonnée avec AuthProvider
-  const handleLogout = useCallback(() => {
+  // CORRECTION MAJEURE : Déconnexion avec préservation RememberMe et navigation immédiate
+  const handleLogout = useCallback(async () => {
     // Protection contre les clics multiples
     if (logoutInProgressRef.current || !isMountedRef.current) return
     
-    console.log('[DEBUG-LOGOUT] Début déconnexion coordonnée')
+    console.log('[DEBUG-LOGOUT-UserMenu] Début déconnexion coordonnée')
     logoutInProgressRef.current = true
     setIsOpen(false)
 
     try {
-      // Stratégie finale : Nettoyer localStorage ET rediriger immédiatement
-      // Cela évite complètement les callbacks Supabase dans AuthProvider
+      // STRATÉGIE DEFENSIVE : Navigation immédiate pour éviter les callbacks
+      console.log('[DEBUG-LOGOUT-UserMenu] Navigation immédiate pour éviter callbacks')
       
-      console.log('[DEBUG-LOGOUT] Nettoyage localStorage complet')
-      localStorage.clear()
+      // Fermer le menu immédiatement
+      setIsOpen(false)
       
-      console.log('[DEBUG-LOGOUT] Redirection immédiate pour éviter callbacks')
-      window.location.href = '/'
+      // Lancer le logout en arrière-plan SANS attendre
+      logout().catch((error) => {
+        console.error('[DEBUG-LOGOUT-UserMenu] Erreur logout async (ignorée):', error)
+      })
       
-      // Cleanup Supabase en arrière-plan (optionnel car page change)
-      setTimeout(() => {
-        logout().catch((error) => {
-          console.error('Logout async error (ignoré):', error)
-        })
-      }, 100)
+      // Navigation immédiate pour stopper les re-renders
+      console.log('[DEBUG-LOGOUT-UserMenu] Redirection immédiate')
+      router.push('/')
       
     } catch (error) {
-      console.error('Erreur logout:', error)
+      console.error('[DEBUG-LOGOUT-UserMenu] Erreur logout:', error)
       // Fallback de sécurité
-      window.location.href = '/'
+      router.push('/')
+    } finally {
+      logoutInProgressRef.current = false
     }
-  }, [logout])
+  }, [logout, router])
 
   // Handlers des modales avec protection
   const handleContactClick = useCallback(() => {
@@ -362,12 +363,11 @@ export const UserMenuButton = React.memo(() => {
         </Modal>
       )}
 
-      {/* CORRECTION CRITIQUE : UserInfoModal directement SANS wrapper Modal 
-          pour éviter les conflits DOM qui causent React #300 */}
-      {showUserInfoModal && (
+      {/* CORRECTION CRITIQUE : UserInfoModal avec protection supplémentaire */}
+      {showUserInfoModal && isMountedRef.current && (
         <UserInfoModal 
           user={user as any} 
-          onClose={closeUserInfoModal} 
+          onClose={closeUserInfoModal}
         />
       )}
 
