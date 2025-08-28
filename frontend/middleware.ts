@@ -1,37 +1,104 @@
-// middleware.ts - Version Supabase mise à jour
+// middleware.ts - Version Supabase avec CACHE et PROTECTION BOUCLE
 
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+// PROTECTION GLOBALE contre les vérifications multiples
+const middlewareCache = {
+  lastCheck: 0,
+  lastSessionState: null as boolean | null,
+  lastUserId: null as string | null,
+  CACHE_DURATION: 2000, // 2 secondes de cache
+  checkCount: 0,
+  MAX_CHECKS_PER_MINUTE: 30
+}
+
+// Reset du cache périodiquement
+setInterval(() => {
+  middlewareCache.checkCount = 0
+}, 60000) // Reset toutes les minutes
+
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
   
   try {
+    const now = Date.now()
+    const pathname = req.nextUrl.pathname
+
+    // PROTECTION: Limite le nombre de vérifications
+    if (middlewareCache.checkCount > middlewareCache.MAX_CHECKS_PER_MINUTE) {
+      console.warn('🛡️ [Middleware] Trop de vérifications, utilisation du cache')
+      
+      // Utiliser le dernier état connu
+      if (middlewareCache.lastSessionState === false) {
+        const publicRoutes = [
+          '/auth/login', '/auth/signup', '/auth/forgot-password',
+          '/auth/reset-password', '/auth/confirm', '/auth/callback',
+          '/auth/invitation', '/privacy', '/terms', '/',
+          '/_next', '/favicon.ico', '/images', '/icons'
+        ]
+        
+        const isPublicRoute = publicRoutes.some(route => 
+          pathname.startsWith(route) || pathname === route
+        )
+        
+        if (!isPublicRoute) {
+          return NextResponse.redirect(new URL('/', req.url))
+        }
+      }
+      
+      return applySecurityHeaders(res)
+    }
+
+    // CACHE: Utiliser le cache si récent
+    if (now - middlewareCache.lastCheck < middlewareCache.CACHE_DURATION) {
+      console.log('⚡ [Middleware] Utilisation du cache - pas de vérification Supabase')
+      
+      // Appliquer la même logique que si on avait fait la vérification
+      if (middlewareCache.lastSessionState === false) {
+        const protectedPaths = ['/chat', '/profile', '/settings', '/admin']
+        const isProtectedPath = protectedPaths.some(path => pathname.startsWith(path))
+        
+        if (isProtectedPath) {
+          return NextResponse.redirect(new URL('/', req.url))
+        }
+      }
+      
+      return applySecurityHeaders(res)
+    }
+
+    // Incrémenter le compteur de vérifications
+    middlewareCache.checkCount++
+    middlewareCache.lastCheck = now
+
     const supabase = createMiddlewareClient({ req, res })
     const { data: { session } } = await supabase.auth.getSession()
 
-    console.log('🔄 [Middleware] Vérification Supabase:', {
-      path: req.nextUrl.pathname,
-      hasSession: !!session,
-      userEmail: session?.user?.email
-    })
+    // Mettre à jour le cache
+    middlewareCache.lastSessionState = !!session
+    middlewareCache.lastUserId = session?.user?.id || null
 
-    const { pathname } = req.nextUrl
+    // LOGS RÉDUITS (seulement si changement d'état)
+    const sessionChanged = middlewareCache.lastSessionState !== (!!session)
+    if (sessionChanged || middlewareCache.checkCount <= 3) {
+      console.log('🔄 [Middleware] Vérification Supabase:', {
+        path: pathname,
+        hasSession: !!session,
+        userEmail: session?.user?.email,
+        cached: false
+      })
+    }
 
     // 🆕 REDIRECTION /welcome → /auth/invitation (NOUVEAU)
     if (pathname === '/welcome' || pathname === '/welcome/') {
       console.log('🔄 [Middleware] Redirection /welcome → /auth/invitation')
       
-      // Construire la nouvelle URL avec tous les paramètres préservés
       const invitationUrl = new URL('/auth/invitation', req.url)
-      
-      // Copier les query parameters (?invited_by=...)
       req.nextUrl.searchParams.forEach((value, key) => {
         invitationUrl.searchParams.set(key, value)
       })
       
-      console.log('✅ [Middleware] Redirection vers:', invitationUrl.toString())
       return NextResponse.redirect(invitationUrl)
     }
 
@@ -39,27 +106,22 @@ export async function middleware(req: NextRequest) {
     if (pathname === '/auth/logout') {
       console.log('🚪 [Middleware] Route logout détectée - nettoyage forcé')
       
-      // Déconnecter via Supabase
       await supabase.auth.signOut()
       
-      // Créer une réponse de redirection vers login
       const loginUrl = new URL('/auth/login', req.url)
       loginUrl.searchParams.set('auth', 'logout')
       const logoutResponse = NextResponse.redirect(loginUrl)
       
-      // Nettoyer tous les cookies d'auth dans la réponse
       const cookiesToClear = [
         'supabase-auth-token',
         'supabase.auth.token', 
         'sb-access-token',
         'sb-refresh-token',
-        // Cookies Supabase spécifiques au projet
         'sb-' + process.env.NEXT_PUBLIC_SUPABASE_URL?.split('//')[1]?.split('.')[0] + '-auth-token'
       ]
       
       cookiesToClear.forEach(cookieName => {
         logoutResponse.cookies.delete(cookieName)
-        // Aussi marquer comme expiré
         logoutResponse.cookies.set(cookieName, '', { 
           expires: new Date(0),
           path: '/',
@@ -67,94 +129,73 @@ export async function middleware(req: NextRequest) {
         })
       })
       
-      console.log('✅ [Middleware] Redirection logout avec nettoyage cookies Supabase')
+      // Reset du cache lors du logout
+      middlewareCache.lastSessionState = false
+      middlewareCache.lastUserId = null
+      
       return logoutResponse
     }
 
-    // Routes publiques (conservé de votre logique + ajout invitation)
+    // Routes publiques (conservé)
     const publicRoutes = [
-      '/auth/login',
-      '/auth/signup', 
-      '/auth/forgot-password',
-      '/auth/reset-password',
-      '/auth/confirm',
-      '/auth/callback', // 🆕 AJOUT: Route callback Supabase
-      '/auth/invitation', // 🆕 AJOUT: Route invitation
-      '/privacy',
-      '/terms',
-      '/',  // Page d'accueil publique
-      '/_next',
-      '/favicon.ico',
-      '/images',
-      '/icons'
+      '/auth/login', '/auth/signup', '/auth/forgot-password',
+      '/auth/reset-password', '/auth/confirm', '/auth/callback',
+      '/auth/invitation', '/privacy', '/terms', '/',
+      '/_next', '/favicon.ico', '/images', '/icons'
     ]
 
     const isPublicRoute = publicRoutes.some(route => 
       pathname.startsWith(route) || pathname === route
     )
 
-    // Si route publique, appliquer les headers de sécurité et continuer
     if (isPublicRoute) {
-      const secureResponse = applySecurityHeaders(res)
-      return secureResponse
+      return applySecurityHeaders(res)
     }
 
-    // Routes protégées (conservé de votre logique)
+    // Routes protégées
     const protectedPaths = ['/chat', '/profile', '/settings', '/admin']
-    const isProtectedPath = protectedPaths.some(path => 
-      pathname.startsWith(path)
-    )
+    const isProtectedPath = protectedPaths.some(path => pathname.startsWith(path))
 
-    // ✅ CORRECTION PRINCIPALE: Redirection PROPRE sans paramètres indésirables
     if (isProtectedPath && !session) {
       console.log('🚫 [Middleware] Accès refusé à route protégée:', pathname)
-      console.log('🏠 [Middleware] Redirection vers accueil SANS paramètres')
-      
-      // ✅ REDIRECTION PROPRE vers l'accueil (conservé de votre logique)
-      const homeUrl = new URL('/', req.url)
-      return NextResponse.redirect(homeUrl)
+      return NextResponse.redirect(new URL('/', req.url))
     }
 
-    // ✅ ÉVITER LES REDIRECTIONS INUTILES pour les utilisateurs connectés
+    // Éviter les redirections inutiles pour les utilisateurs connectés
     if (pathname === '/' && session) {
       console.log('✅ [Middleware] Utilisateur connecté sur accueil - Pas de redirection forcée')
-      // Laisser l'utilisateur sur la page d'accueil, ne pas forcer vers /chat
     }
 
-    // 🆕 NOUVEAU: Redirection des pages d'auth vers chat si connecté
+    // Redirection des pages d'auth vers chat si connecté
     if (pathname.startsWith('/auth/') && session && pathname !== '/auth/callback' && pathname !== '/auth/invitation') {
       console.log('🔄 [Middleware] Utilisateur connecté sur page auth, redirection vers chat')
       return NextResponse.redirect(new URL('/chat', req.url))
     }
 
-    // Headers de sécurité conservés pour Zoho SalesIQ
-    const secureResponse = applySecurityHeaders(res)
-    return secureResponse
+    return applySecurityHeaders(res)
 
   } catch (error) {
     console.error('❌ [Middleware] Erreur Supabase:', error)
+    
+    // En cas d'erreur, assumer pas de session
+    middlewareCache.lastSessionState = false
+    middlewareCache.lastUserId = null
+    
     return NextResponse.next()
   }
 }
 
-// Fonction pour appliquer vos headers de sécurité existants (VERSION COMPLÈTE RESTAURÉE)
+// Fonction pour appliquer les headers de sécurité (CONSERVÉE)
 function applySecurityHeaders(response: NextResponse): NextResponse {
   const cspHeader = [
     "default-src 'self'",
-    // ✅ SCRIPT-SRC CORRIGÉ pour autoriser Zoho SalesIQ
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://salesiq.zohopublic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
-    // ✅ STYLE-SRC CORRIGÉ pour autoriser Zoho SalesIQ  
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://salesiq.zohopublic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
     "font-src 'self' https://fonts.gstatic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
-    // ✅ IMG-SRC CORRIGÉ pour autoriser Zoho SalesIQ
     "img-src 'self' data: https: blob: https://salesiq.zohopublic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
-    // ✅ CONNECT-SRC CORRIGÉ - AJOUT DE RESTCOUNTRIES.COM + conservation de tout le reste
     "connect-src 'self' https://*.supabase.co https://expert-app-cngws.ondigitalocean.app https://salesiq.zohopublic.com https://*.zoho.com wss://*.zoho.com wss://vts.zohopublic.com wss://salesiq.zohopublic.com https://*.zohostatic.com https://restcountries.com",
-    // ✅ FRAME-SRC CONSERVÉ pour autoriser les iframes Zoho
     "frame-src 'self' https://salesiq.zohopublic.com https://*.zoho.com",
-    // ✅ CHILD-SRC CONSERVÉ pour autoriser les pop-ups Zoho
     "child-src 'self' https://salesiq.zohopublic.com https://*.zoho.com",
-    // ✅ WORKER-SRC CONSERVÉ pour les service workers
     "worker-src 'self' blob:",
     "media-src 'self' https://*.zoho.com",
     "object-src 'none'",

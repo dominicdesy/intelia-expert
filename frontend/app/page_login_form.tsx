@@ -1,8 +1,22 @@
 'use client'
 
-import React, { memo, useCallback } from 'react'
+import React, { memo, useCallback, useState } from 'react'
 import Link from 'next/link'
 import { AlertMessage, PasswordInput } from './page_components'
+
+// Composant de test isolé pour diagnostic
+const TestInput = () => {
+  const [email, setEmail] = useState('')
+  console.log('🧪 [TestInput] Render - email:', email.length, 'caractères')
+  return (
+    <input
+      value={email}
+      onChange={(e) => setEmail(e.target.value)}
+      placeholder="Test isolé - tapez ici"
+      className="block w-full rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+    />
+  )
+}
 
 interface LoginFormProps {
   authLogic: any
@@ -12,7 +26,6 @@ interface LoginFormProps {
   toggleMode: () => void
 }
 
-// ✅ CORRECTION : Mémoriser le composant LoginForm
 export const LoginForm = memo(function LoginForm({ 
   authLogic, 
   t, 
@@ -20,6 +33,8 @@ export const LoginForm = memo(function LoginForm({
   localSuccess, 
   toggleMode 
 }: LoginFormProps) {
+  console.log('🔍 [LoginForm] Composant LoginForm rendu')
+  
   const {
     loginData,
     isLoading,
@@ -31,7 +46,6 @@ export const LoginForm = memo(function LoginForm({
   const [formError, setFormError] = React.useState('')
   const [formSuccess, setFormSuccess] = React.useState('')
 
-  // ✅ Mémoriser les handlers pour éviter les re-renders
   const onSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     setFormError('')
@@ -51,8 +65,8 @@ export const LoginForm = memo(function LoginForm({
     }
   }, [onSubmit])
 
-  // ✅ Mémoriser les handlers d'input pour éviter les cascades de re-renders
   const handleEmailChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('📝 [LoginForm] Email change détecté:', e.target.value.length, 'caractères')
     handleLoginChange('email', e.target.value)
   }, [handleLoginChange])
 
@@ -95,6 +109,10 @@ export const LoginForm = memo(function LoginForm({
               {t.email}
             </label>
             <div className="mt-1">
+              {/* TEST DIAGNOSTIC : Input isolé */}
+              <TestInput />
+              
+              {/* Input original commenté pour test
               <input
                 id="email"
                 name="email"
@@ -105,6 +123,7 @@ export const LoginForm = memo(function LoginForm({
                 onChange={handleEmailChange}
                 className="block w-full rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
               />
+              */}
             </div>
           </div>
 
