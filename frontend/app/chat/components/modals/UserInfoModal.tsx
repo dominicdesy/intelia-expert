@@ -684,21 +684,18 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
   })
 
   return (
-    <>
-      {/* Overlay avec styles forcés - même structure que LanguageModal */}
+    <div 
+      ref={overlayRef}
+      className="fixed inset-0 z-50" 
+      onClick={handleClose}
+      data-debug="modal-overlay"
+    >
       <div 
-        ref={overlayRef}
-        className="fixed inset-0 z-50" 
-        onClick={handleClose}
-        data-debug="modal-overlay"
+        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+        data-modal="user-info"
+        data-debug="modal-content"
       >
-        {/* Modal Container - contenu direct dans l'overlay */}
-        <div 
-          className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-          onClick={(e) => e.stopPropagation()}
-          data-modal="user-info"
-          data-debug="modal-content"
-        >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
@@ -993,6 +990,6 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
