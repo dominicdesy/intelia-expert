@@ -1,9 +1,9 @@
 'use client'
 
-import React, { memo, useCallback, useState, useEffect } from 'react'
+import React, { memo, useCallback, useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { AlertMessage, PasswordInput } from './page_components'
-import { validateEmail, rememberMeUtils } from './page_hooks'
+import { validateEmail, rememberMeUtils, debugLog } from './page_hooks'
 import type { LoginData } from './page_types'
 
 interface LoginFormProps {
@@ -21,7 +21,7 @@ export const LoginForm = memo(function LoginForm({
   localSuccess, 
   toggleMode 
 }: LoginFormProps) {
-  console.log('🔐 [LoginForm] Render - ÉTAT LOCAL GÉRÉ ICI')
+  debugLog('form', 'LoginForm rendered')
   
   const {
     isLoading,
@@ -29,7 +29,6 @@ export const LoginForm = memo(function LoginForm({
     handleLogin
   } = authLogic
 
-  // CORRECTION PRINCIPALE : État local dans LoginForm
   const [loginData, setLoginData] = useState<LoginData>({
     email: '',
     password: '',
@@ -39,35 +38,36 @@ export const LoginForm = memo(function LoginForm({
   const [formError, setFormError] = useState('')
   const [formSuccess, setFormSuccess] = useState('')
 
-  // Gestionnaire local pour les changements de données de connexion
+  // Gestionnaire optimisé avec logs réduits
   const handleLoginChange = useCallback((field: keyof LoginData, value: string | boolean) => {
-    console.log(`🔄 [LoginForm] Changement ${field}:`, value)
+    // Log seulement pour rememberMe et quand nécessaire
+    if (field === 'rememberMe') {
+      debugLog('form', `RememberMe changed to: ${value}`)
+    }
     
     setLoginData(prev => {
       const newData = { ...prev, [field]: value }
       
-      // Gestion spéciale pour rememberMe
+      // Gestion rememberMe
       if (field === 'rememberMe') {
         const isRememberChecked = value as boolean
-        console.log('🛯 [LoginForm] RememberMe changé:', isRememberChecked)
         
         if (isRememberChecked && newData.email?.trim()) {
-          // Sauvegarder immédiatement si email présent
           rememberMeUtils.save(newData.email.trim(), true)
-          console.log('✅ [LoginForm] Email sauvegardé immédiatement:', newData.email.trim())
+          debugLog('storage', 'Email saved immediately', newData.email.trim())
         } else if (!isRememberChecked) {
-          // Nettoyer le localStorage si décoché
           rememberMeUtils.save('', false)
-          console.log('🗑️ [LoginForm] Remember Me désactivé - localStorage nettoyé')
+          debugLog('storage', 'RememberMe disabled - localStorage cleared')
         }
       }
       
-      // Gestion pour l'email quand rememberMe est activé
+      // Gestion email - sauvegarder seulement si email complet et valide
       if (field === 'email' && newData.rememberMe) {
         const emailValue = (value as string).trim()
+        // Sauvegarder seulement si l'email semble complet pour éviter les sauvegardes à chaque caractère
         if (emailValue && validateEmail(emailValue)) {
           rememberMeUtils.save(emailValue, true)
-          console.log('✅ [LoginForm] Nouvel email sauvegardé:', emailValue)
+          debugLog('storage', 'Valid email saved', emailValue)
         }
       }
       
@@ -77,30 +77,27 @@ export const LoginForm = memo(function LoginForm({
 
   // Restaurer les données Remember Me à l'initialisation
   useEffect(() => {
-    console.log('🔄 [LoginForm] Initialisation - Restauration Remember Me...')
+    debugLog('form', 'Initializing RememberMe restoration')
     
     const { rememberMe, lastEmail } = rememberMeUtils.load()
-    console.log('📦 [LoginForm] Données chargées:', { rememberMe, lastEmail })
     
     if (rememberMe && lastEmail) {
       setLoginData(prev => ({
         ...prev,
         email: lastEmail,
-        rememberMe: true // S'assurer que la case est cochée
+        rememberMe: true
       }))
-      console.log('✅ [LoginForm] Email et rememberMe restaurés:', lastEmail)
+      debugLog('form', 'RememberMe data restored', lastEmail)
     }
   }, [])
 
-  // Focus automatique sur le mot de passe si email pré-rempli
+  // Focus automatique optimisé avec délai réduit
   useEffect(() => {
-    const { rememberMe, lastEmail } = rememberMeUtils.load()
-    
-    if (rememberMe && lastEmail && loginData.email && !loginData.password && passwordInputRef.current) {
+    if (loginData.email && !loginData.password && passwordInputRef.current) {
       const timer = setTimeout(() => {
         passwordInputRef.current?.focus()
-        console.log('🎯 [LoginForm] Focus automatique sur le mot de passe')
-      }, 500)
+        debugLog('form', 'Auto-focus on password field')
+      }, 300)
       
       return () => clearTimeout(timer)
     }
@@ -112,16 +109,11 @@ export const LoginForm = memo(function LoginForm({
     setFormSuccess('')
 
     try {
-      console.log('🚀 [LoginForm] Soumission avec données:', {
-        email: loginData.email,
-        rememberMe: loginData.rememberMe
-      })
-      
-      // Passer les données locales au handler du hook parent
+      debugLog('auth', 'Form submission', { email: loginData.email, rememberMe: loginData.rememberMe })
       await handleLogin(e, loginData)
       setFormSuccess(t.authSuccess)
     } catch (error: any) {
-      console.error('❌ [LoginForm] Erreur soumission:', error)
+      debugLog('error', 'Login error', error.message)
       setFormError(error.message)
     }
   }, [handleLogin, loginData, t.authSuccess])
@@ -132,7 +124,7 @@ export const LoginForm = memo(function LoginForm({
     }
   }, [onSubmit])
 
-  // Gestionnaires d'événements optimisés
+  // Gestionnaires memoizés pour éviter les re-renders
   const handleEmailChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     handleLoginChange('email', e.target.value)
   }, [handleLoginChange])
@@ -142,33 +134,43 @@ export const LoginForm = memo(function LoginForm({
   }, [handleLoginChange])
 
   const handleRememberMeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('🛯 [LoginForm] Événement onChange déclenché!')
-    console.log('🛯 [LoginForm] e.target.checked:', e.target.checked)
-    console.log('🛯 [LoginForm] État actuel rememberMe:', loginData.rememberMe)
-    
-    // Appel direct du gestionnaire de changement
+    debugLog('form', 'RememberMe checkbox event triggered', e.target.checked)
     handleLoginChange('rememberMe', e.target.checked)
-  }, [handleLoginChange, loginData.rememberMe])
+  }, [handleLoginChange])
 
-  // Debug du state actuel
-  console.log('🔍 [LoginForm] État actuel loginData:', loginData)
+  // Memoization des messages pour éviter les re-renders
+  const errorMessage = useMemo(() => localError || formError, [localError, formError])
+  const successMessage = useMemo(() => localSuccess || formSuccess, [localSuccess, formSuccess])
+
+  // État des boutons memoizé
+  const isSubmitDisabled = useMemo(() => 
+    isLoading || !loginData.email?.trim() || !loginData.password,
+    [isLoading, loginData.email, loginData.password]
+  )
+
+  // Debug léger en mode développement
+  debugLog('form', 'Current state', { 
+    hasEmail: !!loginData.email, 
+    rememberMe: loginData.rememberMe,
+    isLoading 
+  })
 
   return (
     <>
-      {/* Messages d'erreur et succès pour login */}
-      {(localError || formError) && (
+      {/* Messages d'erreur et succès */}
+      {errorMessage && (
         <AlertMessage 
           type="error" 
           title={t.loginError} 
-          message={localError || formError} 
+          message={errorMessage} 
         />
       )}
 
-      {(localSuccess || formSuccess) && (
+      {successMessage && (
         <AlertMessage 
           type="success" 
           title="" 
-          message={localSuccess || formSuccess} 
+          message={successMessage} 
         />
       )}
 
@@ -248,7 +250,7 @@ export const LoginForm = memo(function LoginForm({
           <div>
             <button
               type="submit"
-              disabled={isLoading || !loginData.email || !loginData.password}
+              disabled={isSubmitDisabled}
               className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isLoading ? (
@@ -276,7 +278,7 @@ export const LoginForm = memo(function LoginForm({
         </div>
       </div>
 
-      {/* Bouton pour ouvrir la modale d'inscription */}
+      {/* Bouton d'inscription */}
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-600">
           {t.newToIntelia}{' '}
@@ -290,16 +292,12 @@ export const LoginForm = memo(function LoginForm({
         </p>
       </div>
 
-      {/* Debug info (à retirer en production) */}
+      {/* Debug info simplifiée - seulement l'essentiel en mode développement */}
       {process.env.NODE_ENV === 'development' && (
-        <div className="mt-4 p-2 bg-gray-100 rounded text-xs">
-          <strong>Debug Info:</strong>
-          <br />
-          Email: {loginData.email}
-          <br />
-          RememberMe: {loginData.rememberMe ? 'Oui' : 'Non'}
-          <br />
-          LocalStorage: {localStorage.getItem('intelia-remember-me') ? 'Présent' : 'Absent'}
+        <div className="mt-4 p-2 bg-gray-100 rounded text-xs opacity-50 hover:opacity-100 transition-opacity">
+          <strong>Debug:</strong> Email: {loginData.email ? 'Présent' : 'Vide'} | 
+          RememberMe: {loginData.rememberMe ? 'Oui' : 'Non'} | 
+          Storage: {localStorage.getItem('intelia-remember-me-persist') ? 'OK' : 'Vide'}
         </div>
       )}
     </>
