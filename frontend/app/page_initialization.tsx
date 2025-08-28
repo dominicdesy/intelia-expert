@@ -19,10 +19,10 @@ export function usePageInitialization() {
   const [localSuccess, setLocalSuccess] = useState('')
   const [hasHydrated, setHasHydrated] = useState(false)
 
-  // ✅ Mémorisation stable des traductions
+  // Mémorisation stable des traductions
   const t = useMemo(() => translations[currentLanguage], [currentLanguage])
 
-  // ✅ CORRECTION : toggleMode sans dépendances changeantes
+  // CORRECTION : toggleMode sans dépendances changeantes
   const toggleMode = useCallback(() => {
     console.log('🔄 [UI] Basculement mode')
     setIsSignupMode(prev => {
@@ -31,21 +31,21 @@ export function usePageInitialization() {
     })
     setLocalError('')
     setLocalSuccess('')
-  }, []) // ✅ Pas de dépendances - fonction stable
+  }, []) // Pas de dépendances - fonction stable
 
-  // ✅ CORRECTION : setCurrentLanguage stable sans dépendances changeantes
+  // CORRECTION : setCurrentLanguage stable sans dépendances changeantes
   const handleSetCurrentLanguage = useCallback((newLanguage: Language) => {
     setCurrentLanguage(prev => {
       if (prev !== newLanguage) {
-        console.log('🌐 [Language] Changement de langue:', prev, '→', newLanguage)
+        console.log('🌍 [Language] Changement de langue:', prev, '→', newLanguage)
         localStorage.setItem('intelia-language', newLanguage)
         return newLanguage
       }
       return prev
     })
-  }, []) // ✅ Pas de dépendances - fonction stable
+  }, []) // Pas de dépendances - fonction stable
 
-  // ✅ Effects d'initialisation optimisés avec Remember Me
+  // Effects d'initialisation optimisés avec Remember Me
   useEffect(() => {
     if (!isMounted.current) return
     
@@ -67,8 +67,9 @@ export function usePageInitialization() {
         }
       }
 
-      // Restaurer EMAIL avec fonction utilitaire - Une seule fois
-      const { hasRememberedEmail, lastEmail } = rememberMeUtils.load()
+      // CORRECTION : Restaurer EMAIL avec la nouvelle structure rememberMeUtils
+      const { rememberMe, lastEmail } = rememberMeUtils.load()
+      const hasRememberedEmail = rememberMe && lastEmail
       
       if (hasRememberedEmail && isMounted.current) {
         setLocalSuccess(`Email restauré : ${lastEmail}. Entrez votre mot de passe.`)
@@ -82,9 +83,9 @@ export function usePageInitialization() {
         return () => clearTimeout(timer)
       }
     }
-  }, []) // ✅ Dépendances vides - ne s'exécute qu'une fois
+  }, []) // Dépendances vides - ne s'exécute qu'une fois
 
-  // ✅ Gestion URL callback optimisée
+  // Gestion URL callback optimisée
   useEffect(() => {
     if (!hasInitialized.current || !isMounted.current) return
 
@@ -119,9 +120,9 @@ export function usePageInitialization() {
     }, 3000)
     
     return () => clearTimeout(timer)
-  }, [searchParams, t.authSuccess, t.authError, t.authIncomplete]) // ✅ Dépendances stables
+  }, [searchParams, t.authSuccess, t.authError, t.authIncomplete]) // Dépendances stables
 
-  // ✅ Effet pour bloquer le scroll en mode signup - Optimisé
+  // Effet pour bloquer le scroll en mode signup - Optimisé
   useEffect(() => {
     const originalBodyOverflow = document.body.style.overflow
     const originalDocumentOverflow = document.documentElement.style.overflow
@@ -134,24 +135,24 @@ export function usePageInitialization() {
       document.documentElement.style.overflow = originalDocumentOverflow || 'unset'
     }
     
-    // ✅ Cleanup optimisé au démontage
+    // Cleanup optimisé au démontage
     return () => {
       document.body.style.overflow = originalBodyOverflow || 'unset'
       document.documentElement.style.overflow = originalDocumentOverflow || 'unset'
     }
   }, [isSignupMode])
 
-  // ✅ Cleanup général au démontage
+  // Cleanup général au démontage
   useEffect(() => {
     return () => {
       isMounted.current = false
     }
   }, [])
 
-  // ✅ CORRECTION : Retour avec fonctions stables
+  // CORRECTION : Retour avec fonctions stables
   return useMemo(() => ({
     currentLanguage,
-    setCurrentLanguage: handleSetCurrentLanguage, // ✅ Fonction stable
+    setCurrentLanguage: handleSetCurrentLanguage, // Fonction stable
     t,
     isSignupMode,
     setIsSignupMode,
@@ -161,7 +162,7 @@ export function usePageInitialization() {
     setLocalSuccess,
     hasHydrated,
     hasInitialized,
-    toggleMode // ✅ Fonction stable
+    toggleMode // Fonction stable
   }), [
     currentLanguage, 
     t, 
@@ -169,7 +170,7 @@ export function usePageInitialization() {
     localError, 
     localSuccess, 
     hasHydrated,
-    handleSetCurrentLanguage, // ✅ Stable
-    toggleMode // ✅ Stable
+    handleSetCurrentLanguage, // Stable
+    toggleMode // Stable
   ])
 }
