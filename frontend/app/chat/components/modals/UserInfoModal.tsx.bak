@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef, startTransition } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '../../hooks/useTranslation'
 import { UserInfoModalProps } from '@/types'
@@ -256,15 +256,6 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     return null
   }
 
-  // Protection unmount-safe
-  const isMountedRef = useRef(true)
-  useEffect(() => {
-    isMountedRef.current = true
-    return () => {
-      isMountedRef.current = false
-    }
-  }, [])
-
   const { updateProfile } = useAuthStore()
   const { t } = useTranslation()
   const { validatePhoneFields } = usePhoneValidation()
@@ -291,7 +282,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       overlay.style.setProperty('padding', '16px', 'important')
       
       // Forcer les dimensions du contenu (700px pour UserInfo)
-      const content = overlay.querySelector('.uimodal-content') as HTMLElement
+      const content = overlay.querySelector('.bg-white') as HTMLElement
       if (content) {
         content.style.setProperty('max-width', '700px', 'important')
         content.style.setProperty('width', '95vw', 'important')
@@ -512,109 +503,111 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     }))
   }, [])
 
-  // Fonction handleProfileSave corrigée
+  // CORRECTION 4: handleProfileSave avec protection contre la race condition
   const handleProfileSave = useCallback(async () => {
-    // garde-fou contre les doubles clics / updates après unmount
-    if (!isMountedRef.current || isLoading) return
-
     debugLog('API', 'Profile save started', { isLoading })
-
-    // reset d'état
+    
+    if (isLoading) return
+    
+    const saveOperationRef = { cancelled: false }
+    
     setIsLoading(true)
     setFormErrors([])
-
+    
     try {
       const errors: string[] = []
-
-      // ==== VALIDATION (reprise de votre logique actuelle inchangée) ====
+      
+      // Validation
       if (!formData.firstName.trim()) {
         errors.push('Le prénom est requis')
       } else if (formData.firstName.length > 50) {
         errors.push('Le prénom est trop long (maximum 50 caractères)')
       }
-
+      
       if (!formData.lastName.trim()) {
         errors.push('Le nom est requis')
       } else if (formData.lastName.length > 50) {
         errors.push('Le nom est trop long (maximum 50 caractères)')
       }
-
+      
       const emailErrors = validateEmail(formData.email)
       errors.push(...emailErrors)
-
+      
+      // Phone validation
       const hasPhoneData = formData.country_code || formData.area_code || formData.phone_number
       if (hasPhoneData) {
         const phoneValidation = validatePhoneFields(
-          formData.country_code,
-          formData.area_code,
+          formData.country_code, 
+          formData.area_code, 
           formData.phone_number
         )
+        
         if (!phoneValidation.isValid) {
           errors.push(...phoneValidation.errors.map(err => `Téléphone: ${err}`))
         }
       }
-
+      
+      // URL validations
       if (formData.linkedinProfile) {
         const linkedinErrors = validateLinkedInUrl(formData.linkedinProfile, 'Profil LinkedIn personnel')
         errors.push(...linkedinErrors)
       }
-
+      
       if (formData.companyWebsite) {
-        const websiteErrors = validateUrl(formData.companyWebsite, "Site web de l'entreprise")
+        const websiteErrors = validateUrl(formData.companyWebsite, 'Site web de l\'entreprise')
         errors.push(...websiteErrors)
       }
-
+      
       if (formData.linkedinCorporate) {
         const corporateErrors = validateLinkedInUrl(formData.linkedinCorporate, 'Page LinkedIn entreprise')
         errors.push(...corporateErrors)
       }
-
+      
       if (formData.companyName && formData.companyName.length > 100) {
-        errors.push("Le nom de l'entreprise est trop long (maximum 100 caractères)")
+        errors.push('Le nom de l\'entreprise est trop long (maximum 100 caractères)')
       }
-
+      
       if (errors.length > 0) {
         debugLog('API', 'Profile save validation failed', { errors })
-        if (isMountedRef.current) setFormErrors(errors)
+        if (!saveOperationRef.cancelled) {
+          setFormErrors(errors)
+        }
         return
       }
-      // ==== FIN VALIDATION ====
 
       debugLog('API', 'Calling updateProfile', { formData })
       await updateProfile(formData)
-
-      if (!isMountedRef.current) return
-
-      debugLog('API', 'Profile save successful')
-      console.log('✅ Profil mis à jour avec succès')
-
-      // Fermeture non bloquante et sûre
-      startTransition(() => {
-        if (isMountedRef.current) {
-          handleClose()
-        }
-      })
+      
+      if (!saveOperationRef.cancelled) {
+        debugLog('API', 'Profile save successful')
+        
+        // Délai avant fermeture pour éviter la race condition
+        setTimeout(() => {
+          if (!saveOperationRef.cancelled) {
+            alert(t('profile.title') + ' mis à jour avec succès!')
+            handleClose()
+          }
+        }, 100)
+      }
+      
     } catch (error: any) {
-      if (isMountedRef.current) {
+      if (!saveOperationRef.cancelled) {
         debugLog('API', 'Profile save error', { error: error?.message })
         console.error('Erreur mise à jour profil:', error)
+        alert('Erreur lors de la mise à jour: ' + (error?.message || 'Erreur inconnue'))
       }
     } finally {
-      if (isMountedRef.current) {
+      if (!saveOperationRef.cancelled) {
         debugLog('API', 'Profile save finished')
         setIsLoading(false)
       }
     }
-  }, [
-    isLoading,
-    formData,
-    validateEmail,
-    validateUrl,
-    validateLinkedInUrl,
-    validatePhoneFields,
-    updateProfile,
-    handleClose
-  ])
+    
+    // Nettoyage
+    return () => {
+      saveOperationRef.cancelled = true
+    }
+  }, [formData, validateEmail, validateUrl, validateLinkedInUrl, validatePhoneFields, updateProfile, t, handleClose, isLoading])
 
   const handlePasswordChange = useCallback(async () => {
     debugLog('API', 'Password change started')
@@ -702,7 +695,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         confirmPassword: ''
       })
       setPasswordErrors([])
-      console.log('Mot de passe changé avec succès!')
+      alert('Mot de passe changé avec succès!')
       handleClose()
       
     } catch (error: any) {
@@ -717,7 +710,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
 
   const tabs = useMemo(() => [
     { id: 'profile', label: t('nav.profile'), icon: '👤' },
-    { id: 'password', label: t('profile.password'), icon: '🔑' }
+    { id: 'password', label: t('profile.password'), icon: '🔐' }
   ], [t])
 
   // Keyboard handling
@@ -762,7 +755,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       data-debug="modal-overlay"
     >
       <div 
-        className="uimodal-content bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
         data-modal="user-info"
         data-debug="modal-content"

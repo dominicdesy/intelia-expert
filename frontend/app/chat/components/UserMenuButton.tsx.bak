@@ -341,17 +341,17 @@ export const UserMenuButton = React.memo(() => {
         )}
       </div>
 
-      {/* MODALES DIRECTES - SANS WRAPPER UNIFIÉ */}
+      {/* MODALES DIRECTES - CORRECTION REACT #300 */}
       
       {/* Abonnement Modal */}
       {!isSuperAdmin && showAccountModal && (
-        <AccountModal user={user as any} onClose={closeAccountModal} />
+        <AccountModal user={user} onClose={closeAccountModal} />
       )}
 
-      {/* Profil Modal */}
-      {showUserInfoModal && isMountedRef.current && (
+      {/* Profil Modal - CORRIGÉ : suppression de isMountedRef.current et as any */}
+      {showUserInfoModal && (
         <UserInfoModal 
-          user={user as any} 
+          user={user} 
           onClose={closeUserInfoModal}
         />
       )}

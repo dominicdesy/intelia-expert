@@ -1,7 +1,7 @@
 // components/UserMenu.tsx - VERSION CORRIGÉE AVEC TYPES FIXES ET SÉCURITÉ REACT #300
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
 import type { User } from '@/types'
@@ -80,37 +80,23 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [activeModal, setActiveModal] = useState<'profile' | 'settings' | 'legal' | null>(null)
 
-  // CORRECTION: Protection React #300 avec isMountedRef
-  const isMountedRef = useRef(true)
-
-  useEffect(() => {
-    isMountedRef.current = true
-    return () => {
-      isMountedRef.current = false
-    }
-  }, [])
-
   // Variables sécurisées
   const userName = getSafeName(user)
   const userEmail = getSafeEmail(user)
   const userType = getSafeUserType(user)
   const userInitials = getSecureInitials(userName)
 
-  // CORRECTION: Fonction de déconnexion sécurisée avec navigation différée
+  // Fonction de déconnexion sécurisée
   const handleLogout = async () => {
-    if (!isMountedRef.current) return
-    
     try {
-      // Fermer le menu d'abord
+      // Fermer le menu avant la déconnexion
       setIsOpen(false)
       
-      // CORRECTION: Navigation différée pour éviter race condition
-      queueMicrotask(async () => {
-        if (isMountedRef.current) {
-          await logout()
-          router.replace('/')
-        }
-      })
+      // Attendre la déconnexion complète
+      await logout()
+      
+      // Redirection propre
+      router.replace('/')
       
     } catch (error) {
       console.error('Erreur déconnexion:', error)
@@ -120,27 +106,17 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
   }
 
   const handleAboutIntelia = () => {
-    if (!isMountedRef.current) return
     setIsOpen(false)
-    queueMicrotask(() => {
-      window.open('https://intelia.com', '_blank')
-    })
+    window.open('https://intelia.com', '_blank')
   }
 
   const handleLegal = () => {
-    if (!isMountedRef.current) return
     setIsOpen(false)
-    queueMicrotask(() => {
-      if (isMountedRef.current) {
-        setActiveModal('legal')
-      }
-    })
+    setActiveModal('legal')
   }
 
-  // CORRECTION: Fonction de suppression sécurisée avec navigation différée
+  // Fonction de suppression sécurisée
   const handleDeleteData = async () => {
-    if (!isMountedRef.current) return
-    
     if (!showDeleteConfirm) {
       setShowDeleteConfirm(true)
       return
@@ -151,20 +127,16 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
       setShowDeleteConfirm(false)
       setIsOpen(false)
       
-      // CORRECTION: Navigation différée pour éviter race condition
-      queueMicrotask(async () => {
-        if (isMountedRef.current) {
-          await deleteUserData()
-          router.replace('/')
-        }
-      })
+      // Effectuer la suppression
+      await deleteUserData()
+      
+      // Redirection après suppression
+      router.replace('/')
       
     } catch (error) {
       console.error('Erreur suppression:', error)
-      if (isMountedRef.current) {
-        alert('Erreur lors de la suppression du compte')
-        setShowDeleteConfirm(false)
-      }
+      alert('Erreur lors de la suppression du compte')
+      setShowDeleteConfirm(false)
     }
   }
 
@@ -172,11 +144,7 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
     <div className={`relative ${className}`}>
       {/* Bouton utilisateur avec affichage sécurisé */}
       <button
-        onClick={() => {
-          if (isMountedRef.current) {
-            setIsOpen(!isOpen)
-          }
-        }}
+        onClick={() => setIsOpen(!isOpen)}
         className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
       >
         <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
@@ -192,11 +160,7 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
           {/* Overlay */}
           <div 
             className="fixed inset-0 z-10" 
-            onClick={() => {
-              if (isMountedRef.current) {
-                setIsOpen(false)
-              }
-            }}
+            onClick={() => setIsOpen(false)}
           />
           
           {/* Menu */}
@@ -220,13 +184,8 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
               {/* Mon profil */}
               <button
                 onClick={() => {
-                  if (!isMountedRef.current) return
                   setIsOpen(false)
-                  queueMicrotask(() => {
-                    if (isMountedRef.current) {
-                      setActiveModal('profile')
-                    }
-                  })
+                  setActiveModal('profile')
                 }}
                 className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
               >
@@ -237,13 +196,8 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
               {/* Paramètres */}
               <button
                 onClick={() => {
-                  if (!isMountedRef.current) return
                   setIsOpen(false)
-                  queueMicrotask(() => {
-                    if (isMountedRef.current) {
-                      setActiveModal('settings')
-                    }
-                  })
+                  setActiveModal('settings')
                 }}
                 className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
               >
@@ -275,13 +229,8 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
               {/* Supprimer compte */}
               <button
                 onClick={() => {
-                  if (!isMountedRef.current) return
                   setIsOpen(false)
-                  queueMicrotask(() => {
-                    if (isMountedRef.current) {
-                      setShowDeleteConfirm(true)
-                    }
-                  })
+                  setShowDeleteConfirm(true)
                 }}
                 className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
               >
@@ -316,11 +265,7 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
       {activeModal === 'profile' && user && (
         <ProfileModal 
           user={user}
-          onClose={() => {
-            if (isMountedRef.current) {
-              setActiveModal(null)
-            }
-          }}
+          onClose={() => setActiveModal(null)}
           onSave={updateProfile}
         />
       )}
@@ -328,22 +273,14 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
       {/* Modal Paramètres */}
       {activeModal === 'settings' && (
         <SettingsModal 
-          onClose={() => {
-            if (isMountedRef.current) {
-              setActiveModal(null)
-            }
-          }}
+          onClose={() => setActiveModal(null)}
         />
       )}
 
       {/* Modal Legal */}
       {activeModal === 'legal' && (
         <LegalModal 
-          onClose={() => {
-            if (isMountedRef.current) {
-              setActiveModal(null)
-            }
-          }}
+          onClose={() => setActiveModal(null)}
         />
       )}
 
@@ -367,11 +304,7 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
             
             <div className="flex space-x-3">
               <button
-                onClick={() => {
-                  if (isMountedRef.current) {
-                    setShowDeleteConfirm(false)
-                  }
-                }}
+                onClick={() => setShowDeleteConfirm(false)}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700"
               >
                 Annuler
@@ -430,10 +363,10 @@ function ProfileModal({ user, onClose, onSave }: ProfileModalProps) {
       })
       setSuccess('Profil mis à jour avec succès !')
       
-      // CORRECTION: Fermeture sans setTimeout
-      queueMicrotask(() => {
+      // Fermeture automatique après succès
+      setTimeout(() => {
         onClose()
-      })
+      }, 1500)
     } catch (err: any) {
       setError(err.message || 'Erreur lors de la mise à jour')
     } finally {
