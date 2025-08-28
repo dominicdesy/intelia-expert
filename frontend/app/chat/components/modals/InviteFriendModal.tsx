@@ -161,7 +161,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
       overlay.style.setProperty('padding', '16px', 'important')
       
       // Forcer les dimensions du contenu
-      const content = overlay.querySelector('.bg-white')
+      const content = overlay.querySelector('.bg-white') as HTMLElement
       if (content) {
         content.style.setProperty('width', '95vw', 'important')
         content.style.setProperty('max-width', '700px', 'important')
