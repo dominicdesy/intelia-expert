@@ -352,6 +352,8 @@ export default function ChatInterface() {
   const addMessage = useChatStore(state => state.addMessage)
   const updateMessage = useChatStore(state => state.updateMessage)
   const createNewConversation = useChatStore(state => state.createNewConversation)
+  // CORRECTION: Obtenir la fonction loadConversations de manière stable
+  const loadConversations = useChatStore(state => state.loadConversations)
 
   const config = { level: 'standard' }
 
@@ -451,7 +453,7 @@ export default function ChatInterface() {
       
       // CORRECTION : Fallback fonctionnel - NE PAS définir isMountedRef.current = false maintenant
       redirectTimeoutRef.current = setTimeout(() => {
-        console.log('🕒 [DEBUG-TIMEOUT-REDIRECT] Execution - isMounted:', isMountedRef.current, 'currentPath:', window.location.pathname)
+        console.log('🕐 [DEBUG-TIMEOUT-REDIRECT] Execution - isMounted:', isMountedRef.current, 'currentPath:', window.location.pathname)
         
         // CORRECTION : Le fallback peut maintenant s'exécuter car isMountedRef est encore true
         if (isMountedRef.current && window.location.pathname !== '/') {
@@ -599,39 +601,6 @@ export default function ChatInterface() {
     return cleaned.trim()
   }, [])
 
-  // loadConversationsWithBreaker simplifiée
-  const loadConversationsWithBreaker = useCallback(async (userId: string) => {
-    if (!pageLoadingBreaker.canAttempt() || hasLoadedConversationsRef.current || !isMountedRef.current) {
-      return
-    }
-
-    pageLoadingBreaker.recordAttempt()
-    conversationLoadingAttemptsRef.current++
-
-    try {
-      await useChatStore.getState().loadConversations(userId)
-      
-      if (isMountedRef.current) {
-        hasLoadedConversationsRef.current = true
-        conversationLoadingAttemptsRef.current = 0
-        pageLoadingBreaker.recordSuccess()
-      }
-    } catch (error) {
-      pageLoadingBreaker.recordFailure()
-      
-      if (isMountedRef.current) {
-        handleAuthError(error)
-        hasLoadedConversationsRef.current = false
-        
-        if (conversationLoadingAttemptsRef.current >= 3) {
-          hasLoadedConversationsRef.current = true
-        }
-      }
-      
-      throw error
-    }
-  }, [handleAuthError])
-
   // useEffect pour auth backend avec nettoyage approprié
   useEffect(() => {
     let isInitializing = false
@@ -672,7 +641,7 @@ export default function ChatInterface() {
 
     if (hasHydrated && isAuthenticated === false && !isLoading && isMountedRef.current) {
       timeoutId = setTimeout(() => {
-        console.log('🕒 [DEBUG-TIMEOUT-AUTH-LOGOUT] Execution - isMounted:', isMountedRef.current)
+        console.log('🕐 [DEBUG-TIMEOUT-AUTH-LOGOUT] Execution - isMounted:', isMountedRef.current)
         if (isMountedRef.current) {
           redirectToLogin('Déconnexion')
         } else {
@@ -716,7 +685,7 @@ export default function ChatInterface() {
         if (heightDifference > 150) {
           document.body.classList.add('keyboard-open')
           setTimeout(() => {
-            console.log('🕒 [DEBUG-TIMEOUT-VIEWPORT] Execution - isMounted:', isMountedRef.current)
+            console.log('🕐 [DEBUG-TIMEOUT-VIEWPORT] Execution - isMounted:', isMountedRef.current)
             if (messagesEndRef.current && isMountedRef.current && !isCancelled) {
               messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" })
             } else {
@@ -764,7 +733,7 @@ export default function ChatInterface() {
       document.body.classList.add('keyboard-open')
       
       setTimeout(() => {
-        console.log('🕒 [DEBUG-TIMEOUT-FOCUS] Execution - isMounted:', isMountedRef.current)
+        console.log('🕐 [DEBUG-TIMEOUT-FOCUS] Execution - isMounted:', isMountedRef.current)
         if (messagesEndRef.current && isMountedRef.current && !isCancelled) {
           messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" })
         } else {
@@ -775,7 +744,7 @@ export default function ChatInterface() {
 
     const handleBlur = () => {
       setTimeout(() => {
-        console.log('🕒 [DEBUG-TIMEOUT-BLUR] Execution - isMounted:', isMountedRef.current)
+        console.log('🕐 [DEBUG-TIMEOUT-BLUR] Execution - isMounted:', isMountedRef.current)
         if (isMountedRef.current && !isCancelled) {
           setUiState(prev => ({ 
             ...prev, 
@@ -880,7 +849,7 @@ export default function ChatInterface() {
         !uiState.isUserScrolling) {
       
       timeoutId = setTimeout(() => {
-        console.log('🕒 [DEBUG-TIMEOUT-AUTOSCROLL] Execution - isMounted:', isMountedRef.current)
+        console.log('🕐 [DEBUG-TIMEOUT-AUTOSCROLL] Execution - isMounted:', isMountedRef.current)
         if (isMountedRef.current && messagesEndRef.current) {
           messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
         } else {
@@ -929,7 +898,7 @@ export default function ChatInterface() {
 
       clearTimeout(scrollTimeout)
       scrollTimeout = setTimeout(() => {
-        console.log('🕒 [DEBUG-TIMEOUT-SCROLL] Execution - isMounted:', isMountedRef.current)
+        console.log('🕐 [DEBUG-TIMEOUT-SCROLL] Execution - isMounted:', isMountedRef.current)
         if (isMountedRef.current && !isCancelled) {
           setUiState(prev => ({ ...prev, isUserScrolling: false }))
           isScrolling = false
@@ -996,29 +965,53 @@ export default function ChatInterface() {
     }
   }, [currentLanguage, t, currentConversation, setCurrentConversation])
 
-  // Chargement des conversations avec timeout et protection et logs debug
+  // CORRECTION: Chargement des conversations avec protection SANS boucle infinie
   useEffect(() => {
     if (isAuthenticated && user?.id && isMountedRef.current && !hasLoadedConversationsRef.current) {
+      // Nettoyer le timeout précédent si existant
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current)
       }
 
+      // Marquer immédiatement comme "en cours de chargement"
+      hasLoadedConversationsRef.current = true
+
       loadingTimeoutRef.current = setTimeout(() => {
-        console.log('🕒 [DEBUG-TIMEOUT-LOADING] Execution - isMounted:', isMountedRef.current)
-        if (isMountedRef.current && !hasLoadedConversationsRef.current) {
-          loadConversationsWithBreaker(user.email || user.id)
+        console.log('🕐 [DEBUG-TIMEOUT-LOADING] Execution - isMounted:', isMountedRef.current)
+        if (isMountedRef.current) {
+          // Vérifier le circuit breaker
+          if (!pageLoadingBreaker.canAttempt()) {
+            console.warn('Circuit breaker: chargement bloqué')
+            return
+          }
+
+          pageLoadingBreaker.recordAttempt()
+          conversationLoadingAttemptsRef.current++
+
+          loadConversations(user.email || user.id)
             .then(() => {
               if (isMountedRef.current) {
                 console.log('✅ [DEBUG-LOADING] Historique chargé avec succès')
+                conversationLoadingAttemptsRef.current = 0
+                pageLoadingBreaker.recordSuccess()
               }
             })
             .catch(err => {
               if (isMountedRef.current) {
                 console.error('❌ [DEBUG-LOADING] Erreur chargement historique:', err)
+                pageLoadingBreaker.recordFailure()
+                handleAuthError(err)
+                
+                // Permettre retry en cas d'erreur réseau (max 3 tentatives)
+                if (conversationLoadingAttemptsRef.current < 3) {
+                  hasLoadedConversationsRef.current = false
+                } else {
+                  console.warn('Max tentatives atteint, abandon')
+                }
               }
             })
         } else {
-          console.log('⚠️ [DEBUG-TIMEOUT-LOADING] Ignoré - composant démonté ou déjà chargé')
+          console.log('⚠️ [DEBUG-TIMEOUT-LOADING] Ignoré - composant démonté')
         }
       }, 800)
 
@@ -1029,7 +1022,7 @@ export default function ChatInterface() {
         }
       }
     }
-  }, [isAuthenticated, user?.id, loadConversationsWithBreaker])
+  }, [isAuthenticated, user?.id, loadConversations, handleAuthError]) // CORRECTION: Retiré loadConversationsWithBreaker
 
   // Reset circuit breaker
   useEffect(() => {
