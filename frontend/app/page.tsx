@@ -25,7 +25,7 @@ const LoadingContent = memo(() => (
   </div>
 ))
 
-// Contenu principal mémorisé
+// Contenu principal - VERSION COMPLETE conservant toute la logique
 const PageContent = memo(() => {
   console.log('🚀 [PageContent] Composant PageContent rendu')
   

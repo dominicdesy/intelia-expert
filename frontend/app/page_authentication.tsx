@@ -333,6 +333,14 @@ export function useAuthenticationLogic({
     passwordInputRef
   }), [showPassword, showConfirmPassword, isLoading])
 
+  // À ajouter temporairement pour debugging
+  console.log('DEBUG re-render authLogic:', {
+    loginDataChanged: JSON.stringify(loginData),
+    signupDataChanged: JSON.stringify(signupData),
+    isLoadingChanged: isLoading,
+    timestamp: new Date().toISOString()
+  });
+
   // CORRECTION : Retour avec loginData et signupData séparés pour éviter re-renders
   return useMemo(() => ({
     // États des formulaires (changent souvent, mais isolés)
