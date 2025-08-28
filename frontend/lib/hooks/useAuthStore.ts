@@ -33,7 +33,8 @@ export const useAuth = () => {
     updateConsent: state.updateConsent,
     deleteUserData: state.deleteUserData,
     exportUserData: state.exportUserData,
-    getAuthToken: state.getAuthToken
+    getAuthToken: state.getAuthToken,
+    setHasHydrated: state.setHasHydrated
   }))
 }
 
