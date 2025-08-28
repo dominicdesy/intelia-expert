@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-// CORRECTION CRITIQUE : Utiliser les hooks optimisés au lieu du store complet
 import { useUser, useAuth, useAuthLoading } from '@/lib/hooks/useAuthStore'
 import type { User } from '@/types'
 import { 
@@ -33,25 +32,21 @@ export function useAuthenticationLogic({
   const router = useRouter()
   const pathname = usePathname()
   
-  // CORRECTION : Hooks optimisés séparés pour éviter les re-renders
   const { user, isAuthenticated, hasHydrated } = useUser()
   const { login, register, initializeSession } = useAuth()
   const { isLoading } = useAuthLoading()
 
-  // Hooks pour les pays - optimisés
   console.log('🎯 [PageContent] Appel du hook useCountries...')
   const countriesData = useCountries()
   const { countries, loading: countriesLoading, usingFallback } = countriesData
   const countryCodeMap = useCountryCodeMap(countries)
 
-  // Refs pour éviter les doubles appels et les re-renders
   const hasCheckedAuth = useRef(false)
   const redirectLock = useRef(false)
   const sessionInitialized = useRef(false)
   const passwordInputRef = useRef<HTMLInputElement>(null)
   const isMounted = useRef(true)
 
-  // États pour les formulaires
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   
@@ -77,7 +72,6 @@ export function useAuthenticationLogic({
     companyLinkedin: ''
   })
 
-  // Fonction de redirection sécurisée mémorisée
   const safeRedirectToChat = useCallback(() => {
     if (redirectLock.current || !isMounted.current) {
       console.log('🔒 [Redirect] Déjà en cours de redirection ou démontage, ignoré')
@@ -94,12 +88,10 @@ export function useAuthenticationLogic({
     router.replace('/chat')
   }, [pathname, router])
 
-  // Gestion des changements de formulaires optimisée
   const handleLoginChange = useCallback((field: keyof LoginData, value: string | boolean) => {
     setLoginData(prev => {
       const newData = { ...prev, [field]: value }
       
-      // Gestion spéciale pour rememberMe
       if (field === 'rememberMe') {
         const isRememberChecked = value as boolean
         console.log('🛯 [HandleChange] RememberMe changé:', isRememberChecked)
@@ -113,7 +105,6 @@ export function useAuthenticationLogic({
         }
       }
       
-      // Gestion spéciale pour l'email quand rememberMe est actif
       if (field === 'email' && prev.rememberMe) {
         const emailValue = (value as string).trim()
         if (emailValue && validateEmail(emailValue)) {
@@ -130,7 +121,6 @@ export function useAuthenticationLogic({
     setSignupData(prev => {
       const newData = { ...prev, [field]: value }
       
-      // Auto-remplir l'indicatif pays quand le pays change
       if (field === 'country' && value && countryCodeMap[value]) {
         console.log('🏳️ [Country] Auto-remplissage code pays:', value, '->', countryCodeMap[value])
         newData.countryCode = countryCodeMap[value]
@@ -140,7 +130,6 @@ export function useAuthenticationLogic({
     })
   }, [countryCodeMap])
 
-  // Validation du formulaire d'inscription mémorisée
   const validateSignupForm = useCallback((): string | null => {
     const { 
       email, password, confirmPassword, firstName, lastName, country, 
@@ -171,7 +160,6 @@ export function useAuthenticationLogic({
     return null
   }, [signupData, t])
 
-  // Gestion de la connexion mémorisée
   const handleLogin = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -196,7 +184,6 @@ export function useAuthenticationLogic({
       
       await login(loginData.email.trim(), loginData.password)
       
-      // Gestion "Se souvenir de moi" avec fonction utilitaire
       rememberMeUtils.save(loginData.email.trim(), loginData.rememberMe)
       console.log('✅ [Login] Confirmation persistence remember me:', loginData.rememberMe)
       
@@ -218,7 +205,6 @@ export function useAuthenticationLogic({
     }
   }, [loginData, t, login])
 
-  // Gestion de l'inscription mémorisée
   const handleSignup = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -240,7 +226,6 @@ export function useAuthenticationLogic({
       
       console.log('✅ [Signup] Création compte réussie')
       
-      // Réinitialiser le formulaire
       setSignupData({
         email: '', password: '', confirmPassword: '',
         firstName: '', lastName: '', linkedinProfile: '',
@@ -254,7 +239,6 @@ export function useAuthenticationLogic({
     }
   }, [signupData, currentLanguage, register, validateSignupForm])
 
-  // Initialisation de la session optimisée
   useEffect(() => {
     if (!hasHydrated || !isMounted.current) return
     
@@ -265,7 +249,6 @@ export function useAuthenticationLogic({
     }
   }, [hasHydrated, initializeSession])
 
-  // Vérification authentification optimisée
   useEffect(() => {
     if (!hasHydrated || hasCheckedAuth.current || !isMounted.current) {
       return
@@ -296,7 +279,6 @@ export function useAuthenticationLogic({
     }
   }, [hasHydrated, isAuthenticated, initializeSession, safeRedirectToChat])
 
-  // Surveillance changement AUTH optimisée
   useEffect(() => {
     if (!hasHydrated || !hasCheckedAuth.current || !isMounted.current) {
       return
@@ -308,7 +290,6 @@ export function useAuthenticationLogic({
     }
   }, [isAuthenticated, isLoading, hasHydrated, safeRedirectToChat])
 
-  // Focus automatique sur mot de passe si email pré-rempli
   useEffect(() => {
     const { rememberMe, lastEmail } = rememberMeUtils.load()
     
@@ -321,7 +302,6 @@ export function useAuthenticationLogic({
     }
   }, [loginData.email, loginData.password])
 
-  // Restaurer email lors du retour en mode login
   useEffect(() => {
     if (!isSignupMode) {
       const { rememberMe, lastEmail } = rememberMeUtils.load()
@@ -336,60 +316,57 @@ export function useAuthenticationLogic({
     }
   }, [isSignupMode])
 
-  // Cleanup au démontage
   useEffect(() => {
     return () => {
       isMounted.current = false
     }
   }, [])
 
-  // Retour mémorisé pour éviter les re-renders des composants parents
-  return useMemo(() => ({
-    // États
-    loginData,
-    signupData,
-    showPassword,
-    setShowPassword,
-    showConfirmPassword,
-    setShowConfirmPassword,
-    isLoading,
-    
-    // Countries
-    countries,
-    countriesLoading,
-    usingFallback,
-    countryCodeMap,
-    
-    // Refs
-    passwordInputRef,
-    
-    // Handlers
+  // CORRECTION CRITIQUE : Mémoriser les handlers et données stables séparément
+  const stableHandlers = useMemo(() => ({
     handleLoginChange,
     handleSignupChange,
     handleLogin,
     handleSignup,
     validateSignupForm,
-    
-    // Validation functions
     validateEmail,
     validatePassword,
     validatePhone,
     validateLinkedIn,
     validateWebsite
-  }), [
-    loginData,
-    signupData, 
-    showPassword, 
-    showConfirmPassword,
-    isLoading,
+  }), [handleLoginChange, handleSignupChange, handleLogin, handleSignup, validateSignupForm])
+
+  const stableCountriesData = useMemo(() => ({
     countries,
     countriesLoading,
     usingFallback,
-    countryCodeMap,
-    handleLoginChange,
-    handleSignupChange,
-    handleLogin,
-    handleSignup,
-    validateSignupForm
+    countryCodeMap
+  }), [countries, countriesLoading, usingFallback, countryCodeMap])
+
+  const stableFormStates = useMemo(() => ({
+    showPassword,
+    setShowPassword,
+    showConfirmPassword,
+    setShowConfirmPassword,
+    isLoading,
+    passwordInputRef
+  }), [showPassword, showConfirmPassword, isLoading])
+
+  // CORRECTION : Retour avec loginData et signupData séparés pour éviter re-renders
+  return useMemo(() => ({
+    // États des formulaires (changent souvent, mais isolés)
+    loginData,
+    signupData,
+    
+    // États stables (ne changent pas souvent)
+    ...stableFormStates,
+    ...stableCountriesData,
+    ...stableHandlers
+  }), [
+    loginData,
+    signupData,
+    stableFormStates,
+    stableCountriesData,
+    stableHandlers
   ])
 }
