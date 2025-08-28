@@ -545,7 +545,6 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // FONCTION UPDATEPROFILE CORRIGÉE POUR ÉVITER REACT #300
       updateProfile: async (data: Partial<AppUser>) => {
         if (!isStoreActive) {
           console.log('⚠️ [DEBUG-TIMEOUT-STORE] updateProfile ignoré - store démonté')
@@ -564,20 +563,12 @@ export const useAuthStore = create<AuthState>()(
           // Validation des données avant envoi
           const validatedData: any = {}
           
-          if (data.firstName !== undefined) {
-            validatedData.first_name = String(data.firstName).trim()
-          }
-          
-          if (data.lastName !== undefined) {
-            validatedData.last_name = String(data.lastName).trim()
-          }
-          
-          if (data.firstName !== undefined || data.lastName !== undefined) {
-            const fullName = `${data.firstName || currentUser.firstName || ''} ${data.lastName || currentUser.lastName || ''}`.trim()
-            if (fullName.length < 2) {
+          if (data.name !== undefined) {
+            const name = String(data.name).trim()
+            if (name.length < 2) {
               throw new Error('Le nom doit contenir au moins 2 caractères')
             }
-            validatedData.full_name = fullName
+            validatedData.full_name = name
           }
           
           if (data.user_type !== undefined) {
@@ -596,16 +587,6 @@ export const useAuthStore = create<AuthState>()(
             validatedData.language = language
           }
 
-          // Ajouter tous les autres champs
-          if (data.country_code !== undefined) validatedData.country_code = data.country_code
-          if (data.area_code !== undefined) validatedData.area_code = data.area_code
-          if (data.phone_number !== undefined) validatedData.phone_number = data.phone_number
-          if (data.country !== undefined) validatedData.country = data.country
-          if (data.linkedinProfile !== undefined) validatedData.linkedin_profile = data.linkedinProfile
-          if (data.companyName !== undefined) validatedData.company_name = data.companyName
-          if (data.companyWebsite !== undefined) validatedData.company_website = data.companyWebsite
-          if (data.linkedinCorporate !== undefined) validatedData.linkedin_corporate = data.linkedinCorporate
-
           const supabase = getSupabaseClient()
           const { error } = await supabase
             .from('users')
@@ -617,29 +598,16 @@ export const useAuthStore = create<AuthState>()(
           }
 
           if (isStoreActive) {
-            // CORRECTION CRITIQUE: Vérifier si les données ont vraiment changé
-            const currentState = get()
-            const hasChanges = Object.keys(data).some(key => {
-              const currentValue = currentState.user?.[key as keyof AppUser]
-              const newValue = data[key as keyof Partial<AppUser>]
-              return currentValue !== newValue
-            })
-            
-            if (hasChanges) {
-              console.log('[updateProfile] Changements détectés - mise à jour du store')
-              // Mise à jour locale avec validation - SANS créer un nouvel objet systématiquement
-              const updatedUser = { 
-                ...currentUser,
-                ...data,
-                // S'assurer que les champs requis restent définis
-                email: currentUser.email, // L'email ne change jamais
-              }
-              safeSetState(() => set({ user: updatedUser }), 'updateProfile-success')
-            } else {
-              console.log('[updateProfile] Pas de changements détectés - pas de setState')
-              // Quand même marquer comme succès pour les logs
-              console.log('✅ [DEBUG-TIMEOUT-STORE-SET] setState appliqué directement: updateProfile-success')
+            // Mise à jour locale avec validation
+            const updatedUser = { 
+              ...currentUser,
+              ...data,
+              // S'assurer que les champs requis restent définis
+              name: data.name || currentUser.name,
+              email: currentUser.email, // L'email ne change jamais
+              user_type: data.user_type || currentUser.user_type
             }
+            safeSetState(() => set({ user: updatedUser }), 'updateProfile-success')
           }
           
           alog('updateProfile réussi (singleton)')
