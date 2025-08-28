@@ -1,8 +1,10 @@
 'use client'
 
-import React, { memo, useCallback } from 'react'
+import React, { memo, useCallback, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { AlertMessage, PasswordInput } from './page_components'
+import { validateEmail, rememberMeUtils } from './page_hooks'
+import type { LoginData } from './page_types'
 
 interface LoginFormProps {
   authLogic: any
@@ -19,16 +21,79 @@ export const LoginForm = memo(function LoginForm({
   localSuccess, 
   toggleMode 
 }: LoginFormProps) {
+  console.log('🔐 [LoginForm] Render - ÉTAT LOCAL GÉRÉ ICI')
+  
   const {
-    loginData,
     isLoading,
     passwordInputRef,
-    handleLoginChange,
     handleLogin
   } = authLogic
 
+  // CORRECTION PRINCIPALE : État local dans LoginForm
+  const [loginData, setLoginData] = useState<LoginData>({
+    email: '',
+    password: '',
+    rememberMe: false
+  })
+
   const [formError, setFormError] = React.useState('')
   const [formSuccess, setFormSuccess] = React.useState('')
+
+  // Gestionnaire local pour les changements de données de connexion
+  const handleLoginChange = useCallback((field: keyof LoginData, value: string | boolean) => {
+    setLoginData(prev => {
+      const newData = { ...prev, [field]: value }
+      
+      if (field === 'rememberMe') {
+        const isRememberChecked = value as boolean
+        console.log('🛯 [LoginForm] RememberMe changé:', isRememberChecked)
+        
+        if (isRememberChecked && prev.email?.trim()) {
+          rememberMeUtils.save(prev.email.trim(), true)
+          console.log('✅ [LoginForm] Email sauvegardé immédiatement:', prev.email.trim())
+        } else if (!isRememberChecked) {
+          rememberMeUtils.save('', false)
+          console.log('🗑️ [LoginForm] Remember Me désactivé')
+        }
+      }
+      
+      if (field === 'email' && prev.rememberMe) {
+        const emailValue = (value as string).trim()
+        if (emailValue && validateEmail(emailValue)) {
+          rememberMeUtils.save(emailValue, true)
+          console.log('✅ [LoginForm] Nouvel email sauvegardé:', emailValue)
+        }
+      }
+      
+      return newData
+    })
+  }, [])
+
+  // Restaurer les données Remember Me à l'initialisation
+  useEffect(() => {
+    const { rememberMe, lastEmail } = rememberMeUtils.load()
+    
+    if (rememberMe && lastEmail) {
+      setLoginData(prev => ({
+        ...prev,
+        email: lastEmail,
+        rememberMe
+      }))
+    }
+  }, [])
+
+  // Focus automatique sur le mot de passe si email pré-rempli
+  useEffect(() => {
+    const { rememberMe, lastEmail } = rememberMeUtils.load()
+    
+    if (rememberMe && lastEmail && loginData.email && !loginData.password && passwordInputRef.current) {
+      const timer = setTimeout(() => {
+        passwordInputRef.current?.focus()
+      }, 500)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [loginData.email, loginData.password, passwordInputRef])
 
   const onSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,12 +101,13 @@ export const LoginForm = memo(function LoginForm({
     setFormSuccess('')
 
     try {
-      await handleLogin(e)
+      // Passer les données locales au handler du hook parent
+      await handleLogin(e, loginData)
       setFormSuccess(t.authSuccess)
     } catch (error: any) {
       setFormError(error.message)
     }
-  }, [handleLogin, t.authSuccess])
+  }, [handleLogin, loginData, t.authSuccess])
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -58,9 +124,9 @@ export const LoginForm = memo(function LoginForm({
   }, [handleLoginChange])
 
   const handleRememberMeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('🛯 [Checkbox] Événement onChange déclenché!')
-    console.log('🛯 [Checkbox] e.target.checked:', e.target.checked)
-    console.log('🛯 [Checkbox] État actuel rememberMe:', loginData.rememberMe)
+    console.log('🛯 [LoginForm] Événement onChange déclenché!')
+    console.log('🛯 [LoginForm] e.target.checked:', e.target.checked)
+    console.log('🛯 [LoginForm] État actuel rememberMe:', loginData.rememberMe)
     
     handleLoginChange('rememberMe', e.target.checked)
   }, [handleLoginChange, loginData.rememberMe])

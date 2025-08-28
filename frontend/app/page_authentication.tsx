@@ -43,12 +43,6 @@ export function useAuthenticationLogic({
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   
-  const [loginData, setLoginData] = useState<LoginData>({
-    email: '',
-    password: '',
-    rememberMe: false
-  })
-
   const [signupData, setSignupData] = useState<SignupData>({
     email: '',
     password: '',
@@ -80,35 +74,6 @@ export function useAuthenticationLogic({
     redirectLock.current = true
     router.replace('/chat')
   }, [pathname, router])
-
-  const handleLoginChange = useCallback((field: keyof LoginData, value: string | boolean) => {
-    setLoginData(prev => {
-      const newData = { ...prev, [field]: value }
-      
-      if (field === 'rememberMe') {
-        const isRememberChecked = value as boolean
-        console.log('🛯 [HandleChange] RememberMe changé:', isRememberChecked)
-        
-        if (isRememberChecked && prev.email?.trim()) {
-          rememberMeUtils.save(prev.email.trim(), true)
-          console.log('✅ [HandleChange] Email sauvegardé immédiatement:', prev.email.trim())
-        } else if (!isRememberChecked) {
-          rememberMeUtils.save('', false)
-          console.log('🗑️ [HandleChange] Remember Me désactivé')
-        }
-      }
-      
-      if (field === 'email' && prev.rememberMe) {
-        const emailValue = (value as string).trim()
-        if (emailValue && validateEmail(emailValue)) {
-          rememberMeUtils.save(emailValue, true)
-          console.log('✅ [HandleChange] Nouvel email sauvegardé:', emailValue)
-        }
-      }
-      
-      return newData
-    })
-  }, [])
 
   const handleSignupChange = useCallback((field: keyof SignupData, value: string) => {
     setSignupData(prev => {
@@ -148,32 +113,32 @@ export function useAuthenticationLogic({
     return null
   }, [signupData, t])
 
-  const handleLogin = useCallback(async (e: React.FormEvent) => {
+  const handleLogin = useCallback(async (e: React.FormEvent, loginFormData: LoginData) => {
     e.preventDefault()
 
-    if (!loginData.email.trim()) {
+    if (!loginFormData.email.trim()) {
       throw new Error(t.emailRequired)
     }
 
-    if (!validateEmail(loginData.email)) {
+    if (!validateEmail(loginFormData.email)) {
       throw new Error(t.emailInvalid)
     }
 
-    if (!loginData.password) {
+    if (!loginFormData.password) {
       throw new Error(t.passwordRequired)
     }
 
-    if (loginData.password.length < 6) {
+    if (loginFormData.password.length < 6) {
       throw new Error(t.passwordTooShort)
     }
 
     try {
       console.log('🔐 [Login] Tentative connexion...')
       
-      await login(loginData.email.trim(), loginData.password)
+      await login(loginFormData.email.trim(), loginFormData.password)
       
-      rememberMeUtils.save(loginData.email.trim(), loginData.rememberMe)
-      console.log('✅ [Login] Confirmation persistence remember me:', loginData.rememberMe)
+      rememberMeUtils.save(loginFormData.email.trim(), loginFormData.rememberMe)
+      console.log('✅ [Login] Confirmation persistence remember me:', loginFormData.rememberMe)
       
       console.log('✅ [Login] Connexion réussie')
       
@@ -191,7 +156,7 @@ export function useAuthenticationLogic({
         throw new Error(error.message || 'Erreur de connexion')
       }
     }
-  }, [loginData, t, login])
+  }, [t, login])
 
   const handleSignup = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
@@ -279,32 +244,6 @@ export function useAuthenticationLogic({
   }, [isAuthenticated, isLoading, hasHydrated, safeRedirectToChat])
 
   useEffect(() => {
-    const { rememberMe, lastEmail } = rememberMeUtils.load()
-    
-    if (rememberMe && lastEmail && loginData.email && !loginData.password && passwordInputRef.current) {
-      const timer = setTimeout(() => {
-        passwordInputRef.current?.focus()
-      }, 500)
-      
-      return () => clearTimeout(timer)
-    }
-  }, [loginData.email, loginData.password])
-
-  useEffect(() => {
-    if (!isSignupMode) {
-      const { rememberMe, lastEmail } = rememberMeUtils.load()
-      
-      if (rememberMe && lastEmail) {
-        setLoginData(prev => ({
-          ...prev,
-          email: lastEmail,
-          rememberMe
-        }))
-      }
-    }
-  }, [isSignupMode])
-
-  useEffect(() => {
     return () => {
       isMounted.current = false
     }
@@ -312,17 +251,15 @@ export function useAuthenticationLogic({
 
   // CORRECTION CRITIQUE : Mémoriser les handlers et données stables séparément
   const stableHandlers = useMemo(() => ({
-    handleLoginChange,
     handleSignupChange,
     handleLogin,
-    handleSignup,
     validateSignupForm,
     validateEmail,
     validatePassword,
     validatePhone,
     validateLinkedIn,
     validateWebsite
-  }), [handleLoginChange, handleSignupChange, handleLogin, handleSignup, validateSignupForm])
+  }), [handleSignupChange, handleLogin, validateSignupForm])
 
   const stableFormStates = useMemo(() => ({
     showPassword,
@@ -334,24 +271,22 @@ export function useAuthenticationLogic({
   }), [showPassword, showConfirmPassword, isLoading])
 
   // À ajouter temporairement pour debugging
-  console.log('DEBUG re-render authLogic:', {
-    loginDataChanged: JSON.stringify(loginData),
+  console.log('DEBUG re-render authLogic OPTIMISÉ:', {
     signupDataChanged: JSON.stringify(signupData),
     isLoadingChanged: isLoading,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    note: 'loginData retiré - plus de re-renders!'
   });
 
-  // CORRECTION : Retour avec loginData et signupData séparés pour éviter re-renders
+  // CORRECTION : Retour sans loginData pour éviter re-renders
   return useMemo(() => ({
-    // États des formulaires (changent souvent, mais isolés)
-    loginData,
+    // États des formulaires signup uniquement
     signupData,
     
     // États stables (ne changent pas souvent)
     ...stableFormStates,
     ...stableHandlers
   }), [
-    loginData,
     signupData,
     stableFormStates,
     stableHandlers
