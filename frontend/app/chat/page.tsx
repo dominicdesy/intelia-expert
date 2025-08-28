@@ -409,21 +409,14 @@ export default function ChatInterface() {
     return messages.length > 0
   }, [messages.length])
 
-  // CORRECTION C: redirectToLogin avec fallback fonctionnel
+
+
   const redirectToLogin = useCallback((reason: string = 'Session expirée') => {
-    // Éviter les doubles redirections
-    if (isRedirectingRef.current) {
-      console.log('🚪 [DEBUG-REDIRECT] Redirection déjà en cours, ignore:', reason)
-      return
-    }
+    if (isRedirectingRef.current) return
     isRedirectingRef.current = true
     console.log('🚪 [DEBUG-REDIRECT] Redirection forcée -', reason)
-    console.log('🔍 [DEBUG-REDIRECT] État avant:', {
-      currentPath: window.location.pathname,
-      isMounted: isMountedRef.current
-    })
 
-    // Nettoyage timeouts
+    // 🔹 Cleanup des timeouts existants d'abord
     const timeoutRefs = [redirectTimeoutRef, authCheckTimeoutRef, loadingTimeoutRef]
     timeoutRefs.forEach(ref => {
       if (ref.current) {
@@ -432,48 +425,47 @@ export default function ChatInterface() {
       }
     })
 
-    // Reset du store de chat (défensif)
-    try {
-      useChatStore.setState({
-        currentConversation: null,
-        conversations: [],
-        isLoading: false
-      })
-    } catch (err) {
-      console.warn('Erreur nettoyage stores:', err)
-    }
-
-    // Nettoyage CSS
-    document.body.classList.remove('keyboard-open')
-
-    // CORRECTION C: Redirection avec fallback fonctionnel
+    // 🔹 NAVIGATION D'ABORD
     try {
       router.push('/')
-      console.log('✅ [DEBUG-REDIRECT] router.push executé')
-      
-      // CORRECTION : Fallback fonctionnel - NE PAS définir isMountedRef.current = false maintenant
-      redirectTimeoutRef.current = setTimeout(() => {
-        console.log('🕐 [DEBUG-TIMEOUT-REDIRECT] Execution - isMounted:', isMountedRef.current, 'currentPath:', window.location.pathname)
-        
-        // CORRECTION : Le fallback peut maintenant s'exécuter car isMountedRef est encore true
-        if (isMountedRef.current && window.location.pathname !== '/') {
-          console.log('🔄 [DEBUG-TIMEOUT-REDIRECT] Next.js redirect failed, using window.location fallback')
-          
-          // MAINTENANT on peut bloquer les setState car on va quitter la page
-          isMountedRef.current = false
-          window.location.href = '/'
-        } else if (!isMountedRef.current) {
-          console.log('⚠️ [DEBUG-TIMEOUT-REDIRECT] Composant démonté - fallback ignoré')
-        } else {
-          console.log('✅ [DEBUG-TIMEOUT-REDIRECT] Next.js redirect successful, timeout cancelled')
-        }
-      }, 500)
+      console.log('✅ [DEBUG-REDIRECT] router.push exécuté')
     } catch (err) {
       console.error('Erreur router, fallback immédiat', err)
       isMountedRef.current = false
       window.location.href = '/'
+      return
     }
+
+    // 🔹 Nettoyage des stores DÉCALÉ à la micro-tâche
+    const defer = typeof queueMicrotask === 'function'
+      ? queueMicrotask
+      : (fn: () => void) => Promise.resolve().then(fn)
+
+    defer(() => {
+      try {
+        useChatStore.setState({
+          currentConversation: null,
+          conversations: [],
+          isLoading: false
+        })
+      } catch (err) {
+        console.warn('Erreur nettoyage stores:', err)
+      }
+      // Nettoyage CSS éventuel
+      document.body.classList.remove('keyboard-open')
+    })
+
+    // 🔹 Fallback sécurisé si Next.js ne redirige pas
+    redirectTimeoutRef.current = setTimeout(() => {
+      if (isMountedRef.current && window.location.pathname !== '/') {
+        console.log('🔄 [DEBUG-TIMEOUT-REDIRECT] Fallback window.location')
+        isMountedRef.current = false
+        window.location.href = '/'
+      }
+    }, 500)
   }, [router])
+
+
 
   const handleAuthError = useCallback((error: any) => {
     console.log('Gestion erreur auth:', error)
