@@ -1,15 +1,22 @@
 import { create } from 'zustand'
 import { ConversationItem, Conversation, ConversationWithMessages, ConversationGroup, Message } from '../../../types'
 import { conversationService } from '../services/conversationService'
-import { loadUserConversations } from '../services/apiService' // ✅ AJOUT: Import de la nouvelle fonction
+import { loadUserConversations } from '../services/apiService'
+
+// ==================== PROTECTION GLOBALE CONTRE LA BOUCLE ====================
+const globalLoadingProtection = {
+  isLoading: false,
+  currentUserId: null as string | null,
+  lastLoadTime: 0,
+  COOLDOWN_PERIOD: 3000, // 3 secondes entre les chargements
+  MAX_RETRIES: 3,
+  retryCount: 0
+}
 
 // ==================== INTERFACE DU STORE ====================
 interface ChatStoreState {
-  // États existants
   conversations: ConversationItem[]
   isLoading: boolean
-  
-  // Nouveaux états pour conversations style Claude.ai
   conversationGroups: ConversationGroup[]
   currentConversation: ConversationWithMessages | null
   isLoadingHistory: boolean
@@ -63,9 +70,8 @@ const groupConversationsByDate = (conversations: Conversation[]): ConversationGr
   return groups.filter(group => group.conversations.length > 0)
 }
 
-// ==================== STORE ZUSTAND CENTRALISÉ ====================
+// ==================== STORE ZUSTAND AVEC PROTECTION ====================
 export const useChatStore = create<ChatStoreState>((set, get) => ({
-  // États initiaux
   conversations: [],
   isLoading: false,
   conversationGroups: [],
@@ -74,19 +80,42 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   isLoadingConversation: false,
 
   // ==================== MÉTHODE CORRIGÉE loadConversations ====================
-  
   loadConversations: async (userId: string) => {
     if (!userId) {
       console.warn('⚠️ [ChatStore] Pas d\'userId fourni pour charger les conversations')
       return
     }
 
+    // PROTECTION 1: Vérifier si un chargement est déjà en cours pour ce user
+    if (globalLoadingProtection.isLoading && globalLoadingProtection.currentUserId === userId) {
+      console.log('🛡️ [ChatStore] Chargement déjà en cours pour cet utilisateur, ignoré')
+      return
+    }
+
+    // PROTECTION 2: Cooldown entre les chargements
+    const now = Date.now()
+    if (now - globalLoadingProtection.lastLoadTime < globalLoadingProtection.COOLDOWN_PERIOD) {
+      console.log('🛡️ [ChatStore] Cooldown actif, chargement ignoré')
+      return
+    }
+
+    // PROTECTION 3: Maximum de tentatives
+    if (globalLoadingProtection.retryCount >= globalLoadingProtection.MAX_RETRIES) {
+      console.log('🛡️ [ChatStore] Maximum de tentatives atteint, chargement bloqué')
+      return
+    }
+
+    // Marquer comme en cours de chargement
+    globalLoadingProtection.isLoading = true
+    globalLoadingProtection.currentUserId = userId
+    globalLoadingProtection.lastLoadTime = now
+    globalLoadingProtection.retryCount++
+
     set({ isLoading: true, isLoadingHistory: true })
     
     try {
       console.log('📡 [ChatStore] Chargement conversations pour:', userId)
       
-      // ✅ CORRECTION CRITIQUE: Utiliser la nouvelle fonction avec URL corrigée
       const conversationsData = await loadUserConversations(userId)
       
       if (!conversationsData || !conversationsData.conversations || conversationsData.conversations.length === 0) {
@@ -136,6 +165,9 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       
       console.log('✅ [ChatStore] État mis à jour - Conversations:', sortedConversations.length, 'Groupes:', groups.length)
       
+      // SUCCÈS: Reset du compteur de retry
+      globalLoadingProtection.retryCount = 0
+      
     } catch (error) {
       console.error('❌ [ChatStore] Erreur chargement conversations:', error)
       set({ 
@@ -144,6 +176,19 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         isLoading: false,
         isLoadingHistory: false
       })
+      
+      // En cas d'erreur, permettre un nouveau chargement après un délai
+      if (globalLoadingProtection.retryCount < globalLoadingProtection.MAX_RETRIES) {
+        setTimeout(() => {
+          globalLoadingProtection.isLoading = false
+        }, 5000) // 5 secondes avant de permettre un retry
+      }
+      
+      throw error
+    } finally {
+      // IMPORTANT: Reset du flag de chargement
+      globalLoadingProtection.isLoading = false
+      globalLoadingProtection.lastLoadTime = Date.now()
     }
   },
 
@@ -176,6 +221,11 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     try {
       console.log('🗑️ [ChatStore] Suppression toutes conversations')
       
+      // Reset de la protection globale
+      globalLoadingProtection.isLoading = false
+      globalLoadingProtection.currentUserId = null
+      globalLoadingProtection.retryCount = 0
+      
       set({ 
         conversations: [],
         conversationGroups: [],
@@ -193,6 +243,11 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   },
 
   refreshConversations: async (userId: string) => {
+    // Reset de la protection pour permettre un refresh manuel
+    globalLoadingProtection.isLoading = false
+    globalLoadingProtection.retryCount = 0
+    globalLoadingProtection.lastLoadTime = 0
+    
     await get().loadConversations(userId)
   },
 
@@ -233,8 +288,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     })
   },
 
-  // ==================== MÉTHODE CORRIGÉE loadConversation ====================
-
   loadConversation: async (conversationId: string) => {
     if (!conversationId) {
       console.warn('⚠️ [ChatStore] ID conversation requis')
@@ -246,7 +299,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     try {
       console.log('📖 [ChatStore] Chargement conversation:', conversationId)
       
-      // ✅ ESSAYER MÉTHODE getConversationWithMessages DU SERVICE
       try {
         const fullConversation = await conversationService.getConversationWithMessages?.(conversationId)
         
@@ -259,7 +311,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         console.warn('⚠️ [ChatStore] Service getConversationWithMessages non disponible:', serviceError)
       }
       
-      // ✅ FALLBACK: Chercher dans les conversations locales
       const state = get()
       const existingConv = state.conversations.find(c => c.id === conversationId)
       
@@ -291,7 +342,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         return
       }
       
-      // ✅ Si rien ne fonctionne, message d'erreur
       const errorConversation: ConversationWithMessages = {
         id: conversationId,
         title: 'Conversation non disponible',
@@ -323,7 +373,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     set({ currentConversation: null })
   },
 
-  // ==================== MÉTHODE CORRIGÉE addMessage ====================
   addMessage: (message: Message) => {
     console.log('💬 [ChatStore] Ajout message:', message.id, 'User:', message.isUser)
     
@@ -355,7 +404,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     
     const updatedMessages = [...(state.currentConversation.messages || []), message]
     
-    // ✅ CORRECTION: Mise à jour de l'ID SEULEMENT si on a un conversation_id de retour
     let updatedId = state.currentConversation.id
     
     if (message.conversation_id && 
@@ -408,7 +456,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
 }))
 
 // ==================== HOOKS UTILITAIRES ====================
-
 export const useConversationGroups = () => {
   const conversationGroups = useChatStore(state => state.conversationGroups)
   const isLoadingHistory = useChatStore(state => state.isLoadingHistory)
