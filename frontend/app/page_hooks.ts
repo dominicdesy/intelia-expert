@@ -1,4 +1,4 @@
-// page_hooks.ts - Version optimisée complète
+// page_hooks.ts - Version avec correction définitive du re-render
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import type { Country } from './page_types'
 
@@ -26,201 +26,173 @@ const fallbackCountries: Country[] = [
   { value: 'FI', label: 'Finlande', phoneCode: '+358', flag: '🇫🇮' }
 ]
 
-// 🚀 Cache global pour éviter les multiples appels API
+// Cache global pour éviter les multiples appels API
 let countriesCache: Country[] | null = null
 let isLoadingGlobal = false
 let loadingPromise: Promise<Country[]> | null = null
 
-// Hook pour charger les pays depuis l'API REST Countries - VERSION OPTIMISÉE
+// CORRECTION CRITIQUE : Fonction de fetch hors du hook pour éviter les re-créations
+const fetchCountriesGlobal = async (): Promise<Country[]> => {
+  // Si on a déjà les données en cache, les retourner
+  if (countriesCache) {
+    console.log('📦 [Countries] Données déjà en cache')
+    return countriesCache
+  }
+
+  // Si un chargement est déjà en cours, attendre sa fin
+  if (loadingPromise) {
+    console.log('⏳ [Countries] Chargement en cours, attente...')
+    return loadingPromise
+  }
+
+  // Créer une nouvelle promesse de chargement
+  loadingPromise = new Promise(async (resolve) => {
+    try {
+      console.log('🌐 [Countries] Début du chargement depuis l\'API REST Countries...')
+      console.log('📡 [Countries] URL: https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations')
+      
+      isLoadingGlobal = true
+      
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => {
+        console.log('⏰ [Countries] Timeout atteint (10s)')
+        controller.abort()
+      }, 10000)
+      
+      const response = await fetch('https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations', {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (compatible; Intelia/1.0)',
+          'Cache-Control': 'no-cache'
+        },
+        signal: controller.signal
+      })
+      
+      clearTimeout(timeoutId)
+      console.log(`📡 [Countries] Statut HTTP: ${response.status} ${response.statusText}`)
+      
+      if (!response.ok) {
+        throw new Error(`API indisponible: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      console.log(`📊 [Countries] Données reçues: ${data.length} pays bruts`)
+      console.log('🔍 [Countries] Échantillon brut:', data.slice(0, 2))
+      
+      if (!Array.isArray(data)) {
+        console.error('❌ [Countries] Format invalide - pas un array')
+        throw new Error('Format de données invalide')
+      }
+      
+      const formattedCountries = data
+        .map((country: any, index: number) => {
+          let phoneCode = ''
+          if (country.idd?.root) {
+            phoneCode = country.idd.root
+            if (country.idd.suffixes && country.idd.suffixes[0]) {
+              phoneCode += country.idd.suffixes[0]
+            }
+          }
+          
+          const formatted = {
+            value: country.cca2,
+            label: country.translations?.fra?.common || country.name?.common || country.cca2,
+            phoneCode: phoneCode,
+            flag: country.flag || ''
+          }
+          
+          if (index < 3) {
+            console.log(`🏳️ [Countries] Pays ${index + 1}:`, formatted)
+          }
+          
+          return formatted
+        })
+        .filter((country: Country, index: number) => {
+          const hasValidCode = country.phoneCode && 
+                              country.phoneCode !== 'undefined' && 
+                              country.phoneCode !== 'null' &&
+                              country.phoneCode.length > 1 &&
+                              country.phoneCode.startsWith('+') &&
+                              /^\+\d+$/.test(country.phoneCode)
+          
+          const hasValidInfo = country.value && 
+                              country.value.length === 2 &&
+                              country.label && 
+                              country.label.length > 1
+          
+          const isValid = hasValidCode && hasValidInfo
+          
+          if (!isValid && index < 5) {
+            console.log(`❌ [Countries] Pays rejeté:`, {
+              country: country.label,
+              code: country.value,
+              phoneCode: country.phoneCode,
+              hasValidCode,
+              hasValidInfo
+            })
+          }
+          
+          return isValid
+        })
+        .sort((a: Country, b: Country) => a.label.localeCompare(b.label, 'fr', { numeric: true }))
+      
+      console.log(`✅ [Countries] Pays valides après filtrage: ${formattedCountries.length}`)
+      console.log('📋 [Countries] Échantillon final:', formattedCountries.slice(0, 5))
+      
+      if (formattedCountries.length >= 50) {
+        console.log('🎉 [Countries] API validée! Utilisation des données complètes')
+        console.log(`📈 [Countries] Transition: fallback(${fallbackCountries.length}) → API(${formattedCountries.length})`)
+        
+        // Mise en cache globale
+        countriesCache = formattedCountries
+        resolve(formattedCountries)
+      } else {
+        console.warn(`⚠️ [Countries] Pas assez de pays valides: ${formattedCountries.length}/50`)
+        throw new Error(`Qualité insuffisante: ${formattedCountries.length}/50 pays`)
+      }
+      
+    } catch (err: any) {
+      console.error('💥 [Countries] ERREUR:', err)
+      console.warn('🔄 [Countries] Passage en mode fallback')
+      
+      if (err.name === 'AbortError') {
+        console.warn('⏰ [Countries] Cause: Timeout de l\'API (10s)')
+      } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        console.warn('🌐 [Countries] Cause: Problème de connexion réseau')
+      } else {
+        console.warn('🐛 [Countries] Cause:', err.message)
+      }
+      
+      // Même le fallback va en cache pour éviter les re-fetch
+      countriesCache = fallbackCountries
+      resolve(fallbackCountries)
+    } finally {
+      console.log('🏁 [Countries] Chargement terminé')
+      isLoadingGlobal = false
+      // Nettoyer la promesse après utilisation
+      loadingPromise = null
+    }
+  })
+
+  return loadingPromise
+}
+
+// Hook pour charger les pays depuis l'API REST Countries - VERSION DÉFINITIVEMENT CORRIGÉE
 export const useCountries = () => {
   console.log('🎯 [Countries] Hook useCountries appelé!')
   
-  // ✅ État initial basé sur le cache
+  // État initial basé sur le cache
   const [countries, setCountries] = useState<Country[]>(() => 
     countriesCache || fallbackCountries
   )
   const [loading, setLoading] = useState(() => countriesCache === null)
   const [usingFallback, setUsingFallback] = useState(() => countriesCache === null)
   
-  // ✅ Références pour éviter les re-renders
+  // Références pour éviter les re-renders
   const hasFetched = useRef(false)
   const isMounted = useRef(true)
 
-  // ✅ Fonction de fetch optimisée avec cache global
-  const fetchCountriesOptimized = useCallback(async (): Promise<void> => {
-    // Si on a déjà les données en cache, pas besoin de refetch
-    if (countriesCache) {
-      console.log('📦 [Countries] Données déjà en cache')
-      if (isMounted.current) {
-        setCountries(countriesCache)
-        setUsingFallback(false)
-        setLoading(false)
-      }
-      return
-    }
-
-    // Si un chargement est déjà en cours ailleurs, l'attendre
-    if (loadingPromise) {
-      console.log('⏳ [Countries] Chargement en cours, attente...')
-      try {
-        const result = await loadingPromise
-        if (isMounted.current) {
-          setCountries(result)
-          setUsingFallback(result === fallbackCountries)
-          setLoading(false)
-        }
-      } catch (error) {
-        console.error('❌ [Countries] Erreur lors de l\'attente:', error)
-      }
-      return
-    }
-
-    // Créer une nouvelle promesse de chargement
-    loadingPromise = new Promise(async (resolve) => {
-      try {
-        console.log('🌐 [Countries] Début du chargement depuis l\'API REST Countries...')
-        console.log('📡 [Countries] URL: https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations')
-        
-        isLoadingGlobal = true
-        
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => {
-          console.log('⏰ [Countries] Timeout atteint (10s)')
-          controller.abort()
-        }, 10000)
-        
-        const response = await fetch('https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations', {
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (compatible; Intelia/1.0)',
-            'Cache-Control': 'no-cache'
-          },
-          signal: controller.signal
-        })
-        
-        clearTimeout(timeoutId)
-        console.log(`📡 [Countries] Statut HTTP: ${response.status} ${response.statusText}`)
-        
-        if (!response.ok) {
-          throw new Error(`API indisponible: ${response.status}`)
-        }
-        
-        const data = await response.json()
-        console.log(`📊 [Countries] Données reçues: ${data.length} pays bruts`)
-        console.log('🔍 [Countries] Échantillon brut:', data.slice(0, 2))
-        
-        if (!Array.isArray(data)) {
-          console.error('❌ [Countries] Format invalide - pas un array')
-          throw new Error('Format de données invalide')
-        }
-        
-        const formattedCountries = data
-          .map((country: any, index: number) => {
-            let phoneCode = ''
-            if (country.idd?.root) {
-              phoneCode = country.idd.root
-              if (country.idd.suffixes && country.idd.suffixes[0]) {
-                phoneCode += country.idd.suffixes[0]
-              }
-            }
-            
-            const formatted = {
-              value: country.cca2,
-              label: country.translations?.fra?.common || country.name?.common || country.cca2,
-              phoneCode: phoneCode,
-              flag: country.flag || ''
-            }
-            
-            if (index < 3) {
-              console.log(`🏳️ [Countries] Pays ${index + 1}:`, formatted)
-            }
-            
-            return formatted
-          })
-          .filter((country: Country, index: number) => {
-            const hasValidCode = country.phoneCode && 
-                                country.phoneCode !== 'undefined' && 
-                                country.phoneCode !== 'null' &&
-                                country.phoneCode.length > 1 &&
-                                country.phoneCode.startsWith('+') &&
-                                /^\+\d+$/.test(country.phoneCode)
-            
-            const hasValidInfo = country.value && 
-                                country.value.length === 2 &&
-                                country.label && 
-                                country.label.length > 1
-            
-            const isValid = hasValidCode && hasValidInfo
-            
-            if (!isValid && index < 5) {
-              console.log(`❌ [Countries] Pays rejeté:`, {
-                country: country.label,
-                code: country.value,
-                phoneCode: country.phoneCode,
-                hasValidCode,
-                hasValidInfo
-              })
-            }
-            
-            return isValid
-          })
-          .sort((a: Country, b: Country) => a.label.localeCompare(b.label, 'fr', { numeric: true }))
-        
-        console.log(`✅ [Countries] Pays valides après filtrage: ${formattedCountries.length}`)
-        console.log('📋 [Countries] Échantillon final:', formattedCountries.slice(0, 5))
-        
-        if (formattedCountries.length >= 50) {
-          console.log('🎉 [Countries] API validée! Utilisation des données complètes')
-          console.log(`📈 [Countries] Transition: fallback(${fallbackCountries.length}) → API(${formattedCountries.length})`)
-          
-          // ✅ Mise en cache globale
-          countriesCache = formattedCountries
-          
-          if (isMounted.current) {
-            setCountries(formattedCountries)
-            setUsingFallback(false)
-          }
-          resolve(formattedCountries)
-        } else {
-          console.warn(`⚠️ [Countries] Pas assez de pays valides: ${formattedCountries.length}/50`)
-          throw new Error(`Qualité insuffisante: ${formattedCountries.length}/50 pays`)
-        }
-        
-      } catch (err: any) {
-        console.error('💥 [Countries] ERREUR:', err)
-        console.warn('🔄 [Countries] Passage en mode fallback')
-        
-        if (err.name === 'AbortError') {
-          console.warn('⏰ [Countries] Cause: Timeout de l\'API (10s)')
-        } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
-          console.warn('🌐 [Countries] Cause: Problème de connexion réseau')
-        } else {
-          console.warn('🐛 [Countries] Cause:', err.message)
-        }
-        
-        // ✅ Même le fallback va en cache pour éviter les re-fetch
-        countriesCache = fallbackCountries
-        
-        if (isMounted.current) {
-          setCountries(fallbackCountries)
-          setUsingFallback(true)
-        }
-        resolve(fallbackCountries)
-      } finally {
-        console.log('🏁 [Countries] Chargement terminé')
-        isLoadingGlobal = false
-        if (isMounted.current) {
-          setLoading(false)
-        }
-        // ✅ Nettoyer la promesse après utilisation
-        loadingPromise = null
-      }
-    })
-
-    await loadingPromise
-  }, [])
-
-  // ✅ useEffect optimisé - ne se déclenche qu'une seule fois
+  // CORRECTION CRITIQUE : useEffect sans dépendances pour éviter les re-déclenchements
   useEffect(() => {
     // Éviter les doubles appels en mode strict
     if (hasFetched.current) {
@@ -231,22 +203,45 @@ export const useCountries = () => {
     hasFetched.current = true
     console.log('🚀 [Countries] DÉMARRAGE du processus de chargement des pays')
     
+    // Si on a déjà les données en cache, les utiliser immédiatement
+    if (countriesCache) {
+      console.log('📦 [Countries] Utilisation du cache existant')
+      setCountries(countriesCache)
+      setUsingFallback(false)
+      setLoading(false)
+      return
+    }
+    
     // Délai pour éviter les conflits avec l'hydratation
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       if (isMounted.current) {
         console.log('⏰ [Countries] Démarrage après délai de 100ms')
-        fetchCountriesOptimized()
+        try {
+          const result = await fetchCountriesGlobal()
+          if (isMounted.current) {
+            setCountries(result)
+            setUsingFallback(result === fallbackCountries)
+            setLoading(false)
+          }
+        } catch (error) {
+          console.error('❌ [Countries] Erreur dans le timer:', error)
+          if (isMounted.current) {
+            setCountries(fallbackCountries)
+            setUsingFallback(true)
+            setLoading(false)
+          }
+        }
       }
     }, 100)
     
-    // ✅ Cleanup function
+    // Cleanup function
     return () => {
       clearTimeout(timer)
       isMounted.current = false
     }
-  }, [fetchCountriesOptimized])
+  }, []) // CORRECTION CRITIQUE : Aucune dépendance pour éviter les re-déclenchements
 
-  // ✅ Cleanup au démontage
+  // Cleanup au démontage
   useEffect(() => {
     return () => {
       isMounted.current = false
@@ -255,7 +250,7 @@ export const useCountries = () => {
 
   console.log(`🔄 [Countries] Render - ${countries.length} pays, loading:${loading}, fallback:${usingFallback}`)
   
-  // ✅ Mémoisation du retour pour éviter les re-renders des composants parents
+  // Mémoisation du retour pour éviter les re-renders des composants parents
   return useMemo(() => ({
     countries,
     loading,
