@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-// CORRECTION CRITIQUE : Utiliser les hooks optimisés au lieu du store complet
+// CORRECTION : Utiliser directement le store principal
 import { useAuthStore } from '@/lib/stores/auth'
 import { getSupabaseClient } from '@/lib/supabase/singleton'
 
@@ -10,9 +10,8 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  // CORRECTION : Hooks séparés pour éviter les re-renders
-  const { hasHydrated } = useUser()
-  const { setHasHydrated, initializeSession, checkAuth } = useAuth()
+  // CORRECTION : Utiliser directement useAuthStore au lieu de hooks séparés
+  const { hasHydrated, setHasHydrated, initializeSession, checkAuth } = useAuthStore()
   
   // Protection race condition et démontage
   const isInitializingRef = useRef(false)
@@ -88,7 +87,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           switch (event) {
             case 'INITIAL_SESSION':
               console.log('🔥 [DEBUG-AUTH] INITIAL_SESSION ignoré')
-              break;
+              break
               
             case 'SIGNED_IN':
               console.log('🔥 [DEBUG-AUTH] SIGNED_IN - vérification état...')
@@ -98,7 +97,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
               } else {
                 console.log('🔥 [DEBUG-AUTH] SIGNED_IN ignoré - déconnexion en cours')
               }
-              break;
+              break
               
             case 'SIGNED_OUT':
               console.log('🔥 [DEBUG-AUTH] SIGNED_OUT - NOUVELLE STRATÉGIE SANS setState')
@@ -126,7 +125,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 }
               }, 5000)
               
-              break;
+              break
               
             case 'TOKEN_REFRESHED':
               if (!isLoggingOutRef.current) {
@@ -135,7 +134,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
               } else {
                 console.log('🔥 [DEBUG-AUTH] TOKEN_REFRESHED ignoré - déconnexion en cours')
               }
-              break;
+              break
               
             case 'USER_UPDATED':
               if (!isLoggingOutRef.current) {
@@ -144,7 +143,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
               } else {
                 console.log('🔥 [DEBUG-AUTH] USER_UPDATED ignoré - déconnexion en cours')
               }
-              break;
+              break
               
             default:
               console.log('🔥 [DEBUG-AUTH] Événement non géré:', event)
@@ -179,19 +178,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return
         }
         
-        // CORRECTION : Importer le store directement pour la vérification périodique
-        try {
-          const { useAuthStore } = require('@/lib/stores/auth')
-          const isAuthenticated = useAuthStore.getState().isAuthenticated
-          const hasSession = !!session
-          
-          if (isAuthenticated !== hasSession) {
-            console.log('[AuthProvider] Synchronisation état auth nécessaire')
-            await safeCheckAuth()
-          }
-        } catch (error) {
-          // Si l'import échoue, ignorer cette vérification
-          console.warn('[AuthProvider] Impossible d\'importer le store pour vérification:', error)
+        // Vérification synchronisation avec le store
+        const isAuthenticated = useAuthStore.getState().isAuthenticated
+        const hasSession = !!session
+        
+        if (isAuthenticated !== hasSession) {
+          console.log('[AuthProvider] Synchronisation état auth nécessaire')
+          await safeCheckAuth()
         }
       } catch (error) {
         if (isMountedRef.current && !isLoggingOutRef.current) {
