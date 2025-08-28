@@ -103,7 +103,7 @@ export const UserMenuButton = React.memo(() => {
     return { currentPlan, plan, isSuperAdmin }
   }, [user?.plan, user?.user_type])
 
-  // CORRECTION MAJEURE : Déconnexion avec préservation RememberMe
+  // CORRECTION MAJEURE : Déconnexion avec préservation RememberMe et navigation immédiate
   const handleLogout = useCallback(async () => {
     // Protection contre les clics multiples
     if (logoutInProgressRef.current || !isMountedRef.current) return
@@ -113,12 +113,19 @@ export const UserMenuButton = React.memo(() => {
     setIsOpen(false)
 
     try {
-      // UTILISER LA FONCTION LOGOUT DU STORE qui préserve RememberMe
-      console.log('[DEBUG-LOGOUT-UserMenu] Appel logout() du store avec préservation RememberMe')
-      await logout()
+      // STRATÉGIE DEFENSIVE : Navigation immédiate pour éviter les callbacks
+      console.log('[DEBUG-LOGOUT-UserMenu] Navigation immédiate pour éviter callbacks')
       
-      // Redirection après nettoyage sélectif
-      console.log('[DEBUG-LOGOUT-UserMenu] Redirection vers page d\'accueil')
+      // Fermer le menu immédiatement
+      setIsOpen(false)
+      
+      // Lancer le logout en arrière-plan SANS attendre
+      logout().catch((error) => {
+        console.error('[DEBUG-LOGOUT-UserMenu] Erreur logout async (ignorée):', error)
+      })
+      
+      // Navigation immédiate pour stopper les re-renders
+      console.log('[DEBUG-LOGOUT-UserMenu] Redirection immédiate')
       router.push('/')
       
     } catch (error) {
@@ -356,12 +363,11 @@ export const UserMenuButton = React.memo(() => {
         </Modal>
       )}
 
-      {/* CORRECTION CRITIQUE : UserInfoModal directement SANS wrapper Modal 
-          pour éviter les conflits DOM qui causent React #300 */}
-      {showUserInfoModal && (
+      {/* CORRECTION CRITIQUE : UserInfoModal avec protection supplémentaire */}
+      {showUserInfoModal && isMountedRef.current && (
         <UserInfoModal 
           user={user as any} 
-          onClose={closeUserInfoModal} 
+          onClose={closeUserInfoModal}
         />
       )}
 
