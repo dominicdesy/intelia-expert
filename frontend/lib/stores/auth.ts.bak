@@ -1,4 +1,4 @@
-// lib/stores/auth.ts – Store d'auth SUPABASE NATIF (VERSION FINALE CORRIGÉE + SINGLETON + API EXPERT + REMEMBER ME)
+// lib/stores/auth.ts — Store d'auth SUPABASE NATIF (VERSION FINALE CORRIGÉE + SINGLETON + API EXPERT)
 'use client'
 
 import { create } from 'zustand'
@@ -46,29 +46,6 @@ const safeSetState = (setFn: any, stateName: string) => {
   } else {
     console.log('⚠️ [DEBUG-TIMEOUT-STORE-SET] setState ignoré - store démonté:', stateName)
   }
-}
-
-// NOUVEAU: Import des utilitaires RememberMe
-let rememberMeUtils: any = null
-
-// Lazy loading des utilitaires RememberMe pour éviter les imports circulaires
-const getRememberMeUtils = async () => {
-  if (!rememberMeUtils) {
-    try {
-      const { rememberMeUtils: rmUtils } = await import('@/app/page_hooks')
-      rememberMeUtils = rmUtils
-      console.log('✅ [RememberMe] Utilitaires chargés dans auth store')
-    } catch (error) {
-      console.warn('⚠️ [RememberMe] Impossible de charger les utilitaires:', error)
-      // Fallback simple si les utilitaires ne sont pas disponibles
-      rememberMeUtils = {
-        preserveOnLogout: () => null,
-        restoreAfterLogout: () => {},
-        clear: () => {}
-      }
-    }
-  }
-  return rememberMeUtils
 }
 
 // Types d'état du store
@@ -145,7 +122,7 @@ function adaptSupabaseUser(supabaseUser: any, additionalData?: any): AppUser {
   }
 }
 
-// Store Supabase NATIF (avec singleton et protection démontage RENFORCÉE + REMEMBER ME)
+// Store Supabase NATIF (avec singleton et protection démontage RENFORCÉE)
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -447,7 +424,6 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // FONCTION LOGOUT MODIFIÉE AVEC PRÉSERVATION REMEMBER ME
       logout: async () => {
         if (!isStoreActive) {
           console.log('⚠️ [DEBUG-TIMEOUT-STORE] logout ignoré - store démonté')
@@ -455,15 +431,9 @@ export const useAuthStore = create<AuthState>()(
         }
         
         safeSetState(() => set({ isLoading: true }), 'logout-start')
-        console.log('[DEBUG-LOGOUT] Début déconnexion coordonnée avec préservation RememberMe')
+        alog('logout via Supabase natif (singleton)')
         
         try {
-          // ÉTAPE 1 : Préserver les données RememberMe AVANT le nettoyage
-          const rmUtils = await getRememberMeUtils()
-          const preservedRememberMe = rmUtils.preserveOnLogout()
-          console.log('[DEBUG-LOGOUT] Données RememberMe préservées:', preservedRememberMe)
-
-          // ÉTAPE 2 : Déconnexion Supabase
           const supabase = getSupabaseClient()
           const { error } = await supabase.auth.signOut()
           
@@ -471,60 +441,33 @@ export const useAuthStore = create<AuthState>()(
             throw new Error(error.message)
           }
 
-          // ÉTAPE 3 : Nettoyage localStorage SÉLECTIF (exclure RememberMe)
-          console.log('[DEBUG-LOGOUT] Nettoyage localStorage sélectif')
-          
+          // Nettoyer SEULEMENT les clés spécifiques (pas localStorage.clear())
           try {
-            const keysToRemove = []
+            const keysToRemove = [
+              'supabase-auth-store', 
+              'intelia-chat-storage',
+              'intelia-expert-auth'
+            ]
             
-            // Parcourir toutes les clés localStorage
-            for (let i = 0; i < localStorage.length; i++) {
-              const key = localStorage.key(i)
-              if (key && key !== 'intelia-remember-me-persist') {
-                // Supprimer les clés auth/session mais GARDER RememberMe
-                if (key.startsWith('supabase-') || 
-                    key.startsWith('intelia-') && key !== 'intelia-remember-me-persist' ||
-                    key.includes('auth') || 
-                    key.includes('session') ||
-                    key === 'intelia-expert-auth' ||
-                    key === 'intelia-chat-storage') {
-                  keysToRemove.push(key)
-                }
-              }
-            }
-            
-            // Supprimer les clés identifiées
             keysToRemove.forEach(key => {
               try {
                 localStorage.removeItem(key)
-                console.log(`[DEBUG-LOGOUT] Supprimé: ${key}`)
               } catch (e) {
-                console.warn(`[DEBUG-LOGOUT] Impossible de supprimer ${key}:`, e)
+                console.warn(`Impossible de supprimer ${key}:`, e)
               }
             })
-            
-            console.log(`[DEBUG-LOGOUT] ${keysToRemove.length} clés supprimées, RememberMe préservé`)
-            
           } catch (storageError) {
-            console.warn('[DEBUG-LOGOUT] Erreur nettoyage localStorage:', storageError)
+            console.warn('Erreur nettoyage localStorage:', storageError)
           }
 
-          // ÉTAPE 4 : Nettoyer l'état du store APRÈS le nettoyage storage
+          // CORRECTION CRITIQUE: Nettoyer l'état APRÈS le nettoyage storage avec protection
           safeSetState(() => set({ 
             user: null, 
             isAuthenticated: false,
             lastAuthCheck: Date.now()
           }), 'logout-clear-state')
-
-          // ÉTAPE 5 : Restaurer RememberMe APRÈS le nettoyage
-          if (preservedRememberMe) {
-            setTimeout(() => {
-              rmUtils.restoreAfterLogout(preservedRememberMe)
-              console.log('[DEBUG-LOGOUT] RememberMe restauré après nettoyage')
-            }, 100)
-          }
           
-          alog('Logout réussi avec préservation RememberMe (singleton)')
+          alog('Logout réussi (singleton)')
           
         } catch (e: any) {
           if (isStoreActive) {
@@ -669,15 +612,6 @@ export const useAuthStore = create<AuthState>()(
 
           if (error) {
             alog('Erreur suppression profil (singleton):', error)
-          }
-
-          // Nettoyer aussi les données RememberMe lors de la suppression du compte
-          try {
-            const rmUtils = await getRememberMeUtils()
-            rmUtils.clear()
-            console.log('[DEBUG-LOGOUT] RememberMe nettoyé lors de la suppression du compte')
-          } catch (error) {
-            console.warn('[DEBUG-LOGOUT] Erreur nettoyage RememberMe:', error)
           }
 
           // Déconnecter

@@ -1,4 +1,4 @@
-// page_hooks.ts - Version avec correction définitive du re-render + RememberMe intégré
+// page_hooks.ts - Version avec correction définitive du re-render
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import type { Country } from './page_types'
 
@@ -31,48 +31,31 @@ let countriesCache: Country[] | null = null
 let isLoadingGlobal = false
 let loadingPromise: Promise<Country[]> | null = null
 
-// Version optimisée des logs pour réduire le "bruit"
-const DEBUG_MODE = process.env.NODE_ENV === 'development'
-
-const debugLog = (category: string, message: string, data?: any) => {
-  if (!DEBUG_MODE) return
-  
-  const emoji = {
-    form: '📝',
-    auth: '🔐', 
-    storage: '💾',
-    error: '❌',
-    success: '✅',
-    countries: '🌍'
-  }
-  
-  console.log(`${emoji[category] || '🔍'} [${category}] ${message}`, data ? data : '')
-}
-
 // CORRECTION CRITIQUE : Fonction de fetch hors du hook pour éviter les re-créations
 const fetchCountriesGlobal = async (): Promise<Country[]> => {
   // Si on a déjà les données en cache, les retourner
   if (countriesCache) {
-    debugLog('countries', 'Données déjà en cache')
+    console.log('📦 [Countries] Données déjà en cache')
     return countriesCache
   }
 
   // Si un chargement est déjà en cours, attendre sa fin
   if (loadingPromise) {
-    debugLog('countries', 'Chargement en cours, attente...')
+    console.log('⏳ [Countries] Chargement en cours, attente...')
     return loadingPromise
   }
 
   // Créer une nouvelle promesse de chargement
   loadingPromise = new Promise(async (resolve) => {
     try {
-      debugLog('countries', 'Début du chargement depuis l\'API REST Countries...')
+      console.log('🌐 [Countries] Début du chargement depuis l\'API REST Countries...')
+      console.log('📡 [Countries] URL: https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations')
       
       isLoadingGlobal = true
       
       const controller = new AbortController()
       const timeoutId = setTimeout(() => {
-        debugLog('countries', 'Timeout atteint (10s)')
+        console.log('⏰ [Countries] Timeout atteint (10s)')
         controller.abort()
       }, 10000)
       
@@ -86,22 +69,23 @@ const fetchCountriesGlobal = async (): Promise<Country[]> => {
       })
       
       clearTimeout(timeoutId)
-      debugLog('countries', `Statut HTTP: ${response.status} ${response.statusText}`)
+      console.log(`📡 [Countries] Statut HTTP: ${response.status} ${response.statusText}`)
       
       if (!response.ok) {
         throw new Error(`API indisponible: ${response.status}`)
       }
       
       const data = await response.json()
-      debugLog('countries', `Données reçues: ${data.length} pays bruts`)
+      console.log(`📊 [Countries] Données reçues: ${data.length} pays bruts`)
+      console.log('🔍 [Countries] Échantillon brut:', data.slice(0, 2))
       
       if (!Array.isArray(data)) {
-        debugLog('error', 'Format invalide - pas un array')
+        console.error('❌ [Countries] Format invalide - pas un array')
         throw new Error('Format de données invalide')
       }
       
       const formattedCountries = data
-        .map((country: any) => {
+        .map((country: any, index: number) => {
           let phoneCode = ''
           if (country.idd?.root) {
             phoneCode = country.idd.root
@@ -110,14 +94,20 @@ const fetchCountriesGlobal = async (): Promise<Country[]> => {
             }
           }
           
-          return {
+          const formatted = {
             value: country.cca2,
             label: country.translations?.fra?.common || country.name?.common || country.cca2,
             phoneCode: phoneCode,
             flag: country.flag || ''
           }
+          
+          if (index < 3) {
+            console.log(`🏳️ [Countries] Pays ${index + 1}:`, formatted)
+          }
+          
+          return formatted
         })
-        .filter((country: Country) => {
+        .filter((country: Country, index: number) => {
           const hasValidCode = country.phoneCode && 
                               country.phoneCode !== 'undefined' && 
                               country.phoneCode !== 'null' &&
@@ -130,32 +120,54 @@ const fetchCountriesGlobal = async (): Promise<Country[]> => {
                               country.label && 
                               country.label.length > 1
           
-          return hasValidCode && hasValidInfo
+          const isValid = hasValidCode && hasValidInfo
+          
+          if (!isValid && index < 5) {
+            console.log(`❌ [Countries] Pays rejeté:`, {
+              country: country.label,
+              code: country.value,
+              phoneCode: country.phoneCode,
+              hasValidCode,
+              hasValidInfo
+            })
+          }
+          
+          return isValid
         })
         .sort((a: Country, b: Country) => a.label.localeCompare(b.label, 'fr', { numeric: true }))
       
-      debugLog('countries', `Pays valides après filtrage: ${formattedCountries.length}`)
+      console.log(`✅ [Countries] Pays valides après filtrage: ${formattedCountries.length}`)
+      console.log('📋 [Countries] Échantillon final:', formattedCountries.slice(0, 5))
       
       if (formattedCountries.length >= 50) {
-        debugLog('success', 'API validée! Utilisation des données complètes')
+        console.log('🎉 [Countries] API validée! Utilisation des données complètes')
+        console.log(`📈 [Countries] Transition: fallback(${fallbackCountries.length}) → API(${formattedCountries.length})`)
         
         // Mise en cache globale
         countriesCache = formattedCountries
         resolve(formattedCountries)
       } else {
-        debugLog('error', `Pas assez de pays valides: ${formattedCountries.length}/50`)
+        console.warn(`⚠️ [Countries] Pas assez de pays valides: ${formattedCountries.length}/50`)
         throw new Error(`Qualité insuffisante: ${formattedCountries.length}/50 pays`)
       }
       
     } catch (err: any) {
-      debugLog('error', 'ERREUR:', err)
-      debugLog('countries', 'Passage en mode fallback')
+      console.error('💥 [Countries] ERREUR:', err)
+      console.warn('🔄 [Countries] Passage en mode fallback')
+      
+      if (err.name === 'AbortError') {
+        console.warn('⏰ [Countries] Cause: Timeout de l\'API (10s)')
+      } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        console.warn('🌐 [Countries] Cause: Problème de connexion réseau')
+      } else {
+        console.warn('🐛 [Countries] Cause:', err.message)
+      }
       
       // Même le fallback va en cache pour éviter les re-fetch
       countriesCache = fallbackCountries
       resolve(fallbackCountries)
     } finally {
-      debugLog('countries', 'Chargement terminé')
+      console.log('🏁 [Countries] Chargement terminé')
       isLoadingGlobal = false
       // Nettoyer la promesse après utilisation
       loadingPromise = null
@@ -167,7 +179,7 @@ const fetchCountriesGlobal = async (): Promise<Country[]> => {
 
 // Hook pour charger les pays depuis l'API REST Countries - VERSION DÉFINITIVEMENT CORRIGÉE
 export const useCountries = () => {
-  debugLog('countries', 'Hook useCountries appelé!')
+  console.log('🎯 [Countries] Hook useCountries appelé!')
   
   // État initial basé sur le cache
   const [countries, setCountries] = useState<Country[]>(() => 
@@ -184,16 +196,16 @@ export const useCountries = () => {
   useEffect(() => {
     // Éviter les doubles appels en mode strict
     if (hasFetched.current) {
-      debugLog('countries', 'Fetch déjà effectué, skip')
+      console.log('🚫 [Countries] Fetch déjà effectué, skip')
       return
     }
     
     hasFetched.current = true
-    debugLog('countries', 'DÉMARRAGE du processus de chargement des pays')
+    console.log('🚀 [Countries] DÉMARRAGE du processus de chargement des pays')
     
     // Si on a déjà les données en cache, les utiliser immédiatement
     if (countriesCache) {
-      debugLog('countries', 'Utilisation du cache existant')
+      console.log('📦 [Countries] Utilisation du cache existant')
       setCountries(countriesCache)
       setUsingFallback(false)
       setLoading(false)
@@ -203,7 +215,7 @@ export const useCountries = () => {
     // Délai pour éviter les conflits avec l'hydratation
     const timer = setTimeout(async () => {
       if (isMounted.current) {
-        debugLog('countries', 'Démarrage après délai de 100ms')
+        console.log('⏰ [Countries] Démarrage après délai de 100ms')
         try {
           const result = await fetchCountriesGlobal()
           if (isMounted.current) {
@@ -212,7 +224,7 @@ export const useCountries = () => {
             setLoading(false)
           }
         } catch (error) {
-          debugLog('error', 'Erreur dans le timer:', error)
+          console.error('❌ [Countries] Erreur dans le timer:', error)
           if (isMounted.current) {
             setCountries(fallbackCountries)
             setUsingFallback(true)
@@ -236,7 +248,7 @@ export const useCountries = () => {
     }
   }, [])
 
-  debugLog('countries', `Render - ${countries.length} pays, loading:${loading}, fallback:${usingFallback}`)
+  console.log(`🔄 [Countries] Render - ${countries.length} pays, loading:${loading}, fallback:${usingFallback}`)
   
   // Mémoisation du retour pour éviter les re-renders des composants parents
   return useMemo(() => ({
@@ -254,7 +266,10 @@ export const useCountryCodeMap = (countries: Country[]) => {
       return acc
     }, {} as Record<string, string>)
     
-    debugLog('countries', `Mapping créé avec ${Object.keys(mapping).length} entrées`)
+    console.log(`🗺️ [CountryCodeMap] Mapping créé avec ${Object.keys(mapping).length} entrées`)
+    if (Object.keys(mapping).length > 0) {
+      console.log('📋 [CountryCodeMap] Échantillon:', Object.entries(mapping).slice(0, 3))
+    }
     
     return mapping
   }, [countries])
@@ -317,182 +332,37 @@ export const validateWebsite = (url: string): boolean => {
   return /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/.test(url)
 }
 
-// ===== NOUVELLE SECTION: RememberMe Utils avec préservation lors de la déconnexion =====
-
+// Utilitaires pour Remember Me - INCHANGÉS
 export const rememberMeUtils = {
-  // Clé de stockage spécifique pour éviter la suppression lors du logout
-  STORAGE_KEY: 'intelia-remember-me-persist',
-
-  // Sauvegarder les données remember me
-  save: (email: string, rememberMe: boolean): void => {
+  save: (email: string, remember = true) => {
     try {
-      if (!rememberMe || !email.trim()) {
-        localStorage.removeItem(rememberMeUtils.STORAGE_KEY)
-        debugLog('storage', 'localStorage nettoyé')
-        return
-      }
-
-      const data = {
-        email: email.trim(),
-        rememberMe: true,
-        timestamp: Date.now(),
-        version: '1.0'
-      }
-
-      localStorage.setItem(rememberMeUtils.STORAGE_KEY, JSON.stringify(data))
-      debugLog('storage', 'Sauvegardé:', { email: email.trim(), rememberMe })
-    } catch (error) {
-      debugLog('error', 'Erreur sauvegarde:', error)
-    }
-  },
-
-  // Charger les données remember me
-  load: (): { rememberMe: boolean; lastEmail: string } => {
-    try {
-      const stored = localStorage.getItem(rememberMeUtils.STORAGE_KEY)
-      
-      if (!stored) {
-        debugLog('storage', 'Aucune donnée stockée')
-        return { rememberMe: false, lastEmail: '' }
-      }
-
-      const data = JSON.parse(stored)
-      
-      // Vérifier l'intégrité des données
-      if (!data.email || typeof data.rememberMe !== 'boolean') {
-        debugLog('error', 'Données corrompues, nettoyage')
-        localStorage.removeItem(rememberMeUtils.STORAGE_KEY)
-        return { rememberMe: false, lastEmail: '' }
-      }
-
-      // Vérifier l'âge des données (30 jours max)
-      const age = Date.now() - (data.timestamp || 0)
-      const maxAge = 30 * 24 * 60 * 60 * 1000
-
-      if (age > maxAge) {
-        debugLog('storage', 'Données expirées, nettoyage')
-        localStorage.removeItem(rememberMeUtils.STORAGE_KEY)
-        return { rememberMe: false, lastEmail: '' }
-      }
-
-      debugLog('storage', 'Données chargées:', { 
-        email: data.email, 
-        rememberMe: data.rememberMe,
-        age: Math.round(age / (24 * 60 * 60 * 1000)) + ' jours'
-      })
-
-      return {
-        rememberMe: data.rememberMe,
-        lastEmail: data.email
+      if (remember && email?.trim()) {
+        localStorage.setItem('intelia-remember-me', 'true')
+        localStorage.setItem('intelia-last-email', email.trim())
+        console.log('✅ [RememberMe] Email sauvegardé:', email.trim())
+      } else {
+        localStorage.removeItem('intelia-remember-me')
+        localStorage.removeItem('intelia-last-email')
+        console.log('🗑️ [RememberMe] Préférences effacées')
       }
     } catch (error) {
-      debugLog('error', 'Erreur chargement:', error)
-      try {
-        localStorage.removeItem(rememberMeUtils.STORAGE_KEY)
-      } catch (e) {
-        debugLog('error', 'Impossible de nettoyer localStorage:', e)
-      }
-      return { rememberMe: false, lastEmail: '' }
+      console.error('❌ [RememberMe] Erreur sauvegarde:', error)
     }
   },
-
-  // Nettoyer explicitement les données
-  clear: (): void => {
-    try {
-      localStorage.removeItem(rememberMeUtils.STORAGE_KEY)
-      debugLog('storage', 'Données nettoyées manuellement')
-    } catch (error) {
-      debugLog('error', 'Erreur nettoyage:', error)
-    }
-  },
-
-  // NOUVELLE FONCTION : Préserver RememberMe lors de la déconnexion
-  preserveOnLogout: (): { email: string; rememberMe: boolean } | null => {
-    const current = rememberMeUtils.load()
-    if (current.rememberMe && current.lastEmail) {
-      return {
-        email: current.lastEmail,
-        rememberMe: true
-      }
-    }
-    return null
-  },
-
-  // NOUVELLE FONCTION : Restaurer après déconnexion
-  restoreAfterLogout: (preservedData: { email: string; rememberMe: boolean } | null): void => {
-    if (preservedData && preservedData.rememberMe) {
-      rememberMeUtils.save(preservedData.email, true)
-      debugLog('storage', 'Restauré après déconnexion:', preservedData.email)
-    }
-  }
-}
-
-// NOUVELLES FONCTIONS : Gestion de la déconnexion avec préservation RememberMe
-
-export const preserveRememberMeOnLogout = () => {
-  const preserved = rememberMeUtils.preserveOnLogout()
   
-  return {
-    restore: () => {
-      if (preserved) {
-        rememberMeUtils.restoreAfterLogout(preserved)
+  load: () => {
+    try {
+      const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
+      const lastEmail = localStorage.getItem('intelia-last-email') || ''
+      
+      return {
+        rememberMe,
+        lastEmail: rememberMe ? lastEmail : '',
+        hasRememberedEmail: rememberMe && lastEmail.length > 0
       }
+    } catch (error) {
+      console.error('❌ [RememberMe] Erreur chargement:', error)
+      return { rememberMe: false, lastEmail: '', hasRememberedEmail: false }
     }
   }
 }
-
-export const logoutWithRememberMePreservation = async (customLogoutFn?: () => Promise<void>) => {
-  try {
-    debugLog('auth', 'Début déconnexion coordonnée')
-    
-    // ÉTAPE 1 : Préserver les données RememberMe AVANT le nettoyage
-    const preservedRememberMe = rememberMeUtils.preserveOnLogout()
-    debugLog('auth', 'Données RememberMe préservées:', preservedRememberMe)
-    
-    // ÉTAPE 2 : Nettoyage localStorage sélectif
-    debugLog('auth', 'Nettoyage localStorage sélectif')
-    
-    // Supprimer toutes les clés auth SAUF remember-me
-    const keysToRemove = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && key !== rememberMeUtils.STORAGE_KEY) {
-        // Garder seulement la clé remember-me
-        if (key.startsWith('intelia-') || key.includes('auth') || key.includes('session') || key.includes('supabase')) {
-          keysToRemove.push(key)
-        }
-      }
-    }
-    
-    // Supprimer les clés identifiées
-    keysToRemove.forEach(key => {
-      localStorage.removeItem(key)
-      debugLog('auth', `Supprimé: ${key}`)
-    })
-    
-    // ÉTAPE 3 : Déconnexion personnalisée si fournie
-    if (customLogoutFn) {
-      await customLogoutFn()
-    }
-    
-    // ÉTAPE 4 : Restaurer les données RememberMe APRÈS le nettoyage
-    if (preservedRememberMe) {
-      setTimeout(() => {
-        rememberMeUtils.restoreAfterLogout(preservedRememberMe)
-        debugLog('auth', 'RememberMe restauré après nettoyage')
-      }, 100)
-    }
-    
-    // ÉTAPE 5 : Redirection
-    debugLog('auth', 'Redirection pour éviter callbacks')
-    window.location.href = '/'
-    
-  } catch (error) {
-    debugLog('error', 'Erreur lors de la déconnexion:', error)
-    // En cas d'erreur, forcer quand même la redirection
-    window.location.href = '/'
-  }
-}
-
-// Export pour compatibilité avec le code existant
-export { debugLog }
