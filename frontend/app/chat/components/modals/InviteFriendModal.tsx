@@ -1,27 +1,4 @@
-// Forcer les styles au montage pour contourner les problèmes CSS (même correction que ContactModal)
-  useEffect(() => {
-    const overlay = overlayRef.current
-    
-    if (overlay) {
-      // Forcer les dimensions de l'overlay (correction complète)
-      overlay.style.setProperty('width', '100vw', 'important')
-      overlay.style.setProperty('height', '100vh', 'important')
-      overlay.style.setProperty('top', '0', 'important')
-      overlay.style.setProperty('left', '0', 'important')
-      overlay.style.setProperty('right', '0', 'important')
-      overlay.style.setProperty('bottom', '0', 'important')
-      
-      // Overlay transparent + centrage flex
-      overlay.style.setProperty('background-color', 'transparent', 'important')
-      overlay.style.setProperty('display', 'flex', 'important')
-      overlay.style.setProperty('align-items', 'center', 'important')
-      overlay.style.setProperty('justify-content', 'center', 'important')
-      overlay.style.setProperty('padding', '16px', 'important')
-      
-      // Forcer les dimensions du contenu
-      const content = overlay.querySelector('.bg-white')
-      if (content) {
-        import React, { useState, useMemo, useEffect, useRef } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useTranslation } from '../../hooks/useTranslation'
 import { useAuthStore } from '@/lib/stores/auth' 
 import { getSupabaseClient } from '@/lib/supabase/singleton'
@@ -163,12 +140,12 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
   const [results, setResults] = useState<InvitationResponse | null>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
 
-  // Forcer les styles au montage pour contourner les problèmes CSS (même correction que ContactModal)
+  // Forcer les styles au montage pour contourner les problèmes CSS
   useEffect(() => {
     const overlay = overlayRef.current
     
     if (overlay) {
-      // Forcer les dimensions de l'overlay (correction complète)
+      // Forcer les dimensions de l'overlay
       overlay.style.setProperty('width', '100vw', 'important')
       overlay.style.setProperty('height', '100vh', 'important')
       overlay.style.setProperty('top', '0', 'important')
@@ -183,7 +160,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
       overlay.style.setProperty('justify-content', 'center', 'important')
       overlay.style.setProperty('padding', '16px', 'important')
       
-      // Forcer les dimensions du contenu (700px harmonisé avec UserInfo)
+      // Forcer les dimensions du contenu
       const content = overlay.querySelector('.bg-white')
       if (content) {
         content.style.setProperty('width', '95vw', 'important')
@@ -372,7 +349,36 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     return valid.length
   }
 
-  // Fonction pour messages simplifiés
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A'
+    return new Date(dateString).toLocaleDateString('fr-FR', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  }
+
+  const getStatusIcon = (status: string, reason?: string) => {
+    switch (status) {
+      case 'sent': return <span className="text-green-600">✅</span>
+      case 'skipped': 
+        if (reason === 'user_exists') return <span className="text-blue-600">👤</span>
+        return <span className="text-yellow-600">⭐</span>
+      case 'failed': return <span className="text-red-600">❌</span>
+      default: return <span className="text-gray-600">⚪</span>
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'sent': return 'bg-green-50 border-green-200 text-green-800'
+      case 'skipped': return 'bg-blue-50 border-blue-200 text-blue-800'
+      case 'failed': return 'bg-red-50 border-red-200 text-red-800'
+      default: return 'bg-gray-50 border-gray-200 text-gray-800'
+    }
+  }
+
+  // ==================== AJOUT: Fonction pour messages simplifiés ====================
   const getFriendlyMessage = (result: InvitationResult) => {
     if (result.status === 'sent') {
       return `Invitation envoyée avec succès à ${result.email} ! 🎉`
@@ -409,7 +415,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     return result.message
   }
 
-  // Affichage conditionnel si pas d'utilisateur
+  // Affichage conditionnel si pas d'utilisateur (votre code original conservé)
   if (!currentUser?.email) {
     return (
       <div ref={overlayRef} className="fixed inset-0 z-50" onClick={onClose}>
@@ -470,14 +476,14 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
               </p>
             </div>
 
-            {/* Interface pour les résultats */}
+            {/* ==================== INTERFACE SIMPLIFIÉE POUR LES RÉSULTATS ==================== */}
             {results && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
                   État de l'envoi
                 </h3>
 
-                {/* Messages des résultats */}
+                {/* Messages des résultats - Interface simplifiée */}
                 <div className="space-y-3">
                   {results.results.map((result, index) => (
                     <div
@@ -550,7 +556,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
               </div>
             )}
 
-            {/* Formulaire principal */}
+            {/* Formulaire principal (si pas de résultats affichés) */}
             {!results && (
               <div className="space-y-6">
                 {/* Section Email Addresses */}
@@ -578,7 +584,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
                     disabled={isLoading}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Séparez les adresses par des virgules. Maximum 10 invitations à la fois.
+                    💡 Séparez les adresses par des virgules. Maximum 10 invitations à la fois.
                   </p>
                 </div>
 
@@ -605,7 +611,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
                   />
                   <div className="flex justify-between items-center mt-1">
                     <p className="text-xs text-gray-500">
-                      Votre message sera inclus dans l'email d'invitation
+                      💬 Votre message sera inclus dans l'email d'invitation
                     </p>
                     <span className="text-xs text-gray-400">
                       {personalMessage.length}/500
@@ -617,9 +623,13 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
 
             {/* Boutons d'action */}
             <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+              {/* Bouton d'envoi (seulement si pas de résultats) */}
               {!results && (
                 <button
-                  onClick={handleSendInvitations}
+                  onClick={() => {
+                    console.log('🖱️ [InviteFriendModal] Bouton "Envoyer" cliqué depuis onClick')
+                    handleSendInvitations()
+                  }}
                   disabled={isLoading || getEmailCount() === 0}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center space-x-2"
                 >
@@ -644,7 +654,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
 
             {/* Footer avec informations */}
             <div className="text-xs text-gray-500 text-center pt-2 border-t border-gray-100">
-              Les invitations sont envoyées depuis support@intelia.com avec votre nom comme expéditeur.
+              📧 Les invitations sont envoyées depuis support@intelia.com avec votre nom comme expéditeur.
               <br />
               Vos contacts recevront un lien pour créer leur compte Intelia Expert gratuitement.
             </div>
