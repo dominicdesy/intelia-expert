@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { useAuthStore } from '@/lib/stores/auth'
+// CORRECTION CRITIQUE : Utiliser les hooks optimisés au lieu du store complet
+import { useUser, useAuth, useAuthLoading } from '@/lib/hooks/useAuthStore'
 import type { User } from '@/types'
 import { 
   useCountries, 
@@ -32,10 +33,12 @@ export function useAuthenticationLogic({
   const router = useRouter()
   const pathname = usePathname()
   
-  const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore()
-  const { login, register, initializeSession } = useAuthStore()
+  // CORRECTION : Hooks optimisés séparés pour éviter les re-renders
+  const { user, isAuthenticated, hasHydrated } = useUser()
+  const { login, register, initializeSession } = useAuth()
+  const { isLoading } = useAuthLoading()
 
-  // ✅ Hooks pour les pays - optimisés
+  // Hooks pour les pays - optimisés
   console.log('🎯 [PageContent] Appel du hook useCountries...')
   const countriesData = useCountries()
   const { countries, loading: countriesLoading, usingFallback } = countriesData
@@ -74,7 +77,7 @@ export function useAuthenticationLogic({
     companyLinkedin: ''
   })
 
-  // ✅ Fonction de redirection sécurisée mémorisée
+  // Fonction de redirection sécurisée mémorisée
   const safeRedirectToChat = useCallback(() => {
     if (redirectLock.current || !isMounted.current) {
       console.log('🔒 [Redirect] Déjà en cours de redirection ou démontage, ignoré')
@@ -91,7 +94,7 @@ export function useAuthenticationLogic({
     router.replace('/chat')
   }, [pathname, router])
 
-  // ✅ Gestion des changements de formulaires optimisée
+  // Gestion des changements de formulaires optimisée
   const handleLoginChange = useCallback((field: keyof LoginData, value: string | boolean) => {
     setLoginData(prev => {
       const newData = { ...prev, [field]: value }
@@ -137,7 +140,7 @@ export function useAuthenticationLogic({
     })
   }, [countryCodeMap])
 
-  // ✅ Validation du formulaire d'inscription mémorisée
+  // Validation du formulaire d'inscription mémorisée
   const validateSignupForm = useCallback((): string | null => {
     const { 
       email, password, confirmPassword, firstName, lastName, country, 
@@ -168,7 +171,7 @@ export function useAuthenticationLogic({
     return null
   }, [signupData, t])
 
-  // ✅ Gestion de la connexion mémorisée
+  // Gestion de la connexion mémorisée
   const handleLogin = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -215,7 +218,7 @@ export function useAuthenticationLogic({
     }
   }, [loginData, t, login])
 
-  // ✅ Gestion de l'inscription mémorisée
+  // Gestion de l'inscription mémorisée
   const handleSignup = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -251,7 +254,7 @@ export function useAuthenticationLogic({
     }
   }, [signupData, currentLanguage, register, validateSignupForm])
 
-  // ✅ Initialisation de la session optimisée
+  // Initialisation de la session optimisée
   useEffect(() => {
     if (!hasHydrated || !isMounted.current) return
     
@@ -262,7 +265,7 @@ export function useAuthenticationLogic({
     }
   }, [hasHydrated, initializeSession])
 
-  // ✅ Vérification authentification optimisée
+  // Vérification authentification optimisée
   useEffect(() => {
     if (!hasHydrated || hasCheckedAuth.current || !isMounted.current) {
       return
@@ -293,7 +296,7 @@ export function useAuthenticationLogic({
     }
   }, [hasHydrated, isAuthenticated, initializeSession, safeRedirectToChat])
 
-  // ✅ Surveillance changement AUTH optimisée
+  // Surveillance changement AUTH optimisée
   useEffect(() => {
     if (!hasHydrated || !hasCheckedAuth.current || !isMounted.current) {
       return
@@ -305,7 +308,7 @@ export function useAuthenticationLogic({
     }
   }, [isAuthenticated, isLoading, hasHydrated, safeRedirectToChat])
 
-  // ✅ Focus automatique sur mot de passe si email pré-rempli
+  // Focus automatique sur mot de passe si email pré-rempli
   useEffect(() => {
     const { rememberMe, lastEmail } = rememberMeUtils.load()
     
@@ -318,7 +321,7 @@ export function useAuthenticationLogic({
     }
   }, [loginData.email, loginData.password])
 
-  // ✅ Restaurer email lors du retour en mode login
+  // Restaurer email lors du retour en mode login
   useEffect(() => {
     if (!isSignupMode) {
       const { rememberMe, lastEmail } = rememberMeUtils.load()
@@ -333,14 +336,14 @@ export function useAuthenticationLogic({
     }
   }, [isSignupMode])
 
-  // ✅ Cleanup au démontage
+  // Cleanup au démontage
   useEffect(() => {
     return () => {
       isMounted.current = false
     }
   }, [])
 
-  // ✅ Retour mémorisé pour éviter les re-renders des composants parents
+  // Retour mémorisé pour éviter les re-renders des composants parents
   return useMemo(() => ({
     // États
     loginData,
