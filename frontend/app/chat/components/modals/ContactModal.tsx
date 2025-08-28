@@ -26,11 +26,12 @@ export const ContactModal = ({ onClose }: { onClose: () => void }) => {
       overlay.style.setProperty('justify-content', 'center', 'important')
       overlay.style.setProperty('padding', '16px', 'important')
       
-      // Forcer les dimensions du contenu
-      const content = overlay.querySelector('.bg-white')
+      // Forcer les dimensions du contenu (700px harmonisé avec UserInfo)
+      const content = overlay.querySelector('.bg-white') as HTMLElement
       if (content) {
-        content.style.setProperty('width', '100%', 'important')
-        content.style.setProperty('max-width', '600px', 'important')
+        content.style.setProperty('width', '95vw', 'important')
+        content.style.setProperty('max-width', '700px', 'important')
+        content.style.setProperty('max-height', '85vh', 'important')
         content.style.setProperty('min-width', '320px', 'important')
       }
     }
