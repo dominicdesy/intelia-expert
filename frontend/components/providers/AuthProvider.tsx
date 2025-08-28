@@ -179,13 +179,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return
         }
         
-        // CORRECTION : Utiliser l'import au lieu d'accéder directement au store
-        const { isAuthenticated } = useAuth.getState ? useAuth.getState() : { isAuthenticated: false }
-        const hasSession = !!session
-        
-        if (isAuthenticated !== hasSession) {
-          console.log('[AuthProvider] Synchronisation état auth nécessaire')
-          await safeCheckAuth()
+        // CORRECTION : Importer le store directement pour la vérification périodique
+        try {
+          const { useAuthStore } = require('@/lib/stores/auth')
+          const isAuthenticated = useAuthStore.getState().isAuthenticated
+          const hasSession = !!session
+          
+          if (isAuthenticated !== hasSession) {
+            console.log('[AuthProvider] Synchronisation état auth nécessaire')
+            await safeCheckAuth()
+          }
+        } catch (error) {
+          // Si l'import échoue, ignorer cette vérification
+          console.warn('[AuthProvider] Impossible d\'importer le store pour vérification:', error)
         }
       } catch (error) {
         if (isMountedRef.current && !isLoggingOutRef.current) {
