@@ -1401,11 +1401,10 @@ export default function ChatInterface() {
     <>
       <ZohoSalesIQ user={user} language={currentLanguage} />
 
-	  <div 
-	    className={`bg-gray-50 flex flex-col relative z-0 ${uiState.isMobileDevice ? 'chat-main-container' : 'min-h-dvh h-screen'}`}
-	    style={containerStyle}
-	  >
-
+      <div 
+        className={`bg-gray-50 flex flex-col ${uiState.isMobileDevice ? 'chat-main-container' : 'min-h-dvh h-screen'}`}
+        style={containerStyle}
+      >
 
         <header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
