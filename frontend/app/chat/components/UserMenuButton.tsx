@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '../hooks/useTranslation'
+import { Modal } from './Modal'
 import { UserInfoModal } from './modals/UserInfoModal'
 import { AccountModal } from './modals/AccountModal'
 import { ContactModal } from './modals/ContactModal'
@@ -351,11 +352,9 @@ export const UserMenuButton = React.memo(() => {
         )}
       </div>
 
-      {/* TOUTES LES MODALES SANS WRAPPER - Structure simple */}
-      {!isSuperAdmin && showAccountModal && (
-        <AccountModal user={user as any} onClose={closeAccountModal} />
-      )}
-
+      {/* SOLUTION HYBRIDE - Selon la structure réelle de chaque modale */}
+      
+      {/* UserInfoModal et ContactModal - Ont leur propre structure complète, PAS de wrapper */}
       {showUserInfoModal && isMountedRef.current && (
         <UserInfoModal 
           user={user as any} 
@@ -363,17 +362,36 @@ export const UserMenuButton = React.memo(() => {
         />
       )}
 
-      {showLanguageModal && (
-        <LanguageModal onClose={closeLanguageModal} />
-      )}
-
       {showContactModal && (
         <ContactModal onClose={closeContactModal} />
       )}
 
-      {showInviteFriendModal && (
-        <InviteFriendModal onClose={closeInviteFriendModal} />
+      {/* AccountModal, LanguageModal, InviteFriendModal - Ont besoin du wrapper Modal */}
+      {!isSuperAdmin && (
+        <Modal
+          isOpen={showAccountModal}
+          onClose={closeAccountModal}
+          title={t('subscription.title')}
+        >
+          <AccountModal user={user as any} onClose={closeAccountModal} />
+        </Modal>
       )}
+
+      <Modal
+        isOpen={showLanguageModal}
+        onClose={closeLanguageModal}
+        title={t('language.title')}
+      >
+        <LanguageModal onClose={closeLanguageModal} />
+      </Modal>
+
+      <Modal
+        isOpen={showInviteFriendModal}
+        onClose={closeInviteFriendModal}
+        title={t('nav.inviteFriend')}
+      >
+        <InviteFriendModal onClose={closeInviteFriendModal} />
+      </Modal>
     </>
   )
 })
