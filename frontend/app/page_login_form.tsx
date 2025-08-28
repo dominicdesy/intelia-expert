@@ -1,6 +1,6 @@
 'use client'
 
-import React, { memo, useCallback, useState, useEffect, useMemo } from 'react'
+import React, { memo, useCallback, useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { AlertMessage, PasswordInput } from './page_components'
 import { validateEmail, rememberMeUtils, debugLog } from './page_hooks'
@@ -37,10 +37,32 @@ export const LoginForm = memo(function LoginForm({
 
   const [formError, setFormError] = useState('')
   const [formSuccess, setFormSuccess] = useState('')
+  
+  // CORRECTION 1: Référence pour éviter le focus automatique pendant la saisie
+  const isInitialLoadRef = useRef(true)
+  const hasAutoFocusedRef = useRef(false)
+  const userIsTypingRef = useRef(false)
 
-  // Gestionnaire optimisé avec logs réduits
+  // CORRECTION 2: Gestionnaire avec débounce pour éviter les sauvegardes à chaque caractère
+  const saveRememberMeDebounced = useCallback(
+    debounce((email: string, rememberMe: boolean) => {
+      if (rememberMe && email && validateEmail(email)) {
+        rememberMeUtils.save(email, true)
+        debugLog('storage', 'Email saved (debounced)', email)
+      }
+    }, 500),
+    []
+  )
+
   const handleLoginChange = useCallback((field: keyof LoginData, value: string | boolean) => {
-    // Log seulement pour rememberMe et quand nécessaire
+    // Marquer que l'utilisateur tape (pour éviter le focus automatique)
+    if (field === 'email') {
+      userIsTypingRef.current = true
+      setTimeout(() => {
+        userIsTypingRef.current = false
+      }, 1000)
+    }
+
     if (field === 'rememberMe') {
       debugLog('form', `RememberMe changed to: ${value}`)
     }
@@ -61,23 +83,22 @@ export const LoginForm = memo(function LoginForm({
         }
       }
       
-      // Gestion email - sauvegarder seulement si email complet et valide
+      // CORRECTION 3: Sauvegarde différée pour l'email pour éviter le spam
       if (field === 'email' && newData.rememberMe) {
         const emailValue = (value as string).trim()
-        // Sauvegarder seulement si l'email semble complet pour éviter les sauvegardes à chaque caractère
-        if (emailValue && validateEmail(emailValue)) {
-          rememberMeUtils.save(emailValue, true)
-          debugLog('storage', 'Valid email saved', emailValue)
-        }
+        // Utiliser le débounce pour éviter les sauvegardes à chaque caractère
+        saveRememberMeDebounced(emailValue, true)
       }
       
       return newData
     })
-  }, [])
+  }, [saveRememberMeDebounced])
 
-  // Restaurer les données Remember Me à l'initialisation
+  // CORRECTION 4: Restauration RememberMe seulement au premier chargement
   useEffect(() => {
-    debugLog('form', 'Initializing RememberMe restoration')
+    if (!isInitialLoadRef.current) return
+
+    debugLog('form', 'Initializing RememberMe restoration (first load only)')
     
     const { rememberMe, lastEmail } = rememberMeUtils.load()
     
@@ -89,19 +110,43 @@ export const LoginForm = memo(function LoginForm({
       }))
       debugLog('form', 'RememberMe data restored', lastEmail)
     }
-  }, [])
 
-  // Focus automatique optimisé avec délai réduit
+    isInitialLoadRef.current = false
+  }, []) // Pas de dépendances - s'exécute une seule fois
+
+  // CORRECTION 5: Focus automatique SEULEMENT si email pré-rempli ET utilisateur ne tape pas
   useEffect(() => {
-    if (loginData.email && !loginData.password && passwordInputRef.current) {
+    // Ne pas faire le focus si :
+    // - L'utilisateur est en train de taper
+    // - On a déjà fait le focus automatique
+    // - Il n'y a pas de champ password
+    if (userIsTypingRef.current || hasAutoFocusedRef.current || !passwordInputRef.current) {
+      return
+    }
+
+    // Faire le focus SEULEMENT si :
+    // - Email pré-rempli par RememberMe
+    // - Pas de mot de passe
+    // - RememberMe activé
+    if (loginData.rememberMe && loginData.email && !loginData.password) {
       const timer = setTimeout(() => {
-        passwordInputRef.current?.focus()
-        debugLog('form', 'Auto-focus on password field')
-      }, 300)
+        if (!userIsTypingRef.current && passwordInputRef.current) {
+          passwordInputRef.current.focus()
+          hasAutoFocusedRef.current = true
+          debugLog('form', 'Auto-focus on password field (RememberMe)')
+        }
+      }, 800) // Délai plus long pour être sûr que l'utilisateur a fini de taper
       
       return () => clearTimeout(timer)
     }
-  }, [loginData.email, loginData.password, passwordInputRef])
+  }, [loginData.rememberMe, loginData.email, loginData.password, passwordInputRef])
+
+  // Reset du flag de focus quand l'utilisateur change d'email
+  useEffect(() => {
+    if (loginData.email !== '') {
+      hasAutoFocusedRef.current = false
+    }
+  }, [loginData.email])
 
   const onSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
@@ -124,7 +169,7 @@ export const LoginForm = memo(function LoginForm({
     }
   }, [onSubmit])
 
-  // Gestionnaires memoizés pour éviter les re-renders
+  // Gestionnaires memoizés
   const handleEmailChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     handleLoginChange('email', e.target.value)
   }, [handleLoginChange])
@@ -148,11 +193,12 @@ export const LoginForm = memo(function LoginForm({
     [isLoading, loginData.email, loginData.password]
   )
 
-  // Debug léger en mode développement
+  // Debug léger
   debugLog('form', 'Current state', { 
     hasEmail: !!loginData.email, 
     rememberMe: loginData.rememberMe,
-    isLoading 
+    isLoading,
+    userIsTyping: userIsTypingRef.current
   })
 
   return (
@@ -292,14 +338,24 @@ export const LoginForm = memo(function LoginForm({
         </p>
       </div>
 
-      {/* Debug info simplifiée - seulement l'essentiel en mode développement */}
+      {/* Debug info simplifiée */}
       {process.env.NODE_ENV === 'development' && (
         <div className="mt-4 p-2 bg-gray-100 rounded text-xs opacity-50 hover:opacity-100 transition-opacity">
           <strong>Debug:</strong> Email: {loginData.email ? 'Présent' : 'Vide'} | 
           RememberMe: {loginData.rememberMe ? 'Oui' : 'Non'} | 
-          Storage: {localStorage.getItem('intelia-remember-me-persist') ? 'OK' : 'Vide'}
+          Storage: {localStorage.getItem('intelia-remember-me-persist') ? 'OK' : 'Vide'} |
+          UserTyping: {userIsTypingRef.current ? 'Oui' : 'Non'}
         </div>
       )}
     </>
   )
 })
+
+// Fonction utilitaire debounce pour éviter les appels trop fréquents
+function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
+  let timeout: NodeJS.Timeout | null = null
+  return ((...args: Parameters<T>) => {
+    if (timeout) clearTimeout(timeout)
+    timeout = setTimeout(() => func(...args), wait)
+  }) as T
+}

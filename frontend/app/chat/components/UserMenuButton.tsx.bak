@@ -103,32 +103,38 @@ export const UserMenuButton = React.memo(() => {
     return { currentPlan, plan, isSuperAdmin }
   }, [user?.plan, user?.user_type])
 
-  // CORRECTION MAJEURE : Déconnexion avec préservation RememberMe
-  const handleLogout = useCallback(async () => {
+  // Solution finale : Déconnexion coordonnée avec AuthProvider
+  const handleLogout = useCallback(() => {
     // Protection contre les clics multiples
     if (logoutInProgressRef.current || !isMountedRef.current) return
     
-    console.log('[DEBUG-LOGOUT-UserMenu] Début déconnexion coordonnée')
+    console.log('[DEBUG-LOGOUT] Début déconnexion coordonnée')
     logoutInProgressRef.current = true
     setIsOpen(false)
 
     try {
-      // UTILISER LA FONCTION LOGOUT DU STORE qui préserve RememberMe
-      console.log('[DEBUG-LOGOUT-UserMenu] Appel logout() du store avec préservation RememberMe')
-      await logout()
+      // Stratégie finale : Nettoyer localStorage ET rediriger immédiatement
+      // Cela évite complètement les callbacks Supabase dans AuthProvider
       
-      // Redirection après nettoyage sélectif
-      console.log('[DEBUG-LOGOUT-UserMenu] Redirection vers page d\'accueil')
-      router.push('/')
+      console.log('[DEBUG-LOGOUT] Nettoyage localStorage complet')
+      localStorage.clear()
+      
+      console.log('[DEBUG-LOGOUT] Redirection immédiate pour éviter callbacks')
+      window.location.href = '/'
+      
+      // Cleanup Supabase en arrière-plan (optionnel car page change)
+      setTimeout(() => {
+        logout().catch((error) => {
+          console.error('Logout async error (ignoré):', error)
+        })
+      }, 100)
       
     } catch (error) {
-      console.error('[DEBUG-LOGOUT-UserMenu] Erreur logout:', error)
+      console.error('Erreur logout:', error)
       // Fallback de sécurité
-      router.push('/')
-    } finally {
-      logoutInProgressRef.current = false
+      window.location.href = '/'
     }
-  }, [logout, router])
+  }, [logout])
 
   // Handlers des modales avec protection
   const handleContactClick = useCallback(() => {
