@@ -139,26 +139,18 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
   const [errors, setErrors] = useState<string[]>([])
   const [results, setResults] = useState<InvitationResponse | null>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
-  const contentRef = useRef<HTMLDivElement>(null)
 
-  // Forcer les styles au montage pour contourner les problèmes CSS
+  // Forcer les styles au montage pour contourner les problèmes CSS (même approche que LanguageModal)
   useEffect(() => {
     const overlay = overlayRef.current
-    const content = contentRef.current
     
-    if (overlay && content) {
-      // Corriger l'overlay (transparent)
+    if (overlay) {
+      // Seulement l'overlay transparent + centrage flex (comme LanguageModal)
       overlay.style.setProperty('background-color', 'transparent', 'important')
       overlay.style.setProperty('display', 'flex', 'important')
       overlay.style.setProperty('align-items', 'center', 'important')
       overlay.style.setProperty('justify-content', 'center', 'important')
-      
-      // Corriger le contenu (centré)
-      content.style.setProperty('position', 'fixed', 'important')
-      content.style.setProperty('top', '50%', 'important')
-      content.style.setProperty('left', '50%', 'important')
-      content.style.setProperty('transform', 'translate(-50%, -50%)', 'important')
-      content.style.setProperty('z-index', '51', 'important')
+      overlay.style.setProperty('padding', '16px', 'important')
     }
   }, [])
 
@@ -410,12 +402,11 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
   if (!currentUser?.email) {
     return (
       <>
-        <div ref={overlayRef} className="fixed inset-0 z-50" onClick={onClose} />
-        <div 
-          ref={contentRef}
-          className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" 
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div ref={overlayRef} className="fixed inset-0 z-50" onClick={onClose}>
+          <div 
+            className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" 
+            onClick={(e) => e.stopPropagation()}
+          >
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">Inviter des amis</h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
@@ -433,10 +424,10 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
                 Fermer
               </button>
             </div>
+                      </div>
           </div>
         </div>
-      </>
-    )
+      )
   }
 
   return (
