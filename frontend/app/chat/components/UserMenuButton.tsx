@@ -341,7 +341,7 @@ export const UserMenuButton = React.memo(() => {
         )}
       </div>
 
-      {/* MODALES DIRECTES - SANS WRAPPER UNIFIÉ QUI CAUSAIT LE DOUBLE OVERLAY */}
+      {/* MODALES DIRECTES - SANS WRAPPER UNIFIÉ */}
       
       {/* Abonnement Modal */}
       {!isSuperAdmin && showAccountModal && (
