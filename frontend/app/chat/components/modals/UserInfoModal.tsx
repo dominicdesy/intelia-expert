@@ -292,48 +292,80 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     }
   }, [])
   
-  // Memoized user data - STABLE references
+  // CORRECTION 1: userDataMemo avec dépendance stable
   const userDataMemo = useMemo(() => {
+    if (!user?.id) {
+      return {
+        firstName: '',
+        lastName: '',
+        email: '',
+        country_code: '',
+        area_code: '',
+        phone_number: '',
+        country: '',
+        linkedinProfile: '',
+        companyName: '',
+        companyWebsite: '',
+        linkedinCorporate: ''
+      }
+    }
+    
     const memo = {
-      firstName: user?.firstName || '',
-      lastName: user?.lastName || '',
-      email: user?.email || '',
-      country_code: user?.country_code || '',
-      area_code: user?.area_code || '',
-      phone_number: user?.phone_number || '',
-      country: user?.country || '',
-      linkedinProfile: user?.linkedinProfile || '',
-      companyName: user?.companyName || '',
-      companyWebsite: user?.companyWebsite || '',
-      linkedinCorporate: user?.linkedinCorporate || ''
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      email: user.email || '',
+      country_code: user.country_code || '',
+      area_code: user.area_code || '',
+      phone_number: user.phone_number || '',
+      country: user.country || '',
+      linkedinProfile: user.linkedinProfile || '',
+      companyName: user.companyName || '',
+      companyWebsite: user.companyWebsite || '',
+      linkedinCorporate: user.linkedinCorporate || ''
     }
     
     debugLog('DATA', 'User data memo updated', memo)
     return memo
-  }, [
-    user?.firstName,
-    user?.lastName,
-    user?.email,
-    user?.country_code,
-    user?.area_code,
-    user?.phone_number,
-    user?.country,
-    user?.linkedinProfile,
-    user?.companyName,
-    user?.companyWebsite,
-    user?.linkedinCorporate
-  ])
+  }, [user?.id]) // SEULE DÉPENDANCE: l'ID utilisateur (stable)
   
-  // States - Initialize with stable data, NO MORE SYNC EFFECT
+  // States - Initialize with stable data
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('profile')
   const [formErrors, setFormErrors] = useState<string[]>([])
   const [passwordErrors, setPasswordErrors] = useState<string[]>([])
   
-  // Initialize formData ONCE with the memoized user data
+  // CORRECTION 2: Initialize formData sans dépendre de userDataMemo
   const [formData, setFormData] = useState(() => {
-    debugLog('STATE', 'Initializing formData with userDataMemo')
-    return { ...userDataMemo }
+    if (!user?.id) {
+      return {
+        firstName: '',
+        lastName: '',
+        email: '',
+        country_code: '',
+        area_code: '',
+        phone_number: '',
+        country: '',
+        linkedinProfile: '',
+        companyName: '',
+        companyWebsite: '',
+        linkedinCorporate: ''
+      }
+    }
+    
+    debugLog('STATE', 'Initializing formData with user data')
+    return {
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      email: user.email || '',
+      country_code: user.country_code || '',
+      area_code: user.area_code || '',
+      phone_number: user.phone_number || '',
+      country: user.country || '',
+      linkedinProfile: user.linkedinProfile || '',
+      companyName: user.companyName || '',
+      companyWebsite: user.companyWebsite || '',
+      linkedinCorporate: user.linkedinCorporate || ''
+    }
   })
   
   const [passwordData, setPasswordData] = useState({
@@ -354,15 +386,8 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     passwordErrorsCount: passwordErrors.length
   })
 
-  // Only update formData if user changes (different email = different user)
-  const userEmailRef = useRef(user?.email)
-  useEffect(() => {
-    if (userEmailRef.current !== user?.email) {
-      debugLog('SYNC', 'User changed - updating form data')
-      setFormData({ ...userDataMemo })
-      userEmailRef.current = user?.email
-    }
-  }, [user?.email, userDataMemo])
+  // CORRECTION 3: Suppression de l'useEffect de synchronisation problématique
+  // (Le code qui causait la boucle infinie a été supprimé)
 
   const { countries, loading: countriesLoading, usingFallback } = useCountries()
 
@@ -478,10 +503,13 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     }))
   }, [])
 
+  // CORRECTION 4: handleProfileSave avec protection contre la race condition
   const handleProfileSave = useCallback(async () => {
     debugLog('API', 'Profile save started', { isLoading })
     
     if (isLoading) return
+    
+    const saveOperationRef = { cancelled: false }
     
     setIsLoading(true)
     setFormErrors([])
@@ -541,24 +569,43 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       
       if (errors.length > 0) {
         debugLog('API', 'Profile save validation failed', { errors })
-        setFormErrors(errors)
+        if (!saveOperationRef.cancelled) {
+          setFormErrors(errors)
+        }
         return
       }
 
       debugLog('API', 'Calling updateProfile', { formData })
       await updateProfile(formData)
-      debugLog('API', 'Profile save successful')
       
-      alert(t('profile.title') + ' mis à jour avec succès!')
-      handleClose()
+      if (!saveOperationRef.cancelled) {
+        debugLog('API', 'Profile save successful')
+        
+        // Délai avant fermeture pour éviter la race condition
+        setTimeout(() => {
+          if (!saveOperationRef.cancelled) {
+            alert(t('profile.title') + ' mis à jour avec succès!')
+            handleClose()
+          }
+        }, 100)
+      }
       
     } catch (error: any) {
-      debugLog('API', 'Profile save error', { error: error?.message })
-      console.error('Erreur mise à jour profil:', error)
-      alert('Erreur lors de la mise à jour: ' + (error?.message || 'Erreur inconnue'))
+      if (!saveOperationRef.cancelled) {
+        debugLog('API', 'Profile save error', { error: error?.message })
+        console.error('Erreur mise à jour profil:', error)
+        alert('Erreur lors de la mise à jour: ' + (error?.message || 'Erreur inconnue'))
+      }
     } finally {
-      debugLog('API', 'Profile save finished')
-      setIsLoading(false)
+      if (!saveOperationRef.cancelled) {
+        debugLog('API', 'Profile save finished')
+        setIsLoading(false)
+      }
+    }
+    
+    // Nettoyage
+    return () => {
+      saveOperationRef.cancelled = true
     }
   }, [formData, validateEmail, validateUrl, validateLinkedInUrl, validatePhoneFields, updateProfile, t, handleClose, isLoading])
 
@@ -663,7 +710,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
 
   const tabs = useMemo(() => [
     { id: 'profile', label: t('nav.profile'), icon: '👤' },
-    { id: 'password', label: t('profile.password'), icon: '🔒' }
+    { id: 'password', label: t('profile.password'), icon: '🔐' }
   ], [t])
 
   // Keyboard handling
