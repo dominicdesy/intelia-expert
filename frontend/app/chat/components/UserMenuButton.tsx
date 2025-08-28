@@ -4,61 +4,14 @@ import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '../hooks/useTranslation'
 import { PLAN_CONFIGS } from '@/types'
 
-// Import des composants INTERNES des modales (sans leur structure overlay)
+// Import des modales avec leur structure complète
 import { UserInfoModal } from './modals/UserInfoModal'
 import { AccountModal } from './modals/AccountModal'
 import { ContactModal } from './modals/ContactModal'
 import { LanguageModal } from './modals/LanguageModal'
 import { InviteFriendModal } from './modals/InviteFriendModal'
 
-// Composant Modal unifié et réutilisable
-const UnifiedModal = React.memo<{
-  isOpen: boolean
-  onClose: () => void
-  title?: string
-  children: React.ReactNode
-}>(({ isOpen, onClose, title, children }) => {
-  const handleBackdropClick = useCallback((e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose()
-    }
-  }, [onClose])
-
-  if (!isOpen) return null
-
-  return (
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-      onClick={handleBackdropClick}
-    >
-      <div 
-        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {title && (
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        )}
-        <div className="overflow-y-auto max-h-[calc(90vh-80px)]">
-          {children}
-        </div>
-      </div>
-    </div>
-  )
-})
-
-UnifiedModal.displayName = 'UnifiedModal'
-
-// UserMenuButton - Version corrigée avec système modal unifié
+// UserMenuButton - Version corrigée sans système modal unifié
 export const UserMenuButton = React.memo(() => {
   const router = useRouter()
   const { user, logout } = useAuthStore()
@@ -388,54 +341,35 @@ export const UserMenuButton = React.memo(() => {
         )}
       </div>
 
-      {/* SYSTÈME MODAL UNIFIÉ - UNE SEULE STRUCTURE POUR TOUTES LES MODALES */}
+      {/* MODALES DIRECTES - SANS WRAPPER UNIFIÉ QUI CAUSAIT LE DOUBLE OVERLAY */}
       
       {/* Abonnement Modal */}
-      {!isSuperAdmin && (
-        <UnifiedModal
-          isOpen={showAccountModal}
-          onClose={closeAccountModal}
-          title={t('subscription.title')}
-        >
-          <AccountModal user={user as any} onClose={closeAccountModal} />
-        </UnifiedModal>
+      {!isSuperAdmin && showAccountModal && (
+        <AccountModal user={user as any} onClose={closeAccountModal} />
       )}
 
       {/* Profil Modal */}
-      <UnifiedModal
-        isOpen={showUserInfoModal}
-        onClose={closeUserInfoModal}
-        title={t('nav.profile')}
-      >
-        <UserInfoModal user={user as any} onClose={closeUserInfoModal} />
-      </UnifiedModal>
+      {showUserInfoModal && isMountedRef.current && (
+        <UserInfoModal 
+          user={user as any} 
+          onClose={closeUserInfoModal}
+        />
+      )}
 
       {/* Langue Modal */}
-      <UnifiedModal
-        isOpen={showLanguageModal}
-        onClose={closeLanguageModal}
-        title={t('language.title')}
-      >
+      {showLanguageModal && (
         <LanguageModal onClose={closeLanguageModal} />
-      </UnifiedModal>
+      )}
 
       {/* Contact Modal */}
-      <UnifiedModal
-        isOpen={showContactModal}
-        onClose={closeContactModal}
-        title={t('contact.title')}
-      >
+      {showContactModal && (
         <ContactModal onClose={closeContactModal} />
-      </UnifiedModal>
+      )}
 
       {/* Inviter ami Modal */}
-      <UnifiedModal
-        isOpen={showInviteFriendModal}
-        onClose={closeInviteFriendModal}
-        title={t('nav.inviteFriend')}
-      >
+      {showInviteFriendModal && (
         <InviteFriendModal onClose={closeInviteFriendModal} />
-      </UnifiedModal>
+      )}
     </>
   )
 })
