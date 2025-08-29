@@ -76,6 +76,7 @@ Question: """
 def extract_entities_via_gpt(question: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Extraction d'entités via GPT - Support multilingue français/anglais
+    VERSION CORRIGÉE pour la nouvelle structure de réponse OpenAI
     """
     if not ENABLE_GPT_MULTILINGUAL or not OPENAI_AVAILABLE:
         return {}
@@ -93,11 +94,12 @@ def extract_entities_via_gpt(question: str, context: Dict[str, Any] = None) -> D
             max_tokens=500
         )
         
-        if not response or not response.get("choices"):
+        # CORRECTION: Nouvelle structure de réponse OpenAI
+        if not response or not hasattr(response, 'choices') or not response.choices:
             logger.warning("[GPT_EXTRACT] Réponse GPT vide")
             return {}
             
-        content = response["choices"][0]["message"]["content"].strip()
+        content = response.choices[0].message.content.strip()
         logger.debug(f"[GPT_EXTRACT] Réponse brute: {content}")
         
         try:
@@ -105,14 +107,58 @@ def extract_entities_via_gpt(question: str, context: Dict[str, Any] = None) -> D
             if isinstance(extracted, dict):
                 cleaned = _clean_gpt_entities(extracted)
                 logger.info(f"[GPT_EXTRACT] Entités extraites: {cleaned}")
-                return cleaned
+            def _fallback_parse_gpt_response(content: str) -> Dict[str, Any]:
+    """
+    Parse de secours si le JSON GPT est malformé
+    Extrait les valeurs même si la structure JSON n'est pas parfaite
+    """
+    fallback = {}
+    
+    try:
+        # Patterns de récupération pour extraire du texte non-JSON
+        import re
+        
+        # Age extraction
+        age_match = re.search(r'"age_days":\s*(\d+)', content)
+        if age_match:
+            fallback["age_days"] = int(age_match.group(1))
+        
+        # Species extraction
+        species_match = re.search(r'"species":\s*"(broiler|layer|breeder)"', content)
+        if species_match:
+            fallback["species"] = species_match.group(1)
+        
+        # Line extraction
+        line_match = re.search(r'"line":\s*"([^"]+)"', content)
+        if line_match:
+            line_val = line_match.group(1).lower().replace(" ", "").replace("-", "")
+            line_map = {
+                "cobb500": "cobb500", "ross308": "ross308", 
+                "isabrown": "isa_brown", "lohmannbrown": "lohmann_brown"
+            }
+            if line_val in line_map:
+                fallback["line"] = line_map[line_val]
+        
+        # Sex extraction
+        sex_match = re.search(r'"sex":\s*"(male|female|mixed|as_hatched)"', content)
+        if sex_match:
+            fallback["sex"] = sex_match.group(1)
+        
+        if fallback:
+            logger.info(f"[GPT_FALLBACK_PARSE] Récupéré: {fallback}")
+        
+    except Exception as e:
+        logger.warning(f"[GPT_FALLBACK_PARSE] Erreur: {e}")
+    
+    return fallback
             else:
                 logger.warning("[GPT_EXTRACT] Réponse n'est pas un dict")
                 return {}
                 
         except json.JSONDecodeError as e:
             logger.warning(f"[GPT_EXTRACT] Erreur JSON: {e}")
-            return {}
+            # Tentative de récupération avec fallback
+            return _fallback_parse_gpt_response(content)
             
     except Exception as e:
         logger.error(f"[GPT_EXTRACT] Erreur: {e}")
@@ -190,6 +236,51 @@ def _clean_gpt_entities(extracted: Dict[str, Any]) -> Dict[str, Any]:
             cleaned[field] = value.strip()
     
     return cleaned
+
+def _fallback_parse_gpt_response(content: str) -> Dict[str, Any]:
+    """
+    Parse de secours si le JSON GPT est malformé
+    Extrait les valeurs même si la structure JSON n'est pas parfaite
+    """
+    fallback = {}
+    
+    try:
+        # Patterns de récupération pour extraire du texte non-JSON
+        import re
+        
+        # Age extraction
+        age_match = re.search(r'"age_days":\s*(\d+)', content)
+        if age_match:
+            fallback["age_days"] = int(age_match.group(1))
+        
+        # Species extraction
+        species_match = re.search(r'"species":\s*"(broiler|layer|breeder)"', content)
+        if species_match:
+            fallback["species"] = species_match.group(1)
+        
+        # Line extraction
+        line_match = re.search(r'"line":\s*"([^"]+)"', content)
+        if line_match:
+            line_val = line_match.group(1).lower().replace(" ", "").replace("-", "")
+            line_map = {
+                "cobb500": "cobb500", "ross308": "ross308", 
+                "isabrown": "isa_brown", "lohmannbrown": "lohmann_brown"
+            }
+            if line_val in line_map:
+                fallback["line"] = line_map[line_val]
+        
+        # Sex extraction
+        sex_match = re.search(r'"sex":\s*"(male|female|mixed|as_hatched)"', content)
+        if sex_match:
+            fallback["sex"] = sex_match.group(1)
+        
+        if fallback:
+            logger.info(f"[GPT_FALLBACK_PARSE] Récupéré: {fallback}")
+        
+    except Exception as e:
+        logger.warning(f"[GPT_FALLBACK_PARSE] Erreur: {e}")
+    
+    return fallback
 
 # =============================================================================
 # EXTRACTION REGEX (FALLBACK)

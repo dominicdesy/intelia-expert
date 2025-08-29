@@ -1,10 +1,19 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useMemo } from 'react'
 
 interface PhoneInputProps {
   countryCode: string
   areaCode: string
   phoneNumber: string
   onChange: (data: { country_code: string; area_code: string; phone_number: string }) => void
+  // Nouvelles props pour recevoir les données des pays depuis UserInfoModal
+  countries?: Array<{
+    value: string
+    label: string
+    phoneCode: string
+    flag?: string
+  }>
+  countriesLoading?: boolean
+  usingFallback?: boolean
 }
 
 interface PhoneCode {
@@ -14,7 +23,7 @@ interface PhoneCode {
   priority?: number
 }
 
-// Codes de secours avec les pays les plus courants
+// Codes de secours avec priorité (inchangé)
 const fallbackPhoneCodes: PhoneCode[] = [
   { code: '+1', country: 'Canada/États-Unis', flag: '🇨🇦🇺🇸', priority: 1 },
   { code: '+33', country: 'France', flag: '🇫🇷', priority: 2 },
@@ -38,113 +47,56 @@ const fallbackPhoneCodes: PhoneCode[] = [
   { code: '+7', country: 'Russie', flag: '🇷🇺', priority: 20 }
 ]
 
-// Hook pour récupérer les codes téléphoniques complets
-const usePhoneCodes = () => {
-  const [phoneCodes, setPhoneCodes] = useState<PhoneCode[]>(fallbackPhoneCodes)
-  const [loading, setLoading] = useState(false)
-  const [usingFallback, setUsingFallback] = useState(true)
-  const abortControllerRef = useRef<AbortController | null>(null)
-
-  useEffect(() => {
-    const fetchPhoneCodes = async () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
-      }
-      
-      abortControllerRef.current = new AbortController()
-      const signal = abortControllerRef.current.signal
-
-      try {
-        setLoading(true)
-        const response = await fetch(
-          'https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations',
-          { signal }
-        )
-        
-        if (!response.ok || signal.aborted) return
-        
-        const data = await response.json()
-        
-        if (signal.aborted) return
-        
-        const formattedPhoneCodes = data
-          .map((country: any) => ({
-            code: (country.idd?.root || '') + (country.idd?.suffixes?.[0] || ''),
-            country: country.translations?.fra?.common || country.name.common,
-            flag: country.flag,
-            cca2: country.cca2
-          }))
-          .filter((item: any) => 
-            item.code && 
-            item.code.length > 1 &&
-            item.code.startsWith('+') &&
-            item.country
-          )
-          // Regrouper les pays avec le même code téléphonique
-          .reduce((acc: any, current: any) => {
-            const existing = acc.find((item: any) => item.code === current.code)
-            if (existing) {
-              // Si plusieurs pays ont le même code, les combiner
-              if (!existing.country.includes(current.country)) {
-                existing.country += `, ${current.country}`
-              }
-            } else {
-              acc.push({
-                code: current.code,
-                country: current.country,
-                flag: current.flag
-              })
-            }
-            return acc
-          }, [])
-          .sort((a: PhoneCode, b: PhoneCode) => {
-            // Priorité aux codes les plus courants
-            const priorityA = fallbackPhoneCodes.find(f => f.code === a.code)?.priority || 999
-            const priorityB = fallbackPhoneCodes.find(f => f.code === b.code)?.priority || 999
-            
-            if (priorityA !== priorityB) {
-              return priorityA - priorityB
-            }
-            
-            // Puis tri alphabétique par pays
-            return a.country.localeCompare(b.country)
-          })
-        
-        if (formattedPhoneCodes.length >= 100 && !signal.aborted) {
-          setPhoneCodes(formattedPhoneCodes)
-          setUsingFallback(false)
-        }
-        
-      } catch (error) {
-        if (error instanceof Error && error.name !== 'AbortError') {
-          console.warn('Erreur récupération codes téléphoniques:', error.message)
-        }
-      } finally {
-        if (!signal.aborted) {
-          setLoading(false)
-        }
-      }
-    }
-
-    fetchPhoneCodes()
-    
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
-      }
-    }
-  }, [])
-
-  return { phoneCodes, loading, usingFallback }
-}
-
 export const PhoneInput: React.FC<PhoneInputProps> = ({
   countryCode,
   areaCode,
   phoneNumber,
-  onChange
+  onChange,
+  countries = [],
+  countriesLoading = false,
+  usingFallback = true
 }) => {
-  const { phoneCodes, loading, usingFallback } = usePhoneCodes()
+  
+  // Convertir les données countries en phoneCodes
+  const phoneCodes = useMemo(() => {
+    if (countries.length === 0 || usingFallback) {
+      return fallbackPhoneCodes
+    }
+
+    // Transformer les données countries en phoneCodes
+    const transformed = countries
+      .filter(country => country.phoneCode && country.phoneCode !== '+')
+      .reduce((acc: PhoneCode[], current) => {
+        const existing = acc.find(item => item.code === current.phoneCode)
+        if (existing) {
+          // Si plusieurs pays ont le même code, les combiner
+          if (!existing.country.includes(current.label)) {
+            existing.country += `, ${current.label}`
+          }
+        } else {
+          acc.push({
+            code: current.phoneCode,
+            country: current.label,
+            flag: current.flag
+          })
+        }
+        return acc
+      }, [])
+      .sort((a: PhoneCode, b: PhoneCode) => {
+        // Priorité aux codes les plus courants
+        const priorityA = fallbackPhoneCodes.find(f => f.code === a.code)?.priority || 999
+        const priorityB = fallbackPhoneCodes.find(f => f.code === b.code)?.priority || 999
+        
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB
+        }
+        
+        // Puis tri alphabétique par pays
+        return a.country.localeCompare(b.country)
+      })
+
+    return transformed.length > 50 ? transformed : fallbackPhoneCodes
+  }, [countries, usingFallback])
   
   const handleChange = (field: 'country' | 'area' | 'number', value: string) => {
     onChange({
@@ -166,7 +118,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
   return (
     <div>
       {/* Avertissement si utilisation de la liste de secours */}
-      {usingFallback && !loading && (
+      {usingFallback && !countriesLoading && (
         <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
           <div className="flex items-center space-x-1">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -179,7 +131,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
       )}
 
       <div className="grid grid-cols-12 gap-3 items-end">
-        {/* Code pays avec liste complète */}
+        {/* Code pays */}
         <div className="col-span-4">
           <label htmlFor={countryId} className="block text-sm font-medium text-gray-700 mb-1">
             Code pays
@@ -191,10 +143,10 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
             onChange={(e) => handleChange('country', e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white h-10"
             aria-describedby={`${countryId}-help`}
-            disabled={loading}
+            disabled={countriesLoading}
           >
             <option value="">
-              {loading ? 'Chargement...' : 'Sélectionner'}
+              {countriesLoading ? 'Chargement...' : 'Sélectionner'}
             </option>
             {phoneCodes.map(({ code, country, flag }) => (
               <option key={code} value={code}>
@@ -205,7 +157,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
           <div id={`${countryId}-help`} className="sr-only">
             Sélectionnez le code pays pour votre numéro de téléphone
           </div>
-          {loading && (
+          {countriesLoading && (
             <div className="mt-1 text-xs text-gray-500">
               Chargement des codes téléphoniques...
             </div>
