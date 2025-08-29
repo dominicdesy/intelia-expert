@@ -626,13 +626,25 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
 
       console.log('Profil mis à jour avec succès (API direct)')
 
+      // Recharger les données utilisateur dans le store pour synchroniser l'interface
+      setTimeout(async () => {
+        try {
+          const authStore = useAuthStore.getState()
+          if (authStore.checkAuth) {
+            await authStore.checkAuth() // Recharge depuis Supabase
+            console.log('Store auth synchronisé avec les nouvelles données')
+          }
+        } catch (err) {
+          console.warn('Erreur rechargement profil:', err)
+        }
+      }, 100)
+
       // Fermer immédiatement la modale
       startTransition(() => {
         if (isMountedRef.current) {
           handleClose()
         }
       })
-
 
 
     } catch (error: any) {
