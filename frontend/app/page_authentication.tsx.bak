@@ -249,20 +249,6 @@ export function useAuthenticationLogic({
     }
   }, [])
 
-  // Écouter l'événement auth-state-changed déclenché par le store auth
-  useEffect(() => {
-    const handleAuthChange = () => {
-      if (user && isAuthenticated && isMounted.current) {
-        console.log('🚀 [Redirect] Redirection vers /chat après auth-state-changed')
-        safeRedirectToChat()
-      }
-    }
-  
-    window.addEventListener('auth-state-changed', handleAuthChange)
-    return () => window.removeEventListener('auth-state-changed', handleAuthChange)
-  }, [user, isAuthenticated, safeRedirectToChat])
-
-
   // CORRECTION CRITIQUE : Mémoriser les handlers et données stables séparément
   const stableHandlers = useMemo(() => ({
     handleSignupChange,
