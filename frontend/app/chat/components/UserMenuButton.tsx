@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/lib/stores/auth'
+import { useAuthStore, markStoreUnmounted } from '@/lib/stores/auth'
 import { useTranslation } from '../hooks/useTranslation'
 import { PLAN_CONFIGS } from '@/types'
 
@@ -13,7 +13,7 @@ import { ContactModal } from './modals/ContactModal'
 import { LanguageModal } from './modals/LanguageModal'
 import { InviteFriendModal } from './modals/InviteFriendModal'
 
-// UserMenuButton - Version corrigée sans système modal unifié
+// UserMenuButton - Version corrigée avec coordination auth store pour React #300
 export const UserMenuButton = React.memo(() => {
   const router = useRouter()
   const { user, logout } = useAuthStore()
@@ -27,7 +27,7 @@ export const UserMenuButton = React.memo(() => {
   const [showLanguageModal, setShowLanguageModal] = useState(false)
   const [showInviteFriendModal, setShowInviteFriendModal] = useState(false)
 
-  // Protection contre React #300
+  // Protection contre React #300 renforcée
   const isMountedRef = useRef(true)
   const logoutInProgressRef = useRef(false)
 
@@ -106,74 +106,75 @@ export const UserMenuButton = React.memo(() => {
     return { currentPlan, plan, isSuperAdmin }
   }, [user?.plan, user?.user_type])
 
-  // Déconnexion avec navigation différée pour éviter la race condition
+  // CORRECTION CRITIQUE: Déconnexion coordonnée avec auth store pour éviter React #300
   const handleLogout = useCallback(async () => {
     if (logoutInProgressRef.current || !isMountedRef.current) return
-
-    logoutInProgressRef.current = true
-    setIsOpen(false)
-
-    const defer = typeof queueMicrotask === 'function'
-      ? queueMicrotask
-      : (fn: () => void) => Promise.resolve().then(fn)
-
-    defer(() => {
-      if (!isMountedRef.current) return
-      try {
-        logout().catch(e => console.error('[DEBUG-LOGOUT-UserMenu] logout async:', e))
-        router.push('/')
-      } catch (e) {
-        router.push('/')
-      } finally {
-        logoutInProgressRef.current = false
-      }
-    })
+    
+    try {
+      console.log('[UserMenu] Démarrage déconnexion coordonnée')
+      logoutInProgressRef.current = true
+      
+      // 1. CRITIQUE: Marquer le store comme démonté AVANT logout() pour éviter React #300
+      markStoreUnmounted()
+      
+      // 2. Fermer le menu immédiatement
+      setIsOpen(false)
+      
+      // 3. Attendre que logout() termine (le store est maintenant protégé)
+      await logout()
+      
+      // 4. Redirection propre
+      router.replace('/')
+      console.log('[UserMenu] Déconnexion terminée')
+      
+    } catch (error) {
+      console.error('[UserMenu] Erreur logout:', error)
+      // Forcer la redirection même en cas d'erreur
+      router.replace('/')
+    } finally {
+      logoutInProgressRef.current = false
+    }
   }, [logout, router])
 
-  // Handlers des modales avec actions différées
+  // Handlers des modales avec protection renforcée
   const handleContactClick = useCallback(() => {
     if (!isMountedRef.current) return
     setIsOpen(false)
-    const defer = typeof queueMicrotask === 'function'
-      ? queueMicrotask
-      : (fn: () => void) => Promise.resolve().then(fn)
-    defer(() => { if (isMountedRef.current) setShowContactModal(true) })
+    setTimeout(() => {
+      if (isMountedRef.current) setShowContactModal(true)
+    }, 50)
   }, [])
 
   const handleUserInfoClick = useCallback(() => {
     if (!isMountedRef.current) return
     setIsOpen(false)
-    const defer = typeof queueMicrotask === 'function'
-      ? queueMicrotask
-      : (fn: () => void) => Promise.resolve().then(fn)
-    defer(() => { if (isMountedRef.current) setShowUserInfoModal(true) })
+    setTimeout(() => {
+      if (isMountedRef.current) setShowUserInfoModal(true)
+    }, 50)
   }, [])
 
   const handleAccountClick = useCallback(() => {
     if (!isMountedRef.current) return
     setIsOpen(false)
-    const defer = typeof queueMicrotask === 'function'
-      ? queueMicrotask
-      : (fn: () => void) => Promise.resolve().then(fn)
-    defer(() => { if (isMountedRef.current) setShowAccountModal(true) })
+    setTimeout(() => {
+      if (isMountedRef.current) setShowAccountModal(true)
+    }, 50)
   }, [])
 
   const handleLanguageClick = useCallback(() => {
     if (!isMountedRef.current) return
     setIsOpen(false)
-    const defer = typeof queueMicrotask === 'function'
-      ? queueMicrotask
-      : (fn: () => void) => Promise.resolve().then(fn)
-    defer(() => { if (isMountedRef.current) setShowLanguageModal(true) })
+    setTimeout(() => {
+      if (isMountedRef.current) setShowLanguageModal(true)
+    }, 50)
   }, [])
 
   const handleInviteFriendClick = useCallback(() => {
     if (!isMountedRef.current) return
     setIsOpen(false)
-    const defer = typeof queueMicrotask === 'function'
-      ? queueMicrotask
-      : (fn: () => void) => Promise.resolve().then(fn)
-    defer(() => { if (isMountedRef.current) setShowInviteFriendModal(true) })
+    setTimeout(() => {
+      if (isMountedRef.current) setShowInviteFriendModal(true)
+    }, 50)
   }, [])
 
   const handleStatisticsClick = useCallback(() => {
@@ -354,14 +355,14 @@ export const UserMenuButton = React.memo(() => {
         )}
       </div>
 
-      {/* MODALES DIRECTES - CORRECTION REACT #300 */}
+      {/* MODALES DIRECTES - AVEC PROTECTION REACT #300 */}
       
       {/* Abonnement Modal */}
       {!isSuperAdmin && showAccountModal && (
         <AccountModal user={user} onClose={closeAccountModal} />
       )}
 
-      {/* Profil Modal - CORRIGÉ : suppression de isMountedRef.current et as any */}
+      {/* Profil Modal */}
       {showUserInfoModal && (
         <UserInfoModal 
           user={user} 

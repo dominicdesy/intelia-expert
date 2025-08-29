@@ -17,63 +17,90 @@ const alog = (...args: any[]) => {
 
 alog('Store Auth Supabase NATIF chargé (singleton + React #300 fix)')
 
-// CORRECTION CRITIQUE: Variable globale pour gérer l'état de montage avec logs debug
-let isStoreActive = true
+// ============================================================================
+// SOLUTION REACT #300: Contrôle du cycle de vie et états de logout
+// ============================================================================
 
-// CORRECTION: Fonctions pour contrôler l'état du store avec logs debug
+// Variables de contrôle du cycle de vie
+let isStoreActive = true
+let logoutInProgress = false  // NOUVEAU : Flag spécial pour logout
+
+// CORRECTION: Fonctions pour contrôler l'état du store
 export const markStoreUnmounted = () => {
-  console.log('🕒 [DEBUG-TIMEOUT-STORE] Execution markStoreUnmounted - isStoreActive:', isStoreActive)
+  console.log('[DEBUG-TIMEOUT-STORE] Execution markStoreUnmounted - isStoreActive:', isStoreActive)
   isStoreActive = false
-  console.log('⚠️ [DEBUG-TIMEOUT-STORE] Store marqué comme démonté')
+  logoutInProgress = true // Bloquer TOUT setState pendant logout
+  console.log('[DEBUG-TIMEOUT-STORE] Store marqué comme démonté + logout bloqué')
 }
 
 export const markStoreMounted = () => {
-  console.log('🕒 [DEBUG-TIMEOUT-STORE] Execution markStoreMounted - isStoreActive:', isStoreActive)
+  console.log('[DEBUG-TIMEOUT-STORE] Execution markStoreMounted - isStoreActive:', isStoreActive)
   isStoreActive = true
-  console.log('✅ [DEBUG-TIMEOUT-STORE] Store marqué comme monté')
+  logoutInProgress = false
+  console.log('[DEBUG-TIMEOUT-STORE] Store marqué comme monté')
 }
 
-// ============================================================================
-// SOLUTION REACT #300: setState NON-BLOQUANTS avec microtâches
-// ============================================================================
+// NOUVEAU: Function pour marquer début de logout SANS démontage
+export const markLogoutStart = () => {
+  console.log('[DEBUG-LOGOUT] Début logout - blocage setState préventif')
+  logoutInProgress = true
+}
 
-// Utilitaire de planification non-bloquante (microtâche)
-const schedule = 
-  typeof queueMicrotask === 'function'
-    ? queueMicrotask
-    : (fn: () => void) => Promise.resolve().then(fn)
+export const markLogoutEnd = () => {
+  console.log('[DEBUG-LOGOUT] Fin logout - réactivation setState')
+  logoutInProgress = false
+}
 
-// Wrapper pour set() de Zustand afin de décaler l'écriture d'un microtick
-// Cela évite les collisions avec le cycle de démontage React
 let zustandSetFn: any = null // Sera initialisé dans le store
 
+// CORRECTION CRITIQUE: safeSet qui vérifie le cycle de vie ET l'état de logout
 const safeSet = <T extends Partial<AuthState>>(
   partial: T | ((s: AuthState) => T),
   replace = false,
   debugLabel = 'unknown'
 ) => {
-  if (!isStoreActive) {
-    console.log('⚠️ [DEBUG-MICROTASK] safeSet ignoré - store démonté:', debugLabel)
+  // Vérifications préalables - SANS microtâche pour les opérations critiques
+  if (!isStoreActive || logoutInProgress) {
+    console.log('[DEBUG-MICROTASK] safeSet bloqué - store inactive ou logout en cours:', debugLabel)
     return
   }
   
-  schedule(() => {
+  // Pour les opérations de logout, exécution IMMÉDIATE sans microtâche
+  if (debugLabel.includes('logout')) {
     try {
-      if (isStoreActive && zustandSetFn) {
+      if (zustandSetFn) {
         zustandSetFn(partial as any, replace)
-        console.log('✅ [DEBUG-MICROTASK] setState appliqué en microtâche:', debugLabel)
-      } else {
-        console.log('⚠️ [DEBUG-MICROTASK] setState ignoré - store inactif/non-initialisé:', debugLabel)
+        console.log('[DEBUG-IMMEDIATE] setState appliqué immédiatement (logout):', debugLabel)
       }
     } catch (error) {
-      console.error('❌ [DEBUG-MICROTASK] Erreur setState microtâche:', debugLabel, error)
+      console.error('[DEBUG-IMMEDIATE] Erreur setState immédiat:', debugLabel, error)
+    }
+    return
+  }
+  
+  // Pour toutes les autres opérations, utiliser microtâche avec protection renforcée
+  const schedule = typeof queueMicrotask === 'function' 
+    ? queueMicrotask 
+    : (fn: () => void) => Promise.resolve().then(fn)
+    
+  schedule(() => {
+    // Double vérification au moment de l'exécution
+    if (isStoreActive && !logoutInProgress && zustandSetFn) {
+      try {
+        zustandSetFn(partial as any, replace)
+        console.log('[DEBUG-MICROTASK] setState appliqué en microtâche:', debugLabel)
+      } catch (error) {
+        console.error('[DEBUG-MICROTASK] Erreur setState microtâche:', debugLabel, error)
+      }
+    } else {
+      console.log('[DEBUG-MICROTASK] setState bloqué en microtâche - conditions non remplies:', debugLabel)
     }
   })
 }
 
 // ANCIEN WRAPPER conservé pour compatibilité (utilise maintenant safeSet)
 const safeSetState = (setFn: any, stateName: string) => {
-  console.log('🕒 [DEBUG-TIMEOUT-STORE-SET] Redirection vers safeSet:', stateName)
+  console.log('[DEBUG-TIMEOUT-STORE-SET] Redirection vers safeSet:', stateName)
   safeSet(() => setFn(), false, stateName)
 }
 
@@ -86,9 +113,9 @@ const getRememberMeUtils = async () => {
     try {
       const { rememberMeUtils: rmUtils } = await import('@/app/page_hooks')
       rememberMeUtils = rmUtils
-      console.log('✅ [RememberMe] Utilitaires chargés dans auth store')
+      console.log('[RememberMe] Utilitaires chargés dans auth store')
     } catch (error) {
-      console.warn('⚠️ [RememberMe] Impossible de charger les utilitaires:', error)
+      console.warn('[RememberMe] Impossible de charger les utilitaires:', error)
       // Fallback simple si les utilitaires ne sont pas disponibles
       rememberMeUtils = {
         preserveOnLogout: () => null,
@@ -205,7 +232,7 @@ export const useAuthStore = create<AuthState>()(
 
         initializeSession: async () => {
           if (!isStoreActive) {
-            console.log('⚠️ [DEBUG-TIMEOUT-STORE] initializeSession ignoré - store démonté')
+            console.log('[DEBUG-TIMEOUT-STORE] initializeSession ignoré - store démonté')
             return false
           }
           
@@ -264,7 +291,7 @@ export const useAuthStore = create<AuthState>()(
             }
 
             if (!isStoreActive) {
-              console.log('⚠️ [DEBUG-TIMEOUT-STORE] initializeSession interrompu - store démonté')
+              console.log('[DEBUG-TIMEOUT-STORE] initializeSession interrompu - store démonté')
               return false
             }
 
@@ -290,7 +317,7 @@ export const useAuthStore = create<AuthState>()(
 
         checkAuth: async () => {
           if (!isStoreActive) {
-            console.log('⚠️ [DEBUG-TIMEOUT-STORE] checkAuth ignoré - store démonté')
+            console.log('[DEBUG-TIMEOUT-STORE] checkAuth ignoré - store démonté')
             return
           }
           
@@ -320,7 +347,7 @@ export const useAuthStore = create<AuthState>()(
             }
 
             if (!isStoreActive) {
-              console.log('⚠️ [DEBUG-TIMEOUT-STORE] checkAuth interrompu - store démonté')
+              console.log('[DEBUG-TIMEOUT-STORE] checkAuth interrompu - store démonté')
               return
             }
 
@@ -344,7 +371,7 @@ export const useAuthStore = create<AuthState>()(
 
         login: async (email: string, password: string) => {
           if (!isStoreActive) {
-            console.log('⚠️ [DEBUG-TIMEOUT-STORE] login ignoré - store démonté')
+            console.log('[DEBUG-TIMEOUT-STORE] login ignoré - store démonté')
             return
           }
           
@@ -391,7 +418,7 @@ export const useAuthStore = create<AuthState>()(
 
         register: async (email: string, password: string, userData: Partial<AppUser>) => {
           if (!isStoreActive) {
-            console.log('⚠️ [DEBUG-TIMEOUT-STORE] register ignoré - store démonté')
+            console.log('[DEBUG-TIMEOUT-STORE] register ignoré - store démonté')
             return
           }
           
@@ -480,23 +507,35 @@ export const useAuthStore = create<AuthState>()(
           }
         },
 
-        // FONCTION LOGOUT MODIFIÉE AVEC PRÉSERVATION REMEMBER ME + REACT #300 FIX
+        // FONCTION LOGOUT MODIFIÉE AVEC PRÉSERVATION REMEMBER ME + REACT #300 FIX COMPLET
         logout: async () => {
+          // ÉTAPE 0 : Marquer le début de logout pour bloquer les setState concurrent
+          markLogoutStart()
+          console.log('[DEBUG-LOGOUT] Début déconnexion avec blocage setState préventif')
+          
           if (!isStoreActive) {
-            console.log('⚠️ [DEBUG-TIMEOUT-STORE] logout ignoré - store démonté')
+            console.log('[DEBUG-TIMEOUT-STORE] logout ignoré - store démonté')
+            markLogoutEnd()
             return
           }
           
-          safeSet({ isLoading: true }, false, 'logout-start')
-          console.log('[DEBUG-LOGOUT] Début déconnexion coordonnée avec préservation RememberMe')
+          // ÉTAPE 1 : setState immédiat pour loading (sans microtâche)
+          try {
+            if (zustandSetFn) {
+              zustandSetFn({ isLoading: true }, false)
+              console.log('[DEBUG-LOGOUT] Loading state appliqué immédiatement')
+            }
+          } catch (error) {
+            console.error('[DEBUG-LOGOUT] Erreur loading state:', error)
+          }
           
           try {
-            // ÉTAPE 1 : Préserver les données RememberMe AVANT le nettoyage
+            // ÉTAPE 2 : Préserver les données RememberMe AVANT le nettoyage
             const rmUtils = await getRememberMeUtils()
             const preservedRememberMe = rmUtils.preserveOnLogout()
             console.log('[DEBUG-LOGOUT] Données RememberMe préservées:', preservedRememberMe)
 
-            // ÉTAPE 2 : Déconnexion Supabase
+            // ÉTAPE 3 : Déconnexion Supabase
             const supabase = getSupabaseClient()
             const { error } = await supabase.auth.signOut()
             
@@ -504,7 +543,7 @@ export const useAuthStore = create<AuthState>()(
               throw new Error(error.message)
             }
 
-            // ÉTAPE 3 : Nettoyage localStorage SÉLECTIF (exclure RememberMe)
+            // ÉTAPE 4 : Nettoyage localStorage SÉLECTIF (exclure RememberMe)
             console.log('[DEBUG-LOGOUT] Nettoyage localStorage sélectif')
             
             try {
@@ -542,50 +581,59 @@ export const useAuthStore = create<AuthState>()(
               console.warn('[DEBUG-LOGOUT] Erreur nettoyage localStorage:', storageError)
             }
 
-            // ÉTAPE 4 : Nettoyer l'état du store APRÈS le nettoyage storage (avec microtâche)
-            safeSet({ 
-              user: null, 
-              isAuthenticated: false,
-              lastAuthCheck: Date.now()
-            }, false, 'logout-clear-state')
+            // ÉTAPE 5 : Nettoyer l'état du store IMMÉDIATEMENT (sans microtâche)
+            if (isStoreActive && zustandSetFn) {
+              zustandSetFn({ 
+                user: null, 
+                isAuthenticated: false,
+                lastAuthCheck: Date.now(),
+                isLoading: false  // Aussi mettre loading à false
+              }, false)
+              console.log('[DEBUG-LOGOUT] Store nettoyé immédiatement')
+            }
 
-            // ÉTAPE 5 : Restaurer RememberMe APRÈS le nettoyage (avec délai pour éviter conflit)
+            // ÉTAPE 6 : Restaurer RememberMe APRÈS le nettoyage
             if (preservedRememberMe) {
-              schedule(() => {
+              setTimeout(() => {  // Utiliser setTimeout au lieu de microtâche pour plus de sécurité
                 try {
                   rmUtils.restoreAfterLogout(preservedRememberMe)
                   console.log('[DEBUG-LOGOUT] RememberMe restauré après nettoyage')
                 } catch (error) {
                   console.warn('[DEBUG-LOGOUT] Erreur restauration RememberMe:', error)
                 }
-              })
+              }, 100)
             }
             
             alog('Logout réussi avec préservation RememberMe (singleton)')
             
           } catch (e: any) {
-            if (isStoreActive) {
-              get().handleAuthError(e, 'logout')
-              alog('Erreur logout (singleton):', e?.message)
-              
-              // Même en cas d'erreur, nettoyer l'état local avec protection
-              safeSet({ 
+            console.error('[DEBUG-LOGOUT] Erreur durant logout:', e)
+            
+            // Même en cas d'erreur, nettoyer l'état local IMMÉDIATEMENT
+            if (isStoreActive && zustandSetFn) {
+              zustandSetFn({ 
                 user: null, 
                 isAuthenticated: false,
-                lastAuthCheck: Date.now()
-              }, false, 'logout-error-clear-state')
-              
-              throw new Error(e?.message || 'Erreur lors de la déconnexion')
+                lastAuthCheck: Date.now(),
+                isLoading: false
+              }, false)
+              console.log('[DEBUG-LOGOUT] Store nettoyé en urgence')
             }
+            
+            throw new Error(e?.message || 'Erreur lors de la déconnexion')
           } finally {
-            safeSet({ isLoading: false }, false, 'logout-finally')
+            // ÉTAPE 7 : Réactiver les setState après logout
+            setTimeout(() => {
+              markLogoutEnd()
+              console.log('[DEBUG-LOGOUT] Déconnexion terminée - setState réactivé')
+            }, 200)
           }
         },
 
         // FONCTION UPDATEPROFILE CORRIGÉE POUR ÉVITER REACT #300 avec microtâches
         updateProfile: async (data: Partial<AppUser>) => {
           if (!isStoreActive) {
-            console.log('⚠️ [DEBUG-TIMEOUT-STORE] updateProfile ignoré - store démonté')
+            console.log('[DEBUG-TIMEOUT-STORE] updateProfile ignoré - store démonté')
             return
           }
           
@@ -693,7 +741,7 @@ export const useAuthStore = create<AuthState>()(
 
         updateConsent: async (consent: RGPDConsent) => {
           if (!isStoreActive) {
-            console.log('⚠️ [DEBUG-TIMEOUT-STORE] updateConsent ignoré - store démonté')
+            console.log('[DEBUG-TIMEOUT-STORE] updateConsent ignoré - store démonté')
             return
           }
           
@@ -720,7 +768,7 @@ export const useAuthStore = create<AuthState>()(
 
         deleteUserData: async () => {
           if (!isStoreActive) {
-            console.log('⚠️ [DEBUG-TIMEOUT-STORE] deleteUserData ignoré - store démonté')
+            console.log('[DEBUG-TIMEOUT-STORE] deleteUserData ignoré - store démonté')
             return
           }
           
@@ -785,7 +833,7 @@ export const useAuthStore = create<AuthState>()(
         // Nouvelle méthode: Récupérer le token Supabase pour l'API Expert
         getAuthToken: async () => {
           if (!isStoreActive) {
-            console.log('⚠️ [DEBUG-TIMEOUT-STORE] getAuthToken ignoré - store démonté')
+            console.log('[DEBUG-TIMEOUT-STORE] getAuthToken ignoré - store démonté')
             return null
           }
           
@@ -830,7 +878,7 @@ export const useAuthStore = create<AuthState>()(
 // Fonction utilitaire exportée: Pour utilisation dans d'autres fichiers
 export const getAuthToken = async (): Promise<string | null> => {
   if (!isStoreActive) {
-    console.log('⚠️ [DEBUG-TIMEOUT-STORE] getAuthToken utilitaire ignoré - store démonté')
+    console.log('[DEBUG-TIMEOUT-STORE] getAuthToken utilitaire ignoré - store démonté')
     return null
   }
   
