@@ -1,4 +1,5 @@
-// lib/stores/auth.ts — Store d'auth SUPABASE NATIF (VERSION FINALE CORRIGÉE + SINGLETON + API EXPERT + REMEMBER ME + REACT #300 FIX)
+// lib/stores/auth.ts
+
 'use client'
 
 import { create } from 'zustand'
