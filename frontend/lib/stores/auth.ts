@@ -555,17 +555,12 @@ export const useAuthStore = create<AuthState>()(
               console.warn('[DEBUG-LOGOUT] Erreur nettoyage localStorage:', storageError)
             }
 
-            // ÉTAPE 4: setState DIRECT via zustand - bypass safeSet complètement
-            if (zustandSetFn) {
-              zustandSetFn({
-                user: null,
-                isAuthenticated: false,
-                isLoading: false,
-                authErrors: [],
-                lastAuthCheck: Date.now()
-              }, false)
-              console.log('[DEBUG-LOGOUT] État de déconnexion appliqué directement')
-            }
+            // ÉTAPE 4: AUCUN setState pendant logout - reporté après navigation
+            console.log('[DEBUG-LOGOUT] Nettoyage du store reporté après navigation - évite React #300')
+            
+            // Marquer la session comme terminée sans toucher au store React
+            sessionStorage.setItem('recent-logout', Date.now().toString())
+            sessionStorage.removeItem('current-session')
 
             // ÉTAPE 5: Restaurer RememberMe APRÈS le nettoyage
             if (preservedRememberMe) {
