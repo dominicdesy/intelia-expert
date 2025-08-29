@@ -107,55 +107,6 @@ export const UserMenuButton = React.memo(() => {
     return { currentPlan, plan, isSuperAdmin }
   }, [user?.plan, user?.user_type])
 
-  // CORRECTION: Mémoriser l'objet user pour éviter les re-renders
-  const stableUser = useMemo(() => {
-    if (!user?.id) return user
-    
-    // Créer un objet stable avec les propriétés essentielles seulement
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      phone: user.phone,
-      country: user.country,
-      linkedinProfile: user.linkedinProfile,
-      companyName: user.companyName,
-      companyWebsite: user.companyWebsite,
-      linkedinCorporate: user.linkedinCorporate,
-      user_type: user.user_type,
-      language: user.language,
-      created_at: user.created_at,
-      plan: user.plan,
-      country_code: user.country_code,
-      area_code: user.area_code,
-      phone_number: user.phone_number,
-      full_name: user.full_name,
-      avatar_url: user.avatar_url,
-      consent_given: user.consent_given,
-      consent_date: user.consent_date,
-      updated_at: user.updated_at,
-      user_id: user.user_id,
-      profile_id: user.profile_id,
-      preferences: user.preferences,
-      is_admin: user.is_admin
-    }
-  }, [
-    user?.id,
-    user?.firstName,
-    user?.lastName,
-    user?.phone,
-    user?.country,
-    user?.linkedinProfile,
-    user?.companyName,
-    user?.companyWebsite,
-    user?.linkedinCorporate,
-    user?.country_code,
-    user?.area_code,
-    user?.phone_number
-  ])
-
   // SOLUTION DÉFINITIVE: Service de logout indépendant
   const handleLogout = useCallback(async () => {
     if (logoutInProgressRef.current || !isMountedRef.current) return
@@ -176,6 +127,7 @@ export const UserMenuButton = React.memo(() => {
       window.location.href = '/'
     }
   }, [])
+
 
   // Handlers des modales avec protection renforcée
   const handleContactClick = useCallback(() => {
@@ -403,10 +355,10 @@ export const UserMenuButton = React.memo(() => {
         <AccountModal user={user} onClose={closeAccountModal} />
       )}
 
-      {/* Profil Modal - CORRECTION APPLIQUÉE */}
+      {/* Profil Modal */}
       {showUserInfoModal && (
         <UserInfoModal 
-          user={stableUser}
+          user={user} 
           onClose={closeUserInfoModal}
         />
       )}
