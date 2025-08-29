@@ -1,12 +1,12 @@
 import React, { useEffect, useRef } from 'react'
 import { useTranslation } from '../../hooks/useTranslation'
 
-// ==================== MODAL CONTACT AVEC BACKDROP GRISÉ ====================
+// ==================== MODAL CONTACT AVEC POSITIONNEMENT CORRIGÉ ====================
 export const ContactModal = ({ onClose }: { onClose: () => void }) => {
   const { t, currentLanguage } = useTranslation()
   const overlayRef = useRef<HTMLDivElement>(null)
   
-  // Forcer les styles au montage pour contourner les problèmes CSS
+  // Forcer les styles au montage pour contourner les problèmes CSS (même approche que LanguageModal)
   useEffect(() => {
     const overlay = overlayRef.current
     
@@ -19,16 +19,12 @@ export const ContactModal = ({ onClose }: { onClose: () => void }) => {
       overlay.style.setProperty('right', '0', 'important')
       overlay.style.setProperty('bottom', '0', 'important')
       
-      // BACKDROP GRISÉ - fond semi-transparent noir/gris
-      overlay.style.setProperty('background-color', 'rgba(0, 0, 0, 0.5)', 'important')
-      overlay.style.setProperty('backdrop-filter', 'blur(2px)', 'important') // Effet de flou léger (optionnel)
+      // Overlay transparent + centrage flex
+      overlay.style.setProperty('background-color', 'transparent', 'important')
       overlay.style.setProperty('display', 'flex', 'important')
       overlay.style.setProperty('align-items', 'center', 'important')
       overlay.style.setProperty('justify-content', 'center', 'important')
       overlay.style.setProperty('padding', '16px', 'important')
-      
-      // Animation d'apparition douce pour le backdrop
-      overlay.style.setProperty('animation', 'fadeIn 0.2s ease-out', 'important')
       
       // Forcer les dimensions du contenu (700px harmonisé avec UserInfo)
       const content = overlay.querySelector('.bg-white') as HTMLElement
@@ -37,8 +33,6 @@ export const ContactModal = ({ onClose }: { onClose: () => void }) => {
         content.style.setProperty('max-width', '700px', 'important')
         content.style.setProperty('max-height', '85vh', 'important')
         content.style.setProperty('min-width', '320px', 'important')
-        // Animation d'apparition pour le contenu de la modal
-        content.style.setProperty('animation', 'modalSlideIn 0.3s ease-out', 'important')
       }
     }
   }, [])
@@ -62,26 +56,7 @@ export const ContactModal = ({ onClose }: { onClose: () => void }) => {
   
   return (
     <>
-      {/* Styles CSS pour les animations */}
-      <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        
-        @keyframes modalSlideIn {
-          from { 
-            opacity: 0; 
-            transform: translateY(-20px) scale(0.95); 
-          }
-          to { 
-            opacity: 1; 
-            transform: translateY(0) scale(1); 
-          }
-        }
-      `}</style>
-
-      {/* Overlay avec backdrop grisé et styles forcés */}
+      {/* Overlay avec styles forcés - même structure que LanguageModal */}
       <div 
         ref={overlayRef}
         className="fixed inset-0 z-50" 
@@ -99,7 +74,7 @@ export const ContactModal = ({ onClose }: { onClose: () => void }) => {
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl transition-colors hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"
+            className="text-gray-400 hover:text-gray-600 text-2xl"
             aria-label="Fermer la modal"
             title="Fermer"
           >
@@ -124,7 +99,7 @@ export const ContactModal = ({ onClose }: { onClose: () => void }) => {
                 </p>
                 <a 
                   href="tel:+18666666221"
-                  className="text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors"
+                  className="text-blue-600 hover:text-blue-700 font-medium text-sm"
                 >
                   +1 (866) 666 6221
                 </a>
@@ -145,7 +120,7 @@ export const ContactModal = ({ onClose }: { onClose: () => void }) => {
                 </p>
                 <a 
                   href="mailto:support@intelia.com"
-                  className="text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors"
+                  className="text-blue-600 hover:text-blue-700 font-medium text-sm"
                 >
                   support@intelia.com
                 </a>
@@ -168,7 +143,7 @@ export const ContactModal = ({ onClose }: { onClose: () => void }) => {
                   href={websiteUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors"
+                  className="text-blue-600 hover:text-blue-700 font-medium text-sm"
                 >
                   {websiteUrl}
                 </a>
@@ -178,7 +153,7 @@ export const ContactModal = ({ onClose }: { onClose: () => void }) => {
             <div className="flex justify-end pt-3">
               <button
                 onClick={onClose}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
               >
                 {t('modal.close')}
               </button>
