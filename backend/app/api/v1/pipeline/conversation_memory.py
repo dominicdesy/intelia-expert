@@ -107,50 +107,7 @@ def extract_entities_via_gpt(question: str, context: Dict[str, Any] = None) -> D
             if isinstance(extracted, dict):
                 cleaned = _clean_gpt_entities(extracted)
                 logger.info(f"[GPT_EXTRACT] Entités extraites: {cleaned}")
-            def _fallback_parse_gpt_response(content: str) -> Dict[str, Any]:
-    """
-    Parse de secours si le JSON GPT est malformé
-    Extrait les valeurs même si la structure JSON n'est pas parfaite
-    """
-    fallback = {}
-    
-    try:
-        # Patterns de récupération pour extraire du texte non-JSON
-        import re
-        
-        # Age extraction
-        age_match = re.search(r'"age_days":\s*(\d+)', content)
-        if age_match:
-            fallback["age_days"] = int(age_match.group(1))
-        
-        # Species extraction
-        species_match = re.search(r'"species":\s*"(broiler|layer|breeder)"', content)
-        if species_match:
-            fallback["species"] = species_match.group(1)
-        
-        # Line extraction
-        line_match = re.search(r'"line":\s*"([^"]+)"', content)
-        if line_match:
-            line_val = line_match.group(1).lower().replace(" ", "").replace("-", "")
-            line_map = {
-                "cobb500": "cobb500", "ross308": "ross308", 
-                "isabrown": "isa_brown", "lohmannbrown": "lohmann_brown"
-            }
-            if line_val in line_map:
-                fallback["line"] = line_map[line_val]
-        
-        # Sex extraction
-        sex_match = re.search(r'"sex":\s*"(male|female|mixed|as_hatched)"', content)
-        if sex_match:
-            fallback["sex"] = sex_match.group(1)
-        
-        if fallback:
-            logger.info(f"[GPT_FALLBACK_PARSE] Récupéré: {fallback}")
-        
-    except Exception as e:
-        logger.warning(f"[GPT_FALLBACK_PARSE] Erreur: {e}")
-    
-    return fallback
+                return cleaned
             else:
                 logger.warning("[GPT_EXTRACT] Réponse n'est pas un dict")
                 return {}
@@ -222,9 +179,9 @@ def _clean_gpt_entities(extracted: Dict[str, Any]) -> Dict[str, Any]:
         value = extracted.get(field)
         if value is not None:
             try:
-                num_val = float(value)
-                if min_val <= num_val <= max_val:
-                    cleaned[field] = num_val
+                num_value = float(value)
+                if min_val <= num_value <= max_val:
+                    cleaned[field] = num_value
             except (ValueError, TypeError):
                 pass
     
@@ -246,7 +203,6 @@ def _fallback_parse_gpt_response(content: str) -> Dict[str, Any]:
     
     try:
         # Patterns de récupération pour extraire du texte non-JSON
-        import re
         
         # Age extraction
         age_match = re.search(r'"age_days":\s*(\d+)', content)
@@ -312,29 +268,6 @@ _AGE_PATTERNS = [
     
     # Priorité 5: Patterns génériques (moins précis)
     r"\b(\d{1,2})\s*(?:j|jours|d|days)\b",                       # 21 j / 21d
-]
-
-# Patterns pour les autres entités
-_SEX_PATTERNS = [
-    r"\b(male|mâle)\b",
-    r"\b(female|femelle)\b", 
-    r"\b(mixed|mixte|as[-_]hatched)\b"
-]
-
-_SPECIES_PATTERNS = [
-    r"\b(broiler|poulet\s*de\s*chair)\b",
-    r"\b(layer|pondeuse)\b",
-    r"\b(breeder|reproducteur)\b"
-]
-
-_LINE_PATTERNS = [
-    r"\b(ross\s*308|ross308)\b",
-    r"\b(ross\s*708|ross708)\b",
-    r"\b(cobb\s*500|cobb500)\b",
-    r"\b(cobb\s*700|cobb700)\b",
-    r"\b(isa\s*brown|isabrown)\b",
-    r"\b(lohmann\s*brown|lohmannbrown)\b",
-    r"\b(hyline\s*brown|hylinebrown)\b"
 ]
 
 def extract_age_days_from_text(text: str) -> Optional[int]:
@@ -671,7 +604,7 @@ def test_multilingual_extraction() -> Dict[str, Any]:
 def get_memory_status() -> Dict[str, Any]:
     """Status de la mémoire conversationnelle"""
     return {
-        "version": "multilingual_gpt_enhanced",
+        "version": "multilingual_gpt_enhanced_fixed",
         "gpt_extraction": {
             "enabled": ENABLE_GPT_MULTILINGUAL,
             "available": OPENAI_AVAILABLE
