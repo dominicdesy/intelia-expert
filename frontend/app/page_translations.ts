@@ -58,7 +58,9 @@ export const translations: Record<Language, TranslationStrings> = {
     forceLogout: 'Déconnexion automatique',
     loadingCountries: 'Chargement des pays...',
     limitedCountryList: 'Liste de pays limitée (connexion API limitée)',
-    selectCountry: 'Sélectionner un pays...'
+    selectCountry: 'Sélectionner un pays...',
+    emailPlaceholder: 'votre@email.com',
+    passwordPlaceholder: '••••••••'
   },
   en: {
     title: 'Intelia Expert',
@@ -116,7 +118,9 @@ export const translations: Record<Language, TranslationStrings> = {
     forceLogout: 'Automatic logout',
     loadingCountries: 'Loading countries...',
     limitedCountryList: 'Limited country list (limited internet connection)',
-    selectCountry: 'Select a country...'
+    selectCountry: 'Select a country...',
+    emailPlaceholder: 'your@email.com',
+    passwordPlaceholder: '••••••••'
   },
   es: {
     title: 'Intelia Expert',
@@ -174,7 +178,9 @@ export const translations: Record<Language, TranslationStrings> = {
     forceLogout: 'Cierre automático',
     loadingCountries: 'Cargando países...',
     limitedCountryList: 'Lista limitada de países (conexión limitada)',
-    selectCountry: 'Seleccionar un país...'
+    selectCountry: 'Seleccionar un país...',
+    emailPlaceholder: 'tu@email.com',
+    passwordPlaceholder: '••••••••'
   },
   de: {
     title: 'Intelia Expert',
@@ -232,9 +238,10 @@ export const translations: Record<Language, TranslationStrings> = {
     forceLogout: 'Automatische Abmeldung',
     loadingCountries: 'Länder werden geladen...',
     limitedCountryList: 'Begrenzte Länderliste (begrenzte Verbindung)',
-    selectCountry: 'Land auswählen...'
+    selectCountry: 'Land auswählen...',
+    emailPlaceholder: 'ihre@email.com',
+    passwordPlaceholder: '••••••••'
   },
-  // Ajout des langues manquantes
   pt: {
     title: 'Intelia Expert',
     email: 'E-mail',
@@ -291,7 +298,9 @@ export const translations: Record<Language, TranslationStrings> = {
     forceLogout: 'Logout automático',
     loadingCountries: 'Carregando países...',
     limitedCountryList: 'Lista limitada de países (conexão limitada)',
-    selectCountry: 'Selecionar um país...'
+    selectCountry: 'Selecionar um país...',
+    emailPlaceholder: 'seu@email.com',
+    passwordPlaceholder: '••••••••'
   },
   nl: {
     title: 'Intelia Expert',
@@ -349,7 +358,9 @@ export const translations: Record<Language, TranslationStrings> = {
     forceLogout: 'Automatisch uitloggen',
     loadingCountries: 'Landen laden...',
     limitedCountryList: 'Beperkte landenlijst (beperkte verbinding)',
-    selectCountry: 'Selecteer een land...'
+    selectCountry: 'Selecteer een land...',
+    emailPlaceholder: 'uw@email.com',
+    passwordPlaceholder: '••••••••'
   },
   pl: {
     title: 'Intelia Expert',
@@ -407,6 +418,8 @@ export const translations: Record<Language, TranslationStrings> = {
     forceLogout: 'Automatyczne wylogowanie',
     loadingCountries: 'Ładowanie krajów...',
     limitedCountryList: 'Ograniczona lista krajów (ograniczone połączenie)',
-    selectCountry: 'Wybierz kraj...'
+    selectCountry: 'Wybierz kraj...',
+    emailPlaceholder: 'twoj@email.com',
+    passwordPlaceholder: '••••••••'
   }
 }

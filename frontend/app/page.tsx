@@ -99,6 +99,7 @@ const PageContent = memo(() => {
             <MemoizedLoginForm 
               authLogic={authLogic}
               t={t}
+              currentLanguage={currentLanguage}
               localError={localError}
               localSuccess={localSuccess}
               toggleMode={toggleMode}

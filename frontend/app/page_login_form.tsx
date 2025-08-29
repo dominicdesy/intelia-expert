@@ -5,10 +5,12 @@ import Link from 'next/link'
 import { AlertMessage, PasswordInput } from './page_components'
 import { validateEmail, rememberMeUtils, debugLog } from './page_hooks'
 import type { LoginData } from './page_types'
+import type { Language } from '@/types'
 
 interface LoginFormProps {
   authLogic: any
   t: any
+  currentLanguage: Language // AJOUTÉ
   localError: string
   localSuccess: string
   toggleMode: () => void
@@ -17,6 +19,7 @@ interface LoginFormProps {
 export const LoginForm = memo(function LoginForm({ 
   authLogic, 
   t, 
+  currentLanguage, // AJOUTÉ
   localError, 
   localSuccess, 
   toggleMode 
@@ -238,7 +241,7 @@ export const LoginForm = memo(function LoginForm({
                 value={loginData.email}
                 onChange={handleEmailChange}
                 className="block w-full rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                placeholder="votre@email.com"
+                placeholder={t.emailPlaceholder}
               />
             </div>
           </div>
@@ -257,7 +260,7 @@ export const LoginForm = memo(function LoginForm({
                 onChange={handlePasswordChange}
                 autoComplete="current-password"
                 required
-                placeholder="••••••••"
+                placeholder={t.passwordPlaceholder}
               />
             </div>
           </div>
@@ -284,7 +287,7 @@ export const LoginForm = memo(function LoginForm({
 
             <div className="text-sm">
               <Link 
-                href="/auth/forgot-password" 
+                href={`/auth/forgot-password?lang=${currentLanguage}`}
                 className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
               >
                 {t.forgotPassword}
