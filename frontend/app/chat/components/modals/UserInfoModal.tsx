@@ -573,16 +573,31 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         return
       }
 
-      await updateProfile(formData)
-
-      if (!isMountedRef.current) return
-
-      console.log('✅ Profil mis à jour avec succès')
-
-      // Fermeture non bloquante et sûre
+      // Fermeture immédiate de la modale AVANT updateProfile
       startTransition(() => {
         if (isMountedRef.current) {
           handleClose()
+        }
+      })
+
+      // Différer complètement updateProfile pour éviter setState pendant render
+      const defer = typeof queueMicrotask === 'function'
+        ? queueMicrotask
+        : (fn: () => void) => Promise.resolve().then(fn)
+
+      defer(async () => {
+        if (!isMountedRef.current) return
+        
+        try {
+          await updateProfile(formData)
+          if (isMountedRef.current) {
+            console.log('✅ Profil mis à jour avec succès')
+          }
+        } catch (error: any) {
+          if (isMountedRef.current) {
+            console.error('Erreur updateProfile différé:', error)
+            setFormErrors([t('common.unexpectedError') || 'Une erreur est survenue.'])
+          }
         }
       })
     } catch (error: any) {
