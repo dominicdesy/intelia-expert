@@ -967,14 +967,17 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
                       <label className="block text-sm font-medium text-gray-700 mb-3">
                         {t('profile.phone')} <span className="text-gray-500 text-sm">(optionnel)</span>
                       </label>
-                      <div data-debug="phone-input">
-                        <PhoneInput
-                          countryCode={formData.country_code}
-                          areaCode={formData.area_code}
-                          phoneNumber={formData.phone_number}
-                          onChange={handlePhoneChange}
-                        />
-                      </div>
+					  <div data-debug="phone-input">
+					    <PhoneInput
+						  countryCode={formData.country_code}
+			  			  areaCode={formData.area_code}
+						  phoneNumber={formData.phone_number}
+						  onChange={handlePhoneChange}
+						  countries={countries}
+						  countriesLoading={countriesLoading}
+						  usingFallback={usingFallback}
+					    />
+					  </div>					  
                     </div>
 
                     <div>

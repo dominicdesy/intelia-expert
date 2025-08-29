@@ -4,16 +4,10 @@ import { UserInfoModalProps } from '@/types'
 import { PhoneInput, usePhoneValidation } from '../PhoneInput'
 import { CountrySelect } from '../CountrySelect'
 
-// Debug utility
+// Debug utility - TEMPORAIREMENT DÉSACTIVÉ
 const debugLog = (category: string, message: string, data?: any) => {
-  const timestamp = new Date().toISOString().split('T')[1].split('.')[0]
-  const logMessage = `[${timestamp}] [UserInfoModal-${category}] ${message}`
-  
-  if (data !== undefined) {
-    console.log(logMessage, data)
-  } else {
-    console.log(logMessage)
-  }
+  // Désactivé pour réduire le bruit console
+  return
 }
 
 const fallbackCountries = [
