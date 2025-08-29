@@ -325,13 +325,12 @@ export default function ChatInterface() {
 
   // Déplace la vérification dans un effet pour ne pas casser l'ordre des hooks
   React.useEffect(() => {
-    // On garde la même logique du breaker, mais on n'interrompt plus le cycle des hooks
     const ok = renderBreaker.checkRender();
     if (!ok) {
       console.error("Trop de re-renders détectés, affichage d'un fallback puis reload");
       setRenderOk(false);
     }
-  }) // Pas de [] pour vérifier à chaque render
+  })
 
   // planifier un seul reload quand renderOk devient false
   React.useEffect(() => {
@@ -465,7 +464,6 @@ export default function ChatInterface() {
   const handleAuthError = useCallback((error: any) => {
     console.log('Gestion erreur auth:', error)
     
-    // Empêcher les opérations si le composant n'est plus monté
     if (!isMountedRef.current) {
       console.log('Composant démonté, ignore erreur auth')
       return
@@ -480,7 +478,6 @@ export default function ChatInterface() {
     }
   }, [redirectToLogin])
 
-  // Fonctions simplifiées
   const getUserInitials = useCallback((user: any): string => {
     if (!user) return 'U'
 
@@ -508,7 +505,6 @@ export default function ChatInterface() {
     if (!content) return ""
 
     let processed = content
-
     processed = processed.replace(/(#{1,6})\s*([^#\n]+?)([A-Z][a-z])/g, '$1 $2\n\n$3')
     processed = processed.replace(/^(#{1,6}[^\n]+)(?!\n)/gm, '$1\n')
     processed = processed.replace(/([a-z])([A-Z])/g, '$1, $2')
@@ -536,14 +532,9 @@ export default function ChatInterface() {
 
   const cleanResponseText = useCallback((text: string): string => {
     if (!text) return ""
-
-    if (text.length < 100) {
-      return text.trim()
-    }
+    if (text.length < 100) return text.trim()
 
     let cleaned = text
-
-    // Nettoyage des références aux sources et autres éléments indésirables
     cleaned = cleaned.replace(/\*\*Source:\s*[^*]+\*\*/g, '')
     cleaned = cleaned.replace(/\*\*ource:\s*[^*]+\*\*/g, '')
     cleaned = cleaned.replace(/\*\*Source[^*]*\*\*/g, '')
@@ -777,7 +768,6 @@ export default function ChatInterface() {
       isMountedRef.current = false
       isRedirectingRef.current = false
       
-      // Nettoyer TOUS les timeouts
       const timeoutRefs = [loadingTimeoutRef, redirectTimeoutRef, authCheckTimeoutRef]
       timeoutRefs.forEach(ref => {
         if (ref.current) {
@@ -786,10 +776,8 @@ export default function ChatInterface() {
         }
       })
       
-      // Nettoyer les classes CSS
       document.body.classList.remove('keyboard-open')
       
-      // Réinitialiser les refs
       hasLoadedConversationsRef.current = false
       conversationLoadingAttemptsRef.current = 0
       pageLoadingBreaker.reset()
@@ -955,18 +943,15 @@ export default function ChatInterface() {
   // Chargement des conversations avec protection SANS boucle infinie
   useEffect(() => {
     if (isAuthenticated && user?.id && isMountedRef.current && !hasLoadedConversationsRef.current) {
-      // Nettoyer le timeout précédent si existant
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current)
       }
 
-      // Marquer immédiatement comme "en cours de chargement"
       hasLoadedConversationsRef.current = true
 
       loadingTimeoutRef.current = setTimeout(() => {
         console.log('🕐 [DEBUG-TIMEOUT-LOADING] Execution - isMounted:', isMountedRef.current)
         if (isMountedRef.current) {
-          // Vérifier le circuit breaker
           if (!pageLoadingBreaker.canAttempt()) {
             console.warn('Circuit breaker: chargement bloqué')
             return
@@ -989,7 +974,6 @@ export default function ChatInterface() {
                 pageLoadingBreaker.recordFailure()
                 handleAuthError(err)
                 
-                // Permettre retry en cas d'erreur réseau (max 3 tentatives)
                 if (conversationLoadingAttemptsRef.current < 3) {
                   hasLoadedConversationsRef.current = false
                 } else {
@@ -1295,7 +1279,6 @@ export default function ChatInterface() {
       console.error('Erreur générale feedback:', error)
       throw error
     } finally {
-      // Vérifier que le composant est encore monté
       if (isMountedRef.current) {
         setUiState(prev => ({ ...prev, isSubmittingFeedback: false }))
       }
@@ -1430,54 +1413,7 @@ export default function ChatInterface() {
             className={`flex-1 overflow-y-auto px-2 sm:px-4 py-6 pb-28 overscroll-contain ${uiState.isMobileDevice ? 'chat-scroll-area' : ''}`}
             style={chatScrollStyle}
           >
-            <div className="max-w-full sm:max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto w-full sm:w-[90%] lg:w-[75%] xl:w-[60%]">
-              {clarificationState && (
-                <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <span className="text-blue-700 text-sm font-medium">
-                      Mode clarification : répondez à la question ci-dessus
-                    </span>
-                    <button
-                      onClick={() => setClarificationState(null)}
-                      className="text-blue-600 hover:text-blue-800 text-sm underline"
-                    >
-                      Annuler
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <ChatInput
-                inputMessage={uiState.inputMessage}
-                setInputMessage={(value: string) => setUiState(prev => ({ ...prev, inputMessage: value }))}
-                onSendMessage={handleSendMessage}
-                isLoadingChat={uiState.isLoadingChat}
-                clarificationState={clarificationState}
-                isMobileDevice={uiState.isMobileDevice}
-                inputRef={inputRef}
-                t={t}
-              />
-
-              <div className="text-center mt-2">
-                <p className="text-xs text-gray-500">
-                  Intelia Expert peut faire des erreurs. Faites vérifiez les réponses par un professionnel au besoin.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <FeedbackModal
-        isOpen={feedbackModal.isOpen}
-        onClose={handleFeedbackModalClose}
-        onSubmit={handleFeedbackSubmit}
-        feedbackType={feedbackModal.feedbackType ?? undefined}
-        isSubmitting={uiState.isSubmittingFeedback}
-      />
-    </>
-  )
-}w-full sm:max-w-4xl mx-auto space-y-6 px-2 sm:px-4">
+            <div className="max-w-full sm:max-w-4xl mx-auto space-y-6 px-2 sm:px-4">
               {hasMessages && (
                 <div className="text-center">
                   <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
@@ -1533,4 +1469,50 @@ export default function ChatInterface() {
               opacity: 1
             }}
           >
-            <div className="max-
+            <div className="max-w-full sm:max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto w-full sm:w-[90%] lg:w-[75%] xl:w-[60%]">
+              {clarificationState && (
+                <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700 text-sm font-medium">
+                      Mode clarification : répondez à la question ci-dessus
+                    </span>
+                    <button
+                      onClick={() => setClarificationState(null)}
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <ChatInput
+                inputMessage={uiState.inputMessage}
+                setInputMessage={(value: string) => setUiState(prev => ({ ...prev, inputMessage: value }))}
+                onSendMessage={handleSendMessage}
+                isLoadingChat={uiState.isLoadingChat}
+                clarificationState={clarificationState}
+                isMobileDevice={uiState.isMobileDevice}
+                inputRef={inputRef}
+                t={t}
+              />
+
+              <div className="text-center mt-2">
+                <p className="text-xs text-gray-500">
+                  Intelia Expert peut faire des erreurs. Faites vérifiez les réponses par un professionnel au besoin.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <FeedbackModal
+        isOpen={feedbackModal.isOpen}
+        onClose={handleFeedbackModalClose}
+        onSubmit={handleFeedbackSubmit}
+        feedbackType={feedbackModal.feedbackType ?? undefined}
+        isSubmitting={uiState.isSubmittingFeedback}
+      />
+    </>
+  )
+}
