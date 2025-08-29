@@ -5,7 +5,6 @@ Intent & entity classifier with Chain-of-Thought complexity detection.
 - classify() returns {"intent": Intention, "entities": {...}, "complexity": {...}}
 - Designed to be lightweight and robust with regex + keywords
 - 🆕 NEW: Complexity scoring for CoT routing
-- 🔧 FIXED: Multilingual support for PerfTargets detection
 """
 from enum import Enum
 import re
@@ -21,74 +20,6 @@ LINES = [
 
 PHASES = ["starter", "démarrage", "grower", "croissance", "finisher", "finition"]
 HOUSING = ["tunnel", "ventilation naturelle", "naturelle", "plein air", "free range"]
-
-# 🔧 NEW: Multilingual keywords for better classification
-PERF_TARGETS_KEYWORDS = [
-    # Français
-    "poids", "fcr", "indice de consommation", "gain de poids", "iep", 
-    "pourcentage de ponte", "poids d'œuf", "poids d'oeuf",
-    # English - CRITICAL FIX
-    "weight", "target weight", "body weight", "feed conversion", "feed conversion ratio",
-    "weight gain", "egg production", "egg weight", "laying rate", "production rate"
-]
-
-NUTRITION_KEYWORDS = [
-    # Français
-    "protéine", "lysine", "kcal/kg", "énergie", "calcium", "phosphore", "formulation",
-    # English
-    "protein", "lysine", "energy", "kcal/kg", "calcium", "phosphorus", "formulation"
-]
-
-DIAGNOSTIC_KEYWORDS = [
-    # Français
-    "diagnostic", "symptôme", "symptomes", "symptômes", "diarrhée", "dyspnée", 
-    "coquilles molles", "picorent", "mortalité",
-    # English
-    "diagnosis", "diagnostic", "symptom", "symptoms", "diarrhea", "mortality", 
-    "soft shells", "dyspnea", "respiratory"
-]
-
-WATER_FEED_KEYWORDS = [
-    # Français
-    "consommation d'eau", "débit d'eau", "consommation d'aliment",
-    # English
-    "water consumption", "water intake", "feed intake", "feed consumption"
-]
-
-ENV_KEYWORDS = [
-    # Français
-    "température", "humidité", "co2", "nh3", "ammoniac", "éclairage", "lumens", "lux",
-    # English
-    "temperature", "humidity", "co2", "nh3", "ammonia", "lighting", "lumens", "lux"
-]
-
-VENTILATION_KEYWORDS = [
-    # Français
-    "ventilation minimale", "débit d'air", "m³/h", "m3/h", "tunnel",
-    # English
-    "minimum ventilation", "air flow", "m3/h", "tunnel", "ventilation"
-]
-
-EQUIPMENT_KEYWORDS = [
-    # Français
-    "espace mangeoire", "mangeoires", "abreuvoirs", "nipples", "calibrage chaîne",
-    # English
-    "feeder space", "feeders", "drinkers", "nipples", "equipment"
-]
-
-TREATMENT_KEYWORDS = [
-    # Français
-    "dosage", "dose", "posologie", "enrofloxacine", "amoxicilline", "tylosine",
-    # English
-    "dosage", "dose", "treatment", "enrofloxacin", "amoxicillin", "tylosin"
-]
-
-ECONOMICS_KEYWORDS = [
-    # Français
-    "coût", "rentabilité", "combien coûte",
-    # English
-    "cost", "profitability", "how much", "economics", "roi"
-]
 
 class Intention(str, Enum):
     PerfTargets = "PerfTargets"
@@ -168,14 +99,9 @@ DIAGNOSTIC_COMPLEXITY_PATTERNS = [
     r"(?:analyse|évaluation).*(?:complète|approfondie|détaillée)"
 ]
 
-# --- Regex helpers (code original conservé + améliorations) ---
-# 🔧 IMPROVED: Better age detection patterns including English
-AGE_DAYS_RE = re.compile(r"\b(\d{1,2})\s*(?:j|jours?|day|days?)\b", re.I)
+# --- Regex helpers (code original conservé) ---
+AGE_DAYS_RE = re.compile(r"\b(\d{1,2})\s*(?:j|jours?|day|days)\b", re.I)
 AGE_WEEKS_RE = re.compile(r"\b(\d{1,2})\s*(?:sem|semaines?|wk|wks|weeks?)\b", re.I)
-# 🔧 NEW: Support for "X-day-old" and "X-week-old" patterns
-AGE_DAY_OLD_RE = re.compile(r"\b(\d{1,2})-day-old\b", re.I)
-AGE_WEEK_OLD_RE = re.compile(r"\b(\d{1,2})-week-old\b", re.I)
-
 FLOCK_RE = re.compile(r"\b(\d{2,6})\s*(?:oiseaux?|birds?|poulets?)\b", re.I)
 
 def _normalize_line(q: str) -> Optional[str]:
@@ -187,26 +113,13 @@ def _normalize_line(q: str) -> Optional[str]:
 
 def _infer_species(q: str) -> Optional[str]:
     ql = q.lower()
-    if any(k in ql for k in ["isa", "lohmann", "œuf", "oeuf", "egg", "hy-line", "hy line", "hyline", "pondeuse", "layer"]):
+    if any(k in ql for k in ["isa", "lohmann", "œuf", "oeuf", "egg", "hy-line", "hy line", "hyline", "pondeuse"]):
         return "layer"
-    if any(k in ql for k in ["ross", "cobb", "broiler", "chair", "chicken"]):  # Added "chicken"
+    if any(k in ql for k in ["ross", "cobb", "broiler", "chair"]):
         return "broiler"
     return None
 
 def _extract_age(q: str) -> Dict[str, Optional[int]]:
-    """🔧 IMPROVED: Better age extraction with English support"""
-    # Try day-old patterns first (most specific)
-    day_old_match = AGE_DAY_OLD_RE.search(q)
-    if day_old_match:
-        return {"age_days": int(day_old_match.group(1)), "age_weeks": None}
-    
-    # Try week-old patterns
-    week_old_match = AGE_WEEK_OLD_RE.search(q)
-    if week_old_match:
-        weeks = int(week_old_match.group(1))
-        return {"age_days": weeks * 7, "age_weeks": weeks}
-    
-    # Fallback to original patterns
     d = AGE_DAYS_RE.search(q)
     w = AGE_WEEKS_RE.search(q)
     return {"age_days": int(d.group(1)) if d else None, "age_weeks": int(w.group(1)) if w else None}
@@ -231,7 +144,6 @@ def _detect_housing(q: str) -> Optional[str]:
     return None
 
 def _detect_sex(q: str) -> Optional[str]:
-    """🔧 IMPROVED: Better sex detection with English support"""
     ql = q.lower()
     if "mâle" in ql or "males" in ql or "male" in ql: return "male"
     if "femelle" in ql or "females" in ql or "female" in ql: return "female"
@@ -247,9 +159,7 @@ def _detect_program_type(q: str) -> Optional[str]:
     return None
 
 def _has_any(ql: str, words: List[str]) -> bool:
-    """🔧 IMPROVED: Case-insensitive matching"""
-    ql_lower = ql.lower()
-    return any(w.lower() in ql_lower for w in words)
+    return any(w in ql for w in words)
 
 # 🆕 NOUVELLES FONCTIONS DE DÉTECTION DE COMPLEXITÉ
 
@@ -334,7 +244,6 @@ def _detect_complexity_score(q: str) -> Dict[str, Any]:
 def _classify_intent_enhanced(q: str) -> Tuple[Intention, Dict[str, Any]]:
     """
     Classification enrichie avec détection d'intentions complexes
-    🔧 FIXED: Multilingual keyword support
     """
     ql = q.lower()
     complexity_info = _detect_complexity_score(q)
@@ -342,7 +251,7 @@ def _classify_intent_enhanced(q: str) -> Tuple[Intention, Dict[str, Any]]:
     # 🆕 NOUVELLES INTENTIONS COMPLEXES (priorité haute si complexité détectée)
     if complexity_info["needs_cot"]:
         # Diagnostic complexe
-        if (_has_any(ql, DIAGNOSTIC_KEYWORDS) and 
+        if (_has_any(ql, ["diagnostic", "symptôme", "symptomes", "symptômes", "mortalité"]) and 
             (complexity_info["score"] >= 40 or "complex_diagnostic" in complexity_info["factors"])):
             return Intention.HealthDiagnosis, complexity_info
         
@@ -365,27 +274,26 @@ def _classify_intent_enhanced(q: str) -> Tuple[Intention, Dict[str, Any]]:
         if complexity_info["score"] >= 50:
             return Intention.MultiFactor, complexity_info
     
-    # 🔧 INTENTIONS CLASSIQUES (FIXED avec support multilingue)
-    if _has_any(ql, TREATMENT_KEYWORDS):
+    # 🔄 INTENTIONS CLASSIQUES (code original conservé)
+    if _has_any(ql, ["dosage", "dose", "posologie", "enrofloxacine", "amoxicilline", "tylosine"]):
         return Intention.Treatments, complexity_info
-    if _has_any(ql, DIAGNOSTIC_KEYWORDS):
+    if _has_any(ql, ["diagnostic", "symptôme", "symptomes", "symptômes", "diarrhée", "dyspnée", "coquilles molles", "picorent", "mortalité"]):
         return Intention.Diagnostics, complexity_info
-    # 🔧 CRITICAL FIX: Now includes English "weight" keywords
-    if _has_any(ql, PERF_TARGETS_KEYWORDS):
+    if _has_any(ql, ["poids", "fcr", "indice de consommation", "gain de poids", "iep", "pourcentage de ponte", "poids d'œuf", "poids d'oeuf"]):
         return Intention.PerfTargets, complexity_info
-    if _has_any(ql, NUTRITION_KEYWORDS):
+    if _has_any(ql, ["protéine", "lysine", "kcal/kg", "énergie", "calcium", "phosphore", "formulation"]):
         return Intention.NutritionSpecs, complexity_info
-    if _has_any(ql, WATER_FEED_KEYWORDS):
+    if _has_any(ql, ["consommation d'eau", "débit d'eau", "consommation d'aliment", "consommation d'aliment"]):
         return Intention.WaterFeedIntake, complexity_info
-    if _has_any(ql, ENV_KEYWORDS):
+    if _has_any(ql, ["température", "humidité", "co2", "nh3", "ammoniac", "éclairage", "lumens", "lux"]):
         return Intention.EnvSetpoints, complexity_info
-    if _has_any(ql, VENTILATION_KEYWORDS):
+    if _has_any(ql, ["ventilation minimale", "débit d'air", "m³/h", "m3/h", "tunnel"]):
         return Intention.VentilationSizing, complexity_info
-    if _has_any(ql, EQUIPMENT_KEYWORDS):
+    if _has_any(ql, ["espace mangeoire", "mangeoires", "abreuvoirs", "nipples", "calibrage chaîne"]):
         return Intention.EquipmentSizing, complexity_info
     if _detect_program_type(ql):
         return Intention.Programs, complexity_info
-    if _has_any(ql, ECONOMICS_KEYWORDS):
+    if _has_any(ql, ["coût", "rentabilité", "combien coûte"]):
         return Intention.Economics, complexity_info
     if _has_any(ql, ["label rouge", "plein air", "catégorie a+", "enrichissements obligatoires", "densité maximale"]):
         return Intention.Compliance, complexity_info
@@ -397,13 +305,12 @@ def _classify_intent_enhanced(q: str) -> Tuple[Intention, Dict[str, Any]]:
 def classify(question: str) -> Dict[str, Any]:
     """
     Classification principale avec enrichissements CoT
-    🔧 IMPROVED: Better multilingual support
     """
     intent, complexity_info = _classify_intent_enhanced(question)
     line = _normalize_line(question) or None
     species = _infer_species(question)
     sex = _detect_sex(question)
-    age = _extract_age(question)  # Now handles "18-day-old" correctly
+    age = _extract_age(question)
     phase = _detect_phase(question)
     housing = _detect_housing(question)
     program_type = _detect_program_type(question)
