@@ -7,6 +7,7 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
   const { t, changeLanguage, currentLanguage } = useTranslation()
   const { updateProfile } = useAuthStore() 
   const [isUpdating, setIsUpdating] = useState(false)
+  const [showReloadPrompt, setShowReloadPrompt] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   
@@ -75,29 +76,123 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     try {
       console.log('🔄 [LanguageModal] Début changement langue:', currentLanguage, '→', languageCode)
       
+      // 1. Changer la langue dans le store et l'interface immédiatement
       changeLanguage(languageCode)
-      console.log('✅ [LanguageModal] changeLanguage() appelée avec:', languageCode)
+      console.log('✅ [LanguageModal] Interface mise à jour immédiatement:', languageCode)
       
+      // 2. Sauvegarder dans le profil utilisateur
       await updateProfile({ language: languageCode } as any)
-      console.log('✅ [LanguageModal] updateProfile() terminé')
+      console.log('✅ [LanguageModal] Profil sauvegardé')
       
-      setTimeout(() => {
-        onClose()
-      }, 500)
+      // 3. Marquer dans localStorage pour forcer le rechargement du widget Zoho
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('intelia_language_changed', 'true')
+        localStorage.setItem('intelia_new_language', languageCode)
+        console.log('💾 [LanguageModal] Marqueur de rechargement créé')
+      }
+      
+      // 4. Afficher l'invite de rechargement pour le widget Zoho
+      setShowReloadPrompt(true)
       
     } catch (error) {
       console.error('❌ [LanguageModal] Erreur changement langue:', error)
-    } finally {
       setIsUpdating(false)
     }
   }
 
+  const handleReloadPage = () => {
+    console.log('🔄 [LanguageModal] Rechargement page pour widget Zoho')
+    window.location.reload()
+  }
+
+  const handleSkipReload = () => {
+    console.log('⏭️ [LanguageModal] Rechargement ignoré - widget restera en ancienne langue')
+    setShowReloadPrompt(false)
+    setIsUpdating(false)
+    onClose()
+  }
+
   const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
+    if (e.target === e.currentTarget && !showReloadPrompt) {
       onClose()
     }
   }
 
+  // Interface de rechargement
+  if (showReloadPrompt) {
+    return (
+      <>
+        <style jsx>{`
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          
+          @keyframes modalSlideIn {
+            from { 
+              opacity: 0; 
+              transform: translateY(-20px) scale(0.95); 
+            }
+            to { 
+              opacity: 1; 
+              transform: translateY(0) scale(1); 
+            }
+          }
+        `}</style>
+
+        <div 
+          ref={overlayRef}
+          className="fixed inset-0 z-50"
+        >
+          <div 
+            ref={contentRef}
+            className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-center mb-6">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </div>
+              </div>
+
+              <h2 className="text-2xl font-bold text-gray-900 text-center mb-4">
+                {t('language.changeSuccess')}
+              </h2>
+
+              <div className="text-center text-gray-600 mb-6">
+                <p className="mb-3">
+                  {t('language.interfaceUpdated')}
+                </p>
+                <p className="text-sm">
+                  {t('language.reloadForWidget')}
+                </p>
+              </div>
+
+              <div className="flex flex-col space-y-3">
+                <button
+                  onClick={handleReloadPage}
+                  className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium"
+                >
+                  {t('language.reloadNow')}
+                </button>
+                
+                <button
+                  onClick={handleSkipReload}
+                  className="w-full px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                >
+                  {t('language.continueWithoutReload')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  // Interface principale de sélection de langue
   return (
     <>
       {/* Styles CSS pour les animations */}
@@ -136,6 +231,7 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
               <button
                 onClick={onClose}
                 className="text-gray-400 hover:text-gray-600 transition-colors hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"
+                disabled={isUpdating}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -167,9 +263,18 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
                       </div>
                     </div>
                     
-                    {currentLanguage === lang.code && (
+                    {currentLanguage === lang.code && !isUpdating && (
                       <div className="flex items-center text-blue-600">
                         <CheckIcon className="w-5 h-5" />
+                      </div>
+                    )}
+
+                    {isUpdating && currentLanguage !== lang.code && (
+                      <div className="flex items-center text-gray-400">
+                        <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
                       </div>
                     )}
                   </div>

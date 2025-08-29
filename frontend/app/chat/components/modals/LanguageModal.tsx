@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from '../../hooks/useTranslation'
 import { useAuthStore } from '@/lib/stores/auth' 
 import { CheckIcon } from '../../utils/icons'
@@ -8,8 +8,19 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
   const { updateProfile } = useAuthStore() 
   const [isUpdating, setIsUpdating] = useState(false)
   const [showReloadPrompt, setShowReloadPrompt] = useState(false)
+  const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
+  const updateTimeoutRef = useRef<NodeJS.Timeout>()
+  
+  // Nettoyer les timeouts au démontage
+  useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current)
+      }
+    }
+  }, [])
   
   // Forcer les styles au montage pour contourner les problèmes CSS
   useEffect(() => {
@@ -69,54 +80,108 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     }
   ]
 
-  const handleLanguageChange = async (languageCode: string) => {
-    if (languageCode === currentLanguage) return
+  const handleLanguageChange = useCallback(async (languageCode: string) => {
+    if (languageCode === currentLanguage || isUpdating) return
 
     setIsUpdating(true)
+    setSelectedLanguage(languageCode)
+    
     try {
       console.log('🔄 [LanguageModal] Début changement langue:', currentLanguage, '→', languageCode)
       
-      // 1. Changer la langue dans le store et l'interface immédiatement
-      changeLanguage(languageCode)
-      console.log('✅ [LanguageModal] Interface mise à jour immédiatement:', languageCode)
+      // 1. Délai pour éviter les conflits de re-render
+      await new Promise(resolve => {
+        updateTimeoutRef.current = setTimeout(resolve, 100)
+      })
       
-      // 2. Sauvegarder dans le profil utilisateur
+      // 2. Changer la langue dans le store
+      changeLanguage(languageCode)
+      console.log('✅ [LanguageModal] Langue changée dans le store:', languageCode)
+      
+      // 3. Délai avant mise à jour du profil
+      await new Promise(resolve => {
+        updateTimeoutRef.current = setTimeout(resolve, 200)
+      })
+      
+      // 4. Sauvegarder dans le profil utilisateur
       await updateProfile({ language: languageCode } as any)
       console.log('✅ [LanguageModal] Profil sauvegardé')
       
-      // 3. Marquer dans localStorage pour forcer le rechargement du widget Zoho
+      // 5. Marquer pour le rechargement du widget Zoho
       if (typeof window !== 'undefined') {
         localStorage.setItem('intelia_language_changed', 'true')
         localStorage.setItem('intelia_new_language', languageCode)
+        localStorage.setItem('intelia_previous_language', currentLanguage)
         console.log('💾 [LanguageModal] Marqueur de rechargement créé')
       }
       
-      // 4. Afficher l'invite de rechargement pour le widget Zoho
+      // 6. Afficher l'invite de rechargement après un délai
+      await new Promise(resolve => {
+        updateTimeoutRef.current = setTimeout(resolve, 300)
+      })
+      
       setShowReloadPrompt(true)
       
     } catch (error) {
       console.error('❌ [LanguageModal] Erreur changement langue:', error)
+      // Réinitialiser l'état en cas d'erreur
       setIsUpdating(false)
+      setSelectedLanguage(null)
     }
-  }
+  }, [currentLanguage, isUpdating, changeLanguage, updateProfile])
 
-  const handleReloadPage = () => {
+  const handleReloadPage = useCallback(() => {
     console.log('🔄 [LanguageModal] Rechargement page pour widget Zoho')
+    
+    // Nettoyer les timeouts avant rechargement
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current)
+    }
+    
+    // Marquer que le rechargement est en cours
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('intelia_reload_in_progress', 'true')
+    }
+    
     window.location.reload()
-  }
+  }, [])
 
-  const handleSkipReload = () => {
-    console.log('⏭️ [LanguageModal] Rechargement ignoré - widget restera en ancienne langue')
+  const handleSkipReload = useCallback(() => {
+    console.log('⭐️ [LanguageModal] Rechargement ignoré - widget restera en ancienne langue')
+    
+    // Nettoyer les marqueurs
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('intelia_language_changed')
+      localStorage.removeItem('intelia_new_language')
+      localStorage.removeItem('intelia_previous_language')
+    }
+    
     setShowReloadPrompt(false)
     setIsUpdating(false)
-    onClose()
-  }
+    setSelectedLanguage(null)
+    
+    // Fermer avec un délai pour éviter les conflits
+    setTimeout(() => {
+      onClose()
+    }, 100)
+  }, [onClose])
 
-  const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget && !showReloadPrompt) {
+  const handleOverlayClick = useCallback((e: React.MouseEvent) => {
+    if (e.target === e.currentTarget && !showReloadPrompt && !isUpdating) {
       onClose()
     }
-  }
+  }, [showReloadPrompt, isUpdating, onClose])
+
+  const handleClose = useCallback(() => {
+    if (isUpdating || showReloadPrompt) return
+    
+    // Nettoyer les timeouts
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current)
+    }
+    
+    onClose()
+  }, [isUpdating, showReloadPrompt, onClose])
 
   // Interface de rechargement
   if (showReloadPrompt) {
@@ -212,6 +277,11 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
             transform: translateY(0) scale(1); 
           }
         }
+        
+        .language-option-disabled {
+          pointer-events: none;
+          opacity: 0.6;
+        }
       `}</style>
 
       <div 
@@ -229,9 +299,9 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
                 {t('language.title')}
               </h2>
               <button
-                onClick={onClose}
-                className="text-gray-400 hover:text-gray-600 transition-colors hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"
-                disabled={isUpdating}
+                onClick={handleClose}
+                className="text-gray-400 hover:text-gray-600 transition-colors hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center disabled:opacity-50"
+                disabled={isUpdating || showReloadPrompt}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -239,18 +309,36 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
               </button>
             </div>
 
+            {/* Indicateur de mise à jour globale */}
+            {isUpdating && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <svg className="animate-spin h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span className="text-blue-700 font-medium">
+                    {t('language.updating')} {selectedLanguage && languages.find(l => l.code === selectedLanguage)?.name}...
+                  </span>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-3">
               {languages.map((lang) => (
                 <div
                   key={lang.code}
-                  onClick={() => !isUpdating && handleLanguageChange(lang.code)}
+                  onClick={() => handleLanguageChange(lang.code)}
                   className={`
-                    relative p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 hover:shadow-md
+                    relative p-4 rounded-lg border-2 transition-all duration-200 hover:shadow-md
                     ${currentLanguage === lang.code 
                       ? 'border-blue-500 bg-blue-50' 
                       : 'border-gray-200 hover:border-blue-300 bg-white'
                     }
-                    ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-50'}
+                    ${isUpdating 
+                      ? 'language-option-disabled cursor-not-allowed' 
+                      : 'cursor-pointer hover:bg-blue-50'
+                    }
                   `}
                 >
                   <div className="flex items-center justify-between">
@@ -263,14 +351,16 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
                       </div>
                     </div>
                     
+                    {/* Langue actuelle */}
                     {currentLanguage === lang.code && !isUpdating && (
                       <div className="flex items-center text-blue-600">
                         <CheckIcon className="w-5 h-5" />
                       </div>
                     )}
 
-                    {isUpdating && currentLanguage !== lang.code && (
-                      <div className="flex items-center text-gray-400">
+                    {/* Langue en cours de sélection */}
+                    {selectedLanguage === lang.code && isUpdating && (
+                      <div className="flex items-center text-blue-600">
                         <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -284,9 +374,9 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
 
             <div className="mt-8 flex justify-end space-x-3">
               <button
-                onClick={onClose}
-                className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-                disabled={isUpdating}
+                onClick={handleClose}
+                className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isUpdating || showReloadPrompt}
               >
                 {t('modal.close')}
               </button>
