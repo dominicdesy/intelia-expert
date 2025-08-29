@@ -1,4 +1,4 @@
-// lib/stores/auth.ts – Store d'auth SUPABASE NATIF (VERSION FINALE CORRIGÉE + SINGLETON + API EXPERT + REMEMBER ME)
+// lib/stores/auth.ts — Store d'auth SUPABASE NATIF (VERSION FINALE CORRIGÉE + SINGLETON + API EXPERT + REMEMBER ME + REACT #300 FIX)
 'use client'
 
 import { create } from 'zustand'
@@ -15,7 +15,7 @@ const alog = (...args: any[]) => {
   }
 }
 
-alog('Store Auth Supabase NATIF chargé (singleton)')
+alog('Store Auth Supabase NATIF chargé (singleton + React #300 fix)')
 
 // CORRECTION CRITIQUE: Variable globale pour gérer l'état de montage avec logs debug
 let isStoreActive = true
@@ -33,19 +33,48 @@ export const markStoreMounted = () => {
   console.log('✅ [DEBUG-TIMEOUT-STORE] Store marqué comme monté')
 }
 
-// CORRECTION FINALE: Wrapper sécurisé SANS setTimeout pour éviter React #300
-const safeSetState = (setFn: any, stateName: string) => {
-  console.log('🕒 [DEBUG-TIMEOUT-STORE-SET] Tentative setState:', stateName, '- isStoreActive:', isStoreActive)
-  if (isStoreActive) {
-    try {
-      setFn()
-      console.log('✅ [DEBUG-TIMEOUT-STORE-SET] setState appliqué directement:', stateName)
-    } catch (error) {
-      console.error('❌ [DEBUG-TIMEOUT-STORE-SET] Erreur setState:', stateName, error)
-    }
-  } else {
-    console.log('⚠️ [DEBUG-TIMEOUT-STORE-SET] setState ignoré - store démonté:', stateName)
+// ============================================================================
+// SOLUTION REACT #300: setState NON-BLOQUANTS avec microtâches
+// ============================================================================
+
+// Utilitaire de planification non-bloquante (microtâche)
+const schedule = 
+  typeof queueMicrotask === 'function'
+    ? queueMicrotask
+    : (fn: () => void) => Promise.resolve().then(fn)
+
+// Wrapper pour set() de Zustand afin de décaler l'écriture d'un microtick
+// Cela évite les collisions avec le cycle de démontage React
+let zustandSetFn: any = null // Sera initialisé dans le store
+
+const safeSet = <T extends Partial<AuthState>>(
+  partial: T | ((s: AuthState) => T),
+  replace = false,
+  debugLabel = 'unknown'
+) => {
+  if (!isStoreActive) {
+    console.log('⚠️ [DEBUG-MICROTASK] safeSet ignoré - store démonté:', debugLabel)
+    return
   }
+  
+  schedule(() => {
+    try {
+      if (isStoreActive && zustandSetFn) {
+        zustandSetFn(partial as any, replace)
+        console.log('✅ [DEBUG-MICROTASK] setState appliqué en microtâche:', debugLabel)
+      } else {
+        console.log('⚠️ [DEBUG-MICROTASK] setState ignoré - store inactif/non-initialisé:', debugLabel)
+      }
+    } catch (error) {
+      console.error('❌ [DEBUG-MICROTASK] Erreur setState microtâche:', debugLabel, error)
+    }
+  })
+}
+
+// ANCIEN WRAPPER conservé pour compatibilité (utilise maintenant safeSet)
+const safeSetState = (setFn: any, stateName: string) => {
+  console.log('🕒 [DEBUG-TIMEOUT-STORE-SET] Redirection vers safeSet:', stateName)
+  safeSet(() => setFn(), false, stateName)
 }
 
 // NOUVEAU: Import des utilitaires RememberMe
@@ -145,630 +174,639 @@ function adaptSupabaseUser(supabaseUser: any, additionalData?: any): AppUser {
   }
 }
 
-// Store Supabase NATIF (avec singleton et protection démontage RENFORCÉE + REMEMBER ME)
+// Store Supabase NATIF (avec singleton et protection démontage RENFORCÉE + REMEMBER ME + REACT #300 FIX)
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
-      user: null,
-      isLoading: false,
-      isAuthenticated: false,
-      hasHydrated: false,
-      lastAuthCheck: 0,
-      authErrors: [],
+    (set, get) => {
+      // Initialiser la référence pour safeSet
+      zustandSetFn = set
+      
+      return {
+        user: null,
+        isLoading: false,
+        isAuthenticated: false,
+        hasHydrated: false,
+        lastAuthCheck: 0,
+        authErrors: [],
 
-      setHasHydrated: (v: boolean) => {
-        safeSetState(() => set({ hasHydrated: v }), 'setHasHydrated')
-      },
+        setHasHydrated: (v: boolean) => {
+          safeSet({ hasHydrated: v }, false, 'setHasHydrated')
+        },
 
-      handleAuthError: (error: any, ctx?: string) => {
-        const msg = (error?.message || 'Authentication error').toString()
-        console.error('[SupabaseAuth/Singleton]', ctx || '', error)
-        safeSetState(() => set((s) => ({ authErrors: [...s.authErrors, msg] })), 'handleAuthError')
-      },
+        handleAuthError: (error: any, ctx?: string) => {
+          const msg = (error?.message || 'Authentication error').toString()
+          console.error('[SupabaseAuth/Singleton]', ctx || '', error)
+          safeSet((s) => ({ authErrors: [...s.authErrors, msg] }), false, 'handleAuthError')
+        },
 
-      clearAuthErrors: () => {
-        safeSetState(() => set({ authErrors: [] }), 'clearAuthErrors')
-      },
+        clearAuthErrors: () => {
+          safeSet({ authErrors: [] }, false, 'clearAuthErrors')
+        },
 
-      initializeSession: async () => {
-        if (!isStoreActive) {
-          console.log('⚠️ [DEBUG-TIMEOUT-STORE] initializeSession ignoré - store démonté')
-          return false
-        }
-        
-        try {
-          alog('initializeSession via Supabase natif (singleton)')
-          
-          const supabase = getSupabaseClient()
-          const { data: { session }, error } = await supabase.auth.getSession()
-          
-          if (error) {
-            alog('Erreur session Supabase (singleton):', error)
-            safeSetState(() => set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() }), 'initializeSession-error')
-            return false
-          }
-
-          if (!session || !session.user) {
-            alog('Pas de session Supabase (singleton)')
-            safeSetState(() => set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() }), 'initializeSession-no-session')
-            return false
-          }
-
-          alog('Session Supabase trouvée (singleton):', session.user.email)
-
-          // Récupérer le profil utilisateur depuis Supabase
-          let profileData = {}
-          try {
-            const { data: profile } = await supabase
-              .from('users')
-              .select('*')
-              .eq('auth_user_id', session.user.id)
-              .single()
-            
-            if (profile) {
-              profileData = profile
-              alog('Profil utilisateur trouvé (singleton):', profile.user_type)
-            } else {
-              alog('Pas de profil utilisateur, création automatique (singleton)...')
-              const { error: insertError } = await supabase
-                .from('users')
-                .insert({
-                  auth_user_id: session.user.id,
-                  email: session.user.email,
-                  full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
-                  user_type: 'producer',
-                  language: 'fr'
-                })
-              
-              if (!insertError) {
-                profileData = { user_type: 'producer', language: 'fr' }
-                alog('Profil créé automatiquement (singleton)')
-              }
-            }
-          } catch (profileError) {
-            alog('Erreur profil, utilisation valeurs par défaut (singleton):', profileError)
-            profileData = { user_type: 'producer', language: 'fr' }
-          }
-
+        initializeSession: async () => {
           if (!isStoreActive) {
-            console.log('⚠️ [DEBUG-TIMEOUT-STORE] initializeSession interrompu - store démonté')
+            console.log('⚠️ [DEBUG-TIMEOUT-STORE] initializeSession ignoré - store démonté')
             return false
           }
-
-          const appUser = adaptSupabaseUser(session.user, profileData)
-
-          safeSetState(() => set({ 
-            user: appUser, 
-            isAuthenticated: true, 
-            lastAuthCheck: Date.now()
-          }), 'initializeSession-success')
           
-          alog('initializeSession réussi (singleton):', appUser.email)
-          return true
-          
-        } catch (e) {
-          if (isStoreActive) {
-            get().handleAuthError(e, 'initializeSession')
-            safeSetState(() => set({ isAuthenticated: false, user: null }), 'initializeSession-catch')
-          }
-          return false
-        }
-      },
-
-      checkAuth: async () => {
-        if (!isStoreActive) {
-          console.log('⚠️ [DEBUG-TIMEOUT-STORE] checkAuth ignoré - store démonté')
-          return
-        }
-        
-        try {
-          const supabase = getSupabaseClient()
-          const { data: { session } } = await supabase.auth.getSession()
-          
-          if (!session || !session.user) {
-            safeSetState(() => set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() }), 'checkAuth-no-session')
-            return
-          }
-
-          // Récupérer le profil utilisateur mis à jour
-          let profileData = {}
           try {
-            const { data: profile } = await supabase
-              .from('users')
-              .select('*')
-              .eq('auth_user_id', session.user.id)
-              .single()
+            alog('initializeSession via Supabase natif (singleton)')
             
-            if (profile) {
-              profileData = profile
-            }
-          } catch (profileError) {
-            alog('Erreur récupération profil lors du checkAuth (singleton)')
-          }
-
-          if (!isStoreActive) {
-            console.log('⚠️ [DEBUG-TIMEOUT-STORE] checkAuth interrompu - store démonté')
-            return
-          }
-
-          const appUser = adaptSupabaseUser(session.user, profileData)
-
-          safeSetState(() => set({
-            user: appUser,
-            isAuthenticated: true,
-            lastAuthCheck: Date.now()
-          }), 'checkAuth-success')
-          
-          alog('checkAuth réussi (singleton)')
-          
-        } catch (e) {
-          if (isStoreActive) {
-            get().handleAuthError(e, 'checkAuth')
-            safeSetState(() => set({ isAuthenticated: false, user: null }), 'checkAuth-error')
-          }
-        }
-      },
-
-      login: async (email: string, password: string) => {
-        if (!isStoreActive) {
-          console.log('⚠️ [DEBUG-TIMEOUT-STORE] login ignoré - store démonté')
-          return
-        }
-        
-        safeSetState(() => set({ isLoading: true, authErrors: [] }), 'login-start')
-        alog('login via Supabase natif (singleton):', email)
-        
-        try {
-          const supabase = getSupabaseClient()
-          const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password
-          })
-
-          if (error) {
-            throw new Error(error.message)
-          }
-
-          if (!data.user) {
-            throw new Error('Aucun utilisateur retourné')
-          }
-
-          alog('Login Supabase réussi (singleton):', data.user.email)
-
-          safeSetState(() => set({ isLoading: false }), 'login-success')
-          
-        } catch (e: any) {
-          if (isStoreActive) {
-            get().handleAuthError(e, 'login')
-            alog('Erreur login (singleton):', e?.message)
+            const supabase = getSupabaseClient()
+            const { data: { session }, error } = await supabase.auth.getSession()
             
-            let userMessage = e?.message || 'Erreur de connexion'
-            if (userMessage.includes('Invalid login credentials')) {
-              userMessage = 'Email ou mot de passe incorrect'
-            } else if (userMessage.includes('Email not confirmed')) {
-              userMessage = 'Veuillez confirmer votre email avant de vous connecter'
+            if (error) {
+              alog('Erreur session Supabase (singleton):', error)
+              safeSet({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() }, false, 'initializeSession-error')
+              return false
             }
-            
-            throw new Error(userMessage)
-          }
-        } finally {
-          safeSetState(() => set({ isLoading: false }), 'login-finally')
-        }
-      },
 
-      register: async (email: string, password: string, userData: Partial<AppUser>) => {
-        if (!isStoreActive) {
-          console.log('⚠️ [DEBUG-TIMEOUT-STORE] register ignoré - store démonté')
-          return
-        }
-        
-        safeSetState(() => set({ isLoading: true, authErrors: [] }), 'register-start')
-        alog('register via Supabase natif (singleton):', email)
-        
-        try {
-          const fullName = String(userData?.name || '').trim()
-          if (!fullName || fullName.length < 2) {
-            throw new Error('Le nom doit contenir au moins 2 caractères')
-          }
-
-          const supabase = getSupabaseClient()
-          
-          const { data, error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                full_name: fullName,
-                user_type: userData.user_type || 'producer',
-                language: userData.language || 'fr'
-              }
+            if (!session || !session.user) {
+              alog('Pas de session Supabase (singleton)')
+              safeSet({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() }, false, 'initializeSession-no-session')
+              return false
             }
-          })
 
-          if (error) {
-            throw new Error(error.message)
-          }
+            alog('Session Supabase trouvée (singleton):', session.user.email)
 
-          if (!data.user) {
-            throw new Error('Erreur lors de la création du compte')
-          }
-
-          alog('Inscription Supabase réussie (singleton):', data.user.email)
-
-          if (data.user.id) {
+            // Récupérer le profil utilisateur depuis Supabase
+            let profileData = {}
             try {
-              const { error: profileError } = await supabase
+              const { data: profile } = await supabase
                 .from('users')
-                .insert({
-                  auth_user_id: data.user.id,
-                  email: email,
+                .select('*')
+                .eq('auth_user_id', session.user.id)
+                .single()
+              
+              if (profile) {
+                profileData = profile
+                alog('Profil utilisateur trouvé (singleton):', profile.user_type)
+              } else {
+                alog('Pas de profil utilisateur, création automatique (singleton)...')
+                const { error: insertError } = await supabase
+                  .from('users')
+                  .insert({
+                    auth_user_id: session.user.id,
+                    email: session.user.email,
+                    full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
+                    user_type: 'producer',
+                    language: 'fr'
+                  })
+                
+                if (!insertError) {
+                  profileData = { user_type: 'producer', language: 'fr' }
+                  alog('Profil créé automatiquement (singleton)')
+                }
+              }
+            } catch (profileError) {
+              alog('Erreur profil, utilisation valeurs par défaut (singleton):', profileError)
+              profileData = { user_type: 'producer', language: 'fr' }
+            }
+
+            if (!isStoreActive) {
+              console.log('⚠️ [DEBUG-TIMEOUT-STORE] initializeSession interrompu - store démonté')
+              return false
+            }
+
+            const appUser = adaptSupabaseUser(session.user, profileData)
+
+            safeSet({ 
+              user: appUser, 
+              isAuthenticated: true, 
+              lastAuthCheck: Date.now()
+            }, false, 'initializeSession-success')
+            
+            alog('initializeSession réussi (singleton):', appUser.email)
+            return true
+            
+          } catch (e) {
+            if (isStoreActive) {
+              get().handleAuthError(e, 'initializeSession')
+              safeSet({ isAuthenticated: false, user: null }, false, 'initializeSession-catch')
+            }
+            return false
+          }
+        },
+
+        checkAuth: async () => {
+          if (!isStoreActive) {
+            console.log('⚠️ [DEBUG-TIMEOUT-STORE] checkAuth ignoré - store démonté')
+            return
+          }
+          
+          try {
+            const supabase = getSupabaseClient()
+            const { data: { session } } = await supabase.auth.getSession()
+            
+            if (!session || !session.user) {
+              safeSet({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() }, false, 'checkAuth-no-session')
+              return
+            }
+
+            // Récupérer le profil utilisateur mis à jour
+            let profileData = {}
+            try {
+              const { data: profile } = await supabase
+                .from('users')
+                .select('*')
+                .eq('auth_user_id', session.user.id)
+                .single()
+              
+              if (profile) {
+                profileData = profile
+              }
+            } catch (profileError) {
+              alog('Erreur récupération profil lors du checkAuth (singleton)')
+            }
+
+            if (!isStoreActive) {
+              console.log('⚠️ [DEBUG-TIMEOUT-STORE] checkAuth interrompu - store démonté')
+              return
+            }
+
+            const appUser = adaptSupabaseUser(session.user, profileData)
+
+            safeSet({
+              user: appUser,
+              isAuthenticated: true,
+              lastAuthCheck: Date.now()
+            }, false, 'checkAuth-success')
+            
+            alog('checkAuth réussi (singleton)')
+            
+          } catch (e) {
+            if (isStoreActive) {
+              get().handleAuthError(e, 'checkAuth')
+              safeSet({ isAuthenticated: false, user: null }, false, 'checkAuth-error')
+            }
+          }
+        },
+
+        login: async (email: string, password: string) => {
+          if (!isStoreActive) {
+            console.log('⚠️ [DEBUG-TIMEOUT-STORE] login ignoré - store démonté')
+            return
+          }
+          
+          safeSet({ isLoading: true, authErrors: [] }, false, 'login-start')
+          alog('login via Supabase natif (singleton):', email)
+          
+          try {
+            const supabase = getSupabaseClient()
+            const { data, error } = await supabase.auth.signInWithPassword({
+              email,
+              password
+            })
+
+            if (error) {
+              throw new Error(error.message)
+            }
+
+            if (!data.user) {
+              throw new Error('Aucun utilisateur retourné')
+            }
+
+            alog('Login Supabase réussi (singleton):', data.user.email)
+
+            safeSet({ isLoading: false }, false, 'login-success')
+            
+          } catch (e: any) {
+            if (isStoreActive) {
+              get().handleAuthError(e, 'login')
+              alog('Erreur login (singleton):', e?.message)
+              
+              let userMessage = e?.message || 'Erreur de connexion'
+              if (userMessage.includes('Invalid login credentials')) {
+                userMessage = 'Email ou mot de passe incorrect'
+              } else if (userMessage.includes('Email not confirmed')) {
+                userMessage = 'Veuillez confirmer votre email avant de vous connecter'
+              }
+              
+              throw new Error(userMessage)
+            }
+          } finally {
+            safeSet({ isLoading: false }, false, 'login-finally')
+          }
+        },
+
+        register: async (email: string, password: string, userData: Partial<AppUser>) => {
+          if (!isStoreActive) {
+            console.log('⚠️ [DEBUG-TIMEOUT-STORE] register ignoré - store démonté')
+            return
+          }
+          
+          safeSet({ isLoading: true, authErrors: [] }, false, 'register-start')
+          alog('register via Supabase natif (singleton):', email)
+          
+          try {
+            const fullName = String(userData?.name || '').trim()
+            if (!fullName || fullName.length < 2) {
+              throw new Error('Le nom doit contenir au moins 2 caractères')
+            }
+
+            const supabase = getSupabaseClient()
+            
+            const { data, error } = await supabase.auth.signUp({
+              email,
+              password,
+              options: {
+                data: {
                   full_name: fullName,
                   user_type: userData.user_type || 'producer',
                   language: userData.language || 'fr'
-                })
-
-              if (profileError) {
-                alog('Erreur création profil (singleton):', profileError)
-              } else {
-                alog('Profil utilisateur créé (singleton)')
-              }
-            } catch (profileError) {
-              alog('Erreur création profil (singleton):', profileError)
-            }
-          }
-
-          safeSetState(() => set({ isLoading: false }), 'register-profile-done')
-          
-          if (!data.session) {
-            toast.success('Compte créé ! Vérifiez votre email pour confirmer votre inscription.')
-          } else {
-            if (isStoreActive) {
-              await get().initializeSession()
-            }
-          }
-          
-        } catch (e: any) {
-          if (isStoreActive) {
-            get().handleAuthError(e, 'register')
-            alog('Erreur register (singleton):', e?.message)
-            
-            let userMessage = e?.message || 'Erreur lors de la création du compte'
-            
-            if (userMessage.includes('already registered')) {
-              userMessage = 'Cette adresse email est déjà utilisée'
-            } else if (userMessage.includes('Password should be at least')) {
-              userMessage = 'Le mot de passe doit contenir au moins 6 caractères'
-            }
-            
-            throw new Error(userMessage)
-          }
-        } finally {
-          safeSetState(() => set({ isLoading: false }), 'register-finally')
-        }
-      },
-
-      // FONCTION LOGOUT MODIFIÉE AVEC PRÉSERVATION REMEMBER ME
-      logout: async () => {
-        if (!isStoreActive) {
-          console.log('⚠️ [DEBUG-TIMEOUT-STORE] logout ignoré - store démonté')
-          return
-        }
-        
-        safeSetState(() => set({ isLoading: true }), 'logout-start')
-        console.log('[DEBUG-LOGOUT] Début déconnexion coordonnée avec préservation RememberMe')
-        
-        try {
-          // ÉTAPE 1 : Préserver les données RememberMe AVANT le nettoyage
-          const rmUtils = await getRememberMeUtils()
-          const preservedRememberMe = rmUtils.preserveOnLogout()
-          console.log('[DEBUG-LOGOUT] Données RememberMe préservées:', preservedRememberMe)
-
-          // ÉTAPE 2 : Déconnexion Supabase
-          const supabase = getSupabaseClient()
-          const { error } = await supabase.auth.signOut()
-          
-          if (error) {
-            throw new Error(error.message)
-          }
-
-          // ÉTAPE 3 : Nettoyage localStorage SÉLECTIF (exclure RememberMe)
-          console.log('[DEBUG-LOGOUT] Nettoyage localStorage sélectif')
-          
-          try {
-            const keysToRemove = []
-            
-            // Parcourir toutes les clés localStorage
-            for (let i = 0; i < localStorage.length; i++) {
-              const key = localStorage.key(i)
-              if (key && key !== 'intelia-remember-me-persist') {
-                // Supprimer les clés auth/session mais GARDER RememberMe
-                if (key.startsWith('supabase-') || 
-                    key.startsWith('intelia-') && key !== 'intelia-remember-me-persist' ||
-                    key.includes('auth') || 
-                    key.includes('session') ||
-                    key === 'intelia-expert-auth' ||
-                    key === 'intelia-chat-storage') {
-                  keysToRemove.push(key)
                 }
               }
+            })
+
+            if (error) {
+              throw new Error(error.message)
+            }
+
+            if (!data.user) {
+              throw new Error('Erreur lors de la création du compte')
+            }
+
+            alog('Inscription Supabase réussie (singleton):', data.user.email)
+
+            if (data.user.id) {
+              try {
+                const { error: profileError } = await supabase
+                  .from('users')
+                  .insert({
+                    auth_user_id: data.user.id,
+                    email: email,
+                    full_name: fullName,
+                    user_type: userData.user_type || 'producer',
+                    language: userData.language || 'fr'
+                  })
+
+                if (profileError) {
+                  alog('Erreur création profil (singleton):', profileError)
+                } else {
+                  alog('Profil utilisateur créé (singleton)')
+                }
+              } catch (profileError) {
+                alog('Erreur création profil (singleton):', profileError)
+              }
+            }
+
+            safeSet({ isLoading: false }, false, 'register-profile-done')
+            
+            if (!data.session) {
+              toast.success('Compte créé ! Vérifiez votre email pour confirmer votre inscription.')
+            } else {
+              if (isStoreActive) {
+                await get().initializeSession()
+              }
             }
             
-            // Supprimer les clés identifiées
-            keysToRemove.forEach(key => {
-              try {
-                localStorage.removeItem(key)
-                console.log(`[DEBUG-LOGOUT] Supprimé: ${key}`)
-              } catch (e) {
-                console.warn(`[DEBUG-LOGOUT] Impossible de supprimer ${key}:`, e)
+          } catch (e: any) {
+            if (isStoreActive) {
+              get().handleAuthError(e, 'register')
+              alog('Erreur register (singleton):', e?.message)
+              
+              let userMessage = e?.message || 'Erreur lors de la création du compte'
+              
+              if (userMessage.includes('already registered')) {
+                userMessage = 'Cette adresse email est déjà utilisée'
+              } else if (userMessage.includes('Password should be at least')) {
+                userMessage = 'Le mot de passe doit contenir au moins 6 caractères'
               }
-            })
-            
-            console.log(`[DEBUG-LOGOUT] ${keysToRemove.length} clés supprimées, RememberMe préservé`)
-            
-          } catch (storageError) {
-            console.warn('[DEBUG-LOGOUT] Erreur nettoyage localStorage:', storageError)
+              
+              throw new Error(userMessage)
+            }
+          } finally {
+            safeSet({ isLoading: false }, false, 'register-finally')
           }
+        },
 
-          // ÉTAPE 4 : Nettoyer l'état du store APRÈS le nettoyage storage
-          safeSetState(() => set({ 
-            user: null, 
-            isAuthenticated: false,
-            lastAuthCheck: Date.now()
-          }), 'logout-clear-state')
-
-          // ÉTAPE 5 : Restaurer RememberMe APRÈS le nettoyage
-          if (preservedRememberMe) {
-            setTimeout(() => {
-              rmUtils.restoreAfterLogout(preservedRememberMe)
-              console.log('[DEBUG-LOGOUT] RememberMe restauré après nettoyage')
-            }, 100)
+        // FONCTION LOGOUT MODIFIÉE AVEC PRÉSERVATION REMEMBER ME + REACT #300 FIX
+        logout: async () => {
+          if (!isStoreActive) {
+            console.log('⚠️ [DEBUG-TIMEOUT-STORE] logout ignoré - store démonté')
+            return
           }
           
-          alog('Logout réussi avec préservation RememberMe (singleton)')
+          safeSet({ isLoading: true }, false, 'logout-start')
+          console.log('[DEBUG-LOGOUT] Début déconnexion coordonnée avec préservation RememberMe')
           
-        } catch (e: any) {
-          if (isStoreActive) {
-            get().handleAuthError(e, 'logout')
-            alog('Erreur logout (singleton):', e?.message)
+          try {
+            // ÉTAPE 1 : Préserver les données RememberMe AVANT le nettoyage
+            const rmUtils = await getRememberMeUtils()
+            const preservedRememberMe = rmUtils.preserveOnLogout()
+            console.log('[DEBUG-LOGOUT] Données RememberMe préservées:', preservedRememberMe)
+
+            // ÉTAPE 2 : Déconnexion Supabase
+            const supabase = getSupabaseClient()
+            const { error } = await supabase.auth.signOut()
             
-            // Même en cas d'erreur, nettoyer l'état local avec protection
-            safeSetState(() => set({ 
+            if (error) {
+              throw new Error(error.message)
+            }
+
+            // ÉTAPE 3 : Nettoyage localStorage SÉLECTIF (exclure RememberMe)
+            console.log('[DEBUG-LOGOUT] Nettoyage localStorage sélectif')
+            
+            try {
+              const keysToRemove = []
+              
+              // Parcourir toutes les clés localStorage
+              for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i)
+                if (key && key !== 'intelia-remember-me-persist') {
+                  // Supprimer les clés auth/session mais GARDER RememberMe
+                  if (key.startsWith('supabase-') || 
+                      key.startsWith('intelia-') && key !== 'intelia-remember-me-persist' ||
+                      key.includes('auth') || 
+                      key.includes('session') ||
+                      key === 'intelia-expert-auth' ||
+                      key === 'intelia-chat-storage') {
+                    keysToRemove.push(key)
+                  }
+                }
+              }
+              
+              // Supprimer les clés identifiées
+              keysToRemove.forEach(key => {
+                try {
+                  localStorage.removeItem(key)
+                  console.log(`[DEBUG-LOGOUT] Supprimé: ${key}`)
+                } catch (e) {
+                  console.warn(`[DEBUG-LOGOUT] Impossible de supprimer ${key}:`, e)
+                }
+              })
+              
+              console.log(`[DEBUG-LOGOUT] ${keysToRemove.length} clés supprimées, RememberMe préservé`)
+              
+            } catch (storageError) {
+              console.warn('[DEBUG-LOGOUT] Erreur nettoyage localStorage:', storageError)
+            }
+
+            // ÉTAPE 4 : Nettoyer l'état du store APRÈS le nettoyage storage (avec microtâche)
+            safeSet({ 
               user: null, 
               isAuthenticated: false,
               lastAuthCheck: Date.now()
-            }), 'logout-error-clear-state')
+            }, false, 'logout-clear-state')
+
+            // ÉTAPE 5 : Restaurer RememberMe APRÈS le nettoyage (avec délai pour éviter conflit)
+            if (preservedRememberMe) {
+              schedule(() => {
+                try {
+                  rmUtils.restoreAfterLogout(preservedRememberMe)
+                  console.log('[DEBUG-LOGOUT] RememberMe restauré après nettoyage')
+                } catch (error) {
+                  console.warn('[DEBUG-LOGOUT] Erreur restauration RememberMe:', error)
+                }
+              })
+            }
             
-            throw new Error(e?.message || 'Erreur lors de la déconnexion')
-          }
-        } finally {
-          safeSetState(() => set({ isLoading: false }), 'logout-finally')
-        }
-      },
-
-      // FONCTION UPDATEPROFILE CORRIGÉE POUR ÉVITER REACT #300
-      updateProfile: async (data: Partial<AppUser>) => {
-        if (!isStoreActive) {
-          console.log('⚠️ [DEBUG-TIMEOUT-STORE] updateProfile ignoré - store démonté')
-          return
-        }
-        
-        safeSetState(() => set({ isLoading: true }), 'updateProfile-start')
-        alog('updateProfile via Supabase (singleton)')
-        
-        try {
-          const currentUser = get().user
-          if (!currentUser) {
-            throw new Error('Utilisateur non connecté')
-          }
-
-          // Validation des données avant envoi
-          const validatedData: any = {}
-          
-          if (data.firstName !== undefined) {
-            validatedData.first_name = String(data.firstName).trim()
-          }
-          
-          if (data.lastName !== undefined) {
-            validatedData.last_name = String(data.lastName).trim()
-          }
-          
-          if (data.firstName !== undefined || data.lastName !== undefined) {
-            const fullName = `${data.firstName || currentUser.firstName || ''} ${data.lastName || currentUser.lastName || ''}`.trim()
-            if (fullName.length < 2) {
-              throw new Error('Le nom doit contenir au moins 2 caractères')
-            }
-            validatedData.full_name = fullName
-          }
-          
-          if (data.user_type !== undefined) {
-            const userType = String(data.user_type)
-            if (!['producer', 'professional', 'super_admin'].includes(userType)) {
-              throw new Error('Type d\'utilisateur invalide')
-            }
-            validatedData.user_type = userType
-          }
-          
-          if (data.language !== undefined) {
-            const language = String(data.language)
-            if (!['fr', 'en', 'es'].includes(language)) {
-              throw new Error('Langue non supportée')
-            }
-            validatedData.language = language
-          }
-
-          // Ajouter tous les autres champs
-          if (data.country_code !== undefined) validatedData.country_code = data.country_code
-          if (data.area_code !== undefined) validatedData.area_code = data.area_code
-          if (data.phone_number !== undefined) validatedData.phone_number = data.phone_number
-          if (data.country !== undefined) validatedData.country = data.country
-          if (data.linkedinProfile !== undefined) validatedData.linkedin_profile = data.linkedinProfile
-          if (data.companyName !== undefined) validatedData.company_name = data.companyName
-          if (data.companyWebsite !== undefined) validatedData.company_website = data.companyWebsite
-          if (data.linkedinCorporate !== undefined) validatedData.linkedin_corporate = data.linkedinCorporate
-
-          const supabase = getSupabaseClient()
-          const { error } = await supabase
-            .from('users')
-            .update(validatedData)
-            .eq('auth_user_id', currentUser.id)
-
-          if (error) {
-            throw new Error(error.message)
-          }
-
-          if (isStoreActive) {
-            // CORRECTION CRITIQUE: Vérifier si les données ont vraiment changé
-            const currentState = get()
-            const hasChanges = Object.keys(data).some(key => {
-              const currentValue = currentState.user?.[key as keyof AppUser]
-              const newValue = data[key as keyof Partial<AppUser>]
-              return currentValue !== newValue
-            })
+            alog('Logout réussi avec préservation RememberMe (singleton)')
             
-            if (hasChanges) {
-              console.log('[updateProfile] Changements détectés - mise à jour du store')
-              // Mise à jour locale avec validation - SANS créer un nouvel objet systématiquement
-              const updatedUser = { 
-                ...currentUser,
-                ...data,
-                // S'assurer que les champs requis restent définis
-                email: currentUser.email, // L'email ne change jamais
-              }
-              safeSetState(() => set({ user: updatedUser }), 'updateProfile-success')
-            } else {
-              console.log('[updateProfile] Pas de changements détectés - pas de setState')
-              // Quand même marquer comme succès pour les logs
-              console.log('✅ [DEBUG-TIMEOUT-STORE-SET] setState appliqué directement: updateProfile-success')
+          } catch (e: any) {
+            if (isStoreActive) {
+              get().handleAuthError(e, 'logout')
+              alog('Erreur logout (singleton):', e?.message)
+              
+              // Même en cas d'erreur, nettoyer l'état local avec protection
+              safeSet({ 
+                user: null, 
+                isAuthenticated: false,
+                lastAuthCheck: Date.now()
+              }, false, 'logout-error-clear-state')
+              
+              throw new Error(e?.message || 'Erreur lors de la déconnexion')
             }
+          } finally {
+            safeSet({ isLoading: false }, false, 'logout-finally')
+          }
+        },
+
+        // FONCTION UPDATEPROFILE CORRIGÉE POUR ÉVITER REACT #300 avec microtâches
+        updateProfile: async (data: Partial<AppUser>) => {
+          if (!isStoreActive) {
+            console.log('⚠️ [DEBUG-TIMEOUT-STORE] updateProfile ignoré - store démonté')
+            return
           }
           
-          alog('updateProfile réussi (singleton)')
+          safeSet({ isLoading: true }, false, 'updateProfile-start')
+          alog('updateProfile via Supabase (singleton)')
           
-        } catch (e: any) {
-          if (isStoreActive) {
-            get().handleAuthError(e, 'updateProfile')
-            throw new Error(e?.message || 'Erreur de mise à jour du profil')
-          }
-        } finally {
-          safeSetState(() => set({ isLoading: false }), 'updateProfile-finally')
-        }
-      },
-
-      updateConsent: async (consent: RGPDConsent) => {
-        if (!isStoreActive) {
-          console.log('⚠️ [DEBUG-TIMEOUT-STORE] updateConsent ignoré - store démonté')
-          return
-        }
-        
-        alog('updateConsent via Supabase (singleton)')
-        
-        try {
-          const currentUser = get().user
-          if (!currentUser) return
-
-          const supabase = getSupabaseClient()
-          const { error } = await supabase
-            .from('users')
-            .update({ rgpd_consent: consent })
-            .eq('auth_user_id', currentUser.id)
-
-          if (error) {
-            throw new Error(error.message)
-          }
-        } catch (e: any) {
-          alog('updateConsent error (singleton):', e?.message)
-          throw new Error(e?.message || 'Erreur de mise à jour du consentement')
-        }
-      },
-
-      deleteUserData: async () => {
-        if (!isStoreActive) {
-          console.log('⚠️ [DEBUG-TIMEOUT-STORE] deleteUserData ignoré - store démonté')
-          return
-        }
-        
-        const currentUser = get().user
-        if (!currentUser) throw new Error('Non authentifié')
-
-        try {
-          const supabase = getSupabaseClient()
-          
-          // Supprimer le profil utilisateur
-          const { error } = await supabase
-            .from('users')
-            .delete()
-            .eq('auth_user_id', currentUser.id)
-
-          if (error) {
-            alog('Erreur suppression profil (singleton):', error)
-          }
-
-          // Nettoyer aussi les données RememberMe lors de la suppression du compte
           try {
-            const rmUtils = await getRememberMeUtils()
-            rmUtils.clear()
-            console.log('[DEBUG-LOGOUT] RememberMe nettoyé lors de la suppression du compte')
+            const currentUser = get().user
+            if (!currentUser) {
+              throw new Error('Utilisateur non connecté')
+            }
+
+            // Validation des données avant envoi
+            const validatedData: any = {}
+            
+            if (data.firstName !== undefined) {
+              validatedData.first_name = String(data.firstName).trim()
+            }
+            
+            if (data.lastName !== undefined) {
+              validatedData.last_name = String(data.lastName).trim()
+            }
+            
+            if (data.firstName !== undefined || data.lastName !== undefined) {
+              const fullName = `${data.firstName || currentUser.firstName || ''} ${data.lastName || currentUser.lastName || ''}`.trim()
+              if (fullName.length < 2) {
+                throw new Error('Le nom doit contenir au moins 2 caractères')
+              }
+              validatedData.full_name = fullName
+            }
+            
+            if (data.user_type !== undefined) {
+              const userType = String(data.user_type)
+              if (!['producer', 'professional', 'super_admin'].includes(userType)) {
+                throw new Error('Type d\'utilisateur invalide')
+              }
+              validatedData.user_type = userType
+            }
+            
+            if (data.language !== undefined) {
+              const language = String(data.language)
+              if (!['fr', 'en', 'es'].includes(language)) {
+                throw new Error('Langue non supportée')
+              }
+              validatedData.language = language
+            }
+
+            // Ajouter tous les autres champs
+            if (data.country_code !== undefined) validatedData.country_code = data.country_code
+            if (data.area_code !== undefined) validatedData.area_code = data.area_code
+            if (data.phone_number !== undefined) validatedData.phone_number = data.phone_number
+            if (data.country !== undefined) validatedData.country = data.country
+            if (data.linkedinProfile !== undefined) validatedData.linkedin_profile = data.linkedinProfile
+            if (data.companyName !== undefined) validatedData.company_name = data.companyName
+            if (data.companyWebsite !== undefined) validatedData.company_website = data.companyWebsite
+            if (data.linkedinCorporate !== undefined) validatedData.linkedin_corporate = data.linkedinCorporate
+
+            const supabase = getSupabaseClient()
+            const { error } = await supabase
+              .from('users')
+              .update(validatedData)
+              .eq('auth_user_id', currentUser.id)
+
+            if (error) {
+              throw new Error(error.message)
+            }
+
+            if (isStoreActive) {
+              // CORRECTION CRITIQUE: Vérifier si les données ont vraiment changé
+              const currentState = get()
+              const hasChanges = Object.keys(data).some(key => {
+                const currentValue = currentState.user?.[key as keyof AppUser]
+                const newValue = data[key as keyof Partial<AppUser>]
+                return currentValue !== newValue
+              })
+              
+              if (hasChanges) {
+                console.log('[updateProfile] Changements détectés - mise à jour du store (microtâche)')
+                // Mise à jour locale avec validation - AVEC microtâche pour éviter React #300
+                const updatedUser = { 
+                  ...currentUser,
+                  ...data,
+                  // S'assurer que les champs requis restent définis
+                  email: currentUser.email, // L'email ne change jamais
+                }
+                safeSet({ user: updatedUser }, false, 'updateProfile-success')
+              } else {
+                console.log('[updateProfile] Pas de changements détectés - setState léger')
+                // Marquer quand même comme traité en microtâche
+                safeSet({}, false, 'updateProfile-no-changes')
+              }
+            }
+            
+            alog('updateProfile réussi (singleton)')
+            
+          } catch (e: any) {
+            if (isStoreActive) {
+              get().handleAuthError(e, 'updateProfile')
+              throw new Error(e?.message || 'Erreur de mise à jour du profil')
+            }
+          } finally {
+            safeSet({ isLoading: false }, false, 'updateProfile-finally')
+          }
+        },
+
+        updateConsent: async (consent: RGPDConsent) => {
+          if (!isStoreActive) {
+            console.log('⚠️ [DEBUG-TIMEOUT-STORE] updateConsent ignoré - store démonté')
+            return
+          }
+          
+          alog('updateConsent via Supabase (singleton)')
+          
+          try {
+            const currentUser = get().user
+            if (!currentUser) return
+
+            const supabase = getSupabaseClient()
+            const { error } = await supabase
+              .from('users')
+              .update({ rgpd_consent: consent })
+              .eq('auth_user_id', currentUser.id)
+
+            if (error) {
+              throw new Error(error.message)
+            }
+          } catch (e: any) {
+            alog('updateConsent error (singleton):', e?.message)
+            throw new Error(e?.message || 'Erreur de mise à jour du consentement')
+          }
+        },
+
+        deleteUserData: async () => {
+          if (!isStoreActive) {
+            console.log('⚠️ [DEBUG-TIMEOUT-STORE] deleteUserData ignoré - store démonté')
+            return
+          }
+          
+          const currentUser = get().user
+          if (!currentUser) throw new Error('Non authentifié')
+
+          try {
+            const supabase = getSupabaseClient()
+            
+            // Supprimer le profil utilisateur
+            const { error } = await supabase
+              .from('users')
+              .delete()
+              .eq('auth_user_id', currentUser.id)
+
+            if (error) {
+              alog('Erreur suppression profil (singleton):', error)
+            }
+
+            // Nettoyer aussi les données RememberMe lors de la suppression du compte
+            try {
+              const rmUtils = await getRememberMeUtils()
+              rmUtils.clear()
+              console.log('[DEBUG-LOGOUT] RememberMe nettoyé lors de la suppression du compte')
+            } catch (error) {
+              console.warn('[DEBUG-LOGOUT] Erreur nettoyage RememberMe:', error)
+            }
+
+            // Déconnecter
+            if (isStoreActive) {
+              await get().logout()
+            }
+            
+          } catch (e: any) {
+            throw new Error(e?.message || 'Erreur de suppression des données')
+          }
+        },
+
+        exportUserData: async () => {
+          const currentUser = get().user
+          if (!currentUser) throw new Error('Non authentifié')
+
+          try {
+            const supabase = getSupabaseClient()
+            const { data: profile } = await supabase
+              .from('users')
+              .select('*')
+              .eq('auth_user_id', currentUser.id)
+              .single()
+
+            return {
+              user_profile: profile,
+              export_date: new Date().toISOString(),
+              message: 'Données utilisateur exportées'
+            }
+            
+          } catch (e: any) {
+            throw new Error(e?.message || 'Erreur d\'exportation des données')
+          }
+        },
+
+        // Nouvelle méthode: Récupérer le token Supabase pour l'API Expert
+        getAuthToken: async () => {
+          if (!isStoreActive) {
+            console.log('⚠️ [DEBUG-TIMEOUT-STORE] getAuthToken ignoré - store démonté')
+            return null
+          }
+          
+          try {
+            const supabase = getSupabaseClient()
+            const { data: { session } } = await supabase.auth.getSession()
+            
+            if (session?.access_token) {
+              alog('Token Supabase récupéré pour API Expert')
+              return session.access_token
+            }
+            
+            alog('Pas de token Supabase disponible')
+            return null
           } catch (error) {
-            console.warn('[DEBUG-LOGOUT] Erreur nettoyage RememberMe:', error)
+            alog('Erreur récupération token:', error)
+            return null
           }
-
-          // Déconnecter
-          if (isStoreActive) {
-            await get().logout()
-          }
-          
-        } catch (e: any) {
-          throw new Error(e?.message || 'Erreur de suppression des données')
-        }
-      },
-
-      exportUserData: async () => {
-        const currentUser = get().user
-        if (!currentUser) throw new Error('Non authentifié')
-
-        try {
-          const supabase = getSupabaseClient()
-          const { data: profile } = await supabase
-            .from('users')
-            .select('*')
-            .eq('auth_user_id', currentUser.id)
-            .single()
-
-          return {
-            user_profile: profile,
-            export_date: new Date().toISOString(),
-            message: 'Données utilisateur exportées'
-          }
-          
-        } catch (e: any) {
-          throw new Error(e?.message || 'Erreur d\'exportation des données')
-        }
-      },
-
-      // Nouvelle méthode: Récupérer le token Supabase pour l'API Expert
-      getAuthToken: async () => {
-        if (!isStoreActive) {
-          console.log('⚠️ [DEBUG-TIMEOUT-STORE] getAuthToken ignoré - store démonté')
-          return null
-        }
-        
-        try {
-          const supabase = getSupabaseClient()
-          const { data: { session } } = await supabase.auth.getSession()
-          
-          if (session?.access_token) {
-            alog('Token Supabase récupéré pour API Expert')
-            return session.access_token
-          }
-          
-          alog('Pas de token Supabase disponible')
-          return null
-        } catch (error) {
-          alog('Erreur récupération token:', error)
-          return null
-        }
-      },
-    }),
+        },
+      }
+    },
     {
       name: 'supabase-auth-store',
       storage: createJSONStorage(() => localStorage),
