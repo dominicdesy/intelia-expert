@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, startTransition } from 'react'
-import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '../../hooks/useTranslation'
 import { UserInfoModalProps } from '@/types'
 import { PhoneInput, usePhoneValidation } from '../PhoneInput'
@@ -265,7 +264,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     }
   }, [])
 
-  const { updateProfile } = useAuthStore()
+  // SUPPRIMÉ : const { updateProfile } = useAuthStore() pour éviter React #300
   const { t } = useTranslation()
   const { validatePhoneFields } = usePhoneValidation()
   const overlayRef = useRef<HTMLDivElement>(null)
@@ -573,10 +572,59 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         return
       }
 
-      // Stocker les données pour la mise à jour différée
-      const updateData = { ...formData }
-      
-      console.log('✅ Données validées, fermeture de la modale')
+
+
+      // API call direct sans passer par le store auth pour éviter React #300
+      const { useAuthStore } = await import('@/lib/stores/auth')
+      const get = useAuthStore.getState
+      const currentUser = get().user
+      if (!currentUser) {
+        if (isMountedRef.current) setFormErrors(['Utilisateur non connecté'])
+        return
+      }
+
+      // Validation des données avant envoi (reprise de la logique du store)
+      const validatedData: any = {}
+
+      if (formData.firstName !== undefined) {
+        validatedData.first_name = String(formData.firstName).trim()
+      }
+
+      if (formData.lastName !== undefined) {
+        validatedData.last_name = String(formData.lastName).trim()
+      }
+
+      if (formData.firstName !== undefined || formData.lastName !== undefined) {
+        const fullName = `${formData.firstName || ''} ${formData.lastName || ''}`.trim()
+        validatedData.full_name = fullName
+      }
+
+      // Ajouter les autres champs
+      if (formData.country_code !== undefined) validatedData.country_code = formData.country_code
+      if (formData.area_code !== undefined) validatedData.area_code = formData.area_code
+      if (formData.phone_number !== undefined) validatedData.phone_number = formData.phone_number
+      if (formData.country !== undefined) validatedData.country = formData.country
+      if (formData.linkedinProfile !== undefined) validatedData.linkedin_profile = formData.linkedinProfile
+      if (formData.companyName !== undefined) validatedData.company_name = formData.companyName
+      if (formData.companyWebsite !== undefined) validatedData.company_website = formData.companyWebsite
+      if (formData.linkedinCorporate !== undefined) validatedData.linkedin_corporate = formData.linkedinCorporate
+
+      // API call Supabase direct (sans store)
+      const { getSupabaseClient } = await import('@/lib/supabase/singleton')
+      const supabase = getSupabaseClient()
+      const { error } = await supabase
+        .from('users')
+        .update(validatedData)
+        .eq('auth_user_id', currentUser.id)
+
+      if (error) {
+        if (isMountedRef.current) setFormErrors([error.message || 'Erreur de mise à jour'])
+        return
+      }
+
+      if (!isMountedRef.current) return
+
+      console.log('Profil mis à jour avec succès (API direct)')
 
       // Fermer immédiatement la modale
       startTransition(() => {
@@ -585,16 +633,8 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         }
       })
 
-      // Différer updateProfile après fermeture complète
-      setTimeout(async () => {
-        try {
-          await updateProfile(updateData)
-          console.log('✅ Profil mis à jour avec succès (différé)')
-        } catch (error: any) {
-          console.error('Erreur mise à jour profil (différé):', error)
-          // Optionnel: afficher une notification toast ici
-        }
-      }, 50) // 50ms pour laisser le temps à la modale de se fermer
+
+
     } catch (error: any) {
       if (isMountedRef.current) {
         console.error('Erreur mise à jour profil:', error)
@@ -612,7 +652,6 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     validateUrl,
     validateLinkedInUrl,
     validatePhoneFields,
-    updateProfile,
     handleClose,
     t
   ])
