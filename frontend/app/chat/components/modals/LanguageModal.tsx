@@ -13,24 +13,34 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
   // Forcer les styles au montage pour contourner les problèmes CSS
   useEffect(() => {
     const overlay = overlayRef.current
-    const content = contentRef.current
     
-    if (overlay && content) {
-      // Corriger l'overlay avec backdrop grisé
+    if (overlay) {
+      // Forcer les dimensions de l'overlay
+      overlay.style.setProperty('width', '100vw', 'important')
+      overlay.style.setProperty('height', '100vh', 'important')
+      overlay.style.setProperty('top', '0', 'important')
+      overlay.style.setProperty('left', '0', 'important')
+      overlay.style.setProperty('right', '0', 'important')
+      overlay.style.setProperty('bottom', '0', 'important')
+      
+      // BACKDROP GRISÉ avec flou
       overlay.style.setProperty('background-color', 'rgba(0, 0, 0, 0.5)', 'important')
       overlay.style.setProperty('backdrop-filter', 'blur(2px)', 'important')
       overlay.style.setProperty('animation', 'fadeIn 0.2s ease-out', 'important')
       overlay.style.setProperty('display', 'flex', 'important')
       overlay.style.setProperty('align-items', 'center', 'important')
       overlay.style.setProperty('justify-content', 'center', 'important')
+      overlay.style.setProperty('padding', '16px', 'important')
       
-      // Corriger le contenu (centré avec animation)
-      content.style.setProperty('position', 'fixed', 'important')
-      content.style.setProperty('top', '50%', 'important')
-      content.style.setProperty('left', '50%', 'important')
-      content.style.setProperty('transform', 'translate(-50%, -50%)', 'important')
-      content.style.setProperty('z-index', '51', 'important')
-      content.style.setProperty('animation', 'modalSlideIn 0.3s ease-out', 'important')
+      // Animation pour le contenu
+      const content = overlay.querySelector('.bg-white') as HTMLElement
+      if (content) {
+        content.style.setProperty('animation', 'modalSlideIn 0.3s ease-out', 'important')
+        content.style.setProperty('width', '95vw', 'important')
+        content.style.setProperty('max-width', '700px', 'important')
+        content.style.setProperty('max-height', '85vh', 'important')
+        content.style.setProperty('min-width', '320px', 'important')
+      }
     }
   }, [])
   
