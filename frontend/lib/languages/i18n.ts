@@ -30,6 +30,7 @@ interface TranslationKeys {
   'chat.loading': string
   'chat.errorMessage': string
   'chat.newConversation': string
+  'chat.disclaimer': string  // ✅ AJOUTÉ
 
   // Modals
   'modal.close': string
@@ -66,6 +67,11 @@ interface TranslationKeys {
   'language.title': string
   'language.description': string
   'language.updating': string
+  'language.changeSuccess': string      // ✅ AJOUTÉ
+  'language.interfaceUpdated': string   // ✅ AJOUTÉ
+  'language.reloadForWidget': string    // ✅ AJOUTÉ
+  'language.reloadNow': string          // ✅ AJOUTÉ
+  'language.continueWithoutReload': string // ✅ AJOUTÉ
 
   // Abonnement
   'subscription.title': string
@@ -155,6 +161,7 @@ const translations: Record<string, TranslationKeys> = {
     'chat.loading': 'Chargement...',
     'chat.errorMessage': 'Désolé, je rencontre un problème technique. Veuillez réessayer dans quelques instants.',
     'chat.newConversation': 'Nouvelle conversation',
+    'chat.disclaimer': 'Intelia Expert peut faire des erreurs. Faites vérifier les réponses par un professionnel au besoin.',  // ✅ AJOUTÉ
 
     // Modals
     'modal.close': 'Fermer',
@@ -191,6 +198,11 @@ const translations: Record<string, TranslationKeys> = {
     'language.title': 'Langue',
     'language.description': 'Sélectionnez votre langue préférée pour l\'interface Intelia Expert',
     'language.updating': 'Mise à jour en cours...',
+    'language.changeSuccess': 'Langue modifiée !',                            // ✅ AJOUTÉ
+    'language.interfaceUpdated': 'L\'interface a été mise à jour immédiatement.',  // ✅ AJOUTÉ
+    'language.reloadForWidget': 'Pour que le widget de chat soit également dans la nouvelle langue, un rechargement de page est recommandé.',  // ✅ AJOUTÉ
+    'language.reloadNow': '🔄 Recharger maintenant',                          // ✅ AJOUTÉ
+    'language.continueWithoutReload': '⏭️ Continuer sans recharger',          // ✅ AJOUTÉ
 
     // Abonnement
     'subscription.title': 'Abonnement',
@@ -278,6 +290,7 @@ const translations: Record<string, TranslationKeys> = {
     'chat.loading': 'Loading...',
     'chat.errorMessage': 'Sorry, I\'m experiencing a technical issue. Please try again in a few moments.',
     'chat.newConversation': 'New conversation',
+    'chat.disclaimer': 'Intelia Expert can make mistakes. Please verify the answers with a professional if necessary.',  // ✅ AJOUTÉ
 
     // Modals
     'modal.close': 'Close',
@@ -314,6 +327,11 @@ const translations: Record<string, TranslationKeys> = {
     'language.title': 'Language',
     'language.description': 'Select your preferred language for the Intelia Expert interface',
     'language.updating': 'Updating...',
+    'language.changeSuccess': 'Language Changed!',                            // ✅ AJOUTÉ
+    'language.interfaceUpdated': 'The interface has been updated immediately.',   // ✅ AJOUTÉ
+    'language.reloadForWidget': 'For the chat widget to also be in the new language, a page reload is recommended.',  // ✅ AJOUTÉ
+    'language.reloadNow': '🔄 Reload Now',                                   // ✅ AJOUTÉ
+    'language.continueWithoutReload': '⏭️ Continue Without Reload',          // ✅ AJOUTÉ
 
     // Abonnement
     'subscription.title': 'Subscription',
@@ -401,6 +419,7 @@ const translations: Record<string, TranslationKeys> = {
     'chat.loading': 'Cargando...',
     'chat.errorMessage': 'Lo siento, tengo un problema técnico. Por favor, inténtalo de nuevo en unos momentos.',
     'chat.newConversation': 'Nueva conversación',
+    'chat.disclaimer': 'Intelia Expert puede cometer errores. Verifique las respuestas con un profesional si es necesario.',  // ✅ AJOUTÉ
 
     // Modals
     'modal.close': 'Cerrar',
@@ -437,6 +456,11 @@ const translations: Record<string, TranslationKeys> = {
     'language.title': 'Idioma',
     'language.description': 'Selecciona tu idioma preferido para la interfaz de Intelia Expert',
     'language.updating': 'Actualizando...',
+    'language.changeSuccess': '¡Idioma Cambiado!',                            // ✅ AJOUTÉ
+    'language.interfaceUpdated': 'La interfaz se ha actualizado inmediatamente.',  // ✅ AJOUTÉ
+    'language.reloadForWidget': 'Para que el widget de chat también esté en el nuevo idioma, se recomienda recargar la página.',  // ✅ AJOUTÉ
+    'language.reloadNow': '🔄 Recargar Ahora',                               // ✅ AJOUTÉ
+    'language.continueWithoutReload': '⏭️ Continuar Sin Recargar',           // ✅ AJOUTÉ
 
     // Abonnement
     'subscription.title': 'Suscripción',
