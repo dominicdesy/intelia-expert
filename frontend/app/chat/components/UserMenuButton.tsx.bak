@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
@@ -104,63 +106,74 @@ export const UserMenuButton = React.memo(() => {
     return { currentPlan, plan, isSuperAdmin }
   }, [user?.plan, user?.user_type])
 
-  // Déconnexion avec préservation RememberMe et navigation immédiate
+  // Déconnexion avec navigation différée pour éviter la race condition
   const handleLogout = useCallback(async () => {
     if (logoutInProgressRef.current || !isMountedRef.current) return
-    
-    console.log('[DEBUG-LOGOUT-UserMenu] Début déconnexion coordonnée')
+
     logoutInProgressRef.current = true
     setIsOpen(false)
 
-    try {
-      console.log('[DEBUG-LOGOUT-UserMenu] Navigation immédiate pour éviter callbacks')
-      
-      setIsOpen(false)
-      
-      logout().catch((error) => {
-        console.error('[DEBUG-LOGOUT-UserMenu] Erreur logout async (ignorée):', error)
-      })
-      
-      console.log('[DEBUG-LOGOUT-UserMenu] Redirection immédiate')
-      router.push('/')
-      
-    } catch (error) {
-      console.error('[DEBUG-LOGOUT-UserMenu] Erreur logout:', error)
-      router.push('/')
-    } finally {
-      logoutInProgressRef.current = false
-    }
+    const defer = typeof queueMicrotask === 'function'
+      ? queueMicrotask
+      : (fn: () => void) => Promise.resolve().then(fn)
+
+    defer(() => {
+      if (!isMountedRef.current) return
+      try {
+        logout().catch(e => console.error('[DEBUG-LOGOUT-UserMenu] logout async:', e))
+        router.push('/')
+      } catch (e) {
+        router.push('/')
+      } finally {
+        logoutInProgressRef.current = false
+      }
+    })
   }, [logout, router])
 
-  // Handlers des modales avec protection
+  // Handlers des modales avec actions différées
   const handleContactClick = useCallback(() => {
     if (!isMountedRef.current) return
     setIsOpen(false)
-    setShowContactModal(true)
+    const defer = typeof queueMicrotask === 'function'
+      ? queueMicrotask
+      : (fn: () => void) => Promise.resolve().then(fn)
+    defer(() => { if (isMountedRef.current) setShowContactModal(true) })
   }, [])
 
   const handleUserInfoClick = useCallback(() => {
     if (!isMountedRef.current) return
     setIsOpen(false)
-    setShowUserInfoModal(true)
+    const defer = typeof queueMicrotask === 'function'
+      ? queueMicrotask
+      : (fn: () => void) => Promise.resolve().then(fn)
+    defer(() => { if (isMountedRef.current) setShowUserInfoModal(true) })
   }, [])
 
   const handleAccountClick = useCallback(() => {
     if (!isMountedRef.current) return
     setIsOpen(false)
-    setShowAccountModal(true)
+    const defer = typeof queueMicrotask === 'function'
+      ? queueMicrotask
+      : (fn: () => void) => Promise.resolve().then(fn)
+    defer(() => { if (isMountedRef.current) setShowAccountModal(true) })
   }, [])
 
   const handleLanguageClick = useCallback(() => {
     if (!isMountedRef.current) return
     setIsOpen(false)
-    setShowLanguageModal(true)
+    const defer = typeof queueMicrotask === 'function'
+      ? queueMicrotask
+      : (fn: () => void) => Promise.resolve().then(fn)
+    defer(() => { if (isMountedRef.current) setShowLanguageModal(true) })
   }, [])
 
   const handleInviteFriendClick = useCallback(() => {
     if (!isMountedRef.current) return
     setIsOpen(false)
-    setShowInviteFriendModal(true)
+    const defer = typeof queueMicrotask === 'function'
+      ? queueMicrotask
+      : (fn: () => void) => Promise.resolve().then(fn)
+    defer(() => { if (isMountedRef.current) setShowInviteFriendModal(true) })
   }, [])
 
   const handleStatisticsClick = useCallback(() => {
