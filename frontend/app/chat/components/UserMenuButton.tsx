@@ -106,7 +106,7 @@ export const UserMenuButton = React.memo(() => {
     return { currentPlan, plan, isSuperAdmin }
   }, [user?.plan, user?.user_type])
 
-  // CORRECTION: Déconnexion coordonnée SANS bloquer initializeSession
+  // CORRECTION: Déconnexion coordonnée SANS setState immédiat
   const handleLogout = useCallback(async () => {
     if (logoutInProgressRef.current || !isMountedRef.current) return
     
@@ -120,18 +120,35 @@ export const UserMenuButton = React.memo(() => {
       // 2. Fermer le menu
       setIsOpen(false)
       
-      // 3. Attendre que logout() termine
+      // 3. Attendre que logout() termine (SANS setState dans le store)
       await logout()
       
-      // 4. Redirection
+      // 4. Redirection IMMÉDIATE
       router.replace('/')
       console.log('[UserMenu] Déconnexion terminée')
+      
+      // 5. Nettoyer le store APRÈS la navigation (sécurisé)
+      setTimeout(() => {
+        try {
+          // Nettoyage du store une fois sur la nouvelle page
+          const { setState } = useAuthStore
+          setState({ 
+            user: null, 
+            isAuthenticated: false, 
+            isLoading: false,
+            lastAuthCheck: Date.now()
+          })
+          console.log('[UserMenu] Store nettoyé après navigation')
+        } catch (error) {
+          console.warn('[UserMenu] Erreur nettoyage store différé:', error)
+        }
+      }, 100) // Court délai pour s'assurer que la navigation a commencé
       
     } catch (error) {
       console.error('[UserMenu] Erreur logout:', error)
       router.replace('/')
     } finally {
-      // 5. Réactiver les opérations normales après délai
+      // 6. Réactiver les opérations normales après délai
       setTimeout(() => {
         markLogoutEnd()
         logoutInProgressRef.current = false

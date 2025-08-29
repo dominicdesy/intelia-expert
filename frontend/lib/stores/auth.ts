@@ -522,15 +522,8 @@ export const useAuthStore = create<AuthState>()(
             return
           }
           
-          // ÉTAPE 1 : setState immédiat pour loading (sans microtâche)
-          try {
-            if (zustandSetFn) {
-              zustandSetFn({ isLoading: true }, false)
-              console.log('[DEBUG-LOGOUT] Loading state appliqué immédiatement')
-            }
-          } catch (error) {
-            console.error('[DEBUG-LOGOUT] Erreur loading state:', error)
-          }
+          // CORRECTION CRITIQUE: NE PLUS faire de setState pour loading - cause React #300
+          console.log('[DEBUG-LOGOUT] Saut du loading state pour éviter React #300')
           
           try {
             // ÉTAPE 2 : Préserver les données RememberMe AVANT le nettoyage
@@ -584,16 +577,8 @@ export const useAuthStore = create<AuthState>()(
               console.warn('[DEBUG-LOGOUT] Erreur nettoyage localStorage:', storageError)
             }
 
-            // ÉTAPE 5 : Nettoyer l'état du store IMMÉDIATEMENT (sans microtâche)
-            if (isStoreActive && zustandSetFn) {
-              zustandSetFn({ 
-                user: null, 
-                isAuthenticated: false,
-                lastAuthCheck: Date.now(),
-                isLoading: false  // Aussi mettre loading à false
-              }, false)
-              console.log('[DEBUG-LOGOUT] Store nettoyé immédiatement')
-            }
+            // ÉTAPE 5 : PLUS AUCUN setState pendant logout - évite React #300 complètement
+            console.log('[DEBUG-LOGOUT] Nettoyage du store reporté après navigation')
 
             // ÉTAPE 6 : Restaurer RememberMe APRÈS le nettoyage
             if (preservedRememberMe) {
@@ -612,16 +597,8 @@ export const useAuthStore = create<AuthState>()(
           } catch (e: any) {
             console.error('[DEBUG-LOGOUT] Erreur durant logout:', e)
             
-            // Même en cas d'erreur, nettoyer l'état local IMMÉDIATEMENT
-            if (isStoreActive && zustandSetFn) {
-              zustandSetFn({ 
-                user: null, 
-                isAuthenticated: false,
-                lastAuthCheck: Date.now(),
-                isLoading: false
-              }, false)
-              console.log('[DEBUG-LOGOUT] Store nettoyé en urgence')
-            }
+            // Même en cas d'erreur, PAS de nettoyage du store - évite React #300
+            console.log('[DEBUG-LOGOUT] Erreur logout - nettoyage du store différé')
             
             throw new Error(e?.message || 'Erreur lors de la déconnexion')
           } finally {

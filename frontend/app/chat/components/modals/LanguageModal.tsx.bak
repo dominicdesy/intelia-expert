@@ -17,9 +17,7 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     
     if (overlay && content) {
       // Corriger l'overlay (transparent)
-	  overlay.style.setProperty('background-color', 'rgba(0, 0, 0, 0.5)', 'important')
-	  overlay.style.setProperty('backdrop-filter', 'blur(2px)', 'important')
-	  overlay.style.setProperty('animation', 'fadeIn 0.2s ease-out', 'important')	  
+      overlay.style.setProperty('background-color', 'transparent', 'important')
       overlay.style.setProperty('display', 'flex', 'important')
       overlay.style.setProperty('align-items', 'center', 'important')
       overlay.style.setProperty('justify-content', 'center', 'important')
