@@ -38,15 +38,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  // Logique d'hydratation avec protection
+
+
+
+  // Logique d'hydratation avec protection contre les boucles de redirection
   useEffect(() => {
+    // Vérifier si une déconnexion récente est en cours
+    const recentLogout = sessionStorage.getItem('recent-logout')
+    if (recentLogout) {
+      const logoutTime = parseInt(recentLogout)
+      if (Date.now() - logoutTime < 5000) {
+        console.log('[AuthProvider] Initialisation différée - déconnexion récente')
+        return
+      }
+    }
+
     if (!hasHydrated && isMountedRef.current && !isLoggingOutRef.current) {
       setHasHydrated(true)
       console.log('[AuthProvider] Store hydraté - Supabase auth')
-      
+    
       if (!isInitializingRef.current) {
         isInitializingRef.current = true
-        
+      
         initializeSession().then((success) => {
           if (isMountedRef.current && !isLoggingOutRef.current) {
             console.log('[AuthProvider] Session initialisée:', success ? 'succès' : 'échec')
@@ -61,6 +74,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     }
   }, [hasHydrated, setHasHydrated, initializeSession])
+
+
 
   // CORRECTION FINALE: Listener Supabase qui NE FAIT PLUS DE setState pour SIGNED_OUT
   useEffect(() => {

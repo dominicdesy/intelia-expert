@@ -613,11 +613,25 @@ export default function ChatInterface() {
     }
   }, [hasHydrated, isAuthenticated, initializeSession, redirectToLogin, handleAuthError])
 
-  // useEffect pour gestion de la déconnexion avec protection
+  // useEffect pour gestion de la déconnexion avec protection contre les boucles
   useEffect(() => {
     let timeoutId: NodeJS.Timeout | null = null
 
     if (hasHydrated && isAuthenticated === false && !isLoading && isMountedRef.current) {
+      // Vérifier si on arrive d'une déconnexion récente
+      const recentLogout = sessionStorage.getItem('recent-logout')
+      if (recentLogout) {
+        const logoutTime = parseInt(recentLogout)
+        const now = Date.now()
+      
+        // Si la déconnexion date de moins de 5 secondes, ne pas rediriger
+        if (now - logoutTime < 5000) {
+          console.log('⏳ [AUTH-PROTECTION] Déconnexion récente détectée, pas de redirection automatique')
+          sessionStorage.removeItem('recent-logout')
+          return
+        }
+      }
+
       timeoutId = setTimeout(() => {
         console.log('🕐 [DEBUG-TIMEOUT-AUTH-LOGOUT] Execution - isMounted:', isMountedRef.current)
         if (isMountedRef.current) {
@@ -634,6 +648,8 @@ export default function ChatInterface() {
       }
     }
   }, [hasHydrated, isAuthenticated, isLoading, redirectToLogin])
+
+
 
   // useEffect pour gestion clavier mobile avec cleanup complet
   useEffect(() => {

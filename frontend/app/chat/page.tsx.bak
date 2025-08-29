@@ -24,7 +24,7 @@ import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
 import { FeedbackModal } from './components/modals/FeedbackModal'
 
-// Circuit breaker global pour éviter les boucles infinies de chargement
+// Circuit breaker pour éviter les boucles infinies de chargement
 class PageLoadingCircuitBreaker {
   private attempts = 0
   private lastAttempt = 0
@@ -325,13 +325,12 @@ export default function ChatInterface() {
 
   // Déplace la vérification dans un effet pour ne pas casser l'ordre des hooks
   React.useEffect(() => {
-    // On garde la même logique du breaker, mais on n'interrompt plus le cycle des hooks
     const ok = renderBreaker.checkRender();
     if (!ok) {
       console.error("Trop de re-renders détectés, affichage d'un fallback puis reload");
       setRenderOk(false);
     }
-  }) // Pas de [] pour vérifier à chaque render
+  })
 
   // planifier un seul reload quand renderOk devient false
   React.useEffect(() => {
@@ -352,7 +351,6 @@ export default function ChatInterface() {
   const addMessage = useChatStore(state => state.addMessage)
   const updateMessage = useChatStore(state => state.updateMessage)
   const createNewConversation = useChatStore(state => state.createNewConversation)
-  // CORRECTION: Obtenir la fonction loadConversations de manière stable
   const loadConversations = useChatStore(state => state.loadConversations)
 
   const config = { level: 'standard' }
@@ -409,21 +407,12 @@ export default function ChatInterface() {
     return messages.length > 0
   }, [messages.length])
 
-  // CORRECTION C: redirectToLogin avec fallback fonctionnel
   const redirectToLogin = useCallback((reason: string = 'Session expirée') => {
-    // Éviter les doubles redirections
-    if (isRedirectingRef.current) {
-      console.log('🚪 [DEBUG-REDIRECT] Redirection déjà en cours, ignore:', reason)
-      return
-    }
+    if (isRedirectingRef.current) return
     isRedirectingRef.current = true
     console.log('🚪 [DEBUG-REDIRECT] Redirection forcée -', reason)
-    console.log('🔍 [DEBUG-REDIRECT] État avant:', {
-      currentPath: window.location.pathname,
-      isMounted: isMountedRef.current
-    })
 
-    // Nettoyage timeouts
+    // Cleanup des timeouts existants d'abord
     const timeoutRefs = [redirectTimeoutRef, authCheckTimeoutRef, loadingTimeoutRef]
     timeoutRefs.forEach(ref => {
       if (ref.current) {
@@ -432,53 +421,49 @@ export default function ChatInterface() {
       }
     })
 
-    // Reset du store de chat (défensif)
-    try {
-      useChatStore.setState({
-        currentConversation: null,
-        conversations: [],
-        isLoading: false
-      })
-    } catch (err) {
-      console.warn('Erreur nettoyage stores:', err)
-    }
-
-    // Nettoyage CSS
-    document.body.classList.remove('keyboard-open')
-
-    // CORRECTION C: Redirection avec fallback fonctionnel
+    // NAVIGATION D'ABORD
     try {
       router.push('/')
-      console.log('✅ [DEBUG-REDIRECT] router.push executé')
-      
-      // CORRECTION : Fallback fonctionnel - NE PAS définir isMountedRef.current = false maintenant
-      redirectTimeoutRef.current = setTimeout(() => {
-        console.log('🕐 [DEBUG-TIMEOUT-REDIRECT] Execution - isMounted:', isMountedRef.current, 'currentPath:', window.location.pathname)
-        
-        // CORRECTION : Le fallback peut maintenant s'exécuter car isMountedRef est encore true
-        if (isMountedRef.current && window.location.pathname !== '/') {
-          console.log('🔄 [DEBUG-TIMEOUT-REDIRECT] Next.js redirect failed, using window.location fallback')
-          
-          // MAINTENANT on peut bloquer les setState car on va quitter la page
-          isMountedRef.current = false
-          window.location.href = '/'
-        } else if (!isMountedRef.current) {
-          console.log('⚠️ [DEBUG-TIMEOUT-REDIRECT] Composant démonté - fallback ignoré')
-        } else {
-          console.log('✅ [DEBUG-TIMEOUT-REDIRECT] Next.js redirect successful, timeout cancelled')
-        }
-      }, 500)
+      console.log('✅ [DEBUG-REDIRECT] router.push exécuté')
     } catch (err) {
       console.error('Erreur router, fallback immédiat', err)
       isMountedRef.current = false
       window.location.href = '/'
+      return
     }
+
+    // Nettoyage des stores DÉFÉRÉ à la micro-tâche
+    const defer = typeof queueMicrotask === 'function'
+      ? queueMicrotask
+      : (fn: () => void) => Promise.resolve().then(fn)
+
+    defer(() => {
+      try {
+        useChatStore.setState({
+          currentConversation: null,
+          conversations: [],
+          isLoading: false
+        })
+      } catch (err) {
+        console.warn('Erreur nettoyage stores:', err)
+      }
+      // Nettoyage CSS éventuel
+      document.body.classList.remove('keyboard-open')
+    })
+
+    // Fallback sécurisé si Next.js ne redirige pas
+    redirectTimeoutRef.current = setTimeout(() => {
+      if (isMountedRef.current && window.location.pathname !== '/') {
+        console.log('🔄 [DEBUG-TIMEOUT-REDIRECT] Fallback window.location')
+        isMountedRef.current = false
+        window.location.href = '/'
+      }
+    }, 500)
   }, [router])
 
   const handleAuthError = useCallback((error: any) => {
     console.log('Gestion erreur auth:', error)
     
-    // Empêcher les opérations si le composant n'est plus monté
     if (!isMountedRef.current) {
       console.log('Composant démonté, ignore erreur auth')
       return
@@ -493,7 +478,6 @@ export default function ChatInterface() {
     }
   }, [redirectToLogin])
 
-  // Fonctions simplifiées
   const getUserInitials = useCallback((user: any): string => {
     if (!user) return 'U'
 
@@ -521,7 +505,6 @@ export default function ChatInterface() {
     if (!content) return ""
 
     let processed = content
-
     processed = processed.replace(/(#{1,6})\s*([^#\n]+?)([A-Z][a-z])/g, '$1 $2\n\n$3')
     processed = processed.replace(/^(#{1,6}[^\n]+)(?!\n)/gm, '$1\n')
     processed = processed.replace(/([a-z])([A-Z])/g, '$1, $2')
@@ -549,14 +532,9 @@ export default function ChatInterface() {
 
   const cleanResponseText = useCallback((text: string): string => {
     if (!text) return ""
-
-    if (text.length < 100) {
-      return text.trim()
-    }
+    if (text.length < 100) return text.trim()
 
     let cleaned = text
-
-    // Nettoyage des références aux sources et autres éléments indésirables
     cleaned = cleaned.replace(/\*\*Source:\s*[^*]+\*\*/g, '')
     cleaned = cleaned.replace(/\*\*ource:\s*[^*]+\*\*/g, '')
     cleaned = cleaned.replace(/\*\*Source[^*]*\*\*/g, '')
@@ -657,7 +635,7 @@ export default function ChatInterface() {
     }
   }, [hasHydrated, isAuthenticated, isLoading, redirectToLogin])
 
-  // useEffect pour gestion clavier mobile avec cleanup complet et logs debug
+  // useEffect pour gestion clavier mobile avec cleanup complet
   useEffect(() => {
     if (!uiState.isMobileDevice || !isMountedRef.current) return
 
@@ -790,7 +768,6 @@ export default function ChatInterface() {
       isMountedRef.current = false
       isRedirectingRef.current = false
       
-      // Nettoyer TOUS les timeouts
       const timeoutRefs = [loadingTimeoutRef, redirectTimeoutRef, authCheckTimeoutRef]
       timeoutRefs.forEach(ref => {
         if (ref.current) {
@@ -799,10 +776,8 @@ export default function ChatInterface() {
         }
       })
       
-      // Nettoyer les classes CSS
       document.body.classList.remove('keyboard-open')
       
-      // Réinitialiser les refs
       hasLoadedConversationsRef.current = false
       conversationLoadingAttemptsRef.current = 0
       pageLoadingBreaker.reset()
@@ -838,7 +813,7 @@ export default function ChatInterface() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Auto-scroll avec protection complète et logs debug
+  // Auto-scroll avec protection complète
   useEffect(() => {
     if (!isMountedRef.current) return
 
@@ -965,21 +940,18 @@ export default function ChatInterface() {
     }
   }, [currentLanguage, t, currentConversation, setCurrentConversation])
 
-  // CORRECTION: Chargement des conversations avec protection SANS boucle infinie
+  // Chargement des conversations avec protection SANS boucle infinie
   useEffect(() => {
     if (isAuthenticated && user?.id && isMountedRef.current && !hasLoadedConversationsRef.current) {
-      // Nettoyer le timeout précédent si existant
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current)
       }
 
-      // Marquer immédiatement comme "en cours de chargement"
       hasLoadedConversationsRef.current = true
 
       loadingTimeoutRef.current = setTimeout(() => {
         console.log('🕐 [DEBUG-TIMEOUT-LOADING] Execution - isMounted:', isMountedRef.current)
         if (isMountedRef.current) {
-          // Vérifier le circuit breaker
           if (!pageLoadingBreaker.canAttempt()) {
             console.warn('Circuit breaker: chargement bloqué')
             return
@@ -1002,7 +974,6 @@ export default function ChatInterface() {
                 pageLoadingBreaker.recordFailure()
                 handleAuthError(err)
                 
-                // Permettre retry en cas d'erreur réseau (max 3 tentatives)
                 if (conversationLoadingAttemptsRef.current < 3) {
                   hasLoadedConversationsRef.current = false
                 } else {
@@ -1022,7 +993,7 @@ export default function ChatInterface() {
         }
       }
     }
-  }, [isAuthenticated, user?.id, loadConversations, handleAuthError]) // CORRECTION: Retiré loadConversationsWithBreaker
+  }, [isAuthenticated, user?.id, loadConversations, handleAuthError])
 
   // Reset circuit breaker
   useEffect(() => {
@@ -1308,7 +1279,6 @@ export default function ChatInterface() {
       console.error('Erreur générale feedback:', error)
       throw error
     } finally {
-      // Vérifier que le composant est encore monté
       if (isMountedRef.current) {
         setUiState(prev => ({ ...prev, isSubmittingFeedback: false }))
       }
@@ -1401,12 +1371,10 @@ export default function ChatInterface() {
     <>
       <ZohoSalesIQ user={user} language={currentLanguage} />
 
-	  <div 
-	    className={`bg-gray-50 flex flex-col relative z-0 ${uiState.isMobileDevice ? 'chat-main-container' : 'min-h-dvh h-screen'}`}
-	    style={containerStyle}
-	  >
-
-
+      <div 
+        className={`bg-gray-50 flex flex-col relative z-0 ${uiState.isMobileDevice ? 'chat-main-container' : 'min-h-dvh h-screen'}`}
+        style={containerStyle}
+      >
         <header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -1510,7 +1478,6 @@ export default function ChatInterface() {
                     </span>
                     <button
                       onClick={() => setClarificationState(null)}
-                      className="text-blue-600 hover:text-blue-800 text-sm underline"
                     >
                       Annuler
                     </button>
@@ -1534,7 +1501,6 @@ export default function ChatInterface() {
                   Intelia Expert peut faire des erreurs. Faites vérifiez les réponses par un professionnel au besoin.
                 </p>
               </div>
-              
             </div>
           </div>
         </div>

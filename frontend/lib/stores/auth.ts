@@ -846,6 +846,21 @@ export const useAuthStore = create<AuthState>()(
       }),
       onRehydrateStorage: () => (state, error) => {
         if (error) console.error('Erreur rehydrate auth store:', error)
+        
+        // Protection contre la rehydration pendant une déconnexion récente
+        const recentLogout = sessionStorage.getItem('recent-logout')
+        if (recentLogout) {
+          const logoutTime = parseInt(recentLogout)
+          if (Date.now() - logoutTime < 5000) {
+            console.log('[AuthStore] Rehydration bloquée - déconnexion récente')
+            if (state) {
+              state.user = null
+              state.isAuthenticated = false
+            }
+            return
+          }
+        }
+        
         if (state && isStoreActive) {
           state.setHasHydrated(true)
           alog('Auth store rehydraté (singleton)')
