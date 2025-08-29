@@ -53,41 +53,25 @@ export const markLogoutEnd = () => {
 
 let zustandSetFn: any = null // Sera initialisé dans le store
 
-// CORRECTION CRITIQUE: safeSet qui vérifie le cycle de vie ET évite les microtâches problématiques
+// CORRECTION CRITIQUE: safeSet simplifié - exécution IMMÉDIATE, plus de microtâches
 const safeSet = <T extends Partial<AuthState>>(
   partial: T | ((s: AuthState) => T),
   replace = false,
   debugLabel = 'unknown'
 ) => {
-  // Vérifications préalables - SANS microtâche pour les opérations critiques
-  if (!isStoreActive || logoutInProgress) {
-    console.log('[DEBUG-MICROTASK] safeSet bloqué - store inactive ou logout en cours:', debugLabel)
+  // Vérifications préalables simplifiées
+  if (!isStoreActive) {
+    console.log('[DEBUG-IMMEDIATE] safeSet bloqué - store inactif:', debugLabel)
+    return
+  }
+
+  // Bloquer seulement pendant logout ET si ce n'est pas une opération de logout
+  if (logoutInProgress && !debugLabel.includes('logout')) {
+    console.log('[DEBUG-IMMEDIATE] safeSet bloqué - logout en cours:', debugLabel)
     return
   }
   
-  // CORRECTION FINALE: Plus de microtâches pendant les transitions de navigation
-  // Vérifier si nous sommes dans une transition de navigation
-  const isNavigating = window.location.pathname !== sessionStorage.getItem('last-known-path')
-  if (isNavigating) {
-    console.log('[DEBUG-MICROTASK] safeSet bloqué - navigation en cours:', debugLabel)
-    sessionStorage.setItem('last-known-path', window.location.pathname)
-    return
-  }
-  
-  // Pour les opérations de logout, exécution IMMÉDIATE sans microtâche
-  if (debugLabel.includes('logout')) {
-    try {
-      if (zustandSetFn) {
-        zustandSetFn(partial as any, replace)
-        console.log('[DEBUG-IMMEDIATE] setState appliqué immédiatement (logout):', debugLabel)
-      }
-    } catch (error) {
-      console.error('[DEBUG-IMMEDIATE] Erreur setState immédiat:', debugLabel, error)
-    }
-    return
-  }
-  
-  // CORRECTION: Exécution immédiate pour TOUTES les autres opérations aussi
+  // CORRECTION FINALE: Exécution IMMÉDIATE pour TOUTES les opérations - plus de microtâches
   try {
     if (zustandSetFn) {
       zustandSetFn(partial as any, replace)
@@ -510,28 +494,22 @@ export const useAuthStore = create<AuthState>()(
           }
         },
 
-        // FONCTION LOGOUT MODIFIÉE AVEC PRÉSERVATION REMEMBER ME + REACT #300 FIX COMPLET
+        // CORRECTION CRITIQUE: Logout simplifié sans protections bloquantes
         logout: async () => {
-          // ÉTAPE 0 : Marquer le début de logout pour bloquer les setState concurrent
-          markLogoutStart()
-          console.log('[DEBUG-LOGOUT] Début déconnexion avec blocage setState préventif')
+          console.log('[DEBUG-LOGOUT] Début déconnexion sans protections bloquantes')
           
           if (!isStoreActive) {
             console.log('[DEBUG-TIMEOUT-STORE] logout ignoré - store démonté')
-            markLogoutEnd()
             return
           }
           
-          // CORRECTION CRITIQUE: NE PLUS faire de setState pour loading - cause React #300
-          console.log('[DEBUG-LOGOUT] Saut du loading state pour éviter React #300')
-          
           try {
-            // ÉTAPE 2 : Préserver les données RememberMe AVANT le nettoyage
+            // ÉTAPE 1: Préserver les données RememberMe AVANT le nettoyage
             const rmUtils = await getRememberMeUtils()
             const preservedRememberMe = rmUtils.preserveOnLogout()
             console.log('[DEBUG-LOGOUT] Données RememberMe préservées:', preservedRememberMe)
 
-            // ÉTAPE 3 : Déconnexion Supabase
+            // ÉTAPE 2: Déconnexion Supabase
             const supabase = getSupabaseClient()
             const { error } = await supabase.auth.signOut()
             
@@ -539,7 +517,7 @@ export const useAuthStore = create<AuthState>()(
               throw new Error(error.message)
             }
 
-            // ÉTAPE 4 : Nettoyage localStorage SÉLECTIF (exclure RememberMe)
+            // ÉTAPE 3: Nettoyage localStorage SÉLECTIF (exclure RememberMe)
             console.log('[DEBUG-LOGOUT] Nettoyage localStorage sélectif')
             
             try {
@@ -577,10 +555,19 @@ export const useAuthStore = create<AuthState>()(
               console.warn('[DEBUG-LOGOUT] Erreur nettoyage localStorage:', storageError)
             }
 
-            // ÉTAPE 5 : PLUS AUCUN setState pendant logout - évite React #300 complètement
-            console.log('[DEBUG-LOGOUT] Nettoyage du store reporté après navigation')
+            // ÉTAPE 4: setState DIRECT via zustand - bypass safeSet complètement
+            if (zustandSetFn) {
+              zustandSetFn({
+                user: null,
+                isAuthenticated: false,
+                isLoading: false,
+                authErrors: [],
+                lastAuthCheck: Date.now()
+              }, false)
+              console.log('[DEBUG-LOGOUT] État de déconnexion appliqué directement')
+            }
 
-            // ÉTAPE 6 : Restaurer RememberMe APRÈS le nettoyage
+            // ÉTAPE 5: Restaurer RememberMe APRÈS le nettoyage
             if (preservedRememberMe) {
               setTimeout(() => {  // Utiliser setTimeout au lieu de microtâche pour plus de sécurité
                 try {
@@ -596,17 +583,7 @@ export const useAuthStore = create<AuthState>()(
             
           } catch (e: any) {
             console.error('[DEBUG-LOGOUT] Erreur durant logout:', e)
-            
-            // Même en cas d'erreur, PAS de nettoyage du store - évite React #300
-            console.log('[DEBUG-LOGOUT] Erreur logout - nettoyage du store différé')
-            
             throw new Error(e?.message || 'Erreur lors de la déconnexion')
-          } finally {
-            // ÉTAPE 7 : Réactiver les setState après logout
-            setTimeout(() => {
-              markLogoutEnd()
-              console.log('[DEBUG-LOGOUT] Déconnexion terminée - setState réactivé')
-            }, 200)
           }
         },
 
@@ -691,8 +668,8 @@ export const useAuthStore = create<AuthState>()(
               })
               
               if (hasChanges) {
-                console.log('[updateProfile] Changements détectés - mise à jour du store (microtâche)')
-                // Mise à jour locale avec validation - AVEC microtâche pour éviter React #300
+                console.log('[updateProfile] Changements détectés - mise à jour du store')
+                // Mise à jour locale avec validation - EXÉCUTION IMMÉDIATE
                 const updatedUser = { 
                   ...currentUser,
                   ...data,
@@ -702,7 +679,6 @@ export const useAuthStore = create<AuthState>()(
                 safeSet({ user: updatedUser }, false, 'updateProfile-success')
               } else {
                 console.log('[updateProfile] Pas de changements détectés - setState léger')
-                // Marquer quand même comme traité en microtâche
                 safeSet({}, false, 'updateProfile-no-changes')
               }
             }

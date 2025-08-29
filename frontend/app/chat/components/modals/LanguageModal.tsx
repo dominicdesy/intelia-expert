@@ -170,7 +170,6 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
                     {currentLanguage === lang.code && (
                       <div className="flex items-center text-blue-600">
                         <CheckIcon className="w-5 h-5" />
-                        <span className="ml-2 text-sm font-medium">{t('language.selected')}</span>
                       </div>
                     )}
                   </div>
