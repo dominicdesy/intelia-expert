@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
 import type { Language } from '@/types'
 
@@ -20,7 +20,7 @@ const translations = {
     createAccount: 'Créer un compte',
     supportProblem: 'Problème avec la réinitialisation ?',
     contactSupport: 'Contactez le support',
-    securityInfo: '🔒 Pour votre sécurité, le lien de réinitialisation expire dans 1 heure.',
+    securityInfo: 'Pour votre sécurité, le lien de réinitialisation expire dans 1 heure.',
     securityInfo2: 'Aucun email reçu ? Vérifiez vos spams ou contactez le support.',
     redirecting: 'Redirection en cours...',
     // Messages d'erreur et succès
@@ -45,7 +45,7 @@ const translations = {
     createAccount: 'Create account',
     supportProblem: 'Problem with reset?',
     contactSupport: 'Contact support',
-    securityInfo: '🔒 For your security, the reset link expires in 1 hour.',
+    securityInfo: 'For your security, the reset link expires in 1 hour.',
     securityInfo2: 'No email received? Check your spam folder or contact support.',
     redirecting: 'Redirecting...',
     // Messages d'erreur et succès
@@ -70,7 +70,7 @@ const translations = {
     createAccount: 'Crear cuenta',
     supportProblem: '¿Problema con el restablecimiento?',
     contactSupport: 'Contactar soporte',
-    securityInfo: '🔒 Por tu seguridad, el enlace de restablecimiento expira en 1 hora.',
+    securityInfo: 'Por tu seguridad, el enlace de restablecimiento expira en 1 hora.',
     securityInfo2: '¿No recibiste email? Revisa tu spam o contacta soporte.',
     redirecting: 'Redirigiendo...',
     // Messages d'erreur et succès
@@ -95,7 +95,7 @@ const translations = {
     createAccount: 'Konto erstellen',
     supportProblem: 'Problem beim Zurücksetzen?',
     contactSupport: 'Support kontaktieren',
-    securityInfo: '🔒 Zu Ihrer Sicherheit läuft der Reset-Link in 1 Stunde ab.',
+    securityInfo: 'Zu Ihrer Sicherheit läuft der Reset-Link in 1 Stunde ab.',
     securityInfo2: 'Keine E-Mail erhalten? Überprüfen Sie Ihren Spam-Ordner oder kontaktieren Sie den Support.',
     redirecting: 'Weiterleitung...',
     // Messages d'erreur et succès
@@ -122,51 +122,59 @@ const InteliaLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
 // ==================== PAGE MOT DE PASSE OUBLIÉ ====================
 export default function ForgotPasswordPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { isAuthenticated, user } = useAuthStore()
   
-  // Détection de la langue depuis l'URL ou localStorage
+  // États
   const [currentLanguage, setCurrentLanguage] = useState<Language>('fr')
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
+  const [isClient, setIsClient] = useState(false)
 
-  // Initialisation de la langue
+  // Hydratation côté client
   useEffect(() => {
-    // Priorité 1: Paramètre lang dans l'URL
-    const langParam = searchParams?.get('lang') as Language
-    if (langParam && translations[langParam]) {
-      setCurrentLanguage(langParam)
-      localStorage.setItem('intelia-language', langParam)
-      return
+    setIsClient(true)
+    
+    // Détection de la langue UNIQUEMENT côté client
+    const detectLanguage = () => {
+      // Priorité 1: Paramètre lang dans l'URL
+      const urlParams = new URLSearchParams(window.location.search)
+      const langParam = urlParams.get('lang') as Language
+      if (langParam && translations[langParam]) {
+        setCurrentLanguage(langParam)
+        localStorage.setItem('intelia-language', langParam)
+        return
+      }
+
+      // Priorité 2: localStorage
+      const savedLanguage = localStorage.getItem('intelia-language') as Language
+      if (savedLanguage && translations[savedLanguage]) {
+        setCurrentLanguage(savedLanguage)
+        return
+      }
+
+      // Priorité 3: Langue du navigateur
+      const browserLanguage = navigator.language.substring(0, 2) as Language
+      if (translations[browserLanguage]) {
+        setCurrentLanguage(browserLanguage)
+        localStorage.setItem('intelia-language', browserLanguage)
+      }
     }
 
-    // Priorité 2: localStorage
-    const savedLanguage = localStorage.getItem('intelia-language') as Language
-    if (savedLanguage && translations[savedLanguage]) {
-      setCurrentLanguage(savedLanguage)
-      return
-    }
-
-    // Priorité 3: Langue du navigateur
-    const browserLanguage = navigator.language.substring(0, 2) as Language
-    if (translations[browserLanguage]) {
-      setCurrentLanguage(browserLanguage)
-      localStorage.setItem('intelia-language', browserLanguage)
-    }
-  }, [searchParams])
-
-  // Récupération des traductions pour la langue courante
-  const t = translations[currentLanguage]
+    detectLanguage()
+  }, [])
 
   // Redirection si déjà connecté
   useEffect(() => {
-    if (isAuthenticated && user) {
-      console.log('✅ [ForgotPassword] Utilisateur déjà connecté, redirection...')
+    if (isClient && isAuthenticated && user) {
+      console.log('Utilisateur déjà connecté, redirection...')
       router.push('/chat')
     }
-  }, [isAuthenticated, user, router])
+  }, [isClient, isAuthenticated, user, router])
+
+  // Récupération des traductions pour la langue courante
+  const t = translations[currentLanguage]
 
   const handleSubmit = async () => {
     setError('')
@@ -186,9 +194,9 @@ export default function ForgotPasswordPage() {
     setIsLoading(true)
 
     try {
-      console.log('🔄 [ForgotPassword] Demande réinitialisation pour:', email.trim())
+      console.log('Demande réinitialisation pour:', email.trim())
       
-      // 📧 APPEL API pour la réinitialisation
+      // Appel API pour la réinitialisation
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app/api'}/v1/auth/reset-password`, {
         method: 'POST',
         headers: {
@@ -205,13 +213,13 @@ export default function ForgotPasswordPage() {
       }
 
       const data = await response.json()
-      console.log('✅ [ForgotPassword] Email envoyé avec succès')
+      console.log('Email envoyé avec succès')
       
       setSuccess(`${t.emailSent} ${email.trim()}`)
       setEmail('')
       
     } catch (error: any) {
-      console.error('❌ [ForgotPassword] Erreur:', error)
+      console.error('Erreur:', error)
       
       // Gestion d'erreurs spécifiques
       if (error.message.includes('404')) {
@@ -234,7 +242,20 @@ export default function ForgotPasswordPage() {
     }
   }
 
-  // 🚀 Si l'utilisateur est connecté, on affiche un loader pendant la redirection
+  // Affichage de chargement pendant l'hydratation
+  if (!isClient) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Chargement...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Si l'utilisateur est connecté, on affiche un loader pendant la redirection
   if (isAuthenticated && user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
@@ -374,7 +395,7 @@ export default function ForgotPasswordPage() {
         {/* Debug en développement */}
         {process.env.NODE_ENV === 'development' && (
           <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-            <strong>🔧 Dev Debug:</strong>
+            <strong>Dev Debug:</strong>
             <br />• API URL: {process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app/api'}
             <br />• Endpoint: /v1/auth/reset-password
             <br />• Current Language: {currentLanguage}
