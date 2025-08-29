@@ -24,7 +24,7 @@ import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
 import { FeedbackModal } from './components/modals/FeedbackModal'
 
-// Circuit breaker global pour éviter les boucles infinies de chargement
+// Circuit breaker pour éviter les boucles infinies de chargement
 class PageLoadingCircuitBreaker {
   private attempts = 0
   private lastAttempt = 0
@@ -352,7 +352,6 @@ export default function ChatInterface() {
   const addMessage = useChatStore(state => state.addMessage)
   const updateMessage = useChatStore(state => state.updateMessage)
   const createNewConversation = useChatStore(state => state.createNewConversation)
-  // CORRECTION: Obtenir la fonction loadConversations de manière stable
   const loadConversations = useChatStore(state => state.loadConversations)
 
   const config = { level: 'standard' }
@@ -409,14 +408,12 @@ export default function ChatInterface() {
     return messages.length > 0
   }, [messages.length])
 
-
-
   const redirectToLogin = useCallback((reason: string = 'Session expirée') => {
     if (isRedirectingRef.current) return
     isRedirectingRef.current = true
     console.log('🚪 [DEBUG-REDIRECT] Redirection forcée -', reason)
 
-    // 🔹 Cleanup des timeouts existants d'abord
+    // Cleanup des timeouts existants d'abord
     const timeoutRefs = [redirectTimeoutRef, authCheckTimeoutRef, loadingTimeoutRef]
     timeoutRefs.forEach(ref => {
       if (ref.current) {
@@ -425,7 +422,7 @@ export default function ChatInterface() {
       }
     })
 
-    // 🔹 NAVIGATION D'ABORD
+    // NAVIGATION D'ABORD
     try {
       router.push('/')
       console.log('✅ [DEBUG-REDIRECT] router.push exécuté')
@@ -436,7 +433,7 @@ export default function ChatInterface() {
       return
     }
 
-    // 🔹 Nettoyage des stores DÉCALÉ à la micro-tâche
+    // Nettoyage des stores DÉFÉRÉ à la micro-tâche
     const defer = typeof queueMicrotask === 'function'
       ? queueMicrotask
       : (fn: () => void) => Promise.resolve().then(fn)
@@ -455,7 +452,7 @@ export default function ChatInterface() {
       document.body.classList.remove('keyboard-open')
     })
 
-    // 🔹 Fallback sécurisé si Next.js ne redirige pas
+    // Fallback sécurisé si Next.js ne redirige pas
     redirectTimeoutRef.current = setTimeout(() => {
       if (isMountedRef.current && window.location.pathname !== '/') {
         console.log('🔄 [DEBUG-TIMEOUT-REDIRECT] Fallback window.location')
@@ -464,8 +461,6 @@ export default function ChatInterface() {
       }
     }, 500)
   }, [router])
-
-
 
   const handleAuthError = useCallback((error: any) => {
     console.log('Gestion erreur auth:', error)
@@ -649,7 +644,7 @@ export default function ChatInterface() {
     }
   }, [hasHydrated, isAuthenticated, isLoading, redirectToLogin])
 
-  // useEffect pour gestion clavier mobile avec cleanup complet et logs debug
+  // useEffect pour gestion clavier mobile avec cleanup complet
   useEffect(() => {
     if (!uiState.isMobileDevice || !isMountedRef.current) return
 
@@ -830,7 +825,7 @@ export default function ChatInterface() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Auto-scroll avec protection complète et logs debug
+  // Auto-scroll avec protection complète
   useEffect(() => {
     if (!isMountedRef.current) return
 
@@ -957,7 +952,7 @@ export default function ChatInterface() {
     }
   }, [currentLanguage, t, currentConversation, setCurrentConversation])
 
-  // CORRECTION: Chargement des conversations avec protection SANS boucle infinie
+  // Chargement des conversations avec protection SANS boucle infinie
   useEffect(() => {
     if (isAuthenticated && user?.id && isMountedRef.current && !hasLoadedConversationsRef.current) {
       // Nettoyer le timeout précédent si existant
@@ -1014,7 +1009,7 @@ export default function ChatInterface() {
         }
       }
     }
-  }, [isAuthenticated, user?.id, loadConversations, handleAuthError]) // CORRECTION: Retiré loadConversationsWithBreaker
+  }, [isAuthenticated, user?.id, loadConversations, handleAuthError])
 
   // Reset circuit breaker
   useEffect(() => {
@@ -1393,12 +1388,10 @@ export default function ChatInterface() {
     <>
       <ZohoSalesIQ user={user} language={currentLanguage} />
 
-	  <div 
-	    className={`bg-gray-50 flex flex-col relative z-0 ${uiState.isMobileDevice ? 'chat-main-container' : 'min-h-dvh h-screen'}`}
-	    style={containerStyle}
-	  >
-
-
+      <div 
+        className={`bg-gray-50 flex flex-col relative z-0 ${uiState.isMobileDevice ? 'chat-main-container' : 'min-h-dvh h-screen'}`}
+        style={containerStyle}
+      >
         <header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -1437,7 +1430,54 @@ export default function ChatInterface() {
             className={`flex-1 overflow-y-auto px-2 sm:px-4 py-6 pb-28 overscroll-contain ${uiState.isMobileDevice ? 'chat-scroll-area' : ''}`}
             style={chatScrollStyle}
           >
-            <div className="max-w-full sm:max-w-4xl mx-auto space-y-6 px-2 sm:px-4">
+            <div className="max-w-full sm:max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto w-full sm:w-[90%] lg:w-[75%] xl:w-[60%]">
+              {clarificationState && (
+                <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700 text-sm font-medium">
+                      Mode clarification : répondez à la question ci-dessus
+                    </span>
+                    <button
+                      onClick={() => setClarificationState(null)}
+                      className="text-blue-600 hover:text-blue-800 text-sm underline"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <ChatInput
+                inputMessage={uiState.inputMessage}
+                setInputMessage={(value: string) => setUiState(prev => ({ ...prev, inputMessage: value }))}
+                onSendMessage={handleSendMessage}
+                isLoadingChat={uiState.isLoadingChat}
+                clarificationState={clarificationState}
+                isMobileDevice={uiState.isMobileDevice}
+                inputRef={inputRef}
+                t={t}
+              />
+
+              <div className="text-center mt-2">
+                <p className="text-xs text-gray-500">
+                  Intelia Expert peut faire des erreurs. Faites vérifiez les réponses par un professionnel au besoin.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <FeedbackModal
+        isOpen={feedbackModal.isOpen}
+        onClose={handleFeedbackModalClose}
+        onSubmit={handleFeedbackSubmit}
+        feedbackType={feedbackModal.feedbackType ?? undefined}
+        isSubmitting={uiState.isSubmittingFeedback}
+      />
+    </>
+  )
+}w-full sm:max-w-4xl mx-auto space-y-6 px-2 sm:px-4">
               {hasMessages && (
                 <div className="text-center">
                   <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
@@ -1493,52 +1533,4 @@ export default function ChatInterface() {
               opacity: 1
             }}
           >
-            <div className="max-w-full sm:max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto w-full sm:w-[90%] lg:w-[75%] xl:w-[60%]">
-              {clarificationState && (
-                <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <span className="text-blue-700 text-sm font-medium">
-                      Mode clarification : répondez à la question ci-dessus
-                    </span>
-                    <button
-                      onClick={() => setClarificationState(null)}
-                      className="text-blue-600 hover:text-blue-800 text-sm underline"
-                    >
-                      Annuler
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <ChatInput
-                inputMessage={uiState.inputMessage}
-                setInputMessage={(value: string) => setUiState(prev => ({ ...prev, inputMessage: value }))}
-                onSendMessage={handleSendMessage}
-                isLoadingChat={uiState.isLoadingChat}
-                clarificationState={clarificationState}
-                isMobileDevice={uiState.isMobileDevice}
-                inputRef={inputRef}
-                t={t}
-              />
-
-              <div className="text-center mt-2">
-                <p className="text-xs text-gray-500">
-                  Intelia Expert peut faire des erreurs. Faites vérifiez les réponses par un professionnel au besoin.
-                </p>
-              </div>
-              
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <FeedbackModal
-        isOpen={feedbackModal.isOpen}
-        onClose={handleFeedbackModalClose}
-        onSubmit={handleFeedbackSubmit}
-        feedbackType={feedbackModal.feedbackType ?? undefined}
-        isSubmitting={uiState.isSubmittingFeedback}
-      />
-    </>
-  )
-}
+            <div className="max-

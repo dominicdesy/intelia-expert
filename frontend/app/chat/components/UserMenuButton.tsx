@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
@@ -108,11 +110,9 @@ export const UserMenuButton = React.memo(() => {
   const handleLogout = useCallback(async () => {
     if (logoutInProgressRef.current || !isMountedRef.current) return
 
-    console.log('[DEBUG-LOGOUT-UserMenu] Début déconnexion coordonnée')
     logoutInProgressRef.current = true
     setIsOpen(false)
 
-    // Utilitaire pour différer proprement (shim si queueMicrotask indispo)
     const defer = typeof queueMicrotask === 'function'
       ? queueMicrotask
       : (fn: () => void) => Promise.resolve().then(fn)
@@ -120,11 +120,9 @@ export const UserMenuButton = React.memo(() => {
     defer(() => {
       if (!isMountedRef.current) return
       try {
-        logout().catch((e) => console.error('[DEBUG-LOGOUT-UserMenu] Erreur logout async (ignorée):', e))
-        console.log('[DEBUG-LOGOUT-UserMenu] Redirection différée')
+        logout().catch(e => console.error('[DEBUG-LOGOUT-UserMenu] logout async:', e))
         router.push('/')
       } catch (e) {
-        console.error('[DEBUG-LOGOUT-UserMenu] Erreur logout:', e)
         router.push('/')
       } finally {
         logoutInProgressRef.current = false
