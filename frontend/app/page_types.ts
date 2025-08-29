@@ -85,4 +85,7 @@ export interface TranslationStrings {
   loadingCountries: string
   limitedCountryList: string
   selectCountry: string
+  // NOUVEAUX CHAMPS AJOUTÉS
+  emailPlaceholder: string
+  passwordPlaceholder: string
 }
