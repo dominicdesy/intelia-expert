@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore, markStoreUnmounted } from '@/lib/stores/auth'
+import { useAuthStore, markLogoutStart, markLogoutEnd } from '@/lib/stores/auth'
 import { useTranslation } from '../hooks/useTranslation'
 import { PLAN_CONFIGS } from '@/types'
 
@@ -106,33 +106,36 @@ export const UserMenuButton = React.memo(() => {
     return { currentPlan, plan, isSuperAdmin }
   }, [user?.plan, user?.user_type])
 
-  // CORRECTION CRITIQUE: Déconnexion coordonnée avec auth store pour éviter React #300
+  // CORRECTION: Déconnexion coordonnée SANS bloquer initializeSession
   const handleLogout = useCallback(async () => {
     if (logoutInProgressRef.current || !isMountedRef.current) return
     
     try {
-      console.log('[UserMenu] Démarrage déconnexion coordonnée')
+      console.log('[UserMenu] Démarrage déconnexion')
       logoutInProgressRef.current = true
       
-      // 1. CRITIQUE: Marquer le store comme démonté AVANT logout() pour éviter React #300
-      markStoreUnmounted()
+      // 1. Marquer le début de logout (bloque initializeSession)
+      markLogoutStart()
       
-      // 2. Fermer le menu immédiatement
+      // 2. Fermer le menu
       setIsOpen(false)
       
-      // 3. Attendre que logout() termine (le store est maintenant protégé)
+      // 3. Attendre que logout() termine
       await logout()
       
-      // 4. Redirection propre
+      // 4. Redirection
       router.replace('/')
       console.log('[UserMenu] Déconnexion terminée')
       
     } catch (error) {
       console.error('[UserMenu] Erreur logout:', error)
-      // Forcer la redirection même en cas d'erreur
       router.replace('/')
     } finally {
-      logoutInProgressRef.current = false
+      // 5. Réactiver les opérations normales après délai
+      setTimeout(() => {
+        markLogoutEnd()
+        logoutInProgressRef.current = false
+      }, 1000) // Délai de sécurité
     }
   }, [logout, router])
 
