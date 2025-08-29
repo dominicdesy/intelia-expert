@@ -23,32 +23,32 @@ alog('Store Auth Supabase NATIF chargé (singleton + React #300 fix)')
 
 // Variables de contrôle du cycle de vie
 let isStoreActive = true
-let logoutInProgress = false  // NOUVEAU : Flag spécial pour logout
+let logoutInProgress = false
 
-// CORRECTION: Fonctions pour contrôler l'état du store
+// CORRECTION: Ne pas marquer le store comme démonté sauf pendant logout réel
 export const markStoreUnmounted = () => {
-  console.log('[DEBUG-TIMEOUT-STORE] Execution markStoreUnmounted - isStoreActive:', isStoreActive)
+  console.log('[DEBUG-LOGOUT] markStoreUnmounted appelé - SEULEMENT pendant logout')
   isStoreActive = false
-  logoutInProgress = true // Bloquer TOUT setState pendant logout
-  console.log('[DEBUG-TIMEOUT-STORE] Store marqué comme démonté + logout bloqué')
+  logoutInProgress = true
 }
 
 export const markStoreMounted = () => {
-  console.log('[DEBUG-TIMEOUT-STORE] Execution markStoreMounted - isStoreActive:', isStoreActive)
+  console.log('[DEBUG-TIMEOUT-STORE] Store réactivé')
   isStoreActive = true
   logoutInProgress = false
-  console.log('[DEBUG-TIMEOUT-STORE] Store marqué comme monté')
 }
 
-// NOUVEAU: Function pour marquer début de logout SANS démontage
+// NOUVEAU: Fonction séparée pour logout seulement
 export const markLogoutStart = () => {
   console.log('[DEBUG-LOGOUT] Début logout - blocage setState préventif')
   logoutInProgress = true
+  // NE PAS marquer isStoreActive = false ici !
 }
 
 export const markLogoutEnd = () => {
   console.log('[DEBUG-LOGOUT] Fin logout - réactivation setState')
   logoutInProgress = false
+  // Laisser isStoreActive tel quel
 }
 
 let zustandSetFn: any = null // Sera initialisé dans le store
@@ -231,8 +231,9 @@ export const useAuthStore = create<AuthState>()(
         },
 
         initializeSession: async () => {
-          if (!isStoreActive) {
-            console.log('[DEBUG-TIMEOUT-STORE] initializeSession ignoré - store démonté')
+          // CORRECTION: Vérifier seulement logoutInProgress, pas isStoreActive
+          if (logoutInProgress) {
+            console.log('[DEBUG-LOGOUT] initializeSession ignoré - logout en cours')
             return false
           }
           
@@ -290,8 +291,9 @@ export const useAuthStore = create<AuthState>()(
               profileData = { user_type: 'producer', language: 'fr' }
             }
 
-            if (!isStoreActive) {
-              console.log('[DEBUG-TIMEOUT-STORE] initializeSession interrompu - store démonté')
+            // CORRECTION: Vérifier seulement logoutInProgress avant setState final
+            if (logoutInProgress) {
+              console.log('[DEBUG-LOGOUT] initializeSession interrompu - logout en cours')
               return false
             }
 
@@ -307,7 +309,8 @@ export const useAuthStore = create<AuthState>()(
             return true
             
           } catch (e) {
-            if (isStoreActive) {
+            // CORRECTION: Pas de vérification isStoreActive ici non plus
+            if (!logoutInProgress) {
               get().handleAuthError(e, 'initializeSession')
               safeSet({ isAuthenticated: false, user: null }, false, 'initializeSession-catch')
             }
