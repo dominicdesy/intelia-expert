@@ -336,24 +336,24 @@ export function SignupModal({
                   )}
                 </div>
 
-                {/* Téléphone optionnel */}
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Téléphone {t.optional}
-                  </label>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">{t.countryCode}</label>
-                      <input
-                        type="text"
-                        value={signupData.countryCode}
-                        onChange={(e) => handleSignupChange('countryCode', e.target.value)}
-                        placeholder="+1"
-                        className="block w-full rounded-md border border-gray-300 px-2 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 text-sm"
-                        disabled={isLoading}
-                      />
-                    </div>
-                    
+
+				{/* Téléphone optionnel */}
+				<div className="mt-4">
+				  <label className="block text-sm font-medium text-gray-700 mb-2">
+					Téléphone {t.optional}
+				  </label>
+				  <div className="grid grid-cols-3 gap-3">
+					<div>
+					  <label className="block text-xs font-medium text-gray-600 mb-1">{t.countryCode}</label>
+					  <PhoneCodeSelect
+						countries={countries}
+						value={signupData.countryCode}
+						onChange={handlePhoneCodeChange}
+						disabled={isLoading}
+						className="w-full"
+					  />
+					</div>					
+					
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">{t.areaCode}</label>
                       <input
