@@ -555,12 +555,25 @@ export const useAuthStore = create<AuthState>()(
               console.warn('[DEBUG-LOGOUT] Erreur nettoyage localStorage:', storageError)
             }
 
-            // ÉTAPE 4: AUCUN setState pendant logout - reporté après navigation
-            console.log('[DEBUG-LOGOUT] Nettoyage du store reporté après navigation - évite React #300')
-            
-            // Marquer la session comme terminée sans toucher au store React
+            // ÉTAPE 4: Nettoyage IMMÉDIAT du store Zustand pour éviter les boucles
+            console.log('[DEBUG-LOGOUT] Nettoyage immédiat du store pour éviter les boucles')
+            if (zustandSetFn) {
+              zustandSetFn({
+                user: null,
+                isAuthenticated: false,
+                isLoading: false,
+                authErrors: [],
+                lastAuthCheck: Date.now()
+              }, false)
+              console.log('[DEBUG-LOGOUT] Store Zustand nettoyé immédiatement')
+            }
+
+            // ÉTAPE 5: Marquer la session comme terminée
             sessionStorage.setItem('recent-logout', Date.now().toString())
             sessionStorage.removeItem('current-session')
+            
+            // ÉTAPE 6: Réactiver les setState APRÈS nettoyage
+            markLogoutEnd()
 
             // ÉTAPE 5: Restaurer RememberMe APRÈS le nettoyage
             if (preservedRememberMe) {
@@ -578,6 +591,19 @@ export const useAuthStore = create<AuthState>()(
             
           } catch (e: any) {
             console.error('[DEBUG-LOGOUT] Erreur durant logout:', e)
+            
+            // En cas d'erreur, nettoyer quand même le store
+            if (zustandSetFn) {
+              zustandSetFn({
+                user: null,
+                isAuthenticated: false,
+                isLoading: false,
+                authErrors: [],
+                lastAuthCheck: Date.now()
+              }, false)
+            }
+            
+            markLogoutEnd()
             throw new Error(e?.message || 'Erreur lors de la déconnexion')
           }
         },
