@@ -974,7 +974,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
 						  phoneNumber={formData.phone_number}
 						  onChange={handlePhoneChange}
 						  countries={countries}
-						  countriesLoading={loading}
+						  countriesLoading={countriesLoading}
 						  usingFallback={usingFallback}
 					    />
 					  </div>					  
