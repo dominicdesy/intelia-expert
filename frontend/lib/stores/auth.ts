@@ -53,7 +53,7 @@ export const markLogoutEnd = () => {
 
 let zustandSetFn: any = null // Sera initialisé dans le store
 
-// CORRECTION CRITIQUE: safeSet qui vérifie le cycle de vie ET l'état de logout
+// CORRECTION CRITIQUE: safeSet qui vérifie le cycle de vie ET évite les microtâches problématiques
 const safeSet = <T extends Partial<AuthState>>(
   partial: T | ((s: AuthState) => T),
   replace = false,
@@ -62,6 +62,15 @@ const safeSet = <T extends Partial<AuthState>>(
   // Vérifications préalables - SANS microtâche pour les opérations critiques
   if (!isStoreActive || logoutInProgress) {
     console.log('[DEBUG-MICROTASK] safeSet bloqué - store inactive ou logout en cours:', debugLabel)
+    return
+  }
+  
+  // CORRECTION FINALE: Plus de microtâches pendant les transitions de navigation
+  // Vérifier si nous sommes dans une transition de navigation
+  const isNavigating = window.location.pathname !== sessionStorage.getItem('last-known-path')
+  if (isNavigating) {
+    console.log('[DEBUG-MICROTASK] safeSet bloqué - navigation en cours:', debugLabel)
+    sessionStorage.setItem('last-known-path', window.location.pathname)
     return
   }
   
@@ -78,24 +87,15 @@ const safeSet = <T extends Partial<AuthState>>(
     return
   }
   
-  // Pour toutes les autres opérations, utiliser microtâche avec protection renforcée
-  const schedule = typeof queueMicrotask === 'function' 
-    ? queueMicrotask 
-    : (fn: () => void) => Promise.resolve().then(fn)
-    
-  schedule(() => {
-    // Double vérification au moment de l'exécution
-    if (isStoreActive && !logoutInProgress && zustandSetFn) {
-      try {
-        zustandSetFn(partial as any, replace)
-        console.log('[DEBUG-MICROTASK] setState appliqué en microtâche:', debugLabel)
-      } catch (error) {
-        console.error('[DEBUG-MICROTASK] Erreur setState microtâche:', debugLabel, error)
-      }
-    } else {
-      console.log('[DEBUG-MICROTASK] setState bloqué en microtâche - conditions non remplies:', debugLabel)
+  // CORRECTION: Exécution immédiate pour TOUTES les autres opérations aussi
+  try {
+    if (zustandSetFn) {
+      zustandSetFn(partial as any, replace)
+      console.log('[DEBUG-IMMEDIATE] setState appliqué immédiatement:', debugLabel)
     }
-  })
+  } catch (error) {
+    console.error('[DEBUG-IMMEDIATE] Erreur setState immédiat:', debugLabel, error)
+  }
 }
 
 // ANCIEN WRAPPER conservé pour compatibilité (utilise maintenant safeSet)
