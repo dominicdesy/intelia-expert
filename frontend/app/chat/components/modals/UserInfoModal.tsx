@@ -573,18 +573,28 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         return
       }
 
-      await updateProfile(formData)
+      // Stocker les données pour la mise à jour différée
+      const updateData = { ...formData }
+      
+      console.log('✅ Données validées, fermeture de la modale')
 
-      if (!isMountedRef.current) return
-
-      console.log('✅ Profil mis à jour avec succès')
-
-      // Fermeture non bloquante et sûre uniquement en cas de succès
+      // Fermer immédiatement la modale
       startTransition(() => {
         if (isMountedRef.current) {
           handleClose()
         }
       })
+
+      // Différer updateProfile après fermeture complète
+      setTimeout(async () => {
+        try {
+          await updateProfile(updateData)
+          console.log('✅ Profil mis à jour avec succès (différé)')
+        } catch (error: any) {
+          console.error('Erreur mise à jour profil (différé):', error)
+          // Optionnel: afficher une notification toast ici
+        }
+      }, 50) // 50ms pour laisser le temps à la modale de se fermer
     } catch (error: any) {
       if (isMountedRef.current) {
         console.error('Erreur mise à jour profil:', error)
