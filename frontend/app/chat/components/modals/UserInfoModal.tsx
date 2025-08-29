@@ -514,19 +514,14 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
 
   // Fonction handleProfileSave corrigée
   const handleProfileSave = useCallback(async () => {
-    // garde-fou contre les doubles clics / updates après unmount
     if (!isMountedRef.current || isLoading) return
-
-    debugLog('API', 'Profile save started', { isLoading })
-
-    // reset d'état
     setIsLoading(true)
     setFormErrors([])
 
     try {
       const errors: string[] = []
 
-      // ==== VALIDATION (reprise de votre logique actuelle inchangée) ====
+      // Validation complète (conservant la logique d'origine)
       if (!formData.firstName.trim()) {
         errors.push('Le prénom est requis')
       } else if (formData.firstName.length > 50) {
@@ -574,18 +569,14 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       }
 
       if (errors.length > 0) {
-        debugLog('API', 'Profile save validation failed', { errors })
         if (isMountedRef.current) setFormErrors(errors)
         return
       }
-      // ==== FIN VALIDATION ====
 
-      debugLog('API', 'Calling updateProfile', { formData })
       await updateProfile(formData)
 
       if (!isMountedRef.current) return
 
-      debugLog('API', 'Profile save successful')
       console.log('✅ Profil mis à jour avec succès')
 
       // Fermeture non bloquante et sûre
@@ -596,12 +587,11 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       })
     } catch (error: any) {
       if (isMountedRef.current) {
-        debugLog('API', 'Profile save error', { error: error?.message })
         console.error('Erreur mise à jour profil:', error)
+        setFormErrors([t('common.unexpectedError') || 'Une erreur est survenue.'])
       }
     } finally {
       if (isMountedRef.current) {
-        debugLog('API', 'Profile save finished')
         setIsLoading(false)
       }
     }
@@ -613,7 +603,8 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     validateLinkedInUrl,
     validatePhoneFields,
     updateProfile,
-    handleClose
+    handleClose,
+    t
   ])
 
   const handlePasswordChange = useCallback(async () => {
@@ -703,7 +694,13 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       })
       setPasswordErrors([])
       console.log('Mot de passe changé avec succès!')
-      handleClose()
+      
+      // Fermeture non bloquante et sûre
+      startTransition(() => {
+        if (isMountedRef.current) {
+          handleClose()
+        }
+      })
       
     } catch (error: any) {
       debugLog('API', 'Password change error', { error: error?.message })
