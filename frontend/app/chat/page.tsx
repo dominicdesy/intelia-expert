@@ -1020,6 +1020,15 @@ export default function ChatInterface() {
     }
   }, [user?.id])
 
+
+  // AJOUTEZ CES LIGNES DE DEBUG ICI ↓
+  console.log('[ChatInterface] États:', { 
+    isLoading, 
+    hasHydrated, 
+    isAuthenticated, 
+    user: !!user 
+  })
+
   // États de chargement avec protection
   if (!hasHydrated) {
     return (
