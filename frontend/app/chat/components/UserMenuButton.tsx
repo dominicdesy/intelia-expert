@@ -2,7 +2,8 @@
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore, markLogoutStart, markLogoutEnd } from '@/lib/stores/auth'
+import { useAuthStore } from '@/lib/stores/auth'
+import { logoutService } from '@/lib/services/logoutService'
 import { useTranslation } from '../hooks/useTranslation'
 import { PLAN_CONFIGS } from '@/types'
 
@@ -106,42 +107,27 @@ export const UserMenuButton = React.memo(() => {
     return { currentPlan, plan, isSuperAdmin }
   }, [user?.plan, user?.user_type])
 
-  // SOLUTION RADICALE: Déconnexion SANS aucun setState + protection redirection
+  // SOLUTION DÉFINITIVE: Service de logout indépendant
   const handleLogout = useCallback(async () => {
     if (logoutInProgressRef.current || !isMountedRef.current) return
-    
+  
     try {
-      console.log('[UserMenu] Déconnexion simple sans setState')
+      console.log('[UserMenu] Déconnexion via service indépendant')
       logoutInProgressRef.current = true
-      
-      // 0. Marquer la déconnexion pour éviter les boucles de redirection
-      sessionStorage.setItem('recent-logout', Date.now().toString())
-      
-      // 1. Marquer le début de logout 
-      markLogoutStart()
-      
-      // 2. Fermer le menu
+     
+      // Fermer le menu immédiatement
       setIsOpen(false)
-      
-      // 3. Logout Supabase + localStorage seulement
-      await logout()
-      
-      // 4. Redirection immédiate - le store se synchronisera naturellement
-      router.replace('/')
-      console.log('[UserMenu] Redirection effectuée')
-      
+    
+      // Utiliser le service de logout indépendant
+      await logoutService.performLogout()
+    
     } catch (error) {
-      console.error('[UserMenu] Erreur logout:', error)
-      router.replace('/')
-    } finally {
-      // 5. Réactiver après navigation
-      setTimeout(() => {
-        markLogoutEnd()
-        logoutInProgressRef.current = false
-        console.log('[UserMenu] Déconnexion terminée - pas de nettoyage manuel')
-      }, 1000)
+      console.error('[UserMenu] Erreur logout service:', error)
+      // En cas d'erreur, forcer quand même la redirection
+      window.location.href = '/'
     }
-  }, [logout, router])
+  }, [])
+
 
   // Handlers des modales avec protection renforcée
   const handleContactClick = useCallback(() => {
