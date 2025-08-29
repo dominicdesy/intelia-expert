@@ -384,6 +384,8 @@ export const useAuthStore = create<AuthState>()(
             alog('Login Supabase réussi (singleton):', data.user.email)
 
             safeSet({ isLoading: false }, false, 'login-success')
+			// Nettoyer le flag logout après connexion réussie
+			sessionStorage.removeItem('recent-logout')
             
           } catch (e: any) {
             if (isStoreActive) {
@@ -849,7 +851,7 @@ export const useAuthStore = create<AuthState>()(
         const recentLogout = sessionStorage.getItem('recent-logout')
         if (recentLogout) {
           const logoutTime = parseInt(recentLogout)
-          if (Date.now() - logoutTime < 5000) {
+          if (Date.now() - logoutTime < 1000) {
             console.log('[AuthStore] Rehydration bloquée - déconnexion récente')
             if (state) {
               state.user = null
