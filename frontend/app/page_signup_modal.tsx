@@ -1,9 +1,8 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { AlertMessage } from './page_components'
 import { useCountries, useCountryCodeMap } from './page_hooks'
-import { CountrySelect } from '../chat/components/CountrySelect'
 
 interface SignupModalProps {
   authLogic: any
@@ -11,6 +10,121 @@ interface SignupModalProps {
   localError: string
   localSuccess: string
   toggleMode: () => void
+}
+
+// Composant CountrySelect local pour éviter les problèmes d'import
+interface Country {
+  value: string
+  label: string
+  phoneCode: string
+  flag?: string
+}
+
+interface CountrySelectProps {
+  countries: Country[]
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+  className?: string
+}
+
+const CountrySelect: React.FC<CountrySelectProps> = ({ 
+  countries, 
+  value, 
+  onChange, 
+  placeholder,
+  className = "" 
+}) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const selectRef = useRef<HTMLDivElement>(null)
+
+  const filteredCountries = countries.filter(country =>
+    country.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    country.value.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const selectedCountry = countries.find(c => c.value === value)
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (selectRef.current && !selectRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+        setSearchTerm('')
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isOpen])
+
+  return (
+    <div ref={selectRef} className={`relative ${className}`}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="block w-full rounded-md border border-gray-300 px-3 py-2 text-left shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm bg-white"
+      >
+        {selectedCountry ? (
+          <div className="flex items-center space-x-2">
+            {selectedCountry.flag && <span>{selectedCountry.flag}</span>}
+            <span>{selectedCountry.label}</span>
+            <span className="text-gray-500 ml-auto">{selectedCountry.phoneCode}</span>
+          </div>
+        ) : (
+          <span className="text-gray-400">{placeholder}</span>
+        )}
+        <div className="absolute inset-y-0 right-0 flex items-center pr-2">
+          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-hidden">
+          <div className="p-2 border-b border-gray-200">
+            <input
+              type="text"
+              placeholder="Rechercher un pays..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            {filteredCountries.length > 0 ? (
+              filteredCountries.map((country) => (
+                <button
+                  key={country.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(country.value)
+                    setIsOpen(false)
+                    setSearchTerm('')
+                  }}
+                  className={`w-full text-left px-3 py-2 hover:bg-gray-100 flex items-center space-x-2 ${
+                    value === country.value ? 'bg-blue-50 text-blue-600' : ''
+                  }`}
+                >
+                  {country.flag && <span>{country.flag}</span>}
+                  <span className="flex-1">{country.label}</span>
+                  <span className="text-gray-500">{country.phoneCode}</span>
+                </button>
+              ))
+            ) : (
+              <div className="px-3 py-2 text-gray-500 text-sm">Aucun pays trouvé</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function SignupModal({ 
@@ -198,7 +312,7 @@ export function SignupModal({
                   />
                 </div>
 
-                {/* Sélecteur de pays avec composant sophistiqué */}
+                {/* Sélecteur de pays avec composant local */}
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     {t.country} <span className="text-red-500">{t.required}</span>
