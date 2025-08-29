@@ -1523,7 +1523,7 @@ export default function ChatInterface() {
 
               <div className="text-center mt-2">
                 <p className="text-xs text-gray-500">
-                  Intelia Expert peut faire des erreurs. Faites vérifiez les réponses par un professionnel au besoin.
+                  {t('chat.disclaimer')}
                 </p>
               </div>
             </div>

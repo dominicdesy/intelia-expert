@@ -1030,7 +1030,7 @@ export default function ChatInterface() {
   })
 
   // États de chargement avec protection
-  if (!hasHydrated) {
+  if (!hasHydrated && !user) {	  
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
