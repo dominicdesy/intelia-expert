@@ -106,53 +106,40 @@ export const UserMenuButton = React.memo(() => {
     return { currentPlan, plan, isSuperAdmin }
   }, [user?.plan, user?.user_type])
 
-  // CORRECTION: Déconnexion coordonnée SANS setState immédiat
+  // SOLUTION RADICALE: Déconnexion SANS aucun setState + protection redirection
   const handleLogout = useCallback(async () => {
     if (logoutInProgressRef.current || !isMountedRef.current) return
     
     try {
-      console.log('[UserMenu] Démarrage déconnexion')
+      console.log('[UserMenu] Déconnexion simple sans setState')
       logoutInProgressRef.current = true
       
-      // 1. Marquer le début de logout (bloque initializeSession)
+      // 0. Marquer la déconnexion pour éviter les boucles de redirection
+      sessionStorage.setItem('recent-logout', Date.now().toString())
+      
+      // 1. Marquer le début de logout 
       markLogoutStart()
       
       // 2. Fermer le menu
       setIsOpen(false)
       
-      // 3. Attendre que logout() termine (SANS setState dans le store)
+      // 3. Logout Supabase + localStorage seulement
       await logout()
       
-      // 4. Redirection IMMÉDIATE
+      // 4. Redirection immédiate - le store se synchronisera naturellement
       router.replace('/')
-      console.log('[UserMenu] Déconnexion terminée')
-      
-      // 5. Nettoyer le store APRÈS la navigation (sécurisé)
-      setTimeout(() => {
-        try {
-          // Nettoyage du store une fois sur la nouvelle page
-          const { setState } = useAuthStore
-          setState({ 
-            user: null, 
-            isAuthenticated: false, 
-            isLoading: false,
-            lastAuthCheck: Date.now()
-          })
-          console.log('[UserMenu] Store nettoyé après navigation')
-        } catch (error) {
-          console.warn('[UserMenu] Erreur nettoyage store différé:', error)
-        }
-      }, 100) // Court délai pour s'assurer que la navigation a commencé
+      console.log('[UserMenu] Redirection effectuée')
       
     } catch (error) {
       console.error('[UserMenu] Erreur logout:', error)
       router.replace('/')
     } finally {
-      // 6. Réactiver les opérations normales après délai
+      // 5. Réactiver après navigation
       setTimeout(() => {
         markLogoutEnd()
         logoutInProgressRef.current = false
-      }, 1000) // Délai de sécurité
+        console.log('[UserMenu] Déconnexion terminée - pas de nettoyage manuel')
+      }, 1000)
     }
   }, [logout, router])
 

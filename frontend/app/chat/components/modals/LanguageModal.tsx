@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+pimport React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from '../../hooks/useTranslation'
 import { useAuthStore } from '@/lib/stores/auth' 
 import { CheckIcon } from '../../utils/icons'
@@ -16,20 +16,21 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     const content = contentRef.current
     
     if (overlay && content) {
-      // Corriger l'overlay (transparent)
-	  overlay.style.setProperty('background-color', 'rgba(0, 0, 0, 0.5)', 'important')
-	  overlay.style.setProperty('backdrop-filter', 'blur(2px)', 'important')
-	  overlay.style.setProperty('animation', 'fadeIn 0.2s ease-out', 'important')	  
+      // Corriger l'overlay avec backdrop grisé
+      overlay.style.setProperty('background-color', 'rgba(0, 0, 0, 0.5)', 'important')
+      overlay.style.setProperty('backdrop-filter', 'blur(2px)', 'important')
+      overlay.style.setProperty('animation', 'fadeIn 0.2s ease-out', 'important')
       overlay.style.setProperty('display', 'flex', 'important')
       overlay.style.setProperty('align-items', 'center', 'important')
       overlay.style.setProperty('justify-content', 'center', 'important')
       
-      // Corriger le contenu (centré)
+      // Corriger le contenu (centré avec animation)
       content.style.setProperty('position', 'fixed', 'important')
       content.style.setProperty('top', '50%', 'important')
       content.style.setProperty('left', '50%', 'important')
       content.style.setProperty('transform', 'translate(-50%, -50%)', 'important')
       content.style.setProperty('z-index', '51', 'important')
+      content.style.setProperty('animation', 'modalSlideIn 0.3s ease-out', 'important')
     }
   }, [])
   
@@ -88,76 +89,97 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
   }
 
   return (
-    <div 
-      ref={overlayRef}
-      className="fixed inset-0 z-50"
-      onClick={handleOverlayClick}
-    >
+    <>
+      {/* Styles CSS pour les animations */}
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        
+        @keyframes modalSlideIn {
+          from { 
+            opacity: 0; 
+            transform: translateY(-20px) scale(0.95); 
+          }
+          to { 
+            opacity: 1; 
+            transform: translateY(0) scale(1); 
+          }
+        }
+      `}</style>
+
       <div 
-        ref={contentRef}
-        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        ref={overlayRef}
+        className="fixed inset-0 z-50"
+        onClick={handleOverlayClick}
       >
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">
-              {t('language.title')}
-            </h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {languages.map((lang) => (
-              <div
-                key={lang.code}
-                onClick={() => !isUpdating && handleLanguageChange(lang.code)}
-                className={`
-                  relative p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 hover:shadow-md
-                  ${currentLanguage === lang.code 
-                    ? 'border-blue-500 bg-blue-50' 
-                    : 'border-gray-200 hover:border-blue-300 bg-white'
-                  }
-                  ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-50'}
-                `}
+        <div 
+          ref={contentRef}
+          className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        >
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">
+                {t('language.title')}
+              </h2>
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 transition-colors hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <span className="text-2xl">{lang.flag}</span>
-                    <div>
-                      <div className="font-semibold text-gray-900">{lang.name}</div>
-                      <div className="text-sm text-gray-600">{lang.region}</div>
-                      <div className="text-xs text-gray-500 mt-1">{lang.description}</div>
-                    </div>
-                  </div>
-                  
-                  {currentLanguage === lang.code && (
-                    <div className="flex items-center text-blue-600">
-                      <CheckIcon className="w-5 h-5" />
-                      <span className="ml-2 text-sm font-medium">{t('language.selected')}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
 
-          <div className="mt-8 flex justify-end space-x-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              disabled={isUpdating}
-            >
-              {t('modal.close')}
-            </button>
+            <div className="space-y-3">
+              {languages.map((lang) => (
+                <div
+                  key={lang.code}
+                  onClick={() => !isUpdating && handleLanguageChange(lang.code)}
+                  className={`
+                    relative p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 hover:shadow-md
+                    ${currentLanguage === lang.code 
+                      ? 'border-blue-500 bg-blue-50' 
+                      : 'border-gray-200 hover:border-blue-300 bg-white'
+                    }
+                    ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-50'}
+                  `}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <span className="text-2xl">{lang.flag}</span>
+                      <div>
+                        <div className="font-semibold text-gray-900">{lang.name}</div>
+                        <div className="text-sm text-gray-600">{lang.region}</div>
+                        <div className="text-xs text-gray-500 mt-1">{lang.description}</div>
+                      </div>
+                    </div>
+                    
+                    {currentLanguage === lang.code && (
+                      <div className="flex items-center text-blue-600">
+                        <CheckIcon className="w-5 h-5" />
+                        <span className="ml-2 text-sm font-medium">{t('language.selected')}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 flex justify-end space-x-3">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                disabled={isUpdating}
+              >
+                {t('modal.close')}
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }
