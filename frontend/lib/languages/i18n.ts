@@ -362,11 +362,13 @@ export const useTranslation = () => {
       try {
         const loadedTranslations = await loadTranslations(currentLanguage)
         console.log('✅ [i18n] Traductions chargées:', Object.keys(loadedTranslations).length, 'clés');
+        
+        // IMPORTANT: Mettre à jour les translations AVANT de mettre loading à false
         setTranslations(loadedTranslations)
+        setLoading(false)
+        
       } catch (error) {
         console.error('❌ [i18n] Erreur chargement traductions:', error)
-      } finally {
-        console.log('🏁 [i18n] Fin chargement, setLoading(false)');
         setLoading(false)
       }
     }
