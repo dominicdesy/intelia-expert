@@ -44,11 +44,12 @@ const PageContent = memo(() => {
   } = initData
 
   // Mémorisation stable des props pour éviter les re-renders du hook d'auth
-  // ✅ CORRECTION: Supprimé currentLanguage car le hook useTranslation le gère automatiquement
   const authProps = useMemo(() => ({
+    currentLanguage,
     t,
-    isSignupMode
-  }), [t, isSignupMode])
+    isSignupMode,
+    setCurrentLanguage
+  }), [currentLanguage, t, isSignupMode, setCurrentLanguage])
 
   // Hook d'authentification avec props stables
   const authLogic = useAuthenticationLogic(authProps)
@@ -89,6 +90,7 @@ const PageContent = memo(() => {
             <MemoizedLoginForm 
               authLogic={authLogic}
               t={t}
+              currentLanguage={currentLanguage}
               localError={localError}
               localSuccess={localSuccess}
               toggleMode={toggleMode}
