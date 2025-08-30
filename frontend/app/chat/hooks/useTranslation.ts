@@ -1,19 +1,16 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { translations } from '../utils/translations'
 import { Translation } from '../../../types'
 
-// ==================== 🔒 BOOT PICKUP ATOMIQUE ====================
+// ==================== BOOT PICKUP ATOMIQUE ====================
 let bootApplied = false
 
-// 1. ✅ BOOT PICKUP (priorité absolue) - Application synchrone AVANT tout rendu
+// Application synchrone AVANT tout rendu
 if (typeof window !== 'undefined' && !bootApplied) {
   const forced = sessionStorage.getItem('force_language')
   if (forced && translations[forced as keyof typeof translations]) {
     try {
-      console.log('[useTranslation] 🔒 Boot pickup applied:', forced)
-      
-      // Marque globale pour bypasser toute "garde" pendant ce switch
-      ;(window as any).__INTELIA_FORCED_BOOT_LANG__ = forced
+      console.log('[useTranslation] Boot pickup applied:', forced)
       
       // Application immédiate dans localStorage (source de vérité)
       localStorage.setItem('intelia_language', forced)
@@ -25,50 +22,55 @@ if (typeof window !== 'undefined' && !bootApplied) {
       bootApplied = true
     }
   } else {
-    bootApplied = true // Marquer comme traité même si pas de flag
+    bootApplied = true
   }
 }
 
-// ==================== 🎯 HOOK PRINCIPAL ====================
+// ==================== HOOK PRINCIPAL ====================
 export const useTranslation = (): Translation => {
-  // État initial : priorité au localStorage (déjà mis à jour par boot pickup si nécessaire)
+  // État initial : priorité au localStorage
   const [currentLanguage, setCurrentLanguage] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('intelia_language')
       if (saved && translations[saved as keyof typeof translations]) {
-        console.log('[useTranslation] 🚀 État initial depuis localStorage:', saved)
+        console.log('[useTranslation] État initial depuis localStorage:', saved)
         return saved
       }
     }
-    console.log('[useTranslation] 🔤 État initial par défaut: fr')
+    console.log('[useTranslation] État initial par défaut: fr')
     return 'fr'
   })
   
-  // 3. ✅ API STABLE - Fonction de traduction mémorisée
+  // Protection contre setState après unmount
+  const mountedRef = useRef(true)
+  
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+  
+  // Fonction de traduction mémorisée
   const t = useCallback((key: string): string => {
     const translated = translations[currentLanguage as keyof typeof translations]?.[key as keyof typeof translations['fr']]
     return translated || key
   }, [currentLanguage])
   
-  // 3. ✅ API STABLE - Fonction changeLanguage référentiellement stable
+  // Fonction changeLanguage référentiellement stable
   const changeLanguage = useCallback((lang: string) => {
-    // 5. ✅ IDEMPOTENCE - Éviter les changements inutiles
-    if (lang === currentLanguage) {
-      console.log('[useTranslation] ⏭️ Changement ignoré (identique):', lang)
+    // Vérifier si le composant est encore monté
+    if (!mountedRef.current) {
+      console.log('[useTranslation] setState évité - composant démonté')
       return
     }
     
-    // 2. ✅ PAS DE GARDE qui ignore un switch forcé
-    const isForcedBoot = typeof window !== 'undefined' && 
-                        (window as any).__INTELIA_FORCED_BOOT_LANG__ === lang
-    
-    if (isForcedBoot) {
-      console.log('[useTranslation] 🔓 Switch forcé autorisé (bypass garde):', lang)
-      // Nettoyer la marque après usage
-      delete (window as any).__INTELIA_FORCED_BOOT_LANG__
+    // Éviter les changements inutiles
+    if (lang === currentLanguage) {
+      console.log('[useTranslation] Changement ignoré (identique):', lang)
+      return
     }
     
-    console.log('[useTranslation] 🌐 changeLanguage:', currentLanguage, '→', lang)
+    console.log('[useTranslation] changeLanguage:', currentLanguage, '→', lang)
     
     // Mise à jour immédiate state + localStorage
     setCurrentLanguage(lang)
@@ -81,12 +83,11 @@ export const useTranslation = (): Translation => {
       window.dispatchEvent(new Event('languageChanged'))
     }
     
-    console.log('[useTranslation] ✅ Changement appliqué:', lang)
+    console.log('[useTranslation] Changement appliqué:', lang)
   }, [currentLanguage])
   
-  // 4. ✅ DÉPENDANCES SSR-SAFE - Effet pour synchronisation initiale
+  // Synchronisation initiale
   useEffect(() => {
-    // 4. ✅ Ne rien faire côté SSR
     if (typeof window === 'undefined') return
     
     // Vérifier si on a une langue sauvegardée différente de l'état
@@ -95,21 +96,22 @@ export const useTranslation = (): Translation => {
         savedLang !== currentLanguage && 
         translations[savedLang as keyof typeof translations]) {
       
-      console.log('[useTranslation] 🔄 Synchronisation initiale:', currentLanguage, '→', savedLang)
+      console.log('[useTranslation] Synchronisation initiale:', currentLanguage, '→', savedLang)
       setCurrentLanguage(savedLang)
     }
-  }, []) // ⚠️ DÉPENDANCES VIDES - Une seule fois au mount
+  }, [])
   
-  // 🌐 ÉCOUTER les changements de langue globaux (garde le comportement existant)
+  // Écouter les changements de langue globaux
   useEffect(() => {
     if (typeof window === 'undefined') return
     
     const handleLanguageChange = () => {
-      // 2. ✅ PAS DE GARDE - Accepter tous les changements, pas de logique de bypass complexe
       const savedLang = localStorage.getItem('intelia_language')
       if (savedLang && savedLang !== currentLanguage && translations[savedLang as keyof typeof translations]) {
-        console.log('[useTranslation] 📡 Mise à jour depuis événement global:', savedLang)
-        setCurrentLanguage(savedLang)
+        console.log('[useTranslation] Mise à jour depuis événement global:', savedLang)
+        if (mountedRef.current) {
+          setCurrentLanguage(savedLang)
+        }
       }
     }
 
@@ -117,14 +119,6 @@ export const useTranslation = (): Translation => {
     return () => window.removeEventListener('languageChanged', handleLanguageChange)
   }, [currentLanguage])
   
-  // 7. ✅ LOGS - Confirmation du boot pickup (simplifié)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      console.log('[useTranslation] 🎯 Boot pickup confirmé - langue active:', currentLanguage)
-    }
-  }, [currentLanguage])
-  
-  // 3. ✅ API STABLE - Interface publique stable
   return { 
     t, 
     changeLanguage, 

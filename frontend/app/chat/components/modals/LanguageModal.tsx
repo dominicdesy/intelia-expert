@@ -10,20 +10,17 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
   const overlayRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   
-  // Forcer les styles au montage pour contourner les problèmes CSS
+  // Forcer les styles au montage
   useEffect(() => {
     const overlay = overlayRef.current
     
     if (overlay) {
-      // Forcer les dimensions de l'overlay
       overlay.style.setProperty('width', '100vw', 'important')
       overlay.style.setProperty('height', '100vh', 'important')
       overlay.style.setProperty('top', '0', 'important')
       overlay.style.setProperty('left', '0', 'important')
       overlay.style.setProperty('right', '0', 'important')
       overlay.style.setProperty('bottom', '0', 'important')
-      
-      // BACKDROP GRISÉ avec flou
       overlay.style.setProperty('background-color', 'rgba(0, 0, 0, 0.5)', 'important')
       overlay.style.setProperty('backdrop-filter', 'blur(2px)', 'important')
       overlay.style.setProperty('animation', 'fadeIn 0.2s ease-out', 'important')
@@ -32,7 +29,6 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
       overlay.style.setProperty('justify-content', 'center', 'important')
       overlay.style.setProperty('padding', '16px', 'important')
       
-      // Animation pour le contenu
       const content = overlay.querySelector('.bg-white') as HTMLElement
       if (content) {
         content.style.setProperty('animation', 'modalSlideIn 0.3s ease-out', 'important')
@@ -69,47 +65,43 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
   ]
 
   const handleLanguageChange = async (languageCode: string) => {
-    // 🛡️ GARDES DE SÉCURITÉ
+    // Gardes de sécurité
     if (languageCode === currentLanguage) return
-    if (isUpdating) return // Anti-double-clic
+    if (isUpdating) return
     
     setIsUpdating(true)
     
     try {
-      console.log('🔄 [LanguageModal] Début changement ATOMIQUE:', currentLanguage, '→', languageCode)
+      console.log('[LanguageModal] Début changement ATOMIQUE:', currentLanguage, '→', languageCode)
       
-      // 1. 🎯 CHANGEMENT IMMÉDIAT interface (optimistic update)
+      // 1. Changement immédiat interface
       changeLanguage(languageCode)
-      console.log('✅ [LanguageModal] Interface mise à jour immédiatement')
+      console.log('[LanguageModal] Interface mise à jour immédiatement')
       
-      // 2. 💾 SAUVEGARDE profil utilisateur
+      // 2. Sauvegarde profil utilisateur
       await updateProfile({ language: languageCode } as any)
-      console.log('✅ [LanguageModal] Profil sauvegardé')
+      console.log('[LanguageModal] Profil sauvegardé')
       
-      // 3. 🔒 FLAG FORCE dans sessionStorage
+      // 3. Flag force dans sessionStorage
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('force_language', languageCode)
-        console.log('💾 [LanguageModal] Flag force_language créé:', languageCode)
+        console.log('[LanguageModal] Flag force_language créé:', languageCode)
       }
       
-      // 4. 🚀 REDIRECTION ATOMIQUE - PAS DE setState après !
-      console.log('🚀 [LanguageModal] Redirection atomique...')
+      // 4. Redirection atomique
+      console.log('[LanguageModal] Redirection atomique...')
       setTimeout(() => {
         if (window.location.pathname.startsWith('/chat')) {
-          // Reload "dur" pour repartir proprement sur /chat
           window.location.reload()
         } else {
-          // Redirection vers /chat si on est ailleurs
           window.location.replace('/chat')
         }
-      }, 100) // Petit délai pour que les logs s'affichent
+      }, 100)
       
-      // ⛔ EARLY RETURN - Aucun setState après la redirection !
       return
       
     } catch (error) {
-      console.error('❌ [LanguageModal] Erreur changement langue:', error)
-      // ⚠️ EN CAS D'ERREUR SEULEMENT - remettre isUpdating à false
+      console.error('[LanguageModal] Erreur changement langue:', error)
       setIsUpdating(false)
     }
   }
@@ -122,7 +114,6 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
 
   return (
     <>
-      {/* Styles CSS pour les animations */}
       <style jsx>{`
         @keyframes fadeIn {
           from { opacity: 0; }
@@ -166,7 +157,7 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
               </button>
             </div>
 
-            {/* 🔄 INDICATEUR DE CHARGEMENT GLOBAL */}
+            {/* Indicateur de chargement global */}
             {isUpdating && (
               <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-400 text-blue-700">
                 <div className="flex items-center">
@@ -174,7 +165,7 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  <span>{t('language.updating')}</span>
+                  <span>Changement de langue en cours...</span>
                 </div>
               </div>
             )}
