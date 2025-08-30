@@ -1,6 +1,10 @@
 {
   "page.title": "Connexion à Intelia Expert",
 
+  "auth.success": "Connexion réussie",
+  "auth.error": "Erreur de connexion",
+  "auth.incomplete": "Connexion incomplète",
+
   "nav.history": "Historique des conversations",
   "nav.newConversation": "Nouvelle conversation",
   "nav.profile": "Profil",

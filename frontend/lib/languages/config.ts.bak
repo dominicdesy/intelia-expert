@@ -26,6 +26,70 @@ export const availableLanguages: LanguageConfig[] = [
     region: 'United States',
     flag: '🇺🇸',
     dateFormat: 'en-US'
+  },
+  {
+    code: 'es',
+    name: 'Spanish',
+    nativeName: 'Español',
+    region: 'España',
+    flag: '🇪🇸',
+    dateFormat: 'es-ES'
+  },
+  {
+    code: 'pt',
+    name: 'Portuguese',
+    nativeName: 'Português',
+    region: 'Brasil',
+    flag: '🇧🇷',
+    dateFormat: 'pt-BR'
+  },
+  {
+    code: 'de',
+    name: 'German',
+    nativeName: 'Deutsch',
+    region: 'Deutschland',
+    flag: '🇩🇪',
+    dateFormat: 'de-DE'
+  },
+  {
+    code: 'nl',
+    name: 'Dutch',
+    nativeName: 'Nederlands',
+    region: 'Nederland',
+    flag: '🇳🇱',
+    dateFormat: 'nl-NL'
+  },
+  {
+    code: 'pl',
+    name: 'Polish',
+    nativeName: 'Polski',
+    region: 'Polska',
+    flag: '🇵🇱',
+    dateFormat: 'pl-PL'
+  },
+  {
+    code: 'th',
+    name: 'Thai',
+    nativeName: 'ไทย',
+    region: 'ประเทศไทย',
+    flag: '🇹🇭',
+    dateFormat: 'th-TH'
+  },
+  {
+    code: 'hi',
+    name: 'Hindi',
+    nativeName: 'हिन्दी',
+    region: 'भारत',
+    flag: '🇮🇳',
+    dateFormat: 'hi-IN'
+  },
+  {
+    code: 'zh',
+    name: 'Chinese',
+    nativeName: '中文',
+    region: '中国',
+    flag: '🇨🇳',
+    dateFormat: 'zh-CN'
   }
 ]
 

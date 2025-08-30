@@ -1,6 +1,10 @@
 {
   "page.title": "Sign in to Intelia Expert",
 
+  "auth.success": "Login successful",
+  "auth.error": "Login error",
+  "auth.incomplete": "Incomplete login",
+
   "nav.history": "Conversation history",
   "nav.newConversation": "New conversation",
   "nav.profile": "Profile",
