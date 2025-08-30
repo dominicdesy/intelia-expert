@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react'
-import { useTranslation } from '../hooks/useTranslation'
+import { useTranslation } from '@/lib/languages/i18n'
 import {
   useConversationGroups,
   useConversationActions,

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
-import { useTranslation } from '../../hooks/useTranslation'
+import { useTranslation } from '@/lib/languages/i18n'
 import { useAuthStore } from '@/lib/stores/auth' 
 import { getSupabaseClient } from '@/lib/supabase/singleton'
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react'
-import { useTranslation } from '../../hooks/useTranslation'
+import { useTranslation } from '@/lib/languages/i18n'
 
 // ==================== MODAL CONTACT AVEC BACKDROP GRISÉ ====================
 export const ContactModal = ({ onClose }: { onClose: () => void }) => {

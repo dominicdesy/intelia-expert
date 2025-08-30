@@ -4,7 +4,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
 import { logoutService } from '@/lib/services/logoutService'
-import { useTranslation } from '../hooks/useTranslation'
+import { useTranslation } from '@/lib/languages/i18n'
 import { PLAN_CONFIGS } from '@/types'
 
 // Import des modales avec leur structure complète
