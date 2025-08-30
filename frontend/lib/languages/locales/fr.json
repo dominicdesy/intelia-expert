@@ -5,6 +5,12 @@
   "auth.error": "Erreur de connexion",
   "auth.incomplete": "Connexion incomplète",
 
+  "gdpr.notice": "En vous connectant, vous acceptez nos conditions d'utilisation et notre politique de confidentialité.",
+  "legal.terms": "Conditions d'utilisation",
+  "legal.privacy": "Politique de confidentialité",
+  "login.email": "Adresse e-mail",
+  "login.password": "Mot de passe",
+
   "nav.history": "Historique des conversations",
   "nav.newConversation": "Nouvelle conversation",
   "nav.profile": "Profil",

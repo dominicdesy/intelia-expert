@@ -27,6 +27,15 @@ export interface TranslationKeys {
   'auth.error': string
   'auth.incomplete': string
 
+  // GDPR et Legal
+  'gdpr.notice': string
+  'legal.terms': string
+  'legal.privacy': string
+
+  // Login form
+  'login.email': string
+  'login.password': string
+
   // Messages de Chat
   'chat.welcome': string
   'chat.placeholder': string

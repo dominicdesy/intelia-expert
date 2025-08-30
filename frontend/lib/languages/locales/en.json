@@ -5,6 +5,12 @@
   "auth.error": "Login error",
   "auth.incomplete": "Incomplete login",
 
+  "gdpr.notice": "By signing in, you agree to our terms of service and privacy policy.",
+  "legal.terms": "Terms of Service",
+  "legal.privacy": "Privacy Policy",
+  "login.email": "Email address",
+  "login.password": "Password",
+
   "nav.history": "Conversation history",
   "nav.newConversation": "New conversation",
   "nav.profile": "Profile",
