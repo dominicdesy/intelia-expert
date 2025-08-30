@@ -22,6 +22,11 @@ export interface TranslationKeys {
   'nav.account': string
   'nav.settings': string
 
+  // Authentication
+  'auth.success': string
+  'auth.error': string
+  'auth.incomplete': string
+
   // Messages de Chat
   'chat.welcome': string
   'chat.placeholder': string
