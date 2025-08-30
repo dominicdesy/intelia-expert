@@ -77,10 +77,7 @@ const PageContent = memo(() => {
         
         {/* Sélecteur de langue */}
         <div className="absolute top-4 right-4">
-          <MemoizedLanguageSelector 
-            onLanguageChange={handleLanguageChange} 
-            currentLanguage={currentLanguage} 
-          />
+          <MemoizedLanguageSelector />
         </div>
         
         {/* Logo et titre */}

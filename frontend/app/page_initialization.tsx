@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import type { Language } from '@/types'
-import { translations } from './page_translations'
+import { useTranslation } from '@/lib/languages/i18n'
 import { rememberMeUtils } from './page_hooks'
 
 export function usePageInitialization() {
@@ -19,8 +19,8 @@ export function usePageInitialization() {
   const [localSuccess, setLocalSuccess] = useState('')
   const [hasHydrated, setHasHydrated] = useState(false)
 
-  // Mémorisation stable des traductions
-  const t = useMemo(() => translations[currentLanguage], [currentLanguage])
+  // ✅ CORRECTION : Utiliser le hook centralisé au lieu de translations[currentLanguage]
+  const { t } = useTranslation()
 
   // CORRECTION : toggleMode sans dépendances changeantes
   const toggleMode = useCallback(() => {
@@ -37,7 +37,7 @@ export function usePageInitialization() {
   const handleSetCurrentLanguage = useCallback((newLanguage: Language) => {
     setCurrentLanguage(prev => {
       if (prev !== newLanguage) {
-        console.log('🌍 [Language] Changement de langue:', prev, '→', newLanguage)
+        console.log('🌐 [Language] Changement de langue:', prev, '→', newLanguage)
         localStorage.setItem('intelia-language', newLanguage)
         return newLanguage
       }
@@ -55,14 +55,17 @@ export function usePageInitialization() {
       hasInitialized.current = true
       console.log('🎯 [Init] Initialisation unique')
       
+      // ✅ CORRECTION : Utiliser une liste de langues supportées au lieu de translations[savedLanguage]
+      const supportedLanguages = ['fr', 'en', 'es', 'ar'] // Ajustez selon vos langues supportées
+      
       // Charger les préférences utilisateur de manière synchrone
       const savedLanguage = localStorage.getItem('intelia-language') as Language
-      if (savedLanguage && translations[savedLanguage]) {
+      if (savedLanguage && supportedLanguages.includes(savedLanguage)) {
         setCurrentLanguage(savedLanguage)
       } else {
         // Détection de langue navigateur seulement si pas de langue sauvée
         const browserLanguage = navigator.language.substring(0, 2) as Language
-        if (translations[browserLanguage]) {
+        if (supportedLanguages.includes(browserLanguage)) {
           setCurrentLanguage(browserLanguage)
         }
       }
@@ -95,11 +98,11 @@ export function usePageInitialization() {
     console.log('🔗 [URL] Traitement callback auth:', authStatus)
     
     if (authStatus === 'success') {
-      setLocalSuccess(t.authSuccess)
+      setLocalSuccess(t('auth.success') || 'Connexion réussie')
     } else if (authStatus === 'error') {
-      setLocalError(t.authError)
+      setLocalError(t('auth.error') || 'Erreur de connexion')
     } else if (authStatus === 'incomplete') {
-      setLocalError(t.authIncomplete)
+      setLocalError(t('auth.incomplete') || 'Connexion incomplète')
     }
     
     // Nettoyer l'URL de manière optimisée
@@ -120,7 +123,7 @@ export function usePageInitialization() {
     }, 3000)
     
     return () => clearTimeout(timer)
-  }, [searchParams, t.authSuccess, t.authError, t.authIncomplete]) // Dépendances stables
+  }, [searchParams, t]) // ✅ CORRECTION : Seulement t comme dépendance au lieu de t.authSuccess, etc.
 
   // Effet pour bloquer le scroll en mode signup - Optimisé
   useEffect(() => {
@@ -149,7 +152,7 @@ export function usePageInitialization() {
     }
   }, [])
 
-  // CORRECTION : Retour avec fonctions stables
+  // ✅ CORRECTION : Retour avec fonctions stables, sans t dans les dépendances
   return useMemo(() => ({
     currentLanguage,
     setCurrentLanguage: handleSetCurrentLanguage, // Fonction stable
@@ -165,7 +168,7 @@ export function usePageInitialization() {
     toggleMode // Fonction stable
   }), [
     currentLanguage, 
-    t, 
+    // ✅ CORRECTION : t supprimé des dépendances car il vient du hook useTranslation
     isSignupMode, 
     localError, 
     localSuccess, 

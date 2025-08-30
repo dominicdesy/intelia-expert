@@ -3,6 +3,7 @@
 import React, { useState, forwardRef } from 'react'
 import Link from 'next/link'
 import type { Language } from '@/types'
+import { useTranslation, availableLanguages, getLanguageByCode } from '@/lib/languages/i18n'
 
 // Logo Intelia
 export const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
@@ -13,21 +14,17 @@ export const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string })
   />
 )
 
-// Sélecteur de langue
-export const LanguageSelector = ({ onLanguageChange, currentLanguage }: { 
-  onLanguageChange: (lang: Language) => void
-  currentLanguage: Language 
-}) => {
+// Sélecteur de langue intégré avec le système i18n
+export const LanguageSelector = () => {
+  const { changeLanguage, currentLanguage } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
 
-  const languages = [
-    { code: 'fr' as Language, name: 'Français', flag: '🇫🇷' },
-    { code: 'en' as Language, name: 'English', flag: '🇺🇸' },
-    { code: 'es' as Language, name: 'Español', flag: '🇪🇸' },
-    { code: 'de' as Language, name: 'Deutsch', flag: '🇩🇪' }
-  ]
+  const handleLanguageChange = (languageCode: string) => {
+    changeLanguage(languageCode)
+    setIsOpen(false) // Fermer le dropdown après sélection
+  }
 
-  const currentLang = languages.find(lang => lang.code === currentLanguage)
+  const currentLangConfig = getLanguageByCode(currentLanguage)
 
   return (
     <div className="relative">
@@ -38,7 +35,8 @@ export const LanguageSelector = ({ onLanguageChange, currentLanguage }: {
         <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
         </svg>
-        <span>{currentLang?.name}</span>
+        <span className="mr-1">{currentLangConfig?.flag}</span>
+        <span>{currentLangConfig?.nativeName || currentLangConfig?.name}</span>
         <svg className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -50,20 +48,25 @@ export const LanguageSelector = ({ onLanguageChange, currentLanguage }: {
             className="fixed inset-0 z-40" 
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-            {languages.map((lang) => (
+          <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+            {availableLanguages.map((lang) => (
               <button
                 key={lang.code}
-                onClick={() => {
-                  onLanguageChange(lang.code)
-                  setIsOpen(false)
-                }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2 ${
+                onClick={() => handleLanguageChange(lang.code)}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-3 ${
                   lang.code === currentLanguage ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
                 } first:rounded-t-lg last:rounded-b-lg transition-colors`}
               >
-                <span>{lang.flag}</span>
-                <span>{lang.name}</span>
+                <span className="text-xl">{lang.flag}</span>
+                <div className="flex-1">
+                  <div className="font-medium">{lang.nativeName}</div>
+                  <div className="text-xs text-gray-500">{lang.region}</div>
+                </div>
+                {lang.code === currentLanguage && (
+                  <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                )}
               </button>
             ))}
           </div>
@@ -222,13 +225,13 @@ export const LoadingSpinner = ({ text = "Chargement..." }: { text?: string }) =>
 export const AuthFooter = ({ t }: { t: any }) => (
   <div className="mt-6 text-center">
     <p className="text-xs text-gray-500">
-      {t.gdprNotice}{' '}
+      {t('gdpr.notice') || 'En utilisant ce service, vous acceptez nos'}{' '}
       <Link href="/terms" className="text-blue-600 hover:text-blue-500">
-        {t.terms}
+        {t('legal.terms') || 'conditions d\'utilisation'}
       </Link>
       {' '}et notre{' '}
       <Link href="/privacy" className="text-blue-600 hover:text-blue-500">
-        {t.privacy}
+        {t('legal.privacy') || 'politique de confidentialité'}
       </Link>
     </p>
   </div>
