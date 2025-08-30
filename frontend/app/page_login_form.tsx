@@ -10,7 +10,7 @@ import type { Language } from '@/types'
 interface LoginFormProps {
   authLogic: any
   t: any
-  currentLanguage: Language // AJOUTÉ
+  currentLanguage: Language
   localError: string
   localSuccess: string
   toggleMode: () => void
@@ -19,7 +19,7 @@ interface LoginFormProps {
 export const LoginForm = memo(function LoginForm({ 
   authLogic, 
   t, 
-  currentLanguage, // AJOUTÉ
+  currentLanguage,
   localError, 
   localSuccess, 
   toggleMode 
@@ -115,22 +115,14 @@ export const LoginForm = memo(function LoginForm({
     }
 
     isInitialLoadRef.current = false
-  }, []) // Pas de dépendances - s'exécute une seule fois
+  }, [])
 
   // CORRECTION 5: Focus automatique SEULEMENT si email pré-rempli ET utilisateur ne tape pas
   useEffect(() => {
-    // Ne pas faire le focus si :
-    // - L'utilisateur est en train de taper
-    // - On a déjà fait le focus automatique
-    // - Il n'y a pas de champ password
     if (userIsTypingRef.current || hasAutoFocusedRef.current || !passwordInputRef.current) {
       return
     }
 
-    // Faire le focus SEULEMENT si :
-    // - Email pré-rempli par RememberMe
-    // - Pas de mot de passe
-    // - RememberMe activé
     if (loginData.rememberMe && loginData.email && !loginData.password) {
       const timer = setTimeout(() => {
         if (!userIsTypingRef.current && passwordInputRef.current) {
@@ -138,7 +130,7 @@ export const LoginForm = memo(function LoginForm({
           hasAutoFocusedRef.current = true
           debugLog('form', 'Auto-focus on password field (RememberMe)')
         }
-      }, 800) // Délai plus long pour être sûr que l'utilisateur a fini de taper
+      }, 800)
       
       return () => clearTimeout(timer)
     }
@@ -159,12 +151,12 @@ export const LoginForm = memo(function LoginForm({
     try {
       debugLog('auth', 'Form submission', { email: loginData.email, rememberMe: loginData.rememberMe })
       await handleLogin(e, loginData)
-      setFormSuccess(t.authSuccess)
+      setFormSuccess(t('auth.success'))
     } catch (error: any) {
       debugLog('error', 'Login error', error.message)
       setFormError(error.message)
     }
-  }, [handleLogin, loginData, t.authSuccess])
+  }, [handleLogin, loginData, t])
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -210,7 +202,7 @@ export const LoginForm = memo(function LoginForm({
       {errorMessage && (
         <AlertMessage 
           type="error" 
-          title={t.loginError} 
+          title={t('error.generic')} 
           message={errorMessage} 
         />
       )}
@@ -229,7 +221,7 @@ export const LoginForm = memo(function LoginForm({
           {/* Champ Email */}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              {t.email}
+              {t('login.emailLabel')}
             </label>
             <div className="mt-1">
               <input
@@ -241,7 +233,7 @@ export const LoginForm = memo(function LoginForm({
                 value={loginData.email}
                 onChange={handleEmailChange}
                 className="block w-full rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                placeholder={t.emailPlaceholder}
+                placeholder={t('login.emailPlaceholder')}
               />
             </div>
           </div>
@@ -249,7 +241,7 @@ export const LoginForm = memo(function LoginForm({
           {/* Champ Mot de passe */}
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              {t.password}
+              {t('login.passwordLabel')}
             </label>
             <div className="mt-1">
               <PasswordInput
@@ -260,7 +252,7 @@ export const LoginForm = memo(function LoginForm({
                 onChange={handlePasswordChange}
                 autoComplete="current-password"
                 required
-                placeholder={t.passwordPlaceholder}
+                placeholder={t('login.passwordPlaceholder')}
               />
             </div>
           </div>
@@ -281,7 +273,7 @@ export const LoginForm = memo(function LoginForm({
                 htmlFor="remember-me" 
                 className="ml-2 block text-sm text-gray-900 cursor-pointer select-none"
               >
-                {t.rememberMe}
+                {t('login.rememberMe')}
               </label>
             </div>
 
@@ -290,7 +282,7 @@ export const LoginForm = memo(function LoginForm({
                 href={`/auth/forgot-password?lang=${currentLanguage}`}
                 className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
               >
-                {t.forgotPassword}
+                {t('auth.forgotPassword')}
               </Link>
             </div>
           </div>
@@ -305,10 +297,10 @@ export const LoginForm = memo(function LoginForm({
               {isLoading ? (
                 <div className="flex items-center space-x-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>{t.connecting}</span>
+                  <span>{t('auth.connecting')}</span>
                 </div>
               ) : (
-                t.login
+                t('auth.login')
               )}
             </button>
           </div>
@@ -322,7 +314,7 @@ export const LoginForm = memo(function LoginForm({
             <div className="w-full border-t border-gray-300" />
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white text-gray-500">ou</span>
+            <span className="px-2 bg-white text-gray-500">{t('common.or')}</span>
           </div>
         </div>
       </div>
@@ -330,13 +322,13 @@ export const LoginForm = memo(function LoginForm({
       {/* Bouton d'inscription */}
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-600">
-          {t.newToIntelia}{' '}
+          {t('auth.newToIntelia')}{' '}
           <button
             type="button"
             onClick={toggleMode}
             className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
           >
-            {t.createAccount}
+            {t('auth.createAccount')}
           </button>
         </p>
       </div>
