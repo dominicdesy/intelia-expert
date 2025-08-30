@@ -388,7 +388,15 @@ export const useTranslation = () => {
   }, [])
 
   const t = (key: keyof TranslationKeys): string => {
-    console.log('Translation debug:', { key, loading, translations: Object.keys(translations).length > 0, currentLanguage });
+    console.log('Translation debug DÉTAILLÉ:', JSON.stringify({ 
+      key, 
+      loading, 
+      translationsKeys: Object.keys(translations), 
+      translationsLength: Object.keys(translations).length,
+      translationValue: translations[key],
+      currentLanguage 
+    }, null, 2));
+    
     if (loading) return key
     return translations[key] || key
   }
