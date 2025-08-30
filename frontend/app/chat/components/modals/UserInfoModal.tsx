@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, startTransition } from 'react'
-import { useTranslation } from '../../hooks/useTranslation'
+import { useTranslation } from '@/lib/languages/i18n'
 import { UserInfoModalProps } from '@/types'
 import { PhoneInput, usePhoneValidation } from '../PhoneInput'
 import { CountrySelect } from '../CountrySelect'
