@@ -275,6 +275,11 @@ export interface TranslationKeys {
 // Cache pour les traductions chargées
 const translationsCache: Record<string, TranslationKeys> = {}
 
+// Variables globales pour la synchronisation
+let globalTranslations: TranslationKeys = {} as TranslationKeys
+let globalLoading = true
+let globalLanguage = 'fr'
+
 // Fonction pour récupérer la langue depuis le store Zustand
 const getStoredLanguage = (): string => {
   try {
@@ -292,6 +297,9 @@ const getStoredLanguage = (): string => {
 // Fonction pour charger les traductions depuis les fichiers JSON
 async function loadTranslations(language: string): Promise<TranslationKeys> {
   if (translationsCache[language]) {
+    globalTranslations = translationsCache[language]
+    globalLoading = false
+    globalLanguage = language
     return translationsCache[language]
   }
 
@@ -303,6 +311,9 @@ async function loadTranslations(language: string): Promise<TranslationKeys> {
     
     const translations = await response.json()
     translationsCache[language] = translations
+    globalTranslations = translations
+    globalLoading = false
+    globalLanguage = language
     return translations
   } catch (error) {
     console.warn(`Could not load translations for ${language}, falling back to French`)
@@ -390,17 +401,21 @@ export const useTranslation = () => {
   }, [])
 
   const t = (key: keyof TranslationKeys): string => {
+    const finalTranslations = Object.keys(translations).length > 0 ? translations : globalTranslations
+    const finalLoading = loading && globalLoading
+    
     console.log('Translation debug DÉTAILLÉ:', JSON.stringify({ 
       key, 
-      loading, 
-      translationsKeys: Object.keys(translations), 
-      translationsLength: Object.keys(translations).length,
-      translationValue: translations[key],
-      currentLanguage 
+      loading: finalLoading,
+      translationsKeys: Object.keys(finalTranslations), 
+      translationsLength: Object.keys(finalTranslations).length,
+      translationValue: finalTranslations[key],
+      currentLanguage,
+      usingGlobal: Object.keys(translations).length === 0
     }, null, 2));
     
-    if (loading) return key
-    return translations[key] || key
+    if (finalLoading) return key
+    return finalTranslations[key] || key
   }
 
   const changeLanguage = async (newLanguage: string) => {
