@@ -75,21 +75,30 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
       console.log('[LanguageModal] Début changement ATOMIQUE:', currentLanguage, '→', languageCode)
       
       // 1. Changement immédiat interface
+      console.log('[LanguageModal] ETAPE 1: Changement interface...')
       changeLanguage(languageCode)
       console.log('[LanguageModal] Interface mise à jour immédiatement')
       
-      // 2. Sauvegarde profil utilisateur
-      await updateProfile({ language: languageCode } as any)
+      // 2. Sauvegarde profil utilisateur - LOGS DEBUG DETAILLES
+      console.log('[LanguageModal] ETAPE 2: DEBUT updateProfile avec:', languageCode)
+      console.log('[LanguageModal] updateProfile function exists:', typeof updateProfile)
+      
+      const profileData = { language: languageCode }
+      console.log('[LanguageModal] Data to save:', profileData)
+      
+      const result = await updateProfile(profileData as any)
+      console.log('[LanguageModal] updateProfile result:', result)
       console.log('[LanguageModal] Profil sauvegardé')
       
       // 3. Flag force dans sessionStorage
+      console.log('[LanguageModal] ETAPE 3: Création flag sessionStorage...')
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('force_language', languageCode)
         console.log('[LanguageModal] Flag force_language créé:', languageCode)
       }
       
       // 4. Redirection atomique
-      console.log('[LanguageModal] Redirection atomique...')
+      console.log('[LanguageModal] ETAPE 4: Redirection atomique...')
       setTimeout(() => {
         if (window.location.pathname.startsWith('/chat')) {
           window.location.reload()
@@ -101,7 +110,13 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
       return
       
     } catch (error) {
-      console.error('[LanguageModal] Erreur changement langue:', error)
+      console.error('[LanguageModal] ERREUR COMPLETE:', error)
+      console.error('[LanguageModal] Type erreur:', typeof error)
+      console.error('[LanguageModal] Message:', error?.message)
+      console.error('[LanguageModal] Stack:', error?.stack)
+      if (error && typeof error === 'object') {
+        console.error('[LanguageModal] Propriétés erreur:', Object.keys(error))
+      }
       setIsUpdating(false)
     }
   }
