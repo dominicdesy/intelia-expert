@@ -1,5 +1,5 @@
 import React from 'react'
-import { useTranslation } from '../../hooks/useTranslation'
+import { useTranslation } from '@/lib/languages/i18n'
 import { PLAN_CONFIGS } from '@/types'
 
 // ==================== MODAL ABONNEMENT AVEC POSITIONNEMENT CORRIGÉ ====================
