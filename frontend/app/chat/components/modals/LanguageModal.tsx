@@ -88,14 +88,9 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
       onClose()
       console.log('[LanguageModal] Modal fermée - pas de reload')
       
-      // PAS de reload - laissez React gérer l'état
-      
     } catch (error) {
       console.error('[LanguageModal] Erreur changement langue:', error)
     } finally {
-      setIsUpdating(false)
-    }
-  }Modal] Erreur:', error)
       setIsUpdating(false)
     }
   }
