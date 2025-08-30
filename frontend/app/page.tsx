@@ -1,6 +1,6 @@
 'use client'
 
-import React, { Suspense, useMemo, useCallback, memo } from 'react'
+import React, { Suspense, useMemo, memo } from 'react'
 import { useAuthenticationLogic } from './page_authentication'
 import { LoginForm } from './page_login_form'
 import { SignupModal } from './page_signup_modal'
@@ -25,7 +25,7 @@ const LoadingContent = memo(() => (
   </div>
 ))
 
-// Contenu principal - VERSION COMPLETE conservant toute la logique
+// Contenu principal - VERSION COMPLETE adaptée au système i18n
 const PageContent = memo(() => {
   console.log('🚀 [PageContent] Composant PageContent rendu')
   
@@ -44,21 +44,14 @@ const PageContent = memo(() => {
   } = initData
 
   // Mémorisation stable des props pour éviter les re-renders du hook d'auth
+  // ✅ CORRECTION: Supprimé currentLanguage car le hook useTranslation le gère automatiquement
   const authProps = useMemo(() => ({
-    currentLanguage,
     t,
-    isSignupMode,
-    setCurrentLanguage
-  }), [currentLanguage, t, isSignupMode, setCurrentLanguage])
+    isSignupMode
+  }), [t, isSignupMode])
 
   // Hook d'authentification avec props stables
   const authLogic = useAuthenticationLogic(authProps)
-
-  // Gestionnaire de changement de langue mémorisé
-  const handleLanguageChange = useCallback((newLanguage) => {
-    setCurrentLanguage(newLanguage)
-    localStorage.setItem('intelia-language', newLanguage)
-  }, [setCurrentLanguage])
 
   // Mémorisation du contenu de chargement pour éviter les re-renders
   const loadingContent = useMemo(() => <LoadingContent />, [])
@@ -86,7 +79,7 @@ const PageContent = memo(() => {
             <MemoizedInteliaLogo className="w-16 h-16" />
           </div>
           <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-            {t.title}
+            {t('page.title') || 'Connexion à Intelia Expert'}
           </h2>
         </div>
 
@@ -96,7 +89,6 @@ const PageContent = memo(() => {
             <MemoizedLoginForm 
               authLogic={authLogic}
               t={t}
-              currentLanguage={currentLanguage}
               localError={localError}
               localSuccess={localSuccess}
               toggleMode={toggleMode}
