@@ -221,18 +221,22 @@ export const LoadingSpinner = ({ text = "Chargement..." }: { text?: string }) =>
   </div>
 )
 
-// Footer avec liens
-export const AuthFooter = ({ t }: { t: any }) => (
-  <div className="mt-6 text-center">
-    <p className="text-xs text-gray-500">
-      {t('gdpr.notice') || 'En utilisant ce service, vous acceptez nos'}{' '}
-      <Link href="/terms" className="text-blue-600 hover:text-blue-500">
-        {t('legal.terms') || 'conditions d\'utilisation'}
-      </Link>
-      {' '}et notre{' '}
-      <Link href="/privacy" className="text-blue-600 hover:text-blue-500">
-        {t('legal.privacy') || 'politique de confidentialité'}
-      </Link>
-    </p>
-  </div>
-)
+// Footer avec liens - CORRIGÉ: utilise directement le hook useTranslation
+export const AuthFooter = () => {
+  const { t } = useTranslation()
+  
+  return (
+    <div className="mt-6 text-center">
+      <p className="text-xs text-gray-500">
+        {t('gdpr.notice')}{' '}
+        <Link href="/terms" className="text-blue-600 hover:text-blue-500">
+          {t('legal.terms')}
+        </Link>
+        {' '}et notre{' '}
+        <Link href="/privacy" className="text-blue-600 hover:text-blue-500">
+          {t('legal.privacy')}
+        </Link>
+      </p>
+    </div>
+  )
+}

@@ -12,7 +12,7 @@ const MemoizedLoginForm = memo(LoginForm)
 const MemoizedSignupModal = memo(SignupModal)
 const MemoizedInteliaLogo = memo(InteliaLogo)
 const MemoizedLanguageSelector = memo(LanguageSelector)
-const MemoizedAuthFooter = memo(AuthFooter)
+// ✅ SUPPRIMÉ: AuthFooter n'est plus mémorisé car il utilise maintenant directement useTranslation
 
 // Composant de chargement statique mémorisé
 const LoadingContent = memo(() => (
@@ -95,7 +95,8 @@ const PageContent = memo(() => {
               localSuccess={localSuccess}
               toggleMode={toggleMode}
             />
-            <MemoizedAuthFooter t={t} />
+            {/* ✅ CORRIGÉ: AuthFooter utilise maintenant directement useTranslation, plus de props t */}
+            <AuthFooter />
           </div>
         </div>
       </div>
