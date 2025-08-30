@@ -401,6 +401,3 @@ export const getAvailableLanguages = () => availableLanguages.map(lang => ({
 
 // Export de la configuration complète pour les composants
 export { availableLanguages, DEFAULT_LANGUAGE, getLanguageByCode } from './config'
-
-// Export du type pour utilisation dans d'autres composants
-export type { TranslationKeys }
