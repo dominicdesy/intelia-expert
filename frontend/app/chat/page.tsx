@@ -407,10 +407,11 @@ export default function ChatInterface() {
     return messages.length > 0
   }, [messages.length])
 
-  const redirectToLogin = useCallback((reason: string = 'Session expirée') => {
+  const redirectToLogin = useCallback((reason?: string) => {
+    const finalReason = reason || 'Session expirée'
     if (isRedirectingRef.current) return
     isRedirectingRef.current = true
-    console.log('🚪 [DEBUG-REDIRECT] Redirection forcée -', reason)
+    console.log('🚪 [DEBUG-REDIRECT] Redirection forcée -', finalReason)
 
     // Cleanup des timeouts existants d'abord
     const timeoutRefs = [redirectTimeoutRef, authCheckTimeoutRef, loadingTimeoutRef]
