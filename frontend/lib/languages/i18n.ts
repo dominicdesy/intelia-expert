@@ -36,6 +36,9 @@ export interface TranslationKeys {
   'chat.send': string
   'chat.askQuestion': string
 
+  // Page titles
+  'page.title': string
+
   // Modals
   'modal.close': string
   'modal.cancel': string
