@@ -30,7 +30,7 @@ interface TranslationKeys {
   'chat.loading': string
   'chat.errorMessage': string
   'chat.newConversation': string
-  'chat.disclaimer': string  // ✅ AJOUTÉ
+  'chat.disclaimer': string
 
   // Modals
   'modal.close': string
@@ -43,12 +43,14 @@ interface TranslationKeys {
   // Profil
   'profile.title': string
   'profile.personalInfo': string
+  'profile.professionalInfo': string
   'profile.contact': string
   'profile.company': string
   'profile.password': string
   'profile.firstName': string
   'profile.lastName': string
   'profile.linkedinProfile': string
+  'profile.linkedinCorporate': string
   'profile.email': string
   'profile.phone': string
   'profile.country': string
@@ -59,19 +61,25 @@ interface TranslationKeys {
   'profile.newPassword': string
   'profile.confirmPassword': string
   'profile.passwordRequirements': string
+  'profile.passwordRequirements8': string
+  'profile.passwordRequirementsUpper': string
+  'profile.passwordRequirementsLower': string
+  'profile.passwordRequirementsNumber': string
+  'profile.passwordRequirementsSpecial': string
   'profile.passwordErrors': string
   'profile.passwordChanged': string
   'profile.profileUpdated': string
+  'profile.optional': string
 
   // Langue
   'language.title': string
   'language.description': string
   'language.updating': string
-  'language.changeSuccess': string      // ✅ AJOUTÉ
-  'language.interfaceUpdated': string   // ✅ AJOUTÉ
-  'language.reloadForWidget': string    // ✅ AJOUTÉ
-  'language.reloadNow': string          // ✅ AJOUTÉ
-  'language.continueWithoutReload': string // ✅ AJOUTÉ
+  'language.changeSuccess': string
+  'language.interfaceUpdated': string
+  'language.reloadForWidget': string
+  'language.reloadNow': string
+  'language.continueWithoutReload': string
 
   // Abonnement
   'subscription.title': string
@@ -107,6 +115,25 @@ interface TranslationKeys {
   'error.connection': string
   'error.updateProfile': string
   'error.changePassword': string
+  'error.firstNameRequired': string
+  'error.lastNameRequired': string
+  'error.emailRequired': string
+  'error.emailInvalid': string
+  'error.emailTooLong': string
+  'error.firstNameTooLong': string
+  'error.lastNameTooLong': string
+  'error.companyNameTooLong': string
+  'error.urlInvalid': string
+  'error.urlProtocol': string
+  'error.linkedinInvalid': string
+  'error.phonePrefix': string
+  'error.currentPasswordRequired': string
+  'error.newPasswordRequired': string
+  'error.confirmPasswordRequired': string
+  'error.currentPasswordIncorrect': string
+  'error.passwordServerError': string
+  'error.userNotConnected': string
+  'error.validationErrors': string
   'success.profileUpdated': string
   'success.passwordChanged': string
   'success.languageUpdated': string
@@ -120,6 +147,20 @@ interface TranslationKeys {
   'form.passwordNumber': string
   'form.passwordSpecial': string
   'form.passwordMismatch': string
+
+  // Commun
+  'common.optional': string
+  'common.unexpectedError': string
+
+  // Placeholders
+  'placeholder.linkedinPersonal': string
+  'placeholder.companyName': string
+  'placeholder.companyWebsite': string
+  'placeholder.linkedinCorporate': string
+  'placeholder.countrySelect': string
+  'placeholder.currentPassword': string
+  'placeholder.newPassword': string
+  'placeholder.confirmPassword': string
 
   // RGPD et Confidentialité
   'gdpr.deleteAccount': string
@@ -161,7 +202,7 @@ const translations: Record<string, TranslationKeys> = {
     'chat.loading': 'Chargement...',
     'chat.errorMessage': 'Désolé, je rencontre un problème technique. Veuillez réessayer dans quelques instants.',
     'chat.newConversation': 'Nouvelle conversation',
-    'chat.disclaimer': 'Intelia Expert peut faire des erreurs. Faites vérifier les réponses par un professionnel au besoin.',  // ✅ AJOUTÉ
+    'chat.disclaimer': 'Intelia Expert peut faire des erreurs. Faites vérifier les réponses par un professionnel au besoin.',
 
     // Modals
     'modal.close': 'Fermer',
@@ -174,12 +215,14 @@ const translations: Record<string, TranslationKeys> = {
     // Profil
     'profile.title': 'Profil',
     'profile.personalInfo': 'Informations personnelles',
+    'profile.professionalInfo': 'Informations Professionnelles',
     'profile.contact': 'Contact',
     'profile.company': 'Entreprise',
     'profile.password': 'Mot de passe',
     'profile.firstName': 'Prénom *',
     'profile.lastName': 'Nom de famille *',
     'profile.linkedinProfile': 'Profil LinkedIn personnel',
+    'profile.linkedinCorporate': 'Page LinkedIn Entreprise',
     'profile.email': 'Email *',
     'profile.phone': 'Téléphone',
     'profile.country': 'Pays *',
@@ -190,19 +233,25 @@ const translations: Record<string, TranslationKeys> = {
     'profile.newPassword': 'Nouveau mot de passe *',
     'profile.confirmPassword': 'Confirmer le nouveau mot de passe *',
     'profile.passwordRequirements': 'Le mot de passe doit contenir :',
+    'profile.passwordRequirements8': '8+ caractères',
+    'profile.passwordRequirementsUpper': 'Une majuscule',
+    'profile.passwordRequirementsLower': 'Une minuscule',
+    'profile.passwordRequirementsNumber': 'Un chiffre',
+    'profile.passwordRequirementsSpecial': 'Caractère spécial',
     'profile.passwordErrors': 'Erreurs :',
     'profile.passwordChanged': 'Mot de passe changé avec succès !',
     'profile.profileUpdated': 'Profil mis à jour avec succès !',
+    'profile.optional': '(optionnel)',
 
     // Langue
     'language.title': 'Langue',
     'language.description': 'Sélectionnez votre langue préférée pour l\'interface Intelia Expert',
     'language.updating': 'Mise à jour en cours...',
-    'language.changeSuccess': 'Langue modifiée !',                            // ✅ AJOUTÉ
-    'language.interfaceUpdated': 'L\'interface a été mise à jour immédiatement.',  // ✅ AJOUTÉ
-    'language.reloadForWidget': 'Pour que le widget de chat soit également dans la nouvelle langue, un rechargement de page est recommandé.',  // ✅ AJOUTÉ
-    'language.reloadNow': '🔄 Recharger maintenant',                          // ✅ AJOUTÉ
-    'language.continueWithoutReload': '⏭️ Continuer sans recharger',          // ✅ AJOUTÉ
+    'language.changeSuccess': 'Langue modifiée !',
+    'language.interfaceUpdated': 'L\'interface a été mise à jour immédiatement.',
+    'language.reloadForWidget': 'Pour que le widget de chat soit également dans la nouvelle langue, un rechargement de page est recommandé.',
+    'language.reloadNow': '🔄 Recharger maintenant',
+    'language.continueWithoutReload': '⭐️ Continuer sans recharger',
 
     // Abonnement
     'subscription.title': 'Abonnement',
@@ -238,6 +287,25 @@ const translations: Record<string, TranslationKeys> = {
     'error.connection': 'Erreur de connexion',
     'error.updateProfile': 'Erreur lors de la mise à jour du profil',
     'error.changePassword': 'Erreur lors du changement de mot de passe',
+    'error.firstNameRequired': 'Le prénom est requis',
+    'error.lastNameRequired': 'Le nom est requis',
+    'error.emailRequired': 'L\'email est requis',
+    'error.emailInvalid': 'Format d\'email invalide',
+    'error.emailTooLong': 'L\'email est trop long (maximum 254 caractères)',
+    'error.firstNameTooLong': 'Le prénom est trop long (maximum 50 caractères)',
+    'error.lastNameTooLong': 'Le nom est trop long (maximum 50 caractères)',
+    'error.companyNameTooLong': 'Le nom de l\'entreprise est trop long (maximum 100 caractères)',
+    'error.urlInvalid': 'n\'est pas une URL valide',
+    'error.urlProtocol': 'doit commencer par http:// ou https://',
+    'error.linkedinInvalid': 'doit être un lien LinkedIn valide',
+    'error.phonePrefix': 'Téléphone:',
+    'error.currentPasswordRequired': 'Le mot de passe actuel est requis',
+    'error.newPasswordRequired': 'Le nouveau mot de passe est requis',
+    'error.confirmPasswordRequired': 'La confirmation du mot de passe est requise',
+    'error.currentPasswordIncorrect': 'Le mot de passe actuel est incorrect',
+    'error.passwordServerError': 'Erreur de connexion au serveur. Veuillez réessayer.',
+    'error.userNotConnected': 'Utilisateur non connecté',
+    'error.validationErrors': 'Erreurs de validation',
     'success.profileUpdated': 'Profil mis à jour avec succès !',
     'success.passwordChanged': 'Mot de passe changé avec succès !',
     'success.languageUpdated': 'Langue mise à jour',
@@ -251,6 +319,20 @@ const translations: Record<string, TranslationKeys> = {
     'form.passwordNumber': 'Au moins un chiffre',
     'form.passwordSpecial': 'Au moins un caractère spécial',
     'form.passwordMismatch': 'Les mots de passe ne correspondent pas',
+
+    // Commun
+    'common.optional': '(optionnel)',
+    'common.unexpectedError': 'Une erreur est survenue.',
+
+    // Placeholders
+    'placeholder.linkedinPersonal': 'https://linkedin.com/in/votre-profil',
+    'placeholder.companyName': 'Nom de votre entreprise ou exploitation',
+    'placeholder.companyWebsite': 'https://www.votre-entreprise.com',
+    'placeholder.linkedinCorporate': 'https://linkedin.com/company/votre-entreprise',
+    'placeholder.countrySelect': 'Sélectionner un pays ou rechercher...',
+    'placeholder.currentPassword': 'Tapez votre mot de passe actuel',
+    'placeholder.newPassword': 'Tapez votre nouveau mot de passe',
+    'placeholder.confirmPassword': 'Confirmez votre nouveau mot de passe',
 
     // RGPD et Confidentialité
     'gdpr.deleteAccount': 'Supprimer mon compte',
@@ -290,7 +372,7 @@ const translations: Record<string, TranslationKeys> = {
     'chat.loading': 'Loading...',
     'chat.errorMessage': 'Sorry, I\'m experiencing a technical issue. Please try again in a few moments.',
     'chat.newConversation': 'New conversation',
-    'chat.disclaimer': 'Intelia Expert can make mistakes. Please verify the answers with a professional if necessary.',  // ✅ AJOUTÉ
+    'chat.disclaimer': 'Intelia Expert can make mistakes. Please verify the answers with a professional if necessary.',
 
     // Modals
     'modal.close': 'Close',
@@ -303,12 +385,14 @@ const translations: Record<string, TranslationKeys> = {
     // Profil
     'profile.title': 'Profile',
     'profile.personalInfo': 'Personal information',
+    'profile.professionalInfo': 'Professional Information',
     'profile.contact': 'Contact',
     'profile.company': 'Company',
     'profile.password': 'Password',
     'profile.firstName': 'First name *',
     'profile.lastName': 'Last name *',
     'profile.linkedinProfile': 'Personal LinkedIn profile',
+    'profile.linkedinCorporate': 'Company LinkedIn Page',
     'profile.email': 'Email *',
     'profile.phone': 'Phone',
     'profile.country': 'Country *',
@@ -319,19 +403,25 @@ const translations: Record<string, TranslationKeys> = {
     'profile.newPassword': 'New password *',
     'profile.confirmPassword': 'Confirm new password *',
     'profile.passwordRequirements': 'Password must contain:',
+    'profile.passwordRequirements8': '8+ characters',
+    'profile.passwordRequirementsUpper': 'One uppercase',
+    'profile.passwordRequirementsLower': 'One lowercase',
+    'profile.passwordRequirementsNumber': 'One number',
+    'profile.passwordRequirementsSpecial': 'Special character',
     'profile.passwordErrors': 'Errors:',
     'profile.passwordChanged': 'Password changed successfully!',
     'profile.profileUpdated': 'Profile updated successfully!',
+    'profile.optional': '(optional)',
 
     // Langue
     'language.title': 'Language',
     'language.description': 'Select your preferred language for the Intelia Expert interface',
     'language.updating': 'Updating...',
-    'language.changeSuccess': 'Language Changed!',                            // ✅ AJOUTÉ
-    'language.interfaceUpdated': 'The interface has been updated immediately.',   // ✅ AJOUTÉ
-    'language.reloadForWidget': 'For the chat widget to also be in the new language, a page reload is recommended.',  // ✅ AJOUTÉ
-    'language.reloadNow': '🔄 Reload Now',                                   // ✅ AJOUTÉ
-    'language.continueWithoutReload': '⏭️ Continue Without Reload',          // ✅ AJOUTÉ
+    'language.changeSuccess': 'Language Changed!',
+    'language.interfaceUpdated': 'The interface has been updated immediately.',
+    'language.reloadForWidget': 'For the chat widget to also be in the new language, a page reload is recommended.',
+    'language.reloadNow': '🔄 Reload Now',
+    'language.continueWithoutReload': '⭐️ Continue Without Reload',
 
     // Abonnement
     'subscription.title': 'Subscription',
@@ -367,6 +457,25 @@ const translations: Record<string, TranslationKeys> = {
     'error.connection': 'Connection error',
     'error.updateProfile': 'Error updating profile',
     'error.changePassword': 'Error changing password',
+    'error.firstNameRequired': 'First name is required',
+    'error.lastNameRequired': 'Last name is required',
+    'error.emailRequired': 'Email is required',
+    'error.emailInvalid': 'Invalid email format',
+    'error.emailTooLong': 'Email is too long (maximum 254 characters)',
+    'error.firstNameTooLong': 'First name is too long (maximum 50 characters)',
+    'error.lastNameTooLong': 'Last name is too long (maximum 50 characters)',
+    'error.companyNameTooLong': 'Company name is too long (maximum 100 characters)',
+    'error.urlInvalid': 'is not a valid URL',
+    'error.urlProtocol': 'must start with http:// or https://',
+    'error.linkedinInvalid': 'must be a valid LinkedIn link',
+    'error.phonePrefix': 'Phone:',
+    'error.currentPasswordRequired': 'Current password is required',
+    'error.newPasswordRequired': 'New password is required',
+    'error.confirmPasswordRequired': 'Password confirmation is required',
+    'error.currentPasswordIncorrect': 'Current password is incorrect',
+    'error.passwordServerError': 'Server connection error. Please try again.',
+    'error.userNotConnected': 'User not connected',
+    'error.validationErrors': 'Validation errors',
     'success.profileUpdated': 'Profile updated successfully!',
     'success.passwordChanged': 'Password changed successfully!',
     'success.languageUpdated': 'Language updated',
@@ -380,6 +489,20 @@ const translations: Record<string, TranslationKeys> = {
     'form.passwordNumber': 'At least one number',
     'form.passwordSpecial': 'At least one special character',
     'form.passwordMismatch': 'Passwords do not match',
+
+    // Commun
+    'common.optional': '(optional)',
+    'common.unexpectedError': 'An error occurred.',
+
+    // Placeholders
+    'placeholder.linkedinPersonal': 'https://linkedin.com/in/your-profile',
+    'placeholder.companyName': 'Your company or business name',
+    'placeholder.companyWebsite': 'https://www.your-company.com',
+    'placeholder.linkedinCorporate': 'https://linkedin.com/company/your-company',
+    'placeholder.countrySelect': 'Select a country or search...',
+    'placeholder.currentPassword': 'Enter your current password',
+    'placeholder.newPassword': 'Enter your new password',
+    'placeholder.confirmPassword': 'Confirm your new password',
 
     // RGPD et Confidentialité
     'gdpr.deleteAccount': 'Delete my account',
@@ -419,7 +542,7 @@ const translations: Record<string, TranslationKeys> = {
     'chat.loading': 'Cargando...',
     'chat.errorMessage': 'Lo siento, tengo un problema técnico. Por favor, inténtalo de nuevo en unos momentos.',
     'chat.newConversation': 'Nueva conversación',
-    'chat.disclaimer': 'Intelia Expert puede cometer errores. Verifique las respuestas con un profesional si es necesario.',  // ✅ AJOUTÉ
+    'chat.disclaimer': 'Intelia Expert puede cometer errores. Verifique las respuestas con un profesional si es necesario.',
 
     // Modals
     'modal.close': 'Cerrar',
@@ -432,12 +555,14 @@ const translations: Record<string, TranslationKeys> = {
     // Profil
     'profile.title': 'Perfil',
     'profile.personalInfo': 'Información personal',
+    'profile.professionalInfo': 'Información Profesional',
     'profile.contact': 'Contacto',
     'profile.company': 'Empresa',
     'profile.password': 'Contraseña',
     'profile.firstName': 'Nombre *',
     'profile.lastName': 'Apellido *',
     'profile.linkedinProfile': 'Perfil personal de LinkedIn',
+    'profile.linkedinCorporate': 'Página de LinkedIn de la Empresa',
     'profile.email': 'Email *',
     'profile.phone': 'Teléfono',
     'profile.country': 'País *',
@@ -448,19 +573,25 @@ const translations: Record<string, TranslationKeys> = {
     'profile.newPassword': 'Nueva contraseña *',
     'profile.confirmPassword': 'Confirmar nueva contraseña *',
     'profile.passwordRequirements': 'La contraseña debe contener:',
+    'profile.passwordRequirements8': '8+ caracteres',
+    'profile.passwordRequirementsUpper': 'Una mayúscula',
+    'profile.passwordRequirementsLower': 'Una minúscula',
+    'profile.passwordRequirementsNumber': 'Un número',
+    'profile.passwordRequirementsSpecial': 'Carácter especial',
     'profile.passwordErrors': 'Errores:',
     'profile.passwordChanged': '¡Contraseña cambiada con éxito!',
     'profile.profileUpdated': '¡Perfil actualizado con éxito!',
+    'profile.optional': '(opcional)',
 
     // Langue
     'language.title': 'Idioma',
     'language.description': 'Selecciona tu idioma preferido para la interfaz de Intelia Expert',
     'language.updating': 'Actualizando...',
-    'language.changeSuccess': '¡Idioma Cambiado!',                            // ✅ AJOUTÉ
-    'language.interfaceUpdated': 'La interfaz se ha actualizado inmediatamente.',  // ✅ AJOUTÉ
-    'language.reloadForWidget': 'Para que el widget de chat también esté en el nuevo idioma, se recomienda recargar la página.',  // ✅ AJOUTÉ
-    'language.reloadNow': '🔄 Recargar Ahora',                               // ✅ AJOUTÉ
-    'language.continueWithoutReload': '⏭️ Continuar Sin Recargar',           // ✅ AJOUTÉ
+    'language.changeSuccess': '¡Idioma Cambiado!',
+    'language.interfaceUpdated': 'La interfaz se ha actualizado inmediatamente.',
+    'language.reloadForWidget': 'Para que el widget de chat también esté en el nuevo idioma, se recomienda recargar la página.',
+    'language.reloadNow': '🔄 Recargar Ahora',
+    'language.continueWithoutReload': '⭐️ Continuar Sin Recargar',
 
     // Abonnement
     'subscription.title': 'Suscripción',
@@ -496,6 +627,25 @@ const translations: Record<string, TranslationKeys> = {
     'error.connection': 'Error de conexión',
     'error.updateProfile': 'Error al actualizar el perfil',
     'error.changePassword': 'Error al cambiar la contraseña',
+    'error.firstNameRequired': 'El nombre es requerido',
+    'error.lastNameRequired': 'El apellido es requerido',
+    'error.emailRequired': 'El email es requerido',
+    'error.emailInvalid': 'Formato de email inválido',
+    'error.emailTooLong': 'El email es demasiado largo (máximo 254 caracteres)',
+    'error.firstNameTooLong': 'El nombre es demasiado largo (máximo 50 caracteres)',
+    'error.lastNameTooLong': 'El apellido es demasiado largo (máximo 50 caracteres)',
+    'error.companyNameTooLong': 'El nombre de la empresa es demasiado largo (máximo 100 caracteres)',
+    'error.urlInvalid': 'no es una URL válida',
+    'error.urlProtocol': 'debe empezar con http:// o https://',
+    'error.linkedinInvalid': 'debe ser un enlace de LinkedIn válido',
+    'error.phonePrefix': 'Teléfono:',
+    'error.currentPasswordRequired': 'La contraseña actual es requerida',
+    'error.newPasswordRequired': 'La nueva contraseña es requerida',
+    'error.confirmPasswordRequired': 'La confirmación de contraseña es requerida',
+    'error.currentPasswordIncorrect': 'La contraseña actual es incorrecta',
+    'error.passwordServerError': 'Error de conexión al servidor. Por favor, inténtalo de nuevo.',
+    'error.userNotConnected': 'Usuario no conectado',
+    'error.validationErrors': 'Errores de validación',
     'success.profileUpdated': '¡Perfil actualizado con éxito!',
     'success.passwordChanged': '¡Contraseña cambiada con éxito!',
     'success.languageUpdated': 'Idioma actualizado',
@@ -509,6 +659,20 @@ const translations: Record<string, TranslationKeys> = {
     'form.passwordNumber': 'Al menos un número',
     'form.passwordSpecial': 'Al menos un carácter especial',
     'form.passwordMismatch': 'Las contraseñas no coinciden',
+
+    // Commun
+    'common.optional': '(opcional)',
+    'common.unexpectedError': 'Ocurrió un error.',
+
+    // Placeholders
+    'placeholder.linkedinPersonal': 'https://linkedin.com/in/tu-perfil',
+    'placeholder.companyName': 'Nombre de tu empresa o negocio',
+    'placeholder.companyWebsite': 'https://www.tu-empresa.com',
+    'placeholder.linkedinCorporate': 'https://linkedin.com/company/tu-empresa',
+    'placeholder.countrySelect': 'Seleccionar un país o buscar...',
+    'placeholder.currentPassword': 'Ingresa tu contraseña actual',
+    'placeholder.newPassword': 'Ingresa tu nueva contraseña',
+    'placeholder.confirmPassword': 'Confirma tu nueva contraseña',
 
     // RGPD et Confidentialité
     'gdpr.deleteAccount': 'Eliminar mi cuenta',
