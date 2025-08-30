@@ -5,6 +5,13 @@
   "auth.error": "Erreur de connexion",
   "auth.incomplete": "Connexion incomplète",
 
+  "auth.connecting": "Connexion...",
+  "auth.login": "Se connecter",
+  "auth.forgotPassword": "Mot de passe oublié ?",
+  "auth.newToIntelia": "Nouveau sur Intelia Expert ?",
+  "auth.createAccount": "Créer un compte",
+  "common.or": "ou",
+
   "gdpr.notice": "En vous connectant, vous acceptez nos conditions d'utilisation et notre politique de confidentialité.",
   "legal.terms": "Conditions d'utilisation",
   "legal.privacy": "Politique de confidentialité",
