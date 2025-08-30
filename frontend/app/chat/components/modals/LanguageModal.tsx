@@ -66,34 +66,36 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     }
   ]
 
-  const handleLanguageChange = (languageCode: string) => {
-    // Gardes de sécurité
-    if (languageCode === currentLanguage) return
-    if (isUpdating) return
-    
+  const handleLanguageChange = async (languageCode: string) => {
+    if (languageCode === currentLanguage || isUpdating) return
+
     setIsUpdating(true)
     
     try {
-      console.log('[LanguageModal] Changement langue simple:', currentLanguage, '→', languageCode)
+      console.log('[LanguageModal] Changement langue sans reload:', currentLanguage, '→', languageCode)
       
-      // 1. Changement interface immédiat
+      // 1. Changer immédiatement dans l'interface
       changeLanguage(languageCode)
       console.log('[LanguageModal] Interface mise à jour')
       
-      // 2. Sauvegarde localStorage seulement
+      // 2. Sauvegarder dans localStorage
       if (typeof window !== 'undefined') {
         localStorage.setItem('intelia-preferred-language', languageCode)
-        console.log('[LanguageModal] localStorage défini:', languageCode)
+        console.log('[LanguageModal] localStorage sauvegardé:', languageCode)
       }
       
-      // 3. Fermer modal et reload immédiat
+      // 3. Fermer la modal
       onClose()
+      console.log('[LanguageModal] Modal fermée - pas de reload')
       
-      console.log('[LanguageModal] Déclenchement reload...')
-      window.location.reload()
+      // PAS de reload - laissez React gérer l'état
       
     } catch (error) {
-      console.error('[LanguageModal] Erreur:', error)
+      console.error('[LanguageModal] Erreur changement langue:', error)
+    } finally {
+      setIsUpdating(false)
+    }
+  }Modal] Erreur:', error)
       setIsUpdating(false)
     }
   }
