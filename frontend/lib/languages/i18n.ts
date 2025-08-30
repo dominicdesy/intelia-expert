@@ -357,13 +357,16 @@ export const useTranslation = () => {
   // Charger les traductions quand la langue change
   useEffect(() => {
     const loadLanguage = async () => {
+      console.log('🚀 [i18n] Début chargement langue:', currentLanguage);
       setLoading(true)
       try {
         const loadedTranslations = await loadTranslations(currentLanguage)
+        console.log('✅ [i18n] Traductions chargées:', Object.keys(loadedTranslations).length, 'clés');
         setTranslations(loadedTranslations)
       } catch (error) {
-        console.error('Error loading translations:', error)
+        console.error('❌ [i18n] Erreur chargement traductions:', error)
       } finally {
+        console.log('🏁 [i18n] Fin chargement, setLoading(false)');
         setLoading(false)
       }
     }
