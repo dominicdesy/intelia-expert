@@ -312,6 +312,17 @@ let globalTranslations: TranslationKeys = {} as TranslationKeys
 let globalLoading = true
 let globalLanguage = 'fr'
 
+// ✅ EXPOSER LES VARIABLES POUR LE DEBUG
+if (typeof window !== 'undefined') {
+  (window as any).i18nDebug = {
+    getGlobalTranslations: () => globalTranslations,
+    getGlobalLoading: () => globalLoading,
+    getGlobalLanguage: () => globalLanguage,
+    getTranslationsCache: () => translationsCache,
+    notificationManager
+  }
+}
+
 // Fonction pour récupérer la langue depuis le store Zustand
 const getStoredLanguage = (): string => {
   try {
@@ -456,10 +467,17 @@ export const useTranslation = () => {
     const finalTranslations = Object.keys(translations).length > 0 ? translations : globalTranslations
     const isStillLoading = loading && globalLoading
     
-    // ✅ LOGS DE DEBUG MOINS VERBEUX
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`🔍 [i18n] ${key}: ${isStillLoading ? 'LOADING' : finalTranslations[key] || 'NOT_FOUND'}`)
-    }
+    // 🔍 LOGS DE DEBUG DÉTAILLÉS POUR IDENTIFIER LE PROBLÈME
+    console.log('Translation debug DÉTAILLÉ:', JSON.stringify({ 
+      key, 
+      loading: isStillLoading,
+      translationsKeys: Object.keys(finalTranslations).slice(0, 20), // Premier 20 clés seulement
+      translationsLength: Object.keys(finalTranslations).length,
+      translationValue: finalTranslations[key],
+      currentLanguage,
+      usingGlobal: Object.keys(translations).length === 0,
+      hasKey: finalTranslations.hasOwnProperty(key)
+    }, null, 2));
     
     if (isStillLoading || !finalTranslations[key]) {
       return key
