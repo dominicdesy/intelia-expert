@@ -105,12 +105,7 @@ export const useTranslation = (): Translation => {
     if (typeof window === 'undefined') return
     
     const handleLanguageChange = () => {
-      // 2. ✅ PAS DE GARDE - Ne pas ignorer si c'est un boot forcé
-      const isForcedBoot = (window as any).__INTELIA_FORCED_BOOT_LANG__
-      if (isForcedBoot) {
-        console.log('[useTranslation] 🔓 Event autorisé (boot forcé en cours)')
-      }
-      
+      // 2. ✅ PAS DE GARDE - Accepter tous les changements, pas de logique de bypass complexe
       const savedLang = localStorage.getItem('intelia_language')
       if (savedLang && savedLang !== currentLanguage && translations[savedLang as keyof typeof translations]) {
         console.log('[useTranslation] 📡 Mise à jour depuis événement global:', savedLang)
@@ -122,13 +117,10 @@ export const useTranslation = (): Translation => {
     return () => window.removeEventListener('languageChanged', handleLanguageChange)
   }, [currentLanguage])
   
-  // 7. ✅ LOGS - Confirmation du boot pickup
+  // 7. ✅ LOGS - Confirmation du boot pickup (simplifié)
   useEffect(() => {
-    if (typeof window !== 'undefined' && bootApplied) {
-      const isFromBoot = (window as any).__INTELIA_FORCED_BOOT_LANG__
-      if (isFromBoot) {
-        console.log('[useTranslation] 🎯 Boot pickup confirmé - langue active:', currentLanguage)
-      }
+    if (typeof window !== 'undefined') {
+      console.log('[useTranslation] 🎯 Boot pickup confirmé - langue active:', currentLanguage)
     }
   }, [currentLanguage])
   
