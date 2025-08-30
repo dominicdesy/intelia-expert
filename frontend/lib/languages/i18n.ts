@@ -275,6 +275,20 @@ export interface TranslationKeys {
 // Cache pour les traductions chargées
 const translationsCache: Record<string, TranslationKeys> = {}
 
+// Fonction pour récupérer la langue depuis le store Zustand
+const getStoredLanguage = (): string => {
+  try {
+    const storedLang = localStorage.getItem('intelia-language')
+    if (storedLang) {
+      const parsed = JSON.parse(storedLang)
+      return parsed?.state?.currentLanguage || DEFAULT_LANGUAGE
+    }
+  } catch (error) {
+    console.warn('Erreur lecture langue stockée:', error)
+  }
+  return DEFAULT_LANGUAGE
+}
+
 // Fonction pour charger les traductions depuis les fichiers JSON
 async function loadTranslations(language: string): Promise<TranslationKeys> {
   if (translationsCache[language]) {
@@ -313,6 +327,14 @@ export const useTranslation = () => {
   useEffect(() => {
     const getUserLanguage = async () => {
       try {
+        // D'abord vérifier le localStorage Zustand
+        const storedLang = getStoredLanguage()
+        if (storedLang !== DEFAULT_LANGUAGE && isValidLanguageCode(storedLang)) {
+          setCurrentLanguage(storedLang)
+          return
+        }
+
+        // Puis vérifier Supabase
         const { data: { session } } = await supabase.auth.getSession()
         const userLang = session?.user?.user_metadata?.language
         
@@ -363,6 +385,7 @@ export const useTranslation = () => {
   }, [])
 
   const t = (key: keyof TranslationKeys): string => {
+    console.log('Translation debug:', { key, loading, translations: Object.keys(translations).length > 0, currentLanguage });
     if (loading) return key
     return translations[key] || key
   }
