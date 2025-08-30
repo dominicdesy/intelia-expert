@@ -1395,8 +1395,7 @@ export default function ChatInterface() {
 
   return (
     <>
-      <ZohoSalesIQ user={user} language={currentLanguage} />
-
+      <ZohoSalesIQ user={user} />
       <div 
         className={`bg-gray-50 flex flex-col relative z-0 ${uiState.isMobileDevice ? 'chat-main-container' : 'min-h-dvh h-screen'}`}
         style={containerStyle}
