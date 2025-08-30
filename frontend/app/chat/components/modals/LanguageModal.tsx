@@ -66,7 +66,7 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     }
   ]
 
-  const handleLanguageChange = async (languageCode: string) => {
+  const handleLanguageChange = (languageCode: string) => {
     // Gardes de sécurité
     if (languageCode === currentLanguage) return
     if (isUpdating) return
@@ -74,56 +74,26 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     setIsUpdating(true)
     
     try {
-      console.log('[LanguageModal] Début changement ATOMIQUE:', currentLanguage, '→', languageCode)
+      console.log('[LanguageModal] Changement langue simple:', currentLanguage, '→', languageCode)
       
-      // 1. Changement immédiat interface
-      console.log('[LanguageModal] ETAPE 1: Changement interface...')
+      // 1. Changement interface immédiat
       changeLanguage(languageCode)
-      console.log('[LanguageModal] Interface mise à jour immédiatement')
+      console.log('[LanguageModal] Interface mise à jour')
       
-      // 2. Sauvegarde profil utilisateur - LOGS DEBUG DETAILLES
-      console.log('[LanguageModal] ETAPE 2: DEBUT updateProfile avec:', languageCode)
-      console.log('[LanguageModal] updateProfile function exists:', typeof updateProfile)
-      
-      const profileData = { language: languageCode }
-      console.log('[LanguageModal] Data to save:', profileData)
-      
-      const result = await updateProfile(profileData as any)
-      console.log('[LanguageModal] updateProfile result:', result)
-      console.log('[LanguageModal] Profil sauvegardé')
-      
-      // 3. Flag force dans sessionStorage
-      console.log('[LanguageModal] ETAPE 3: Création flag sessionStorage...')
+      // 2. Sauvegarde localStorage seulement
       if (typeof window !== 'undefined') {
-        sessionStorage.setItem('force_language', languageCode)
-        console.log('[LanguageModal] Flag force_language créé:', languageCode)
+        localStorage.setItem('intelia-preferred-language', languageCode)
+        console.log('[LanguageModal] localStorage défini:', languageCode)
       }
       
-      // 4. Redirection atomique
-      console.log('[LanguageModal] ETAPE 4: Redirection atomique...')
-      setTimeout(() => {
-        console.log('[LanguageModal] DEBUT setTimeout redirection')
-        console.log('[LanguageModal] window.location.pathname:', window.location.pathname)
-  
-        if (window.location.pathname.startsWith('/chat')) {
-          console.log('[LanguageModal] DECLENCHEMENT window.location.reload()')
-          window.location.reload()
-        } else {
-          console.log('[LanguageModal] DECLENCHEMENT window.location.replace(/chat)')
-          window.location.replace('/chat')
-        }
-      }, 100)
-
-      return
+      // 3. Fermer modal et reload immédiat
+      onClose()
+      
+      console.log('[LanguageModal] Déclenchement reload...')
+      window.location.reload()
       
     } catch (error) {
-      console.error('[LanguageModal] ERREUR COMPLETE:', error)
-      console.error('[LanguageModal] Type erreur:', typeof error)
-      console.error('[LanguageModal] Message:', error?.message)
-      console.error('[LanguageModal] Stack:', error?.stack)
-      if (error && typeof error === 'object') {
-        console.error('[LanguageModal] Propriétés erreur:', Object.keys(error))
-      }
+      console.error('[LanguageModal] Erreur:', error)
       setIsUpdating(false)
     }
   }
