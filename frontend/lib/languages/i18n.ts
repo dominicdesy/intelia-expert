@@ -272,6 +272,38 @@ export interface TranslationKeys {
   'country.brazil': string
 }
 
+// ✅ SYSTÈME DE NOTIFICATION POUR FORCER LES RE-RENDERS
+class I18nNotificationManager {
+  private static instance: I18nNotificationManager
+  private subscribers: Array<() => void> = []
+
+  static getInstance(): I18nNotificationManager {
+    if (!I18nNotificationManager.instance) {
+      I18nNotificationManager.instance = new I18nNotificationManager()
+    }
+    return I18nNotificationManager.instance
+  }
+
+  subscribe(callback: () => void): () => void {
+    this.subscribers.push(callback)
+    return () => {
+      this.subscribers = this.subscribers.filter(cb => cb !== callback)
+    }
+  }
+
+  notify(): void {
+    this.subscribers.forEach(callback => {
+      try {
+        callback()
+      } catch (error) {
+        console.error('Erreur notification i18n:', error)
+      }
+    })
+  }
+}
+
+const notificationManager = I18nNotificationManager.getInstance()
+
 // Cache pour les traductions chargées
 const translationsCache: Record<string, TranslationKeys> = {}
 
@@ -300,6 +332,10 @@ async function loadTranslations(language: string): Promise<TranslationKeys> {
     globalTranslations = translationsCache[language]
     globalLoading = false
     globalLanguage = language
+    
+    // ✅ NOTIFIER TOUS LES COMPOSANTS
+    notificationManager.notify()
+    
     return translationsCache[language]
   }
 
@@ -314,6 +350,10 @@ async function loadTranslations(language: string): Promise<TranslationKeys> {
     globalTranslations = translations
     globalLoading = false
     globalLanguage = language
+    
+    // ✅ NOTIFIER TOUS LES COMPOSANTS
+    notificationManager.notify()
+    
     return translations
   } catch (error) {
     console.warn(`Could not load translations for ${language}, falling back to French`)
@@ -333,6 +373,17 @@ export const useTranslation = () => {
   const [currentLanguage, setCurrentLanguage] = useState<string>('fr')
   const [translations, setTranslations] = useState<TranslationKeys>({} as TranslationKeys)
   const [loading, setLoading] = useState(true)
+  const [, forceRender] = useState({}) // ✅ Pour forcer les re-renders
+
+  // ✅ S'ABONNER AUX NOTIFICATIONS
+  useEffect(() => {
+    const unsubscribe = notificationManager.subscribe(() => {
+      console.log('🔄 [i18n] Force re-render suite à notification globale')
+      forceRender({}) // Force un re-render
+    })
+
+    return unsubscribe
+  }, [])
 
   // Initialiser avec la langue de l'utilisateur ou celle du navigateur
   useEffect(() => {
@@ -401,21 +452,20 @@ export const useTranslation = () => {
   }, [])
 
   const t = (key: keyof TranslationKeys): string => {
+    // ✅ LOGIQUE SIMPLIFIÉE : priorité aux translations locales, puis globales
     const finalTranslations = Object.keys(translations).length > 0 ? translations : globalTranslations
-    const finalLoading = loading && globalLoading
+    const isStillLoading = loading && globalLoading
     
-    console.log('Translation debug DÉTAILLÉ:', JSON.stringify({ 
-      key, 
-      loading: finalLoading,
-      translationsKeys: Object.keys(finalTranslations), 
-      translationsLength: Object.keys(finalTranslations).length,
-      translationValue: finalTranslations[key],
-      currentLanguage,
-      usingGlobal: Object.keys(translations).length === 0
-    }, null, 2));
+    // ✅ LOGS DE DEBUG MOINS VERBEUX
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🔍 [i18n] ${key}: ${isStillLoading ? 'LOADING' : finalTranslations[key] || 'NOT_FOUND'}`)
+    }
     
-    if (finalLoading) return key
-    return finalTranslations[key] || key
+    if (isStillLoading || !finalTranslations[key]) {
+      return key
+    }
+    
+    return finalTranslations[key]
   }
 
   const changeLanguage = async (newLanguage: string) => {
