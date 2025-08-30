@@ -1,3 +1,5 @@
+// LanguageModal.tsx
+
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from '../../hooks/useTranslation'
 import { useAuthStore } from '@/lib/stores/auth' 
