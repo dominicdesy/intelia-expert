@@ -100,13 +100,18 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
       // 4. Redirection atomique
       console.log('[LanguageModal] ETAPE 4: Redirection atomique...')
       setTimeout(() => {
+        console.log('[LanguageModal] DEBUT setTimeout redirection')
+        console.log('[LanguageModal] window.location.pathname:', window.location.pathname)
+  
         if (window.location.pathname.startsWith('/chat')) {
+          console.log('[LanguageModal] DECLENCHEMENT window.location.reload()')
           window.location.reload()
         } else {
+          console.log('[LanguageModal] DECLENCHEMENT window.location.replace(/chat)')
           window.location.replace('/chat')
         }
       }, 100)
-      
+
       return
       
     } catch (error) {
