@@ -9,8 +9,8 @@ ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 # Copy package files first for better caching
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install all dependencies (dev dependencies needed for build)
+RUN npm ci
 
 # Copy source code
 COPY . .
