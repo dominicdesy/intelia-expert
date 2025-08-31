@@ -260,7 +260,72 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     }
   }, [])
 
-  const { t } = useTranslation()
+  // ✅ CORRECTION CRITIQUE: Hook de traduction avec synchronisation forcée
+  const { t, changeLanguage, getCurrentLanguage } = useTranslation()
+  const [translationsReady, setTranslationsReady] = useState(false)
+  
+  // ✅ SYNCHRONISATION FORCÉE AU MONTAGE
+  useEffect(() => {
+    const forceTranslationSync = async () => {
+      try {
+        console.log('🔄 [UserInfoModal] Synchronisation traductions au montage')
+        
+        // 1. Lire la langue du localStorage
+        const storedLang = localStorage.getItem('intelia-language')
+        if (storedLang) {
+          const parsed = JSON.parse(storedLang)
+          const currentLang = parsed?.state?.currentLanguage
+          
+          if (currentLang && currentLang !== getCurrentLanguage()) {
+            console.log('🔄 [UserInfoModal] Forcer changement langue:', currentLang)
+            await changeLanguage(currentLang)
+          }
+        }
+        
+        // 2. Forcer une notification globale
+        if (typeof window !== 'undefined' && (window as any).i18nDebug) {
+          (window as any).i18nDebug.notificationManager.notify()
+        }
+        
+        // 3. Marquer les traductions comme prêtes
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            setTranslationsReady(true)
+            console.log('✅ [UserInfoModal] Traductions synchronisées')
+          }
+        }, 100)
+        
+      } catch (error) {
+        console.error('❌ [UserInfoModal] Erreur synchronisation traductions:', error)
+        // Même en cas d'erreur, autoriser l'affichage
+        setTranslationsReady(true)
+      }
+    }
+    
+    forceTranslationSync()
+  }, [changeLanguage, getCurrentLanguage])
+
+  // ✅ ÉCOUTER LES CHANGEMENTS DE LANGUE EN TEMPS RÉEL
+  useEffect(() => {
+    const handleLanguageChange = (event: CustomEvent) => {
+      console.log('🔄 [UserInfoModal] Changement langue détecté:', event.detail.language)
+      if (isMountedRef.current) {
+        setTranslationsReady(false)
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            setTranslationsReady(true)
+          }
+        }, 50)
+      }
+    }
+
+    window.addEventListener('languageChanged', handleLanguageChange as EventListener)
+    
+    return () => {
+      window.removeEventListener('languageChanged', handleLanguageChange as EventListener)
+    }
+  }, [])
+
   const { validatePhoneFields } = usePhoneValidation()
   const overlayRef = useRef<HTMLDivElement>(null)
   
@@ -767,7 +832,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
 
   const tabs = useMemo(() => [
     { id: 'profile', label: t('nav.profile'), icon: '👤' },
-    { id: 'password', label: t('profile.password'), icon: '🔐' }
+    { id: 'password', label: t('profile.password'), icon: '🔒' }
   ], [t])
 
   // Keyboard handling
@@ -803,6 +868,18 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     usingFallback,
     countriesLoading
   })
+
+  // ✅ AFFICHAGE CONDITIONNEL : Attendre que les traductions soient prêtes
+  if (!translationsReady) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="bg-white rounded-lg p-6 flex items-center space-x-3">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+          <span className="text-gray-700">Chargement...</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
