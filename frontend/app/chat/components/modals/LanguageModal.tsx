@@ -54,13 +54,40 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
       await changeLanguage(languageCode)
       console.log(t('language.debug.interfaceUpdated'))
       
-      // 2. Sauvegarder dans localStorage
+      // 2. ✅ CORRECTION: Sauvegarder dans localStorage avec la BONNE clé et format
       if (typeof window !== 'undefined') {
-        localStorage.setItem('intelia-preferred-language', languageCode)
+        // Format Zustand attendu par i18n.ts
+        const languageStore = {
+          state: { currentLanguage: languageCode },
+          version: 0
+        }
+        localStorage.setItem('intelia-language', JSON.stringify(languageStore))
+        
+        // ✅ NOUVEAU: Synchroniser avec le store Zustand si disponible
+        try {
+          const { useLanguageStore } = await import('@/lib/stores/language')
+          const languageStoreInstance = useLanguageStore.getState()
+          if (languageStoreInstance.setLanguage) {
+            languageStoreInstance.setLanguage(languageCode)
+          }
+        } catch (error) {
+          console.warn('Store de langue non disponible:', error)
+        }
+        
         console.log(t('language.debug.localStorageSaved'), languageCode)
       }
       
-      // 3. Fermer la modal après un délai pour voir l'effet
+      // 3. ✅ NOUVEAU: Émettre un événement pour forcer la synchronisation
+      window.dispatchEvent(new CustomEvent('languageChanged', { 
+        detail: { language: languageCode } 
+      }))
+      
+      // 4. ✅ NOUVEAU: Forcer un rechargement des traductions globales
+      if (typeof window !== 'undefined' && (window as any).i18nDebug) {
+        (window as any).i18nDebug.notificationManager.notify()
+      }
+      
+      // 5. Fermer la modal après un délai pour voir l'effet
       setTimeout(() => {
         onClose()
         console.log(t('language.debug.modalClosed'))
