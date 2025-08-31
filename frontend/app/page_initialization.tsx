@@ -6,23 +6,78 @@ import type { Language } from '@/types'
 import { useTranslation } from '@/lib/languages/i18n'
 import { rememberMeUtils } from './page_hooks'
 
+// 🎯 NOUVEAU: Traductions critiques par défaut pour éviter le FOUC
+const criticalTranslations = {
+  fr: {
+    'page.title': 'Connexion à Intelia Expert',
+    'auth.success': 'Connexion réussie',
+    'auth.error': 'Erreur de connexion',
+    'auth.incomplete': 'Connexion incomplète',
+    'email': 'Email',
+    'password': 'Mot de passe',
+    'loading': 'Chargement...'
+  },
+  en: {
+    'page.title': 'Login to Intelia Expert',
+    'auth.success': 'Login successful',
+    'auth.error': 'Connection error',
+    'auth.incomplete': 'Incomplete connection',
+    'email': 'Email',
+    'password': 'Password',
+    'loading': 'Loading...'
+  },
+  es: {
+    'page.title': 'Iniciar sesión en Intelia Expert',
+    'auth.success': 'Inicio de sesión exitoso',
+    'auth.error': 'Error de conexión',
+    'auth.incomplete': 'Conexión incompleta',
+    'email': 'Correo electrónico',
+    'password': 'Contraseña',
+    'loading': 'Cargando...'
+  },
+  ar: {
+    'page.title': 'تسجيل الدخول إلى Intelia Expert',
+    'auth.success': 'تم تسجيل الدخول بنجاح',
+    'auth.error': 'خطأ في الاتصال',
+    'auth.incomplete': 'اتصال غير مكتمل',
+    'email': 'البريد الإلكتروني',
+    'password': 'كلمة المرور',
+    'loading': 'جاري التحميل...'
+  }
+}
+
+// 🎯 NOUVEAU: États de chargement pour le skeleton
+type LoadingState = 'initial' | 'hydrating' | 'loading-translations' | 'ready'
+
 export function usePageInitialization() {
   const searchParams = useSearchParams()
   
   // Refs pour éviter les doubles appels
   const hasInitialized = useRef(false)
   const isMounted = useRef(true)
+  const translationsReady = useRef(false)
   
+  // 🎯 NOUVEAU: État de chargement unifié
+  const [loadingState, setLoadingState] = useState<LoadingState>('initial')
   const [currentLanguage, setCurrentLanguage] = useState<Language>('fr')
   const [isSignupMode, setIsSignupMode] = useState(false)
   const [localError, setLocalError] = useState('')
   const [localSuccess, setLocalSuccess] = useState('')
-  const [hasHydrated, setHasHydrated] = useState(false)
 
-  // ✅ CORRECTION : Utiliser le hook centralisé au lieu de translations[currentLanguage]
-  const { t } = useTranslation()
+  // Hook de traductions avec fallback
+  const { t: originalT } = useTranslation()
 
-  // CORRECTION : toggleMode sans dépendances changeantes
+  // 🎯 NOUVEAU: Fonction t avec fallback anti-FOUC
+  const t = useCallback((key: string): string => {
+    // Si les traductions ne sont pas prêtes, utiliser les traductions critiques
+    if (!translationsReady.current && criticalTranslations[currentLanguage]?.[key]) {
+      return criticalTranslations[currentLanguage][key]
+    }
+    // Sinon, utiliser les vraies traductions avec fallback
+    return originalT(key) || criticalTranslations[currentLanguage]?.[key] || key
+  }, [originalT, currentLanguage])
+
+  // Fonction toggleMode stable
   const toggleMode = useCallback(() => {
     console.log('🔄 [UI] Basculement mode')
     setIsSignupMode(prev => {
@@ -31,81 +86,90 @@ export function usePageInitialization() {
     })
     setLocalError('')
     setLocalSuccess('')
-  }, []) // Pas de dépendances - fonction stable
+  }, [])
 
-  // CORRECTION : setCurrentLanguage stable sans dépendances changeantes
+  // Fonction setCurrentLanguage stable avec transition de state
   const handleSetCurrentLanguage = useCallback((newLanguage: Language) => {
     setCurrentLanguage(prev => {
       if (prev !== newLanguage) {
-        console.log('🌐 [Language] Changement de langue:', prev, '→', newLanguage)
+        console.log('🌐 [Language] Changement:', prev, '→', newLanguage)
         localStorage.setItem('intelia-language', newLanguage)
+        // 🎯 NOUVEAU: Déclencher un re-render pour mettre à jour les traductions critiques
+        setLoadingState(current => current === 'ready' ? 'loading-translations' : current)
         return newLanguage
       }
       return prev
     })
-  }, []) // Pas de dépendances - fonction stable
+  }, [])
 
-  // Effects d'initialisation optimisés avec Remember Me
+  // 🎯 NOUVEAU: Effect pour gérer les états de chargement
   useEffect(() => {
     if (!isMounted.current) return
-    
-    setHasHydrated(true)
-    
-    if (!hasInitialized.current) {
-      hasInitialized.current = true
-      console.log('🎯 [Init] Initialisation unique')
-      
-      // ✅ CORRECTION : Utiliser une liste de langues supportées au lieu de translations[savedLanguage]
-      const supportedLanguages = ['fr', 'en', 'es', 'ar'] // Ajustez selon vos langues supportées
-      
-      // Charger les préférences utilisateur de manière synchrone
-      const savedLanguage = localStorage.getItem('intelia-language') as Language
-      if (savedLanguage && supportedLanguages.includes(savedLanguage)) {
-        setCurrentLanguage(savedLanguage)
-      } else {
-        // Détection de langue navigateur seulement si pas de langue sauvée
-        const browserLanguage = navigator.language.substring(0, 2) as Language
-        if (supportedLanguages.includes(browserLanguage)) {
-          setCurrentLanguage(browserLanguage)
-        }
-      }
 
-      // CORRECTION : Restaurer EMAIL avec la nouvelle structure rememberMeUtils
-      const { rememberMe, lastEmail } = rememberMeUtils.load()
-      const hasRememberedEmail = rememberMe && lastEmail
-      
-      if (hasRememberedEmail && isMounted.current) {
-        setLocalSuccess(`Email restauré : ${lastEmail}. Entrez votre mot de passe.`)
-        const timer = setTimeout(() => {
-          if (isMounted.current) {
-            setLocalSuccess('')
-          }
-        }, 4000)
+    const initializeApp = async () => {
+      console.log('🎯 [Init] Début initialisation')
+      setLoadingState('hydrating')
+
+      if (!hasInitialized.current) {
+        hasInitialized.current = true
         
-        // Cleanup timer si démontage
-        return () => clearTimeout(timer)
+        // Charger les préférences de manière synchrone
+        const supportedLanguages = ['fr', 'en', 'es', 'ar']
+        const savedLanguage = localStorage.getItem('intelia-language') as Language
+        
+        if (savedLanguage && supportedLanguages.includes(savedLanguage)) {
+          setCurrentLanguage(savedLanguage)
+        } else {
+          const browserLanguage = navigator.language.substring(0, 2) as Language
+          if (supportedLanguages.includes(browserLanguage)) {
+            setCurrentLanguage(browserLanguage)
+          }
+        }
+
+        // Gérer Remember Me
+        const { rememberMe, lastEmail } = rememberMeUtils.load()
+        if (rememberMe && lastEmail && isMounted.current) {
+          setLocalSuccess(`Email restauré : ${lastEmail}. Entrez votre mot de passe.`)
+          setTimeout(() => {
+            if (isMounted.current) setLocalSuccess('')
+          }, 4000)
+        }
+
+        setLoadingState('loading-translations')
+        
+        // 🎯 NOUVEAU: Simuler un petit délai pour que les vraies traductions se chargent
+        setTimeout(() => {
+          if (isMounted.current) {
+            translationsReady.current = true
+            setLoadingState('ready')
+            console.log('✅ [Init] Application prête')
+          }
+        }, 100) // Délai minimal pour éviter le flash
       }
     }
-  }, []) // Dépendances vides - ne s'exécute qu'une fois
+
+    initializeApp()
+  }, [])
 
   // Gestion URL callback optimisée
   useEffect(() => {
-    if (!hasInitialized.current || !isMounted.current) return
+    if (loadingState !== 'ready' || !isMounted.current) return
 
     const authStatus = searchParams?.get('auth')
     if (!authStatus) return
     
     console.log('🔗 [URL] Traitement callback auth:', authStatus)
     
+    // Utiliser les traductions avec fallback
     if (authStatus === 'success') {
-      setLocalSuccess(t('auth.success') || 'Connexion réussie')
+      setLocalSuccess(t('auth.success'))
     } else if (authStatus === 'error') {
-      setLocalError(t('auth.error') || 'Erreur de connexion')
+      setLocalError(t('auth.error'))
     } else if (authStatus === 'incomplete') {
-      setLocalError(t('auth.incomplete') || 'Connexion incomplète')
+      setLocalError(t('auth.incomplete'))
     }
     
-    // Nettoyer l'URL de manière optimisée
+    // Nettoyer l'URL
     try {
       const url = new URL(window.location.href)
       url.searchParams.delete('auth')
@@ -114,7 +178,6 @@ export function usePageInitialization() {
       console.error('❌ [URL] Erreur nettoyage URL:', error)
     }
     
-    // Masquer les messages après 3 secondes
     const timer = setTimeout(() => {
       if (isMounted.current) {
         setLocalSuccess('')
@@ -123,9 +186,23 @@ export function usePageInitialization() {
     }, 3000)
     
     return () => clearTimeout(timer)
-  }, [searchParams, t]) // ✅ CORRECTION : Seulement t comme dépendance au lieu de t.authSuccess, etc.
+  }, [searchParams, t, loadingState])
 
-  // Effet pour bloquer le scroll en mode signup - Optimisé
+  // 🎯 NOUVEAU: Effect pour gérer les changements de langue après l'initialisation
+  useEffect(() => {
+    if (loadingState === 'loading-translations') {
+      const timer = setTimeout(() => {
+        if (isMounted.current) {
+          translationsReady.current = true
+          setLoadingState('ready')
+        }
+      }, 50) // Délai minimal pour la transition
+      
+      return () => clearTimeout(timer)
+    }
+  }, [loadingState])
+
+  // Effet pour bloquer le scroll en mode signup
   useEffect(() => {
     const originalBodyOverflow = document.body.style.overflow
     const originalDocumentOverflow = document.documentElement.style.overflow
@@ -138,42 +215,51 @@ export function usePageInitialization() {
       document.documentElement.style.overflow = originalDocumentOverflow || 'unset'
     }
     
-    // Cleanup optimisé au démontage
     return () => {
       document.body.style.overflow = originalBodyOverflow || 'unset'
       document.documentElement.style.overflow = originalDocumentOverflow || 'unset'
     }
   }, [isSignupMode])
 
-  // Cleanup général au démontage
+  // Cleanup général
   useEffect(() => {
     return () => {
       isMounted.current = false
     }
   }, [])
 
-  // ✅ CORRECTION : Retour avec fonctions stables, sans t dans les dépendances
+  // 🎯 NOUVEAU: Computed values pour les états de chargement
+  const computedStates = useMemo(() => {
+    return {
+      hasHydrated: loadingState !== 'initial',
+      hasInitialized: { current: loadingState === 'ready' },
+      isLoadingTranslations: loadingState === 'loading-translations',
+      showSkeleton: loadingState === 'hydrating' || loadingState === 'loading-translations'
+    }
+  }, [loadingState])
+
   return useMemo(() => ({
     currentLanguage,
-    setCurrentLanguage: handleSetCurrentLanguage, // Fonction stable
-    t,
+    setCurrentLanguage: handleSetCurrentLanguage,
+    t, // 🎯 NOUVEAU: Fonction t avec fallback anti-FOUC
     isSignupMode,
     setIsSignupMode,
     localError,
     setLocalError,
     localSuccess,
     setLocalSuccess,
-    hasHydrated,
-    hasInitialized,
-    toggleMode // Fonction stable
+    toggleMode,
+    loadingState, // 🎯 NOUVEAU: État de chargement unifié
+    ...computedStates // 🎯 NOUVEAU: États calculés
   }), [
-    currentLanguage, 
-    // ✅ CORRECTION : t supprimé des dépendances car il vient du hook useTranslation
-    isSignupMode, 
-    localError, 
-    localSuccess, 
-    hasHydrated,
-    handleSetCurrentLanguage, // Stable
-    toggleMode // Stable
+    currentLanguage,
+    t, // Inclure t car il dépend de currentLanguage et translationsReady
+    isSignupMode,
+    localError,
+    localSuccess,
+    handleSetCurrentLanguage,
+    toggleMode,
+    loadingState,
+    computedStates
   ])
 }

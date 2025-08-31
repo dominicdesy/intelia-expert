@@ -67,32 +67,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  // CORRECTION: Hydratation avec initialisation centralisée
+  // CORRECTION: Hydratation SANS initialisation automatique
   useEffect(() => {
-    // Vérifier si une déconnexion récente est en cours
-    const recentLogout = sessionStorage.getItem('recent-logout')
-    if (recentLogout) {
-      const logoutTime = parseInt(recentLogout)
-      if (Date.now() - logoutTime < 5000) {
-        console.log('[AuthProvider] Initialisation différée - déconnexion récente')
-        return
-      }
-    }
-
     if (!hasHydrated && isMountedRef.current && !isLoggingOutRef.current) {
       setHasHydrated(true)
-      console.log('[AuthProvider] Store hydraté - Supabase auth')
-    
-      // CORRECTION: Utiliser la fonction centralisée au lieu d'appel direct
-      initializeSessionOnce().then((success) => {
-        if (isMountedRef.current && !isLoggingOutRef.current) {
-          console.log('[AuthProvider] Session initialisée via singleton:', success ? 'succès' : 'échec')
-        }
-      }).catch((error) => {
-        if (isMountedRef.current && !isLoggingOutRef.current) {
-          console.error('[AuthProvider] Erreur initialisation session singleton:', error)
-        }
-      })
+      console.log('[AuthProvider] Store hydraté - initialisation déléguée aux pages')
     }
   }, [hasHydrated, setHasHydrated])
 
