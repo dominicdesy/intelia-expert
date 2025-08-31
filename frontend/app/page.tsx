@@ -8,7 +8,7 @@ import { usePageInitialization } from './page_initialization'
 import { InteliaLogo, LanguageSelector, LoadingSpinner, AuthFooter } from './page_components'
 
 // Mémorisation des composants pour éviter les re-renders
-const MemoizedLoginForm = memo(LoginForm)
+// ✅ SUPPRIMÉ: LoginForm n'est plus mémorisé pour permettre les re-renders avec les nouvelles traductions
 const MemoizedSignupModal = memo(SignupModal)
 const MemoizedInteliaLogo = memo(InteliaLogo)
 const MemoizedLanguageSelector = memo(LanguageSelector)
@@ -87,7 +87,8 @@ const PageContent = memo(() => {
         {/* Formulaire de connexion */}
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
           <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
-            <MemoizedLoginForm 
+            {/* ✅ CORRIGÉ: LoginForm n'est plus mémorisé pour permettre les re-renders avec les traductions */}
+            <LoginForm 
               authLogic={authLogic}
               t={t}
               currentLanguage={currentLanguage}
