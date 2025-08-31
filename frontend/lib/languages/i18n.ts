@@ -26,6 +26,11 @@ export interface TranslationKeys {
   'auth.success': string
   'auth.error': string
   'auth.incomplete': string
+  'auth.connecting': string
+  'auth.login': string
+  'auth.forgotPassword': string
+  'auth.newToIntelia': string
+  'auth.createAccount': string
 
   // GDPR et Legal
   'gdpr.notice': string
@@ -40,13 +45,6 @@ export interface TranslationKeys {
   'login.passwordLabel': string
   'login.emailPlaceholder': string
   'login.passwordPlaceholder': string
-
-  // Auth actions
-  'auth.connecting': string
-  'auth.login': string
-  'auth.forgotPassword': string
-  'auth.newToIntelia': string
-  'auth.createAccount': string
   'login.rememberMe': string
   'login.emailLabel': string
   'login.passwordLabel': string
