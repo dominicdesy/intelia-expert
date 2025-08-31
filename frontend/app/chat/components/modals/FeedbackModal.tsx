@@ -118,7 +118,7 @@ export const FeedbackModal = ({
               />
               <div className="flex justify-between items-center mt-2">
                 <div className="text-xs text-gray-400">
-                  {t('feedback.characterCount', { current: comment.length, max: 500 })}
+                  {`${t('feedback.characterCount')}: ${comment.length}/500`}
                 </div>
                 {comment.length > 450 && (
                   <div className="text-xs text-orange-500">

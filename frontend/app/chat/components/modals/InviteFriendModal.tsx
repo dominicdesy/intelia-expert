@@ -391,28 +391,28 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
       if (result.reason === 'user_exists') {
         if (result.details?.registered_since) {
           const registeredDate = new Date(result.details.registered_since).toLocaleDateString('fr-FR')
-          return t('invite.userExistsWithDate', { email: result.email, date: registeredDate })
+          return `${t('invite.userExistsWithDate')}: ${result.email} (${registeredDate})`
         }
-        return t('invite.userExists', { email: result.email })
+        return `${t('invite.userExists')}: ${result.email}`
       }
       
       if (result.reason === 'already_invited_by_you') {
-        return t('invite.alreadyInvitedByYou', { email: result.email })
+        return `${t('invite.alreadyInvitedByYou')}: ${result.email}`
       }
       
       if (result.reason === 'already_invited_by_other') {
-        return t('invite.alreadyInvitedByOther', { email: result.email })
+        return `${t('invite.alreadyInvitedByOther')}: ${result.email}`
       }
     }
     
     if (result.status === 'failed') {
       if (result.reason?.includes('Invalid email')) {
-        return t('invite.invalidEmail', { email: result.email })
+        return `${t('invite.invalidEmail')}: ${result.email}`
       }
       if (result.reason?.includes('rate limit')) {
         return t('invite.rateLimit')
       }
-      return t('invite.sendFailed', { email: result.email })
+      return `${t('invite.sendFailed')}: ${result.email}`
     }
     
     return result.message
@@ -626,7 +626,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
                       {t('invite.emailAddresses')}
                       {getEmailCount() > 0 && (
                         <span className="ml-2 text-blue-600 font-normal">
-                          ({t('invite.recipientCount', { count: getEmailCount() })})
+                          {`${t('invite.recipientCount')}: ${getEmailCount()}`})
                         </span>
                       )}
                     </label>

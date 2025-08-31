@@ -220,7 +220,7 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
               ))
             ) : (
               <li className="px-3 py-4 text-center text-gray-500 text-sm" role="option">
-                {t('countries.noResults', { searchTerm })}
+                {`${t('countries.noResults')}: ${searchTerm}`}
               </li>
             )}
           </ul>

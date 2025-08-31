@@ -46,7 +46,7 @@ const VerificationSuccessPage = ({ email }: { email?: string }) => {
         
         <p className="text-gray-600 mb-4">
           {email ? 
-            t('verification.success.emailConfirmed', { email }) : 
+            `${t('verification.success.emailConfirmed')}: ${email}` : 
             t('verification.success.confirmed')
           }
         </p>
@@ -151,7 +151,7 @@ const PendingVerificationPage = ({ email }: { email?: string }) => {
         
         <p className="text-gray-600 mb-4">
           {email ? 
-            t('verification.pending.emailSentTo', { email }) : 
+            `${t('verification.pending.emailSentTo')}: ${email}` : 
             t('verification.pending.emailSent')
           }
         </p>
