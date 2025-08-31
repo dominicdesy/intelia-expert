@@ -381,10 +381,10 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     }
   }
 
-  // ==================== AJOUT: Fonction pour messages simplifiés ====================
+  // ==================== FONCTION CORRIGÉE POUR MESSAGES SIMPLIFIÉS ====================
   const getFriendlyMessage = (result: InvitationResult) => {
     if (result.status === 'sent') {
-      return t('invite.invitationSent', { email: result.email })
+      return `${t('invite.invitationSent')}: ${result.email}`
     }
     
     if (result.status === 'skipped') {
@@ -626,7 +626,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
                       {t('invite.emailAddresses')}
                       {getEmailCount() > 0 && (
                         <span className="ml-2 text-blue-600 font-normal">
-                          {`${t('invite.recipientCount')}: ${getEmailCount()}`})
+                          ({`${t('invite.recipientCount')}: ${getEmailCount()}`})
                         </span>
                       )}
                     </label>
