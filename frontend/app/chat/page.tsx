@@ -1130,7 +1130,7 @@ export default function ChatInterface() {
                       onClick={() => setClarificationState(null)}
                       className="text-blue-600 hover:text-blue-800 text-sm"
                     >
-                      {t('common.cancel')}
+                      {t('modal.cancel')}
                     </button>
                   </div>
                 </div>
