@@ -63,20 +63,8 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
         }
         localStorage.setItem('intelia-language', JSON.stringify(languageStore))
         
-        // ✅ NOUVEAU: Synchroniser avec le store Zustand si disponible
-        try {
-          const { useLanguageStore } = await import('@/lib/stores/language')
-          const languageStoreInstance = useLanguageStore.getState()
-          if (languageStoreInstance.setLanguage) {
-            // Trouver l'objet Language correspondant au code
-            const languageObject = availableLanguages.find(lang => lang.code === languageCode)
-            if (languageObject) {
-              languageStoreInstance.setLanguage(languageObject)
-            }
-          }
-        } catch (error) {
-          console.warn('Store de langue non disponible:', error)
-        }
+        // Note: La synchronisation se fait via localStorage et les événements
+        // Le store Zustand sera automatiquement mis à jour par le système i18n
         
         console.log(t('language.debug.localStorageSaved'), languageCode)
       }
