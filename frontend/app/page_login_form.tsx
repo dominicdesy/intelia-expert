@@ -4,12 +4,12 @@ import React, { memo, useCallback, useState, useEffect, useMemo, useRef } from '
 import Link from 'next/link'
 import { AlertMessage, PasswordInput } from './page_components'
 import { validateEmail, rememberMeUtils, debugLog } from './page_hooks'
+import { useTranslation } from '@/lib/languages/i18n'
 import type { LoginData } from './page_types'
 import type { Language } from '@/types'
 
 interface LoginFormProps {
   authLogic: any
-  t: any
   currentLanguage: Language
   localError: string
   localSuccess: string
@@ -18,13 +18,15 @@ interface LoginFormProps {
 
 export const LoginForm = memo(function LoginForm({ 
   authLogic, 
-  t, 
   currentLanguage,
   localError, 
   localSuccess, 
   toggleMode 
 }: LoginFormProps) {
   debugLog('form', 'LoginForm rendered')
+  
+  // ✅ UTILISE DIRECTEMENT useTranslation au lieu de recevoir t comme prop
+  const { t } = useTranslation()
   
   const {
     isLoading,

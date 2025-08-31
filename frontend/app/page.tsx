@@ -87,10 +87,9 @@ const PageContent = memo(() => {
         {/* Formulaire de connexion */}
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
           <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
-            {/* ✅ CORRIGÉ: LoginForm n'est plus mémorisé pour permettre les re-renders avec les traductions */}
+            {/* ✅ CORRIGÉ: LoginForm utilise maintenant directement useTranslation, plus de prop t */}
             <LoginForm 
               authLogic={authLogic}
-              t={t}
               currentLanguage={currentLanguage}
               localError={localError}
               localSuccess={localSuccess}
