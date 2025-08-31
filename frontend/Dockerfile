@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
@@ -6,17 +6,20 @@ WORKDIR /app
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-# Install system dependencies for compilation
-RUN apk add --no-cache libc6-compat
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy package files first
+# Copy package files
 COPY package*.json ./
 
-# Install dependencies and pre-download SWC
+# Install dependencies
 RUN npm install
-RUN npm install @next/swc-linux-x64-musl || true
 
-# Set environment variables before copying source
+# Set environment variables
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
@@ -28,16 +31,19 @@ ENV NEXT_PUBLIC_API_BASE_URL="https://expert.intelia.com/api"
 ENV NEXT_PUBLIC_API_VERSION="v1"
 ENV NEXT_PUBLIC_SITE_URL="https://expert.intelia.com"
 
+# Disable SWC minification to avoid download issues
+ENV NEXT_SWCMINIFY=false
+
 # Copy source code
 COPY . .
 
-# Clear any existing build artifacts
+# Clean any existing build
 RUN rm -rf .next
 
-# Build with retry mechanism
-RUN npm run build || (sleep 5 && npm run build) || (sleep 10 && npm run build)
+# Build with Babel fallback instead of SWC
+RUN npm run build
 
-# Verify build exists
+# Verify build
 RUN ls -la .next/
 
 # Expose port
