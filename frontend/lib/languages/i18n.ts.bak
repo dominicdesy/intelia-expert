@@ -622,7 +622,7 @@ export interface TranslationKeys {
   'country.brazil': string
 }
 
-// SYSTÈME DE NOTIFICATION POUR FORCER LES RE-RENDERS
+// ✅ SYSTÈME DE NOTIFICATION POUR FORCER LES RE-RENDERS
 class I18nNotificationManager {
   private static instance: I18nNotificationManager
   private subscribers: Array<() => void> = []
@@ -662,8 +662,8 @@ let globalTranslations: TranslationKeys = {} as TranslationKeys
 let globalLoading = true
 let globalLanguage = 'fr'
 
-// EXPOSER LES VARIABLES POUR LE DEBUG (seulement en développement)
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+// ✅ EXPOSER LES VARIABLES POUR LE DEBUG
+if (typeof window !== 'undefined') {
   (window as any).i18nDebug = {
     getGlobalTranslations: () => globalTranslations,
     getGlobalLoading: () => globalLoading,
@@ -694,7 +694,7 @@ async function loadTranslations(language: string): Promise<TranslationKeys> {
     globalLoading = false
     globalLanguage = language
     
-    // NOTIFIER TOUS LES COMPOSANTS
+    // ✅ NOTIFIER TOUS LES COMPOSANTS
     notificationManager.notify()
     
     return translationsCache[language]
@@ -712,7 +712,7 @@ async function loadTranslations(language: string): Promise<TranslationKeys> {
     globalLoading = false
     globalLanguage = language
     
-    // NOTIFIER TOUS LES COMPOSANTS
+    // ✅ NOTIFIER TOUS LES COMPOSANTS
     notificationManager.notify()
     
     return translations
@@ -734,11 +734,12 @@ export const useTranslation = () => {
   const [currentLanguage, setCurrentLanguage] = useState<string>('fr')
   const [translations, setTranslations] = useState<TranslationKeys>({} as TranslationKeys)
   const [loading, setLoading] = useState(true)
-  const [, forceRender] = useState({}) // Pour forcer les re-renders
+  const [, forceRender] = useState({}) // ✅ Pour forcer les re-renders
 
-  // S'ABONNER AUX NOTIFICATIONS
+  // ✅ S'ABONNER AUX NOTIFICATIONS
   useEffect(() => {
     const unsubscribe = notificationManager.subscribe(() => {
+      console.log('🔄 [i18n] Force re-render suite à notification globale')
       forceRender({}) // Force un re-render
     })
 
@@ -779,16 +780,18 @@ export const useTranslation = () => {
   // Charger les traductions quand la langue change
   useEffect(() => {
     const loadLanguage = async () => {
+      console.log('🚀 [i18n] Début chargement langue:', currentLanguage);
       setLoading(true)
       try {
         const loadedTranslations = await loadTranslations(currentLanguage)
+        console.log('✅ [i18n] Traductions chargées:', Object.keys(loadedTranslations).length, 'clés');
         
         // IMPORTANT: Mettre à jour les translations AVANT de mettre loading à false
         setTranslations(loadedTranslations)
         setLoading(false)
         
       } catch (error) {
-        console.error('Erreur chargement traductions:', error)
+        console.error('❌ [i18n] Erreur chargement traductions:', error)
         setLoading(false)
       }
     }
@@ -810,11 +813,21 @@ export const useTranslation = () => {
   }, [])
 
   const t = (key: keyof TranslationKeys): string => {
-    // LOGIQUE SIMPLIFIÉE : priorité aux translations locales, puis globales
+    // ✅ LOGIQUE SIMPLIFIÉE : priorité aux translations locales, puis globales
     const finalTranslations = Object.keys(translations).length > 0 ? translations : globalTranslations
     const isStillLoading = loading && globalLoading
     
-    // SUPPRESSION COMPLÈTE DES LOGS DEBUG QUI CAUSAIENT LA BOUCLE INFINIE
+    // 🔍 LOGS DE DEBUG DÉTAILLÉS POUR IDENTIFIER LE PROBLÈME
+    console.log('Translation debug DÉTAILLÉ:', JSON.stringify({ 
+      key, 
+      loading: isStillLoading,
+      translationsKeys: Object.keys(finalTranslations).slice(0, 20), // Premier 20 clés seulement
+      translationsLength: Object.keys(finalTranslations).length,
+      translationValue: finalTranslations[key],
+      currentLanguage,
+      usingGlobal: Object.keys(translations).length === 0,
+      hasKey: finalTranslations.hasOwnProperty(key)
+    }, null, 2));
     
     if (isStillLoading || !finalTranslations[key]) {
       return key
