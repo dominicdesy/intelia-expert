@@ -478,7 +478,7 @@ function InvitationAcceptPageContent() {
         if (!formData.phoneNumber.trim()) missingFields.push(t('profile.phoneNumber'))
         
         if (missingFields.length > 0) {
-          validationErrors.push(t('validation.phone.incomplete', { fields: missingFields.join(', ') }))
+          validationErrors.push(`${t('validation.phone.incomplete')}: ${missingFields.join(', ')}`)
         } else {
           validationErrors.push(t('validation.phone.invalid'))
         }
@@ -602,7 +602,7 @@ function InvitationAcceptPageContent() {
       setProcessingResult({
         success: true,
         step: 'completion',
-        message: t('invitation.success.welcome', { firstName: formData.firstName })
+        message: `${t('invitation.success.welcome')}, ${formData.firstName}`
       })
       
       setTimeout(() => {
