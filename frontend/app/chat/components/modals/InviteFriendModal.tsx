@@ -267,7 +267,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     if (invalid.length > 0) {
       console.log('❌ [InviteFriendModal] Emails invalides détectés:', invalid)
       setErrors([
-        t('invite.invalidEmails', { emails: invalid.join(', ') }),
+        `${t('invite.invalidEmails')}: ${invalid.join(', ')}`,
         t('invite.emailFormat')
       ])
       return
