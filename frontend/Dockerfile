@@ -1,27 +1,30 @@
-FROM node:20-slim
-
+# ---------- Stage 1: deps ----------
+FROM node:20-bullseye-slim AS deps
 WORKDIR /app
 
 # Build arguments
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    python3 \
-    make \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
+# Robustesse réseau npm
+RUN npm config set fetch-retries 5 \
+ && npm config set fetch-retry-maxtimeout 120000 \
+ && npm config set prefer-offline false
 
-# Copy package files
-COPY package*.json ./
+# Installation déterministe
+COPY package.json package-lock.json ./
+RUN npm ci
 
-# Install dependencies
-RUN npm install
+# ---------- Stage 2: builder ----------
+FROM node:20-bullseye-slim AS builder
+WORKDIR /app
 
-# Set environment variables
+# Variables d'environnement pour build
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS=--max_old_space_size=2048
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_APP_NAME="Intelia Expert"
@@ -31,23 +34,28 @@ ENV NEXT_PUBLIC_API_BASE_URL="https://expert.intelia.com/api"
 ENV NEXT_PUBLIC_API_VERSION="v1"
 ENV NEXT_PUBLIC_SITE_URL="https://expert.intelia.com"
 
-# Disable SWC minification to avoid download issues
-ENV NEXT_SWCMINIFY=false
-
-# Copy source code
+# Reprend node_modules installés
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Clean any existing build
-RUN rm -rf .next
+# Purge le cache SWC (évite les archives corrompues)
+RUN rm -rf /root/.cache/next-swc
 
-# Build with Babel fallback instead of SWC
+# Build Next (PAS de "npx next build")
 RUN npm run build
 
-# Verify build
-RUN ls -la .next/
-
-# Expose port
+# ---------- Stage 3: runtime ----------
+FROM node:20-bullseye-slim AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=8080
 EXPOSE 8080
 
-# Start application
-CMD ["npm", "start"]
+# Copie le minimum pour runtime
+COPY --from=builder /app/package.json ./
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+
+# Start avec port explicite
+CMD ["npm", "run", "start", "--", "-p", "8080"]
