@@ -222,8 +222,9 @@ function VerifyEmailPageContent() {
       if (!token && !confirmationUrl) {
         console.log('[VerifyEmail] Pas de token - page en attente')
         setStatus('pending')
+        // CORRECTION: Utiliser les clés simples sans interpolation
         setMessage(emailParam ? 
-          t('verification.pending.emailSentTo', { email: emailParam }) : 
+          `${t('verification.pending.emailSentTo')}: ${emailParam}` : 
           t('verification.pending.checkEmail')
         )
         return
