@@ -1,4 +1,4 @@
-// LanguageModal.tsx
+// LanguageModal.tsx - CORRECTION ligne 26 et ajout de synchronisation
 
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation, availableLanguages, getLanguageByCode } from '@/lib/languages/i18n'
@@ -68,7 +68,11 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
           const { useLanguageStore } = await import('@/lib/stores/language')
           const languageStoreInstance = useLanguageStore.getState()
           if (languageStoreInstance.setLanguage) {
-            languageStoreInstance.setLanguage(languageCode)
+            // Trouver l'objet Language correspondant au code
+            const languageObject = availableLanguages.find(lang => lang.code === languageCode)
+            if (languageObject) {
+              languageStoreInstance.setLanguage(languageObject)
+            }
           }
         } catch (error) {
           console.warn('Store de langue non disponible:', error)
