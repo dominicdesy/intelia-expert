@@ -63,7 +63,44 @@
 /* 🎯 NOUVEAUX: Styles anti-FOUC spécifiques */
 @layer utilities {
   
-  /* === STYLES ANTI-FOUC === */
+  /* === STYLES ANTI-FOUC AVANCÉS === */
+  
+  /* Transition fluide entre statique et dynamique */
+  .fade-transition {
+    transition: opacity 300ms ease-in-out;
+  }
+  
+  .static-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+  }
+  
+  .dynamic-content {
+    position: relative;
+    z-index: 2;
+  }
+  
+  /* Empêcher tout flash de contenu */
+  .no-fouc-container {
+    min-height: 100vh;
+    background: linear-gradient(to bottom right, #dbeafe, #ffffff, #f0fdf4);
+  }
+  
+  /* Force l'affichage immédiat du contenu critique */
+  .critical-content {
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: block !important;
+  }
+  
+  /* Pré-calculer les dimensions pour éviter les CLS */
+  .stable-layout {
+    min-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
   
   .loading-skeleton {
     background: linear-gradient(90deg, var(--skeleton-base) 25%, var(--skeleton-highlight) 50%, var(--skeleton-base) 75%);

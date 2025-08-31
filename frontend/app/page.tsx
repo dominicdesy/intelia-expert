@@ -7,18 +7,18 @@ import { SignupModal } from './page_signup_modal'
 import { usePageInitialization } from './page_initialization'
 import { InteliaLogo, LanguageSelector, LoadingSpinner, AuthFooter } from './page_components'
 
-// Skeleton du contenu avec textes par défaut pour éviter le FOUC
-const ContentSkeleton = memo(() => (
+// 🎯 SOLUTION RADICALE: Composant statique affiché immédiatement
+const StaticLoginPage = memo(() => (
   <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative">
     
-    {/* Sélecteur de langue avec placeholder */}
+    {/* Sélecteur de langue statique */}
     <div className="absolute top-4 right-4">
-      <div className="w-32 h-10 bg-white/80 rounded-lg border border-gray-200 flex items-center justify-center">
-        <span className="text-sm text-gray-500">🌐 FR</span>
+      <div className="inline-flex items-center bg-white border border-gray-300 rounded-lg px-3 py-2 shadow-sm">
+        <span className="text-sm font-medium text-gray-700">🌐 FR</span>
       </div>
     </div>
     
-    {/* Logo et titre avec texte par défaut */}
+    {/* Logo et titre statiques */}
     <div className="sm:mx-auto sm:w-full sm:max-w-md">
       <div className="flex justify-center">
         <InteliaLogo className="w-16 h-16" />
@@ -28,57 +28,99 @@ const ContentSkeleton = memo(() => (
       </h2>
     </div>
 
-    {/* Skeleton du formulaire avec structure complète */}
+    {/* Formulaire statique complet */}
     <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
       <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
-        <div className="space-y-6">
+        <form className="space-y-6">
           
-          {/* Email field skeleton */}
+          {/* Email field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
               Email
             </label>
-            <div className="h-10 bg-gray-100 rounded-md border border-gray-300 animate-pulse"></div>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-base text-gray-900 bg-white"
+              placeholder="votre@email.com"
+            />
           </div>
           
-          {/* Password field skeleton */}
+          {/* Password field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
               Mot de passe
             </label>
-            <div className="h-10 bg-gray-100 rounded-md border border-gray-300 animate-pulse"></div>
+            <div className="relative">
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-base text-gray-900 bg-white pr-10"
+                placeholder="••••••••"
+              />
+            </div>
           </div>
 
-          {/* Remember me skeleton */}
-          <div className="flex items-center">
-            <div className="w-4 h-4 bg-gray-200 rounded animate-pulse mr-2"></div>
-            <span className="text-sm text-gray-600">Se souvenir de moi</span>
-          </div>
-
-          {/* Submit button skeleton */}
-          <div className="h-10 bg-blue-500/50 rounded-md animate-pulse"></div>
-          
-          {/* Links skeleton */}
-          <div className="text-center space-y-3">
-            <div className="text-sm text-blue-600">
+          {/* Remember me */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <input
+                id="remember-me"
+                name="remember-me"
+                type="checkbox"
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
+                Se souvenir de moi
+              </label>
+            </div>
+            <button
+              type="button"
+              className="text-sm text-blue-600 hover:text-blue-500 transition-colors"
+            >
               Mot de passe oublié ?
-            </div>
-            <div className="text-sm text-gray-600">
-              Pas encore de compte ? 
-              <span className="text-blue-600 ml-1">S'inscrire</span>
-            </div>
+            </button>
           </div>
-        </div>
+
+          {/* Submit button */}
+          <button
+            type="submit"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors duration-200"
+          >
+            Se connecter
+          </button>
+          
+          {/* Signup link */}
+          <div className="text-center">
+            <span className="text-sm text-gray-600">
+              Pas encore de compte ?{' '}
+              <button
+                type="button"
+                className="text-blue-600 hover:text-blue-500 font-medium transition-colors"
+              >
+                S'inscrire
+              </button>
+            </span>
+          </div>
+        </form>
         
-        {/* Footer skeleton */}
+        {/* Footer statique */}
         <div className="mt-8 pt-6 border-t border-gray-200">
-          <div className="text-center space-y-2">
-            <div className="text-xs text-gray-500">
-              © 2024 Intelia Expert
-            </div>
+          <div className="text-center space-y-3">
+            <p className="text-xs text-gray-500">
+              © 2024 Intelia Expert. Tous droits réservés.
+            </p>
             <div className="flex justify-center space-x-4 text-xs">
-              <span className="text-blue-600">Politique de confidentialité</span>
-              <span className="text-blue-600">Conditions d'utilisation</span>
+              <button className="text-blue-600 hover:text-blue-500 transition-colors">
+                Politique de confidentialité
+              </button>
+              <button className="text-blue-600 hover:text-blue-500 transition-colors">
+                Conditions d'utilisation
+              </button>
             </div>
           </div>
         </div>
@@ -87,22 +129,22 @@ const ContentSkeleton = memo(() => (
   </div>
 ))
 
-// Composant de chargement initial amélioré
-const InitialLoader = memo(() => (
-  <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
-    <div className="text-center">
-      <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-      <p className="mt-4 text-gray-600 animate-pulse">Chargement...</p>
-    </div>
-  </div>
-))
-
-// Composant principal optimisé
-const PageContent = memo(() => {
-  console.log('🚀 [PageContent] Rendu du composant principal')
+// 🎯 Hook personnalisé pour détecter quand hydratation complète
+const useIsHydrated = () => {
+  const [isHydrated, setIsHydrated] = React.useState(false)
   
-  // Récupération des données d'initialisation
+  React.useEffect(() => {
+    // Marquer comme hydraté dès que ce useEffect s'exécute
+    setIsHydrated(true)
+  }, [])
+  
+  return isHydrated
+}
+
+// Composant dynamique qui remplace le statique
+const DynamicLoginPage = memo(() => {
+  console.log('🚀 [DynamicLoginPage] Rendu du composant dynamique')
+  
   const initData = usePageInitialization()
   const {
     currentLanguage,
@@ -116,7 +158,6 @@ const PageContent = memo(() => {
     hasInitialized
   } = initData
 
-  // Mémorisation stable des props d'authentification
   const authProps = useMemo(() => ({
     currentLanguage,
     t,
@@ -124,33 +165,23 @@ const PageContent = memo(() => {
     setCurrentLanguage
   }), [currentLanguage, t, isSignupMode, setCurrentLanguage])
 
-  // Hook d'authentification avec props stables
   const authLogic = useAuthenticationLogic(authProps)
 
-  // État de chargement : avant hydratation
-  if (!hasHydrated) {
-    return <InitialLoader />
+  // Ne pas afficher si pas prêt
+  if (!hasHydrated || !hasInitialized.current) {
+    return null // Ne rien afficher, laisser le statique
   }
 
-  // État de chargement : après hydratation mais avant initialisation complète
-  if (!hasInitialized.current) {
-    return <ContentSkeleton />
-  }
-
-  // Interface complètement chargée
-  console.log('🎨 [Render] Interface complètement initialisée')
+  console.log('🎨 [Render] Interface dynamique prête')
 
   return (
     <>
-      {/* PAGE PRINCIPALE - Interface finale */}
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative">
         
-        {/* Sélecteur de langue */}
         <div className="absolute top-4 right-4">
           <LanguageSelector />
         </div>
         
-        {/* Logo et titre traduits */}
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="flex justify-center">
             <InteliaLogo className="w-16 h-16" />
@@ -160,7 +191,6 @@ const PageContent = memo(() => {
           </h2>
         </div>
 
-        {/* Formulaire de connexion complet */}
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
           <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
             <LoginForm 
@@ -175,7 +205,6 @@ const PageContent = memo(() => {
         </div>
       </div>
 
-      {/* Modal d'inscription conditionnelle */}
       {isSignupMode && (
         <SignupModal 
           authLogic={authLogic}
@@ -188,51 +217,66 @@ const PageContent = memo(() => {
   )
 })
 
-// Noms d'affichage pour le debugging
-ContentSkeleton.displayName = 'ContentSkeleton'
-InitialLoader.displayName = 'InitialLoader'
-PageContent.displayName = 'PageContent'
-
-// Export principal avec gestion d'erreur
-export default function Page() {
-  console.log('🎯 [Page] Initialisation de la page de connexion')
+// Composant principal avec superposition
+const PageContent = memo(() => {
+  const isHydrated = useIsHydrated()
   
   return (
-    <Suspense fallback={<InitialLoader />}>
+    <div className="relative">
+      {/* 🎯 COUCHE 1: Interface statique (toujours visible au début) */}
+      <div 
+        className={`transition-opacity duration-300 ${
+          isHydrated ? 'opacity-0 pointer-events-none absolute inset-0' : 'opacity-100'
+        }`}
+      >
+        <StaticLoginPage />
+      </div>
+      
+      {/* 🎯 COUCHE 2: Interface dynamique (fade in progressivement) */}
+      <div 
+        className={`transition-opacity duration-300 ${
+          isHydrated ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
+        <DynamicLoginPage />
+      </div>
+    </div>
+  )
+})
+
+// Noms d'affichage
+StaticLoginPage.displayName = 'StaticLoginPage'
+DynamicLoginPage.displayName = 'DynamicLoginPage'
+PageContent.displayName = 'PageContent'
+
+// Export principal
+export default function Page() {
+  console.log('🎯 [Page] Initialisation avec rendu immédiat')
+  
+  return (
+    <Suspense fallback={<StaticLoginPage />}>
       <PageContent />
     </Suspense>
   )
 }
 
-// CSS additionnels pour améliorer les transitions (à ajouter dans globals.css)
+// 🎯 CSS à ajouter dans globals.css pour la transition fluide
 /*
-.fade-in {
-  animation: fadeIn 0.3s ease-in-out;
+.fade-transition {
+  transition: opacity 300ms ease-in-out;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.static-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
 }
 
-.skeleton-text {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200% 100%;
-  animation: loading 1.5s infinite;
-}
-
-@keyframes loading {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
+.dynamic-content {
+  position: relative;
+  z-index: 2;
 }
 */

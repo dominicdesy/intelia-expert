@@ -76,27 +76,28 @@ export const UserMenuButton = React.memo(() => {
     return 'U'
   }, [])
 
+  // CORRECTION: useMemo sans effet de bord et sans 't' dans les dépendances
   const userInitials = useMemo(() => {
     const initials = getUserInitials(user)
     
-    // Debug conditionnel
-    const debugId = `${user?.name}-${user?.email}`
-    if (!window.userMenuLastDebugId) {
-      window.userMenuLastDebugId = ''
-    }
+    // SUPPRESSION COMPLÈTE du debug qui modifie window - cause de la boucle
+    // Plus de modification de variables globales dans useMemo !
     
-    if (debugId !== window.userMenuLastDebugId) {
-      window.userMenuLastDebugId = debugId
-      console.log(t('userMenu.debug.changeDetected'), {
+    return initials
+  }, [user?.name, user?.email, getUserInitials]) // ← 't' supprimé !
+
+  // DÉPLACEMENT du debug dans un useEffect séparé si nécessaire
+  useEffect(() => {
+    // Debug seulement en cas de changement réel des données utilisateur
+    if (user?.name || user?.email) {
+      console.log('UserMenu user data:', {
         user_name: user?.name,
         user_email: user?.email,
-        calculated_initials: initials,
+        calculated_initials: getUserInitials(user),
         has_name: !!user?.name
       })
     }
-    
-    return initials
-  }, [user?.name, user?.email, getUserInitials, t])
+  }, [user?.name, user?.email, getUserInitials]) // Pas de 't' ici non plus
 
   // Mémorisation des variables de plan
   const { currentPlan, plan, isSuperAdmin } = useMemo(() => {
@@ -432,9 +433,3 @@ export const UserMenuButton = React.memo(() => {
 })
 
 UserMenuButton.displayName = 'UserMenuButton'
-
-declare global {
-  interface Window {
-    userMenuLastDebugId?: string
-  }
-}
