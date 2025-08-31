@@ -280,4 +280,5 @@ export default function Page() {
   z-index: 2;
 }
 */c o n s o l e . l o g ( " M i g r a t i o n   s u c c e s s f u l ! " ) ;  
+ c o n s o l e . l o g ( ' F o r c e   D o c k e r   r e b u i l d ' ) ;  
  
