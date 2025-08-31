@@ -67,14 +67,31 @@ export function usePageInitialization() {
   // Hook de traductions avec fallback
   const { t: originalT } = useTranslation()
 
-  // 🎯 NOUVEAU: Fonction t avec fallback anti-FOUC
+  // 🎯 NOUVEAU: Fonction t avec fallback anti-FOUC et gestion des types
   const t = useCallback((key: string): string => {
     // Si les traductions ne sont pas prêtes, utiliser les traductions critiques
-    if (!translationsReady.current && criticalTranslations[currentLanguage]?.[key]) {
-      return criticalTranslations[currentLanguage][key]
+    if (!translationsReady.current) {
+      const criticalTranslation = criticalTranslations[currentLanguage]?.[key]
+      if (criticalTranslation) {
+        return criticalTranslation
+      }
     }
-    // Sinon, utiliser les vraies traductions avec fallback
-    return originalT(key) || criticalTranslations[currentLanguage]?.[key] || key
+    
+    // Utiliser les vraies traductions avec gestion sécurisée des types
+    let translation: string = ''
+    try {
+      // Vérifier si la clé existe dans le système de traductions
+      if (typeof originalT === 'function') {
+        // Utilisation conditionnelle selon le type de originalT
+        translation = (originalT as any)(key) || ''
+      }
+    } catch (error) {
+      console.warn(`[Translation] Erreur pour la clé "${key}":`, error)
+      translation = ''
+    }
+    
+    // Retourner dans l'ordre de priorité : traduction réelle > critique > clé
+    return translation || criticalTranslations[currentLanguage]?.[key] || key
   }, [originalT, currentLanguage])
 
   // Fonction toggleMode stable
