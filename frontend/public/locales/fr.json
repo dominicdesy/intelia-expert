@@ -147,7 +147,7 @@
   "chat.send": "Envoyer le message",
   "chat.noMessages": "Aucun message à afficher",
   "chat.feedbackThanks": "Merci pour votre retour !",
-  "chat.feedbackComment": "Commentaire: {comment}",
+  "chat.feedbackCommentPrefix": "Commentaire: ",
   "chat.scrollToBottom": "Revenir en bas de la conversation",
   "chat.newConversation": "Nouvelle conversation",
   "chat.startQuestion": "Commencez par poser une question",

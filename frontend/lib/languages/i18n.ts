@@ -28,21 +28,6 @@ export interface TranslationKeys {
   // Dans la section FORM PLACEHOLDERS
   'placeholder.email': string
 
-  // Dans la section COUNTRIES & REGIONS  
-  'countries.noResults': string
-
-  // Dans la section INVITATION MODAL & FRIEND INVITES
-  'invite.invalidEmails': string
-  'invite.userExistsWithDate': string
-  'invite.alreadyInvitedByYou': string
-  'invite.alreadyInvitedByOther': string
-  'invite.invalidEmail': string
-  'invite.sendFailed': string
-  'invite.recipientCount': string
-   
-  // Dans la section FEEDBACK MODAL
-  'feedback.characterCount': string
-
   // ===========================================
   // COMMON ELEMENTS
   // ===========================================
