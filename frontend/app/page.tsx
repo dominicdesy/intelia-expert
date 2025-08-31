@@ -8,8 +8,7 @@ import { usePageInitialization } from './page_initialization'
 import { InteliaLogo, LanguageSelector, LoadingSpinner, AuthFooter } from './page_components'
 
 // Mémorisation des composants pour éviter les re-renders
-// ✅ SUPPRIMÉ: LoginForm n'est plus mémorisé pour permettre les re-renders avec les nouvelles traductions
-const MemoizedSignupModal = memo(SignupModal)
+// ✅ SUPPRIMÉ: LoginForm et SignupModal ne sont plus mémorisés pour permettre les re-renders avec les nouvelles traductions
 const MemoizedInteliaLogo = memo(InteliaLogo)
 const MemoizedLanguageSelector = memo(LanguageSelector)
 // ✅ SUPPRIMÉ: AuthFooter n'est plus mémorisé car il utilise maintenant directement useTranslation
@@ -103,7 +102,7 @@ const PageContent = memo(() => {
 
       {/* Modal d'inscription */}
       {isSignupMode && (
-        <MemoizedSignupModal 
+        <SignupModal 
           authLogic={authLogic}
           localError={localError}
           localSuccess={localSuccess}
