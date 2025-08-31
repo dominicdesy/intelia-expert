@@ -105,7 +105,6 @@ const PageContent = memo(() => {
       {isSignupMode && (
         <MemoizedSignupModal 
           authLogic={authLogic}
-          t={t}
           localError={localError}
           localSuccess={localSuccess}
           toggleMode={toggleMode}

@@ -3,10 +3,10 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { AlertMessage } from './page_components'
 import { useCountries, useCountryCodeMap } from './page_hooks'
+import { useTranslation } from '@/lib/languages/i18n'
 
 interface SignupModalProps {
   authLogic: any
-  t: any
   localError: string
   localSuccess: string
   toggleMode: () => void
@@ -299,11 +299,13 @@ const PhoneCodeSelect: React.FC<PhoneCodeSelectProps> = ({
 
 export function SignupModal({ 
   authLogic, 
-  t, 
   localError, 
   localSuccess, 
   toggleMode 
 }: SignupModalProps) {
+  // ✅ UTILISE DIRECTEMENT useTranslation au lieu de recevoir t comme prop
+  const { t } = useTranslation()
+  
   // Chargement des pays uniquement dans SignupModal
   const { countries, loading: countriesLoading, usingFallback } = useCountries()
   const countryCodeMap = useCountryCodeMap(countries)
@@ -348,7 +350,7 @@ export function SignupModal({
 
     try {
       await handleSignup(e)
-      setFormSuccess(t.accountCreated)
+      setFormSuccess(t('auth.success'))
       
       // Passer en mode login après 4 secondes
       setTimeout(() => {
@@ -372,7 +374,7 @@ export function SignupModal({
         
         {/* Header de la modale avec bouton fermer */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-lg">
-          <h3 className="text-lg font-semibold text-gray-900">{t.createAccount}</h3>
+          <h3 className="text-lg font-semibold text-gray-900">{t('auth.createAccount')}</h3>
           <button
             onClick={toggleMode}
             className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
@@ -390,7 +392,7 @@ export function SignupModal({
           {(localError || formError) && (
             <AlertMessage 
               type="error" 
-              title={t.signupError} 
+              title={t('error.generic')} 
               message={localError || formError} 
             />
           )}
@@ -422,12 +424,12 @@ export function SignupModal({
             <div className="space-y-6">
               {/* Section Informations personnelles */}
               <div className="border-b border-gray-200 pb-6">
-                <h4 className="text-md font-medium text-gray-900 mb-4">{t.personalInfo}</h4>
+                <h4 className="text-md font-medium text-gray-900 mb-4">{t('profile.personalInfo')}</h4>
                 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      {t.firstName} <span className="text-red-500">{t.required}</span>
+                      {t('profile.firstName')} <span className="text-red-500">{t('form.required')}</span>
                     </label>
                     <input
                       type="text"
@@ -441,7 +443,7 @@ export function SignupModal({
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      {t.lastName} <span className="text-red-500">{t.required}</span>
+                      {t('profile.lastName')} <span className="text-red-500">{t('form.required')}</span>
                     </label>
                     <input
                       type="text"
@@ -456,13 +458,13 @@ export function SignupModal({
 
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700">
-                    {t.linkedinProfile} {t.optional}
+                    {t('profile.linkedinProfile')} {t('common.optional')}
                   </label>
                   <input
                     type="url"
                     value={signupData.linkedinProfile}
                     onChange={(e) => handleSignupChange('linkedinProfile', e.target.value)}
-                    placeholder="https://linkedin.com/in/votre-profil"
+                    placeholder={t('placeholder.linkedinPersonal')}
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
                     disabled={isLoading}
                   />
@@ -471,11 +473,11 @@ export function SignupModal({
 
               {/* Section Contact */}
               <div className="border-b border-gray-200 pb-6">
-                <h4 className="text-md font-medium text-gray-900 mb-4">{t.contact}</h4>
+                <h4 className="text-md font-medium text-gray-900 mb-4">{t('profile.contact')}</h4>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    {t.email} <span className="text-red-500">{t.required}</span>
+                    {t('profile.email')} <span className="text-red-500">{t('form.required')}</span>
                   </label>
                   <input
                     type="email"
@@ -490,14 +492,14 @@ export function SignupModal({
                 {/* Sélecteur de pays avec composant local */}
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t.country} <span className="text-red-500">{t.required}</span>
+                    {t('profile.country')} <span className="text-red-500">{t('form.required')}</span>
                   </label>
                   
                   {countriesLoading ? (
                     <div className="block w-full rounded-md border border-gray-300 px-3 py-2 bg-gray-50">
                       <div className="flex items-center space-x-2">
                         <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                        <span className="text-sm text-gray-600">{t.loadingCountries}</span>
+                        <span className="text-sm text-gray-600">{t('common.loading')}</span>
                       </div>
                     </div>
                   ) : (
@@ -505,7 +507,7 @@ export function SignupModal({
                       countries={countries}
                       value={signupData.country}
                       onChange={handleCountryChange}
-                      placeholder="Sélectionner un pays ou rechercher..."
+                      placeholder={t('placeholder.countrySelect')}
                       className="w-full"
                     />
                   )}
@@ -514,11 +516,11 @@ export function SignupModal({
                 {/* Téléphone optionnel avec PhoneCodeSelect */}
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Téléphone {t.optional}
+                    {t('profile.phone')} {t('common.optional')}
                   </label>
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">{t.countryCode}</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Code pays</label>
                       <PhoneCodeSelect
                         countries={countries}
                         value={signupData.countryCode}
@@ -529,7 +531,7 @@ export function SignupModal({
                     </div>					
                     
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">{t.areaCode}</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Code région</label>
                       <input
                         type="tel"
                         value={signupData.areaCode}
@@ -542,7 +544,7 @@ export function SignupModal({
                     </div>
                     
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">{t.phoneNumber}</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Numéro</label>
                       <input
                         type="tel"
                         value={signupData.phoneNumber}
@@ -598,16 +600,17 @@ export function SignupModal({
 
               {/* Section Entreprise */}
               <div className="border-b border-gray-200 pb-6">
-                <h4 className="text-md font-medium text-gray-900 mb-4">{t.company}</h4>
+                <h4 className="text-md font-medium text-gray-900 mb-4">{t('profile.company')}</h4>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    {t.companyName} {t.optional}
+                    {t('profile.companyName')} {t('common.optional')}
                   </label>
                   <input
                     type="text"
                     value={signupData.companyName}
                     onChange={(e) => handleSignupChange('companyName', e.target.value)}
+                    placeholder={t('placeholder.companyName')}
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
                     disabled={isLoading}
                   />
@@ -615,13 +618,13 @@ export function SignupModal({
 
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700">
-                    {t.companyWebsite} {t.optional}
+                    {t('profile.companyWebsite')} {t('common.optional')}
                   </label>
                   <input
                     type="url"
                     value={signupData.companyWebsite}
                     onChange={(e) => handleSignupChange('companyWebsite', e.target.value)}
-                    placeholder="https://www.entreprise.com"
+                    placeholder={t('placeholder.companyWebsite')}
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
                     disabled={isLoading}
                   />
@@ -629,13 +632,13 @@ export function SignupModal({
 
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700">
-                    {t.companyLinkedin} {t.optional}
+                    {t('profile.companyLinkedin')} {t('common.optional')}
                   </label>
                   <input
                     type="url"
                     value={signupData.companyLinkedin}
                     onChange={(e) => handleSignupChange('companyLinkedin', e.target.value)}
-                    placeholder="https://linkedin.com/company/votre-entreprise"
+                    placeholder={t('placeholder.linkedinCorporate')}
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
                     disabled={isLoading}
                   />
@@ -647,7 +650,7 @@ export function SignupModal({
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      {t.password} <span className="text-red-500">{t.required}</span>
+                      {t('profile.password')} <span className="text-red-500">{t('form.required')}</span>
                     </label>
                     <div className="mt-1 relative">
                       <input
@@ -698,7 +701,7 @@ export function SignupModal({
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      {t.confirmPassword} <span className="text-red-500">{t.required}</span>
+                      {t('profile.confirmPassword')} <span className="text-red-500">{t('form.required')}</span>
                     </label>
                     <div className="mt-1 relative">
                       <input
@@ -756,14 +759,14 @@ export function SignupModal({
               onClick={toggleMode}
               className="flex-1 rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
-              {t.backToLogin}
+              {t('modal.back')}
             </button>
             <button
               onClick={onSubmit}
               disabled={isLoading}
               className="flex-1 rounded-md border border-transparent bg-green-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? t.creating : t.createAccount}
+              {isLoading ? t('common.loading') : t('auth.createAccount')}
             </button>
           </div>
         </div>
