@@ -357,7 +357,7 @@ function InvitationAcceptPageContent() {
           setProcessingResult({
             success: true,
             step: 'validation',
-            message: t('invitation.success.tokenValidated', { email: validationResult.user_email }),
+            message: `${t('invitation.success.tokenValidated')}: ${validationResult.user_email}`,
             details: validationResult
           })
           
