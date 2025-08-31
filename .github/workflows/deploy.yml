@@ -9,12 +9,41 @@ on:
       - 'docs/**'
 
 jobs:
+  # Job temporaire pour le premier build complet
+  initial-build:
+    runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.message, 'initial build') || contains(github.event.head_commit.message, 'Docker support')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Login to DigitalOcean Container Registry
+        run: echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login registry.digitalocean.com -u doctl --password-stdin
+      
+      - name: Build and push both images (initial)
+        run: |
+          # Build frontend
+          docker build -t registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }} ./frontend
+          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }}
+          docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }} registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
+          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
+          
+          # Build backend
+          docker build -t registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }} ./backend
+          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }}
+          docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }} registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
+          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
+          
+          echo "✅ Initial images pushed successfully"
+
   frontend:
     runs-on: ubuntu-latest
     if: |
-      contains(join(github.event.commits.*.modified), 'frontend/') ||
-      contains(join(github.event.commits.*.added), 'frontend/') ||
-      contains(join(github.event.commits.*.removed), 'frontend/')
+      !contains(github.event.head_commit.message, 'initial build') &&
+      !contains(github.event.head_commit.message, 'Docker support') &&
+      (contains(join(github.event.commits.*.modified), 'frontend/') ||
+       contains(join(github.event.commits.*.added), 'frontend/') ||
+       contains(join(github.event.commits.*.removed), 'frontend/'))
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,16 +55,17 @@ jobs:
         run: |
           docker build -t registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }} ./frontend
           docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }}
-          
           docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }} registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
           docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
 
   backend:
     runs-on: ubuntu-latest
     if: |
-      contains(join(github.event.commits.*.modified), 'backend/') ||
-      contains(join(github.event.commits.*.added), 'backend/') ||
-      contains(join(github.event.commits.*.removed), 'backend/')
+      !contains(github.event.head_commit.message, 'initial build') &&
+      !contains(github.event.head_commit.message, 'Docker support') &&
+      (contains(join(github.event.commits.*.modified), 'backend/') ||
+       contains(join(github.event.commits.*.added), 'backend/') ||
+       contains(join(github.event.commits.*.removed), 'backend/'))
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -47,6 +77,5 @@ jobs:
         run: |
           docker build -t registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }} ./backend
           docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }}
-          
           docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }} registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
           docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
