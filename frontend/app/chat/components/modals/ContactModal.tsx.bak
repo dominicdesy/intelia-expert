@@ -100,8 +100,8 @@ export const ContactModal = ({ onClose }: { onClose: () => void }) => {
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 text-2xl transition-colors hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"
-            aria-label={t('modal.close')}
-            title={t('modal.close')}
+            aria-label="Fermer la modal"
+            title="Fermer"
           >
             ×
           </button>

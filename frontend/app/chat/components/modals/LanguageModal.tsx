@@ -48,26 +48,26 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     setIsUpdating(true)
     
     try {
-      console.log('[LanguageModal] Changement langue:', currentLanguage, '→', languageCode)
+      console.log(t('language.debug.changing'), currentLanguage, '→', languageCode)
       
       // 1. Changer immédiatement dans l'interface
       await changeLanguage(languageCode)
-      console.log('[LanguageModal] Interface mise à jour')
+      console.log(t('language.debug.interfaceUpdated'))
       
       // 2. Sauvegarder dans localStorage
       if (typeof window !== 'undefined') {
         localStorage.setItem('intelia-preferred-language', languageCode)
-        console.log('[LanguageModal] localStorage sauvegardé:', languageCode)
+        console.log(t('language.debug.localStorageSaved'), languageCode)
       }
       
       // 3. Fermer la modal après un délai pour voir l'effet
       setTimeout(() => {
         onClose()
-        console.log('[LanguageModal] Modal fermée')
+        console.log(t('language.debug.modalClosed'))
       }, 300)
       
     } catch (error) {
-      console.error('[LanguageModal] Erreur changement langue:', error)
+      console.error(t('language.debug.changeError'), error)
     } finally {
       setTimeout(() => {
         setIsUpdating(false)
@@ -121,6 +121,8 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
                 onClick={onClose}
                 className="text-gray-400 hover:text-gray-600 transition-colors hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"
                 disabled={isUpdating}
+                aria-label={t('modal.close')}
+                title={t('modal.close')}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -140,7 +142,7 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
                   <span className="text-2xl mr-3">{currentLangConfig.flag}</span>
                   <div>
                     <div className="font-semibold text-blue-900">
-                      {t('language.title')}: {currentLangConfig.nativeName}
+                      {t('language.current')}: {currentLangConfig.nativeName}
                     </div>
                     <div className="text-sm text-blue-700">
                       {currentLangConfig.region}
@@ -208,8 +210,7 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span>
-                  La langue est détectée automatiquement depuis votre navigateur.
-                  Vous pouvez la changer à tout moment.
+                  {t('language.autoDetectionInfo')}
                 </span>
               </div>
             </div>

@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { useTranslation } from '@/lib/languages/i18n'
 
 interface Country {
   value: string
@@ -20,19 +19,15 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
   countries,
   value,
   onChange,
-  placeholder,
+  placeholder = "Sélectionner un pays",
   className = ""
 }) => {
-  const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const selectRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
-
-  // Utiliser la traduction par défaut si pas de placeholder fourni
-  const finalPlaceholder = placeholder || t('placeholder.countrySelect')
 
   // Filtrer les pays selon le terme de recherche
   const filteredCountries = countries.filter(country =>
@@ -130,9 +125,6 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
         className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-left flex items-center justify-between ${
           isOpen ? 'ring-2 ring-blue-500 border-transparent' : ''
         }`}
-        aria-label={selectedCountry ? selectedCountry.label : finalPlaceholder}
-        aria-expanded={isOpen}
-        aria-haspopup="listbox"
       >
         <span className={selectedCountry ? 'text-gray-900' : 'text-gray-500'}>
           {selectedCountry ? (
@@ -141,7 +133,7 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
               {selectedCountry.label}
             </span>
           ) : (
-            finalPlaceholder
+            placeholder
           )}
         </span>
         
@@ -152,7 +144,6 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
-          aria-hidden="true"
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -172,22 +163,16 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
                 setHighlightedIndex(-1)
               }}
               onKeyDown={handleKeyDown}
-              placeholder={t('countries.searchPlaceholder')}
+              placeholder="Rechercher un pays..."
               className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-              aria-label={t('countries.searchPlaceholder')}
             />
           </div>
 
           {/* Liste des pays */}
-          <ul 
-            ref={listRef} 
-            className="max-h-48 overflow-y-auto"
-            role="listbox"
-            aria-label={t('countries.listLabel')}
-          >
+          <ul ref={listRef} className="max-h-48 overflow-y-auto">
             {filteredCountries.length > 0 ? (
               filteredCountries.map((country, index) => (
-                <li key={country.value} role="option" aria-selected={country.value === value}>
+                <li key={country.value}>
                   <button
                     type="button"
                     onClick={() => handleSelect(country)}
@@ -200,18 +185,11 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
                       color: country.value === value ? '#1e3a8a' : '#111827',
                       backgroundColor: country.value === value ? '#dbeafe' : (index === highlightedIndex ? '#eff6ff' : '#ffffff')
                     }}
-                    aria-label={`${t('countries.select')} ${country.label}`}
                   >
-                    <span className="mr-2 text-base" aria-hidden="true">{country.flag}</span>
+                    <span className="mr-2 text-base">{country.flag}</span>
                     <span className="flex-1">{country.label}</span>
                     {country.value === value && (
-                      <svg 
-                        className="w-4 h-4 text-blue-600" 
-                        fill="none" 
-                        viewBox="0 0 24 24" 
-                        stroke="currentColor"
-                        aria-hidden="true"
-                      >
+                      <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     )}
@@ -219,8 +197,8 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
                 </li>
               ))
             ) : (
-              <li className="px-3 py-4 text-center text-gray-500 text-sm" role="option">
-                {t('countries.noResults', { searchTerm })}
+              <li className="px-3 py-4 text-center text-gray-500 text-sm">
+                Aucun pays trouvé pour "{searchTerm}"
               </li>
             )}
           </ul>

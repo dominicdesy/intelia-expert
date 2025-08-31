@@ -43,7 +43,7 @@ export const HistoryMenu = React.memo(() => {
 
   // CORRECTION CRITIQUE: Éviter la boucle infinie dans handleToggle
   const handleToggle = useCallback(async () => {
-    console.log(t('history.toggleClicked'), isOpen, t('history.userPresent'), !!user)
+    console.log('[HistoryMenu] Toggle clicked, isOpen:', isOpen, 'user:', !!user)
     
     // Changer l'état AVANT de charger pour éviter les boucles
     const newIsOpen = !isOpen
@@ -51,15 +51,15 @@ export const HistoryMenu = React.memo(() => {
     
     // Charger seulement si on OUVRE le menu et qu'on a un utilisateur
     if (newIsOpen && user && !isLoadingHistory) {
-      console.log(t('history.loadingConversationsFor'), user.email || user.id)
+      console.log('[HistoryMenu] Chargement conversations pour:', user.email || user.id)
       try {
         await loadConversations(user.email || user.id)
-        console.log(t('history.conversationsLoaded'))
+        console.log('[HistoryMenu] Conversations chargées avec succès')
       } catch (error) {
-        console.error(t('history.loadingError'), error)
+        console.error('[HistoryMenu] Erreur chargement conversations:', error)
       }
     }
-  }, [isOpen, user, isLoadingHistory, loadConversations, t])
+  }, [isOpen, user, isLoadingHistory, loadConversations])
 
   // Mémoisation des handlers pour éviter les re-créations
   const handleRefresh = useCallback(async (e: React.MouseEvent) => {
@@ -73,9 +73,9 @@ export const HistoryMenu = React.memo(() => {
     e.preventDefault()
     e.stopPropagation()
     if (!user) return
-    if (!confirm(t('history.confirmClearAll'))) return
+    if (!confirm('Supprimer toutes les conversations ?')) return
     await clearAllConversations(user.email || user.id)
-  }, [user, clearAllConversations, t])
+  }, [user, clearAllConversations])
 
   const handleDeleteSingle = useCallback(async (conversationId: string, e: React.MouseEvent) => {
     e.preventDefault()
@@ -131,10 +131,10 @@ export const HistoryMenu = React.memo(() => {
       hasUser: !!user
     }
     
-    console.log(t('history.renderState'), state)
+    console.log('[HistoryMenu] Render state:', state)
     
     return state
-  }, [isOpen, totalConversations, conversationGroups.length, isLoadingHistory, user, t])
+  }, [isOpen, totalConversations, conversationGroups.length, isLoadingHistory, user])
 
   // Mémoisation du rendu des conversations pour optimiser les performances
   const conversationsList = useMemo(() => {
@@ -143,9 +143,9 @@ export const HistoryMenu = React.memo(() => {
         <div className="p-6 text-center text-gray-500">
           <div className="flex items-center justify-center space-x-3 mb-2">
             <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-            <span>{t('history.loadingConversations')}</span>
+            <span>Chargement des conversations...</span>
           </div>
-          <p className="text-xs text-gray-400">{t('history.retrievingHistory')}</p>
+          <p className="text-xs text-gray-400">Récupération de votre historique</p>
         </div>
       )
     }
@@ -156,15 +156,15 @@ export const HistoryMenu = React.memo(() => {
           <div className="mb-3">
             <MessageCircleIcon className="w-12 h-12 text-gray-300 mx-auto mb-2" />
           </div>
-          <div className="text-sm font-medium text-gray-600 mb-1">{t('history.noConversations')}</div>
-          <div className="text-xs text-gray-400 mb-4">{t('history.startQuestion')}</div>
+          <div className="text-sm font-medium text-gray-600 mb-1">Aucune conversation</div>
+          <div className="text-xs text-gray-400 mb-4">Commencez par poser une question</div>
 
           <button
             onClick={handleNewConversation}
             className="inline-flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors"
           >
             <PlusIcon className="w-4 h-4" />
-            <span>{t('history.newConversation')}</span>
+            <span>Nouvelle conversation</span>
           </button>
 
           {user && (
@@ -173,7 +173,7 @@ export const HistoryMenu = React.memo(() => {
               className="ml-2 text-blue-600 hover:text-blue-700 text-xs underline"
               disabled={isLoadingHistory}
             >
-              {t('history.refresh')}
+              Actualiser
             </button>
           )}
         </div>
@@ -208,9 +208,7 @@ export const HistoryMenu = React.memo(() => {
 
                   <div className="flex items-center space-x-3 text-xs text-gray-400">
                     <span>{formatConversationTime(conv.updated_at)}</span>
-                    {conv.message_count != null && (
-                      <span>{conv.message_count} {t('history.messageCount')}</span>
-                    )}
+                    {conv.message_count != null && <span>{conv.message_count} msg</span>}
                   </div>
                 </div>
 
@@ -218,8 +216,7 @@ export const HistoryMenu = React.memo(() => {
                   <button
                     onClick={(e) => handleDeleteSingle(conv.id, e)}
                     className="text-red-600 hover:text-red-700 p-1 rounded"
-                    title={t('history.deleteConversation')}
-                    aria-label={t('history.deleteConversation')}
+                    title="Supprimer cette conversation"
                   >
                     <TrashIcon className="w-4 h-4" />
                   </button>
@@ -230,18 +227,7 @@ export const HistoryMenu = React.memo(() => {
         </div>
       </div>
     ))
-  }, [
-    isLoadingHistory, 
-    conversationGroups, 
-    user, 
-    currentConversation?.id, 
-    handleNewConversation, 
-    handleRefresh, 
-    handleConversationClick, 
-    handleDeleteSingle, 
-    formatConversationTime,
-    t
-  ])
+  }, [isLoadingHistory, conversationGroups, user, currentConversation?.id, handleNewConversation, handleRefresh, handleConversationClick, handleDeleteSingle, formatConversationTime])
 
   // Mémoisation du badge de notification
   const notificationBadge = useMemo(() => {

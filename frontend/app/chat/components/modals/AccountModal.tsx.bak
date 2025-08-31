@@ -31,14 +31,14 @@ export const AccountModal = ({ user, onClose }: { user: any, onClose: () => void
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 text-2xl"
-              aria-label={t('modal.close')}
-              title={t('modal.close')}
+              aria-label="Fermer la modal"
+              title="Fermer"
             >
               ×
             </button>
           </div>
           
-          {/* Content - contenu original avec i18n */}
+          {/* Content - contenu original inchangé */}
           <div className="p-6">
             <div className="space-y-6">
               <div className="text-center">
@@ -47,13 +47,13 @@ export const AccountModal = ({ user, onClose }: { user: any, onClose: () => void
                   <span className={`font-medium ${userPlan.color}`}>{userPlan.name}</span>
                   <span className="mx-2 text-gray-400">•</span>
                   <span className={`font-bold ${userPlan.color}`}>
-                    {currentPlan === 'essential' ? t('subscription.free') : t('subscription.premium.price')}
+                    {currentPlan === 'essential' ? 'Gratuit' : '29$ / mois'}
                   </span>
                 </div>
               </div>
 
               <div className={`p-4 rounded-lg ${userPlan.bgColor} ${userPlan.borderColor} border`}>
-                <h4 className="font-medium text-gray-900 mb-3">{t('subscription.featuresIncluded')}:</h4>
+                <h4 className="font-medium text-gray-900 mb-3">Fonctionnalités incluses :</h4>
                 <ul className="space-y-2">
                   {userPlan.features.map((feature, index) => (
                     <li key={index} className="flex items-center text-sm text-gray-700">

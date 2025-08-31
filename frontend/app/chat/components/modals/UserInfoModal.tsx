@@ -625,7 +625,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
           const authStore = useAuthStore.getState()
           if (authStore.checkAuth) {
             await authStore.checkAuth()
-            console.log('Store auth synchronisé avec les nouvelles données')
+            console.log(t('success.authSynchronized'))
           }
         } catch (err) {
           console.warn('Erreur rechargement profil:', err)
@@ -767,7 +767,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
 
   const tabs = useMemo(() => [
     { id: 'profile', label: t('nav.profile'), icon: '👤' },
-    { id: 'password', label: t('profile.password'), icon: '🔑' }
+    { id: 'password', label: t('profile.password'), icon: '🔐' }
   ], [t])
 
   // Keyboard handling
@@ -893,7 +893,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
                     </svg>
                     <span className="text-sm text-yellow-800">
-                      Liste de pays limitée (service externe temporairement indisponible)
+                      {t('countries.fallbackWarning')}
                     </span>
                   </div>
                 </div>
@@ -957,7 +957,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
 
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-3">
-                        {t('profile.phone')} <span className="text-gray-500 text-sm">{t('common.optional')}</span>
+                        {t('profile.phone')} <span className="text-gray-500 text-sm">({t('common.optional')})</span>
                       </label>
                       <div data-debug="phone-input">
                         <PhoneInput
@@ -974,7 +974,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {t('profile.country')} <span className="text-gray-500 text-sm">{t('common.optional')}</span>
+                        {t('profile.country')} <span className="text-gray-500 text-sm">({t('common.optional')})</span>
                       </label>
                       <div data-debug="country-select">
                         <CountrySelect
@@ -992,7 +992,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
                     <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
                       <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
                       {t('profile.professionalInfo')}
-                      <span className="text-gray-500 text-sm ml-2">{t('profile.optional')}</span>
+                      <span className="text-gray-500 text-sm ml-2">({t('common.optional')})</span>
                     </h3>
                     
                     <div className="space-y-4">

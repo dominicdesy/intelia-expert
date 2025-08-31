@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { useTranslation } from '@/lib/languages/i18n'
 import { ThumbUpIcon, ThumbDownIcon } from '../../utils/icons'
 
 interface FeedbackModalProps {
@@ -17,7 +16,6 @@ export const FeedbackModal = ({
   feedbackType, 
   isSubmitting = false 
 }: FeedbackModalProps) => {
-  const { t } = useTranslation()
   const [comment, setComment] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
@@ -30,7 +28,7 @@ export const FeedbackModal = ({
       setComment('')
       onClose() // ✅ Fermer la modal après succès
     } catch (error) {
-      console.error(t('feedback.sendError'), error)
+      console.error('Erreur envoi feedback:', error)
       // ✅ CORRECTION: Fermer la modal même en cas d'erreur
       setComment('')
       onClose()
@@ -46,10 +44,10 @@ export const FeedbackModal = ({
   }
 
   const isPositive = feedbackType === 'positive'
-  const title = isPositive ? t('feedback.positiveTitle') : t('feedback.negativeTitle')
+  const title = isPositive ? 'Merci pour votre feedback positif !' : 'Aidez-nous à améliorer'
   const placeholder = isPositive 
-    ? t('feedback.positivePlaceholder')
-    : t('feedback.negativePlaceholder')
+    ? 'Qu\'avez-vous apprécié dans cette réponse ?'
+    : 'Dans quelle mesure cette réponse était-elle satisfaisante ?'
 
   return (
     <>
@@ -91,8 +89,6 @@ export const FeedbackModal = ({
                 onClick={handleCancel}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
                 disabled={isLoading}
-                aria-label={t('modal.close')}
-                title={t('modal.close')}
               >
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -102,7 +98,7 @@ export const FeedbackModal = ({
 
             {/* Description */}
             <p className="text-sm text-gray-600 mb-4">
-              {t('feedback.description')}
+              Veuillez fournir des détails : (facultatif)
             </p>
 
             {/* Textarea de commentaire */}
@@ -118,11 +114,11 @@ export const FeedbackModal = ({
               />
               <div className="flex justify-between items-center mt-2">
                 <div className="text-xs text-gray-400">
-                  {t('feedback.characterCount', { current: comment.length, max: 500 })}
+                  {comment.length}/500 caractères
                 </div>
                 {comment.length > 450 && (
                   <div className="text-xs text-orange-500">
-                    {t('feedback.limitWarning')}
+                    Limite bientôt atteinte
                   </div>
                 )}
               </div>
@@ -131,13 +127,13 @@ export const FeedbackModal = ({
             {/* Note de confidentialité */}
             <div className="mb-6">
               <p className="text-xs text-gray-500 leading-relaxed">
-                {t('feedback.privacyNotice')}{' '}
+                En soumettant ce rapport, vous envoyez l'intégralité de la conversation actuelle à Intelia pour nous aider à améliorer nos modèles.{' '}
                 <button 
                   type="button"
                   className="text-blue-600 hover:text-blue-700 underline font-medium"
                   onClick={() => window.open('https://intelia.com/privacy-policy/', '_blank')}
                 >
-                  {t('feedback.learnMore')}
+                  En savoir plus
                 </button>
               </p>
             </div>
@@ -151,7 +147,7 @@ export const FeedbackModal = ({
                 disabled={isLoading}
                 className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {t('modal.cancel')}
+                Annuler
               </button>
               
               <button
@@ -162,10 +158,10 @@ export const FeedbackModal = ({
                 {isLoading ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>{t('feedback.sending')}</span>
+                    <span>Envoi...</span>
                   </>
                 ) : (
-                  <span>{t('feedback.send')}</span>
+                  <span>Envoyer</span>
                 )}
               </button>
             </div>

@@ -6,12 +6,16 @@ import { availableLanguages, DEFAULT_LANGUAGE, getLanguageByCode, isValidLanguag
 
 const supabase = getSupabaseClient()
 
-// Types pour le système de traduction - VERSION PROPRE SANS DOUBLONS
+// Types pour le système de traduction - VERSION ORGANISÉE PAR CATÉGORIES
 export interface TranslationKeys {
-  // Page titles
+  // ===========================================
+  // PAGE TITLES
+  // ===========================================
   'page.title': string
 
-  // Authentication
+  // ===========================================
+  // AUTHENTICATION & AUTH FLOWS
+  // ===========================================
   'auth.success': string
   'auth.error': string
   'auth.incomplete': string
@@ -21,12 +25,32 @@ export interface TranslationKeys {
   'auth.newToIntelia': string
   'auth.createAccount': string
 
-  // GDPR et Legal
-  'gdpr.notice': string
-  'legal.terms': string
-  'legal.privacy': string
+  // ===========================================
+  // COMMON ELEMENTS
+  // ===========================================
+  'common.or': string
+  'common.optional': string
+  'common.appName': string
+  'common.notSpecified': string
+  'common.unexpectedError': string
+  'common.loading': string
+  'common.saving': string
+  'common.success': string
+  'common.error': string
+  'common.confirm': string
+  'common.delete': string
+  'common.edit': string
+  'common.view': string
+  'common.search': string
+  'common.filter': string
+  'common.clear': string
+  'common.reset': string
+  'common.apply': string
+  'common.update': string
 
-  // Login form
+  // ===========================================
+  // LOGIN FORM
+  // ===========================================
   'login.email': string
   'login.password': string
   'login.rememberMe': string
@@ -35,7 +59,113 @@ export interface TranslationKeys {
   'login.emailPlaceholder': string
   'login.passwordPlaceholder': string
 
-  // Navigation et Interface
+  // ===========================================
+  // FORGOT PASSWORD
+  // ===========================================
+  'forgotPassword.title': string
+  'forgotPassword.description': string
+  'forgotPassword.emailLabel': string
+  'forgotPassword.emailPlaceholder': string
+  'forgotPassword.sendButton': string
+  'forgotPassword.sending': string
+  'forgotPassword.backToLogin': string
+  'forgotPassword.noAccount': string
+  'forgotPassword.supportProblem': string
+  'forgotPassword.contactSupport': string
+  'forgotPassword.securityInfo': string
+  'forgotPassword.securityInfo2': string
+  'forgotPassword.redirecting': string
+  'forgotPassword.enterEmail': string
+  'forgotPassword.invalidEmail': string
+  'forgotPassword.emailSent': string
+  'forgotPassword.checkInbox': string
+  'forgotPassword.emailNotFound': string
+  'forgotPassword.tooManyAttempts': string
+  'forgotPassword.connectionError': string
+  'forgotPassword.genericError': string
+
+  // ===========================================
+  // EMAIL VERIFICATION
+  // ===========================================
+  'verification.title': string
+  'verification.subtitle': string
+  'verification.verifying': string
+  'verification.autoRedirect': string
+  'verification.loginNow': string
+  'verification.backToLogin': string
+  'verification.refreshPage': string
+  'verification.redirecting': string
+  'verification.loadingVerification': string
+  'verification.noEmail': string
+  'verification.retrySignup': string
+  'verification.supportQuestion': string
+  'verification.supportSubject': string
+  'verification.contactSupport': string
+  'verification.success.title': string
+  'verification.success.emailConfirmed': string
+  'verification.success.confirmed': string
+  'verification.success.canLogin': string
+  'verification.success.verified': string
+  'verification.error.title': string
+  'verification.error.possibleCauses': string
+  'verification.error.expired': string
+  'verification.error.alreadyUsed': string
+  'verification.error.invalid': string
+  'verification.error.retrySignup': string
+  'verification.error.invalidOrExpired': string
+  'verification.error.alreadyVerified': string
+  'verification.error.generic': string
+  'verification.error.network': string
+  'verification.pending.title': string
+  'verification.pending.emailSentTo': string
+  'verification.pending.emailSent': string
+  'verification.pending.checkEmail': string
+  'verification.pending.nextSteps': string
+  'verification.pending.step1': string
+  'verification.pending.step2': string
+  'verification.pending.step3': string
+
+  // ===========================================
+  // INVITATION SYSTEM
+  // ===========================================
+  'invitation.validating': string
+  'invitation.processing': string
+  'invitation.completeProfile': string
+  'invitation.finalizingInvitation': string
+  'invitation.backendValidation': string
+  'invitation.waitMessage': string
+  'invitation.welcomeComplete': string
+  'invitation.validatedSuccess': string
+  'invitation.invitedBy': string
+  'invitation.personalMessage': string
+  'invitation.emailFromInvitation': string
+  'invitation.phoneAutoFill': string
+  'invitation.creatingAccount': string
+  'invitation.createAccount': string
+  'invitation.needHelp': string
+  'invitation.loadingInvitation': string
+  'invitation.status.tokenValidated': string
+  'invitation.status.tokenError': string
+  'invitation.status.accountCreated': string
+  'invitation.status.accountError': string
+  'invitation.status.processing': string
+  'invitation.redirecting.dashboard': string
+  'invitation.redirecting.login': string
+  'invitation.errors.missingToken': string
+  'invitation.errors.tokenValidation': string
+  'invitation.errors.noInvitation': string
+  'invitation.errors.processing': string
+  'invitation.errors.generic': string
+  'invitation.errors.missingAccessToken': string
+  'invitation.errors.profileCompletion': string
+  'invitation.errors.accountCompletion': string
+  'invitation.success.tokenValidated': string
+  'invitation.success.accountCreated': string
+  'invitation.success.welcome': string
+
+  // ===========================================
+  // NAVIGATION
+  // ===========================================
   'nav.history': string
   'nav.newConversation': string
   'nav.profile': string
@@ -48,8 +178,11 @@ export interface TranslationKeys {
   'nav.inviteFriend': string
   'nav.account': string
   'nav.settings': string
+  'nav.statistics': string
 
-  // Messages de Chat
+  // ===========================================
+  // CHAT INTERFACE
+  // ===========================================
   'chat.welcome': string
   'chat.placeholder': string
   'chat.helpfulResponse': string
@@ -62,16 +195,61 @@ export interface TranslationKeys {
   'chat.disclaimer': string
   'chat.send': string
   'chat.askQuestion': string
+  'chat.clarificationPlaceholder': string
+  'chat.clarificationInstruction': string
+  'chat.clarificationMode': string
+  'chat.sending': string
+  'chat.noMessages': string
+  'chat.feedbackThanks': string
+  'chat.feedbackComment': string
+  'chat.scrollToBottom': string
+  'chat.startQuestion': string
+  'chat.redirectingLogin': string
+  'chat.sessionExpired': string
+  'chat.authInitError': string
+  'chat.recentLogout': string
+  'chat.logout': string
+  'chat.historyLoaded': string
+  'chat.historyLoadError': string
+  'chat.rejectionMessage': string
+  'chat.suggestedTopics': string
+  'chat.formatError': string
+  'chat.emptyContent': string
+  'chat.sendError': string
+  'chat.commentNotSent': string
+  'chat.feedbackSendError': string
+  'chat.feedbackGeneralError': string
+  'chat.redirectingInProgress': string
 
-  // Modals
-  'modal.close': string
-  'modal.cancel': string
-  'modal.save': string
-  'modal.back': string
-  'modal.loading': string
-  'modal.updating': string
+  // ===========================================
+  // CONVERSATION HISTORY
+  // ===========================================
+  'history.confirmClearAll': string
+  'history.loadingConversations': string
+  'history.retrievingHistory': string
+  'history.noConversations': string
+  'history.startQuestion': string
+  'history.newConversation': string
+  'history.refresh': string
+  'history.messageCount': string
+  'history.deleteConversation': string
+  'history.clear': string
+  'history.delete': string
+  'history.export': string
+  'history.search': string
+  'history.filter': string
+  'history.noResults': string
+  'history.confirmClear': string
+  'history.toggleClicked': string
+  'history.userPresent': string
+  'history.loadingConversationsFor': string
+  'history.conversationsLoaded': string
+  'history.loadingError': string
+  'history.renderState': string
 
-  // Profil
+  // ===========================================
+  // USER PROFILE
+  // ===========================================
   'profile.title': string
   'profile.personalInfo': string
   'profile.professionalInfo': string
@@ -101,8 +279,15 @@ export interface TranslationKeys {
   'profile.passwordChanged': string
   'profile.profileUpdated': string
   'profile.optional': string
+  'profile.security': string
+  'profile.countryCode': string
+  'profile.areaCode': string
+  'profile.phoneNumber': string
+  'profile.jobTitle': string
 
-  // Langue
+  // ===========================================
+  // LANGUAGE SETTINGS
+  // ===========================================
   'language.title': string
   'language.description': string
   'language.updating': string
@@ -111,8 +296,17 @@ export interface TranslationKeys {
   'language.reloadForWidget': string
   'language.reloadNow': string
   'language.continueWithoutReload': string
+  'language.current': string
+  'language.autoDetectionInfo': string
+  'language.debug.changing': string
+  'language.debug.interfaceUpdated': string
+  'language.debug.localStorageSaved': string
+  'language.debug.modalClosed': string
+  'language.debug.changeError': string
 
-  // Abonnement
+  // ===========================================
+  // SUBSCRIPTION & BILLING
+  // ===========================================
   'subscription.title': string
   'subscription.currentPlan': string
   'subscription.modify': string
@@ -122,8 +316,13 @@ export interface TranslationKeys {
   'subscription.cancellation': string
   'subscription.cancel': string
   'subscription.confirmCancel': string
+  'subscription.free': string
+  'subscription.premium.price': string
+  'subscription.featuresIncluded': string
 
-  // Contact
+  // ===========================================
+  // CONTACT & SUPPORT
+  // ===========================================
   'contact.title': string
   'contact.phone': string
   'contact.phoneDescription': string
@@ -135,17 +334,123 @@ export interface TranslationKeys {
   'contact.message': string
   'contact.sendMessage': string
   'contact.messageSent': string
+  'contact.supportEmail': string
 
-  // Dates et Formats
-  'date.today': string
-  'date.format': string
+  // ===========================================
+  // INVITATION MODAL & FRIEND INVITES
+  // ===========================================
+  'invite.title': string
+  'invite.subtitle': string
+  'invite.sendStatus': string
+  'invite.lastLogin': string
+  'invite.inviteOthers': string
+  'invite.emailAddresses': string
+  'invite.recipientCount': string
+  'invite.emailPlaceholder': string
+  'invite.emailHelp': string
+  'invite.personalMessage': string
+  'invite.messagePlaceholder': string
+  'invite.messageHelp': string
+  'invite.sending': string
+  'invite.send': string
+  'invite.footerInfo': string
+  'invite.authRetrievalError': string
+  'invite.loginRequired': string
+  'invite.loginRequiredTitle': string
+  'invite.emailRequired': string
+  'invite.invalidEmails': string
+  'invite.emailFormat': string
+  'invite.noValidEmails': string
+  'invite.maxLimit': string
+  'invite.sendError': string
+  'invite.authError': string
+  'invite.reconnectSuggestion': string
+  'invite.sessionExpired': string
+  'invite.sessionExpiredDetail': string
+  'invite.retryOrContact': string
+  'invite.validationError': string
+  'invite.invitationSent': string
+  'invite.userExists': string
+  'invite.userExistsWithDate': string
+  'invite.alreadyInvitedByYou': string
+  'invite.alreadyInvitedByOther': string
+  'invite.invalidEmail': string
+  'invite.rateLimit': string
+  'invite.sendFailed': string
+  'invite.namePlaceholder': string
+  'invite.sendButton': string
+  'invite.sentSuccess': string
+  'invite.error': string
+  'invite.optional': string
 
-  // Plans
-  'plan.essential': string
-  'plan.pro': string
-  'plan.max': string
+  // ===========================================
+  // FEEDBACK MODAL
+  // ===========================================
+  'feedback.sendError': string
+  'feedback.positiveTitle': string
+  'feedback.negativeTitle': string
+  'feedback.positivePlaceholder': string
+  'feedback.negativePlaceholder': string
+  'feedback.description': string
+  'feedback.characterCount': string
+  'feedback.limitWarning': string
+  'feedback.privacyNotice': string
+  'feedback.learnMore': string
+  'feedback.sending': string
+  'feedback.send': string
 
-  // Messages d'erreur et succès
+  // ===========================================
+  // COUNTRIES & REGIONS
+  // ===========================================
+  'countries.fallbackWarning': string
+  'countries.searchPlaceholder': string
+  'countries.listLabel': string
+  'countries.select': string
+  'countries.noResults': string
+  'countries.limitedList': string
+  'countries.loading': string
+
+  // ===========================================
+  // PHONE INPUT & VALIDATION
+  // ===========================================
+  'phone.limitedList': string
+  'phone.countryCode': string
+  'phone.loading': string
+  'phone.select': string
+  'phone.countryCodeHelp': string
+  'phone.loadingCodes': string
+  'phone.areaCode': string
+  'phone.areaCodePlaceholder': string
+  'phone.areaCodeHelp': string
+  'phone.phoneNumber': string
+  'phone.phoneNumberPlaceholder': string
+  'phone.phoneNumberHelp': string
+  'phone.validation.countryRequired': string
+  'phone.validation.numberRequired': string
+
+  // ===========================================
+  // USER MENU & INTERFACE CONTROLS
+  // ===========================================
+  'userMenu.openMenu': string
+  'userMenu.superAdmin': string
+  'userMenu.debug.unmounting': string
+  'userMenu.debug.changeDetected': string
+  'userMenu.debug.logoutViaService': string
+  'userMenu.debug.logoutServiceError': string
+  'userMenu.debug.toggleOpen': string
+  'userMenu.debug.currentIsOpen': string
+
+  // ===========================================
+  // SUCCESS MESSAGES
+  // ===========================================
+  'success.authSynchronized': string
+  'success.profileUpdated': string
+  'success.passwordChanged': string
+  'success.languageUpdated': string
+
+  // ===========================================
+  // ERROR MESSAGES
+  // ===========================================
   'error.generic': string
   'error.connection': string
   'error.updateProfile': string
@@ -169,11 +474,34 @@ export interface TranslationKeys {
   'error.passwordServerError': string
   'error.userNotConnected': string
   'error.validationErrors': string
-  'success.profileUpdated': string
-  'success.passwordChanged': string
-  'success.languageUpdated': string
 
-  // Formulaires
+  // ===========================================
+  // VALIDATION RULES & MESSAGES
+  // ===========================================
+  'validation.required.firstName': string
+  'validation.required.lastName': string
+  'validation.required.fullName': string
+  'validation.required.email': string
+  'validation.required.country': string
+  'validation.required.password': string
+  'validation.required.confirmPassword': string
+  'validation.required.accessToken': string
+  'validation.correctErrors': string
+  'validation.invalidData': string
+  'validation.password.requirements': string
+  'validation.password.minLength': string
+  'validation.password.uppercase': string
+  'validation.password.lowercase': string
+  'validation.password.number': string
+  'validation.password.special': string
+  'validation.password.match': string
+  'validation.password.mismatch': string
+  'validation.phone.incomplete': string
+  'validation.phone.invalid': string
+
+  // ===========================================
+  // FORM ELEMENTS
+  // ===========================================
   'form.required': string
   'form.phoneFormat': string
   'form.passwordMinLength': string
@@ -183,26 +511,19 @@ export interface TranslationKeys {
   'form.passwordSpecial': string
   'form.passwordMismatch': string
 
-  // Commun
-  'common.optional': string
-  'common.unexpectedError': string
-  'common.loading': string
-  'common.saving': string
-  'common.success': string
-  'common.error': string
-  'common.confirm': string
-  'common.delete': string
-  'common.edit': string
-  'common.view': string
-  'common.search': string
-  'common.filter': string
-  'common.clear': string
-  'common.reset': string
-  'common.apply': string
-  'common.update': string
-  'common.or': string
+  // ===========================================
+  // MODAL DIALOGS
+  // ===========================================
+  'modal.close': string
+  'modal.cancel': string
+  'modal.save': string
+  'modal.back': string
+  'modal.loading': string
+  'modal.updating': string
 
-  // Interface utilisateur
+  // ===========================================
+  // USER INTERFACE CONTROLS
+  // ===========================================
   'ui.menu': string
   'ui.close': string
   'ui.open': string
@@ -211,53 +532,48 @@ export interface TranslationKeys {
   'ui.previous': string
   'ui.next': string
 
-  // Modales et dialogues
+  // ===========================================
+  // DIALOG BUTTONS
+  // ===========================================
   'dialog.confirm': string
   'dialog.cancel': string
   'dialog.ok': string
   'dialog.yes': string
   'dialog.no': string
 
-  // Messages d'état
+  // ===========================================
+  // SYSTEM STATUS
+  // ===========================================
   'status.online': string
   'status.offline': string
   'status.connecting': string
   'status.connected': string
   'status.disconnected': string
 
-  // Invitations
-  'invite.emailPlaceholder': string
-  'invite.namePlaceholder': string
-  'invite.messagePlaceholder': string
-  'invite.sendButton': string
-  'invite.sentSuccess': string
-  'invite.error': string
-  'invite.invalidEmail': string
-
-  // Compte
+  // ===========================================
+  // USER ACCOUNT SETTINGS
+  // ===========================================
   'account.settings': string
   'account.preferences': string
   'account.security': string
   'account.privacy': string
   'account.notifications': string
 
-  // Historique
-  'history.clear': string
-  'history.delete': string
-  'history.export': string
-  'history.search': string
-  'history.filter': string
-  'history.noResults': string
-  'history.confirmClear': string
-
-  // Menu utilisateur
+  // ===========================================
+  // USER MENU ITEMS
+  // ===========================================
   'user.menu': string
   'user.profile': string
   'user.settings': string
   'user.logout': string
   'user.account': string
 
-  // Placeholders
+  // ===========================================
+  // FORM PLACEHOLDERS
+  // ===========================================
+  'placeholder.firstName': string
+  'placeholder.lastName': string
+  'placeholder.jobTitle': string
   'placeholder.linkedinPersonal': string
   'placeholder.companyName': string
   'placeholder.companyWebsite': string
@@ -267,13 +583,33 @@ export interface TranslationKeys {
   'placeholder.newPassword': string
   'placeholder.confirmPassword': string
 
-  // RGPD et Confidentialité
+  // ===========================================
+  // DATE & TIME FORMATTING
+  // ===========================================
+  'date.today': string
+  'date.format': string
+
+  // ===========================================
+  // SUBSCRIPTION PLANS
+  // ===========================================
+  'plan.essential': string
+  'plan.pro': string
+  'plan.max': string
+
+  // ===========================================
+  // GDPR & LEGAL
+  // ===========================================
+  'gdpr.notice': string
   'gdpr.deleteAccount': string
   'gdpr.exportData': string
   'gdpr.confirmDelete': string
   'gdpr.contactSupport': string
+  'legal.terms': string
+  'legal.privacy': string
 
-  // Pays
+  // ===========================================
+  // COUNTRIES LIST
+  // ===========================================
   'country.canada': string
   'country.usa': string
   'country.france': string

@@ -35,10 +35,10 @@ export const UserMenuButton = React.memo(() => {
   useEffect(() => {
     isMountedRef.current = true
     return () => {
-      console.log(t('userMenu.debug.unmounting'))
+      console.log('[DEBUG-UserMenu] Composant en cours de démontage')
       isMountedRef.current = false
     }
-  }, [t])
+  }, [])
 
   // Fonction robuste pour obtenir les initiales utilisateur
   const getUserInitials = useCallback((user: any): string => {
@@ -87,7 +87,7 @@ export const UserMenuButton = React.memo(() => {
     
     if (debugId !== window.userMenuLastDebugId) {
       window.userMenuLastDebugId = debugId
-      console.log(t('userMenu.debug.changeDetected'), {
+      console.log('[UserMenu] Changement détecté:', {
         user_name: user?.name,
         user_email: user?.email,
         calculated_initials: initials,
@@ -96,7 +96,7 @@ export const UserMenuButton = React.memo(() => {
     }
     
     return initials
-  }, [user?.name, user?.email, getUserInitials, t])
+  }, [user?.name, user?.email, getUserInitials])
 
   // Mémorisation des variables de plan
   const { currentPlan, plan, isSuperAdmin } = useMemo(() => {
@@ -161,7 +161,7 @@ export const UserMenuButton = React.memo(() => {
     if (logoutInProgressRef.current || !isMountedRef.current) return
   
     try {
-      console.log(t('userMenu.debug.logoutViaService'))
+      console.log('[UserMenu] Déconnexion via service indépendant')
       logoutInProgressRef.current = true
      
       // Fermer le menu immédiatement
@@ -171,11 +171,11 @@ export const UserMenuButton = React.memo(() => {
       await logoutService.performLogout()
     
     } catch (error) {
-      console.error(t('userMenu.debug.logoutServiceError'), error)
+      console.error('[UserMenu] Erreur logout service:', error)
       // En cas d'erreur, forcer quand même la redirection
       window.location.href = '/'
     }
-  }, [t])
+  }, [])
 
   // Handlers des modales avec protection renforcée
   const handleContactClick = useCallback(() => {
@@ -230,9 +230,9 @@ export const UserMenuButton = React.memo(() => {
 
   const toggleOpen = useCallback(() => {
     if (!isMountedRef.current) return
-    console.log(t('userMenu.debug.toggleOpen'), isMountedRef.current, t('userMenu.debug.currentIsOpen'), isOpen)
+    console.log('[DEBUG-UserMenu] toggleOpen - isMounted:', isMountedRef.current, 'current isOpen:', isOpen)
     setIsOpen(prev => !prev)
-  }, [isOpen, t])
+  }, [isOpen])
 
   const closeMenu = useCallback(() => {
     if (!isMountedRef.current) return
@@ -273,8 +273,6 @@ export const UserMenuButton = React.memo(() => {
         <button
           onClick={toggleOpen}
           className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors"
-          title={t('userMenu.openMenu')}
-          aria-label={t('userMenu.openMenu')}
         >
           <span className="text-white text-xs font-medium">{userInitials}</span>
         </button>
@@ -299,7 +297,7 @@ export const UserMenuButton = React.memo(() => {
                     )}
                     {isSuperAdmin && (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
-                        {t('userMenu.superAdmin')}
+                        Super Admin
                       </span>
                     )}
                   </div>
@@ -315,7 +313,7 @@ export const UserMenuButton = React.memo(() => {
                     <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
                     </svg>
-                    <span>{t('nav.statistics')}</span>
+                    <span>Statistiques</span>
                   </button>
                 )}
 
