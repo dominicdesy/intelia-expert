@@ -198,7 +198,7 @@ const MessageList = React.memo(({
                     {t('chat.feedbackThanks')}
                   </span>
                   {message.feedbackComment && (
-                    <span className="text-xs text-blue-600" title={t('chat.feedbackComment', { comment: message.feedbackComment })}>
+                    <span className="text-xs text-blue-600" title={`${t('chat.feedbackComment')}: ${message.feedbackComment}`}>
                       💬
                     </span>
                   )}
