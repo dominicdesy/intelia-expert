@@ -6,9 +6,6 @@ const nextConfig = {
   swcMinify: true,
   trailingSlash: true,
 
-  // 🐳 Configuration Docker
-  output: 'standalone',
-
   // 🚀 Optimisations pour Digital Ocean
   compress: true,
   
@@ -34,7 +31,7 @@ const nextConfig = {
     unoptimized: process.env.NODE_ENV === 'production',
   },
 
-  // 🌍 Variables d'environnement
+  // 🌐 Variables d'environnement
   env: {
     NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
     NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
@@ -133,7 +130,7 @@ const nextConfig = {
       }
     }
     
-    // 🌍 Fallbacks pour le navigateur (Supabase uniquement)
+    // 🌐 Fallbacks pour le navigateur (Supabase uniquement)
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -223,7 +220,7 @@ const nextConfig = {
   },
 }
 
-// 📝 Validation de la configuration
+// 🔍 Validation de la configuration
 console.log('🚀 Next.js config loaded for environment:', process.env.NODE_ENV)
 
 module.exports = nextConfig

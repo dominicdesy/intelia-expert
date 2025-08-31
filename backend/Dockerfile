@@ -1,45 +1,40 @@
-# ---- Simple working Dockerfile ----
 FROM python:3.11-slim
 
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PORT=8080
-
-# non-root user
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl libgomp1 \
- && rm -rf /var/lib/apt/lists/*
-
+# Set working directory to match your App Platform structure
 WORKDIR /workspace/backend
 
-# Copy and install requirements (single step to avoid dependency conflicts)
+# Install system dependencies for compilation
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+
+# Upgrade pip and install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY app/ ./app/
-COPY rag/ ./rag/
-COPY rag_index/ ./rag_index/
+COPY . .
 
-# RAG index environment variables
-ENV RAG_INDEX_DIR=/workspace/backend/rag_index \
-    RAG_INDEX_BROILER=/workspace/backend/rag_index/broiler \
-    RAG_INDEX_LAYER=/workspace/backend/rag_index/layer \
-    RAG_INDEX_GLOBAL=/workspace/backend/rag_index/global
+# Create RAG index directories (to match your paths)
+RUN mkdir -p rag_index/global rag_index/broiler rag_index/layer
 
-# Set permissions
-RUN chown -R appuser:appuser /workspace/backend
-USER appuser
+# Create logs and data directories
+RUN mkdir -p logs data
 
-EXPOSE $PORT
+# Set proper permissions
+RUN chmod -R 755 /workspace/backend
+
+# Expose the port
+EXPOSE 8080
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 \
-  CMD curl -fsS http://localhost:$PORT/api/v1/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:8080/healthz || exit 1
 
-# Start API - Utilise la variable PORT dynamiquement
-CMD ["sh", "-c", "python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+# Run the application
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers", "--forwarded-allow-ips", "*"]
