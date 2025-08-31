@@ -423,8 +423,8 @@ export default function ChatInterface() {
       if (!hasHydrated || isCancelled || !isMountedRef.current) return
       
       try {
-        const sessionValid = await initializeSession()
-        
+        const { initializeSessionOnce } = await import('@/components/providers/AuthProvider')
+        const sessionValid = await initializeSessionOnce()
         if (!sessionValid && isMountedRef.current && !isCancelled) {
           redirectToLogin(t('chat.sessionExpired'))
         }
