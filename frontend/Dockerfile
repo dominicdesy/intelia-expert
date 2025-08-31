@@ -6,16 +6,16 @@ WORKDIR /app
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-# Copy package files first
+# Copy package files
 COPY package*.json ./
 
-# Install ALL dependencies (dev needed for build)
+# Install dependencies
 RUN npm install
 
 # Copy source code
 COPY . .
 
-# Set all environment variables for build
+# Set environment variables for build
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
@@ -27,17 +27,17 @@ ENV NEXT_PUBLIC_API_BASE_URL="https://expert.intelia.com/api"
 ENV NEXT_PUBLIC_API_VERSION="v1"
 ENV NEXT_PUBLIC_SITE_URL="https://expert.intelia.com"
 
-# Fix the prebuild issue by skipping package-lock.json removal
-RUN sed -i 's/rm -f package-lock.json/echo "Skipping lock removal"/' package.json || true
+# Create .next directory first
+RUN mkdir -p .next
 
-# Build with error handling - continue even if some pages fail
-RUN npm run build 2>&1 | tee build.log || (echo "Build had errors but continuing..." && ls -la .next)
+# Build Next.js directly (bypass problematic prebuild)
+RUN npx next build
 
-# Verify .next directory exists
-RUN ls -la .next && ls -la .next/server 2>/dev/null || echo ".next/server not found"
-
-# Create minimal BUILD_ID if missing
+# Create BUILD_ID if missing
 RUN test -f .next/BUILD_ID || echo "docker-build-$(date +%s)" > .next/BUILD_ID
+
+# Verify build succeeded
+RUN ls -la .next
 
 # Expose port
 EXPOSE 8080
