@@ -8,40 +8,6 @@ interface AuthProviderProps {
   children: React.ReactNode
 }
 
-// Singleton pour éviter les appels multiples d'initializeSession
-let initializationPromise: Promise<boolean> | null = null
-let isInitializing = false
-
-// Fonction centralisée d'initialisation avec cache
-const initializeSessionOnce = async (): Promise<boolean> => {
-  if (isInitializing && initializationPromise) {
-    console.log('🔄 [AuthProvider] Réutilisation initialisation en cours')
-    return initializationPromise
-  }
-
-  if (isInitializing) {
-    console.log('🛑 [AuthProvider] Initialisation déjà en cours, abandon')
-    return false
-  }
-
-  isInitializing = true
-  console.log('🚀 [AuthProvider] Nouvelle initialisation session')
-
-  initializationPromise = useAuthStore.getState().initializeSession()
-  
-  try {
-    const result = await initializationPromise
-    console.log('✅ [AuthProvider] Initialisation terminée:', result)
-    return result
-  } catch (error) {
-    console.error('❌ [AuthProvider] Erreur initialisation:', error)
-    return false
-  } finally {
-    isInitializing = false
-    initializationPromise = null
-  }
-}
-
 export function AuthProvider({ children }: AuthProviderProps) {
   const { hasHydrated, setHasHydrated, checkAuth } = useAuthStore()
   
@@ -49,6 +15,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isMountedRef = useRef(true)
   const subscriptionRef = useRef<any>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // CORRECTION CRITIQUE: Flag pour bloquer TOUS les setState pendant déconnexion
   const isLoggingOutRef = useRef(false)
   const logoutTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -67,15 +35,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  // CORRECTION: Hydratation SANS initialisation automatique
+  // Logique d'hydratation SANS initialisation automatique pour éviter la boucle
   useEffect(() => {
+    // Vérifier si une déconnexion récente est en cours
+    const recentLogout = sessionStorage.getItem('recent-logout')
+    if (recentLogout) {
+      const logoutTime = parseInt(recentLogout)
+      if (Date.now() - logoutTime < 5000) {
+        console.log('[AuthProvider] Initialisation différée - déconnexion récente')
+        return
+      }
+    }
+
     if (!hasHydrated && isMountedRef.current && !isLoggingOutRef.current) {
       setHasHydrated(true)
-      console.log('[AuthProvider] Store hydraté - initialisation déléguée aux pages')
+      console.log('[AuthProvider] Store hydraté - AUCUNE initialisation automatique')
+      
+      // SUPPRESSION COMPLÈTE de l'appel à initializeSession() qui causait la boucle
+      // La page chat gère maintenant sa propre initialisation
     }
   }, [hasHydrated, setHasHydrated])
 
-  // Listener Supabase conservé intégralement
+  // CORRECTION FINALE: Listener Supabase qui NE FAIT PLUS DE setState pour SIGNED_OUT
   useEffect(() => {
     let isCancelled = false
     
@@ -115,12 +96,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
             case 'SIGNED_OUT':
               console.log('🔥 [DEBUG-AUTH] SIGNED_OUT - NOUVELLE STRATÉGIE SANS setState')
               
-              // Marquer le flag sans setState pour éviter React #300
+              // CORRECTION FINALE: NE PLUS FAIRE DE setState ICI
+              // Cette ligne causait React #300 car elle s'exécutait pendant le démontage
+              // useAuthStore.setState({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() })
+              
+              // À la place, juste marquer le flag et laisser le store gérer
               isLoggingOutRef.current = true
               
               console.log('🔥 [DEBUG-AUTH] SIGNED_OUT traité - PAS de setState, juste flag activé')
               
-              // Timeout pour débloquer après sécurité
+              // Le timeout reste pour débloquer après sécurité
               if (logoutTimeoutRef.current) {
                 clearTimeout(logoutTimeoutRef.current)
               }
@@ -165,9 +150,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     )
 
+    // Stocker la subscription pour nettoyage
     subscriptionRef.current = subscription
 
-    // Vérification périodique conservée intégralement
+    // Vérification périodique avec protection renforcée
     const intervalId = setInterval(async () => {
       if (isCancelled || !isMountedRef.current || isLoggingOutRef.current) {
         return
@@ -203,7 +189,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     intervalRef.current = intervalId
 
-    // Cleanup complet conservé intégralement
+    // Cleanup complet avec protection
     return () => {
       isCancelled = true
       
@@ -227,7 +213,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [checkAuth])
 
-  // Effect de démontage conservé intégralement
+  // Effect de démontage pour nettoyer les refs
   useEffect(() => {
     isMountedRef.current = true
     isLoggingOutRef.current = false
@@ -235,7 +221,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       console.log('[AuthProvider] Démontage - nettoyage des refs')
       isMountedRef.current = false
-      isLoggingOutRef.current = true
+      isLoggingOutRef.current = true // Bloquer définitivement les setState
       
       // Nettoyage final des ressources
       if (subscriptionRef.current) {
@@ -258,9 +244,3 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     }
   }, [])
-
-  return <>{children}</>
-}
-
-// Export de la fonction centralisée pour utilisation dans les pages
-export { initializeSessionOnce }
