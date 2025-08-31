@@ -24,7 +24,7 @@ jobs:
       
       - name: Build and push frontend image
         run: |
-          echo "🌐 Building frontend only..."
+          echo "Building frontend only..."
           docker build \
             --build-arg NEXT_PUBLIC_SUPABASE_URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
             --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
@@ -33,7 +33,7 @@ jobs:
           docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }}
           docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }} registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
           docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
-          echo "✅ Frontend deployed - Backend unchanged"
+          echo "Frontend deployed - Backend unchanged"
 
   backend:
     runs-on: ubuntu-latest
@@ -50,12 +50,12 @@ jobs:
       
       - name: Build and push backend image
         run: |
-          echo "🐍 Building backend only..."
+          echo "Building backend only..."
           docker build -t registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }} ./backend
           docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }}
           docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }} registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
           docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
-          echo "✅ Backend deployed - Frontend unchanged"
+          echo "Backend deployed - Frontend unchanged"
 
   no-changes:
     runs-on: ubuntu-latest
@@ -69,6 +69,6 @@ jobs:
     steps:
       - name: No deployment needed
         run: |
-          echo "🎯 No frontend or backend changes detected"
-          echo "📋 Changes in: ${{ join(github.event.commits.*.modified, ', ') }}"
-          echo "✅ No deployment triggered - Infrastructure savings!"
+          echo "No frontend or backend changes detected"
+          echo "Changes in: ${{ join(github.event.commits.*.modified, ', ') }}"
+          echo "No deployment triggered - Infrastructure savings!"
