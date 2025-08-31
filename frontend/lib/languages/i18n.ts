@@ -35,6 +35,30 @@ export interface TranslationKeys {
   // Login form
   'login.email': string
   'login.password': string
+  'login.rememberMe': string
+  'login.emailLabel': string
+  'login.passwordLabel': string
+  'login.emailPlaceholder': string
+  'login.passwordPlaceholder': string
+
+  // Auth actions
+  'auth.connecting': string
+  'auth.login': string
+  'auth.forgotPassword': string
+  'auth.newToIntelia': string
+  'auth.createAccount': string
+  'login.rememberMe': string
+  'login.emailLabel': string
+  'login.passwordLabel': string
+  'login.emailPlaceholder': string
+  'login.passwordPlaceholder': string
+
+  // Auth actions
+  'auth.connecting': string
+  'auth.login': string
+  'auth.forgotPassword': string
+  'auth.newToIntelia': string
+  'auth.createAccount': string
 
   // Messages de Chat
   'chat.welcome': string
@@ -190,6 +214,8 @@ export interface TranslationKeys {
   'common.reset': string
   'common.apply': string
   'common.update': string
+  'common.or': string
+  'common.or': string
 
   // Interface utilisateur
   'ui.menu': string
