@@ -24,13 +24,6 @@
   "login.emailPlaceholder": "votre@email.com",
   "login.passwordPlaceholder": "Votre mot de passe",
 
-  "auth.connecting": "Connexion...",
-  "auth.login": "Se connecter",
-  "auth.forgotPassword": "Mot de passe oublié ?",
-  "auth.newToIntelia": "Nouveau sur Intelia Expert ?",
-  "auth.createAccount": "Créer un compte",
-  "common.or": "ou",
-
   "nav.history": "Historique des conversations",
   "nav.newConversation": "Nouvelle conversation",
   "nav.profile": "Profil",

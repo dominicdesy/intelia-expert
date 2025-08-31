@@ -6,21 +6,10 @@ import { availableLanguages, DEFAULT_LANGUAGE, getLanguageByCode, isValidLanguag
 
 const supabase = getSupabaseClient()
 
-// Types pour le système de traduction
+// Types pour le système de traduction - VERSION PROPRE SANS DOUBLONS
 export interface TranslationKeys {
-  // Navigation et Interface
-  'nav.history': string
-  'nav.newConversation': string
-  'nav.profile': string
-  'nav.language': string
-  'nav.subscription': string
-  'nav.contact': string
-  'nav.legal': string
-  'nav.logout': string
-  'nav.clearAll': string
-  'nav.inviteFriend': string
-  'nav.account': string
-  'nav.settings': string
+  // Page titles
+  'page.title': string
 
   // Authentication
   'auth.success': string
@@ -45,18 +34,20 @@ export interface TranslationKeys {
   'login.passwordLabel': string
   'login.emailPlaceholder': string
   'login.passwordPlaceholder': string
-  'login.rememberMe': string
-  'login.emailLabel': string
-  'login.passwordLabel': string
-  'login.emailPlaceholder': string
-  'login.passwordPlaceholder': string
 
-  // Auth actions
-  'auth.connecting': string
-  'auth.login': string
-  'auth.forgotPassword': string
-  'auth.newToIntelia': string
-  'auth.createAccount': string
+  // Navigation et Interface
+  'nav.history': string
+  'nav.newConversation': string
+  'nav.profile': string
+  'nav.language': string
+  'nav.subscription': string
+  'nav.contact': string
+  'nav.legal': string
+  'nav.logout': string
+  'nav.clearAll': string
+  'nav.inviteFriend': string
+  'nav.account': string
+  'nav.settings': string
 
   // Messages de Chat
   'chat.welcome': string
@@ -71,9 +62,6 @@ export interface TranslationKeys {
   'chat.disclaimer': string
   'chat.send': string
   'chat.askQuestion': string
-
-  // Page titles
-  'page.title': string
 
   // Modals
   'modal.close': string
@@ -212,7 +200,6 @@ export interface TranslationKeys {
   'common.reset': string
   'common.apply': string
   'common.update': string
-  'common.or': string
   'common.or': string
 
   // Interface utilisateur
