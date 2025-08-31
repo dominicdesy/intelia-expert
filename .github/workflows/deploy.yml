@@ -1,20 +1,13 @@
-name: Selective Docker Build and Deploy
+name: Build and Deploy Docker Images
 
 on:
   push:
     branches: [ main ]
-    paths-ignore:
-      - '**.md'
-      - '.gitignore'
-      - 'docs/**'
+  workflow_dispatch:
 
 jobs:
-  frontend:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    if: |
-      contains(join(github.event.commits.*.modified), 'frontend/') ||
-      contains(join(github.event.commits.*.added), 'frontend/') ||
-      contains(join(github.event.commits.*.removed), 'frontend/')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -24,7 +17,7 @@ jobs:
       
       - name: Build and push frontend image
         run: |
-          echo "Building frontend only..."
+          echo "Building frontend..."
           docker build \
             --build-arg NEXT_PUBLIC_SUPABASE_URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
             --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
@@ -33,42 +26,13 @@ jobs:
           docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }}
           docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }} registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
           docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
-          echo "Frontend deployed - Backend unchanged"
-
-  backend:
-    runs-on: ubuntu-latest
-    if: |
-      contains(join(github.event.commits.*.modified), 'backend/') ||
-      contains(join(github.event.commits.*.added), 'backend/') ||
-      contains(join(github.event.commits.*.removed), 'backend/')
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Login to DigitalOcean Container Registry
-        run: echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login registry.digitalocean.com -u doctl --password-stdin
+          echo "Frontend deployed"
       
       - name: Build and push backend image
         run: |
-          echo "Building backend only..."
+          echo "Building backend..."
           docker build -t registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }} ./backend
           docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }}
           docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }} registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
           docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
-          echo "Backend deployed - Frontend unchanged"
-
-  no-changes:
-    runs-on: ubuntu-latest
-    if: |
-      !contains(join(github.event.commits.*.modified), 'frontend/') &&
-      !contains(join(github.event.commits.*.added), 'frontend/') &&
-      !contains(join(github.event.commits.*.removed), 'frontend/') &&
-      !contains(join(github.event.commits.*.modified), 'backend/') &&
-      !contains(join(github.event.commits.*.added), 'backend/') &&
-      !contains(join(github.event.commits.*.removed), 'backend/')
-    steps:
-      - name: No deployment needed
-        run: |
-          echo "No frontend or backend changes detected"
-          echo "Changes in: ${{ join(github.event.commits.*.modified, ', ') }}"
-          echo "No deployment triggered - Infrastructure savings!"
+          echo "Backend deployed"
