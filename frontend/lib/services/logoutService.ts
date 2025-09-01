@@ -89,23 +89,23 @@ export const logoutService = {
         }
       }
 
-      // 6. Preserver la langue pour la page de login
+      // 6. Preserver la langue pour la page d'accueil
       sessionStorage.setItem('recent-logout', Date.now().toString())
       sessionStorage.setItem('logout-complete', 'true')
       sessionStorage.setItem('logout-language', userLanguage)
       
-      console.log('[LogoutService] Redirection vers login en', userLanguage)
+      console.log('[LogoutService] Redirection vers page d\'accueil en', userLanguage)
       
-      // 7. Rediriger vers la page de login dans la bonne langue
+      // 7. Rediriger vers la page d'accueil (app/page.tsx) dans la bonne langue
       setTimeout(() => {
-        window.location.href = '/auth/login'
+        window.location.href = '/'
       }, 100)
       
     } catch (error) {
       console.error('[LogoutService] Erreur durant logout:', error)
-      // En cas d'erreur, forcer quand meme la redirection
+      // En cas d'erreur, forcer quand meme la redirection vers la page d'accueil
       setTimeout(() => {
-        window.location.href = '/auth/login'
+        window.location.href = '/'
       }, 100)
     }
   }
