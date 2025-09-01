@@ -4,8 +4,8 @@ const nextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   
-  // 🚨 SOLUTION: SWC avec fallback gracieux
-  swcMinify: process.env.DISABLE_SWC !== 'true', // Peut être désactivé via env
+  // 🎯 SOLUTION 3: Utilise Terser au lieu de SWC (plus fiable pour Docker)
+  swcMinify: false,
   
   trailingSlash: true,
 
@@ -15,14 +15,11 @@ const nextConfig = {
   // 🚀 Optimisations pour Digital Ocean
   compress: true,
   
-  // ⚡ Configuration expérimentale minimale avec SWC options
+  // ⚡ Configuration expérimentale minimale
   experimental: {
     serverComponentsExternalPackages: [
       '@supabase/supabase-js'
-    ],
-    // 🔧 Options SWC spécifiques pour Docker
-    swcPlugins: [], // Pas de plugins SWC custom
-    forceSwcTransforms: false, // Laisse Next.js décider
+    ]
   },
   
   // 🏷️ Build ID simple et prévisible
@@ -46,14 +43,14 @@ const nextConfig = {
     NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
   },
 
-  // 📝 Configuration TypeScript - Plus permissive en cas de problème
+  // 📝 Configuration TypeScript
   typescript: {
-    ignoreBuildErrors: process.env.IGNORE_TS_ERRORS === 'true',
+    ignoreBuildErrors: false,
   },
 
-  // 📝 Configuration ESLint - Plus permissive en cas de problème
+  // 📝 Configuration ESLint
   eslint: {
-    ignoreDuringBuilds: process.env.IGNORE_ESLINT === 'true',
+    ignoreDuringBuilds: false,
   },
 
   // 🔒 Headers de sécurité
@@ -111,7 +108,7 @@ const nextConfig = {
     ]
   },
 
-  // ⚙️ Configuration Webpack ROBUSTE avec fallback
+  // ⚙️ Configuration Webpack simplifiée
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
     
     // 🛠 Mode développement - configurations de debug
@@ -119,26 +116,11 @@ const nextConfig = {
       config.devtool = 'cheap-module-source-map'
     }
     
-    // 🏭 Mode production - optimisations avec fallback Babel si SWC fail
+    // 🏭 Mode production - optimisations standard
     if (!dev && !isServer) {
-      // 🔄 Fallback Babel si SWC indisponible
-      if (process.env.DISABLE_SWC === 'true') {
-        config.module.rules.push({
-          test: /\.(js|jsx|ts|tsx)$/,
-          exclude: /node_modules/,
-          use: {
-            loader: 'babel-loader',
-            options: {
-              presets: ['next/babel'],
-              cacheDirectory: true,
-            },
-          },
-        })
-      }
-      
       config.optimization = {
         ...config.optimization,
-        minimize: true,
+        minimize: true, // Utilise Terser par défaut
         splitChunks: {
           chunks: 'all',
           cacheGroups: {
@@ -192,7 +174,7 @@ const nextConfig = {
       },
     })
 
-    // 🚫 Ignorer les warnings spécifiques + SWC warnings
+    // 🚫 Ignorer les warnings
     config.ignoreWarnings = [
       {
         module: /node_modules/,
@@ -201,38 +183,10 @@ const nextConfig = {
       {
         module: /node_modules/,
         message: /Can't resolve/,
-      },
-      // 🚨 Ignorer les erreurs SWC qui ne bloquent pas le build
-      {
-        message: /SWC.*failed/,
-      },
-      {
-        message: /TAR_ABORT/,
       }
     ]
 
-    // 📊 Analyse du bundle en développement
-    if (dev && process.env.ANALYZE === 'true') {
-      try {
-        const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer')
-        config.plugins.push(
-          new BundleAnalyzerPlugin({
-            analyzerMode: 'server',
-            openAnalyzer: true,
-          })
-        )
-      } catch (e) {
-        console.warn('Bundle analyzer not available:', e.message)
-      }
-    }
-
     return config
-  },
-
-  // 🚨 Configuration de compilation avec retry logic
-  onDemandEntries: {
-    maxInactiveAge: 25 * 1000,
-    pagesBufferLength: 2,
   },
 
   // 📄 Redirections pour compatibilité
@@ -248,6 +202,6 @@ const nextConfig = {
 
 // 🔍 Validation de la configuration
 console.log('🚀 Next.js config loaded for environment:', process.env.NODE_ENV)
-console.log('🔧 SWC enabled:', nextConfig.swcMinify)
+console.log('🔧 Minifier used:', nextConfig.swcMinify ? 'SWC' : 'Terser')
 
 module.exports = nextConfig
