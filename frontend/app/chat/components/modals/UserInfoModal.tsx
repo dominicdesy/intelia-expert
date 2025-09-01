@@ -369,7 +369,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       // Forcer les dimensions du contenu (700px pour UserInfo)
       const content = overlay.querySelector('.uimodal-content') as HTMLElement
       if (content) {
-        content.style.setProperty('max-width', '700px', 'important')
+        content.style.setProperty('max-width', '400px', 'important')
         content.style.setProperty('width', '95vw', 'important')
         content.style.setProperty('max-height', '85vh', 'important')
         content.style.setProperty('min-width', '320px', 'important')
