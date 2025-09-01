@@ -4,7 +4,7 @@ const nextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   
-  // 🎯 SOLUTION 3: Utilise Terser au lieu de SWC (plus fiable pour Docker)
+  // 🎯 Terser pour minification (SWC reste pour compilation)
   swcMinify: false,
   
   trailingSlash: true,
@@ -27,14 +27,15 @@ const nextConfig = {
     return `intelia-expert-${Date.now()}`
   },
 
-  // 🖼️ Configuration des images
+  // 🖼️ Configuration des images - CORRECTION IMPORTANTE
   images: {
     domains: [
       'cdrmjshmkdfwwtsfdvbl.supabase.co',
       'avatars.githubusercontent.com'
     ],
     formats: ['image/webp', 'image/avif'],
-    unoptimized: process.env.NODE_ENV === 'production',
+    // 🔧 CORRECTION: Garder l'optimisation d'images en production
+    unoptimized: false, // Était: process.env.NODE_ENV === 'production'
   },
 
   // 🌍 Variables d'environnement
@@ -108,19 +109,19 @@ const nextConfig = {
     ]
   },
 
-  // ⚙️ Configuration Webpack simplifiée
+  // ⚙️ Configuration Webpack simplifiée et robuste
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
     
-    // 🛠 Mode développement - configurations de debug
+    // 🛠 Mode développement
     if (dev) {
       config.devtool = 'cheap-module-source-map'
     }
     
-    // 🏭 Mode production - optimisations standard
+    // 🏭 Mode production - optimisations avec Terser
     if (!dev && !isServer) {
       config.optimization = {
         ...config.optimization,
-        minimize: true, // Utilise Terser par défaut
+        minimize: true, // Utilise Terser (swcMinify: false)
         splitChunks: {
           chunks: 'all',
           cacheGroups: {
@@ -134,7 +135,7 @@ const nextConfig = {
       }
     }
     
-    // 🌍 Fallbacks pour le navigateur (Supabase uniquement)
+    // 🌍 Fallbacks pour le navigateur
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -189,12 +190,12 @@ const nextConfig = {
     return config
   },
 
-  // 📄 Redirections pour compatibilité
+  // 📄 Redirections
   async redirects() {
     return []
   },
 
-  // ✨ Rewrites pour l'API si nécessaire
+  // ✨ Rewrites
   async rewrites() {
     return []
   },
@@ -202,6 +203,7 @@ const nextConfig = {
 
 // 🔍 Validation de la configuration
 console.log('🚀 Next.js config loaded for environment:', process.env.NODE_ENV)
-console.log('🔧 Minifier used:', nextConfig.swcMinify ? 'SWC' : 'Terser')
+console.log('🔧 SWC compilation: enabled, Terser minification: enabled')
+console.log('🖼️ Image optimization:', nextConfig.images.unoptimized ? 'disabled' : 'enabled')
 
 module.exports = nextConfig
