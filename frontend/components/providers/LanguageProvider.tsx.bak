@@ -1,10 +1,8 @@
 // components/providers/LanguageProvider.tsx
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useLanguageStore } from '@/lib/stores/language'
-// CORRECTION CRITIQUE : Utiliser le hook optimisé au lieu du store complet
-import { useUser } from '@/lib/hooks/useAuthStore'
 
 // Type Language depuis types
 type Language = 'fr' | 'en' | 'es' | 'pt' | 'de' | 'nl' | 'pl'
@@ -17,21 +15,15 @@ function isValidLanguage(lang: string): lang is Language {
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const { setLanguage } = useLanguageStore()
-  
-  // CORRECTION : Utiliser le hook sélectif pour éviter les re-renders
-  const { user } = useUser()
+  const hasInitializedRef = useRef(false)
 
   useEffect(() => {
-    // Définir la langue basée sur l'utilisateur ou le navigateur
-    if (user?.language) {
-      // Valider le type avant de passer à setLanguage
-      if (isValidLanguage(user.language)) {
-        setLanguage(user.language)
-      } else {
-        console.warn(`Langue utilisateur invalide: ${user.language}, fallback vers 'fr'`)
-        setLanguage('fr')
-      }
-    } else if (typeof window !== 'undefined') {
+    // CORRECTION: Initialisation UNE SEULE FOIS, sans dépendance sur user
+    if (hasInitializedRef.current) return
+    hasInitializedRef.current = true
+
+    // Définer la langue basée sur le navigateur SEULEMENT
+    if (typeof window !== 'undefined') {
       const browserLang = navigator.language.split('-')[0]
       
       // Validation propre du type
@@ -40,8 +32,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       } else {
         setLanguage('fr') // Français par défaut
       }
+      
+      console.log('[LanguageProvider] Langue initialisée depuis navigateur:', browserLang)
     }
-  }, [user, setLanguage])
+  }, [setLanguage]) // SUPPRESSION de 'user' des dépendances !
 
   return <>{children}</>
 }

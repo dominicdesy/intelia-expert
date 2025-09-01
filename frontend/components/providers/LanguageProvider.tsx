@@ -2,40 +2,42 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { useLanguageStore } from '@/lib/stores/language'
+import { useTranslation } from '@/lib/languages/i18n'
 
-// Type Language depuis types
-type Language = 'fr' | 'en' | 'es' | 'pt' | 'de' | 'nl' | 'pl'
+// Import de la configuration officielle
+import { isValidLanguageCode } from '@/lib/languages/config'
 
-// Helper function pour valider le type Language
+// Types supportés par le système i18n (basé sur config.ts)
+type Language = 'fr' | 'en' | 'es' | 'pt' | 'de' | 'nl' | 'pl' | 'th' | 'hi' | 'zh'
+
+// Helper function pour valider le type Language (utilise la config officielle)
 function isValidLanguage(lang: string): lang is Language {
-  const supportedLangs: Language[] = ['fr', 'en', 'es', 'pt', 'de', 'nl', 'pl']
-  return supportedLangs.includes(lang as Language)
+  return isValidLanguageCode(lang)
 }
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const { setLanguage } = useLanguageStore()
+  const { changeLanguage } = useTranslation()
   const hasInitializedRef = useRef(false)
 
   useEffect(() => {
-    // CORRECTION: Initialisation UNE SEULE FOIS, sans dépendance sur user
+    // Initialisation UNE SEULE FOIS
     if (hasInitializedRef.current) return
     hasInitializedRef.current = true
 
-    // Définer la langue basée sur le navigateur SEULEMENT
+    // Définir la langue basée sur le navigateur
     if (typeof window !== 'undefined') {
       const browserLang = navigator.language.split('-')[0]
       
-      // Validation propre du type
+      // Validation et application de la langue
       if (isValidLanguage(browserLang)) {
-        setLanguage(browserLang)
+        changeLanguage(browserLang)
+        console.log('[LanguageProvider] Langue initialisée depuis navigateur:', browserLang)
       } else {
-        setLanguage('fr') // Français par défaut
+        changeLanguage('fr') // Français par défaut
+        console.log('[LanguageProvider] Langue par défaut appliquée: fr')
       }
-      
-      console.log('[LanguageProvider] Langue initialisée depuis navigateur:', browserLang)
     }
-  }, [setLanguage]) // SUPPRESSION de 'user' des dépendances !
+  }, [changeLanguage])
 
   return <>{children}</>
 }
