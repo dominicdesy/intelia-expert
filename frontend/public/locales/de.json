@@ -393,7 +393,7 @@
   "profile.confirmPassword": "Neues Passwort bestätigen *",
   "profile.passwordRequirements": "Das Passwort muss enthalten:",
   "profile.passwordRequirements8": "8+ Zeichen",
-  "profile.passwordRequirementsUpper": "Einen Großbuchstaben",
+  "profile.passwordRequirementsUpper": "Einen Großbuchstabe",
   "profile.passwordRequirementsLower": "Einen Kleinbuchstaben",
   "profile.passwordRequirementsNumber": "Eine Zahl",
   "profile.passwordRequirementsSpecial": "Sonderzeichen",

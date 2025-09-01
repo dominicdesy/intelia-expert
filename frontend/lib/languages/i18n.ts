@@ -657,6 +657,9 @@ const notificationManager = I18nNotificationManager.getInstance()
 // Cache pour les traductions chargées
 const translationsCache: Record<string, TranslationKeys> = {}
 
+// 🆕 Cache des erreurs pour éviter les boucles infinies
+const errorCache = new Set<string>()
+
 // Variables globales pour la synchronisation (UTILISER DEFAULT_LANGUAGE)
 let globalTranslations: TranslationKeys = {} as TranslationKeys
 let globalLoading = true
@@ -669,6 +672,9 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
     getGlobalLoading: () => globalLoading,
     getGlobalLanguage: () => globalLanguage,
     getTranslationsCache: () => translationsCache,
+    // 🆕 Ajout des fonctions de debug pour le cache d'erreurs
+    getErrorCache: () => errorCache,
+    clearErrorCache: () => errorCache.clear(),
     notificationManager
   }
 }
@@ -687,8 +693,17 @@ const getStoredLanguage = (): string => {
   return DEFAULT_LANGUAGE
 }
 
-// Fonction pour charger les traductions depuis les fichiers JSON
+// 🔄 Fonction pour charger les traductions depuis les fichiers JSON - AVEC PROTECTION ANTI-BOUCLE
 async function loadTranslations(language: string): Promise<TranslationKeys> {
+  // 🛡️ Vérifier le cache des erreurs
+  if (errorCache.has(language)) {
+    console.warn(`[i18n] Langue ${language} en cache d'erreur, utilisation de ${DEFAULT_LANGUAGE}`)
+    if (language === DEFAULT_LANGUAGE) {
+      return {} as TranslationKeys
+    }
+    return loadTranslations(DEFAULT_LANGUAGE)
+  }
+
   if (translationsCache[language]) {
     globalTranslations = translationsCache[language]
     globalLoading = false
@@ -703,10 +718,16 @@ async function loadTranslations(language: string): Promise<TranslationKeys> {
   try {
     const response = await fetch(`/locales/${language}.json`)
     if (!response.ok) {
-      throw new Error(`Failed to load translations for ${language}`)
+      throw new Error(`HTTP ${response.status}: Failed to load translations for ${language}`)
     }
     
     const translations = await response.json()
+    
+    // 🔍 Vérifier que les traductions ne sont pas vides ou corrompues
+    if (!translations || typeof translations !== 'object' || Object.keys(translations).length === 0) {
+      throw new Error(`Empty or invalid translations for ${language}`)
+    }
+    
     translationsCache[language] = translations
     globalTranslations = translations
     globalLoading = false
@@ -715,16 +736,23 @@ async function loadTranslations(language: string): Promise<TranslationKeys> {
     // NOTIFIER TOUS LES COMPOSANTS
     notificationManager.notify()
     
+    console.log(`[i18n] ✅ Traductions chargées pour ${language}: ${Object.keys(translations).length} clés`)
     return translations
+    
   } catch (error) {
-    console.warn(`Could not load translations for ${language}, falling back to ${DEFAULT_LANGUAGE}`)
+    console.error(`[i18n] ❌ Could not load translations for ${language}:`, error)
+    
+    // 🚨 Ajouter à la cache des erreurs pour éviter les boucles
+    errorCache.add(language)
     
     // Fallback vers la langue par défaut
     if (language !== DEFAULT_LANGUAGE) {
+      console.warn(`[i18n] 🔄 Falling back to ${DEFAULT_LANGUAGE}`)
       return loadTranslations(DEFAULT_LANGUAGE)
     }
     
     // Si même la langue par défaut échoue, retourner des clés vides
+    console.error(`[i18n] 💥 Even ${DEFAULT_LANGUAGE} failed to load, returning empty translations`)
     return {} as TranslationKeys
   }
 }
@@ -822,6 +850,9 @@ export const useTranslation = () => {
   }
 
   const changeLanguage = async (newLanguage: string) => {
+    // 🔄 Nettoyer le cache d'erreur si on retente une langue
+    errorCache.delete(newLanguage)
+    
     setCurrentLanguage(newLanguage)
     
     // Précharger les traductions

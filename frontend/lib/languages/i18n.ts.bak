@@ -657,10 +657,10 @@ const notificationManager = I18nNotificationManager.getInstance()
 // Cache pour les traductions chargées
 const translationsCache: Record<string, TranslationKeys> = {}
 
-// Variables globales pour la synchronisation
+// Variables globales pour la synchronisation (UTILISER DEFAULT_LANGUAGE)
 let globalTranslations: TranslationKeys = {} as TranslationKeys
 let globalLoading = true
-let globalLanguage = 'fr'
+let globalLanguage = DEFAULT_LANGUAGE
 
 // EXPOSER LES VARIABLES POUR LE DEBUG (seulement en développement)
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
@@ -673,7 +673,7 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   }
 }
 
-// Fonction pour récupérer la langue depuis le store Zustand
+// Fonction pour récupérer la langue depuis le localStorage
 const getStoredLanguage = (): string => {
   try {
     const storedLang = localStorage.getItem('intelia-language')
@@ -717,21 +717,21 @@ async function loadTranslations(language: string): Promise<TranslationKeys> {
     
     return translations
   } catch (error) {
-    console.warn(`Could not load translations for ${language}, falling back to French`)
+    console.warn(`Could not load translations for ${language}, falling back to ${DEFAULT_LANGUAGE}`)
     
-    // Fallback vers le français
-    if (language !== 'fr') {
-      return loadTranslations('fr')
+    // Fallback vers la langue par défaut
+    if (language !== DEFAULT_LANGUAGE) {
+      return loadTranslations(DEFAULT_LANGUAGE)
     }
     
-    // Si même le français échoue, retourner des clés vides
+    // Si même la langue par défaut échoue, retourner des clés vides
     return {} as TranslationKeys
   }
 }
 
 // Hook de traduction
 export const useTranslation = () => {
-  const [currentLanguage, setCurrentLanguage] = useState<string>('fr')
+  const [currentLanguage, setCurrentLanguage] = useState<string>(DEFAULT_LANGUAGE)
   const [translations, setTranslations] = useState<TranslationKeys>({} as TranslationKeys)
   const [loading, setLoading] = useState(true)
   const [, forceRender] = useState({}) // Pour forcer les re-renders
@@ -749,7 +749,7 @@ export const useTranslation = () => {
   useEffect(() => {
     const getUserLanguage = async () => {
       try {
-        // D'abord vérifier le localStorage Zustand
+        // D'abord vérifier le localStorage
         const storedLang = getStoredLanguage()
         if (storedLang !== DEFAULT_LANGUAGE && isValidLanguageCode(storedLang)) {
           setCurrentLanguage(storedLang)
@@ -814,8 +814,6 @@ export const useTranslation = () => {
     const finalTranslations = Object.keys(translations).length > 0 ? translations : globalTranslations
     const isStillLoading = loading && globalLoading
     
-    // SUPPRESSION COMPLÈTE DES LOGS DEBUG QUI CAUSAIENT LA BOUCLE INFINIE
-    
     if (isStillLoading || !finalTranslations[key]) {
       return key
     }
@@ -839,7 +837,7 @@ export const useTranslation = () => {
 
   const formatDate = (date: Date) => {
     const langConfig = getLanguageByCode(currentLanguage)
-    const locale = langConfig?.dateFormat || 'fr-FR'
+    const locale = langConfig?.dateFormat || 'en-US'
     return date.toLocaleDateString(locale, { 
       day: 'numeric', 
       month: 'long', 
