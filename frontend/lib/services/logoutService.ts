@@ -2,11 +2,32 @@
 // Service de logout independant pour eviter les problemes React #300
 
 export const logoutService = {
-  async performLogout(): Promise<void> {
+  async performLogout(user?: any): Promise<void> {
     console.log('[LogoutService] Debut deconnexion via service independant')
     
     try {
-      // 1. Preserver RememberMe si necessaire
+      // 1. Detecter la langue de l'utilisateur AVANT le nettoyage
+      let userLanguage = 'fr' // Defaut francais
+      try {
+        // Methode 1: Depuis le parametre user passe
+        if (user?.language) {
+          userLanguage = user.language
+          console.log('[LogoutService] Langue detectee depuis user:', userLanguage)
+        }
+        // Methode 2: Depuis le localStorage du store Zustand
+        else {
+          const zustandLang = localStorage.getItem('intelia-language')
+          if (zustandLang) {
+            const parsed = JSON.parse(zustandLang)
+            userLanguage = parsed?.state?.currentLanguage || 'fr'
+            console.log('[LogoutService] Langue detectee depuis localStorage:', userLanguage)
+          }
+        }
+      } catch (error) {
+        console.warn('[LogoutService] Erreur detection langue, utilisation du francais:', error)
+      }
+
+      // 2. Preserver RememberMe si necessaire
       let preservedRememberMe = null
       try {
         const rememberMeData = localStorage.getItem('intelia-remember-me-persist')
@@ -18,7 +39,7 @@ export const logoutService = {
         console.warn('[LogoutService] Erreur preservation RememberMe:', error)
       }
 
-      // 2. Deconnexion Supabase
+      // 3. Deconnexion Supabase
       console.log('[LogoutService] Tentative deconnexion Supabase...')
       try {
         const { getSupabaseClient } = await import('@/lib/supabase/singleton')
@@ -29,7 +50,7 @@ export const logoutService = {
         console.warn('[LogoutService] Erreur Supabase (continue quand meme):', supabaseError)
       }
 
-      // 3. Nettoyage localStorage selectif
+      // 4. Nettoyage localStorage selectif
       console.log('[LogoutService] Nettoyage localStorage...')
       const keysToRemove = []
       for (let i = 0; i < localStorage.length; i++) {
@@ -58,7 +79,7 @@ export const logoutService = {
       
       console.log(`[LogoutService] ${keysToRemove.length} cles supprimees, RememberMe preserve`)
 
-      // 4. Restaurer RememberMe si necessaire
+      // 5. Restaurer RememberMe si necessaire
       if (preservedRememberMe) {
         try {
           localStorage.setItem('intelia-remember-me-persist', JSON.stringify(preservedRememberMe))
@@ -68,27 +89,23 @@ export const logoutService = {
         }
       }
 
-      // 5. Detecter la langue actuelle avant la redirection
-      let currentLanguage = 'fr' // Defaut francais
-      try {
-        // Essayer de recuperer la langue depuis localStorage
-        const langData = localStorage.getItem('intelia-language') || localStorage.getItem('language')
-        if (langData) {
-          const parsed = JSON.parse(langData)
-          currentLanguage = parsed.language || parsed || 'fr'
-        }
-        
-        // Ou depuis l'URL actuelle
-        const urlPath = window.location.pathname
-        if (urlPath.includes('/en')) currentLanguage = 'en'
-        else if (urlPath.includes('/es')) currentLanguage = 'es'
-        else if (urlPath.includes('/de')) currentLanguage = 'de
+      // 6. Preserver la langue pour la page de login
+      sessionStorage.setItem('recent-logout', Date.now().toString())
+      sessionStorage.setItem('logout-complete', 'true')
+      sessionStorage.setItem('logout-language', userLanguage)
+      
+      console.log('[LogoutService] Redirection vers login en', userLanguage)
+      
+      // 7. Rediriger vers la page de login dans la bonne langue
+      setTimeout(() => {
+        window.location.href = '/auth/login'
+      }, 100)
       
     } catch (error) {
       console.error('[LogoutService] Erreur durant logout:', error)
-      // En cas d'erreur, forcer quand meme le reload
+      // En cas d'erreur, forcer quand meme la redirection
       setTimeout(() => {
-        window.location.href = '/'
+        window.location.href = '/auth/login'
       }, 100)
     }
   }
