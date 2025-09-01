@@ -812,35 +812,23 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         }
       `}</style>
 
-      {/* ✅ OVERLAY CORRIGÉ - Identique à LanguageModal */}
+      {/* OVERLAY CORRIGÉ - Structure identique à LanguageModal */}
       <div 
         ref={overlayRef}
         className="fixed inset-0 z-50"
         style={{
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          backdropFilter: 'blur(2px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px'
+          backdropFilter: 'blur(2px)'
         }}
         onClick={handleOverlayClick}
         data-debug="modal-overlay"
       >
-        {/* ✅ MODAL CONTAINER CORRIGÉ */}
+        {/* MODAL CONTAINER - SUPPRIMER TOUS LES STYLES INLINE PROBLÉMATIQUES */}
         <div 
-          className="modal-content bg-white rounded-lg shadow-xl max-h-[90vh] overflow-y-auto"
+          className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
           data-modal="user-info"
           data-debug="modal-content"
-          style={{
-            backgroundColor: 'white',
-            width: '95vw',
-            maxWidth: '700px',
-            maxHeight: '85vh',
-            minWidth: '320px',
-            animation: 'modalSlideIn 0.3s ease-out'
-          }}
         >
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
