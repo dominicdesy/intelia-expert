@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import { useTranslation } from '@/lib/languages/i18n'
 
@@ -13,23 +13,22 @@ const InteliaLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
   />
 )
 
-// Page Mot de Passe Oublié - VERSION ULTRA-SIMPLE COMME CONTACTMODAL
+// COPIE EXACTE DU PATTERN CONTACTMODAL
 export default function ForgotPasswordPage() {
-  // EXACTEMENT COMME CONTACTMODAL - RIEN D'AUTRE
+  // EXACTEMENT comme ContactModal - ligne identique
   const { t, currentLanguage } = useTranslation()
   
-  // États simples
+  // États simples - comme ContactModal
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
 
-  // Fonction de soumission simple
+  // Fonction simple - pas de useCallback, pas de refs, comme ContactModal
   const handleSubmit = async () => {
     setError('')
     setSuccess('')
     
-    // Validations basiques
     if (!email.trim()) {
       setError(t('forgotPassword.enterEmail'))
       return
@@ -76,9 +75,11 @@ export default function ForgotPasswordPage() {
     }
   }
 
+  // RENDER direct - pas de conditions complexes comme ContactModal
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-6">
       <div className="w-full max-w-md">
+        
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
@@ -200,10 +201,10 @@ export default function ForgotPasswordPage() {
           </p>
         </div>
 
-        {/* Debug simple */}
+        {/* Debug - COMME LE CONTACTMODAL */}
         {process.env.NODE_ENV === 'development' && (
           <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-            <strong>Debug:</strong> Langue: {currentLanguage} | Titre: {t('forgotPassword.title')}
+            <strong>Debug Langue:</strong> {currentLanguage} | <strong>Titre:</strong> {t('forgotPassword.title')} | <strong>Email:</strong> {t('forgotPassword.emailLabel')}
           </div>
         )}
       </div>
