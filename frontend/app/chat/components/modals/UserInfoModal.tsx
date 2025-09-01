@@ -372,9 +372,14 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       const applyContentStyles = () => {
         const content = overlay.querySelector('.bg-white') as HTMLElement
         if (content) {
-          // Supprimer d'abord les styles existants pour éviter les conflits
+          // Supprimer TOUTES les classes de largeur Tailwind et styles existants
           content.style.removeProperty('max-width')
           content.style.removeProperty('width')
+          content.style.removeProperty('min-width')
+          
+          // Supprimer les classes Tailwind problématiques si elles existent
+          content.classList.remove('max-w-2xl', 'max-w-xl', 'max-w-lg', 'max-w-md', 'max-w-sm')
+          content.classList.remove('w-full', 'w-auto')
           
           // Appliquer les nouveaux styles avec priorité maximale
           content.style.setProperty('width', '95vw', 'important')
@@ -941,9 +946,9 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         onClick={handleClose}
         data-debug="modal-overlay"
       >
-        {/* Modal Container - CORRECTION: Structure simplifiée comme ContactModal */}
+        {/* Modal Container - CORRECTION: Supprimer toutes classes de largeur */}
         <div 
-          className="bg-white rounded-lg shadow-xl w-full max-h-[90vh] overflow-y-auto"
+          className="bg-white rounded-lg shadow-xl max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
           data-modal="user-info"
           data-debug="modal-content"
