@@ -11,9 +11,9 @@ RUN npm config set fetch-retries 5 \
  && npm config set fetch-retry-maxtimeout 120000 \
  && npm config set prefer-offline false
 
-# Installation déterministe
+# Installation déterministe avec devDependencies (nécessaire pour TailwindCSS)
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --include=dev
 
 # ---------- Stage 2: builder ----------
 FROM node:20-bullseye-slim AS builder
@@ -36,7 +36,12 @@ ENV NEXT_PUBLIC_SITE_URL="https://expert.intelia.com"
 
 # Reprend node_modules installés
 COPY --from=deps /app/node_modules ./node_modules
+
+# Copy source avec .dockerignore
 COPY . .
+
+# Ensure fonts directory exists
+RUN mkdir -p public/fonts
 
 # Purge le cache SWC (évite les archives corrompues)
 RUN rm -rf /root/.cache/next-swc
