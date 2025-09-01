@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "rm -f package-lock.json",
-    "build": "npm install && next build",
+    "build": "next build",
+    "build:local": "npm install && next build",
     "start": "next start -p $PORT",
     "lint": "next lint",
     "type-check": "tsc --noEmit"
