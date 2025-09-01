@@ -1,9 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '@/lib/languages/i18n'
 
 // Logo Intelia
@@ -15,69 +13,36 @@ const InteliaLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
   />
 )
 
-// Page Mot de Passe Oublié - VERSION SIMPLIFIÉE COMME LE MODAL
+// Page Mot de Passe Oublié - VERSION ULTRA-SIMPLE COMME CONTACTMODAL
 export default function ForgotPasswordPage() {
-  const router = useRouter()
-  const { isAuthenticated, user } = useAuthStore()
-  
-  // UTILISATION SIMPLE COMME DANS LE MODAL - PAS DE LOGIQUE COMPLEXE
+  // EXACTEMENT COMME CONTACTMODAL - RIEN D'AUTRE
   const { t, currentLanguage } = useTranslation()
   
-  // États
+  // États simples
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
-  const [isClient, setIsClient] = useState(false)
 
-  // Refs pour éviter les doubles appels
-  const hasCheckedAuth = useRef(false)
-  const isMounted = useRef(true)
-
-  // Hydratation côté client simple
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
-
-  // Redirection si déjà connecté - LOGIQUE SIMPLIFIÉE
-  useEffect(() => {
-    if (hasCheckedAuth.current || !isMounted.current) return
-    
-    if (isClient && isAuthenticated && user) {
-      hasCheckedAuth.current = true
-      console.log('Utilisateur déjà connecté, redirection...')
-      
-      const timer = setTimeout(() => {
-        if (isMounted.current && window.location.pathname !== '/chat') {
-          router.push('/chat')
-        }
-      }, 100)
-
-      return () => clearTimeout(timer)
-    }
-  }, [isClient, isAuthenticated, user, router])
-
-  // Fonction de soumission
-  const handleSubmit = useCallback(async () => {
+  // Fonction de soumission simple
+  const handleSubmit = async () => {
     setError('')
     setSuccess('')
     
-    // Validations
+    // Validations basiques
     if (!email.trim()) {
-      setError(t('forgotPassword.enterEmail') || 'Veuillez saisir votre email')
+      setError(t('forgotPassword.enterEmail'))
       return
     }
     
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setError(t('forgotPassword.invalidEmail') || 'Format d\'email invalide')
+      setError(t('forgotPassword.invalidEmail'))
       return
     }
 
     setIsLoading(true)
 
     try {
-      console.log('Demande réinitialisation pour:', email.trim())
-      
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app/api'}/v1/auth/reset-password`, {
         method: 'POST',
         headers: {
@@ -93,67 +58,22 @@ export default function ForgotPasswordPage() {
         throw new Error(errorData.detail || `Erreur ${response.status}`)
       }
 
-      const data = await response.json()
-      console.log('Email envoyé avec succès')
-      
-      setSuccess(`${t('forgotPassword.emailSent') || 'Email envoyé à'} ${email.trim()}`)
+      setSuccess(`${t('forgotPassword.emailSent')} ${email.trim()}`)
       setEmail('')
       
     } catch (error: any) {
-      console.error('Erreur:', error)
-      
       if (error.message.includes('404')) {
-        setError(t('forgotPassword.emailNotFound') || 'Email non trouvé')
+        setError(t('forgotPassword.emailNotFound'))
       } else if (error.message.includes('429')) {
-        setError(t('forgotPassword.tooManyAttempts') || 'Trop de tentatives')
+        setError(t('forgotPassword.tooManyAttempts'))
       } else if (error.message.includes('Failed to fetch')) {
-        setError(t('forgotPassword.connectionError') || 'Erreur de connexion')
+        setError(t('forgotPassword.connectionError'))
       } else {
-        setError(error.message || t('forgotPassword.genericError') || 'Erreur inconnue')
+        setError(error.message || t('forgotPassword.genericError'))
       }
     } finally {
       setIsLoading(false)
     }
-  }, [email, t])
-
-  // Gestionnaire de touches
-  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !isLoading && email.trim()) {
-      handleSubmit()
-    }
-  }, [isLoading, email, handleSubmit])
-
-  // Cleanup au démontage
-  useEffect(() => {
-    return () => {
-      isMounted.current = false
-    }
-  }, [])
-
-  // AFFICHAGE SIMPLE - PAS DE VÉRIFICATION COMPLEXE DE LOADING
-  if (!isClient) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
-        <div className="text-center">
-          <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Si l'utilisateur est connecté, loader de redirection
-  if (isAuthenticated && user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
-        <div className="text-center">
-          <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Redirection...</p>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -211,7 +131,7 @@ export default function ForgotPasswordPage() {
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyPress={(e) => e.key === 'Enter' && handleSubmit()}
                 className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
                 placeholder={t('forgotPassword.emailPlaceholder')}
                 disabled={isLoading}
@@ -280,13 +200,10 @@ export default function ForgotPasswordPage() {
           </p>
         </div>
 
-        {/* Debug en développement */}
+        {/* Debug simple */}
         {process.env.NODE_ENV === 'development' && (
           <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-            <strong>Dev Debug:</strong>
-            <br />• Current Language: {currentLanguage}
-            <br />• Test Translation: {t('forgotPassword.title')}
-            <br />• Email Label: {t('forgotPassword.emailLabel')}
+            <strong>Debug:</strong> Langue: {currentLanguage} | Titre: {t('forgotPassword.title')}
           </div>
         )}
       </div>
