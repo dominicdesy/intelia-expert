@@ -1,6 +1,4 @@
-// ==
 // ==================== SYSTÈME DE TRADUCTION INTELIA EXPERT ====================
-// ==
 
 import { useState, useEffect } from 'react'
 import { getSupabaseClient } from '@/lib/supabase/singleton'
@@ -779,22 +777,25 @@ export const useTranslation = () => {
   useEffect(() => {
     const getUserLanguage = async () => {
       try {
-        // D'abord vérifier le localStorage
+        // D'abord vérifier le localStorage (même logique que LanguageProvider)
         const storedLang = getStoredLanguage()
         if (storedLang !== DEFAULT_LANGUAGE && isValidLanguageCode(storedLang)) {
+          console.log(`[i18n] 📦 Initialisation avec langue stockée: ${storedLang}`)
           setCurrentLanguage(storedLang)
           return
         }
 
-        // Puis vérifier Supabase
+        // Puis vérifier Supabase seulement si pas de langue stockée
         const { data: { session } } = await supabase.auth.getSession()
         const userLang = session?.user?.user_metadata?.language
         
         if (userLang && isValidLanguageCode(userLang)) {
+          console.log(`[i18n] 📦 Initialisation avec langue Supabase: ${userLang}`)
           setCurrentLanguage(userLang)
         } else {
           // Utiliser la langue du navigateur comme fallback
           const browserLang = detectBrowserLanguage()
+          console.log(`[i18n] 📦 Initialisation avec langue navigateur: ${browserLang}`)
           setCurrentLanguage(browserLang)
         }
       } catch (error) {

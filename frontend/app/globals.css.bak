@@ -1,64 +1,7 @@
-/* app/globals.css - VERSION FINALE AVEC CORRECTIONS HEADER + ZOHO + TEXTE + MODAL + ANTI-FLASH */
+/* app/globals.css - VERSION FINALE AVEC CORRECTIONS HEADER + ZOHO + TEXTE + MODAL */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* === SOLUTION ANTI-FLASH POUR LES LANGUES === */
-/* IMPORTANT : Ajouté en premier pour éviter tout conflit */
-
-/* Masquer le contenu pendant l'initialisation des langues */
-html {
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.2s ease-in-out, visibility 0s linear 0.2s;
-}
-
-/* Afficher une fois que les langues sont prêtes */
-html.language-ready {
-  opacity: 1;
-  visibility: visible;
-  transition: opacity 0.2s ease-in-out;
-}
-
-/* Loader pendant l'initialisation - Ne s'affiche que si nécessaire */
-html:not(.language-ready) body::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  z-index: 99999;
-  display: block;
-}
-
-html:not(.language-ready) body::after {
-  content: 'Intelia Expert';
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: white;
-  font-size: 24px;
-  font-weight: 600;
-  z-index: 100000;
-  opacity: 0.9;
-  animation: pulse 1.5s ease-in-out infinite;
-  pointer-events: none;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
-
-/* Responsive pour le loader */
-@media (max-width: 768px) {
-  html:not(.language-ready) body::after {
-    font-size: 20px;
-  }
-}
 
 /* Base styles avec optimisations mobile */
 @layer base {
@@ -84,7 +27,7 @@ html:not(.language-ready) body::after {
     border-radius: 0;
   }
   
-  /* Fix spécifique pour les options de select */
+  /* Fix spÃ©cifique pour les options de select */
   select option {
     @apply text-gray-900 bg-white;
     color: #111827;
@@ -103,7 +46,7 @@ html:not(.language-ready) body::after {
   }
 }
 
-/* Utilities personnalisées */
+/* Utilities personnalisÃ©es */
 @layer utilities {
   .safe-area-top {
     padding-top: env(safe-area-inset-top);
@@ -179,7 +122,7 @@ html:not(.language-ready) body::after {
     animation: fadeInUp 0.4s ease-out;
   }
   
-  /* Force le carré pour les boutons utilisateur qui veulent être ronds */
+  /* Force le carrÃ© pour les boutons utilisateur qui veulent Ãªtre ronds */
   .force-square {
     border-radius: 8px !important;
     border-radius: 0.5rem !important;
@@ -191,7 +134,7 @@ html:not(.language-ready) body::after {
     z-index: 20;
   }
   
-  /* Utility pour forcer la visibilité du texte si nécessaire */
+  /* Utility pour forcer la visibilitÃ© du texte si nÃ©cessaire */
   .force-text-visible {
     color: #111827 !important;
     background-color: #ffffff !important;
@@ -201,32 +144,9 @@ html:not(.language-ready) body::after {
     color: #111827 !important;
     background-color: #ffffff !important;
   }
-  
-  /* === UTILITIES ANTI-FLASH === */
-  
-  /* Pour les éléments de traduction qui changent */
-  .translation-fade {
-    transition: opacity 0.15s ease-in-out;
-  }
-  
-  .translation-fade.updating {
-    opacity: 0.7;
-  }
-  
-  /* Pour marquer les composants prêts */
-  .component-ready {
-    opacity: 1;
-    transform: none;
-  }
-  
-  .component-loading {
-    opacity: 0.5;
-    transform: translateY(10px);
-    transition: all 0.2s ease-in-out;
-  }
 }
 
-/* Components personnalisés - SÉPARÉS POUR ÉVITER LES ERREURS */
+/* Components personnalisÃ©s - SÃ‰PARÃ‰S POUR Ã‰VITER LES ERREURS */
 @layer components {
   .btn-primary {
     @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors duration-200;
@@ -256,7 +176,7 @@ html:not(.language-ready) body::after {
     @apply bg-white border border-gray-200 text-gray-900 rounded-lg px-4 py-3;
   }
   
-  /* Topic card - SÉPARÉ EN PLUSIEURS CLASSES */
+  /* Topic card - SÃ‰PARÃ‰ EN PLUSIEURS CLASSES */
   .topic-card {
     @apply p-3 sm:p-4 bg-white rounded-lg border border-gray-200 transition-colors text-left;
   }
@@ -284,7 +204,7 @@ html:not(.language-ready) body::after {
     @apply header-button bg-blue-600 text-white hover:bg-blue-700 text-sm;
   }
   
-  /* Style forcé pour HistoryMenu - CORRIGÉ pour cibler seulement le bouton */
+  /* Style forcÃ© pour HistoryMenu - CORRIGÃ‰ pour cibler seulement le bouton */
   .history-menu-container > button {
     width: 40px !important;
     height: 40px !important;
@@ -295,7 +215,7 @@ html:not(.language-ready) body::after {
     justify-content: center !important;
   }
   
-  /* Style forcé pour UserMenuButton - Carré arrondi bleu */
+  /* Style forcÃ© pour UserMenuButton - CarrÃ© arrondi bleu */
   .user-menu-container > * {
     width: 40px !important;
     height: 40px !important;
@@ -320,7 +240,7 @@ html:not(.language-ready) body::after {
     z-index: 10;
   }
   
-  /* Container pour éviter les lignes parasites */
+  /* Container pour Ã©viter les lignes parasites */
   .header-icon-container {
     @apply relative;
     isolation: isolate;
@@ -328,7 +248,7 @@ html:not(.language-ready) body::after {
   
   /* === STYLES MODALS - CORRECTION POSITIONNEMENT === */
   
-  /* Modal overlay générique */
+  /* Modal overlay gÃ©nÃ©rique */
   .modal-overlay {
     position: fixed !important;
     top: 0 !important;
@@ -342,7 +262,7 @@ html:not(.language-ready) body::after {
     background-color: rgba(0, 0, 0, 0.5) !important;
   }
   
-  /* Modal container générique */
+  /* Modal container gÃ©nÃ©rique */
   .modal-container {
     position: relative !important;
     z-index: 9999 !important;
@@ -355,7 +275,7 @@ html:not(.language-ready) body::after {
     overflow: hidden !important;
   }
   
-  /* UserInfoModal spécifique - Force le centrage */
+  /* UserInfoModal spÃ©cifique - Force le centrage */
   .user-info-modal {
     position: fixed !important;
     top: 0 !important;
@@ -383,7 +303,7 @@ html:not(.language-ready) body::after {
     overflow: hidden !important;
   }
   
-  /* Fix pour mobile - Assure une bonne visibilité */
+  /* Fix pour mobile - Assure une bonne visibilitÃ© */
   @media (max-width: 640px) {
     .user-info-modal {
       padding: 0.5rem !important;
@@ -395,7 +315,7 @@ html:not(.language-ready) body::after {
     }
   }
   
-  /* Reset des styles qui pourraient interférer */
+  /* Reset des styles qui pourraient interfÃ©rer */
   .user-info-modal * {
     box-sizing: border-box;
   }
@@ -451,7 +371,7 @@ html:not(.language-ready) body::after {
   }
 }
 
-/* Animations personnalisées */
+/* Animations personnalisÃ©es */
 @keyframes slideInBottom {
   from {
     transform: translateY(100%);
@@ -485,7 +405,7 @@ html:not(.language-ready) body::after {
   }
 }
 
-/* Media queries spécifiques */
+/* Media queries spÃ©cifiques */
 @media (max-width: 640px) {
   .container {
     @apply px-3;
@@ -517,27 +437,4 @@ html:not(.language-ready) body::after {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-  
-  /* Désactiver le loader animé aussi */
-  html:not(.language-ready) body::after {
-    animation: none !important;
-  }
-}
-
-/* Fallback si JavaScript est désactivé */
-noscript {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: #1a1a1a;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 999999;
-  font-size: 18px;
-  text-align: center;
-  padding: 2rem;
 }
