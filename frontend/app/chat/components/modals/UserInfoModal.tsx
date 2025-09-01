@@ -642,7 +642,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       }
 
       // Validation des données avant envoi
-      const validatedData: any = {}
+      const validatedData: Record<string, any> = {}
 
       if (formData.firstName !== undefined) {
         validatedData.first_name = String(formData.firstName).trim()
@@ -670,9 +670,10 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       // API call Supabase direct
       const { getSupabaseClient } = await import('@/lib/supabase/singleton')
       const supabase = getSupabaseClient()
+
       const { error } = await supabase
         .from('users')
-        .update(validatedData)
+        .update(validatedData as any)
         .eq('auth_user_id', currentUser?.id)
 
       if (error) {
