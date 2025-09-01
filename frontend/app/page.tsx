@@ -7,151 +7,28 @@ import { SignupModal } from './page_signup_modal'
 import { usePageInitialization } from './page_initialization'
 import { InteliaLogo, LanguageSelector, LoadingSpinner, AuthFooter } from './page_components'
 
-// 🎯 SOLUTION: Composant statique avec IDs uniques
-const StaticLoginPage = memo(() => (
-  <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative">
-    
-    {/* Sélecteur de langue statique */}
-    <div className="absolute top-4 right-4">
-      <div className="inline-flex items-center bg-white border border-gray-300 rounded-lg px-3 py-2 shadow-sm">
-        <span className="text-sm font-medium text-gray-700">🌐 FR</span>
-      </div>
-    </div>
-    
-    {/* Logo et titre statiques */}
-    <div className="sm:mx-auto sm:w-full sm:max-w-md">
-      <div className="flex justify-center">
-        <InteliaLogo className="w-16 h-16" />
-      </div>
-      <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-        Connexion à Intelia Expert
-      </h2>
-    </div>
+// Mémorisation des composants pour éviter les re-renders
+// ✅ SUPPRIMÉ: LoginForm et SignupModal ne sont plus mémorisés pour permettre les re-renders avec les nouvelles traductions
+const MemoizedInteliaLogo = memo(InteliaLogo)
+const MemoizedLanguageSelector = memo(LanguageSelector)
+// ✅ SUPPRIMÉ: AuthFooter n'est plus mémorisé car il utilise maintenant directement useTranslation
 
-    {/* Formulaire statique avec IDs uniques */}
-    <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-      <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
-        <form className="space-y-6">
-          
-          {/* Email field - ID unique */}
-          <div>
-            <label htmlFor="static-email" className="block text-sm font-medium text-gray-700 mb-2">
-              Email
-            </label>
-            <input
-              id="static-email"
-              name="static-email"
-              type="email"
-              autoComplete="email"
-              disabled
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-base text-gray-900 bg-gray-50"
-              placeholder="votre@email.com"
-            />
-          </div>
-          
-          {/* Password field - ID unique */}
-          <div>
-            <label htmlFor="static-password" className="block text-sm font-medium text-gray-700 mb-2">
-              Mot de passe
-            </label>
-            <div className="relative">
-              <input
-                id="static-password"
-                name="static-password"
-                type="password"
-                autoComplete="current-password"
-                disabled
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-base text-gray-900 bg-gray-50 pr-10"
-                placeholder="••••••••"
-              />
-            </div>
-          </div>
-
-          {/* Remember me - ID unique */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="static-remember-me"
-                name="static-remember-me"
-                type="checkbox"
-                disabled
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="static-remember-me" className="ml-2 block text-sm text-gray-700">
-                Se souvenir de moi
-              </label>
-            </div>
-            <button
-              type="button"
-              disabled
-              className="text-sm text-gray-400 cursor-not-allowed"
-            >
-              Mot de passe oublié ?
-            </button>
-          </div>
-
-          {/* Submit button */}
-          <button
-            type="button"
-            disabled
-            className="w-full bg-gray-400 text-white font-medium py-2.5 px-4 rounded-lg cursor-not-allowed"
-          >
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-            Chargement...
-          </button>
-          
-          {/* Signup link */}
-          <div className="text-center">
-            <span className="text-sm text-gray-600">
-              Pas encore de compte ?{' '}
-              <button
-                type="button"
-                disabled
-                className="text-gray-400 cursor-not-allowed font-medium"
-              >
-                S'inscrire
-              </button>
-            </span>
-          </div>
-        </form>
-        
-        {/* Footer statique */}
-        <div className="mt-8 pt-6 border-t border-gray-200">
-          <div className="text-center space-y-3">
-            <p className="text-xs text-gray-500">
-              © 2024 Intelia Expert. Tous droits réservés.
-            </p>
-            <div className="flex justify-center space-x-4 text-xs">
-              <button disabled className="text-gray-400 cursor-not-allowed">
-                Politique de confidentialité
-              </button>
-              <button disabled className="text-gray-400 cursor-not-allowed">
-                Conditions d'utilisation
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+// Composant de chargement statique mémorisé
+const LoadingContent = memo(() => (
+  <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+    <div className="text-center">
+      <MemoizedInteliaLogo className="w-16 h-16 mx-auto mb-4" />
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+      <p className="mt-4 text-gray-600">Initialisation...</p>
     </div>
   </div>
 ))
 
-// 🎯 Hook personnalisé pour détecter quand hydratation complète
-const useIsHydrated = () => {
-  const [isHydrated, setIsHydrated] = React.useState(false)
+// Contenu principal - VERSION COMPLETE adaptée au système i18n
+const PageContent = memo(() => {
+  console.log('🚀 [PageContent] Composant PageContent rendu')
   
-  React.useEffect(() => {
-    // Marquer comme hydraté dès que ce useEffect s'exécute
-    setIsHydrated(true)
-  }, [])
-  
-  return isHydrated
-}
-
-// Composant dynamique qui remplace le statique
-const DynamicLoginPage = memo(() => {
-  console.log('🚀 [DynamicLoginPage] Rendu du composant dynamique')
-  
+  // Récupération des données d'initialisation
   const initData = usePageInitialization()
   const {
     currentLanguage,
@@ -165,6 +42,7 @@ const DynamicLoginPage = memo(() => {
     hasInitialized
   } = initData
 
+  // Mémorisation stable des props pour éviter les re-renders du hook d'auth
   const authProps = useMemo(() => ({
     currentLanguage,
     t,
@@ -172,34 +50,43 @@ const DynamicLoginPage = memo(() => {
     setCurrentLanguage
   }), [currentLanguage, t, isSignupMode, setCurrentLanguage])
 
+  // Hook d'authentification avec props stables
   const authLogic = useAuthenticationLogic(authProps)
 
-  // Ne pas afficher si pas prêt
+  // Mémorisation du contenu de chargement pour éviter les re-renders
+  const loadingContent = useMemo(() => <LoadingContent />, [])
+
+  // Affichage conditionnel avec contenu mémorisé
   if (!hasHydrated || !hasInitialized.current) {
-    return null // Ne rien afficher, laisser le statique
+    return loadingContent
   }
 
-  console.log('🎨 [Render] Interface dynamique prête')
+  console.log('🎨 [Render] Rendu de la page principale')
 
   return (
     <>
+      {/* PAGE PRINCIPALE (LOGIN) */}
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative">
         
+        {/* Sélecteur de langue */}
         <div className="absolute top-4 right-4">
-          <LanguageSelector />
+          <MemoizedLanguageSelector />
         </div>
         
+        {/* Logo et titre */}
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="flex justify-center">
-            <InteliaLogo className="w-16 h-16" />
+            <MemoizedInteliaLogo className="w-16 h-16" />
           </div>
           <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-            {t('page.title')}
+            {t('page.title') || 'Connexion à Intelia Expert'}
           </h2>
         </div>
 
+        {/* Formulaire de connexion */}
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
           <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
+            {/* ✅ CORRIGÉ: LoginForm utilise maintenant directement useTranslation, plus de prop t */}
             <LoginForm 
               authLogic={authLogic}
               currentLanguage={currentLanguage}
@@ -207,11 +94,13 @@ const DynamicLoginPage = memo(() => {
               localSuccess={localSuccess}
               toggleMode={toggleMode}
             />
+            {/* ✅ CORRIGÉ: AuthFooter utilise maintenant directement useTranslation, plus de props t */}
             <AuthFooter />
           </div>
         </div>
       </div>
 
+      {/* Modal d'inscription */}
       {isSignupMode && (
         <SignupModal 
           authLogic={authLogic}
@@ -224,32 +113,15 @@ const DynamicLoginPage = memo(() => {
   )
 })
 
-// Composant principal avec suppression conditionnelle
-const PageContent = memo(() => {
-  const isHydrated = useIsHydrated()
-  
-  return (
-    <div className="relative">
-      {/* 🎯 COUCHE 1: Interface statique (supprimée après hydratation) */}
-      {!isHydrated && <StaticLoginPage />}
-      
-      {/* 🎯 COUCHE 2: Interface dynamique (rendue après hydratation) */}
-      {isHydrated && <DynamicLoginPage />}
-    </div>
-  )
-})
-
-// Noms d'affichage
-StaticLoginPage.displayName = 'StaticLoginPage'
-DynamicLoginPage.displayName = 'DynamicLoginPage'
+// Ajout du displayName pour le debugging
 PageContent.displayName = 'PageContent'
+LoadingContent.displayName = 'LoadingContent'
 
-// Export principal
+// Export principal avec Suspense
 export default function Page() {
-  console.log('🎯 [Page] Initialisation avec rendu immédiat')
-  
+  console.log('🎯 [Page] Composant Page principal appelé')
   return (
-    <Suspense fallback={<StaticLoginPage />}>
+    <Suspense fallback={<LoadingSpinner />}>
       <PageContent />
     </Suspense>
   )

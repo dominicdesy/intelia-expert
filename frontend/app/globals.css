@@ -1,17 +1,9 @@
-/* app/globals.css - VERSION ANTI-FOUC OPTIMISÉE */
+/* app/globals.css - VERSION FINALE AVEC CORRECTIONS HEADER + ZOHO + TEXTE + MODAL */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* 🎯 NOUVEAU: Variables CSS pour les transitions anti-FOUC */
-:root {
-  --content-transition-duration: 300ms;
-  --skeleton-base: #f8f9fa;
-  --skeleton-highlight: #e9ecef;
-  --loading-opacity: 0.7;
-}
-
-/* Base styles avec optimisations anti-FOUC */
+/* Base styles avec optimisations mobile */
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
@@ -26,9 +18,6 @@
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
     min-height: 100%;
-    /* 🎯 NOUVEAU: Empêcher le flash initial */
-    opacity: 1;
-    transition: opacity var(--content-transition-duration) ease-in-out;
   }
   
   /* FIX PRINCIPAL : Forcer la couleur du texte pour tous les inputs */
@@ -36,10 +25,9 @@
     @apply text-base text-gray-900 bg-white;
     -webkit-appearance: none;
     border-radius: 0;
-    /* 🎯 NOUVEAU: Transition douce pour l'apparition */
-    transition: all var(--content-transition-duration) ease-in-out;
   }
   
+  /* Fix spÃ©cifique pour les options de select */
   select option {
     @apply text-gray-900 bg-white;
     color: #111827;
@@ -51,8 +39,6 @@
     min-width: 44px;
     -webkit-tap-highlight-color: transparent;
     cursor: pointer;
-    /* 🎯 NOUVEAU: Transition pour éviter les changements brusques */
-    transition: all 200ms ease-in-out;
   }
   
   * {
@@ -60,124 +46,8 @@
   }
 }
 
-/* 🎯 NOUVEAUX: Styles anti-FOUC spécifiques */
+/* Utilities personnalisÃ©es */
 @layer utilities {
-  
-  /* === STYLES ANTI-FOUC AVANCÉS === */
-  
-  /* Transition fluide entre statique et dynamique */
-  .fade-transition {
-    transition: opacity 300ms ease-in-out;
-  }
-  
-  .static-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1;
-  }
-  
-  .dynamic-content {
-    position: relative;
-    z-index: 2;
-  }
-  
-  /* Empêcher tout flash de contenu */
-  .no-fouc-container {
-    min-height: 100vh;
-    background: linear-gradient(to bottom right, #dbeafe, #ffffff, #f0fdf4);
-  }
-  
-  /* Force l'affichage immédiat du contenu critique */
-  .critical-content {
-    opacity: 1 !important;
-    visibility: visible !important;
-    display: block !important;
-  }
-  
-  /* Pré-calculer les dimensions pour éviter les CLS */
-  .stable-layout {
-    min-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-  }
-  
-  .loading-skeleton {
-    background: linear-gradient(90deg, var(--skeleton-base) 25%, var(--skeleton-highlight) 50%, var(--skeleton-base) 75%);
-    background-size: 200% 100%;
-    animation: skeleton-loading 1.5s infinite;
-    border-radius: 0.375rem;
-  }
-  
-  .skeleton-text {
-    @apply loading-skeleton;
-    height: 1rem;
-    margin: 0.25rem 0;
-  }
-  
-  .skeleton-text-lg {
-    @apply loading-skeleton;
-    height: 1.5rem;
-    margin: 0.5rem 0;
-  }
-  
-  .skeleton-input {
-    @apply loading-skeleton;
-    height: 2.5rem;
-    width: 100%;
-    margin: 0.5rem 0;
-  }
-  
-  .skeleton-button {
-    @apply loading-skeleton;
-    height: 2.5rem;
-    width: 100%;
-    margin: 0.5rem 0;
-  }
-  
-  /* Transition douce pour l'apparition du contenu */
-  .content-fade-in {
-    animation: contentFadeIn var(--content-transition-duration) ease-out;
-  }
-  
-  .content-slide-up {
-    animation: contentSlideUp var(--content-transition-duration) ease-out;
-  }
-  
-  /* États de chargement progressifs */
-  .loading-state-initial {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  
-  .loading-state-ready {
-    opacity: 1;
-    transform: translateY(0);
-    transition: opacity var(--content-transition-duration) ease-out,
-                transform var(--content-transition-duration) ease-out;
-  }
-  
-  /* Anti-FOUC pour les textes */
-  .text-no-flash {
-    min-height: 1.5rem;
-    display: flex;
-    align-items: center;
-  }
-  
-  .text-no-flash:empty::before {
-    content: '\00A0'; /* Espace insécable */
-    opacity: 0;
-  }
-  
-  /* Container pour éviter les re-layouts */
-  .stable-container {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  /* === UTILITIES EXISTANTES CONSERVÉES === */
-  
   .safe-area-top {
     padding-top: env(safe-area-inset-top);
   }
@@ -252,16 +122,19 @@
     animation: fadeInUp 0.4s ease-out;
   }
   
+  /* Force le carrÃ© pour les boutons utilisateur qui veulent Ãªtre ronds */
   .force-square {
     border-radius: 8px !important;
     border-radius: 0.5rem !important;
   }
   
+  /* Isolation pour les badges */
   .badge-isolated {
     isolation: isolate;
     z-index: 20;
   }
   
+  /* Utility pour forcer la visibilitÃ© du texte si nÃ©cessaire */
   .force-text-visible {
     color: #111827 !important;
     background-color: #ffffff !important;
@@ -273,7 +146,7 @@
   }
 }
 
-/* Components personnalisés */
+/* Components personnalisÃ©s - SÃ‰PARÃ‰S POUR Ã‰VITER LES ERREURS */
 @layer components {
   .btn-primary {
     @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors duration-200;
@@ -303,6 +176,7 @@
     @apply bg-white border border-gray-200 text-gray-900 rounded-lg px-4 py-3;
   }
   
+  /* Topic card - SÃ‰PARÃ‰ EN PLUSIEURS CLASSES */
   .topic-card {
     @apply p-3 sm:p-4 bg-white rounded-lg border border-gray-200 transition-colors text-left;
   }
@@ -317,6 +191,7 @@
   
   /* === STYLES POUR LE HEADER === */
   
+  /* Boutons header uniformes */
   .header-button {
     @apply w-10 h-10 flex items-center justify-center rounded-lg transition-colors;
   }
@@ -329,6 +204,7 @@
     @apply header-button bg-blue-600 text-white hover:bg-blue-700 text-sm;
   }
   
+  /* Style forcÃ© pour HistoryMenu - CORRIGÃ‰ pour cibler seulement le bouton */
   .history-menu-container > button {
     width: 40px !important;
     height: 40px !important;
@@ -339,13 +215,14 @@
     justify-content: center !important;
   }
   
+  /* Style forcÃ© pour UserMenuButton - CarrÃ© arrondi bleu */
   .user-menu-container > * {
     width: 40px !important;
     height: 40px !important;
     background-color: rgb(37 99 235) !important;
     color: white !important;
     border-radius: 0.5rem !important;
-    border-radius: 8px !important;
+    border-radius: 8px !important; /* Force explicite */
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -357,18 +234,21 @@
     background-color: rgb(29 78 216) !important;
   }
   
+  /* Badge de notification */
   .notification-badge {
     @apply absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium;
     z-index: 10;
   }
   
+  /* Container pour Ã©viter les lignes parasites */
   .header-icon-container {
     @apply relative;
     isolation: isolate;
   }
   
-  /* === STYLES MODALS === */
+  /* === STYLES MODALS - CORRECTION POSITIONNEMENT === */
   
+  /* Modal overlay gÃ©nÃ©rique */
   .modal-overlay {
     position: fixed !important;
     top: 0 !important;
@@ -382,6 +262,7 @@
     background-color: rgba(0, 0, 0, 0.5) !important;
   }
   
+  /* Modal container gÃ©nÃ©rique */
   .modal-container {
     position: relative !important;
     z-index: 9999 !important;
@@ -394,6 +275,7 @@
     overflow: hidden !important;
   }
   
+  /* UserInfoModal spÃ©cifique - Force le centrage */
   .user-info-modal {
     position: fixed !important;
     top: 0 !important;
@@ -411,7 +293,7 @@
   .user-info-modal-content {
     position: relative !important;
     width: 100% !important;
-    max-width: 42rem !important;
+    max-width: 42rem !important; /* max-w-2xl */
     max-height: 85vh !important;
     background: white !important;
     border-radius: 0.75rem !important;
@@ -421,6 +303,7 @@
     overflow: hidden !important;
   }
   
+  /* Fix pour mobile - Assure une bonne visibilitÃ© */
   @media (max-width: 640px) {
     .user-info-modal {
       padding: 0.5rem !important;
@@ -432,16 +315,19 @@
     }
   }
   
+  /* Reset des styles qui pourraient interfÃ©rer */
   .user-info-modal * {
     box-sizing: border-box;
   }
   
+  /* Assure que les overlays sont au-dessus de tout */
   .modal-overlay,
   .user-info-modal {
     z-index: 9999 !important;
     position: fixed !important;
   }
   
+  /* Alternative rapide si les classes above ne marchent pas - Force le style inline */
   .force-modal-center {
     position: fixed !important;
     top: 50% !important;
@@ -449,7 +335,10 @@
     transform: translate(-50%, -50%) !important;
     z-index: 9999 !important;
   }
+
+  /* === FIX DÉFINITIF USERINFMODAL === */
   
+  /* Fix définitif pour UserInfoModal */
   [data-modal="user-info"] {
     position: fixed !important;
     top: 50% !important;
@@ -466,7 +355,8 @@
     border-radius: 12px !important;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
   }
-  
+
+  /* Force l'overlay aussi */
   [data-debug="modal-overlay"] {
     position: fixed !important;
     top: 0 !important;
@@ -481,39 +371,7 @@
   }
 }
 
-/* 🎯 NOUVELLES: Animations anti-FOUC */
-@keyframes skeleton-loading {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
-
-@keyframes contentFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes contentSlideUp {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Animations existantes conservées */
+/* Animations personnalisÃ©es */
 @keyframes slideInBottom {
   from {
     transform: translateY(100%);
@@ -547,7 +405,7 @@
   }
 }
 
-/* Media queries spécifiques */
+/* Media queries spÃ©cifiques */
 @media (max-width: 640px) {
   .container {
     @apply px-3;
@@ -572,18 +430,11 @@
   }
 }
 
-/* Reduced motion avec respect des préférences anti-FOUC */
+/* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-  
-  /* 🎯 NOUVEAU: Maintenir les transitions critiques même en mode réduit */
-  .content-fade-in,
-  .loading-state-ready {
-    animation: none !important;
-    transition: opacity 100ms ease-out !important;
   }
 }
