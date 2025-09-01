@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '@/lib/languages/i18n'
 
-// ==================== LOGO INTELIA ====================
+// Logo Intelia
 const InteliaLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
   <img 
     src="/images/favicon.png" 
@@ -15,7 +15,7 @@ const InteliaLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
   />
 )
 
-// ==================== PAGE MOT DE PASSE OUBLIÉ ====================
+// Page Mot de Passe Oublié
 export default function ForgotPasswordPage() {
   const router = useRouter()
   const { isAuthenticated, user } = useAuthStore()
@@ -28,10 +28,28 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState('')
   const [isClient, setIsClient] = useState(false)
 
-  // Hydratation côté client ET lecture du paramètre lang
+  // Hydratation côté client AVEC synchronisation système principal
   useEffect(() => {
     setIsClient(true)
-  }, [])
+    
+    // Forcer la synchronisation avec la langue du système principal
+    const syncWithMainSystem = () => {
+      try {
+        // Lire la langue comme le fait usePageInitialization (format simple)
+        const savedLanguage = localStorage.getItem('intelia-language')
+        
+        if (savedLanguage && savedLanguage !== currentLanguage) {
+          console.log('[ForgotPassword] Synchronisation avec langue système:', savedLanguage)
+          changeLanguage(savedLanguage)
+        }
+      } catch (error) {
+        console.warn('[ForgotPassword] Erreur synchronisation langue:', error)
+      }
+    }
+    
+    // Délai court pour permettre à useTranslation de s'initialiser
+    setTimeout(syncWithMainSystem, 100)
+  }, [currentLanguage, changeLanguage])
 
   // Redirection si déjà connecté
   useEffect(() => {
@@ -107,14 +125,14 @@ export default function ForgotPasswordPage() {
     }
   }
 
-  // ✅ ATTENDRE QUE TOUT SOIT PRÊT avant d'afficher le contenu
+  // Attendre que tout soit prêt avant d'afficher le contenu
   if (!isClient || translationsLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
         <div className="text-center">
           <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">{t('common.loading')}</p>
         </div>
       </div>
     )
@@ -214,12 +232,12 @@ export default function ForgotPasswordPage() {
           </div>
         </div>
 
-        {/* Navigation */}
+        {/* Navigation - CORRIGÉ: suppression des paramètres lang */}
         <div className="mt-6 text-center space-y-3">
-		  <Link
-		    href="/"
-		    className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
-		  >
+          <Link
+            href="/"
+            className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+          >
             <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
@@ -228,9 +246,9 @@ export default function ForgotPasswordPage() {
           
           <div className="text-xs text-gray-500">
             {t('forgotPassword.noAccount')}{' '}
-			<Link href="/?signup=true" className="text-blue-600 hover:underline transition-colors">
-			  {t('auth.createAccount')}
-			</Link>			
+            <Link href="/?signup=true" className="text-blue-600 hover:underline transition-colors">
+              {t('auth.createAccount')}
+            </Link>
           </div>
         </div>
 
