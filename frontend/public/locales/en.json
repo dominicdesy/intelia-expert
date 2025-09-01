@@ -44,7 +44,6 @@
   "success.languageUpdated": "Language updated",
 
   "language.current": "Current language",
-  "language.autoDetectionInfo": "Language is automatically detected from your browser. You can change it at any time.",
   "language.debug.changing": "[LanguageModal] Changing language:",
   "language.debug.interfaceUpdated": "[LanguageModal] Interface updated",
   "language.debug.localStorageSaved": "[LanguageModal] localStorage saved:",

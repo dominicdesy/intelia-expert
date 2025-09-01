@@ -44,7 +44,6 @@
   "success.languageUpdated": "อัปเดตภาษาแล้ว",
 
   "language.current": "ภาษาปัจจุบัน",
-  "language.autoDetectionInfo": "ภาษาถูกตรวจจับโดยอัตโนมัติจากเบราว์เซอร์ของคุณ คุณสามารถเปลี่ยนได้ตลอดเวลา",
   "language.debug.changing": "[LanguageModal] กำลังเปลี่ยนภาษา:",
   "language.debug.interfaceUpdated": "[LanguageModal] อัปเดตส่วนติดต่อแล้ว",
   "language.debug.localStorageSaved": "[LanguageModal] บันทึก localStorage:",

@@ -44,7 +44,6 @@
   "success.languageUpdated": "भाषा अपडेट हो गई",
 
   "language.current": "वर्तमान भाषा",
-  "language.autoDetectionInfo": "भाषा आपके ब्राउज़र से स्वचालित रूप से पहचानी जाती है। आप इसे किसी भी समय बदल सकते हैं।",
   "language.debug.changing": "[LanguageModal] भाषा बदली जा रही है:",
   "language.debug.interfaceUpdated": "[LanguageModal] इंटरफ़ेस अपडेट किया गया",
   "language.debug.localStorageSaved": "[LanguageModal] localStorage सहेजा गया:",

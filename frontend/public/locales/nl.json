@@ -44,7 +44,6 @@
   "success.languageUpdated": "Taal bijgewerkt",
 
   "language.current": "Huidige taal",
-  "language.autoDetectionInfo": "De taal wordt automatisch gedetecteerd vanuit uw browser. U kunt het altijd wijzigen.",
   "language.debug.changing": "[LanguageModal] Taal wijzigen:",
   "language.debug.interfaceUpdated": "[LanguageModal] Interface bijgewerkt",
   "language.debug.localStorageSaved": "[LanguageModal] localStorage opgeslagen:",

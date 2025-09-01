@@ -260,7 +260,6 @@
   "language.reloadNow": "Recargar ahora",
   "language.continueWithoutReload": "Continuar sin recargar",
   "language.current": "Idioma actual",
-  "language.autoDetectionInfo": "El idioma se detecta automáticamente desde su navegador.",
   "language.debug.changing": "[LanguageModal] Cambiando idioma:",
   "language.debug.interfaceUpdated": "[LanguageModal] Interfaz actualizada",
   "language.debug.localStorageSaved": "[LanguageModal] localStorage guardado:",

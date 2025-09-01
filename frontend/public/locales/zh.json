@@ -44,7 +44,6 @@
   "success.languageUpdated": "语言已更新",
 
   "language.current": "当前语言",
-  "language.autoDetectionInfo": "语言是从您的浏览器自动检测的。您可以随时更改它。",
   "language.debug.changing": "[LanguageModal] 更改语言:",
   "language.debug.interfaceUpdated": "[LanguageModal] 界面已更新",
   "language.debug.localStorageSaved": "[LanguageModal] localStorage已保存:",

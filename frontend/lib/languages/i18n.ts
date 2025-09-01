@@ -300,7 +300,6 @@ export interface TranslationKeys {
   'language.reloadNow': string
   'language.continueWithoutReload': string
   'language.current': string
-  'language.autoDetectionInfo': string
   'language.debug.changing': string
   'language.debug.interfaceUpdated': string
   'language.debug.localStorageSaved': string
