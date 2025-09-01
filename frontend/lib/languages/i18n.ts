@@ -1,4 +1,6 @@
+// ==
 // ==================== SYSTÈME DE TRADUCTION INTELIA EXPERT ====================
+// ==
 
 import { useState, useEffect } from 'react'
 import { getSupabaseClient } from '@/lib/supabase/singleton'
