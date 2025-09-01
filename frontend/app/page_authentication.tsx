@@ -163,6 +163,14 @@ export function useAuthenticationLogic({
       
       console.log('✅ [Login] Connexion réussie')
       
+      // ✅ CORRECTION: Déclencher la redirection immédiatement après la connexion
+      setTimeout(() => {
+        if (isMounted.current) {
+          console.log('🎯 [Login] Déclenchement redirection post-connexion')
+          safeRedirectToChat()
+        }
+      }, 500) // Laisser le temps aux états de se mettre à jour
+      
     } catch (error: any) {
       console.error('❌ [Login] Erreur connexion:', error)
       redirectLock.current = false
@@ -280,6 +288,18 @@ export function useAuthenticationLogic({
     }
   
     window.addEventListener('auth-state-changed', handleAuthChange)
+    
+    // ✅ CORRECTION: Ajouter une vérification immédiate au cas où l'événement a été manqué
+    if (user && isAuthenticated && isMounted.current) {
+      console.log('🔍 [Redirect] Vérification immédiate après montage')
+      setTimeout(() => {
+        if (isMounted.current && window.location.pathname !== '/chat') {
+          console.log('⚡ [Redirect] Redirection de secours')
+          safeRedirectToChat()
+        }
+      }, 100)
+    }
+    
     return () => window.removeEventListener('auth-state-changed', handleAuthChange)
   }, [user, isAuthenticated, safeRedirectToChat])
 
