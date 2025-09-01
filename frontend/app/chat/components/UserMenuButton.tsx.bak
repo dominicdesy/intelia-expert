@@ -17,7 +17,7 @@ import { InviteFriendModal } from './modals/InviteFriendModal'
 // UserMenuButton - Version corrigée avec coordination auth store pour React #300
 export const UserMenuButton = React.memo(() => {
   const router = useRouter()
-  const { user } = useAuthStore() // ✅ CORRECTION: Retiré 'logout' du destructuring
+  const { user, logout } = useAuthStore()
   const { t } = useTranslation()
 
   // États des modales
@@ -157,7 +157,7 @@ export const UserMenuButton = React.memo(() => {
     user?.phone_number
   ])
 
-  // ✅ SOLUTION DÉFINITIVE: Service de logout indépendant
+  // SOLUTION DÉFINITIVE: Service de logout indépendant
   const handleLogout = useCallback(async () => {
     if (logoutInProgressRef.current || !isMountedRef.current) return
   
@@ -168,7 +168,7 @@ export const UserMenuButton = React.memo(() => {
       // Fermer le menu immédiatement
       setIsOpen(false)
     
-      // ✅ CORRECTION: Utiliser SEULEMENT le service de logout indépendant
+      // Utiliser le service de logout indépendant
       await logoutService.performLogout()
     
     } catch (error) {

@@ -19,7 +19,7 @@ const InteliaLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
 export default function ForgotPasswordPage() {
   const router = useRouter()
   const { isAuthenticated, user } = useAuthStore()
-  const { t, currentLanguage } = useTranslation()
+  const { t, currentLanguage, loading: translationsLoading } = useTranslation()
   
   // États
   const [email, setEmail] = useState('')
@@ -35,11 +35,11 @@ export default function ForgotPasswordPage() {
 
   // Redirection si déjà connecté
   useEffect(() => {
-    if (isClient && isAuthenticated && user) {
+    if (isClient && isAuthenticated && user && !translationsLoading) {
       console.log('Utilisateur déjà connecté, redirection...')
       router.push('/chat')
     }
-  }, [isClient, isAuthenticated, user, router])
+  }, [isClient, isAuthenticated, user, translationsLoading, router])
 
   const handleSubmit = async () => {
     setError('')
@@ -107,14 +107,14 @@ export default function ForgotPasswordPage() {
     }
   }
 
-  // Affichage de chargement pendant l'hydratation
-  if (!isClient) {
+  // ✅ ATTENDRE QUE TOUT SOIT PRÊT avant d'afficher le contenu
+  if (!isClient || translationsLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
         <div className="text-center">
           <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">{t('common.loading')}</p>
+          <p className="text-gray-600">Loading...</p>
         </div>
       </div>
     )
@@ -264,6 +264,8 @@ export default function ForgotPasswordPage() {
             <br />• API URL: {process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app/api'}
             <br />• Endpoint: /v1/auth/reset-password
             <br />• Current Language: {currentLanguage}
+            <br />• Translations Loading: {translationsLoading ? 'Yes' : 'No'}
+            <br />• Test Translation: {t('forgotPassword.title')}
           </div>
         )}
       </div>
