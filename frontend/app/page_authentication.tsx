@@ -59,6 +59,7 @@ export function useAuthenticationLogic({
     companyLinkedin: ''
   })
 
+  // ✅ CORRECTION: Nouvelle fonction de redirection fiable
   const safeRedirectToChat = useCallback(() => {
     if (redirectLock.current || !isMounted.current) {
       console.log('🔒 [Redirect] Déjà en cours de redirection ou démontage, ignoré')
@@ -72,7 +73,27 @@ export function useAuthenticationLogic({
     
     console.log('🚀 [Redirect] Redirection vers /chat depuis:', pathname)
     redirectLock.current = true
-    router.replace('/chat')
+    
+    // Fonction de redirection avec fallback
+    const redirectWithFallback = () => {
+      try {
+        router.push('/chat')
+        console.log('🎯 [Redirect] router.push tenté')
+        
+        // Fallback au cas où router.push ne marche pas
+        setTimeout(() => {
+          if (isMounted.current && window.location.pathname !== '/chat') {
+            console.log('🔄 [Redirect] Fallback avec window.location')
+            window.location.href = '/chat'
+          }
+        }, 1000)
+      } catch (error) {
+        console.error('❌ [Redirect] Erreur router.push, utilisation window.location:', error)
+        window.location.href = '/chat'
+      }
+    }
+    
+    setTimeout(redirectWithFallback, 100)
   }, [pathname, router])
 
   const handleSignupChange = useCallback((field: keyof SignupData, value: string) => {
@@ -208,7 +229,7 @@ export function useAuthenticationLogic({
     }
 
     hasCheckedAuth.current = true
-    console.log('🔒 [Auth] Vérification unique de l\'authentification')
+    console.log('🔑 [Auth] Vérification unique de l\'authentification')
 
     if (isAuthenticated) {
       console.log('✅ [Auth] Déjà connecté, redirection immédiate')
@@ -261,7 +282,6 @@ export function useAuthenticationLogic({
     window.addEventListener('auth-state-changed', handleAuthChange)
     return () => window.removeEventListener('auth-state-changed', handleAuthChange)
   }, [user, isAuthenticated, safeRedirectToChat])
-
 
   // CORRECTION CRITIQUE : Mémoriser les handlers et données stables séparément
   const stableHandlers = useMemo(() => ({
