@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useTranslation } from '@/lib/languages/i18n'
+import { LanguageSelector } from '@/app/page_components' // ✅ Utiliser la version factorisée
 
 // Logo Intelia
 const InteliaLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
@@ -13,18 +14,33 @@ const InteliaLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
   />
 )
 
-// COPIE EXACTE DU PATTERN CONTACTMODAL
 export default function ForgotPasswordPage() {
-  // EXACTEMENT comme ContactModal - ligne identique
-  const { t, currentLanguage } = useTranslation()
+  const { t, currentLanguage, changeLanguage } = useTranslation() // ⬅️ Ajouter changeLanguage
   
-  // États simples - comme ContactModal
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
 
-  // Fonction simple - pas de useCallback, pas de refs, comme ContactModal
+  // B) Forcer la resynchronisation au premier rendu
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('intelia-language')
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        const saved = parsed?.state?.currentLanguage
+        if (saved && saved !== currentLanguage) {
+          console.log(`[FORGOT] Resynchronisation immédiate: ${currentLanguage} → ${saved}`)
+          changeLanguage(saved) // ⬅️ Aligner immédiatement sur la langue stockée
+        }
+      }
+      // Synchroniser <html lang="...">
+      document.documentElement.setAttribute('lang', saved || currentLanguage)
+    } catch (error) {
+      console.warn('[FORGOT] Erreur lecture localStorage:', error)
+    }
+  }, [currentLanguage, changeLanguage])
+
   const handleSubmit = async () => {
     setError('')
     setSuccess('')
@@ -75,9 +91,14 @@ export default function ForgotPasswordPage() {
     }
   }
 
-  // RENDER direct - pas de conditions complexes comme ContactModal
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-6">
+      
+      {/* A) Sélecteur de langue unifié */}
+      <div className="absolute top-4 right-4">
+        <LanguageSelector />
+      </div>
+
       <div className="w-full max-w-md">
         
         {/* Header */}
@@ -201,10 +222,10 @@ export default function ForgotPasswordPage() {
           </p>
         </div>
 
-        {/* Debug - COMME LE CONTACTMODAL */}
+        {/* Debug */}
         {process.env.NODE_ENV === 'development' && (
           <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-            <strong>Debug Langue:</strong> {currentLanguage} | <strong>Titre:</strong> {t('forgotPassword.title')} | <strong>Email:</strong> {t('forgotPassword.emailLabel')}
+            <strong>Debug:</strong> Langue: {currentLanguage} | Titre: {t('forgotPassword.title')}
           </div>
         )}
       </div>
