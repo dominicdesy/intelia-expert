@@ -142,16 +142,17 @@ export const isRTLLanguage = (code: string): boolean => {
 
 // Groupement des langues par région (optionnel pour l'interface)
 export const LANGUAGE_REGIONS = {
-  europe: ['fr', 'en', 'es', 'pt', 'de', 'nl', 'pl'],
-  asia: ['th', 'hi', 'zh'],
-  americas: [], // Si vous ajoutez plus tard pt-BR, en-CA, etc.
-  africa: [],
-  oceania: []
-} as const
+  europe: ['fr', 'en', 'es', 'pt', 'de', 'nl', 'pl'] as const,
+  asia: ['th', 'hi', 'zh'] as const,
+  americas: [] as const, // Si vous ajoutez plus tard pt-BR, en-CA, etc.
+  africa: [] as const,
+  oceania: [] as const
+}
 
 // Export des langues disponibles par région
 export const getLanguagesByRegion = (region: keyof typeof LANGUAGE_REGIONS) => {
+  const regionCodes = LANGUAGE_REGIONS[region] as readonly string[]
   return availableLanguages.filter(lang => 
-    LANGUAGE_REGIONS[region].includes(lang.code)
+    regionCodes.includes(lang.code)
   )
 }
