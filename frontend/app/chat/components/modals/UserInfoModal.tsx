@@ -280,6 +280,38 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
 
   const { validatePhoneFields } = usePhoneValidation()
   const overlayRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  
+  // Forcer les styles au montage - IDENTIQUE À LanguageModal
+  useEffect(() => {
+    const overlay = overlayRef.current
+    
+    if (overlay) {
+      overlay.style.setProperty('width', '100vw', 'important')
+      overlay.style.setProperty('height', '100vh', 'important')
+      overlay.style.setProperty('top', '0', 'important')
+      overlay.style.setProperty('left', '0', 'important')
+      overlay.style.setProperty('right', '0', 'important')
+      overlay.style.setProperty('bottom', '0', 'important')
+      overlay.style.setProperty('background-color', 'rgba(0, 0, 0, 0.5)', 'important')
+      overlay.style.setProperty('backdrop-filter', 'blur(2px)', 'important')
+      overlay.style.setProperty('animation', 'fadeIn 0.2s ease-out', 'important')
+      overlay.style.setProperty('display', 'flex', 'important')
+      overlay.style.setProperty('align-items', 'center', 'important')
+      overlay.style.setProperty('justify-content', 'center', 'important')
+      overlay.style.setProperty('padding', '16px', 'important')
+      
+      const content = overlay.querySelector('[data-modal="user-info"]') as HTMLElement
+      if (content) {
+        content.style.setProperty('animation', 'modalSlideIn 0.3s ease-out', 'important')
+        content.style.setProperty('width', '95vw', 'important')
+        content.style.setProperty('max-width', '700px', 'important')
+        content.style.setProperty('max-height', '85vh', 'important')
+        content.style.setProperty('min-width', '320px', 'important')
+        content.style.setProperty('background-color', 'white', 'important')
+      }
+    }
+  }, [])
   
   // userDataMemo avec dépendance stable
   const userDataMemo = useMemo(() => {
@@ -812,10 +844,10 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         }
       `}</style>
 
-      {/* OVERLAY CORRIGÉ - Structure identique à LanguageModal */}
+      {/* OVERLAY CORRIGÉ - Flexbox nécessaire pour le centrage */}
       <div 
         ref={overlayRef}
-        className="fixed inset-0 z-50"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
         style={{
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
           backdropFilter: 'blur(2px)'
