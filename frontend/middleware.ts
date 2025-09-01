@@ -161,9 +161,10 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL('/', req.url))
     }
 
-    // Éviter les redirections inutiles pour les utilisateurs connectés
+    // Redirection automatique vers chat pour les utilisateurs connectés
     if (pathname === '/' && session) {
-      console.log('✅ [Middleware] Utilisateur connecté sur accueil - Pas de redirection forcée')
+      console.log('🔄 [Middleware] Utilisateur connecté sur accueil - redirection vers chat')
+      return NextResponse.redirect(new URL('/chat', req.url))
     }
 
     // Redirection des pages d'auth vers chat si connecté
