@@ -7,7 +7,7 @@ import { SignupModal } from './page_signup_modal'
 import { usePageInitialization } from './page_initialization'
 import { InteliaLogo, LanguageSelector, LoadingSpinner, AuthFooter } from './page_components'
 
-// 🎯 SOLUTION RADICALE: Composant statique affiché immédiatement
+// 🎯 SOLUTION: Composant statique avec IDs uniques
 const StaticLoginPage = memo(() => (
   <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative">
     
@@ -28,59 +28,63 @@ const StaticLoginPage = memo(() => (
       </h2>
     </div>
 
-    {/* Formulaire statique complet */}
+    {/* Formulaire statique avec IDs uniques */}
     <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
       <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
         <form className="space-y-6">
           
-          {/* Email field */}
+          {/* Email field - ID unique */}
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="static-email" className="block text-sm font-medium text-gray-700 mb-2">
               Email
             </label>
             <input
-              id="email"
-              name="email"
+              id="static-email"
+              name="static-email"
               type="email"
               autoComplete="email"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-base text-gray-900 bg-white"
+              disabled
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-base text-gray-900 bg-gray-50"
               placeholder="votre@email.com"
             />
           </div>
           
-          {/* Password field */}
+          {/* Password field - ID unique */}
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="static-password" className="block text-sm font-medium text-gray-700 mb-2">
               Mot de passe
             </label>
             <div className="relative">
               <input
-                id="password"
-                name="password"
+                id="static-password"
+                name="static-password"
                 type="password"
                 autoComplete="current-password"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-base text-gray-900 bg-white pr-10"
+                disabled
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-base text-gray-900 bg-gray-50 pr-10"
                 placeholder="••••••••"
               />
             </div>
           </div>
 
-          {/* Remember me */}
+          {/* Remember me - ID unique */}
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <input
-                id="remember-me"
-                name="remember-me"
+                id="static-remember-me"
+                name="static-remember-me"
                 type="checkbox"
+                disabled
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
+              <label htmlFor="static-remember-me" className="ml-2 block text-sm text-gray-700">
                 Se souvenir de moi
               </label>
             </div>
             <button
               type="button"
-              className="text-sm text-blue-600 hover:text-blue-500 transition-colors"
+              disabled
+              className="text-sm text-gray-400 cursor-not-allowed"
             >
               Mot de passe oublié ?
             </button>
@@ -88,10 +92,12 @@ const StaticLoginPage = memo(() => (
 
           {/* Submit button */}
           <button
-            type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors duration-200"
+            type="button"
+            disabled
+            className="w-full bg-gray-400 text-white font-medium py-2.5 px-4 rounded-lg cursor-not-allowed"
           >
-            Se connecter
+            <LoadingSpinner size="sm" className="mr-2" />
+            Chargement...
           </button>
           
           {/* Signup link */}
@@ -100,7 +106,8 @@ const StaticLoginPage = memo(() => (
               Pas encore de compte ?{' '}
               <button
                 type="button"
-                className="text-blue-600 hover:text-blue-500 font-medium transition-colors"
+                disabled
+                className="text-gray-400 cursor-not-allowed font-medium"
               >
                 S'inscrire
               </button>
@@ -115,10 +122,10 @@ const StaticLoginPage = memo(() => (
               © 2024 Intelia Expert. Tous droits réservés.
             </p>
             <div className="flex justify-center space-x-4 text-xs">
-              <button className="text-blue-600 hover:text-blue-500 transition-colors">
+              <button disabled className="text-gray-400 cursor-not-allowed">
                 Politique de confidentialité
               </button>
-              <button className="text-blue-600 hover:text-blue-500 transition-colors">
+              <button disabled className="text-gray-400 cursor-not-allowed">
                 Conditions d'utilisation
               </button>
             </div>
@@ -217,29 +224,17 @@ const DynamicLoginPage = memo(() => {
   )
 })
 
-// Composant principal avec superposition
+// Composant principal avec suppression conditionnelle
 const PageContent = memo(() => {
   const isHydrated = useIsHydrated()
   
   return (
     <div className="relative">
-      {/* 🎯 COUCHE 1: Interface statique (toujours visible au début) */}
-      <div 
-        className={`transition-opacity duration-300 ${
-          isHydrated ? 'opacity-0 pointer-events-none absolute inset-0' : 'opacity-100'
-        }`}
-      >
-        <StaticLoginPage />
-      </div>
+      {/* 🎯 COUCHE 1: Interface statique (supprimée après hydratation) */}
+      {!isHydrated && <StaticLoginPage />}
       
-      {/* 🎯 COUCHE 2: Interface dynamique (fade in progressivement) */}
-      <div 
-        className={`transition-opacity duration-300 ${
-          isHydrated ? 'opacity-100' : 'opacity-0'
-        }`}
-      >
-        <DynamicLoginPage />
-      </div>
+      {/* 🎯 COUCHE 2: Interface dynamique (rendue après hydratation) */}
+      {isHydrated && <DynamicLoginPage />}
     </div>
   )
 })
@@ -259,24 +254,3 @@ export default function Page() {
     </Suspense>
   )
 }
-
-// 🎯 CSS à ajouter dans globals.css pour la transition fluide
-/*
-.fade-transition {
-  transition: opacity 300ms ease-in-out;
-}
-
-.static-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1;
-}
-
-.dynamic-content {
-  position: relative;
-  z-index: 2;
-} 
-*/
