@@ -773,15 +773,12 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     }
   }, [handleClose, isLoading])
 
-  // Debug DOM state
-  useEffect(() => {
-    debugLog('DOM', 'Modal rendered', {
-      bodyOverflow: document.body.style.overflow,
-      documentHeight: document.documentElement.scrollHeight,
-      viewportHeight: window.innerHeight,
-      modalExists: !!document.querySelector('[data-modal="user-info"]')
-    })
-  })
+  // Handle overlay click
+  const handleOverlayClick = useCallback((e: React.MouseEvent) => {
+    if (e.target === e.currentTarget && !isLoading) {
+      handleClose()
+    }
+  }, [handleClose, isLoading])
 
   debugLog('RENDER', 'Component rendering', {
     activeTab,
@@ -809,45 +806,38 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
             transform: translateY(0) scale(1); 
           }
         }
+        
+        .modal-content {
+          background-color: white !important;
+        }
       `}</style>
 
-      {/* Overlay avec backdrop grisé */}
+      {/* ✅ OVERLAY CORRIGÉ - Identique à LanguageModal */}
       <div 
         ref={overlayRef}
-        className="fixed inset-0 z-50" 
-        onClick={handleClose}
-        data-debug="modal-overlay"
+        className="fixed inset-0 z-50"
         style={{
-          position: 'fixed',
-          width: '100vw',
-          height: '100vh',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
           backdropFilter: 'blur(2px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '20px',
-          animation: 'fadeIn 0.2s ease-out'
+          padding: '16px'
         }}
+        onClick={handleOverlayClick}
+        data-debug="modal-overlay"
       >
-        {/* Modal Container */}
+        {/* ✅ MODAL CONTAINER CORRIGÉ */}
         <div 
-          className="bg-white rounded-lg shadow-xl max-h-[90vh] overflow-y-auto"
+          className="modal-content bg-white rounded-lg shadow-xl max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
           data-modal="user-info"
           data-debug="modal-content"
           style={{
-            position: 'absolute',
-            top: '20px',
-            left: '50%',
-            transform: 'translateX(-50%)',
+            backgroundColor: 'white',
             width: '95vw',
             maxWidth: '700px',
-            maxHeight: '80vh',
+            maxHeight: '85vh',
             minWidth: '320px',
             animation: 'modalSlideIn 0.3s ease-out'
           }}
@@ -859,13 +849,15 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
             </h2>
             <button
               onClick={handleClose}
-              className="text-gray-400 hover:text-gray-600 text-2xl transition-colors hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"
+              className="text-gray-400 hover:text-gray-600 transition-colors hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"
               aria-label={t('modal.close')}
               title={t('modal.close')}
               disabled={isLoading}
               data-debug="close-button"
             >
-              ×
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
 
