@@ -311,7 +311,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         }, 100)
         
       } catch (error) {
-        console.error('❌ [UserInfoModal] Erreur synchronisation traductions:', error)
+        console.error('⚠ [UserInfoModal] Erreur synchronisation traductions:', error)
         // Même en cas d'erreur, autoriser l'affichage
         setTranslationsReady(true)
       }
@@ -344,12 +344,12 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
   const { validatePhoneFields } = usePhoneValidation()
   const overlayRef = useRef<HTMLDivElement>(null)
   
-  // Forcer les styles au montage pour contourner les problèmes CSS
+  // CORRECTION: Utiliser l'approche ContactModal pour la gestion des styles
   useEffect(() => {
     const overlay = overlayRef.current
     
     if (overlay) {
-      // Forcer les dimensions de l'overlay
+      // Forcer les dimensions de l'overlay (correction complète)
       overlay.style.setProperty('width', '100vw', 'important')
       overlay.style.setProperty('height', '100vh', 'important')
       overlay.style.setProperty('top', '0', 'important')
@@ -357,20 +357,22 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       overlay.style.setProperty('right', '0', 'important')
       overlay.style.setProperty('bottom', '0', 'important')
       
-      // BACKDROP GRISÉ avec flou + centrage flex
+      // BACKDROP GRISÉ - fond semi-transparent noir/gris
       overlay.style.setProperty('background-color', 'rgba(0, 0, 0, 0.5)', 'important')
       overlay.style.setProperty('backdrop-filter', 'blur(2px)', 'important')
-      overlay.style.setProperty('animation', 'fadeIn 0.2s ease-out', 'important')
       overlay.style.setProperty('display', 'flex', 'important')
       overlay.style.setProperty('align-items', 'center', 'important')
       overlay.style.setProperty('justify-content', 'center', 'important')
       overlay.style.setProperty('padding', '16px', 'important')
       
-      // Forcer les dimensions du contenu (700px pour UserInfo)
-      const content = overlay.querySelector('.uimodal-content') as HTMLElement
+      // Animation d'apparition douce pour le backdrop
+      overlay.style.setProperty('animation', 'fadeIn 0.2s ease-out', 'important')
+      
+      // Forcer les dimensions du contenu (400px pour UserInfo - compact)
+      const content = overlay.querySelector('.bg-white') as HTMLElement
       if (content) {
-        content.style.setProperty('max-width', '400px', 'important')
         content.style.setProperty('width', '95vw', 'important')
+        content.style.setProperty('max-width', '400px', 'important')
         content.style.setProperty('max-height', '85vh', 'important')
         content.style.setProperty('min-width', '320px', 'important')
         content.style.setProperty('animation', 'modalSlideIn 0.3s ease-out', 'important')
@@ -850,7 +852,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
 
   const tabs = useMemo(() => [
     { id: 'profile', label: t('nav.profile'), icon: '👤' },
-    { id: 'password', label: t('profile.password'), icon: '🔒' }
+    { id: 'password', label: t('profile.password'), icon: '🔑' }
   ], [t])
 
   // Keyboard handling
@@ -920,14 +922,16 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         }
       `}</style>
 
+      {/* Overlay avec backdrop grisé - CORRECTION: Utiliser l'approche ContactModal */}
       <div 
         ref={overlayRef}
         className="fixed inset-0 z-50" 
         onClick={handleClose}
         data-debug="modal-overlay"
       >
+        {/* Modal Container - CORRECTION: Structure simplifiée comme ContactModal */}
         <div 
-          className="uimodal-content bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          className="bg-white rounded-lg shadow-xl w-full max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
           data-modal="user-info"
           data-debug="modal-content"
@@ -1006,7 +1010,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
                       <span className="text-red-500 ml-1">*</span>
                     </h3>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="grid grid-cols-1 gap-4 mb-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           {t('profile.firstName')}
