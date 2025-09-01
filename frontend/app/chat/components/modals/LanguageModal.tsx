@@ -1,4 +1,4 @@
-// LanguageModal.tsx - Version améliorée avec design bleu et sans pays
+// LanguageModal.tsx - Design blanc original avec codes de langue en bleu
 
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation, availableLanguages, getLanguageByCode } from '@/lib/languages/i18n'
@@ -31,13 +31,14 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
       overlay.style.setProperty('justify-content', 'center', 'important')
       overlay.style.setProperty('padding', '16px', 'important')
       
-      const content = overlay.querySelector('.bg-blue-900') as HTMLElement
+      const content = overlay.querySelector('.modal-content') as HTMLElement
       if (content) {
         content.style.setProperty('animation', 'modalSlideIn 0.3s ease-out', 'important')
         content.style.setProperty('width', '95vw', 'important')
-        content.style.setProperty('max-width', '700px', 'important')
+        content.style.setProperty('max-width', '800px', 'important')
         content.style.setProperty('max-height', '85vh', 'important')
         content.style.setProperty('min-width', '320px', 'important')
+        content.style.setProperty('background-color', 'white', 'important')
       }
     }
   }, [])
@@ -54,7 +55,7 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
       await changeLanguage(languageCode)
       console.log(t('language.debug.interfaceUpdated'))
       
-      // 2. ✅ CORRECTION: Sauvegarder dans localStorage avec la BONNE clé et format
+      // 2. Sauvegarder dans localStorage avec la BONNE clé et format
       if (typeof window !== 'undefined') {
         // Format Zustand attendu par i18n.ts
         const languageStore = {
@@ -66,12 +67,12 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
         console.log(t('language.debug.localStorageSaved'), languageCode)
       }
       
-      // 3. ✅ NOUVEAU: Émettre un événement pour forcer la synchronisation
+      // 3. Émettre un événement pour forcer la synchronisation
       window.dispatchEvent(new CustomEvent('languageChanged', { 
         detail: { language: languageCode } 
       }))
       
-      // 4. ✅ NOUVEAU: Forcer un rechargement des traductions globales
+      // 4. Forcer un rechargement des traductions globales
       if (typeof window !== 'undefined' && (window as any).i18nDebug) {
         (window as any).i18nDebug.notificationManager.notify()
       }
@@ -117,25 +118,34 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
             transform: translateY(0) scale(1); 
           }
         }
+        
+        .modal-content {
+          background-color: white !important;
+        }
       `}</style>
 
       <div 
         ref={overlayRef}
         className="fixed inset-0 z-50"
+        style={{
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backdropFilter: 'blur(2px)'
+        }}
         onClick={handleOverlayClick}
       >
         <div 
           ref={contentRef}
-          className="bg-blue-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          className="modal-content bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          style={{ backgroundColor: 'white' }}
         >
           <div className="p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-white">
+              <h2 className="text-2xl font-bold text-gray-900">
                 {t('language.title')}
               </h2>
               <button
                 onClick={onClose}
-                className="text-blue-200 hover:text-white transition-colors hover:bg-blue-800 rounded-full w-8 h-8 flex items-center justify-center"
+                className="text-gray-400 hover:text-gray-600 transition-colors hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"
                 disabled={isUpdating}
                 aria-label={t('modal.close')}
                 title={t('modal.close')}
@@ -147,20 +157,20 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
             </div>
 
             {/* Description */}
-            <p className="text-blue-100 mb-6">
+            <p className="text-gray-600 mb-6">
               {t('language.description')}
             </p>
 
             {/* Langue actuelle */}
             {currentLangConfig && (
-              <div className="mb-6 p-4 bg-blue-800 rounded-lg border border-blue-700">
+              <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="flex items-center">
                   <span className="text-2xl mr-3">{currentLangConfig.flag}</span>
                   <div>
-                    <div className="font-semibold text-white">
+                    <div className="font-semibold text-blue-900">
                       {t('language.current')}: {currentLangConfig.nativeName}
                     </div>
-                    <div className="text-sm text-blue-200 font-semibold">
+                    <div className="text-sm font-bold text-blue-600">
                       {currentLangConfig.code.toUpperCase()}
                     </div>
                   </div>
@@ -170,7 +180,7 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
 
             {/* Indicateur de chargement global */}
             {isUpdating && (
-              <div className="mb-4 p-3 bg-blue-800 border-l-4 border-blue-400 text-blue-100">
+              <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-400 text-blue-700">
                 <div className="flex items-center">
                   <svg className="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -181,8 +191,8 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
               </div>
             )}
 
-            {/* Grille des langues disponibles */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Grille des langues disponibles - FOND BLANC */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {availableLanguages.map((lang) => (
                 <div
                   key={lang.code}
@@ -190,27 +200,29 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
                   className={`
                     relative p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 hover:shadow-md
                     ${currentLanguage === lang.code 
-                      ? 'border-blue-400 bg-blue-800 shadow-md' 
-                      : 'border-blue-700 hover:border-blue-500 bg-blue-800/50'
+                      ? 'border-blue-500 bg-blue-50 shadow-md' 
+                      : 'border-gray-200 hover:border-blue-300 bg-white'
                     }
-                    ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-800'}
+                    ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-50'}
                   `}
+                  style={{ backgroundColor: currentLanguage === lang.code ? '#eff6ff' : 'white' }}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <span className="text-2xl">{lang.flag}</span>
                       <div>
-                        <div className="font-semibold text-white text-base">
+                        <div className="font-semibold text-gray-900 text-sm">
                           {lang.nativeName}
                         </div>
-                        <div className="text-sm text-blue-200 font-semibold mt-1">
+                        {/* CODES DE LANGUE EN BLEU */}
+                        <div className="text-sm font-bold text-blue-600 mt-1">
                           {lang.code.toUpperCase()}
                         </div>
                       </div>
                     </div>
                     
                     {currentLanguage === lang.code && (
-                      <div className="flex items-center text-blue-300">
+                      <div className="flex items-center text-blue-600">
                         <CheckIcon className="w-5 h-5" />
                       </div>
                     )}
@@ -220,8 +232,8 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
             </div>
 
             {/* Information sur la détection automatique */}
-            <div className="mt-6 p-3 bg-blue-800/50 rounded-lg">
-              <div className="flex items-center text-sm text-blue-100">
+            <div className="mt-6 p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center text-sm text-gray-600">
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -235,7 +247,7 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
             <div className="mt-8 flex justify-end space-x-3">
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-blue-100 bg-blue-700 rounded-lg hover:bg-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-blue-900"
+                className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
                 disabled={isUpdating}
               >
                 {t('modal.close')}

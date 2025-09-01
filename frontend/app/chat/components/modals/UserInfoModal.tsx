@@ -1226,7 +1226,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
               )}
 
               {/* Footer Buttons */}
-              <div className="flex justify-end space-x-3 pt-4" data-debug="footer">
+              <div className="flex justify-end space-x-3 pt-4 pb-8" data-debug="footer">
                 <button
                   onClick={handleClose}
                   className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
