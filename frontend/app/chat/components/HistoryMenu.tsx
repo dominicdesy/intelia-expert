@@ -19,6 +19,24 @@ export const HistoryMenu = React.memo(() => {
     useConversationActions()
   const { currentConversation, loadConversation } = useCurrentConversation()
 
+  // Fonction pour traduire les titres de groupes
+  const getGroupTitle = useCallback((title: string): string => {
+    switch (title) {
+      case 'today':
+        return t('history.groups.today')
+      case 'yesterday':
+        return t('history.groups.yesterday')
+      case 'thisWeek':
+        return t('history.groups.thisWeek')
+      case 'thisMonth':
+        return t('history.groups.thisMonth')
+      case 'older':
+        return t('history.groups.older')
+      default:
+        return title // Fallback au titre original si pas de traduction
+    }
+  }, [t])
+
   // Auto-refresh du compteur quand l'utilisateur change ou qu'une nouvelle conversation est créée
   React.useEffect(() => {
     if (user && !isLoadingHistory) {
@@ -61,7 +79,7 @@ export const HistoryMenu = React.memo(() => {
     }
   }, [isOpen, user, isLoadingHistory, loadConversations, t])
 
-  // Mémoisation des handlers pour éviter les re-créations
+  // Mémorisation des handlers pour éviter les re-créations
   const handleRefresh = useCallback(async (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -98,7 +116,7 @@ export const HistoryMenu = React.memo(() => {
     setIsOpen(false)
   }, [createNewConversation])
 
-  // Mémoisation de la fonction de formatage
+  // Mémorisation de la fonction de formatage
   const formatConversationTime = useCallback((timestamp: string): string => {
     try {
       let ts = timestamp
@@ -113,7 +131,7 @@ export const HistoryMenu = React.memo(() => {
     }
   }, [])
 
-  // Mémoisation du calcul du total de conversations
+  // Mémorisation du calcul du total de conversations
   const totalConversations = useMemo(() => {
     return conversationGroups.reduce(
       (acc: number, g: ConversationGroup) => acc + g.conversations.length,
@@ -136,7 +154,7 @@ export const HistoryMenu = React.memo(() => {
     return state
   }, [isOpen, totalConversations, conversationGroups.length, isLoadingHistory, user, t])
 
-  // Mémoisation du rendu des conversations pour optimiser les performances
+  // Mémorisation du rendu des conversations pour optimiser les performances
   const conversationsList = useMemo(() => {
     if (isLoadingHistory) {
       return (
@@ -186,7 +204,7 @@ export const HistoryMenu = React.memo(() => {
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
           <div className="flex items-center space-x-2">
             <span className="text-sm font-medium text-gray-700">
-              {t(`history.groups.${group.title}`)}
+              {getGroupTitle(group.title)}
             </span>
             <span className="text-xs text-gray-400">({group.conversations.length})</span>
           </div>
@@ -242,10 +260,11 @@ export const HistoryMenu = React.memo(() => {
     handleConversationClick, 
     handleDeleteSingle, 
     formatConversationTime,
+    getGroupTitle,
     t
   ])
 
-  // Mémoisation du badge de notification
+  // Mémorisation du badge de notification
   const notificationBadge = useMemo(() => {
     if (totalConversations <= 0) return null
     
