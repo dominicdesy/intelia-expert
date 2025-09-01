@@ -368,15 +368,27 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       // Animation d'apparition douce pour le backdrop
       overlay.style.setProperty('animation', 'fadeIn 0.2s ease-out', 'important')
       
-      // Forcer les dimensions du contenu (400px pour UserInfo - compact)
-      const content = overlay.querySelector('.bg-white') as HTMLElement
-      if (content) {
-        content.style.setProperty('width', '95vw', 'important')
-        content.style.setProperty('max-width', '400px', 'important')
-        content.style.setProperty('max-height', '85vh', 'important')
-        content.style.setProperty('min-width', '320px', 'important')
-        content.style.setProperty('animation', 'modalSlideIn 0.3s ease-out', 'important')
+      // Appliquer les styles au content avec un délai pour assurer le rendu
+      const applyContentStyles = () => {
+        const content = overlay.querySelector('.bg-white') as HTMLElement
+        if (content) {
+          // Supprimer d'abord les styles existants pour éviter les conflits
+          content.style.removeProperty('max-width')
+          content.style.removeProperty('width')
+          
+          // Appliquer les nouveaux styles avec priorité maximale
+          content.style.setProperty('width', '95vw', 'important')
+          content.style.setProperty('max-width', '700px', 'important')
+          content.style.setProperty('max-height', '85vh', 'important')
+          content.style.setProperty('min-width', '320px', 'important')
+          content.style.setProperty('animation', 'modalSlideIn 0.3s ease-out', 'important')
+        }
       }
+      
+      // Appliquer immédiatement et avec un délai pour garantir l'application
+      applyContentStyles()
+      setTimeout(applyContentStyles, 0)
+      setTimeout(applyContentStyles, 10)
     }
   }, [])
   
