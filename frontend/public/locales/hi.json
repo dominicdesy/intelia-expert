@@ -144,7 +144,6 @@
   "chat.clarificationInstruction": "बस चैट में अनुरोधित जानकारी के साथ उत्तर दें।",
   "chat.clarificationMode": "स्पष्टीकरण मोड: उपरोक्त प्रश्न का उत्तर दें",
   "chat.sending": "भेजा जा रहा है...",
-  "chat.send": "संदेश भेजें",
   "chat.noMessages": "दिखाने के लिए कोई संदेश नहीं",
   "chat.feedbackThanks": "आपके फीडबैक के लिए धन्यवाद!",
   "chat.feedbackCommentPrefix": "टिप्पणी: ",
@@ -169,8 +168,6 @@
   "history.messageCount": "संदेश",
   "history.deleteConversation": "इस बातचीत को हटाएं",
 
-  "nav.history": "इतिहास",
-
   "chat.redirectingLogin": "लॉगिन पर रीडायरेक्ट कर रहा है:",
   "chat.sessionExpired": "सत्र समाप्त",
   "chat.authInitError": "Auth प्रारंभीकरण त्रुटि:",
@@ -187,8 +184,6 @@
   "chat.feedbackSendError": "फीडबैक भेजने में त्रुटि:",
   "chat.feedbackGeneralError": "सामान्य फीडबैक त्रुटि:",
   "chat.redirectingInProgress": "रीडायरेक्ट चल रहा है...",
-
-  "nav.newConversation": "नई वार्तालाप",
 
   "gdpr.notice": "साइन इन करके, आप हमारी सेवा की शर्तों और गोपनीयता नीति से सहमत होते हैं।",
   "legal.terms": "सेवा की शर्तें",
@@ -360,7 +355,6 @@
   "chat.noConversations": "कोई पिछली वार्तालाप नहीं",
   "chat.loading": "लोड हो रहा है...",
   "chat.errorMessage": "क्षमा करें, मुझे तकनीकी समस्या हो रही है। कृपया कुछ क्षणों में पुनः प्रयास करें।",
-  "chat.newConversation": "नई वार्तालाप",
   "chat.disclaimer": "Intelia Expert में त्रुटियां हो सकती हैं। यदि आवश्यक हो तो किसी पेशेवर से उत्तरों की पुष्टि कराएं।",
   "chat.send": "भेजें",
   "chat.askQuestion": "विशेषज्ञ से अपना प्रश्न पूछें...",

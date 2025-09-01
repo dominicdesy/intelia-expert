@@ -144,12 +144,10 @@
   "chat.clarificationInstruction": "เพียงตอบในแชทด้วยข้อมูลที่ร้องขอ",
   "chat.clarificationMode": "โหมดชี้แจง: ตอบคำถามข้างบน",
   "chat.sending": "กำลังส่ง...",
-  "chat.send": "ส่งข้อความ",
   "chat.noMessages": "ไม่มีข้อความให้แสดง",
   "chat.feedbackThanks": "ขอบคุณสำหรับความคิดเห็นของคุณ!",
   "chat.feedbackCommentPrefix": "ความคิดเห็น: ",
   "chat.scrollToBottom": "กลับไปที่ด้านล่างของการสนทนา",
-  "chat.newConversation": "การสนทนาใหม่",
   "chat.startQuestion": "เริ่มต้นด้วยการถามคำถาม",
 
   "history.toggleClicked": "[HistoryMenu] คลิก Toggle, isOpen:",
@@ -169,8 +167,6 @@
   "history.messageCount": "ข้อความ",
   "history.deleteConversation": "ลบการสนทนานี้",
 
-  "nav.history": "ประวัติ",
-
   "chat.redirectingLogin": "กำลังเปลี่ยนเส้นทางไปยัง login:",
   "chat.sessionExpired": "เซสชันหมดอายุ",
   "chat.authInitError": "ข้อผิดพลาดการเริ่มต้น Auth:",
@@ -187,8 +183,6 @@
   "chat.feedbackSendError": "ข้อผิดพลาดในการส่งความคิดเห็น:",
   "chat.feedbackGeneralError": "ข้อผิดพลาดทั่วไปของความคิดเห็น:",
   "chat.redirectingInProgress": "กำลังเปลี่ยนเส้นทาง...",
-
-  "nav.newConversation": "การสนทนาใหม่",
 
   "gdpr.notice": "การเข้าสู่ระบบ คุณยอมรับข้อกำหนดการใช้บริการและนโยบายความเป็นส่วนตัวของเรา",
   "legal.terms": "ข้อกำหนดการใช้บริการ",
@@ -534,3 +528,4 @@
   "country.switzerland": "สวิตเซอร์แลนด์",
   "country.mexico": "เม็กซิโก",
   "country.brazil": "บราซิล"
+  }

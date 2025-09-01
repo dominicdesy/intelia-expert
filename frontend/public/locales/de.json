@@ -144,12 +144,10 @@
   "chat.clarificationInstruction": "Antworten Sie einfach im Chat mit den angeforderten Informationen.",
   "chat.clarificationMode": "Klärungsmodus: beantworten Sie die obige Frage",
   "chat.sending": "Senden...",
-  "chat.send": "Nachricht senden",
   "chat.noMessages": "Keine Nachrichten anzuzeigen",
   "chat.feedbackThanks": "Vielen Dank für Ihr Feedback!",
   "chat.feedbackCommentPrefix": "Kommentar: ",
   "chat.scrollToBottom": "Zum Ende der Unterhaltung zurückkehren",
-  "chat.newConversation": "Neue Unterhaltung",
   "chat.startQuestion": "Beginnen Sie mit einer Frage",
 
   "history.toggleClicked": "[HistoryMenu] Toggle geklickt, isOpen:",
@@ -169,8 +167,6 @@
   "history.messageCount": "Nachr.",
   "history.deleteConversation": "Diese Unterhaltung löschen",
 
-  "nav.history": "Verlauf",
-
   "chat.redirectingLogin": "Weiterleitung zum Login:",
   "chat.sessionExpired": "Sitzung abgelaufen",
   "chat.authInitError": "Auth-Initialisierungsfehler:",
@@ -187,8 +183,6 @@
   "chat.feedbackSendError": "Feedback senden Fehler:",
   "chat.feedbackGeneralError": "Allgemeiner Feedback-Fehler:",
   "chat.redirectingInProgress": "Weiterleitung läuft...",
-
-  "nav.newConversation": "Neue Unterhaltung",
 
   "gdpr.notice": "Durch die Anmeldung stimmen Sie unseren Nutzungsbedingungen und Datenschutzrichtlinien zu.",
   "legal.terms": "Nutzungsbedingungen",

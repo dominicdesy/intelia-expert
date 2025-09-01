@@ -144,12 +144,10 @@
   "chat.clarificationInstruction": "Po prostu odpowiedz na czacie z żądanymi informacjami.",
   "chat.clarificationMode": "Tryb wyjaśnienia: odpowiedz na powyższe pytanie",
   "chat.sending": "Wysyłanie...",
-  "chat.send": "Wyślij wiadomość",
   "chat.noMessages": "Brak wiadomości do wyświetlenia",
   "chat.feedbackThanks": "Dziękujemy za opinię!",
   "chat.feedbackCommentPrefix": "Komentarz: ",
   "chat.scrollToBottom": "Wróć na dół rozmowy",
-  "chat.newConversation": "Nowa rozmowa",
   "chat.startQuestion": "Zacznij od zadania pytania",
 
   "history.toggleClicked": "[HistoryMenu] Toggle kliknięty, isOpen:",
@@ -169,8 +167,6 @@
   "history.messageCount": "wiad.",
   "history.deleteConversation": "Usuń tę rozmowę",
 
-  "nav.history": "Historia",
-
   "chat.redirectingLogin": "Przekierowanie do logowania:",
   "chat.sessionExpired": "Sesja wygasła",
   "chat.authInitError": "Błąd inicjalizacji auth:",
@@ -187,8 +183,6 @@
   "chat.feedbackSendError": "Błąd wysyłania feedback:",
   "chat.feedbackGeneralError": "Ogólny błąd feedback:",
   "chat.redirectingInProgress": "Przekierowanie w toku...",
-
-  "nav.newConversation": "Nowa rozmowa",
 
   "gdpr.notice": "Logując się, zgadzasz się na nasze warunki świadczenia usług i politykę prywatności.",
   "legal.terms": "Warunki świadczenia usług",

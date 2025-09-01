@@ -144,7 +144,6 @@
   "chat.clarificationInstruction": "Répondez simplement dans le chat avec les informations demandées.",
   "chat.clarificationMode": "Mode clarification : répondez à la question ci-dessus",
   "chat.sending": "Envoi en cours...",
-  "chat.send": "Envoyer le message",
   "chat.noMessages": "Aucun message à afficher",
   "chat.feedbackThanks": "Merci pour votre retour !",
   "chat.feedbackCommentPrefix": "Commentaire: ",
@@ -169,8 +168,6 @@
   "history.messageCount": "msg",
   "history.deleteConversation": "Supprimer cette conversation",
 
-  "nav.history": "Historique",
-
   "chat.redirectingLogin": "Redirection vers login:",
   "chat.sessionExpired": "Session expirée",
   "chat.authInitError": "Erreur initialisation auth:",
@@ -187,8 +184,6 @@
   "chat.feedbackSendError": "Erreur envoi feedback:",
   "chat.feedbackGeneralError": "Erreur générale feedback:",
   "chat.redirectingInProgress": "Redirection en cours...",
-
-  "nav.newConversation": "Nouvelle conversation",
 
   "gdpr.notice": "En vous connectant, vous acceptez nos conditions d'utilisation et notre politique de confidentialité.",
   "legal.terms": "Conditions d'utilisation",
@@ -360,7 +355,6 @@
   "chat.noConversations": "Aucune conversation précédente",
   "chat.loading": "Chargement...",
   "chat.errorMessage": "Désolé, je rencontre un problème technique. Veuillez réessayer dans quelques instants.",
-  "chat.newConversation": "Nouvelle conversation",
   "chat.disclaimer": "Intelia Expert peut faire des erreurs. Faites vérifier les réponses par un professionnel au besoin.",
   "chat.send": "Envoyer",
   "chat.askQuestion": "Posez votre question à l'expert...",

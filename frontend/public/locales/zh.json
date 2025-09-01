@@ -144,12 +144,10 @@
   "chat.clarificationInstruction": "只需在聊天中回复所请求的信息。",
   "chat.clarificationMode": "澄清模式：回答上面的问题",
   "chat.sending": "发送中...",
-  "chat.send": "发送消息",
   "chat.noMessages": "没有消息显示",
   "chat.feedbackThanks": "感谢您的反馈！",
   "chat.feedbackCommentPrefix": "评论: ",
   "chat.scrollToBottom": "回到对话底部",
-  "chat.newConversation": "新对话",
   "chat.startQuestion": "从问问题开始",
 
   "history.toggleClicked": "[HistoryMenu] Toggle点击, isOpen:",
@@ -169,8 +167,6 @@
   "history.messageCount": "条消息",
   "history.deleteConversation": "删除此对话",
 
-  "nav.history": "历史记录",
-
   "chat.redirectingLogin": "重定向到登录:",
   "chat.sessionExpired": "会话已过期",
   "chat.authInitError": "Auth初始化错误:",
@@ -187,8 +183,6 @@
   "chat.feedbackSendError": "反馈发送错误:",
   "chat.feedbackGeneralError": "一般反馈错误:",
   "chat.redirectingInProgress": "重定向进行中...",
-
-  "nav.newConversation": "新对话",
 
   "gdpr.notice": "通过登录，您同意我们的服务条款和隐私政策。",
   "legal.terms": "服务条款",
@@ -534,3 +528,4 @@
   "country.switzerland": "瑞士",
   "country.mexico": "墨西哥",
   "country.brazil": "巴西"
+  }

@@ -144,12 +144,10 @@
   "chat.clarificationInstruction": "Antwoord gewoon in de chat met de gevraagde informatie.",
   "chat.clarificationMode": "Verduidelijkingsmodus: beantwoord de vraag hierboven",
   "chat.sending": "Verzenden...",
-  "chat.send": "Bericht verzenden",
   "chat.noMessages": "Geen berichten om te tonen",
   "chat.feedbackThanks": "Dank voor uw feedback!",
   "chat.feedbackCommentPrefix": "Reactie: ",
   "chat.scrollToBottom": "Naar beneden scrollen",
-  "chat.newConversation": "Nieuw gesprek",
   "chat.startQuestion": "Begin met het stellen van een vraag",
 
   "history.toggleClicked": "[HistoryMenu] Toggle geklikt, isOpen:",
@@ -169,8 +167,6 @@
   "history.messageCount": "msg",
   "history.deleteConversation": "Dit gesprek verwijderen",
 
-  "nav.history": "Geschiedenis",
-
   "chat.redirectingLogin": "Omleiding naar login:",
   "chat.sessionExpired": "Sessie verlopen",
   "chat.authInitError": "Fout auth initialisatie:",
@@ -187,8 +183,6 @@
   "chat.feedbackSendError": "Fout verzenden feedback:",
   "chat.feedbackGeneralError": "Algemene feedback fout:",
   "chat.redirectingInProgress": "Omleiding bezig...",
-
-  "nav.newConversation": "Nieuw gesprek",
 
   "gdpr.notice": "Door in te loggen, accepteert u onze gebruiksvoorwaarden en privacybeleid.",
   "legal.terms": "Gebruiksvoorwaarden",
