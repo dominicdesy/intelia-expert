@@ -49,11 +49,11 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     setIsUpdating(true)
     
     try {
-      console.log('[LanguageModal] Changement langue:', currentLanguage, '→', languageCode)
+      console.log(t('language.debug.changing'), currentLanguage, '→', languageCode)
       
       // 1. Changer immédiatement dans l'interface
       await changeLanguage(languageCode)
-      console.log('[LanguageModal] Interface mise à jour')
+      console.log(t('language.debug.interfaceUpdated'))
       
       // 2. Sauvegarder dans localStorage avec la BONNE clé et format
       if (typeof window !== 'undefined') {
@@ -63,11 +63,8 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
           version: 0
         }
         localStorage.setItem('intelia-language', JSON.stringify(languageStore))
-        console.log('[LanguageModal] localStorage sauvegardé:', languageCode)
         
-        // ✅ NOUVEAU: Forcer une mise à jour immédiate du currentLanguage
-        // pour que le modal affiche la bonne langue actuelle
-        window.location.reload()
+        console.log(t('language.debug.localStorageSaved'), languageCode)
       }
       
       // 3. Émettre un événement pour forcer la synchronisation
@@ -83,11 +80,11 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
       // 5. Fermer la modal après un délai pour voir l'effet
       setTimeout(() => {
         onClose()
-        console.log('[LanguageModal] Modal fermée')
-      }, 100)
+        console.log(t('language.debug.modalClosed'))
+      }, 300)
       
     } catch (error) {
-      console.error('[LanguageModal] Erreur changement:', error)
+      console.error(t('language.debug.changeError'), error)
     } finally {
       setTimeout(() => {
         setIsUpdating(false)
@@ -173,7 +170,7 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
                     <div className="font-semibold text-blue-900">
                       {t('language.current')}: {currentLangConfig.nativeName}
                     </div>
-                    <div className="text-sm font-bold text-gray-500">
+                    <div className="text-sm font-bold text-blue-600">
                       {currentLangConfig.code.toUpperCase()}
                     </div>
                   </div>
@@ -217,8 +214,8 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
                         <div className="font-semibold text-gray-900 text-sm">
                           {lang.nativeName}
                         </div>
-                        {/* CODES DE LANGUE EN GRIS */}
-                        <div className="text-sm font-bold text-gray-500 mt-1">
+                        {/* CODES DE LANGUE EN BLEU */}
+                        <div className="text-sm font-bold text-blue-600 mt-1">
                           {lang.code.toUpperCase()}
                         </div>
                       </div>
