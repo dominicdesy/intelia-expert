@@ -807,6 +807,49 @@ export const useTranslation = () => {
     getUserLanguage()
   }, [])
 
+  // ✅ NOUVEAU: Vérification continue de localStorage pour éviter le cache corrompu
+  useEffect(() => {
+    // Intervalle pour vérifier périodiquement les changements du localStorage
+    const checkLocalStorageInterval = setInterval(() => {
+      const storedLang = getStoredLanguage()
+      if (storedLang && storedLang !== currentLanguage && isValidLanguageCode(storedLang)) {
+        console.log(`[i18n] 🔄 Resynchronisation détectée: ${currentLanguage} → ${storedLang}`)
+        setCurrentLanguage(storedLang)
+      }
+    }, 1000) // Vérifier toutes les secondes
+
+    // Nettoyer l'intervalle au démontage
+    return () => {
+      clearInterval(checkLocalStorageInterval)
+    }
+  }, [currentLanguage])
+
+  // ✅ AMÉLIORÉ: Écouter les événements de localStorage pour une réactivité immédiate
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'intelia-language' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue)
+          const newLang = parsed?.state?.currentLanguage
+          
+          if (newLang && newLang !== currentLanguage && isValidLanguageCode(newLang)) {
+            console.log(`[i18n] 🔄 Changement localStorage détecté: ${currentLanguage} → ${newLang}`)
+            setCurrentLanguage(newLang)
+          }
+        } catch (error) {
+          console.warn('Erreur parsing localStorage change:', error)
+        }
+      }
+    }
+
+    // Écouter les changements de localStorage depuis d'autres onglets/composants
+    window.addEventListener('storage', handleStorageChange)
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+    }
+  }, [currentLanguage])
+
   // Charger les traductions quand la langue change
   useEffect(() => {
     const loadLanguage = async () => {
