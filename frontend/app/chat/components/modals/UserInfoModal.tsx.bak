@@ -344,6 +344,59 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
   const { validatePhoneFields } = usePhoneValidation()
   const overlayRef = useRef<HTMLDivElement>(null)
   
+  // CORRECTION: Utiliser l'approche ContactModal pour la gestion des styles
+  useEffect(() => {
+    const overlay = overlayRef.current
+    
+    if (overlay) {
+      // Forcer les dimensions de l'overlay (correction complète)
+      overlay.style.setProperty('width', '100vw', 'important')
+      overlay.style.setProperty('height', '100vh', 'important')
+      overlay.style.setProperty('top', '0', 'important')
+      overlay.style.setProperty('left', '0', 'important')
+      overlay.style.setProperty('right', '0', 'important')
+      overlay.style.setProperty('bottom', '0', 'important')
+      
+      // BACKDROP GRISÉ - fond semi-transparent noir/gris
+      overlay.style.setProperty('background-color', 'rgba(0, 0, 0, 0.5)', 'important')
+      overlay.style.setProperty('backdrop-filter', 'blur(2px)', 'important')
+      overlay.style.setProperty('display', 'flex', 'important')
+      overlay.style.setProperty('align-items', 'center', 'important')
+      overlay.style.setProperty('justify-content', 'center', 'important')
+      overlay.style.setProperty('padding', '16px', 'important')
+      
+      // Animation d'apparition douce pour le backdrop
+      overlay.style.setProperty('animation', 'fadeIn 0.2s ease-out', 'important')
+      
+      // Appliquer les styles au content avec un délai pour assurer le rendu
+      const applyContentStyles = () => {
+        const content = overlay.querySelector('.bg-white') as HTMLElement
+        if (content) {
+          // Supprimer TOUTES les classes de largeur Tailwind et styles existants
+          content.style.removeProperty('max-width')
+          content.style.removeProperty('width')
+          content.style.removeProperty('min-width')
+          
+          // Supprimer les classes Tailwind problématiques si elles existent
+          content.classList.remove('max-w-2xl', 'max-w-xl', 'max-w-lg', 'max-w-md', 'max-w-sm')
+          content.classList.remove('w-full', 'w-auto')
+          
+          // Appliquer les nouveaux styles avec priorité maximale
+          content.style.setProperty('width', '95vw', 'important')
+          content.style.setProperty('max-width', '700px', 'important')
+          content.style.setProperty('max-height', '85vh', 'important')
+          content.style.setProperty('min-width', '320px', 'important')
+          content.style.setProperty('animation', 'modalSlideIn 0.3s ease-out', 'important')
+        }
+      }
+      
+      // Appliquer immédiatement et avec un délai pour garantir l'application
+      applyContentStyles()
+      setTimeout(applyContentStyles, 0)
+      setTimeout(applyContentStyles, 10)
+    }
+  }, [])
+  
   // CORRECTION 1: userDataMemo avec dépendance stable
   const userDataMemo = useMemo(() => {
     if (!user?.id) {
@@ -886,41 +939,19 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         }
       `}</style>
 
-      {/* Overlay avec backdrop grisé - CORRECTION: Styles inline pour éviter le redimensionnement */}
+      {/* Overlay avec backdrop grisé - CORRECTION: Utiliser l'approche ContactModal */}
       <div 
         ref={overlayRef}
         className="fixed inset-0 z-50" 
         onClick={handleClose}
         data-debug="modal-overlay"
-        style={{
-          width: '100vw',
-          height: '100vh',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          backdropFilter: 'blur(2px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px',
-          animation: 'fadeIn 0.2s ease-out'
-        }}
       >
-        {/* Modal Container - CORRECTION: Styles inline pour largeur immédiate */}
+        {/* Modal Container - CORRECTION: Supprimer toutes classes de largeur */}
         <div 
           className="bg-white rounded-lg shadow-xl max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
           data-modal="user-info"
           data-debug="modal-content"
-          style={{
-            width: '95vw',
-            maxWidth: '700px',
-            maxHeight: '85vh',
-            minWidth: '320px',
-            animation: 'modalSlideIn 0.3s ease-out'
-          }}
         >
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">

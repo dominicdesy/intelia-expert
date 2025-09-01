@@ -65,9 +65,10 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
         localStorage.setItem('intelia-language', JSON.stringify(languageStore))
         console.log('[LanguageModal] localStorage sauvegardé:', languageCode)
         
-        // ✅ NOUVEAU: Forcer une mise à jour immédiate du currentLanguage
-        // pour que le modal affiche la bonne langue actuelle
-        window.location.reload()
+        // ✅ CORRECTION: Attendre un peu avant de recharger pour que le localStorage soit bien écrit
+        setTimeout(() => {
+          window.location.reload()
+        }, 100)
       }
       
       // 3. Émettre un événement pour forcer la synchronisation
@@ -80,11 +81,9 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
         (window as any).i18nDebug.notificationManager.notify()
       }
       
-      // 5. Fermer la modal après un délai pour voir l'effet
-      setTimeout(() => {
-        onClose()
-        console.log('[LanguageModal] Modal fermée')
-      }, 100)
+      // 5. Fermer la modal sans délai (puisqu'on va recharger)
+      onClose()
+      console.log('[LanguageModal] Modal fermée')
       
     } catch (error) {
       console.error('[LanguageModal] Erreur changement:', error)
