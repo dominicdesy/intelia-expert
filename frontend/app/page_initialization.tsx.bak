@@ -19,7 +19,7 @@ export function usePageInitialization() {
   const [localSuccess, setLocalSuccess] = useState('')
   const [hasHydrated, setHasHydrated] = useState(false)
 
-  // ✅ CORRECTION : Utiliser le hook centralisé directement
+  // ✅ CORRECTION : Utiliser le hook centralisé au lieu de translations[currentLanguage]
   const { t } = useTranslation()
 
   // CORRECTION : toggleMode sans dépendances changeantes
@@ -88,7 +88,7 @@ export function usePageInitialization() {
     }
   }, []) // Dépendances vides - ne s'exécute qu'une fois
 
-  // Gestion URL callback optimisée - ✅ CORRIGÉ : utilise t directement
+  // Gestion URL callback optimisée
   useEffect(() => {
     if (!hasInitialized.current || !isMounted.current) return
 
@@ -98,11 +98,11 @@ export function usePageInitialization() {
     console.log('🔗 [URL] Traitement callback auth:', authStatus)
     
     if (authStatus === 'success') {
-      setLocalSuccess(t('auth.success'))
+      setLocalSuccess(t('auth.success') || 'Connexion réussie')
     } else if (authStatus === 'error') {
-      setLocalError(t('auth.error'))
+      setLocalError(t('auth.error') || 'Erreur de connexion')
     } else if (authStatus === 'incomplete') {
-      setLocalError(t('auth.incomplete'))
+      setLocalError(t('auth.incomplete') || 'Connexion incomplète')
     }
     
     // Nettoyer l'URL de manière optimisée
@@ -123,7 +123,7 @@ export function usePageInitialization() {
     }, 3000)
     
     return () => clearTimeout(timer)
-  }, [searchParams, t]) // ✅ CORRECTION : t comme dépendance stable
+  }, [searchParams, t]) // ✅ CORRECTION : Seulement t comme dépendance au lieu de t.authSuccess, etc.
 
   // Effet pour bloquer le scroll en mode signup - Optimisé
   useEffect(() => {
@@ -152,11 +152,11 @@ export function usePageInitialization() {
     }
   }, [])
 
-  // ✅ CORRECTION : Retour avec fonctions stables et t directement du hook
+  // ✅ CORRECTION : Retour avec fonctions stables, sans t dans les dépendances
   return useMemo(() => ({
     currentLanguage,
     setCurrentLanguage: handleSetCurrentLanguage, // Fonction stable
-    t, // Direct du hook useTranslation
+    t,
     isSignupMode,
     setIsSignupMode,
     localError,
@@ -168,7 +168,7 @@ export function usePageInitialization() {
     toggleMode // Fonction stable
   }), [
     currentLanguage, 
-    t, // Inclure t dans les dépendances pour détecter les changements
+    // ✅ CORRECTION : t supprimé des dépendances car il vient du hook useTranslation
     isSignupMode, 
     localError, 
     localSuccess, 

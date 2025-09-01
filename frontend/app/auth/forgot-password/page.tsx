@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
@@ -15,13 +15,13 @@ const InteliaLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
   />
 )
 
-// Page Mot de Passe Oublié
+// Page Mot de Passe Oublié - VERSION SIMPLIFIÉE COMME LE MODAL
 export default function ForgotPasswordPage() {
   const router = useRouter()
   const { isAuthenticated, user } = useAuthStore()
   
-  // Utilisation directe du hook useTranslation - plus besoin de synchronisation manuelle
-  const { t, currentLanguage, loading: translationsLoading, changeLanguage } = useTranslation()
+  // UTILISATION SIMPLE COMME DANS LE MODAL - PAS DE LOGIQUE COMPLEXE
+  const { t, currentLanguage } = useTranslation()
   
   // États
   const [email, setEmail] = useState('')
@@ -39,15 +39,14 @@ export default function ForgotPasswordPage() {
     setIsClient(true)
   }, [])
 
-  // ✅ CORRECTION : Redirection si déjà connecté AVEC protection
+  // Redirection si déjà connecté - LOGIQUE SIMPLIFIÉE
   useEffect(() => {
     if (hasCheckedAuth.current || !isMounted.current) return
     
-    if (isClient && isAuthenticated && user && !translationsLoading) {
+    if (isClient && isAuthenticated && user) {
       hasCheckedAuth.current = true
       console.log('Utilisateur déjà connecté, redirection...')
       
-      // Protection contre les redirections multiples
       const timer = setTimeout(() => {
         if (isMounted.current && window.location.pathname !== '/chat') {
           router.push('/chat')
@@ -56,9 +55,9 @@ export default function ForgotPasswordPage() {
 
       return () => clearTimeout(timer)
     }
-  }, [isClient, isAuthenticated, user, translationsLoading, router])
+  }, [isClient, isAuthenticated, user, router])
 
-  // CORRECTION : Fonction de soumission stable
+  // Fonction de soumission
   const handleSubmit = useCallback(async () => {
     setError('')
     setSuccess('')
@@ -79,7 +78,6 @@ export default function ForgotPasswordPage() {
     try {
       console.log('Demande réinitialisation pour:', email.trim())
       
-      // Appel API pour la réinitialisation
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app/api'}/v1/auth/reset-password`, {
         method: 'POST',
         headers: {
@@ -104,7 +102,6 @@ export default function ForgotPasswordPage() {
     } catch (error: any) {
       console.error('Erreur:', error)
       
-      // Gestion d'erreurs spécifiques avec fallbacks
       if (error.message.includes('404')) {
         setError(t('forgotPassword.emailNotFound') || 'Email non trouvé')
       } else if (error.message.includes('429')) {
@@ -117,9 +114,9 @@ export default function ForgotPasswordPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [email, t]) // ✅ Dépendances minimales et stables
+  }, [email, t])
 
-  // ✅ CORRECTION : Gestionnaire de touches stable
+  // Gestionnaire de touches
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isLoading && email.trim()) {
       handleSubmit()
@@ -133,27 +130,27 @@ export default function ForgotPasswordPage() {
     }
   }, [])
 
-  // ✅ CORRECTION : Condition d'affichage simplifiée
-  if (!isClient || translationsLoading) {
+  // AFFICHAGE SIMPLE - PAS DE VÉRIFICATION COMPLEXE DE LOADING
+  if (!isClient) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
         <div className="text-center">
           <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">{t('common.loading') || 'Chargement...'}</p>
+          <p className="text-gray-600">Chargement...</p>
         </div>
       </div>
     )
   }
 
-  // Si l'utilisateur est connecté, on affiche un loader pendant la redirection
+  // Si l'utilisateur est connecté, loader de redirection
   if (isAuthenticated && user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
         <div className="text-center">
           <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">{t('forgotPassword.redirecting') || 'Redirection...'}</p>
+          <p className="text-gray-600">Redirection...</p>
         </div>
       </div>
     )
@@ -168,10 +165,10 @@ export default function ForgotPasswordPage() {
             <InteliaLogo className="w-12 h-12" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {t('forgotPassword.title') || 'Mot de passe oublié'}
+            {t('forgotPassword.title')}
           </h1>
           <p className="text-gray-600 leading-relaxed">
-            {t('forgotPassword.description') || 'Saisissez votre email pour recevoir un lien de réinitialisation'}
+            {t('forgotPassword.description')}
           </p>
         </div>
 
@@ -197,7 +194,7 @@ export default function ForgotPasswordPage() {
               <span>{success}</span>
             </div>
             <div className="mt-2 text-xs text-green-600">
-              {t('forgotPassword.checkInbox') || 'Vérifiez votre boîte mail'}
+              {t('forgotPassword.checkInbox')}
             </div>
           </div>
         )}
@@ -207,7 +204,7 @@ export default function ForgotPasswordPage() {
           <div className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                {t('forgotPassword.emailLabel') || 'Adresse email'}
+                {t('forgotPassword.emailLabel')}
               </label>
               <input
                 type="email"
@@ -216,7 +213,7 @@ export default function ForgotPasswordPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 onKeyPress={handleKeyPress}
                 className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-                placeholder={t('forgotPassword.emailPlaceholder') || 'votre@email.com'}
+                placeholder={t('forgotPassword.emailPlaceholder')}
                 disabled={isLoading}
                 autoComplete="email"
               />
@@ -231,10 +228,10 @@ export default function ForgotPasswordPage() {
               {isLoading ? (
                 <div className="flex items-center justify-center space-x-2">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>{t('forgotPassword.sending') || 'Envoi en cours...'}</span>
+                  <span>{t('forgotPassword.sending')}</span>
                 </div>
               ) : (
-                t('forgotPassword.sendButton') || 'Envoyer le lien'
+                t('forgotPassword.sendButton')
               )}
             </button>
           </div>
@@ -249,13 +246,13 @@ export default function ForgotPasswordPage() {
             <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            {t('forgotPassword.backToLogin') || 'Retour à la connexion'}
+            {t('forgotPassword.backToLogin')}
           </Link>
           
           <div className="text-xs text-gray-500">
-            {t('forgotPassword.noAccount') || 'Pas de compte ?'}{' '}
+            {t('forgotPassword.noAccount')}{' '}
             <Link href="/?signup=true" className="text-blue-600 hover:underline transition-colors">
-              {t('auth.createAccount') || 'Créer un compte'}
+              {t('auth.createAccount')}
             </Link>
           </div>
         </div>
@@ -263,13 +260,13 @@ export default function ForgotPasswordPage() {
         {/* Support */}
         <div className="mt-4 p-3 bg-gray-50 rounded-lg text-center">
           <p className="text-xs text-gray-600">
-            {t('forgotPassword.supportProblem') || 'Un problème ?'}{' '}
+            {t('forgotPassword.supportProblem')}{' '}
             <button
               type="button"
               onClick={() => window.open('mailto:support@intelia.com?subject=Problème réinitialisation mot de passe', '_blank')}
               className="text-blue-600 hover:underline font-medium transition-colors"
             >
-              {t('forgotPassword.contactSupport') || 'Contactez le support'}
+              {t('forgotPassword.contactSupport')}
             </button>
           </p>
         </div>
@@ -277,9 +274,9 @@ export default function ForgotPasswordPage() {
         {/* Information sécurité */}
         <div className="mt-6 text-center">
           <p className="text-xs text-gray-500 leading-relaxed">
-            {t('forgotPassword.securityInfo') || 'Pour votre sécurité, le lien expirera dans 1 heure.'}
+            {t('forgotPassword.securityInfo')}
             <br />
-            {t('forgotPassword.securityInfo2') || 'Vérifiez aussi vos spams.'}
+            {t('forgotPassword.securityInfo2')}
           </p>
         </div>
 
@@ -287,11 +284,9 @@ export default function ForgotPasswordPage() {
         {process.env.NODE_ENV === 'development' && (
           <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
             <strong>Dev Debug:</strong>
-            <br />• API URL: {process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app/api'}
-            <br />• Endpoint: /v1/auth/reset-password
             <br />• Current Language: {currentLanguage}
-            <br />• Translations Loading: {translationsLoading ? 'Yes' : 'No'}
-            <br />• Test Translation: {t('forgotPassword.title') || 'FALLBACK'}
+            <br />• Test Translation: {t('forgotPassword.title')}
+            <br />• Email Label: {t('forgotPassword.emailLabel')}
           </div>
         )}
       </div>

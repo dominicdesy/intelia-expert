@@ -6,7 +6,6 @@ import { LoginForm } from './page_login_form'
 import { SignupModal } from './page_signup_modal'
 import { usePageInitialization } from './page_initialization'
 import { InteliaLogo, LanguageSelector, LoadingSpinner, AuthFooter } from './page_components'
-import { useTranslation } from '@/lib/languages/i18n'
 
 // Mémorisation des composants pour éviter les re-renders
 // ✅ SUPPRIMÉ: LoginForm et SignupModal ne sont plus mémorisés pour permettre les re-renders avec les nouvelles traductions
@@ -25,19 +24,16 @@ const LoadingContent = memo(() => (
   </div>
 ))
 
-// Contenu principal - VERSION CORRIGÉE avec useTranslation direct
+// Contenu principal - VERSION COMPLETE adaptée au système i18n
 const PageContent = memo(() => {
   console.log('🚀 [PageContent] Composant PageContent rendu')
-  
-  // ✅ UTILISATION DIRECTE de useTranslation comme tous les autres composants
-  const { t } = useTranslation()
   
   // Récupération des données d'initialisation
   const initData = usePageInitialization()
   const {
     currentLanguage,
     setCurrentLanguage,
-    // ✅ SUPPRIMÉ: t de initData car on utilise le hook directement
+    t,
     localError,
     localSuccess,
     isSignupMode,
@@ -49,7 +45,7 @@ const PageContent = memo(() => {
   // Mémorisation stable des props pour éviter les re-renders du hook d'auth
   const authProps = useMemo(() => ({
     currentLanguage,
-    t, // ✅ UTILISE le t du hook useTranslation de ce composant
+    t,
     isSignupMode,
     setCurrentLanguage
   }), [currentLanguage, t, isSignupMode, setCurrentLanguage])
@@ -83,7 +79,7 @@ const PageContent = memo(() => {
             <MemoizedInteliaLogo className="w-16 h-16" />
           </div>
           <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-            {t('page.title')}
+            {t('page.title') || 'Connexion à Intelia Expert'}
           </h2>
         </div>
 

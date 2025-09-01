@@ -76,7 +76,7 @@ export const LanguageSelector = () => {
   )
 }
 
-// Composant d'alerte pour les erreurs/succès - CORRIGÉ : utilise directement useTranslation
+// Composant d'alerte pour les erreurs/succès
 export const AlertMessage = ({ 
   type, 
   title, 
@@ -177,7 +177,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, {
 // Ajout du displayName pour le debugging
 PasswordInput.displayName = 'PasswordInput'
 
-// Indicateur de correspondance des mots de passe - CORRIGÉ : utilise directement useTranslation
+// Indicateur de correspondance des mots de passe
 export const PasswordMatchIndicator = ({ 
   password, 
   confirmPassword 
@@ -185,8 +185,6 @@ export const PasswordMatchIndicator = ({
   password: string
   confirmPassword: string 
 }) => {
-  const { t } = useTranslation()
-  
   if (!password || !confirmPassword) return null
 
   const match = confirmPassword === password
@@ -198,50 +196,45 @@ export const PasswordMatchIndicator = ({
           <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
-          {t('validation.password.match') || 'Les mots de passe correspondent'}
+          Les mots de passe correspondent
         </span>
       ) : (
         <span className="text-red-600 flex items-center">
           <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
-          {t('validation.password.mismatch') || 'Les mots de passe ne correspondent pas'}
+          Les mots de passe ne correspondent pas
         </span>
       )}
     </div>
   )
 }
 
-// Loading Spinner - CORRIGÉ : utilise directement useTranslation
-export const LoadingSpinner = ({ text }: { text?: string }) => {
-  const { t } = useTranslation()
-  const displayText = text || t('common.loading') || 'Chargement...'
-  
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
-      <div className="text-center">
-        <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">{displayText}</p>
-      </div>
+// Loading Spinner
+export const LoadingSpinner = ({ text = "Chargement..." }: { text?: string }) => (
+  <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+    <div className="text-center">
+      <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+      <p className="text-gray-600">{text}</p>
     </div>
-  )
-}
+  </div>
+)
 
-// Footer avec liens - CORRIGÉ : utilise directement le hook useTranslation
+// Footer avec liens - CORRIGÉ: utilise directement le hook useTranslation
 export const AuthFooter = () => {
   const { t } = useTranslation()
   
   return (
     <div className="mt-6 text-center">
       <p className="text-xs text-gray-500">
-        {t('gdpr.notice') || 'En continuant, vous acceptez nos'}{' '}
+        {t('gdpr.notice')}{' '}
         <Link href="/terms" className="text-blue-600 hover:text-blue-500">
-          {t('legal.terms') || 'Conditions d\'utilisation'}
+          {t('legal.terms')}
         </Link>
-        {' et notre '}
+        {' '}et notre{' '}
         <Link href="/privacy" className="text-blue-600 hover:text-blue-500">
-          {t('legal.privacy') || 'Politique de confidentialité'}
+          {t('legal.privacy')}
         </Link>
       </p>
     </div>
