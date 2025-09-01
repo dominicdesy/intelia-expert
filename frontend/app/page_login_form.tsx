@@ -281,7 +281,7 @@ export const LoginForm = memo(function LoginForm({
 
             <div className="text-sm">
               <Link 
-                href={`/auth/forgot-password?lang=${currentLanguage}`}
+                href="/auth/forgot-password"
                 className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
               >
                 {t('auth.forgotPassword')}

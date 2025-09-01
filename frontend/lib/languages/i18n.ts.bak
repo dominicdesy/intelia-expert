@@ -852,27 +852,14 @@ export const useTranslation = () => {
   }
 
   const changeLanguage = async (newLanguage: string) => {
-    // Nettoyer le cache d'erreur si on retente une langue
+    // 🔄 Nettoyer le cache d'erreur si on retente une langue
     errorCache.delete(newLanguage)
-  
+    
     setCurrentLanguage(newLanguage)
-  
-    // ✅ NOUVEAU : Sauvegarder dans localStorage avec la structure attendue
-    try {
-      const langData = {
-        state: {
-          currentLanguage: newLanguage
-        }
-      }
-      localStorage.setItem('intelia-language', JSON.stringify(langData))
-      console.log('[i18n] Langue sauvegardée:', newLanguage)
-    } catch (error) {
-      console.warn('[i18n] Erreur sauvegarde langue:', error)
-    }
-  
+    
     // Précharger les traductions
     await loadTranslations(newLanguage)
-  
+    
     // Émettre l'événement pour mettre à jour d'autres composants
     window.dispatchEvent(new CustomEvent('languageChanged', { 
       detail: { language: newLanguage } 

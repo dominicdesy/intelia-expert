@@ -68,21 +68,16 @@ export const logoutService = {
         }
       }
 
-      // 5. Detecter la langue actuelle avant la redirection
-      let currentLanguage = 'fr' // Defaut francais
-      try {
-        // Essayer de recuperer la langue depuis localStorage
-        const langData = localStorage.getItem('intelia-language') || localStorage.getItem('language')
-        if (langData) {
-          const parsed = JSON.parse(langData)
-          currentLanguage = parsed.language || parsed || 'fr'
-        }
-        
-        // Ou depuis l'URL actuelle
-        const urlPath = window.location.pathname
-        if (urlPath.includes('/en')) currentLanguage = 'en'
-        else if (urlPath.includes('/es')) currentLanguage = 'es'
-        else if (urlPath.includes('/de')) currentLanguage = 'de
+      // 5. Marquer la deconnexion et forcer le reload
+      sessionStorage.setItem('recent-logout', Date.now().toString())
+      sessionStorage.setItem('logout-complete', 'true')
+      
+      console.log('[LogoutService] Redirection forcee vers /')
+      
+      // 6. Reload complet pour eviter tous les problemes de state React/Zustand
+      setTimeout(() => {
+        window.location.href = '/'
+      }, 100) // Petit delai pour voir les logs
       
     } catch (error) {
       console.error('[LogoutService] Erreur durant logout:', error)

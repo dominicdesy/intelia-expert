@@ -168,15 +168,15 @@ export const UserMenuButton = React.memo(() => {
       // Fermer le menu immédiatement
       setIsOpen(false)
     
-      // ✅ CORRECTION: Utiliser SEULEMENT le service de logout indépendant
-      await logoutService.performLogout()
+      // ✅ CORRECTION: Passer l'objet user pour préserver la langue
+      await logoutService.performLogout(user)
     
     } catch (error) {
       console.error(t('userMenu.debug.logoutServiceError'), error)
       // En cas d'erreur, forcer quand même la redirection
       window.location.href = '/'
     }
-  }, [t])
+  }, [t, user]) // ← Ajout de 'user' dans les dépendances
 
   // Handlers des modales avec protection renforcée
   const handleContactClick = useCallback(() => {
