@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { useRouter } from 'next/navigation'
 import { Message } from '../../types'
 import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '@/lib/languages/i18n'
@@ -250,8 +249,10 @@ const MessageList = React.memo(({
 MessageList.displayName = 'MessageList'
 
 export default function ChatInterface() {
-  const router = useRouter()
-  const { user, isAuthenticated, isLoading, hasHydrated, initializeSession } = useAuthStore()
+  // ✅ CORRECTION PRINCIPALE: Supprimer useRouter - pas de redirections dans cette page
+  // const router = useRouter() // SUPPRIMÉ
+  
+  const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore() // Supprimé initializeSession
   const { t, currentLanguage } = useTranslation()
 
   // Stores Zustand
@@ -297,9 +298,9 @@ export default function ChatInterface() {
   const isMountedRef = useRef(true)
   const inputRef = useRef<HTMLInputElement>(null)
   const hasLoadedConversationsRef = useRef(false)
-  const isRedirectingRef = useRef(false)
+  // const isRedirectingRef = useRef(false) // SUPPRIMÉ
 
-  // Mémoisation stable des données
+  // Mémorisation stable des données
   const messages: Message[] = useMemo(() => {
     return currentConversation?.messages || []
   }, [currentConversation?.messages])
@@ -308,26 +309,17 @@ export default function ChatInterface() {
     return messages.length > 0
   }, [messages.length])
 
-  // Fonctions de redirection et gestion d'erreurs
-  const redirectToLogin = useCallback((reason?: string) => {
-    if (isRedirectingRef.current) return
-    isRedirectingRef.current = true
-    
-    console.log(t('chat.redirectingLogin'), reason || t('chat.sessionExpired'))
-    router.push('/')
-  }, [router, t])
+  // ✅ CORRECTION PRINCIPALE: Supprimer les fonctions de redirection
+  // const redirectToLogin = useCallback((reason?: string) => { ... }) // SUPPRIMÉ
+  // const handleAuthError = useCallback((error: any) => { ... }) // SIMPLIFIÉ
 
   const handleAuthError = useCallback((error: any) => {
-    if (!isMountedRef.current) return
-    
-    if (error?.status === 403 || 
-        error?.message?.includes('Auth session missing') ||
-        error?.message?.includes('Forbidden')) {
-      redirectToLogin(t('chat.sessionExpired'))
-    }
-  }, [redirectToLogin, t])
+    console.error('Auth error:', error)
+    // Plus de redirection - juste log l'erreur
+    // L'AuthProvider au niveau layout gère les redirections
+  }, [])
 
-  // Fonctions utilitaires
+  // Fonctions utilitaires (conservées intégralement)
   const getUserInitials = useCallback((user: any): string => {
     if (!user) return 'U'
 
@@ -409,67 +401,16 @@ export default function ChatInterface() {
     
     return () => {
       isMountedRef.current = false
-      isRedirectingRef.current = false
       document.body.classList.remove('keyboard-open')
       hasLoadedConversationsRef.current = false
     }
   }, [])
 
-  // Initialisation de l'authentification
-  useEffect(() => {
-    let isCancelled = false
-    
-    const initAuth = async () => {
-      if (!hasHydrated || isCancelled || !isMountedRef.current) return
-      
-      try {
-        const sessionValid = await initializeSession()
-        if (!sessionValid && isMountedRef.current && !isCancelled) {
-          redirectToLogin(t('chat.sessionExpired'))
-        }
-      } catch (error) {
-        console.error(t('chat.authInitError'), error)
-        if (isMountedRef.current && !isCancelled) {
-          handleAuthError(error)
-        }
-      }
-    }
-    
-    if (hasHydrated && isAuthenticated !== false) {
-      initAuth()
-    }
+  // ✅ CORRECTION PRINCIPALE: Supprimer les effets de redirection et simplifier
+  // Plus d'initialisation d'auth - l'AuthProvider s'en occupe
+  // Plus de gestion de déconnexion avec redirection - l'AuthProvider s'en occupe
 
-    return () => {
-      isCancelled = true
-    }
-  }, [hasHydrated, isAuthenticated, initializeSession, redirectToLogin, handleAuthError, t])
-
-  // Gestion de la déconnexion
-  useEffect(() => {
-    if (hasHydrated && isAuthenticated === false && !isLoading && isMountedRef.current) {
-      const recentLogout = sessionStorage.getItem('recent-logout')
-      if (recentLogout) {
-        const logoutTime = parseInt(recentLogout)
-        const now = Date.now()
-      
-        if (now - logoutTime < 5000) {
-          console.log(t('chat.recentLogout'))
-          sessionStorage.removeItem('recent-logout')
-          return
-        }
-      }
-
-      const timeoutId = setTimeout(() => {
-        if (isMountedRef.current) {
-          redirectToLogin(t('chat.logout'))
-        }
-      }, 100)
-
-      return () => clearTimeout(timeoutId)
-    }
-  }, [hasHydrated, isAuthenticated, isLoading, redirectToLogin, t])
-
-  // Détection de device mobile
+  // Détection de device mobile (conservée)
   useEffect(() => {
     if (!isMountedRef.current) return
 
@@ -496,7 +437,7 @@ export default function ChatInterface() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Gestion clavier mobile
+  // Gestion clavier mobile (conservée)
   useEffect(() => {
     if (!isMobileDevice || !isMountedRef.current) return
 
@@ -537,7 +478,7 @@ export default function ChatInterface() {
     }
   }, [isMobileDevice])
 
-  // Auto-scroll
+  // Auto-scroll (conservée)
   useEffect(() => {
     if (!isMountedRef.current) return
 
@@ -557,7 +498,7 @@ export default function ChatInterface() {
     lastMessageCountRef.current = messages.length
   }, [messages.length, shouldAutoScroll, isUserScrolling])
 
-  // Gestion du scroll
+  // Gestion du scroll (conservée)
   useEffect(() => {
     const chatContainer = chatContainerRef.current
     if (!chatContainer || !isMountedRef.current) return
@@ -604,7 +545,7 @@ export default function ChatInterface() {
     }
   }, [messages.length])
 
-  // Message de bienvenue
+  // Message de bienvenue (conservée)
   useEffect(() => {
     if (isAuthenticated && !currentConversation && !hasMessages && isMountedRef.current) {
       const welcomeMessage: Message = {
@@ -631,7 +572,7 @@ export default function ChatInterface() {
     }
   }, [isAuthenticated, currentConversation, hasMessages, t, currentLanguage, setCurrentConversation])
 
-  // Update du message de bienvenue selon la langue
+  // Update du message de bienvenue selon la langue (conservée)
   useEffect(() => {
     if (currentConversation?.id === 'welcome' &&
         currentConversation.messages.length === 1 &&
@@ -652,7 +593,7 @@ export default function ChatInterface() {
     }
   }, [currentLanguage, t, currentConversation, setCurrentConversation])
 
-  // Chargement des conversations
+  // Chargement des conversations (conservée mais simplifiée)
   useEffect(() => {
     if (isAuthenticated && user?.id && isMountedRef.current && !hasLoadedConversationsRef.current) {
       hasLoadedConversationsRef.current = true
@@ -668,7 +609,7 @@ export default function ChatInterface() {
             .catch(err => {
               if (isMountedRef.current) {
                 console.error(t('chat.historyLoadError'), err)
-                handleAuthError(err)
+                handleAuthError(err) // Juste log - pas de redirection
               }
             })
         }
@@ -678,7 +619,7 @@ export default function ChatInterface() {
     }
   }, [isAuthenticated, user?.id, loadConversations, handleAuthError, t])
 
-  // Fonctions de gestion des messages
+  // Fonctions de gestion des messages (toutes conservées)
   const extractAnswerAndSources = useCallback((result: any): [string, any[]] => {
     let answerText = ""
     let sources: any[] = []
@@ -839,7 +780,7 @@ export default function ChatInterface() {
     }
   }, [inputMessage, currentConversation, addMessage, clarificationState, user, currentLanguage, cleanResponseText, handleAuthError, t, extractAnswerAndSources])
 
-  // Fonctions de feedback
+  // Fonctions de feedback (conservées)
   const handleFeedbackClick = useCallback((messageId: string, feedback: 'positive' | 'negative') => {
     if (!isMountedRef.current) return
 
@@ -962,7 +903,7 @@ export default function ChatInterface() {
     })
   }, [currentLanguage])
 
-  // Calcul des styles dynamiques pour mobile
+  // Calcul des styles dynamiques pour mobile (conservé)
   const containerStyle = useMemo(() => {
     return isMobileDevice ? {
       height: '100vh',
@@ -986,8 +927,9 @@ export default function ChatInterface() {
     }
   }, [isMobileDevice, isKeyboardVisible, keyboardHeight])
 
-  // États de chargement
-  if (!hasHydrated && !user) {	  
+  // ✅ CORRECTION PRINCIPALE: Simplifier les états de chargement
+  // Plus de redirection - juste attendre que l'AuthProvider fasse son travail
+  if (!hasHydrated) {	  
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -998,23 +940,24 @@ export default function ChatInterface() {
     )
   }
 
-  if (!isAuthenticated) {
+  if (isLoading) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">{t('chat.redirectingInProgress')}</p>
+          <p className="text-gray-600">{t('chat.loading')}</p>
         </div>
       </div>
     )
   }
 
-  if (!user) {
+  if (!isAuthenticated || !user) {
+    // Ne pas faire de redirection - laisser l'AuthProvider gérer
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">{t('chat.redirectingLogin')}</p>
+          <p className="text-gray-600">{t('chat.loading')}</p>
         </div>
       </div>
     )

@@ -64,7 +64,7 @@ const ChatInput = React.memo(({
           value={inputMessage}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder={clarificationState ? "Répondez à la question ci-dessus..." : t('chat.placeholder')}
+          placeholder={clarificationState ? t('chat.clarificationPlaceholder') : t('chat.placeholder')}
           className={`w-full h-12 px-4 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm flex items-center ${isMobileDevice ? 'ios-input-fix' : ''}`}
           disabled={isLoadingChat}
           aria-label={t('chat.placeholder')}
@@ -80,8 +80,8 @@ const ChatInput = React.memo(({
         onClick={onSendMessage}
         disabled={isLoadingChat || !inputMessage.trim()}
         className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 ${isMobileDevice ? 'mobile-send-button' : ''}`}
-        title={isLoadingChat ? 'Envoi en cours...' : 'Envoyer le message'}
-        aria-label={isLoadingChat ? 'Envoi en cours...' : 'Envoyer le message'}
+        title={isLoadingChat ? t('chat.sending') : t('chat.send')}
+        aria-label={isLoadingChat ? t('chat.sending') : t('chat.send')}
         style={{
           minWidth: '48px',
           width: '48px',
@@ -195,10 +195,10 @@ const MessageList = React.memo(({
               {message.feedback && (
                 <div className="flex items-center space-x-2">
                   <span className="text-xs text-gray-500">
-                    Merci pour votre retour !
+                    {t('chat.feedbackThanks')}
                   </span>
                   {message.feedbackComment && (
-                    <span className="text-xs text-blue-600" title={`Commentaire: ${message.feedbackComment}`}>
+                    <span className="text-xs text-blue-600" title={`${t('chat.feedbackComment')}: ${message.feedbackComment}`}>
                       💬
                     </span>
                   )}
@@ -223,7 +223,7 @@ const MessageList = React.memo(({
     <>
       {processedMessages.length === 0 ? (
         <div className="text-center text-gray-500 py-8">
-          <div className="text-sm">Aucun message à afficher</div>
+          <div className="text-sm">{t('chat.noMessages')}</div>
         </div>
       ) : (
         messageComponents
@@ -313,9 +313,9 @@ export default function ChatInterface() {
     if (isRedirectingRef.current) return
     isRedirectingRef.current = true
     
-    console.log('Redirection vers login:', reason || 'Session expirée')
+    console.log(t('chat.redirectingLogin'), reason || t('chat.sessionExpired'))
     router.push('/')
-  }, [router])
+  }, [router, t])
 
   const handleAuthError = useCallback((error: any) => {
     if (!isMountedRef.current) return
@@ -323,9 +323,9 @@ export default function ChatInterface() {
     if (error?.status === 403 || 
         error?.message?.includes('Auth session missing') ||
         error?.message?.includes('Forbidden')) {
-      redirectToLogin('Session expirée')
+      redirectToLogin(t('chat.sessionExpired'))
     }
-  }, [redirectToLogin])
+  }, [redirectToLogin, t])
 
   // Fonctions utilitaires
   const getUserInitials = useCallback((user: any): string => {
@@ -424,12 +424,11 @@ export default function ChatInterface() {
       
       try {
         const sessionValid = await initializeSession()
-        
         if (!sessionValid && isMountedRef.current && !isCancelled) {
-          redirectToLogin('Session expirée')
+          redirectToLogin(t('chat.sessionExpired'))
         }
       } catch (error) {
-        console.error('Erreur initialisation auth:', error)
+        console.error(t('chat.authInitError'), error)
         if (isMountedRef.current && !isCancelled) {
           handleAuthError(error)
         }
@@ -443,7 +442,7 @@ export default function ChatInterface() {
     return () => {
       isCancelled = true
     }
-  }, [hasHydrated, isAuthenticated, initializeSession, redirectToLogin, handleAuthError])
+  }, [hasHydrated, isAuthenticated, initializeSession, redirectToLogin, handleAuthError, t])
 
   // Gestion de la déconnexion
   useEffect(() => {
@@ -454,7 +453,7 @@ export default function ChatInterface() {
         const now = Date.now()
       
         if (now - logoutTime < 5000) {
-          console.log('Déconnexion récente détectée, pas de redirection automatique')
+          console.log(t('chat.recentLogout'))
           sessionStorage.removeItem('recent-logout')
           return
         }
@@ -462,13 +461,13 @@ export default function ChatInterface() {
 
       const timeoutId = setTimeout(() => {
         if (isMountedRef.current) {
-          redirectToLogin('Déconnexion')
+          redirectToLogin(t('chat.logout'))
         }
       }, 100)
 
       return () => clearTimeout(timeoutId)
     }
-  }, [hasHydrated, isAuthenticated, isLoading, redirectToLogin])
+  }, [hasHydrated, isAuthenticated, isLoading, redirectToLogin, t])
 
   // Détection de device mobile
   useEffect(() => {
@@ -617,8 +616,8 @@ export default function ChatInterface() {
 
       const welcomeConversation = {
         id: 'welcome',
-        title: 'Nouvelle conversation',
-        preview: 'Commencez par poser une question',
+        title: t('chat.newConversation'),
+        preview: t('chat.startQuestion'),
         message_count: 1,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -663,12 +662,12 @@ export default function ChatInterface() {
           loadConversations(user.email || user.id)
             .then(() => {
               if (isMountedRef.current) {
-                console.log('Historique chargé avec succès')
+                console.log(t('chat.historyLoaded'))
               }
             })
             .catch(err => {
               if (isMountedRef.current) {
-                console.error('Erreur chargement historique:', err)
+                console.error(t('chat.historyLoadError'), err)
                 handleAuthError(err)
               }
             })
@@ -677,7 +676,7 @@ export default function ChatInterface() {
 
       return () => clearTimeout(loadingTimeoutId)
     }
-  }, [isAuthenticated, user?.id, loadConversations, handleAuthError])
+  }, [isAuthenticated, user?.id, loadConversations, handleAuthError, t])
 
   // Fonctions de gestion des messages
   const extractAnswerAndSources = useCallback((result: any): [string, any[]] => {
@@ -685,10 +684,10 @@ export default function ChatInterface() {
     let sources: any[] = []
 
     if (result?.type === 'validation_rejected') {
-      let rejectionMessage = result.message || "Cette question ne concerne pas le domaine agricole."
+      let rejectionMessage = result.message || t('chat.rejectionMessage')
 
       if (result.validation?.suggested_topics && result.validation.suggested_topics.length > 0) {
-        rejectionMessage += "\n\n**Voici quelques sujets que je peux vous aider :**\n"
+        rejectionMessage += `\n\n**${t('chat.suggestedTopics')}**\n`
         result.validation.suggested_topics.forEach((topic: string) => {
           rejectionMessage += `• ${topic}\n`
         })
@@ -712,10 +711,10 @@ export default function ChatInterface() {
     if (typeof responseContent === 'object' && responseContent !== null) {
       answerText = String(responseContent.answer || "").trim()
       if (!answerText) {
-        answerText = "Désolé, je n'ai pas pu formater la réponse."
+        answerText = t('chat.formatError')
       }
     } else {
-      answerText = String(responseContent).trim() || "Désolé, je n'ai pas pu formater la réponse."
+      answerText = String(responseContent).trim() || t('chat.formatError')
 
       if (answerText.includes("'type': 'text'") && answerText.includes("'answer':")) {
         const match = answerText.match(/'answer': "(.+?)"/)
@@ -729,7 +728,7 @@ export default function ChatInterface() {
     }
 
     return [answerText, []]
-  }, [])
+  }, [t])
 
   const handleSendMessage = useCallback(async (text?: string) => {
     const safeText = text || inputMessage
@@ -791,7 +790,7 @@ export default function ChatInterface() {
       if (needsClarification) {
         const clarificationMessage: Message = {
           id: (Date.now() + 1).toString(),
-          content: (response.full_text || response.response) + "\n\nRépondez simplement dans le chat avec les informations demandées.",
+          content: (response.full_text || response.response) + `\n\n${t('chat.clarificationInstruction')}`,
           isUser: false,
           timestamp: new Date(),
           conversation_id: response.conversation_id
@@ -809,7 +808,7 @@ export default function ChatInterface() {
 
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
-          content: cleanedText || "Erreur: contenu vide",
+          content: cleanedText || t('chat.emptyContent'),
           isUser: false,
           timestamp: new Date(),
           conversation_id: response.conversation_id,
@@ -821,7 +820,7 @@ export default function ChatInterface() {
       }
 
     } catch (error) {
-      console.error('Erreur envoi message:', error)
+      console.error(t('chat.sendError'), error)
       handleAuthError(error)
 
       if (isMountedRef.current) {
@@ -877,11 +876,11 @@ export default function ChatInterface() {
           try {
             await conversationService.sendFeedbackComment(message.conversation_id, comment.trim())
           } catch (commentError) {
-            console.warn('Commentaire non envoyé:', commentError)
+            console.warn(t('chat.commentNotSent'), commentError)
           }
         }
       } catch (feedbackError) {
-        console.error('Erreur envoi feedback:', feedbackError)
+        console.error(t('chat.feedbackSendError'), feedbackError)
         handleAuthError(feedbackError)
         
         if (isMountedRef.current) {
@@ -894,14 +893,14 @@ export default function ChatInterface() {
       }
 
     } catch (error) {
-      console.error('Erreur générale feedback:', error)
+      console.error(t('chat.feedbackGeneralError'), error)
       throw error
     } finally {
       if (isMountedRef.current) {
         setIsSubmittingFeedback(false)
       }
     }
-  }, [feedbackModal, messages, updateMessage, handleAuthError])
+  }, [feedbackModal, messages, updateMessage, handleAuthError, t])
 
   const handleFeedbackModalClose = useCallback(() => {
     if (!isMountedRef.current) return
@@ -928,8 +927,8 @@ export default function ChatInterface() {
 
     const welcomeConversation = {
       id: 'welcome',
-      title: 'Nouvelle conversation',
-      preview: 'Commencez par poser une question',
+      title: t('chat.newConversation'),
+      preview: t('chat.startQuestion'),
       message_count: 1,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -956,12 +955,12 @@ export default function ChatInterface() {
   }, [])
 
   const getCurrentDate = useCallback(() => {
-    return new Date().toLocaleDateString('fr-FR', {
+    return new Date().toLocaleDateString(currentLanguage === 'fr' ? 'fr-FR' : 'en-US', {
       day: 'numeric',
       month: 'long',
       year: 'numeric'
     })
-  }, [])
+  }, [currentLanguage])
 
   // Calcul des styles dynamiques pour mobile
   const containerStyle = useMemo(() => {
@@ -1004,7 +1003,7 @@ export default function ChatInterface() {
       <div className="h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Redirection en cours...</p>
+          <p className="text-gray-600">{t('chat.redirectingInProgress')}</p>
         </div>
       </div>
     )
@@ -1015,7 +1014,7 @@ export default function ChatInterface() {
       <div className="h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Redirection vers la connexion...</p>
+          <p className="text-gray-600">{t('chat.redirectingLogin')}</p>
         </div>
       </div>
     )
@@ -1049,7 +1048,7 @@ export default function ChatInterface() {
               <div className="w-10 h-10 grid place-items-center">
                 <InteliaLogo className="h-8 w-auto" />
               </div>
-              <h1 className="text-lg font-medium text-gray-900 truncate">Intelia Expert</h1>
+              <h1 className="text-lg font-medium text-gray-900 truncate">{t('common.appName')}</h1>
             </div>
 
             <div className="flex items-center space-x-2">
@@ -1093,8 +1092,8 @@ export default function ChatInterface() {
               <button
                 onClick={scrollToBottom}
                 className="bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-colors"
-                title="Revenir en bas"
-                aria-label="Revenir en bas de la conversation"
+                title={t('chat.scrollToBottom')}
+                aria-label={t('chat.scrollToBottom')}
               >
                 <ArrowDownIcon />
               </button>
@@ -1124,13 +1123,13 @@ export default function ChatInterface() {
                 <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <span className="text-blue-700 text-sm font-medium">
-                      Mode clarification : répondez à la question ci-dessus
+                      {t('chat.clarificationMode')}
                     </span>
                     <button
                       onClick={() => setClarificationState(null)}
                       className="text-blue-600 hover:text-blue-800 text-sm"
                     >
-                      Annuler
+                      {t('modal.cancel')}
                     </button>
                   </div>
                 </div>
