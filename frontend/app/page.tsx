@@ -96,7 +96,7 @@ const StaticLoginPage = memo(() => (
             disabled
             className="w-full bg-gray-400 text-white font-medium py-2.5 px-4 rounded-lg cursor-not-allowed"
           >
-            <LoadingSpinner size="sm" className="mr-2" />
+            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
             Chargement...
           </button>
           

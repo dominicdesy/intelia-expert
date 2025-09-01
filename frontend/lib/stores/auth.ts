@@ -16,74 +16,74 @@ const alog = (...args: any[]) => {
   }
 }
 
-alog('Store Auth Supabase NATIF chargÃ© (singleton + React #300 fix)')
+alog('Store Auth Supabase NATIF chargé (singleton + React #300 fix)')
 
 // ============================================================================
-// SOLUTION REACT #300: ContrÃ´le du cycle de vie et Ã©tats de logout
+// SOLUTION REACT #300: Contrôle du cycle de vie et états de logout
 // ============================================================================
 
-// Variables de contrÃ´le du cycle de vie
+// Variables de contrôle du cycle de vie
 let isStoreActive = true
 let logoutInProgress = false
 
-// CORRECTION: Ne pas marquer le store comme dÃ©montÃ© sauf pendant logout rÃ©el
+// CORRECTION: Ne pas marquer le store comme démonté sauf pendant logout réel
 export const markStoreUnmounted = () => {
-  console.log('[DEBUG-LOGOUT] markStoreUnmounted appelÃ© - SEULEMENT pendant logout')
+  console.log('[DEBUG-LOGOUT] markStoreUnmounted appelé - SEULEMENT pendant logout')
   isStoreActive = false
   logoutInProgress = true
 }
 
 export const markStoreMounted = () => {
-  console.log('[DEBUG-TIMEOUT-STORE] Store rÃ©activÃ©')
+  console.log('[DEBUG-TIMEOUT-STORE] Store réactivé')
   isStoreActive = true
   logoutInProgress = false
 }
 
-// NOUVEAU: Fonction sÃ©parÃ©e pour logout seulement
+// NOUVEAU: Fonction séparée pour logout seulement
 export const markLogoutStart = () => {
-  console.log('[DEBUG-LOGOUT] DÃ©but logout - blocage setState prÃ©ventif')
+  console.log('[DEBUG-LOGOUT] Début logout - blocage setState préventif')
   logoutInProgress = true
   // NE PAS marquer isStoreActive = false ici !
 }
 
 export const markLogoutEnd = () => {
-  console.log('[DEBUG-LOGOUT] Fin logout - rÃ©activation setState')
+  console.log('[DEBUG-LOGOUT] Fin logout - réactivation setState')
   logoutInProgress = false
   // Laisser isStoreActive tel quel
 }
 
-let zustandSetFn: any = null // Sera initialisÃ© dans le store
+let zustandSetFn: any = null // Sera initialisé dans le store
 
-// CORRECTION CRITIQUE: safeSet simplifiÃ© - exÃ©cution IMMÃ‰DIATE, plus de microtÃ¢ches
+// CORRECTION CRITIQUE: safeSet simplifié - exécution IMMÉDIATE, plus de microtâches
 const safeSet = <T extends Partial<AuthState>>(
   partial: T | ((s: AuthState) => T),
   replace = false,
   debugLabel = 'unknown'
 ) => {
-  // VÃ©rifications prÃ©alables simplifiÃ©es
+  // Vérifications préalables simplifiées
   if (!isStoreActive) {
-    console.log('[DEBUG-IMMEDIATE] safeSet bloquÃ© - store inactif:', debugLabel)
+    console.log('[DEBUG-IMMEDIATE] safeSet bloqué - store inactif:', debugLabel)
     return
   }
 
-  // Bloquer seulement pendant logout ET si ce n'est pas une opÃ©ration de logout
+  // Bloquer seulement pendant logout ET si ce n'est pas une opération de logout
   if (logoutInProgress && !debugLabel.includes('logout')) {
-    console.log('[DEBUG-IMMEDIATE] safeSet bloquÃ© - logout en cours:', debugLabel)
+    console.log('[DEBUG-IMMEDIATE] safeSet bloqué - logout en cours:', debugLabel)
     return
   }
   
-  // CORRECTION FINALE: ExÃ©cution IMMÃ‰DIATE pour TOUTES les opÃ©rations - plus de microtÃ¢ches
+  // CORRECTION FINALE: Exécution IMMÉDIATE pour TOUTES les opérations - plus de microtâches
   try {
     if (zustandSetFn) {
       zustandSetFn(partial as any, replace)
-      console.log('[DEBUG-IMMEDIATE] setState appliquÃ© immÃ©diatement:', debugLabel)
+      console.log('[DEBUG-IMMEDIATE] setState appliqué immédiatement:', debugLabel)
     }
   } catch (error) {
-    console.error('[DEBUG-IMMEDIATE] Erreur setState immÃ©diat:', debugLabel, error)
+    console.error('[DEBUG-IMMEDIATE] Erreur setState immédiat:', debugLabel, error)
   }
 }
 
-// ANCIEN WRAPPER conservÃ© pour compatibilitÃ© (utilise maintenant safeSet)
+// ANCIEN WRAPPER conservé pour compatibilité (utilise maintenant safeSet)
 const safeSetState = (setFn: any, stateName: string) => {
   console.log('[DEBUG-TIMEOUT-STORE-SET] Redirection vers safeSet:', stateName)
   safeSet(() => setFn(), false, stateName)
@@ -92,13 +92,13 @@ const safeSetState = (setFn: any, stateName: string) => {
 // NOUVEAU: Import des utilitaires RememberMe
 let rememberMeUtils: any = null
 
-// Lazy loading des utilitaires RememberMe pour Ã©viter les imports circulaires
+// Lazy loading des utilitaires RememberMe pour éviter les imports circulaires
 const getRememberMeUtils = async () => {
   if (!rememberMeUtils) {
     try {
       const { rememberMeUtils: rmUtils } = await import('@/app/page_hooks')
       rememberMeUtils = rmUtils
-      console.log('[RememberMe] Utilitaires chargÃ©s dans auth store')
+      console.log('[RememberMe] Utilitaires chargés dans auth store')
     } catch (error) {
       console.warn('[RememberMe] Impossible de charger les utilitaires:', error)
       // Fallback simple si les utilitaires ne sont pas disponibles
@@ -112,7 +112,7 @@ const getRememberMeUtils = async () => {
   return rememberMeUtils
 }
 
-// Types d'Ã©tat du store
+// Types d'état du store
 interface AuthState {
   user: AppUser | null
   isLoading: boolean
@@ -139,7 +139,7 @@ interface AuthState {
 
 // Adapter utilisateur Supabase vers AppUser COMPLET
 function adaptSupabaseUser(supabaseUser: any, additionalData?: any): AppUser {
-  // Construire le nom complet de maniÃ¨re sÃ©curisÃ©e
+  // Construire le nom complet de manière sécurisée
   const rawFullName = additionalData?.full_name || 
                       supabaseUser.user_metadata?.full_name || 
                       supabaseUser.email?.split('@')[0] || 
@@ -147,7 +147,7 @@ function adaptSupabaseUser(supabaseUser: any, additionalData?: any): AppUser {
   
   const fullName = String(rawFullName).trim() || 'Utilisateur'
   
-  // SÃ©parer firstName et lastName
+  // Séparer firstName et lastName
   const nameParts = fullName.trim().split(' ')
   const firstName = nameParts[0] || ''
   const lastName = nameParts.slice(1).join(' ') || ''
@@ -186,11 +186,11 @@ function adaptSupabaseUser(supabaseUser: any, additionalData?: any): AppUser {
   }
 }
 
-// Store Supabase NATIF (avec singleton et protection dÃ©montage RENFORCÃ‰E + REMEMBER ME + REACT #300 FIX)
+// Store Supabase NATIF (avec singleton et protection démontage RENFORCÉE + REMEMBER ME + REACT #300 FIX)
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => {
-      // Initialiser la rÃ©fÃ©rence pour safeSet
+      // Initialiser la référence pour safeSet
       zustandSetFn = set
       
       return {
@@ -216,9 +216,9 @@ export const useAuthStore = create<AuthState>()(
         },
 
         initializeSession: async () => {
-          // CORRECTION: VÃ©rifier seulement logoutInProgress, pas isStoreActive
+          // CORRECTION: Vérifier seulement logoutInProgress, pas isStoreActive
           if (logoutInProgress) {
-            console.log('[DEBUG-LOGOUT] initializeSession ignorÃ© - logout en cours')
+            console.log('[DEBUG-LOGOUT] initializeSession ignoré - logout en cours')
             return false
           }
           
@@ -240,12 +240,12 @@ export const useAuthStore = create<AuthState>()(
               return false
             }
 
-            alog('Session Supabase trouvÃ©e (singleton):', session.user.email)
+            alog('Session Supabase trouvée (singleton):', session.user.email)
 
-            // RÃ©cupÃ©rer le profil utilisateur depuis Supabase
+            // Récupérer le profil utilisateur depuis Supabase
             let profileData = {}
             try {
-              const { data: profile } = await supabase
+              const { data: profile } = await (supabase as any)
                 .from('users')
                 .select('*')
                 .eq('auth_user_id', session.user.id)
@@ -253,10 +253,10 @@ export const useAuthStore = create<AuthState>()(
               
               if (profile) {
                 profileData = profile
-                alog('Profil utilisateur trouvÃ© (singleton):', profile.user_type)
+                alog('Profil utilisateur trouvé (singleton):', (profile as any).user_type)
               } else {
-                alog('Pas de profil utilisateur, crÃ©ation automatique (singleton)...')
-                const { error: insertError } = await supabase
+                alog('Pas de profil utilisateur, création automatique (singleton)...')
+                const { error: insertError } = await (supabase as any)
                   .from('users')
                   .insert({
                     auth_user_id: session.user.id,
@@ -268,15 +268,15 @@ export const useAuthStore = create<AuthState>()(
                 
                 if (!insertError) {
                   profileData = { user_type: 'producer', language: 'fr' }
-                  alog('Profil crÃ©Ã© automatiquement (singleton)')
+                  alog('Profil créé automatiquement (singleton)')
                 }
               }
             } catch (profileError) {
-              alog('Erreur profil, utilisation valeurs par dÃ©faut (singleton):', profileError)
+              alog('Erreur profil, utilisation valeurs par défaut (singleton):', profileError)
               profileData = { user_type: 'producer', language: 'fr' }
             }
 
-            // CORRECTION: VÃ©rifier seulement logoutInProgress avant setState final
+            // CORRECTION: Vérifier seulement logoutInProgress avant setState final
             if (logoutInProgress) {
               console.log('[DEBUG-LOGOUT] initializeSession interrompu - logout en cours')
               return false
@@ -290,11 +290,11 @@ export const useAuthStore = create<AuthState>()(
               lastAuthCheck: Date.now()
             }, false, 'initializeSession-success')
             
-            alog('initializeSession rÃ©ussi (singleton):', appUser.email)
+            alog('initializeSession réussi (singleton):', appUser.email)
             return true
             
           } catch (e) {
-            // CORRECTION: Pas de vÃ©rification isStoreActive ici non plus
+            // CORRECTION: Pas de vérification isStoreActive ici non plus
             if (!logoutInProgress) {
               get().handleAuthError(e, 'initializeSession')
               safeSet({ isAuthenticated: false, user: null }, false, 'initializeSession-catch')
@@ -305,7 +305,7 @@ export const useAuthStore = create<AuthState>()(
 
         checkAuth: async () => {
           if (!isStoreActive) {
-            console.log('[DEBUG-TIMEOUT-STORE] checkAuth ignorÃ© - store dÃ©montÃ©')
+            console.log('[DEBUG-TIMEOUT-STORE] checkAuth ignoré - store démonté')
             return
           }
           
@@ -318,10 +318,10 @@ export const useAuthStore = create<AuthState>()(
               return
             }
 
-            // RÃ©cupÃ©rer le profil utilisateur mis Ã  jour
+            // Récupérer le profil utilisateur mis à jour
             let profileData = {}
             try {
-              const { data: profile } = await supabase
+              const { data: profile } = await (supabase as any)
                 .from('users')
                 .select('*')
                 .eq('auth_user_id', session.user.id)
@@ -331,11 +331,11 @@ export const useAuthStore = create<AuthState>()(
                 profileData = profile
               }
             } catch (profileError) {
-              alog('Erreur rÃ©cupÃ©ration profil lors du checkAuth (singleton)')
+              alog('Erreur récupération profil lors du checkAuth (singleton)')
             }
 
             if (!isStoreActive) {
-              console.log('[DEBUG-TIMEOUT-STORE] checkAuth interrompu - store dÃ©montÃ©')
+              console.log('[DEBUG-TIMEOUT-STORE] checkAuth interrompu - store démonté')
               return
             }
 
@@ -347,7 +347,7 @@ export const useAuthStore = create<AuthState>()(
               lastAuthCheck: Date.now()
             }, false, 'checkAuth-success')
             
-            alog('checkAuth rÃ©ussi (singleton)')
+            alog('checkAuth réussi (singleton)')
             
           } catch (e) {
             if (isStoreActive) {
@@ -359,7 +359,7 @@ export const useAuthStore = create<AuthState>()(
 
         login: async (email: string, password: string) => {
           if (!isStoreActive) {
-            console.log('[DEBUG-TIMEOUT-STORE] login ignorÃ© - store dÃ©montÃ©')
+            console.log('[DEBUG-TIMEOUT-STORE] login ignoré - store démonté')
             return
           }
           
@@ -378,20 +378,20 @@ export const useAuthStore = create<AuthState>()(
             }
 
             if (!data.user) {
-              throw new Error('Aucun utilisateur retournÃ©')
+              throw new Error('Aucun utilisateur retourné')
             }
 
-            alog('Login Supabase rÃ©ussi (singleton):', data.user.email)
+            alog('Login Supabase réussi (singleton):', data.user.email)
 
             safeSet({ isLoading: false }, false, 'login-success')
             
-            // Nettoyer le flag logout aprÃ¨s connexion rÃ©ussie
+            // Nettoyer le flag logout après connexion réussie
             sessionStorage.removeItem('recent-logout')
-            console.log('[Login] Flag recent-logout nettoyÃ©')
+            console.log('[Login] Flag recent-logout nettoyé')
             
-            // DÃ©clencher la vÃ©rification auth pour redirection
+            // Déclencher la vérification auth pour redirection
             setTimeout(() => {
-              console.log('[Login] DÃ©clenchement Ã©vÃ©nement auth-state-changed')
+              console.log('[Login] Déclenchement événement auth-state-changed')
               window.dispatchEvent(new Event('auth-state-changed'))
             }, 100)
             
@@ -416,7 +416,7 @@ export const useAuthStore = create<AuthState>()(
 
         register: async (email: string, password: string, userData: Partial<AppUser>) => {
           if (!isStoreActive) {
-            console.log('[DEBUG-TIMEOUT-STORE] register ignorÃ© - store dÃ©montÃ©')
+            console.log('[DEBUG-TIMEOUT-STORE] register ignoré - store démonté')
             return
           }
           
@@ -426,7 +426,7 @@ export const useAuthStore = create<AuthState>()(
           try {
             const fullName = String(userData?.name || '').trim()
             if (!fullName || fullName.length < 2) {
-              throw new Error('Le nom doit contenir au moins 2 caractÃ¨res')
+              throw new Error('Le nom doit contenir au moins 2 caractères')
             }
 
             const supabase = getSupabaseClient()
@@ -448,14 +448,14 @@ export const useAuthStore = create<AuthState>()(
             }
 
             if (!data.user) {
-              throw new Error('Erreur lors de la crÃ©ation du compte')
+              throw new Error('Erreur lors de la création du compte')
             }
 
-            alog('Inscription Supabase rÃ©ussie (singleton):', data.user.email)
+            alog('Inscription Supabase réussie (singleton):', data.user.email)
 
             if (data.user.id) {
               try {
-                const { error: profileError } = await supabase
+                const { error: profileError } = await (supabase as any)
                   .from('users')
                   .insert({
                     auth_user_id: data.user.id,
@@ -466,19 +466,19 @@ export const useAuthStore = create<AuthState>()(
                   })
 
                 if (profileError) {
-                  alog('Erreur crÃ©ation profil (singleton):', profileError)
+                  alog('Erreur création profil (singleton):', profileError)
                 } else {
-                  alog('Profil utilisateur crÃ©Ã© (singleton)')
+                  alog('Profil utilisateur créé (singleton)')
                 }
               } catch (profileError) {
-                alog('Erreur crÃ©ation profil (singleton):', profileError)
+                alog('Erreur création profil (singleton):', profileError)
               }
             }
 
             safeSet({ isLoading: false }, false, 'register-profile-done')
             
             if (!data.session) {
-              toast.success('Compte crÃ©Ã© ! VÃ©rifiez votre email pour confirmer votre inscription.')
+              toast.success('Compte créé ! Vérifiez votre email pour confirmer votre inscription.')
             } else {
               if (isStoreActive) {
                 await get().initializeSession()
@@ -490,12 +490,12 @@ export const useAuthStore = create<AuthState>()(
               get().handleAuthError(e, 'register')
               alog('Erreur register (singleton):', e?.message)
               
-              let userMessage = e?.message || 'Erreur lors de la crÃ©ation du compte'
+              let userMessage = e?.message || 'Erreur lors de la création du compte'
               
               if (userMessage.includes('already registered')) {
-                userMessage = 'Cette adresse email est dÃ©jÃ  utilisÃ©e'
+                userMessage = 'Cette adresse email est déjà utilisée'
               } else if (userMessage.includes('Password should be at least')) {
-                userMessage = 'Le mot de passe doit contenir au moins 6 caractÃ¨res'
+                userMessage = 'Le mot de passe doit contenir au moins 6 caractères'
               }
               
               throw new Error(userMessage)
@@ -505,22 +505,22 @@ export const useAuthStore = create<AuthState>()(
           }
         },
 
-        // CORRECTION CRITIQUE: Logout simplifiÃ© sans protections bloquantes
+        // CORRECTION CRITIQUE: Logout simplifié sans protections bloquantes
         logout: async () => {
-          console.log('[DEBUG-LOGOUT] DÃ©but dÃ©connexion sans protections bloquantes')
+          console.log('[DEBUG-LOGOUT] Début déconnexion sans protections bloquantes')
           
           if (!isStoreActive) {
-            console.log('[DEBUG-TIMEOUT-STORE] logout ignorÃ© - store dÃ©montÃ©')
+            console.log('[DEBUG-TIMEOUT-STORE] logout ignoré - store démonté')
             return
           }
           
           try {
-            // Ã‰TAPE 1: PrÃ©server les donnÃ©es RememberMe AVANT le nettoyage
+            // ÉTAPE 1: Préserver les données RememberMe AVANT le nettoyage
             const rmUtils = await getRememberMeUtils()
             const preservedRememberMe = rmUtils.preserveOnLogout()
-            console.log('[DEBUG-LOGOUT] DonnÃ©es RememberMe prÃ©servÃ©es:', preservedRememberMe)
+            console.log('[DEBUG-LOGOUT] Données RememberMe préservées:', preservedRememberMe)
 
-            // Ã‰TAPE 2: DÃ©connexion Supabase
+            // ÉTAPE 2: Déconnexion Supabase
             const supabase = getSupabaseClient()
             const { error } = await supabase.auth.signOut()
             
@@ -528,17 +528,17 @@ export const useAuthStore = create<AuthState>()(
               throw new Error(error.message)
             }
 
-            // Ã‰TAPE 3: Nettoyage localStorage SÃ‰LECTIF (exclure RememberMe)
-            console.log('[DEBUG-LOGOUT] Nettoyage localStorage sÃ©lectif')
+            // ÉTAPE 3: Nettoyage localStorage SÉLECTIF (exclure RememberMe)
+            console.log('[DEBUG-LOGOUT] Nettoyage localStorage sélectif')
             
             try {
               const keysToRemove = []
               
-              // Parcourir toutes les clÃ©s localStorage
+              // Parcourir toutes les clés localStorage
               for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i)
                 if (key && key !== 'intelia-remember-me-persist') {
-                  // Supprimer les clÃ©s auth/session mais GARDER RememberMe
+                  // Supprimer les clés auth/session mais GARDER RememberMe
                   if (key.startsWith('supabase-') || 
                       key.startsWith('intelia-') && key !== 'intelia-remember-me-persist' ||
                       key.includes('auth') || 
@@ -550,24 +550,24 @@ export const useAuthStore = create<AuthState>()(
                 }
               }
               
-              // Supprimer les clÃ©s identifiÃ©es
+              // Supprimer les clés identifiées
               keysToRemove.forEach(key => {
                 try {
                   localStorage.removeItem(key)
-                  console.log(`[DEBUG-LOGOUT] SupprimÃ©: ${key}`)
+                  console.log(`[DEBUG-LOGOUT] Supprimé: ${key}`)
                 } catch (e) {
                   console.warn(`[DEBUG-LOGOUT] Impossible de supprimer ${key}:`, e)
                 }
               })
               
-              console.log(`[DEBUG-LOGOUT] ${keysToRemove.length} clÃ©s supprimÃ©es, RememberMe prÃ©servÃ©`)
+              console.log(`[DEBUG-LOGOUT] ${keysToRemove.length} clés supprimées, RememberMe préservé`)
               
             } catch (storageError) {
               console.warn('[DEBUG-LOGOUT] Erreur nettoyage localStorage:', storageError)
             }
 
-            // Ã‰TAPE 4: Nettoyage IMMÃ‰DIAT du store Zustand pour Ã©viter les boucles
-            console.log('[DEBUG-LOGOUT] Nettoyage immÃ©diat du store pour Ã©viter les boucles')
+            // ÉTAPE 4: Nettoyage IMMÉDIAT du store Zustand pour éviter les boucles
+            console.log('[DEBUG-LOGOUT] Nettoyage immédiat du store pour éviter les boucles')
             if (zustandSetFn) {
               zustandSetFn({
                 user: null,
@@ -576,34 +576,34 @@ export const useAuthStore = create<AuthState>()(
                 authErrors: [],
                 lastAuthCheck: Date.now()
               }, false)
-              console.log('[DEBUG-LOGOUT] Store Zustand nettoyÃ© immÃ©diatement')
+              console.log('[DEBUG-LOGOUT] Store Zustand nettoyé immédiatement')
             }
 
-            // Ã‰TAPE 5: Marquer la session comme terminÃ©e
+            // ÉTAPE 5: Marquer la session comme terminée
             sessionStorage.setItem('recent-logout', Date.now().toString())
             sessionStorage.removeItem('current-session')
             
-            // Ã‰TAPE 6: RÃ©activer les setState APRÃˆS nettoyage
+            // ÉTAPE 6: Réactiver les setState APRÈS nettoyage
             markLogoutEnd()
 
-            // Ã‰TAPE 5: Restaurer RememberMe APRÃˆS le nettoyage
+            // ÉTAPE 5: Restaurer RememberMe APRÈS le nettoyage
             if (preservedRememberMe) {
-              setTimeout(() => {  // Utiliser setTimeout au lieu de microtÃ¢che pour plus de sÃ©curitÃ©
+              setTimeout(() => {  // Utiliser setTimeout au lieu de microtâche pour plus de sécurité
                 try {
                   rmUtils.restoreAfterLogout(preservedRememberMe)
-                  console.log('[DEBUG-LOGOUT] RememberMe restaurÃ© aprÃ¨s nettoyage')
+                  console.log('[DEBUG-LOGOUT] RememberMe restauré après nettoyage')
                 } catch (error) {
                   console.warn('[DEBUG-LOGOUT] Erreur restauration RememberMe:', error)
                 }
               }, 100)
             }
             
-            alog('Logout rÃ©ussi avec prÃ©servation RememberMe (singleton)')
+            alog('Logout réussi avec préservation RememberMe (singleton)')
             
           } catch (e: any) {
             console.error('[DEBUG-LOGOUT] Erreur durant logout:', e)
             
-            // En cas d'erreur, nettoyer quand mÃªme le store
+            // En cas d'erreur, nettoyer quand même le store
             if (zustandSetFn) {
               zustandSetFn({
                 user: null,
@@ -615,14 +615,14 @@ export const useAuthStore = create<AuthState>()(
             }
             
             markLogoutEnd()
-            throw new Error(e?.message || 'Erreur lors de la dÃ©connexion')
+            throw new Error(e?.message || 'Erreur lors de la déconnexion')
           }
         },
 
-        // FONCTION UPDATEPROFILE CORRIGÃ‰E POUR Ã‰VITER REACT #300 avec microtÃ¢ches
+        // FONCTION UPDATEPROFILE CORRIGÉE POUR ÉVITER REACT #300 avec microtâches
         updateProfile: async (data: Partial<AppUser>) => {
           if (!isStoreActive) {
-            console.log('[DEBUG-TIMEOUT-STORE] updateProfile ignorÃ© - store dÃ©montÃ©')
+            console.log('[DEBUG-TIMEOUT-STORE] updateProfile ignoré - store démonté')
             return
           }
           
@@ -632,10 +632,10 @@ export const useAuthStore = create<AuthState>()(
           try {
             const currentUser = get().user
             if (!currentUser) {
-              throw new Error('Utilisateur non connectÃ©')
+              throw new Error('Utilisateur non connecté')
             }
 
-            // Validation des donnÃ©es avant envoi
+            // Validation des données avant envoi
             const validatedData: any = {}
             
             if (data.firstName !== undefined) {
@@ -649,7 +649,7 @@ export const useAuthStore = create<AuthState>()(
             if (data.firstName !== undefined || data.lastName !== undefined) {
               const fullName = `${data.firstName || currentUser.firstName || ''} ${data.lastName || currentUser.lastName || ''}`.trim()
               if (fullName.length < 2) {
-                throw new Error('Le nom doit contenir au moins 2 caractÃ¨res')
+                throw new Error('Le nom doit contenir au moins 2 caractères')
               }
               validatedData.full_name = fullName
             }
@@ -665,7 +665,7 @@ export const useAuthStore = create<AuthState>()(
             if (data.language !== undefined) {
               const language = String(data.language)
               if (!['fr', 'en', 'es'].includes(language)) {
-                throw new Error('Langue non supportÃ©e')
+                throw new Error('Langue non supportée')
               }
               validatedData.language = language
             }
@@ -681,7 +681,7 @@ export const useAuthStore = create<AuthState>()(
             if (data.linkedinCorporate !== undefined) validatedData.linkedin_corporate = data.linkedinCorporate
 
             const supabase = getSupabaseClient()
-            const { error } = await supabase
+            const { error } = await (supabase as any)
               .from('users')
               .update(validatedData)
               .eq('auth_user_id', currentUser.id)
@@ -691,7 +691,7 @@ export const useAuthStore = create<AuthState>()(
             }
 
             if (isStoreActive) {
-              // CORRECTION CRITIQUE: VÃ©rifier si les donnÃ©es ont vraiment changÃ©
+              // CORRECTION CRITIQUE: Vérifier si les données ont vraiment changé
               const currentState = get()
               const hasChanges = Object.keys(data).some(key => {
                 const currentValue = currentState.user?.[key as keyof AppUser]
@@ -700,27 +700,27 @@ export const useAuthStore = create<AuthState>()(
               })
               
               if (hasChanges) {
-                console.log('[updateProfile] Changements dÃ©tectÃ©s - mise Ã  jour du store')
-                // Mise Ã  jour locale avec validation - EXÃ‰CUTION IMMÃ‰DIATE
+                console.log('[updateProfile] Changements détectés - mise à jour du store')
+                // Mise à jour locale avec validation - EXÉCUTION IMMÉDIATE
                 const updatedUser = { 
                   ...currentUser,
                   ...data,
-                  // S'assurer que les champs requis restent dÃ©finis
+                  // S'assurer que les champs requis restent définis
                   email: currentUser.email, // L'email ne change jamais
                 }
                 safeSet({ user: updatedUser }, false, 'updateProfile-success')
               } else {
-                console.log('[updateProfile] Pas de changements dÃ©tectÃ©s - setState lÃ©ger')
+                console.log('[updateProfile] Pas de changements détectés - setState léger')
                 safeSet({}, false, 'updateProfile-no-changes')
               }
             }
             
-            alog('updateProfile rÃ©ussi (singleton)')
+            alog('updateProfile réussi (singleton)')
             
           } catch (e: any) {
             if (isStoreActive) {
               get().handleAuthError(e, 'updateProfile')
-              throw new Error(e?.message || 'Erreur de mise Ã  jour du profil')
+              throw new Error(e?.message || 'Erreur de mise à jour du profil')
             }
           } finally {
             safeSet({ isLoading: false }, false, 'updateProfile-finally')
@@ -729,7 +729,7 @@ export const useAuthStore = create<AuthState>()(
 
         updateConsent: async (consent: RGPDConsent) => {
           if (!isStoreActive) {
-            console.log('[DEBUG-TIMEOUT-STORE] updateConsent ignorÃ© - store dÃ©montÃ©')
+            console.log('[DEBUG-TIMEOUT-STORE] updateConsent ignoré - store démonté')
             return
           }
           
@@ -740,7 +740,7 @@ export const useAuthStore = create<AuthState>()(
             if (!currentUser) return
 
             const supabase = getSupabaseClient()
-            const { error } = await supabase
+            const { error } = await (supabase as any)
               .from('users')
               .update({ rgpd_consent: consent })
               .eq('auth_user_id', currentUser.id)
@@ -750,24 +750,24 @@ export const useAuthStore = create<AuthState>()(
             }
           } catch (e: any) {
             alog('updateConsent error (singleton):', e?.message)
-            throw new Error(e?.message || 'Erreur de mise Ã  jour du consentement')
+            throw new Error(e?.message || 'Erreur de mise à jour du consentement')
           }
         },
 
         deleteUserData: async () => {
           if (!isStoreActive) {
-            console.log('[DEBUG-TIMEOUT-STORE] deleteUserData ignorÃ© - store dÃ©montÃ©')
+            console.log('[DEBUG-TIMEOUT-STORE] deleteUserData ignoré - store démonté')
             return
           }
           
           const currentUser = get().user
-          if (!currentUser) throw new Error('Non authentifiÃ©')
+          if (!currentUser) throw new Error('Non authentifié')
 
           try {
             const supabase = getSupabaseClient()
             
             // Supprimer le profil utilisateur
-            const { error } = await supabase
+            const { error } = await (supabase as any)
               .from('users')
               .delete()
               .eq('auth_user_id', currentUser.id)
@@ -776,32 +776,32 @@ export const useAuthStore = create<AuthState>()(
               alog('Erreur suppression profil (singleton):', error)
             }
 
-            // Nettoyer aussi les donnÃ©es RememberMe lors de la suppression du compte
+            // Nettoyer aussi les données RememberMe lors de la suppression du compte
             try {
               const rmUtils = await getRememberMeUtils()
               rmUtils.clear()
-              console.log('[DEBUG-LOGOUT] RememberMe nettoyÃ© lors de la suppression du compte')
+              console.log('[DEBUG-LOGOUT] RememberMe nettoyé lors de la suppression du compte')
             } catch (error) {
               console.warn('[DEBUG-LOGOUT] Erreur nettoyage RememberMe:', error)
             }
 
-            // DÃ©connecter
+            // Déconnecter
             if (isStoreActive) {
               await get().logout()
             }
             
           } catch (e: any) {
-            throw new Error(e?.message || 'Erreur de suppression des donnÃ©es')
+            throw new Error(e?.message || 'Erreur de suppression des données')
           }
         },
 
         exportUserData: async () => {
           const currentUser = get().user
-          if (!currentUser) throw new Error('Non authentifiÃ©')
+          if (!currentUser) throw new Error('Non authentifié')
 
           try {
             const supabase = getSupabaseClient()
-            const { data: profile } = await supabase
+            const { data: profile } = await (supabase as any)
               .from('users')
               .select('*')
               .eq('auth_user_id', currentUser.id)
@@ -810,18 +810,18 @@ export const useAuthStore = create<AuthState>()(
             return {
               user_profile: profile,
               export_date: new Date().toISOString(),
-              message: 'DonnÃ©es utilisateur exportÃ©es'
+              message: 'Données utilisateur exportées'
             }
             
           } catch (e: any) {
-            throw new Error(e?.message || 'Erreur d\'exportation des donnÃ©es')
+            throw new Error(e?.message || 'Erreur d\'exportation des données')
           }
         },
 
-        // Nouvelle mÃ©thode: RÃ©cupÃ©rer le token Supabase pour l'API Expert
+        // Nouvelle méthode: Récupérer le token Supabase pour l'API Expert
         getAuthToken: async () => {
           if (!isStoreActive) {
-            console.log('[DEBUG-TIMEOUT-STORE] getAuthToken ignorÃ© - store dÃ©montÃ©')
+            console.log('[DEBUG-TIMEOUT-STORE] getAuthToken ignoré - store démonté')
             return null
           }
           
@@ -830,14 +830,14 @@ export const useAuthStore = create<AuthState>()(
             const { data: { session } } = await supabase.auth.getSession()
             
             if (session?.access_token) {
-              alog('Token Supabase rÃ©cupÃ©rÃ© pour API Expert')
+              alog('Token Supabase récupéré pour API Expert')
               return session.access_token
             }
             
             alog('Pas de token Supabase disponible')
             return null
           } catch (error) {
-            alog('Erreur rÃ©cupÃ©ration token:', error)
+            alog('Erreur récupération token:', error)
             return null
           }
         },
@@ -855,12 +855,12 @@ export const useAuthStore = create<AuthState>()(
       onRehydrateStorage: () => (state, error) => {
         if (error) console.error('Erreur rehydrate auth store:', error)
         
-        // Protection contre la rehydration pendant une dÃ©connexion rÃ©cente
+        // Protection contre la rehydration pendant une déconnexion récente
         const recentLogout = sessionStorage.getItem('recent-logout')
         if (recentLogout) {
           const logoutTime = parseInt(recentLogout)
           if (Date.now() - logoutTime < 1000) {
-            console.log('[AuthStore] Rehydration bloquÃ©e - dÃ©connexion rÃ©cente')
+            console.log('[AuthStore] Rehydration bloquée - déconnexion récente')
             if (state) {
               state.user = null
               state.isAuthenticated = false
@@ -871,17 +871,17 @@ export const useAuthStore = create<AuthState>()(
         
         if (state && isStoreActive) {
           state.setHasHydrated(true)
-          alog('Auth store rehydratÃ© (singleton)')
+          alog('Auth store rehydraté (singleton)')
         }
       },
     }
   )
 )
 
-// Fonction utilitaire exportÃ©e: Pour utilisation dans d'autres fichiers
+// Fonction utilitaire exportée: Pour utilisation dans d'autres fichiers
 export const getAuthToken = async (): Promise<string | null> => {
   if (!isStoreActive) {
-    console.log('[DEBUG-TIMEOUT-STORE] getAuthToken utilitaire ignorÃ© - store dÃ©montÃ©')
+    console.log('[DEBUG-TIMEOUT-STORE] getAuthToken utilitaire ignoré - store démonté')
     return null
   }
   
@@ -890,13 +890,13 @@ export const getAuthToken = async (): Promise<string | null> => {
     const { data: { session } } = await supabase.auth.getSession()
     
     if (session?.access_token) {
-      alog('Token Supabase rÃ©cupÃ©rÃ© (fonction utilitaire)')
+      alog('Token Supabase récupéré (fonction utilitaire)')
       return session.access_token
     }
     
     return null
   } catch (error) {
-    alog('Erreur rÃ©cupÃ©ration token (fonction utilitaire):', error)
+    alog('Erreur récupération token (fonction utilitaire):', error)
     return null
   }
 }

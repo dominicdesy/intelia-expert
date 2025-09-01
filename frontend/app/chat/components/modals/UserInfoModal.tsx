@@ -684,11 +684,11 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       if (formData.companyWebsite !== undefined) validatedData.company_website = formData.companyWebsite
       if (formData.linkedinCorporate !== undefined) validatedData.linkedin_corporate = formData.linkedinCorporate
 
-      // API call Supabase direct avec currentUser sécurisé
+      // API call Supabase direct avec typage explicite
       const { getSupabaseClient } = await import('@/lib/supabase/singleton')
       const supabase = getSupabaseClient()
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('users')
         .update(validatedData)
         .eq('auth_user_id', currentUser.id) // currentUser.id garanti non-null
