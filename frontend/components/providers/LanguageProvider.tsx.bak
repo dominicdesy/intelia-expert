@@ -1,4 +1,4 @@
-// components/providers/LanguageProvider.tsx - VERSION CORRIGÉE POUR SYNCHRONISATION
+// components/providers/LanguageProvider.tsx - VERSION AVEC ANTI-FLASH INTÉGRÉ
 'use client'
 
 import { useEffect, useRef } from 'react'
@@ -6,28 +6,55 @@ import { useTranslation } from '@/lib/languages/i18n'
 import { isValidLanguageCode } from '@/lib/languages/config'
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const { changeLanguage, currentLanguage } = useTranslation()
+  const { changeLanguage } = useTranslation()
   const hasInitializedRef = useRef(false)
   const isInitializingRef = useRef(false)
 
   useEffect(() => {
-    // Initialisation UNE SEULE FOIS - MAIS SANS ÉCRASER I18N
+    // Initialisation UNE SEULE FOIS avec protection anti-flash
     if (hasInitializedRef.current || isInitializingRef.current) return
     isInitializingRef.current = true
 
     const initializeLanguage = async () => {
       if (typeof window !== 'undefined') {
         try {
-          // ✅ CORRECTION : NE PAS forcer de langue, juste marquer comme prêt
-          // Le hook useTranslation dans i18n.ts gère déjà la logique de langue
+          // 1. PRIORITÉ ABSOLUE : localStorage Zustand
+          const zustandData = localStorage.getItem('intelia-language')
+          let selectedLang = 'fr' // Default fallback
+
+          if (zustandData) {
+            try {
+              const parsed = JSON.parse(zustandData)
+              const storedLang = parsed?.state?.currentLanguage
+              
+              if (storedLang && isValidLanguageCode(storedLang)) {
+                selectedLang = storedLang
+                console.log('[LanguageProvider] ✅ Langue trouvée dans localStorage:', storedLang)
+              }
+            } catch (error) {
+              console.warn('[LanguageProvider] Erreur parsing localStorage:', error)
+            }
+          } else {
+            // 2. FALLBACK : navigateur (seulement si aucune préférence sauvée)
+            const browserLang = navigator.language.split('-')[0]
+            selectedLang = isValidLanguageCode(browserLang) ? browserLang : 'fr'
+            console.log('[LanguageProvider] Langue depuis navigateur/défaut:', selectedLang)
+          }
+
+          // 3. FORCER la synchronisation immédiate
+          await changeLanguage(selectedLang)
           
-          console.log('[LanguageProvider] Synchronisation avec i18n, langue actuelle:', currentLanguage)
+          // 4. Émettre l'événement pour tous les composants
+          window.dispatchEvent(new CustomEvent('languageChanged', { 
+            detail: { language: selectedLang } 
+          }))
           
-          // Attendre que i18n.ts termine son initialisation
+          // 5. MARQUER COMME PRÊT pour éviter le flash
+          // Petit délai pour s'assurer que tous les composants sont synchronisés
           setTimeout(() => {
             document.documentElement.classList.add('language-ready')
             console.log('[LanguageProvider] 🎯 Interface prête - Flash évité')
-          }, 200) // Délai plus long pour laisser i18n.ts finir
+          }, 100) // 100ms suffisant pour la plupart des cas
 
         } catch (error) {
           console.error('[LanguageProvider] Erreur initialisation:', error)
@@ -41,7 +68,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     }
 
     initializeLanguage()
-  }, [currentLanguage]) // ✅ CORRECTION : Écouter currentLanguage au lieu de changeLanguage
+  }, [changeLanguage])
 
   // ÉCOUTER les changements de langue et les propager
   useEffect(() => {
@@ -51,7 +78,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
           const parsed = JSON.parse(e.newValue)
           const newLang = parsed?.state?.currentLanguage
           
-          if (newLang && isValidLanguageCode(newLang) && newLang !== currentLanguage) {
+          if (newLang && isValidLanguageCode(newLang)) {
             // Pas de flash lors des changements manuels
             document.documentElement.classList.remove('language-ready')
             
@@ -59,7 +86,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
               // Remettre la classe après le changement
               setTimeout(() => {
                 document.documentElement.classList.add('language-ready')
-              }, 100)
+              }, 50)
             })
             
             console.log('[LanguageProvider] 🔄 Changement détecté:', newLang)
@@ -72,7 +99,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
     window.addEventListener('storage', handleStorageChange)
     return () => window.removeEventListener('storage', handleStorageChange)
-  }, [changeLanguage, currentLanguage])
+  }, [changeLanguage])
 
   // Timeout de sécurité pour éviter un écran noir permanent
   useEffect(() => {
@@ -81,7 +108,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         console.warn('[LanguageProvider] ⚠️ Timeout sécurité atteint - Affichage forcé')
         document.documentElement.classList.add('language-ready')
       }
-    }, 3000) // 3 secondes max pour laisser le temps à i18n.ts
+    }, 2000) // 2 secondes max
 
     return () => clearTimeout(safetyTimer)
   }, [])
