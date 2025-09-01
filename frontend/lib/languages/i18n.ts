@@ -853,12 +853,21 @@ export const useTranslation = () => {
   }
 
   const changeLanguage = async (newLanguage: string) => {
+    // NETTOYER COMPLÈTEMENT le cache avant changement pour éviter contamination
+    Object.keys(translationsCache).forEach(lang => {
+      delete translationsCache[lang]
+    })
+    
+    // Réinitialiser les variables globales
+    globalTranslations = {} as TranslationKeys
+    globalLoading = true
+    
     // Nettoyer le cache d'erreur si on retente une langue
     errorCache.delete(newLanguage)
   
     setCurrentLanguage(newLanguage)
   
-    // ✅ NOUVEAU : Sauvegarder dans localStorage avec la structure attendue
+    // Sauvegarder dans localStorage avec la structure attendue
     try {
       const langData = {
         state: {
@@ -871,7 +880,7 @@ export const useTranslation = () => {
       console.warn('[i18n] Erreur sauvegarde langue:', error)
     }
   
-    // Précharger les traductions
+    // Forcer le rechargement complet des traductions
     await loadTranslations(newLanguage)
   
     // Émettre l'événement pour mettre à jour d'autres composants
