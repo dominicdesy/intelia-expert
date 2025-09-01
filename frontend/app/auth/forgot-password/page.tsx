@@ -26,14 +26,17 @@ export default function ForgotPasswordPage() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem('intelia-language')
+      let saved = null
+      
       if (raw) {
         const parsed = JSON.parse(raw)
-        const saved = parsed?.state?.currentLanguage
+        saved = parsed?.state?.currentLanguage
         if (saved && saved !== currentLanguage) {
           console.log(`[FORGOT] Resynchronisation immédiate: ${currentLanguage} → ${saved}`)
           changeLanguage(saved) // ⬅️ Aligner immédiatement sur la langue stockée
         }
       }
+      
       // Synchroniser <html lang="...">
       document.documentElement.setAttribute('lang', saved || currentLanguage)
     } catch (error) {
