@@ -19,19 +19,19 @@ export const HistoryMenu = React.memo(() => {
     useConversationActions()
   const { currentConversation, loadConversation } = useCurrentConversation()
 
-  // Fonction pour traduire les titres de groupes
+  // Fonction pour traduire les titres de groupes avec type assertion
   const getGroupTitle = useCallback((title: string): string => {
     switch (title) {
       case 'today':
-        return t('history.groups.today')
+        return t('history.groups.today' as any)
       case 'yesterday':
-        return t('history.groups.yesterday')
+        return t('history.groups.yesterday' as any)
       case 'thisWeek':
-        return t('history.groups.thisWeek')
+        return t('history.groups.thisWeek' as any)
       case 'thisMonth':
-        return t('history.groups.thisMonth')
+        return t('history.groups.thisMonth' as any)
       case 'older':
-        return t('history.groups.older')
+        return t('history.groups.older' as any)
       default:
         return title // Fallback au titre original si pas de traduction
     }
