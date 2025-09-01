@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { useUser, useAuth, useAuthLoading } from '@/lib/hooks/useAuthStore'
 import type { User } from '@/types'
 import { 
@@ -28,18 +28,11 @@ export function useAuthenticationLogic({
   setCurrentLanguage 
 }: UseAuthenticationLogicProps) {
   const router = useRouter()
-  const pathname = usePathname()
-  
-  const { user, isAuthenticated, hasHydrated } = useUser()
-  const { login, register, initializeSession } = useAuth()
+  const { user, isAuthenticated } = useUser()
+  const { login, register } = useAuth()
   const { isLoading } = useAuthLoading()
 
-  const hasCheckedAuth = useRef(false)
-  const redirectLock = useRef(false)
-  const sessionInitialized = useRef(false)
-  const passwordInputRef = useRef<HTMLInputElement>(null)
-  const isMounted = useRef(true)
-
+  // États simples comme ContactModal
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   
@@ -59,51 +52,19 @@ export function useAuthenticationLogic({
     companyLinkedin: ''
   })
 
-  // ✅ CORRECTION: Nouvelle fonction de redirection fiable
-  const safeRedirectToChat = useCallback(() => {
-    if (redirectLock.current || !isMounted.current) {
-      console.log('🔒 [Redirect] Déjà en cours de redirection ou démontage, ignoré')
-      return
-    }
-    
-    if (pathname?.startsWith("/chat")) {
-      console.log('🔧 [Redirect] Déjà sur /chat, pas de redirection')
-      return
-    }
-    
-    console.log('🚀 [Redirect] Redirection vers /chat depuis:', pathname)
-    redirectLock.current = true
-    
-    // Fonction de redirection avec fallback
-    const redirectWithFallback = () => {
-      try {
-        router.push('/chat')
-        console.log('🎯 [Redirect] router.push tenté')
-        
-        // Fallback au cas où router.push ne marche pas
-        setTimeout(() => {
-          if (isMounted.current && window.location.pathname !== '/chat') {
-            console.log('🔄 [Redirect] Fallback avec window.location')
-            window.location.href = '/chat'
-          }
-        }, 1000)
-      } catch (error) {
-        console.error('❌ [Redirect] Erreur router.push, utilisation window.location:', error)
-        window.location.href = '/chat'
-      }
-    }
-    
-    setTimeout(redirectWithFallback, 100)
-  }, [pathname, router])
+  // Fonction simple de redirection
+  const redirectToChat = useCallback(() => {
+    setTimeout(() => {
+      router.push('/chat')
+    }, 100)
+  }, [router])
 
+  // Gestion simple du signup
   const handleSignupChange = useCallback((field: keyof SignupData, value: string) => {
-    setSignupData(prev => {
-      const newData = { ...prev, [field]: value }
-      // Note: L'auto-remplissage du countryCode sera géré dans SignupModal
-      return newData
-    })
+    setSignupData(prev => ({ ...prev, [field]: value }))
   }, [])
 
+  // Validation simple du formulaire signup
   const validateSignupForm = useCallback((): string | null => {
     const { 
       email, password, confirmPassword, firstName, lastName, country, 
@@ -111,20 +72,20 @@ export function useAuthenticationLogic({
       linkedinProfile, companyWebsite, companyLinkedin 
     } = signupData
 
-    if (!email.trim()) return t.emailRequired
-    if (!validateEmail(email)) return t.emailInvalid
-    if (!password) return t.passwordRequired
+    if (!email.trim()) return 'Email requis'
+    if (!validateEmail(email)) return 'Email invalide'
+    if (!password) return 'Mot de passe requis'
     
     const passwordValidation = validatePassword(password)
-    if (!passwordValidation.isValid) return t.passwordTooShort
+    if (!passwordValidation.isValid) return 'Mot de passe trop faible'
     
-    if (password !== confirmPassword) return t.passwordMismatch
-    if (!firstName.trim()) return t.firstNameRequired
-    if (!lastName.trim()) return t.lastNameRequired
-    if (!country) return t.countryRequired
+    if (password !== confirmPassword) return 'Mots de passe différents'
+    if (!firstName.trim()) return 'Prénom requis'
+    if (!lastName.trim()) return 'Nom requis'
+    if (!country) return 'Pays requis'
     
     if (!validatePhone(countryCode, areaCode, phoneNumber)) {
-      return 'Format de téléphone invalide. Si vous renseignez le téléphone, tous les champs (indicatif pays, indicatif régional, numéro) sont requis.'
+      return 'Format de téléphone invalide'
     }
     
     if (linkedinProfile && !validateLinkedIn(linkedinProfile)) return 'Format LinkedIn invalide'
@@ -132,51 +93,32 @@ export function useAuthenticationLogic({
     if (companyLinkedin && !validateLinkedIn(companyLinkedin)) return 'Format LinkedIn entreprise invalide'
     
     return null
-  }, [signupData, t])
+  }, [signupData])
 
+  // Fonction de login simple
   const handleLogin = useCallback(async (e: React.FormEvent, loginFormData: LoginData) => {
     e.preventDefault()
 
     if (!loginFormData.email.trim()) {
-      throw new Error(t.emailRequired)
+      throw new Error('Email requis')
     }
 
     if (!validateEmail(loginFormData.email)) {
-      throw new Error(t.emailInvalid)
+      throw new Error('Email invalide')
     }
 
     if (!loginFormData.password) {
-      throw new Error(t.passwordRequired)
-    }
-
-    if (loginFormData.password.length < 6) {
-      throw new Error(t.passwordTooShort)
+      throw new Error('Mot de passe requis')
     }
 
     try {
-      console.log('🔐 [Login] Tentative connexion...')
-      
       await login(loginFormData.email.trim(), loginFormData.password)
-      
       rememberMeUtils.save(loginFormData.email.trim(), loginFormData.rememberMe)
-      console.log('✅ [Login] Confirmation persistence remember me:', loginFormData.rememberMe)
-      
-      console.log('✅ [Login] Connexion réussie')
-      
-      // ✅ CORRECTION: Déclencher la redirection immédiatement après la connexion
-      setTimeout(() => {
-        if (isMounted.current) {
-          console.log('🎯 [Login] Déclenchement redirection post-connexion')
-          safeRedirectToChat()
-        }
-      }, 500) // Laisser le temps aux états de se mettre à jour
+      redirectToChat()
       
     } catch (error: any) {
-      console.error('❌ [Login] Erreur connexion:', error)
-      redirectLock.current = false
-      
       if (error.message?.includes('Invalid login credentials')) {
-        throw new Error('Email ou mot de passe incorrect. Vérifiez vos identifiants.')
+        throw new Error('Email ou mot de passe incorrect')
       } else if (error.message?.includes('Email not confirmed')) {
         throw new Error('Email non confirmé. Vérifiez votre boîte mail.')
       } else if (error.message?.includes('Too many requests')) {
@@ -185,8 +127,9 @@ export function useAuthenticationLogic({
         throw new Error(error.message || 'Erreur de connexion')
       }
     }
-  }, [t, login])
+  }, [login, redirectToChat])
 
+  // Fonction de signup simple
   const handleSignup = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -196,8 +139,6 @@ export function useAuthenticationLogic({
     }
 
     try {
-      console.log('🔐 [Signup] Tentative création compte...')
-      
       const userData: Partial<User> = {
         name: `${signupData.firstName.trim()} ${signupData.lastName.trim()}`,
         user_type: 'producer',
@@ -206,8 +147,7 @@ export function useAuthenticationLogic({
       
       await register(signupData.email.trim(), signupData.password, userData)
       
-      console.log('✅ [Signup] Création compte réussie')
-      
+      // Reset du formulaire
       setSignupData({
         email: '', password: '', confirmPassword: '',
         firstName: '', lastName: '', linkedinProfile: '',
@@ -216,133 +156,47 @@ export function useAuthenticationLogic({
       })
       
     } catch (error: any) {
-      console.error('❌ [Signup] Erreur création compte:', error)
       throw new Error(error.message || 'Erreur lors de la création du compte')
     }
   }, [signupData, currentLanguage, register, validateSignupForm])
 
+  // Redirection automatique si connecté
   useEffect(() => {
-    if (!hasHydrated || !isMounted.current) return
-    
-    if (!sessionInitialized.current) {
-      sessionInitialized.current = true
-      console.log('🔄 [Session] Initialisation unique de la session')
-      initializeSession()
+    if (isAuthenticated && user) {
+      redirectToChat()
     }
-  }, [hasHydrated, initializeSession])
+  }, [isAuthenticated, user, redirectToChat])
 
-  useEffect(() => {
-    if (!hasHydrated || hasCheckedAuth.current || !isMounted.current) {
-      return
-    }
-
-    hasCheckedAuth.current = true
-    console.log('🔑 [Auth] Vérification unique de l\'authentification')
-
-    if (isAuthenticated) {
-      console.log('✅ [Auth] Déjà connecté, redirection immédiate')
-      safeRedirectToChat()
-      return
-    }
-
-    if (!sessionInitialized.current) {
-      sessionInitialized.current = true
-      console.log('🔄 [Session] Initialisation unique de la session')
-      
-      initializeSession().then((sessionFound) => {
-        if (sessionFound && isMounted.current) {
-          console.log('✅ [Session] Session trouvée, redirection automatique')
-        } else if (isMounted.current) {
-          console.log('❌ [Session] Aucune session trouvée')
-        }
-      }).catch(error => {
-        console.error('❌ [Session] Erreur initialisation:', error)
-      })
-    }
-  }, [hasHydrated, isAuthenticated, initializeSession, safeRedirectToChat])
-
-  useEffect(() => {
-    if (!hasHydrated || !hasCheckedAuth.current || !isMounted.current) {
-      return
-    }
-
-    if (!isLoading && isAuthenticated) {
-      console.log('🔄 [Auth] État auth changé, redirection sécurisée')
-      safeRedirectToChat()
-    }
-  }, [isAuthenticated, isLoading, hasHydrated, safeRedirectToChat])
-
-  useEffect(() => {
-    return () => {
-      isMounted.current = false
-    }
-  }, [])
-
-  // Écouter l'événement auth-state-changed déclenché par le store auth
-  useEffect(() => {
-    const handleAuthChange = () => {
-      if (user && isAuthenticated && isMounted.current) {
-        console.log('🚀 [Redirect] Redirection vers /chat après auth-state-changed')
-        safeRedirectToChat()
-      }
-    }
-  
-    window.addEventListener('auth-state-changed', handleAuthChange)
-    
-    // ✅ CORRECTION: Ajouter une vérification immédiate au cas où l'événement a été manqué
-    if (user && isAuthenticated && isMounted.current) {
-      console.log('🔍 [Redirect] Vérification immédiate après montage')
-      setTimeout(() => {
-        if (isMounted.current && window.location.pathname !== '/chat') {
-          console.log('⚡ [Redirect] Redirection de secours')
-          safeRedirectToChat()
-        }
-      }, 100)
-    }
-    
-    return () => window.removeEventListener('auth-state-changed', handleAuthChange)
-  }, [user, isAuthenticated, safeRedirectToChat])
-
-  // CORRECTION CRITIQUE : Mémoriser les handlers et données stables séparément
-  const stableHandlers = useMemo(() => ({
-    handleSignupChange,
-    handleLogin,
-    validateSignupForm,
-    validateEmail,
-    validatePassword,
-    validatePhone,
-    validateLinkedIn,
-    validateWebsite
-  }), [handleSignupChange, handleLogin, validateSignupForm])
-
-  const stableFormStates = useMemo(() => ({
+  // Retour simple comme ContactModal
+  return useMemo(() => ({
+    // États du formulaire
+    signupData,
     showPassword,
     setShowPassword,
     showConfirmPassword,
     setShowConfirmPassword,
     isLoading,
-    passwordInputRef
-  }), [showPassword, showConfirmPassword, isLoading])
-
-  // À ajouter temporairement pour debugging
-  console.log('DEBUG re-render authLogic OPTIMISÉ:', {
-    signupDataChanged: JSON.stringify(signupData),
-    isLoadingChanged: isLoading,
-    timestamp: new Date().toISOString(),
-    note: 'loginData retiré - plus de re-renders!'
-  });
-
-  // CORRECTION : Retour sans loginData pour éviter re-renders
-  return useMemo(() => ({
-    // États des formulaires signup uniquement
-    signupData,
     
-    // États stables (ne changent pas souvent)
-    ...stableFormStates,
-    ...stableHandlers
+    // Fonctions
+    handleSignupChange,
+    handleLogin,
+    handleSignup,
+    validateSignupForm,
+    
+    // Fonctions de validation
+    validateEmail,
+    validatePassword,
+    validatePhone,
+    validateLinkedIn,
+    validateWebsite
   }), [
     signupData,
-    stableFormStates,
-    stableHandlers
+    showPassword,
+    showConfirmPassword,
+    isLoading,
+    handleSignupChange,
+    handleLogin,
+    handleSignup,
+    validateSignupForm
   ])
 }

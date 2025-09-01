@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import type { Language } from '@/types'
 import { useTranslation } from '@/lib/languages/i18n'
@@ -9,9 +9,8 @@ import { rememberMeUtils } from './page_hooks'
 export function usePageInitialization() {
   const searchParams = useSearchParams()
   
-  // Refs pour éviter les doubles appels
-  const hasInitialized = useRef(false)
-  const isMounted = useRef(true)
+  // PATTERN SIMPLE COMME CONTACTMODAL - Pas de refs complexes
+  const { t } = useTranslation()
   
   const [currentLanguage, setCurrentLanguage] = useState<Language>('fr')
   const [isSignupMode, setIsSignupMode] = useState(false)
@@ -19,83 +18,55 @@ export function usePageInitialization() {
   const [localSuccess, setLocalSuccess] = useState('')
   const [hasHydrated, setHasHydrated] = useState(false)
 
-  // ✅ CORRECTION : Utiliser le hook centralisé directement
-  const { t } = useTranslation()
-
-  // CORRECTION : toggleMode sans dépendances changeantes
+  // Fonction simple comme ContactModal
   const toggleMode = useCallback(() => {
-    console.log('🔄 [UI] Basculement mode')
-    setIsSignupMode(prev => {
-      console.log('🔄 [UI] Mode:', !prev ? 'login → signup' : 'signup → login')
-      return !prev
-    })
+    setIsSignupMode(prev => !prev)
     setLocalError('')
     setLocalSuccess('')
-  }, []) // Pas de dépendances - fonction stable
+  }, [])
 
-  // CORRECTION : setCurrentLanguage stable sans dépendances changeantes
+  // Fonction simple pour changer la langue
   const handleSetCurrentLanguage = useCallback((newLanguage: Language) => {
-    setCurrentLanguage(prev => {
-      if (prev !== newLanguage) {
-        console.log('🌐 [Language] Changement de langue:', prev, '→', newLanguage)
-        localStorage.setItem('intelia-language', newLanguage)
-        return newLanguage
-      }
-      return prev
-    })
-  }, []) // Pas de dépendances - fonction stable
-
-  // Effects d'initialisation optimisés avec Remember Me
-  useEffect(() => {
-    if (!isMounted.current) return
-    
-    setHasHydrated(true)
-    
-    if (!hasInitialized.current) {
-      hasInitialized.current = true
-      console.log('🎯 [Init] Initialisation unique')
-      
-      // ✅ CORRECTION : Utiliser une liste de langues supportées au lieu de translations[savedLanguage]
-      const supportedLanguages = ['fr', 'en', 'es', 'ar'] // Ajustez selon vos langues supportées
-      
-      // Charger les préférences utilisateur de manière synchrone
-      const savedLanguage = localStorage.getItem('intelia-language') as Language
-      if (savedLanguage && supportedLanguages.includes(savedLanguage)) {
-        setCurrentLanguage(savedLanguage)
-      } else {
-        // Détection de langue navigateur seulement si pas de langue sauvée
-        const browserLanguage = navigator.language.substring(0, 2) as Language
-        if (supportedLanguages.includes(browserLanguage)) {
-          setCurrentLanguage(browserLanguage)
-        }
-      }
-
-      // CORRECTION : Restaurer EMAIL avec la nouvelle structure rememberMeUtils
-      const { rememberMe, lastEmail } = rememberMeUtils.load()
-      const hasRememberedEmail = rememberMe && lastEmail
-      
-      if (hasRememberedEmail && isMounted.current) {
-        setLocalSuccess(`Email restauré : ${lastEmail}. Entrez votre mot de passe.`)
-        const timer = setTimeout(() => {
-          if (isMounted.current) {
-            setLocalSuccess('')
-          }
-        }, 4000)
-        
-        // Cleanup timer si démontage
-        return () => clearTimeout(timer)
+    setCurrentLanguage(newLanguage)
+    // CORRECTION: Sauvegarder avec la structure attendue par i18n.ts
+    const langData = {
+      state: {
+        currentLanguage: newLanguage
       }
     }
-  }, []) // Dépendances vides - ne s'exécute qu'une fois
+    localStorage.setItem('intelia-language', JSON.stringify(langData))
+  }, [])
 
-  // Gestion URL callback optimisée - ✅ CORRIGÉ : utilise t directement
+  // Hydratation simple
   useEffect(() => {
-    if (!hasInitialized.current || !isMounted.current) return
+    setHasHydrated(true)
+    
+    // Charger la langue sauvegardée
+    try {
+      const storedLang = localStorage.getItem('intelia-language')
+      if (storedLang) {
+        const parsed = JSON.parse(storedLang)
+        const savedLanguage = parsed?.state?.currentLanguage
+        if (savedLanguage && ['fr', 'en', 'es', 'ar'].includes(savedLanguage)) {
+          setCurrentLanguage(savedLanguage)
+        }
+      }
+    } catch (error) {
+      console.warn('Erreur lecture langue:', error)
+    }
 
+    // Charger RememberMe
+    const { rememberMe, lastEmail } = rememberMeUtils.load()
+    if (rememberMe && lastEmail) {
+      setLocalSuccess(`Email restauré : ${lastEmail}`)
+      setTimeout(() => setLocalSuccess(''), 4000)
+    }
+  }, [])
+
+  // Gestion URL callback - VERSION SIMPLE
+  useEffect(() => {
     const authStatus = searchParams?.get('auth')
     if (!authStatus) return
-    
-    console.log('🔗 [URL] Traitement callback auth:', authStatus)
     
     if (authStatus === 'success') {
       setLocalSuccess(t('auth.success'))
@@ -105,58 +76,39 @@ export function usePageInitialization() {
       setLocalError(t('auth.incomplete'))
     }
     
-    // Nettoyer l'URL de manière optimisée
+    // Nettoyer l'URL
     try {
       const url = new URL(window.location.href)
       url.searchParams.delete('auth')
       window.history.replaceState({}, '', url.pathname)
     } catch (error) {
-      console.error('❌ [URL] Erreur nettoyage URL:', error)
+      console.error('Erreur nettoyage URL:', error)
     }
     
-    // Masquer les messages après 3 secondes
-    const timer = setTimeout(() => {
-      if (isMounted.current) {
-        setLocalSuccess('')
-        setLocalError('')
-      }
+    setTimeout(() => {
+      setLocalSuccess('')
+      setLocalError('')
     }, 3000)
-    
-    return () => clearTimeout(timer)
-  }, [searchParams, t]) // ✅ CORRECTION : t comme dépendance stable
+  }, [searchParams, t])
 
-  // Effet pour bloquer le scroll en mode signup - Optimisé
+  // Gestion scroll en mode signup
   useEffect(() => {
-    const originalBodyOverflow = document.body.style.overflow
-    const originalDocumentOverflow = document.documentElement.style.overflow
-    
     if (isSignupMode) {
       document.body.style.overflow = 'hidden'
-      document.documentElement.style.overflow = 'hidden'
     } else {
-      document.body.style.overflow = originalBodyOverflow || 'unset'
-      document.documentElement.style.overflow = originalDocumentOverflow || 'unset'
+      document.body.style.overflow = 'unset'
     }
     
-    // Cleanup optimisé au démontage
     return () => {
-      document.body.style.overflow = originalBodyOverflow || 'unset'
-      document.documentElement.style.overflow = originalDocumentOverflow || 'unset'
+      document.body.style.overflow = 'unset'
     }
   }, [isSignupMode])
 
-  // Cleanup général au démontage
-  useEffect(() => {
-    return () => {
-      isMounted.current = false
-    }
-  }, [])
-
-  // ✅ CORRECTION : Retour avec fonctions stables et t directement du hook
+  // Retour simple comme ContactModal
   return useMemo(() => ({
     currentLanguage,
-    setCurrentLanguage: handleSetCurrentLanguage, // Fonction stable
-    t, // Direct du hook useTranslation
+    setCurrentLanguage: handleSetCurrentLanguage,
+    t,
     isSignupMode,
     setIsSignupMode,
     localError,
@@ -164,16 +116,16 @@ export function usePageInitialization() {
     localSuccess,
     setLocalSuccess,
     hasHydrated,
-    hasInitialized,
-    toggleMode // Fonction stable
+    hasInitialized: { current: true }, // Toujours initialisé en mode simple
+    toggleMode
   }), [
-    currentLanguage, 
-    t, // Inclure t dans les dépendances pour détecter les changements
-    isSignupMode, 
-    localError, 
-    localSuccess, 
+    currentLanguage,
+    t,
+    isSignupMode,
+    localError,
+    localSuccess,
     hasHydrated,
-    handleSetCurrentLanguage, // Stable
-    toggleMode // Stable
+    handleSetCurrentLanguage,
+    toggleMode
   ])
 }
