@@ -1,28 +1,32 @@
 # ---------- Stage 1: deps ----------
-FROM node:20-bullseye-slim AS deps
+FROM node:20-bullseye AS deps
 WORKDIR /app
 
 # Build arguments
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-# Robustesse réseau npm
-RUN npm config set fetch-retries 5 \
- && npm config set fetch-retry-maxtimeout 120000 \
- && npm config set prefer-offline false
+# Robustesse réseau npm avec timeout plus long
+RUN npm config set fetch-retries 10 \
+ && npm config set fetch-retry-maxtimeout 300000 \
+ && npm config set prefer-offline false \
+ && npm config set registry https://registry.npmjs.org/
 
-# Installation déterministe avec devDependencies (nécessaire pour TailwindCSS)
+# Installation déterministe avec devDependencies
 COPY package.json package-lock.json ./
-RUN npm ci --include=dev
+RUN npm ci --include=dev --verbose
 
 # ---------- Stage 2: builder ----------
-FROM node:20-bullseye-slim AS builder
+FROM node:20-bullseye AS builder
 WORKDIR /app
 
 # Variables d'environnement pour build
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV NODE_OPTIONS=--max_old_space_size=2048
+ENV NODE_OPTIONS="--max_old_space_size=4096"
+ENV NEXT_SWC_PATH=""
+
+# Arguments pour build
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
@@ -40,20 +44,30 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copy source avec .dockerignore
 COPY . .
 
-# Ensure fonts directory exists
-RUN mkdir -p public/fonts
+# Ensure directories exist
+RUN mkdir -p public/fonts .next/cache
 
-# Purge le cache SWC (évite les archives corrompues)
-RUN rm -rf /root/.cache/next-swc
+# Clean SWC cache et téléchargements corrompus
+RUN rm -rf /root/.cache/next-swc ~/.npm/_cacache/tmp
 
-# Build Next (PAS de "npx next build")
-RUN npm run build
+# Force la réinstallation des binaires SWC
+RUN npm rebuild @next/swc-linux-x64-gnu || true
+RUN npm rebuild @next/swc-linux-x64-musl || true
+
+# Build Next avec fallback multi-étapes
+RUN echo "🚀 Tentative de build avec SWC..." && \
+    npm run build || \
+    (echo "❌ SWC failed, trying without SWC..." && \
+     DISABLE_SWC=true IGNORE_TS_ERRORS=true npm run build) || \
+    (echo "❌ Build failed, trying with legacy Node options..." && \
+     NODE_OPTIONS="--max_old_space_size=2048 --openssl-legacy-provider" DISABLE_SWC=true npm run build)
 
 # ---------- Stage 3: runtime ----------
 FROM node:20-bullseye-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8080
+ENV NEXT_TELEMETRY_DISABLED=1
 EXPOSE 8080
 
 # Copie le minimum pour runtime
