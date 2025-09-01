@@ -1,13 +1,56 @@
-name: Build and Deploy Docker Images
+name: Selective Docker Build and Deploy
 
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'docs/**'
+      - 'README*'
   workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force build'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false','true','frontend-only','backend-only']
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  detect-changes:
     runs-on: ubuntu-latest
+    outputs:
+      frontend-changed: ${{ steps.changes.outputs.frontend }}
+      backend-changed: ${{ steps.changes.outputs.backend }}
+      any-changes: ${{ steps.changes.outputs.frontend == 'true' || steps.changes.outputs.backend == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/**'
+            backend:
+              - 'backend/**'
+              - '.github/workflows/**'
+
+  frontend:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: |
+      needs.detect-changes.outputs.frontend-changed == 'true' || 
+      github.event.inputs.force_build == 'true' ||
+      github.event.inputs.force_build == 'frontend-only'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -17,7 +60,7 @@ jobs:
       
       - name: Build and push frontend image
         run: |
-          echo "Building frontend..."
+          echo "Building frontend (changes detected in frontend/)"
           docker build \
             --build-arg NEXT_PUBLIC_SUPABASE_URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
             --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
@@ -26,13 +69,66 @@ jobs:
           docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }}
           docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }} registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
           docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
-          echo "Frontend deployed"
+          echo "Frontend deployed successfully - Backend unchanged"
+
+  backend:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: |
+      needs.detect-changes.outputs.backend-changed == 'true' || 
+      github.event.inputs.force_build == 'true' ||
+      github.event.inputs.force_build == 'backend-only'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Login to DigitalOcean Container Registry
+        run: echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login registry.digitalocean.com -u doctl --password-stdin
       
       - name: Build and push backend image
         run: |
-          echo "Building backend..."
+          echo "Building backend (changes detected in backend/)"
           docker build -t registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }} ./backend
           docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }}
           docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }} registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
           docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
-          echo "Backend deployed"
+          echo "Backend deployed successfully - Frontend unchanged"
+
+  summary:
+    needs: [detect-changes, frontend, backend]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.detect-changes.outputs.frontend-changed }}" == "true" ]]; then
+            if [[ "${{ needs.frontend.result }}" == "success" ]]; then
+              echo "✅ **Frontend**: Built and deployed successfully" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ **Frontend**: Build failed" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "⏭️ **Frontend**: No changes detected - skipped" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [[ "${{ needs.detect-changes.outputs.backend-changed }}" == "true" ]]; then
+            if [[ "${{ needs.backend.result }}" == "success" ]]; then
+              echo "✅ **Backend**: Built and deployed successfully" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ **Backend**: Build failed" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "⏭️ **Backend**: No changes detected - skipped" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [[ "${{ needs.detect-changes.outputs.any-changes }}" == "false" ]]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "🎯 **No changes detected** - Infrastructure savings achieved!" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
