@@ -214,7 +214,7 @@ export interface TranslationKeys {
   'chat.logout': string
   'chat.historyLoaded': string
   'chat.historyLoadError': string
-  'chat.rejectionMessage': string
+  'chato.rejectionMessage': string
   'chat.suggestedTopics': string
   'chat.formatError': string
   'chat.emptyContent': string
@@ -656,7 +656,7 @@ const notificationManager = I18nNotificationManager.getInstance()
 // Cache pour les traductions chargées
 const translationsCache: Record<string, TranslationKeys> = {}
 
-// 🆕 Cache des erreurs pour éviter les boucles infinies
+// Cache des erreurs pour éviter les boucles infinies
 const errorCache = new Set<string>()
 
 // Variables globales pour la synchronisation (UTILISER DEFAULT_LANGUAGE)
@@ -671,7 +671,6 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
     getGlobalLoading: () => globalLoading,
     getGlobalLanguage: () => globalLanguage,
     getTranslationsCache: () => translationsCache,
-    // 🆕 Ajout des fonctions de debug pour le cache d'erreurs
     getErrorCache: () => errorCache,
     clearErrorCache: () => errorCache.clear(),
     notificationManager
@@ -692,9 +691,9 @@ const getStoredLanguage = (): string => {
   return DEFAULT_LANGUAGE
 }
 
-// 🔄 Fonction pour charger les traductions depuis les fichiers JSON - AVEC PROTECTION ANTI-BOUCLE
+// Fonction pour charger les traductions depuis les fichiers JSON - AVEC PROTECTION ANTI-BOUCLE
 async function loadTranslations(language: string): Promise<TranslationKeys> {
-  // 🛡️ Vérifier le cache des erreurs
+  // Vérifier le cache des erreurs
   if (errorCache.has(language)) {
     console.warn(`[i18n] Langue ${language} en cache d'erreur, utilisation de ${DEFAULT_LANGUAGE}`)
     if (language === DEFAULT_LANGUAGE) {
@@ -722,7 +721,7 @@ async function loadTranslations(language: string): Promise<TranslationKeys> {
     
     const translations = await response.json()
     
-    // 🔍 Vérifier que les traductions ne sont pas vides ou corrompues
+    // Vérifier que les traductions ne sont pas vides ou corrompues
     if (!translations || typeof translations !== 'object' || Object.keys(translations).length === 0) {
       throw new Error(`Empty or invalid translations for ${language}`)
     }
@@ -741,7 +740,7 @@ async function loadTranslations(language: string): Promise<TranslationKeys> {
   } catch (error) {
     console.error(`[i18n] ❌ Could not load translations for ${language}:`, error)
     
-    // 🚨 Ajouter à la cache des erreurs pour éviter les boucles
+    // Ajouter à la cache des erreurs pour éviter les boucles
     errorCache.add(language)
     
     // Fallback vers la langue par défaut
@@ -756,7 +755,7 @@ async function loadTranslations(language: string): Promise<TranslationKeys> {
   }
 }
 
-// Hook de traduction
+// Hook de traduction - VERSION CORRIGÉE POUR PRIORITÉ LOCALSTORAGE
 export const useTranslation = () => {
   const [currentLanguage, setCurrentLanguage] = useState<string>(DEFAULT_LANGUAGE)
   const [translations, setTranslations] = useState<TranslationKeys>({} as TranslationKeys)
@@ -772,33 +771,35 @@ export const useTranslation = () => {
     return unsubscribe
   }, [])
 
-  // Initialiser avec la langue de l'utilisateur ou celle du navigateur
+  // ✅ CORRECTION CRITIQUE : Initialiser avec PRIORITÉ ABSOLUE AU LOCALSTORAGE
   useEffect(() => {
     const getUserLanguage = async () => {
       try {
-        // D'abord vérifier le localStorage (même logique que LanguageProvider)
+        // PRIORITÉ 1: localStorage (EXCLUSIF)
         const storedLang = getStoredLanguage()
-        if (storedLang !== DEFAULT_LANGUAGE && isValidLanguageCode(storedLang)) {
+        if (storedLang && isValidLanguageCode(storedLang)) {
           console.log(`[i18n] 📦 Initialisation avec langue stockée: ${storedLang}`)
           setCurrentLanguage(storedLang)
-          return
+          return // ✅ ARRÊT OBLIGATOIRE - ne pas continuer
         }
 
-        // Puis vérifier Supabase seulement si pas de langue stockée
+        // PRIORITÉ 2: Supabase (seulement si localStorage vide)
         const { data: { session } } = await supabase.auth.getSession()
         const userLang = session?.user?.user_metadata?.language
         
         if (userLang && isValidLanguageCode(userLang)) {
           console.log(`[i18n] 📦 Initialisation avec langue Supabase: ${userLang}`)
           setCurrentLanguage(userLang)
-        } else {
-          // Utiliser la langue du navigateur comme fallback
-          const browserLang = detectBrowserLanguage()
-          console.log(`[i18n] 📦 Initialisation avec langue navigateur: ${browserLang}`)
-          setCurrentLanguage(browserLang)
+          return // ✅ ARRÊT
         }
+
+        // PRIORITÉ 3: Navigateur (dernier recours)
+        const browserLang = detectBrowserLanguage()
+        console.log(`[i18n] 📦 Initialisation avec langue navigateur: ${browserLang}`)
+        setCurrentLanguage(browserLang)
+        
       } catch (error) {
-        console.log('Utilisation de la langue par défaut ou du navigateur')
+        console.log('Erreur initialisation langue, utilisation navigateur')
         const browserLang = detectBrowserLanguage()
         setCurrentLanguage(browserLang)
       }

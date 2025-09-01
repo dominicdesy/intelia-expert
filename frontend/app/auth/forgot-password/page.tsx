@@ -20,7 +20,7 @@ export default function ForgotPasswordPage() {
   const router = useRouter()
   const { isAuthenticated, user } = useAuthStore()
   
-  // ✅ CORRECTION : utilisation directe du hook sans useMemo
+  // Utilisation directe du hook useTranslation - plus besoin de synchronisation manuelle
   const { t, currentLanguage, loading: translationsLoading, changeLanguage } = useTranslation()
   
   // États
@@ -31,53 +31,13 @@ export default function ForgotPasswordPage() {
   const [isClient, setIsClient] = useState(false)
 
   // Refs pour éviter les doubles appels
-  const hasInitialized = useRef(false)
   const hasCheckedAuth = useRef(false)
   const isMounted = useRef(true)
 
-  // ✅ CORRECTION : Hydratation côté client SANS boucle
+  // Hydratation côté client simple
   useEffect(() => {
-    if (hasInitialized.current || !isMounted.current) return
-    
-    hasInitialized.current = true
     setIsClient(true)
-    
-    // Synchronisation directe sans fonction externe pour éviter les dépendances
-    const timer = setTimeout(() => {
-      if (isMounted.current) {
-        try {
-          const savedLanguage = localStorage.getItem('intelia-language')
-          if (savedLanguage && savedLanguage !== currentLanguage) {
-            console.log('[ForgotPassword] Synchronisation avec langue système:', savedLanguage)
-            
-            // CORRECTION : Parser le JSON pour extraire la vraie langue
-            let languageCode = savedLanguage
-            try {
-              const parsed = JSON.parse(savedLanguage)
-              if (parsed?.state?.currentLanguage) {
-                languageCode = parsed.state.currentLanguage
-              }
-            } catch (parseError) {
-              // Si ce n'est pas du JSON, utiliser directement la valeur
-              languageCode = savedLanguage
-            }
-            
-            console.log('[ForgotPassword] Code langue extrait:', languageCode)
-            if (languageCode !== currentLanguage) {
-              changeLanguage(languageCode)
-            }
-          }
-        } catch (error) {
-          console.warn('[ForgotPassword] Erreur synchronisation langue:', error)
-        }
-      }
-    }, 100)
-
-    return () => clearTimeout(timer)
-  }, []) // ✅ AUCUNE dépendance pour éviter les boucles
-
-  // SUPPRESSION COMPLÈTE de l'écouteur d'événements qui cause la boucle
-  // La synchronisation se fait uniquement au chargement initial via localStorage
+  }, [])
 
   // ✅ CORRECTION : Redirection si déjà connecté AVEC protection
   useEffect(() => {
