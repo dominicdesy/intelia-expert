@@ -76,13 +76,14 @@ export default function ForgotPasswordPage() {
     return () => clearTimeout(timer)
   }, []) // ✅ AUCUNE dépendance pour éviter les boucles
 
-  // CORRECTION : Écouter les changements de langue en temps réel
+  // CORRECTION : Écouter les changements de langue SANS créer de boucle
   useEffect(() => {
     const handleLanguageChange = (event: CustomEvent) => {
       const newLanguage = event.detail.language
-      if (newLanguage && newLanguage !== currentLanguage) {
+      if (newLanguage && isMounted.current) {
         console.log('[ForgotPassword] Changement langue détecté:', newLanguage)
-        changeLanguage(newLanguage)
+        // CORRECTION : Ne pas appeler changeLanguage, juste recharger la page
+        window.location.reload()
       }
     }
 
@@ -91,7 +92,7 @@ export default function ForgotPasswordPage() {
     return () => {
       window.removeEventListener('languageChanged', handleLanguageChange as EventListener)
     }
-  }, [currentLanguage, changeLanguage])
+  }, []) // ✅ AUCUNE dépendance pour éviter les boucles
 
   // ✅ CORRECTION : Redirection si déjà connecté AVEC protection
   useEffect(() => {
