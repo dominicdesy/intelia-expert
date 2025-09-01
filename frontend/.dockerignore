@@ -1,0 +1,19 @@
+# Node modules et caches
+node_modules
+npm-debug.log
+yarn-error.log
+.next/cache
+.cache
+*.log
+
+# Tests, docs, configs inutiles en prod
+coverage
+*.md
+
+# Build outputs
+dist
+build
+
+# ⚠️ NE PAS ignorer public et fonts
+!public/
+!public/fonts/**
