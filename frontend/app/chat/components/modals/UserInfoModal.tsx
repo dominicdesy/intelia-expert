@@ -275,55 +275,13 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     }
   }, [])
 
-  // Hook de traduction standard - pas de gestion spéciale
-  const { t } = useTranslation()
-  const [translationsReady, setTranslationsReady] = useState(true)window as any).i18nDebug) {
-          (window as any).i18nDebug.notificationManager.notify()
-        }
-        
-        // 3. Marquer les traductions comme prêtes
-        setTimeout(() => {
-          if (isMountedRef.current) {
-            setTranslationsReady(true)
-            console.log('✅ [UserInfoModal] Traductions synchronisées')
-          }
-        }, 100)
-        
-      } catch (error) {
-        console.error('⚠ [UserInfoModal] Erreur synchronisation traductions:', error)
-        // Même en cas d'erreur, autoriser l'affichage
-        setTranslationsReady(true)
-      }
-    }
-    
-    forceTranslationSync()
-  }, [changeLanguage, getCurrentLanguage])
-
-  // ÉCOUTER LES CHANGEMENTS DE LANGUE EN TEMPS RÉEL
-  useEffect(() => {
-    const handleLanguageChange = (event: CustomEvent) => {
-      console.log('🔄 [UserInfoModal] Changement langue détecté:', event.detail.language)
-      if (isMountedRef.current) {
-        setTranslationsReady(false)
-        setTimeout(() => {
-          if (isMountedRef.current) {
-            setTranslationsReady(true)
-          }
-        }, 50)
-      }
-    }
-
-    window.addEventListener('languageChanged', handleLanguageChange as EventListener)
-    
-    return () => {
-      window.removeEventListener('languageChanged', handleLanguageChange as EventListener)
-    }
-  }, [])
+  // Hook de traduction avec gestion des changements de langue
+  const { t, changeLanguage, getCurrentLanguage } = useTranslation()
 
   const { validatePhoneFields } = usePhoneValidation()
   const overlayRef = useRef<HTMLDivElement>(null)
   
-  // CORRECTION 1: userDataMemo avec dépendance stable
+  // userDataMemo avec dépendance stable
   const userDataMemo = useMemo(() => {
     if (!user?.id) {
       return {
@@ -357,7 +315,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     
     debugLog('DATA', 'User data memo updated', memo)
     return memo
-  }, [user?.id]) // SEULE DÉPENDANCE: l'ID utilisateur (stable)
+  }, [user?.id])
   
   // States - Initialize with stable data
   const [isLoading, setIsLoading] = useState(false)
@@ -365,7 +323,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
   const [formErrors, setFormErrors] = useState<string[]>([])
   const [passwordErrors, setPasswordErrors] = useState<string[]>([])
   
-  // CORRECTION 2: Initialize formData sans dépendre de userDataMemo
+  // Initialize formData sans dépendre de userDataMemo
   const [formData, setFormData] = useState(() => {
     if (!user?.id) {
       return {
@@ -597,7 +555,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       const get = useAuthStore.getState
       const currentUser = get().user
       
-      // CORRECTION CRITIQUE: Vérification explicite de currentUser
+      // Vérification explicite de currentUser
       if (!currentUser?.id) {
         if (isMountedRef.current) setFormErrors([t('error.userNotConnected')])
         return
@@ -636,7 +594,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       const { error } = await (supabase as any)
         .from('users')
         .update(validatedData)
-        .eq('auth_user_id', currentUser.id) // currentUser.id garanti non-null
+        .eq('auth_user_id', currentUser.id)
 
       if (error) {
         if (isMountedRef.current) setFormErrors([error.message || t('error.updateProfile')])
@@ -832,8 +790,6 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     countriesLoading
   })
 
-  // AFFICHAGE STANDARD - Pas d'attente de synchronisation spéciale
-
   return (
     <>
       {/* Styles CSS pour les animations */}
@@ -855,7 +811,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         }
       `}</style>
 
-      {/* Overlay avec backdrop grisé - CORRECTION: Styles inline pour éviter le redimensionnement */}
+      {/* Overlay avec backdrop grisé */}
       <div 
         ref={overlayRef}
         className="fixed inset-0 z-50" 
@@ -878,7 +834,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
           animation: 'fadeIn 0.2s ease-out'
         }}
       >
-        {/* Modal Container - CORRECTION: Styles inline pour largeur immédiate */}
+        {/* Modal Container */}
         <div 
           className="bg-white rounded-lg shadow-xl max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
