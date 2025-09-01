@@ -158,6 +158,12 @@
   "history.loadingError": "[HistoryMenu] Error loading conversations:",
   "history.renderState": "[HistoryMenu] Render state:",
 
+  "history.groups.today": "Today",
+  "history.groups.yesterday": "Yesterday", 
+  "history.groups.thisWeek": "This week",
+  "history.groups.thisMonth": "This month",
+  "history.groups.older": "Older",
+
   "history.confirmClearAll": "Delete all conversations?",
   "history.loadingConversations": "Loading conversations...",
   "history.retrievingHistory": "Retrieving your history",

@@ -157,6 +157,12 @@
   "history.loadingError": "[HistoryMenu] Fout bij laden gesprekken:",
   "history.renderState": "[HistoryMenu] Renderstaat:",
 
+  "history.groups.today": "Vandaag",
+  "history.groups.yesterday": "Gisteren",
+  "history.groups.thisWeek": "Deze week",
+  "history.groups.thisMonth": "Deze maand",
+  "history.groups.older": "Ouder",
+
   "history.confirmClearAll": "Alle gesprekken verwijderen?",
   "history.loadingConversations": "Gesprekken laden...",
   "history.retrievingHistory": "Uw geschiedenis ophalen",

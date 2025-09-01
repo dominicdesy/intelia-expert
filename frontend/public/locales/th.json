@@ -157,6 +157,12 @@
   "history.loadingError": "[HistoryMenu] ข้อผิดพลาดในการโหลดการสนทนา:",
   "history.renderState": "[HistoryMenu] สถานะการ render:",
 
+  "history.groups.today": "วันนี้",
+  "history.groups.yesterday": "เมื่อวาน",
+  "history.groups.thisWeek": "สัปดาห์นี้",
+  "history.groups.thisMonth": "เดือนนี้",
+  "history.groups.older": "เก่ากว่า",
+
   "history.confirmClearAll": "ลบการสนทนาทั้งหมด?",
   "history.loadingConversations": "กำลังโหลดการสนทนา...",
   "history.retrievingHistory": "กำลังดึงประวัติของคุณ",

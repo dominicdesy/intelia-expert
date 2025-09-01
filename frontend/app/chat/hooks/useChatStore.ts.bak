@@ -35,7 +35,7 @@ interface ChatStoreState {
   setCurrentConversation: (conversation: ConversationWithMessages | null) => void
 }
 
-// ==================== FONCTION UTILITAIRE GROUPEMENT AVEC CLÉS DE TRADUCTION ====================
+// ==================== FONCTION UTILITAIRE GROUPEMENT ====================
 const groupConversationsByDate = (conversations: Conversation[]): ConversationGroup[] => {
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -43,13 +43,12 @@ const groupConversationsByDate = (conversations: Conversation[]): ConversationGr
   const thisWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
   const thisMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
 
-  // Utilisation de clés de traduction au lieu de textes hardcodés
   const groups: ConversationGroup[] = [
-    { title: "today", conversations: [] },
-    { title: "yesterday", conversations: [] },
-    { title: "thisWeek", conversations: [] },
-    { title: "thisMonth", conversations: [] },
-    { title: "older", conversations: [] }
+    { title: "Aujourd'hui", conversations: [] },
+    { title: "Hier", conversations: [] },
+    { title: "Cette semaine", conversations: [] },
+    { title: "Ce mois-ci", conversations: [] },
+    { title: "Plus ancien", conversations: [] }
   ]
 
   conversations.forEach(conv => {

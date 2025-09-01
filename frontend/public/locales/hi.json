@@ -158,6 +158,12 @@
   "history.loadingError": "[HistoryMenu] बातचीत लोड करने में त्रुटि:",
   "history.renderState": "[HistoryMenu] रेंडर स्थिति:",
 
+  "history.groups.today": "आज",
+  "history.groups.yesterday": "कल",
+  "history.groups.thisWeek": "इस हफ्ते",
+  "history.groups.thisMonth": "इस महीने",
+  "history.groups.older": "पुराना",
+
   "history.confirmClearAll": "सभी बातचीत हटाएं?",
   "history.loadingConversations": "बातचीत लोड की जा रही है...",
   "history.retrievingHistory": "आपका इतिहास पुनर्प्राप्त किया जा रहा है",

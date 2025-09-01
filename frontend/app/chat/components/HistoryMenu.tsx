@@ -185,7 +185,9 @@ export const HistoryMenu = React.memo(() => {
         {/* En-tête de groupe */}
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
           <div className="flex items-center space-x-2">
-            <span className="text-sm font-medium text-gray-700">{group.title}</span>
+            <span className="text-sm font-medium text-gray-700">
+              {t(`history.groups.${group.title}`)}
+            </span>
             <span className="text-xs text-gray-400">({group.conversations.length})</span>
           </div>
         </div>

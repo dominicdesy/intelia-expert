@@ -156,6 +156,12 @@
   "history.loadingError": "[HistoryMenu] Erro carregando conversas:",
   "history.renderState": "[HistoryMenu] Estado do render:",
 
+  "history.groups.today": "Hoje",
+  "history.groups.yesterday": "Ontem",
+  "history.groups.thisWeek": "Esta semana",
+  "history.groups.thisMonth": "Este mês",
+  "history.groups.older": "Mais antigo",
+
   "history.confirmClearAll": "Excluir todas as conversas?",
   "history.loadingConversations": "Carregando conversas...",
   "history.retrievingHistory": "Recuperando seu histórico",

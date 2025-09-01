@@ -210,6 +210,12 @@
   "history.loadingError": "[HistoryMenu] Error cargando conversaciones:",
   "history.renderState": "[HistoryMenu] Estado del renderizado:",
 
+  "history.groups.today": "Hoy",
+  "history.groups.yesterday": "Ayer",
+  "history.groups.thisWeek": "Esta semana",
+  "history.groups.thisMonth": "Este mes",
+  "history.groups.older": "Más antiguo",
+
   "profile.title": "Perfil",
   "profile.personalInfo": "Información personal",
   "profile.professionalInfo": "Información profesional",

@@ -157,6 +157,12 @@
   "history.loadingError": "[HistoryMenu] 加载对话错误:",
   "history.renderState": "[HistoryMenu] 渲染状态:",
 
+  "history.groups.today": "今天",
+  "history.groups.yesterday": "昨天",
+  "history.groups.thisWeek": "本周",
+  "history.groups.thisMonth": "本月",
+  "history.groups.older": "更早",
+
   "history.confirmClearAll": "删除所有对话？",
   "history.loadingConversations": "加载对话中...",
   "history.retrievingHistory": "正在检索您的历史记录",

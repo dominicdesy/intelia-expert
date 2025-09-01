@@ -157,6 +157,12 @@
   "history.loadingError": "[HistoryMenu] Błąd ładowania rozmów:",
   "history.renderState": "[HistoryMenu] Stan renderowania:",
 
+  "history.groups.today": "Dzisiaj",
+  "history.groups.yesterday": "Wczoraj",
+  "history.groups.thisWeek": "Ten tydzień",
+  "history.groups.thisMonth": "Ten miesiąc",
+  "history.groups.older": "Starsze",
+
   "history.confirmClearAll": "Usunąć wszystkie rozmowy?",
   "history.loadingConversations": "Ładowanie rozmów...",
   "history.retrievingHistory": "Pobieranie twojej historii",

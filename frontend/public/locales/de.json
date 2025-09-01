@@ -157,6 +157,12 @@
   "history.loadingError": "[HistoryMenu] Fehler beim Laden der Unterhaltungen:",
   "history.renderState": "[HistoryMenu] Render-Status:",
 
+  "history.groups.today": "Heute",
+  "history.groups.yesterday": "Gestern",
+  "history.groups.thisWeek": "Diese Woche",
+  "history.groups.thisMonth": "Diesen Monat",
+  "history.groups.older": "Älter",
+
   "history.confirmClearAll": "Alle Unterhaltungen löschen?",
   "history.loadingConversations": "Lade Unterhaltungen...",
   "history.retrievingHistory": "Abrufen Ihres Verlaufs",
