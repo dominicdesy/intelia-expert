@@ -40,6 +40,21 @@ interface Country {
   flag?: string
 }
 
+// Interface TypeScript pour les données utilisateur
+interface UserUpdateData {
+  first_name?: string
+  last_name?: string
+  full_name?: string
+  country_code?: string
+  area_code?: string
+  phone_number?: string
+  country?: string
+  linkedin_profile?: string
+  company_name?: string
+  company_website?: string
+  linkedin_corporate?: string
+}
+
 const useCountries = () => {
   const [countries, setCountries] = useState<Country[]>(fallbackCountries)
   const [loading, setLoading] = useState(false)
@@ -260,11 +275,11 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     }
   }, [])
 
-  // ✅ CORRECTION CRITIQUE: Hook de traduction avec synchronisation forcée
+  // CORRECTION CRITIQUE: Hook de traduction avec synchronisation forcée
   const { t, changeLanguage, getCurrentLanguage } = useTranslation()
   const [translationsReady, setTranslationsReady] = useState(false)
   
-  // ✅ SYNCHRONISATION FORCÉE AU MONTAGE
+  // SYNCHRONISATION FORCÉE AU MONTAGE
   useEffect(() => {
     const forceTranslationSync = async () => {
       try {
@@ -305,7 +320,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     forceTranslationSync()
   }, [changeLanguage, getCurrentLanguage])
 
-  // ✅ ÉCOUTER LES CHANGEMENTS DE LANGUE EN TEMPS RÉEL
+  // ÉCOUTER LES CHANGEMENTS DE LANGUE EN TEMPS RÉEL
   useEffect(() => {
     const handleLanguageChange = (event: CustomEvent) => {
       console.log('🔄 [UserInfoModal] Changement langue détecté:', event.detail.language)
@@ -571,7 +586,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     }))
   }, [])
 
-  // Fonction handleProfileSave corrigée avec traductions
+  // Fonction handleProfileSave corrigée avec traductions et sécurité TypeScript
   const handleProfileSave = useCallback(async () => {
     if (!isMountedRef.current || isLoading) return
     setIsLoading(true)
@@ -636,13 +651,15 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       const { useAuthStore } = await import('@/lib/stores/auth')
       const get = useAuthStore.getState
       const currentUser = get().user
-      if (!currentUser) {
+      
+      // CORRECTION CRITIQUE: Vérification explicite de currentUser
+      if (!currentUser?.id) {
         if (isMountedRef.current) setFormErrors([t('error.userNotConnected')])
         return
       }
 
-      // Validation des données avant envoi
-      const validatedData: Record<string, any> = {}
+      // Validation des données avant envoi avec interface TypeScript
+      const validatedData: UserUpdateData = {}
 
       if (formData.firstName !== undefined) {
         validatedData.first_name = String(formData.firstName).trim()
@@ -667,14 +684,14 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       if (formData.companyWebsite !== undefined) validatedData.company_website = formData.companyWebsite
       if (formData.linkedinCorporate !== undefined) validatedData.linkedin_corporate = formData.linkedinCorporate
 
-      // API call Supabase direct
+      // API call Supabase direct avec currentUser sécurisé
       const { getSupabaseClient } = await import('@/lib/supabase/singleton')
       const supabase = getSupabaseClient()
 
       const { error } = await supabase
         .from('users')
-        .update(validatedData as any)
-        .eq('auth_user_id', currentUser?.id)
+        .update(validatedData)
+        .eq('auth_user_id', currentUser.id) // currentUser.id garanti non-null
 
       if (error) {
         if (isMountedRef.current) setFormErrors([error.message || t('error.updateProfile')])
@@ -870,7 +887,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     countriesLoading
   })
 
-  // ✅ AFFICHAGE CONDITIONNEL : Attendre que les traductions soient prêtes
+  // AFFICHAGE CONDITIONNEL : Attendre que les traductions soient prêtes
   if (!translationsReady) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
