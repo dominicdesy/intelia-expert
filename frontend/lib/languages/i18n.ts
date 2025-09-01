@@ -214,7 +214,7 @@ export interface TranslationKeys {
   'chat.logout': string
   'chat.historyLoaded': string
   'chat.historyLoadError': string
-  'chato.rejectionMessage': string
+  'chat.rejectionMessage': string
   'chat.suggestedTopics': string
   'chat.formatError': string
   'chat.emptyContent': string
