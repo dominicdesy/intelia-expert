@@ -275,30 +275,9 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     }
   }, [])
 
-  // CORRECTION CRITIQUE: Hook de traduction avec synchronisation forcée
-  const { t, changeLanguage, getCurrentLanguage } = useTranslation()
-  const [translationsReady, setTranslationsReady] = useState(false)
-  
-  // SYNCHRONISATION FORCÉE AU MONTAGE
-  useEffect(() => {
-    const forceTranslationSync = async () => {
-      try {
-        console.log('🔄 [UserInfoModal] Synchronisation traductions au montage')
-        
-        // 1. Lire la langue du localStorage
-        const storedLang = localStorage.getItem('intelia-language')
-        if (storedLang) {
-          const parsed = JSON.parse(storedLang)
-          const currentLang = parsed?.state?.currentLanguage
-          
-          if (currentLang && currentLang !== getCurrentLanguage()) {
-            console.log('🔄 [UserInfoModal] Forcer changement langue:', currentLang)
-            await changeLanguage(currentLang)
-          }
-        }
-        
-        // 2. Forcer une notification globale
-        if (typeof window !== 'undefined' && (window as any).i18nDebug) {
+  // Hook de traduction standard - pas de gestion spéciale
+  const { t } = useTranslation()
+  const [translationsReady, setTranslationsReady] = useState(true)window as any).i18nDebug) {
           (window as any).i18nDebug.notificationManager.notify()
         }
         
@@ -853,17 +832,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     countriesLoading
   })
 
-  // AFFICHAGE CONDITIONNEL : Attendre que les traductions soient prêtes
-  if (!translationsReady) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div className="bg-white rounded-lg p-6 flex items-center space-x-3">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-          <span className="text-gray-700">Chargement...</span>
-        </div>
-      </div>
-    )
-  }
+  // AFFICHAGE STANDARD - Pas d'attente de synchronisation spéciale
 
   return (
     <>
@@ -893,6 +862,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         onClick={handleClose}
         data-debug="modal-overlay"
         style={{
+          position: 'fixed',
           width: '100vw',
           height: '100vh',
           top: 0,
@@ -904,7 +874,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '16px',
+          padding: '20px',
           animation: 'fadeIn 0.2s ease-out'
         }}
       >
@@ -915,9 +885,13 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
           data-modal="user-info"
           data-debug="modal-content"
           style={{
+            position: 'absolute',
+            top: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
             width: '95vw',
             maxWidth: '700px',
-            maxHeight: '85vh',
+            maxHeight: '80vh',
             minWidth: '320px',
             animation: 'modalSlideIn 0.3s ease-out'
           }}
