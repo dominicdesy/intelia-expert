@@ -49,7 +49,23 @@ export default function ForgotPasswordPage() {
           const savedLanguage = localStorage.getItem('intelia-language')
           if (savedLanguage && savedLanguage !== currentLanguage) {
             console.log('[ForgotPassword] Synchronisation avec langue système:', savedLanguage)
-            changeLanguage(savedLanguage)
+            
+            // CORRECTION : Parser le JSON pour extraire la vraie langue
+            let languageCode = savedLanguage
+            try {
+              const parsed = JSON.parse(savedLanguage)
+              if (parsed?.state?.currentLanguage) {
+                languageCode = parsed.state.currentLanguage
+              }
+            } catch (parseError) {
+              // Si ce n'est pas du JSON, utiliser directement la valeur
+              languageCode = savedLanguage
+            }
+            
+            console.log('[ForgotPassword] Code langue extrait:', languageCode)
+            if (languageCode !== currentLanguage) {
+              changeLanguage(languageCode)
+            }
           }
         } catch (error) {
           console.warn('[ForgotPassword] Erreur synchronisation langue:', error)
