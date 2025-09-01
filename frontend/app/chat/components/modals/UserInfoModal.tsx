@@ -673,7 +673,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       const { error } = await supabase
         .from('users')
         .update(validatedData)
-        .eq('auth_user_id', currentUser.id)
+        .eq('auth_user_id', currentUser?.id)
 
       if (error) {
         if (isMountedRef.current) setFormErrors([error.message || t('error.updateProfile')])
