@@ -20,13 +20,8 @@ export default function ForgotPasswordPage() {
   const router = useRouter()
   const { isAuthenticated, user } = useAuthStore()
   
-  // ✅ CORRECTION CRITIQUE : Stabiliser les données de traduction
-  const translationData = useMemo(() => {
-    const { t, currentLanguage, loading, changeLanguage } = useTranslation()
-    return { t, currentLanguage, loading, changeLanguage }
-  }, []) // Pas de dépendances pour éviter les re-créations
-  
-  const { t, currentLanguage, loading: translationsLoading, changeLanguage } = translationData
+  // ✅ CORRECTION : utilisation directe du hook sans useMemo
+  const { t, currentLanguage, loading: translationsLoading, changeLanguage } = useTranslation()
   
   // États
   const [email, setEmail] = useState('')
@@ -40,20 +35,6 @@ export default function ForgotPasswordPage() {
   const hasCheckedAuth = useRef(false)
   const isMounted = useRef(true)
 
-  // ✅ CORRECTION : Fonction de synchronisation stable
-  const syncWithMainSystem = useCallback(() => {
-    try {
-      const savedLanguage = localStorage.getItem('intelia-language')
-      
-      if (savedLanguage && savedLanguage !== currentLanguage) {
-        console.log('[ForgotPassword] Synchronisation avec langue système:', savedLanguage)
-        changeLanguage(savedLanguage)
-      }
-    } catch (error) {
-      console.warn('[ForgotPassword] Erreur synchronisation langue:', error)
-    }
-  }, [currentLanguage, changeLanguage])
-
   // ✅ CORRECTION : Hydratation côté client SANS boucle
   useEffect(() => {
     if (hasInitialized.current || !isMounted.current) return
@@ -61,15 +42,23 @@ export default function ForgotPasswordPage() {
     hasInitialized.current = true
     setIsClient(true)
     
-    // Délai court pour permettre à useTranslation de s'initialiser
+    // Synchronisation directe sans fonction externe pour éviter les dépendances
     const timer = setTimeout(() => {
       if (isMounted.current) {
-        syncWithMainSystem()
+        try {
+          const savedLanguage = localStorage.getItem('intelia-language')
+          if (savedLanguage && savedLanguage !== currentLanguage) {
+            console.log('[ForgotPassword] Synchronisation avec langue système:', savedLanguage)
+            changeLanguage(savedLanguage)
+          }
+        } catch (error) {
+          console.warn('[ForgotPassword] Erreur synchronisation langue:', error)
+        }
       }
     }, 100)
 
     return () => clearTimeout(timer)
-  }, [syncWithMainSystem]) // ✅ syncWithMainSystem est maintenant stable
+  }, []) // ✅ AUCUNE dépendance pour éviter les boucles
 
   // ✅ CORRECTION : Redirection si déjà connecté AVEC protection
   useEffect(() => {
@@ -90,7 +79,7 @@ export default function ForgotPasswordPage() {
     }
   }, [isClient, isAuthenticated, user, translationsLoading, router])
 
-  // ✅ CORRECTION : Fonction de soumission stable
+  // CORRECTION : Fonction de soumission stable
   const handleSubmit = useCallback(async () => {
     setError('')
     setSuccess('')
