@@ -729,6 +729,9 @@ class LoggingManager:
 _global_logging_manager = None
 _initialization_lock = threading.Lock()
 
+# Alias pour compatibilité avec les autres modules
+AnalyticsManager = LoggingManager
+
 def get_logging_manager(db_config: dict = None) -> LoggingManager:
     """Récupère l'instance globale du LoggingManager (singleton)"""
     global _global_logging_manager
@@ -798,3 +801,6 @@ def track_openai_call(
         )
     except Exception as e:
         logger.error(f"⛔ Erreur tracking OpenAI: {e}")
+
+# Alias pour compatibilité avec les autres modules
+AnalyticsManager = LoggingManager

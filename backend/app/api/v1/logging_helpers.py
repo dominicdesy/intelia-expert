@@ -9,7 +9,9 @@ import logging
 import threading
 from typing import Dict, Any, Optional
 
-from .logging_manager import AnalyticsManager
+from .logging_manager import LoggingManager
+AnalyticsManager = LoggingManager  # Alias pour compatibilité
+
 from .logging_cache import clear_analytics_cache, get_cache_stats
 
 logger = logging.getLogger(__name__)
