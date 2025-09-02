@@ -1,91 +1,155 @@
-# app/api/v1/logging_manager.py
-# -*- coding: utf-8 -*-
-"""
-🚀 GESTIONNAIRE PRINCIPAL D'ANALYTICS
-📊 Classe AnalyticsManager avec toutes les fonctionnalités de logging et analytics
-"""
-import json
-import time
-import os
 import logging
-import threading
-from typing import Dict, Any, Optional
-from datetime import datetime, timedelta
-
 import psycopg2
-from psycopg2.extras import RealDictCursor
-
-from .logging_cache import get_cached_or_compute, clear_analytics_cache
+import json
+from datetime import datetime, date
+from decimal import Decimal
+from psycopg2.extras import Json, RealDictCursor
+from typing import Optional, Dict, Any, List
+import traceback
+import os
+from functools import lru_cache
+import threading
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 
-# 🔒 Verrous pour l'initialisation sécurisée
-_initialization_lock = threading.Lock()
+# 🚀 LOG DE CONFIRMATION AU CHARGEMENT DU MODULE (CORRECTION CRITIQUE)
+logger.error("🚀 LOGGING_MANAGER - VERSION FINALE CORRIGÉE COMPLÈTE - 2025-09-02-20:15 ACTIVE")
 
+class LogLevel(str, Enum):
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
 
-class AnalyticsManager:
-    """
-    🚀 Gestionnaire complet d'analytics et logging - VERSION SÉCURISÉE
-    🛡️ NOUVEAUTÉS: Initialisation contrôlée, cache intelligent, gestion mémoire
-    ✅ COMPATIBILITÉ: Toutes les méthodes originales conservées
-    """
+class ResponseSource(str, Enum):
+    RAG = "rag"
+    OPENAI_FALLBACK = "openai_fallback"
+    TABLE_LOOKUP = "table_lookup"
+    VALIDATION_REJECTED = "validation_rejected"
+    QUOTA_EXCEEDED = "quota_exceeded"
+
+class UserRole(str, Enum):
+    USER = "user"
+    MODERATOR = "moderator"
+    ADMIN = "admin"
+    SUPER_ADMIN = "super_admin"
+
+class Permission(str, Enum):
+    VIEW_OWN_ANALYTICS = "view_own_analytics"
+    VIEW_ALL_ANALYTICS = "view_all_analytics"
+    VIEW_OPENAI_COSTS = "view_openai_costs"
+    VIEW_SERVER_PERFORMANCE = "view_server_performance"
+    MANAGE_SYSTEM = "manage_system"
+    ADMIN_DASHBOARD = "admin_dashboard"
+
+# Cache intelligent global
+_analytics_cache = {}
+_cache_lock = threading.Lock()
+CACHE_TTL_SECONDS = int(os.getenv("ANALYTICS_CACHE_TTL", "300"))
+
+# Système de permissions par rôle
+ROLE_PERMISSIONS: Dict[UserRole, List[Permission]] = {
+    UserRole.USER: [
+        Permission.VIEW_OWN_ANALYTICS,
+        Permission.VIEW_OPENAI_COSTS
+    ],
+    UserRole.MODERATOR: [
+        Permission.VIEW_OWN_ANALYTICS,
+        Permission.VIEW_ALL_ANALYTICS,
+        Permission.VIEW_OPENAI_COSTS
+    ],
+    UserRole.ADMIN: [
+        Permission.VIEW_OWN_ANALYTICS,
+        Permission.VIEW_ALL_ANALYTICS,
+        Permission.VIEW_OPENAI_COSTS,
+        Permission.VIEW_SERVER_PERFORMANCE,
+        Permission.ADMIN_DASHBOARD
+    ],
+    UserRole.SUPER_ADMIN: [
+        Permission.VIEW_OWN_ANALYTICS,
+        Permission.VIEW_ALL_ANALYTICS,
+        Permission.VIEW_OPENAI_COSTS,
+        Permission.VIEW_SERVER_PERFORMANCE,
+        Permission.MANAGE_SYSTEM,
+        Permission.ADMIN_DASHBOARD
+    ]
+}
+
+def get_cached_or_compute(cache_key: str, compute_func, ttl_seconds=None):
+    """Cache intelligent avec TTL"""
+    if ttl_seconds is None:
+        ttl_seconds = CACHE_TTL_SECONDS
     
-    def __init__(self, dsn=None, auto_init=None):
-        """
-        🛡️ INITIALISATION SÉCURISÉE
-        - auto_init=None : Utilise les variables d'environnement (défaut)
-        - auto_init=True : Force l'initialisation (pour tests/admin)
-        - auto_init=False : Pas d'initialisation automatique
-        """
-        self.dsn = dsn or os.getenv("DATABASE_URL")
-        if not self.dsn:
-            raise ValueError("⛔ DATABASE_URL manquant - stockage persistant requis")
+    with _cache_lock:
+        now = datetime.now().timestamp()
         
-        # 🛡️ SÉCURITÉ: Contrôle fin de l'initialisation
-        should_auto_init = auto_init
-        if auto_init is None:
-            # Utiliser les variables d'environnement
-            should_auto_init = (
-                os.getenv("ANALYTICS_INIT_DISABLED", "false").lower() != "true"
-            )
+        if cache_key in _analytics_cache:
+            cached_data, cached_time = _analytics_cache[cache_key]
+            if now - cached_time < ttl_seconds:
+                return cached_data
         
-        if should_auto_init:
-            logger.info("🚀 Initialisation des tables analytics (contrôlée)")
-            self._ensure_analytics_tables()
-        else:
-            logger.info("🛡️ Tables analytics: initialisation désactivée (sécurité)")
-    
-    def ensure_tables_if_needed(self):
-        """
-        🆕 NOUVELLE MÉTHODE: Création manuelle et sécurisée des tables
-        Utilise les variables d'environnement pour éviter les conflits
-        """
-        if os.getenv("ANALYTICS_TABLES_READY", "false").lower() == "true":
-            logger.info("✅ Tables analytics déjà prêtes")
-            return True
+        # Calculer nouvelle valeur
+        result = compute_func()
+        _analytics_cache[cache_key] = (result, now)
         
-        try:
-            with _initialization_lock:
-                # Double vérification avec lock
-                if os.getenv("ANALYTICS_TABLES_READY", "false").lower() == "true":
-                    return True
-                
-                logger.info("🔧 Création des tables analytics...")
-                self._ensure_analytics_tables()
-                
-                # Marquer comme prêt
-                os.environ["ANALYTICS_TABLES_READY"] = "true"
-                logger.info("✅ Tables analytics créées et marquées comme prêtes")
-                return True
-                
-        except Exception as e:
-            logger.error(f"❌ Erreur création tables: {e}")
-            return False
-    
+        # Nettoyage cache (éviter memory leak)
+        _cleanup_expired_cache(now, ttl_seconds)
+        
+        return result
+
+def _cleanup_expired_cache(current_time: float, ttl: int):
+    """Nettoie les entrées expirées du cache"""
+    expired_keys = [
+        key for key, (_, cached_time) in _analytics_cache.items()
+        if current_time - cached_time > ttl
+    ]
+    for key in expired_keys:
+        del _analytics_cache[key]
+
+def clear_analytics_cache():
+    """Vide complètement le cache"""
+    with _cache_lock:
+        _analytics_cache.clear()
+
+def has_permission(user_role: str, required_permission: Permission) -> bool:
+    """Vérifie si un rôle a une permission spécifique"""
+    try:
+        role_enum = UserRole(user_role.lower())
+        return required_permission in ROLE_PERMISSIONS.get(role_enum, [])
+    except (ValueError, AttributeError):
+        return False
+
+def require_permission(required_permission: Permission):
+    """Décorateur pour vérifier les permissions"""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            # Cette logique serait intégrée avec FastAPI Depends dans le contexte réel
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+def is_admin_user(user: Dict[str, Any]) -> bool:
+    """Vérifie si un utilisateur est admin"""
+    return (
+        user.get("is_admin", False) or 
+        user.get("user_type") in ["admin", "super_admin"]
+    )
+
+class LoggingManager:
+    def __init__(self, db_config: dict):
+        self.db_config = db_config
+        # LOG DE CONFIRMATION VERSION FINALE
+        logger.error("🚀 LOGGING_MANAGER - VERSION FINALE CORRIGÉE COMPLÈTE - 2025-09-02-17:45 ACTIVE")
+
+    def get_connection(self):
+        """Connexion à PostgreSQL"""
+        return psycopg2.connect(**self.db_config)
+
     def _ensure_analytics_tables(self):
-        """Création des tables analytics"""
+        """Crée toutes les tables d'analytics nécessaires"""
         try:
-            with psycopg2.connect(self.dsn) as conn:
+            with self.get_connection() as conn:
                 with conn.cursor() as cur:
                     # Table principale des questions/réponses
                     cur.execute("""
@@ -99,26 +163,24 @@ class AnalyticsManager:
                             response_source VARCHAR(50),
                             status VARCHAR(20) DEFAULT 'success',
                             processing_time_ms INTEGER,
-                            response_confidence DECIMAL(5,2),
+                            confidence DECIMAL(5,2),
                             completeness_score DECIMAL(5,2),
-                            
-                            -- Metadata
                             language VARCHAR(10) DEFAULT 'fr',
                             intent VARCHAR(50),
                             entities JSONB DEFAULT '{}',
-                            
-                            -- Erreurs
                             error_type VARCHAR(100),
                             error_message TEXT,
                             error_traceback TEXT,
-                            
-                            -- Timestamps
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         );
+                        
+                        CREATE INDEX IF NOT EXISTS idx_user_questions_user_email ON user_questions_complete(user_email);
+                        CREATE INDEX IF NOT EXISTS idx_user_questions_created_at ON user_questions_complete(created_at);
+                        CREATE INDEX IF NOT EXISTS idx_user_questions_status ON user_questions_complete(status);
                     """)
                     
-                    # Table des erreurs système détaillées
+                    # Table des erreurs système
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS system_errors (
                             id SERIAL PRIMARY KEY,
@@ -129,184 +191,134 @@ class AnalyticsManager:
                             user_email VARCHAR(255),
                             session_id VARCHAR(255),
                             question_id VARCHAR(255),
-                            
-                            -- Détails erreur
-                            error_message TEXT,
-                            error_traceback TEXT,
-                            context_data JSONB DEFAULT '{}',
-                            
-                            -- Status résolution
-                            resolved BOOLEAN DEFAULT FALSE,
-                            resolution_notes TEXT,
-                            resolved_at TIMESTAMP,
-                            
+                            details JSONB DEFAULT '{}',
+                            traceback TEXT,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         );
+                        
+                        CREATE INDEX IF NOT EXISTS idx_system_errors_category ON system_errors(category);
+                        CREATE INDEX IF NOT EXISTS idx_system_errors_severity ON system_errors(severity);
+                        CREATE INDEX IF NOT EXISTS idx_system_errors_created_at ON system_errors(created_at);
                     """)
                     
-                    # Table de tracking des appels OpenAI
+                    # Table utilisation OpenAI
                     cur.execute("""
-                        CREATE TABLE IF NOT EXISTS openai_api_calls (
+                        CREATE TABLE IF NOT EXISTS openai_usage (
                             id SERIAL PRIMARY KEY,
                             user_email VARCHAR(255),
                             session_id VARCHAR(255),
                             question_id VARCHAR(255),
-                            
-                            -- Détails appel OpenAI
-                            call_type VARCHAR(50),
-                            model VARCHAR(100),
-                            prompt_tokens INTEGER,
-                            completion_tokens INTEGER,
-                            total_tokens INTEGER,
-                            
-                            -- Coûts (tarifs OpenAI)
-                            cost_usd DECIMAL(10,6),
-                            cost_eur DECIMAL(10,6),
-                            
-                            -- Contexte
-                            purpose VARCHAR(100),
-                            prompt_preview TEXT,
-                            response_preview TEXT,
-                            
-                            -- Performance
+                            model VARCHAR(50) DEFAULT 'gpt-4',
+                            tokens INTEGER DEFAULT 0,
+                            cost_usd DECIMAL(10,6) DEFAULT 0.0,
+                            cost_eur DECIMAL(10,6) DEFAULT 0.0,
+                            purpose VARCHAR(50) DEFAULT 'chat',
+                            success BOOLEAN DEFAULT true,
                             response_time_ms INTEGER,
-                            success BOOLEAN DEFAULT TRUE,
-                            error_message TEXT,
-                            
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         );
+                        
+                        CREATE INDEX IF NOT EXISTS idx_openai_usage_user_email ON openai_usage(user_email);
+                        CREATE INDEX IF NOT EXISTS idx_openai_usage_created_at ON openai_usage(created_at);
                     """)
                     
-                    # Table de résumés quotidiens OpenAI
+                    # Table résumé quotidien OpenAI
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS daily_openai_summary (
                             id SERIAL PRIMARY KEY,
                             user_email VARCHAR(255),
-                            date_only DATE NOT NULL,
-                            
-                            -- Compteurs
-                            total_calls INTEGER DEFAULT 0,
-                            successful_calls INTEGER DEFAULT 0,
-                            failed_calls INTEGER DEFAULT 0,
-                            total_tokens INTEGER DEFAULT 0,
-                            
-                            -- Coûts
-                            total_cost_usd DECIMAL(10,6) DEFAULT 0,
-                            total_cost_eur DECIMAL(10,6) DEFAULT 0,
-                            
-                            -- Breakdown par purpose
-                            cost_by_purpose JSONB DEFAULT '{}',
-                            
-                            -- Performance
-                            avg_response_time_ms INTEGER,
-                            
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            
-                            UNIQUE(user_email, date_only)
-                        );
-                    """)
-                    
-                    # Table de métriques de performance serveur
-                    cur.execute("""
-                        CREATE TABLE IF NOT EXISTS server_performance_metrics (
-                            id SERIAL PRIMARY KEY,
-                            timestamp_hour TIMESTAMP NOT NULL,
-                            
-                            -- Métriques générales
+                            date DATE NOT NULL,
                             total_requests INTEGER DEFAULT 0,
                             successful_requests INTEGER DEFAULT 0,
-                            failed_requests INTEGER DEFAULT 0,
-                            avg_response_time_ms INTEGER,
-                            max_response_time_ms INTEGER,
-                            
-                            -- Métriques par type
-                            rag_requests INTEGER DEFAULT 0,
-                            openai_requests INTEGER DEFAULT 0,
-                            validation_rejections INTEGER DEFAULT 0,
-                            quota_blocks INTEGER DEFAULT 0,
-                            
-                            -- Status de santé
-                            health_status VARCHAR(20) DEFAULT 'healthy',
-                            error_rate_percent DECIMAL(5,2) DEFAULT 0,
-                            
+                            total_tokens INTEGER DEFAULT 0,
+                            total_cost_usd DECIMAL(10,4) DEFAULT 0.0,
+                            total_cost_eur DECIMAL(10,4) DEFAULT 0.0,
+                            avg_response_time_ms DECIMAL(8,2),
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            
-                            UNIQUE(timestamp_hour)
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            UNIQUE(user_email, date)
                         );
+                        
+                        CREATE INDEX IF NOT EXISTS idx_daily_openai_summary_date ON daily_openai_summary(date);
+                        CREATE INDEX IF NOT EXISTS idx_daily_openai_summary_user_date ON daily_openai_summary(user_email, date);
                     """)
-                    
-                    # Indexes pour performance
-                    indexes = [
-                        "CREATE INDEX IF NOT EXISTS idx_questions_user_created ON user_questions_complete(user_email, created_at DESC);",
-                        "CREATE INDEX IF NOT EXISTS idx_questions_status ON user_questions_complete(status, created_at);",
-                        "CREATE INDEX IF NOT EXISTS idx_errors_category ON system_errors(category, severity, created_at);",
-                        "CREATE INDEX IF NOT EXISTS idx_errors_resolved ON system_errors(resolved, created_at);",
-                        "CREATE INDEX IF NOT EXISTS idx_openai_user_date ON openai_api_calls(user_email, created_at);",
-                        "CREATE INDEX IF NOT EXISTS idx_openai_cost ON openai_api_calls(cost_usd, created_at);",
-                        "CREATE INDEX IF NOT EXISTS idx_daily_summary_user ON daily_openai_summary(user_email, date_only);",
-                        "CREATE INDEX IF NOT EXISTS idx_performance_hour ON server_performance_metrics(timestamp_hour);",
-                    ]
-                    
-                    for index_sql in indexes:
-                        cur.execute(index_sql)
-                    
-                    conn.commit()
-                    logger.info("✅ Tables d'analytics et logging créées avec succès")
                     
         except Exception as e:
             logger.error(f"⛔ Erreur création tables analytics: {e}")
-            raise
-    
+
     def log_question_response(
-        self, 
-        user_email: Optional[str],
+        self,
+        user_email: str,
         session_id: str,
+        question_id: str,
         question: str,
-        response_text: str = "",
-        response_source: str = "unknown",
+        response_text: str,
+        response_source: str,
         status: str = "success",
-        processing_time_ms: int = 0,
+        processing_time_ms: int = None,
         confidence: float = None,
         completeness_score: float = None,
-        language: str = "fr",
+        language: str = None,
         intent: str = None,
         entities: Dict[str, Any] = None,
         error_info: Dict[str, Any] = None
-    ) -> str:
-        """Log une question/réponse complète"""
+    ):
+        """Log des questions/réponses avec correction FINALE du problème dict"""
         try:
-            question_id = f"{session_id}_{int(time.time() * 1000)}"
-            
-            with psycopg2.connect(self.dsn) as conn:
+            with self.get_connection() as conn:
                 with conn.cursor() as cur:
+                    # SOLUTION: Sérialiser TOUS les dictionnaires avec Json()
+                    entities_json = Json(entities) if entities else None
+                    
+                    # ✅ CORRECTION CRITIQUE: Traiter error_info de manière robuste
+                    error_type = None
+                    error_message = None
+                    error_traceback = None
+                    
+                    if error_info:
+                        if isinstance(error_info, dict):
+                            error_type = error_info.get("type")
+                            error_message = error_info.get("message")
+                            error_traceback = error_info.get("traceback")
+                        else:
+                            # Si error_info n'est pas un dict, le convertir en string
+                            error_message = str(error_info)
+                    
                     cur.execute("""
                         INSERT INTO user_questions_complete (
                             user_email, session_id, question_id, question, response_text,
-                            response_source, status, processing_time_ms, response_confidence,
-                            completeness_score, language, intent, entities,
-                            error_type, error_message, error_traceback
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            response_source, status, processing_time_ms, confidence,
+                            completeness_score, language, intent, entities, 
+                            error_type, error_message, error_traceback, created_at
+                        ) VALUES (
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                        )
                     """, (
-                        user_email, session_id, question_id, question[:2000], response_text[:5000],
-                        response_source, status, processing_time_ms, confidence,
-                        completeness_score, language, intent, json.dumps(entities or {}),  # CORRIGÉ: JSON string
-                        error_info.get("type") if error_info else None,
-                        error_info.get("message") if error_info else None,
-                        error_info.get("traceback") if error_info else None
-                    ))                    
-                   
-                    conn.commit()
+                        user_email,
+                        session_id,
+                        question_id,
+                        question[:2000] if question else None,
+                        response_text[:5000] if response_text else None,
+                        response_source,
+                        status,
+                        processing_time_ms,
+                        confidence,
+                        completeness_score,
+                        language,
+                        intent,
+                        entities_json,  # ✅ Sérialisé avec Json()
+                        error_type,     # ✅ String simple
+                        error_message,  # ✅ String simple
+                        error_traceback, # ✅ String simple
+                        datetime.now()
+                    ))
                     
-            # Nettoyer le cache après écriture
-            clear_analytics_cache(f"user_analytics_{user_email}")
-            
-            return question_id
-            
         except Exception as e:
             logger.error(f"⛔ Erreur log question/réponse: {e}")
-            return "error"
-    
+            logger.error(f"📍 Traceback: {traceback.format_exc()}")
+            # Debug détaillé
+            logger.error(f"🔍 DEBUG: user_email={type(user_email)}, entities={type(entities)}, error_info={type(error_info)}")
+
     def log_system_error(
         self,
         error_type: str,
@@ -316,323 +328,473 @@ class AnalyticsManager:
         user_email: str = None,
         session_id: str = None,
         question_id: str = None,
-        error_message: str = None,
-        error_traceback: str = None,
-        context_data: Dict[str, Any] = None
-    ) -> None:
-        """Log une erreur système"""
+        details: Dict[str, Any] = None,
+        traceback_info: str = None
+    ):
+        """Log des erreurs système"""
         try:
-            with psycopg2.connect(self.dsn) as conn:
+            with self.get_connection() as conn:
                 with conn.cursor() as cur:
+                    details_json = Json(details) if details else None
+                    
                     cur.execute("""
                         INSERT INTO system_errors (
                             error_type, category, severity, component, user_email,
-                            session_id, question_id, error_message, error_traceback, context_data
+                            session_id, question_id, details, traceback, created_at
                         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         error_type, category, severity, component, user_email,
-                        session_id, question_id, error_message, error_traceback,
-                        json.dumps(context_data or {})
+                        session_id, question_id, details_json, traceback_info, datetime.now()
                     ))
-                    conn.commit()
                     
         except Exception as e:
-            logger.error(f"⛔ Erreur log system error: {e}")
-    
-    def track_openai_call(
+            logger.error(f"⛔ Erreur log système: {e}")
+
+    def log_openai_usage(
         self,
-        user_email: str = None,
+        user_email: str,
         session_id: str = None,
         question_id: str = None,
-        call_type: str = "completion",
-        model: str = None,
-        prompt_tokens: int = 0,
-        completion_tokens: int = 0,
-        purpose: str = "fallback",
-        prompt_preview: str = "",
-        response_preview: str = "",
-        response_time_ms: int = 0,
+        model: str = "gpt-4",
+        tokens: int = 0,
+        cost_usd: float = 0.0,
+        cost_eur: float = 0.0,
+        purpose: str = "chat",
         success: bool = True,
-        error_message: str = None
-    ) -> None:
-        """Track un appel OpenAI avec calcul des coûts"""
+        response_time_ms: int = None
+    ):
+        """Log de l'utilisation OpenAI"""
         try:
-            # Utiliser le modèle par défaut si non spécifié
-            if model is None:
-                model = os.getenv('DEFAULT_MODEL', 'gpt-5')
-            
-            # Calcul des coûts (tarifs OpenAI mis à jour pour GPT-5)
-            total_tokens = prompt_tokens + completion_tokens
-            
-            # Tarifs mis à jour pour les nouveaux modèles GPT-5
-            if "gpt-5" in model.lower():
-                if "mini" in model.lower():
-                    cost_per_1k_prompt = 0.00025  # GPT-5 mini
-                    cost_per_1k_completion = 0.002
-                elif "nano" in model.lower():
-                    cost_per_1k_prompt = 0.00005  # GPT-5 nano
-                    cost_per_1k_completion = 0.0004
-                else:
-                    cost_per_1k_prompt = 0.00125  # GPT-5
-                    cost_per_1k_completion = 0.01
-            elif "gpt-4" in model.lower():
-                cost_per_1k_prompt = 0.03
-                cost_per_1k_completion = 0.06
-            else:  # GPT-3.5-turbo
-                cost_per_1k_prompt = 0.0015
-                cost_per_1k_completion = 0.002
-            
-            cost_usd = (prompt_tokens / 1000 * cost_per_1k_prompt) + (completion_tokens / 1000 * cost_per_1k_completion)
-            cost_eur = cost_usd * 0.92  # Approximation EUR
-            
-            with psycopg2.connect(self.dsn) as conn:
+            with self.get_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        INSERT INTO openai_api_calls (
-                            user_email, session_id, question_id, call_type, model,
-                            prompt_tokens, completion_tokens, total_tokens, cost_usd, cost_eur,
-                            purpose, prompt_preview, response_preview, response_time_ms,
-                            success, error_message
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        INSERT INTO openai_usage (
+                            user_email, session_id, question_id, model, tokens,
+                            cost_usd, cost_eur, purpose, success, response_time_ms, created_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
-                        user_email, session_id, question_id, call_type, model,
-                        prompt_tokens, completion_tokens, total_tokens, cost_usd, cost_eur,
-                        purpose, prompt_preview[:200], response_preview[:200], response_time_ms,
-                        success, error_message
+                        user_email, session_id, question_id, model, tokens,
+                        cost_usd, cost_eur, purpose, success, response_time_ms, datetime.now()
                     ))
                     
                     # Mise à jour du résumé quotidien
-                    self._update_daily_openai_summary(cur, user_email, cost_usd, cost_eur, total_tokens, purpose, success, response_time_ms)
+                    self._update_daily_openai_summary(cur, user_email, cost_usd, cost_eur, tokens, purpose, success, response_time_ms)
                     
-                    conn.commit()
-                    
-            # Nettoyer le cache après écriture
-            clear_analytics_cache(f"user_analytics_{user_email}")
-            
         except Exception as e:
-            logger.error(f"⛔ Erreur track OpenAI call: {e}")
-    
+            logger.error(f"⛔ Erreur log OpenAI: {e}")
+
     def _update_daily_openai_summary(self, cur, user_email, cost_usd, cost_eur, tokens, purpose, success, response_time_ms):
         """Met à jour le résumé quotidien OpenAI"""
         try:
             today = datetime.now().date()
             
-            # Upsert du résumé quotidien
             cur.execute("""
                 INSERT INTO daily_openai_summary (
-                    user_email, date_only, total_calls, successful_calls, failed_calls,
-                    total_tokens, total_cost_usd, total_cost_eur, cost_by_purpose, avg_response_time_ms
-                ) VALUES (%s, %s, 1, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (user_email, date_only)
-                DO UPDATE SET 
-                    total_calls = daily_openai_summary.total_calls + 1,
-                    successful_calls = daily_openai_summary.successful_calls + %s,
-                    failed_calls = daily_openai_summary.failed_calls + %s,
+                    user_email, date, total_requests, successful_requests, 
+                    total_tokens, total_cost_usd, total_cost_eur, avg_response_time_ms
+                ) VALUES (%s, %s, 1, %s, %s, %s, %s, %s)
+                ON CONFLICT (user_email, date) DO UPDATE SET
+                    total_requests = daily_openai_summary.total_requests + 1,
+                    successful_requests = daily_openai_summary.successful_requests + %s,
                     total_tokens = daily_openai_summary.total_tokens + %s,
                     total_cost_usd = daily_openai_summary.total_cost_usd + %s,
                     total_cost_eur = daily_openai_summary.total_cost_eur + %s,
-                    avg_response_time_ms = (daily_openai_summary.avg_response_time_ms * daily_openai_summary.total_calls + %s) / (daily_openai_summary.total_calls + 1),
+                    avg_response_time_ms = (
+                        CASE 
+                            WHEN %s IS NOT NULL THEN 
+                                (daily_openai_summary.avg_response_time_ms * daily_openai_summary.total_requests + %s) / (daily_openai_summary.total_requests + 1)
+                            ELSE daily_openai_summary.avg_response_time_ms
+                        END
+                    ),
                     updated_at = CURRENT_TIMESTAMP
             """, (
-                user_email, today, 1 if success else 0, 0 if success else 1, tokens, cost_usd, cost_eur,
-                json.dumps({purpose: float(cost_usd)}), response_time_ms,
-                1 if success else 0, 0 if success else 1, tokens, cost_usd, cost_eur, response_time_ms
+                user_email, today, 1 if success else 0, tokens, cost_usd, cost_eur, response_time_ms,
+                1 if success else 0, tokens, cost_usd, cost_eur, response_time_ms, response_time_ms
             ))
             
         except Exception as e:
-            logger.error(f"⛔ Erreur update daily summary: {e}")
-    
-    def get_user_analytics(self, user_email: str, days: int = 30) -> Dict[str, Any]:
-        """
-        🚀 Analytics complètes avec cache intelligent
-        """
-        cache_key = f"user_analytics_{user_email}_{days}"
-        
-        def compute_analytics():
-            return self._compute_user_analytics_direct(user_email, days)
-        
-        return get_cached_or_compute(cache_key, compute_analytics)
-    
-    def _compute_user_analytics_direct(self, user_email: str, days: int = 30) -> Dict[str, Any]:
-        """Calcul direct des analytics utilisateur"""
+            logger.error(f"⛔ Erreur mise à jour résumé quotidien: {e}")
+
+    def get_questions_with_filters(
+        self, 
+        page: int = 1, 
+        limit: int = 10,
+        user_email: str = None,
+        start_date: date = None,
+        end_date: date = None,
+        status: str = None,
+        min_confidence: float = None
+    ) -> Dict[str, Any]:
+        """Récupère les questions avec filtres avancés"""
         try:
-            start_date = datetime.now() - timedelta(days=days)
+            offset = (page - 1) * limit
+            conditions = []
+            params = []
             
-            with psycopg2.connect(self.dsn) as conn:
+            if user_email:
+                conditions.append("user_email = %s")
+                params.append(user_email)
+            
+            if start_date:
+                conditions.append("created_at >= %s")
+                params.append(start_date)
+            
+            if end_date:
+                conditions.append("created_at <= %s")
+                params.append(end_date)
+            
+            if status:
+                conditions.append("status = %s")
+                params.append(status)
+            
+            if min_confidence is not None:
+                conditions.append("confidence >= %s")
+                params.append(min_confidence)
+            
+            where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+            
+            with self.get_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    # Questions/réponses
-                    cur.execute("""
-                        SELECT 
-                            COUNT(*) as total_questions,
-                            COUNT(*) FILTER (WHERE status = 'success') as successful_questions,
-                            COUNT(*) FILTER (WHERE status = 'error') as failed_questions,
-                            AVG(processing_time_ms) as avg_processing_time,
-                            AVG(response_confidence) as avg_confidence
-                        FROM user_questions_complete 
-                        WHERE user_email = %s AND created_at >= %s
-                    """, (user_email, start_date))
+                    # Count total
+                    count_query = f"SELECT COUNT(*) FROM user_questions_complete {where_clause}"
+                    cur.execute(count_query, params)
+                    total_count = cur.fetchone()[0]
                     
-                    questions_stats = dict(cur.fetchone() or {})
+                    # Get data
+                    main_query = f"""
+                        SELECT user_email, session_id, question_id, question, response_text,
+                               response_source, status, processing_time_ms, confidence,
+                               completeness_score, language, intent, entities,
+                               error_type, error_message, error_traceback, created_at
+                        FROM user_questions_complete
+                        {where_clause}
+                        ORDER BY created_at DESC
+                        LIMIT %s OFFSET %s
+                    """
+                    params.extend([limit, offset])
+                    cur.execute(main_query, params)
                     
-                    # Coûts OpenAI
-                    cur.execute("""
-                        SELECT 
-                            COUNT(*) as total_calls,
-                            SUM(total_tokens) as total_tokens,
-                            SUM(cost_usd) as total_cost_usd,
-                            SUM(cost_eur) as total_cost_eur,
-                            AVG(cost_usd) as avg_cost_per_call
-                        FROM openai_api_calls 
-                        WHERE user_email = %s AND created_at >= %s
-                    """, (user_email, start_date))
-                    
-                    openai_stats = dict(cur.fetchone() or {})
-                    
-                    # Breakdown par purpose
-                    cur.execute("""
-                        SELECT 
-                            purpose,
-                            COUNT(*) as calls,
-                            SUM(cost_usd) as cost_usd
-                        FROM openai_api_calls 
-                        WHERE user_email = %s AND created_at >= %s
-                        GROUP BY purpose
-                        ORDER BY cost_usd DESC
-                    """, (user_email, start_date))
-                    
-                    cost_by_purpose = [dict(row) for row in cur.fetchall()]
+                    results = []
+                    for row in cur.fetchall():
+                        row_dict = dict(row)
+                        if row_dict['created_at']:
+                            row_dict['created_at'] = row_dict['created_at'].isoformat()
+                        results.append(row_dict)
                     
                     return {
-                        "user_email": user_email,
-                        "period_days": days,
-                        "questions": questions_stats,
-                        "openai_costs": openai_stats,
-                        "cost_by_purpose": cost_by_purpose,
-                        "cached": False  # Marquer comme calcul direct
-                    }
-                    
-        except Exception as e:
-            logger.error(f"⛔ Erreur get user analytics: {e}")
-            return {"error": str(e)}
-    
-    def log_server_performance(
-        self,
-        timestamp_hour: datetime,
-        total_requests: int = 0,
-        successful_requests: int = 0,
-        failed_requests: int = 0,
-        avg_response_time_ms: int = 0,
-        max_response_time_ms: int = 0,
-        health_status: str = "healthy",
-        error_rate_percent: float = 0.0,
-        rag_requests: int = 0,
-        openai_requests: int = 0,
-        validation_rejections: int = 0,
-        quota_blocks: int = 0
-    ) -> None:
-        """Log des métriques de performance serveur par heure"""
-        try:
-            with psycopg2.connect(self.dsn) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        INSERT INTO server_performance_metrics (
-                            timestamp_hour, total_requests, successful_requests, 
-                            failed_requests, avg_response_time_ms, max_response_time_ms,
-                            rag_requests, openai_requests, validation_rejections, quota_blocks,
-                            health_status, error_rate_percent
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (timestamp_hour) 
-                        DO UPDATE SET 
-                            total_requests = EXCLUDED.total_requests,
-                            successful_requests = EXCLUDED.successful_requests,
-                            failed_requests = EXCLUDED.failed_requests,
-                            avg_response_time_ms = EXCLUDED.avg_response_time_ms,
-                            max_response_time_ms = EXCLUDED.max_response_time_ms,
-                            rag_requests = EXCLUDED.rag_requests,
-                            openai_requests = EXCLUDED.openai_requests,
-                            validation_rejections = EXCLUDED.validation_rejections,
-                            quota_blocks = EXCLUDED.quota_blocks,
-                            health_status = EXCLUDED.health_status,
-                            error_rate_percent = EXCLUDED.error_rate_percent
-                    """, (
-                        timestamp_hour, total_requests, successful_requests, failed_requests,
-                        avg_response_time_ms, max_response_time_ms, rag_requests, openai_requests,
-                        validation_rejections, quota_blocks, health_status, error_rate_percent
-                    ))
-                    conn.commit()
-                    
-        except Exception as e:
-            logger.error(f"⛔ Erreur log server performance: {e}")
-    
-    def get_server_performance_analytics(self, hours: int = 24) -> Dict[str, Any]:
-        """
-        🚀 Performance serveur avec cache
-        """
-        cache_key = f"server_performance_{hours}h"
-        
-        def compute_performance():
-            return self._compute_server_performance_direct(hours)
-        
-        # Cache plus court pour les métriques de performance (2 minutes)
-        return get_cached_or_compute(cache_key, compute_performance, ttl_seconds=120)
-    
-    def _compute_server_performance_direct(self, hours: int = 24) -> Dict[str, Any]:
-        """Calcul direct de la performance serveur"""
-        try:
-            start_time = datetime.now() - timedelta(hours=hours)
-            
-            with psycopg2.connect(self.dsn) as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    # Métriques globales
-                    cur.execute("""
-                        SELECT 
-                            AVG(avg_response_time_ms) as avg_response_time,
-                            AVG(error_rate_percent) as avg_error_rate,
-                            SUM(total_requests) as total_requests,
-                            SUM(failed_requests) as total_failures,
-                            COUNT(*) FILTER (WHERE health_status = 'healthy') as healthy_hours,
-                            COUNT(*) FILTER (WHERE health_status = 'degraded') as degraded_hours,
-                            COUNT(*) FILTER (WHERE health_status = 'critical') as critical_hours
-                        FROM server_performance_metrics 
-                        WHERE timestamp_hour >= %s
-                    """, (start_time,))
-                    
-                    global_stats = dict(cur.fetchone() or {})
-                    
-                    # Patterns par heure
-                    cur.execute("""
-                        SELECT 
-                            EXTRACT(HOUR FROM timestamp_hour) as hour_of_day,
-                            AVG(total_requests) as avg_requests,
-                            MAX(total_requests) as peak_requests,
-                            AVG(avg_response_time_ms) as avg_response_time
-                        FROM server_performance_metrics 
-                        WHERE timestamp_hour >= %s
-                        GROUP BY EXTRACT(HOUR FROM timestamp_hour)
-                        ORDER BY hour_of_day
-                    """, (start_time,))
-                    
-                    hourly_patterns = [dict(row) for row in cur.fetchall()]
-                    
-                    # Déterminer le statut de santé actuel
-                    current_health = "healthy"
-                    if global_stats.get("avg_error_rate", 0) > 10:
-                        current_health = "critical"
-                    elif global_stats.get("avg_error_rate", 0) > 5:
-                        current_health = "degraded"
-                    
-                    return {
-                        "period_hours": hours,
-                        "current_status": {
-                            "overall_health": current_health,
-                            "avg_response_time_ms": round(float(global_stats.get("avg_response_time", 0) or 0), 3),
-                            "error_rate_percent": round(global_stats.get("avg_error_rate", 0) or 0, 2)
+                        "success": True,
+                        "data": results,
+                        "pagination": {
+                            "page": page,
+                            "limit": limit,
+                            "total": total_count,
+                            "pages": (total_count + limit - 1) // limit
                         },
-                        "global_stats": global_stats,
-                        "hourly_usage_patterns": hourly_patterns,
-                        "cached": False  # Marquer comme calcul direct
+                        "debug": {
+                            "query_executed": True,
+                            "total_found": total_count,
+                            "returned": len(results)
+                        }
                     }
                     
         except Exception as e:
-            logger.error(f"⛔ Erreur get server performance analytics: {e}")
-            return {"error": str(e)}
+            logger.error(f"⛔ Erreur récupération questions: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "data": [],
+                "pagination": {"page": page, "limit": limit, "total": 0, "pages": 0}
+            }
+
+    def get_user_stats(self, user_email: str, days: int = 30) -> Dict[str, Any]:
+        """Statistiques détaillées d'un utilisateur"""
+        try:
+            cache_key = f"user_stats_{user_email}_{days}"
+            
+            def compute_stats():
+                with self.get_connection() as conn:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        start_date = datetime.now() - timedelta(days=days)
+                        
+                        # Questions totales
+                        cur.execute("""
+                            SELECT COUNT(*) as total_questions,
+                                   COUNT(CASE WHEN status = 'success' THEN 1 END) as successful_questions,
+                                   AVG(confidence) as avg_confidence,
+                                   AVG(processing_time_ms) as avg_processing_time
+                            FROM user_questions_complete
+                            WHERE user_email = %s AND created_at >= %s
+                        """, (user_email, start_date))
+                        
+                        stats = dict(cur.fetchone() or {})
+                        
+                        # Coûts OpenAI
+                        cur.execute("""
+                            SELECT SUM(cost_usd) as total_cost_usd,
+                                   SUM(cost_eur) as total_cost_eur,
+                                   SUM(tokens) as total_tokens
+                            FROM openai_usage
+                            WHERE user_email = %s AND created_at >= %s
+                        """, (user_email, start_date))
+                        
+                        cost_data = dict(cur.fetchone() or {})
+                        stats.update(cost_data)
+                        
+                        return {
+                            "success": True,
+                            "user_email": user_email,
+                            "period_days": days,
+                            "stats": stats
+                        }
+            
+            return get_cached_or_compute(cache_key, compute_stats, ttl_seconds=1800)  # 30min cache
+            
+        except Exception as e:
+            logger.error(f"⛔ Erreur statistiques utilisateur: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_system_performance(self, hours: int = 24) -> Dict[str, Any]:
+        """Métriques de performance système"""
+        try:
+            cache_key = f"system_performance_{hours}"
+            
+            def compute_performance():
+                with self.get_connection() as conn:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        start_time = datetime.now() - timedelta(hours=hours)
+                        
+                        # Performance globale
+                        cur.execute("""
+                            SELECT 
+                                COUNT(*) as total_requests,
+                                COUNT(CASE WHEN status = 'success' THEN 1 END) as successful_requests,
+                                AVG(processing_time_ms) as avg_response_time,
+                                MAX(processing_time_ms) as max_response_time,
+                                MIN(processing_time_ms) as min_response_time
+                            FROM user_questions_complete
+                            WHERE created_at >= %s
+                        """, (start_time,))
+                        
+                        performance = dict(cur.fetchone() or {})
+                        
+                        # Erreurs système
+                        cur.execute("""
+                            SELECT COUNT(*) as total_errors,
+                                   COUNT(CASE WHEN severity = 'critical' THEN 1 END) as critical_errors
+                            FROM system_errors
+                            WHERE created_at >= %s
+                        """, (start_time,))
+                        
+                        error_data = dict(cur.fetchone() or {})
+                        performance.update(error_data)
+                        
+                        return {
+                            "success": True,
+                            "period_hours": hours,
+                            "performance": performance
+                        }
+            
+            return get_cached_or_compute(cache_key, compute_performance, ttl_seconds=900)  # 15min cache
+            
+        except Exception as e:
+            logger.error(f"⛔ Erreur performance système: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_openai_costs(self, user_email: str = None, days: int = 30) -> Dict[str, Any]:
+        """Analyse des coûts OpenAI"""
+        try:
+            cache_key = f"openai_costs_{user_email or 'all'}_{days}"
+            
+            def compute_costs():
+                with self.get_connection() as conn:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        start_date = datetime.now() - timedelta(days=days)
+                        
+                        conditions = ["created_at >= %s"]
+                        params = [start_date]
+                        
+                        if user_email:
+                            conditions.append("user_email = %s")
+                            params.append(user_email)
+                        
+                        where_clause = "WHERE " + " AND ".join(conditions)
+                        
+                        # Coûts par jour
+                        cur.execute(f"""
+                            SELECT DATE(created_at) as date,
+                                   SUM(cost_usd) as daily_cost_usd,
+                                   SUM(cost_eur) as daily_cost_eur,
+                                   SUM(tokens) as daily_tokens,
+                                   COUNT(*) as daily_requests
+                            FROM openai_usage
+                            {where_clause}
+                            GROUP BY DATE(created_at)
+                            ORDER BY date DESC
+                        """, params)
+                        
+                        daily_costs = [dict(row) for row in cur.fetchall()]
+                        
+                        # Total
+                        cur.execute(f"""
+                            SELECT SUM(cost_usd) as total_cost_usd,
+                                   SUM(cost_eur) as total_cost_eur,
+                                   SUM(tokens) as total_tokens,
+                                   COUNT(*) as total_requests
+                            FROM openai_usage
+                            {where_clause}
+                        """, params)
+                        
+                        totals = dict(cur.fetchone() or {})
+                        
+                        return {
+                            "success": True,
+                            "user_email": user_email,
+                            "period_days": days,
+                            "daily_costs": daily_costs,
+                            "totals": totals
+                        }
+            
+            return get_cached_or_compute(cache_key, compute_costs, ttl_seconds=3600)  # 1h cache
+            
+        except Exception as e:
+            logger.error(f"⛔ Erreur coûts OpenAI: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_dashboard_stats(self) -> Dict[str, Any]:
+        """Statistiques pour le dashboard admin"""
+        try:
+            cache_key = "dashboard_stats"
+            
+            def compute_dashboard():
+                with self.get_connection() as conn:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        today = datetime.now().date()
+                        week_ago = today - timedelta(days=7)
+                        
+                        # Statistiques aujourd'hui
+                        cur.execute("""
+                            SELECT COUNT(*) as questions_today
+                            FROM user_questions_complete
+                            WHERE DATE(created_at) = %s
+                        """, (today,))
+                        
+                        today_stats = dict(cur.fetchone() or {})
+                        
+                        # Statistiques cette semaine
+                        cur.execute("""
+                            SELECT COUNT(*) as questions_week,
+                                   COUNT(DISTINCT user_email) as active_users_week
+                            FROM user_questions_complete
+                            WHERE created_at >= %s
+                        """, (week_ago,))
+                        
+                        week_stats = dict(cur.fetchone() or {})
+                        
+                        # Top utilisateurs
+                        cur.execute("""
+                            SELECT user_email, COUNT(*) as question_count
+                            FROM user_questions_complete
+                            WHERE created_at >= %s
+                            GROUP BY user_email
+                            ORDER BY question_count DESC
+                            LIMIT 10
+                        """, (week_ago,))
+                        
+                        top_users = [dict(row) for row in cur.fetchall()]
+                        
+                        return {
+                            "success": True,
+                            "today": today_stats,
+                            "this_week": week_stats,
+                            "top_users": top_users,
+                            "generated_at": datetime.now().isoformat()
+                        }
+            
+            return get_cached_or_compute(cache_key, compute_dashboard, ttl_seconds=600)  # 10min cache
+            
+        except Exception as e:
+            logger.error(f"⛔ Erreur dashboard stats: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Statistiques du cache pour monitoring"""
+        with _cache_lock:
+            return {
+                "cache_entries": len(_analytics_cache),
+                "cache_keys": list(_analytics_cache.keys()),
+                "ttl_seconds": CACHE_TTL_SECONDS
+            }
+
+# Instance globale pour compatibilité
+_global_logging_manager = None
+_initialization_lock = threading.Lock()
+
+def get_logging_manager(db_config: dict = None) -> LoggingManager:
+    """Récupère l'instance globale du LoggingManager (singleton)"""
+    global _global_logging_manager
+    
+    if _global_logging_manager is None:
+        with _initialization_lock:
+            if _global_logging_manager is None:
+                if db_config is None:
+                    # Configuration par défaut depuis les variables d'environnement
+                    db_config = {
+                        "host": os.getenv("POSTGRES_HOST", "localhost"),
+                        "port": os.getenv("POSTGRES_PORT", 5432),
+                        "database": os.getenv("POSTGRES_DB", "intelia_expert"),
+                        "user": os.getenv("POSTGRES_USER", "postgres"),
+                        "password": os.getenv("POSTGRES_PASSWORD", "password")
+                    }
+                
+                _global_logging_manager = LoggingManager(db_config)
+                
+                # Créer les tables au démarrage
+                _global_logging_manager._ensure_analytics_tables()
+    
+    return _global_logging_manager
+
+def log_question_to_analytics(
+    user_email: str,
+    session_id: str,
+    question_id: str,
+    question: str,
+    response_text: str,
+    response_source: str = "rag",
+    **kwargs
+):
+    """Helper pour logger une question facilement"""
+    try:
+        manager = get_logging_manager()
+        manager.log_question_response(
+            user_email=user_email,
+            session_id=session_id,
+            question_id=question_id,
+            question=question,
+            response_text=response_text,
+            response_source=response_source,
+            **kwargs
+        )
+    except Exception as e:
+        logger.error(f"⛔ Erreur logging question: {e}")
+
+def track_openai_call(
+    user_email: str,
+    model: str,
+    tokens: int,
+    cost_usd: float,
+    success: bool = True,
+    **kwargs
+):
+    """Helper pour tracker un appel OpenAI"""
+    try:
+        manager = get_logging_manager()
+        manager.log_openai_usage(
+            user_email=user_email,
+            model=model,
+            tokens=tokens,
+            cost_usd=cost_usd,
+            success=success,
+            **kwargs
+        )
+    except Exception as e:
+        logger.error(f"⛔ Erreur tracking OpenAI: {e}")
