@@ -559,6 +559,7 @@ __all__ = [
     # Fonctions singleton
     'get_analytics_manager',
     'get_logging_manager',
+    'get_analytics',  # ✅ AJOUTÉ pour compatibilité main.py
     
     # Imports depuis modules spécialisés
     'LogLevel',
