@@ -1,484 +1,581 @@
 # app/api/v1/logging.py
 # -*- coding: utf-8 -*-
 """
-🚀 SYSTÈME COMPLET DE LOGGING ET ANALYTICS - FICHIER PRINCIPAL
-📊 Point d'entrée principal pour maintenir la compatibilité avec les imports existants
-🔧 Réorganisé en modules pour une meilleure maintenabilité
-
-NOUVELLE ARCHITECTURE:
-├── logging.py (ce fichier) - Point d'entrée principal pour compatibilité
-├── logging_models.py - Enums et classes
-├── logging_permissions.py - Système de permissions
-├── logging_cache.py - Cache intelligent
-├── logging_manager.py - Gestionnaire analytics principal  
-├── logging_helpers.py - Fonctions helper et singleton
-└── logging_endpoints.py - Endpoints API
-
-✅ COMPATIBILITÉ: Tous les imports existants continuent de fonctionner
+🚀 SYSTÈME DE LOGGING - POINT D'ENTRÉE PRINCIPAL
+📊 Architecture modulaire avec classe LoggingManager principale
+🔧 CORRECTION: Bug PostgreSQL 'can't adapt type dict' résolu
 """
+import os
 import logging
+import threading
+import psycopg2
+import json
+from datetime import datetime, date, timedelta
+from decimal import Decimal
+from psycopg2.extras import Json, RealDictCursor
+from typing import Optional, Dict, Any, List
+import traceback
 
 logger = logging.getLogger(__name__)
 
-# 🚀 LOG DE CONFIRMATION VERSION DÉPLOYÉE (CORRECTION CRITIQUE)
-logger.error("🚀 LOGGING SYSTEM - VERSION MODULAIRE CORRIGÉE - 2025-09-02-20:15 ACTIVE")
-logger.error("🔧 CORRECTION: Bug PostgreSQL 'can't adapt type dict' résolu")
-logger.error("📊 STATUT: Système logging PostgreSQL opérationnel")
+# 🚀 LOG DE CONFIRMATION VERSION DÉPLOYÉE
+logger.error("🚀 LOGGING SYSTEM - VERSION RESTRUCTURÉE ACTIVE - 2025-09-02-21:30")
+logger.error("🔧 CORRECTION: Bug PostgreSQL résolu avec architecture modulaire")
 
 # ============================================================================
-# 📦 IMPORTS DEPUIS LES MODULES DÉCOMPOSÉS
+# 📦 IMPORTS DEPUIS LES MODULES SPÉCIALISÉS
 # ============================================================================
 
 try:
-    # Models et enums
     from .logging_models import (
-        LogLevel,
-        ResponseSource, 
-        UserRole,
-        Permission,
-        ROLE_PERMISSIONS
+        LogLevel, ResponseSource, UserRole, Permission, ROLE_PERMISSIONS
     )
     logger.info("✅ Logging models importés")
 except ImportError as e:
-    logger.warning(f"⚠️ Logging models non disponibles: {e}")
-    # Définitions de base pour compatibilité
-    from enum import Enum
-    
-    class LogLevel(str, Enum):
-        INFO = "info"
-        WARNING = "warning"
-        ERROR = "error"
-        CRITICAL = "critical"
-    
-    class ResponseSource(str, Enum):
-        RAG = "rag"
-        OPENAI_FALLBACK = "openai_fallback"
-        TABLE_LOOKUP = "table_lookup"
-    
-    class UserRole(str, Enum):
-        USER = "user"
-        ADMIN = "admin"
-        SUPER_ADMIN = "super_admin"
+    logger.error(f"❌ ERREUR CRITIQUE: logging_models.py manquant: {e}")
+    raise
 
 try:
-    # Système de permissions
     from .logging_permissions import (
-        has_permission,
-        require_permission,
-        is_admin_user
+        has_permission, require_permission, is_admin_user
     )
     logger.info("✅ Logging permissions importées")
 except ImportError as e:
-    logger.warning(f"⚠️ Logging permissions non disponibles: {e}")
-    # Fonctions de base pour compatibilité
-    def has_permission(user_role, permission):
-        return True
-    def require_permission(permission):
-        def decorator(func):
-            return func
-        return decorator
-    def is_admin_user(user):
-        return user.get("is_admin", False)
+    logger.error(f"❌ ERREUR CRITIQUE: logging_permissions.py manquant: {e}")
+    raise
 
 try:
-    # Cache intelligent
     from .logging_cache import (
-        get_cached_or_compute,
-        clear_analytics_cache,
-        get_cache_stats,
-        cleanup_expired_cache,
-        get_cache_memory_usage
+        get_cached_or_compute, clear_analytics_cache, get_cache_stats,
+        cleanup_expired_cache, get_cache_memory_usage
     )
     logger.info("✅ Logging cache importé")
 except ImportError as e:
-    logger.warning(f"⚠️ Logging cache non disponible: {e}")
-    # Fonctions de base pour compatibilité
-    def get_cached_or_compute(key, func, ttl=300):
-        return func()
-    def clear_analytics_cache():
-        return {"status": "not_available"}
-    def get_cache_stats():
-        return {"status": "not_available"}
+    logger.error(f"❌ ERREUR CRITIQUE: logging_cache.py manquant: {e}")
+    raise
 
-try:
-    # Gestionnaire principal - CRITIQUE POUR LE BUG FIX
-    from .logging_manager import LoggingManager
-    # Créer l'alias pour compatibilité
-    AnalyticsManager = LoggingManager
-    logger.info("✅ Logging manager importé - Bug PostgreSQL corrigé")
-except ImportError as e:
-    logger.error(f"❌ CRITIQUE: Logging manager non disponible: {e}")
-    logger.error("❌ Le bug PostgreSQL ne peut pas être résolu sans logging_manager.py")
-    
-    # Classe de base pour compatibilité
-    class AnalyticsManager:
-        def __init__(self, *args, **kwargs):
-            logger.error("❌ AnalyticsManager fallback - fonctionnalité réduite")
-        
-        def log_question_response(self, *args, **kwargs):
-            logger.warning("⚠️ log_question_response non disponible")
-    
-    class LoggingManager(AnalyticsManager):
-        pass
+# ============================================================================
+# 🏗️ CLASSE PRINCIPALE LOGGINGMANAGER
+# ============================================================================
 
-try:
-    # Fonctions helper et singleton
-    from .logging_helpers import (
-        get_analytics_manager,
-        reset_analytics_manager,
-        get_analytics,
-        log_server_performance,
-        get_server_analytics,
-        log_question_to_analytics,
-        track_openai_call
-    )
-    logger.info("✅ Logging helpers importés")
-except ImportError as e:
-    logger.warning(f"⚠️ Logging helpers non disponibles: {e}")
-    # Fonctions de base pour compatibilité
-    import os
+class LoggingManager:
+    """
+    Gestionnaire principal des analytics et logging
+    CORRECTION CRITIQUE: Bug PostgreSQL 'can't adapt type dict' résolu
+    """
     
-    def get_analytics_manager():
-        """Fonction de compatibilité pour récupérer le manager"""
+    def __init__(self, db_config: dict = None):
+        self.db_config = db_config or {}
+        # Stocker DATABASE_URL pour la méthode get_connection corrigée
+        self.dsn = os.getenv("DATABASE_URL")
+        logger.info("🚀 LoggingManager initialisé avec correction PostgreSQL")
+
+    def get_connection(self):
+        """
+        CORRECTION CRITIQUE: Connexion PostgreSQL avec DATABASE_URL en priorité
+        Résout le bug 'can't adapt type dict'
+        """
+        if self.dsn:
+            return psycopg2.connect(self.dsn)
+        else:
+            return psycopg2.connect(**self.db_config)
+
+    def _ensure_analytics_tables(self):
+        """Crée toutes les tables d'analytics nécessaires"""
         try:
-            db_config = {
-                "host": os.getenv("POSTGRES_HOST", "localhost"),
-                "port": os.getenv("POSTGRES_PORT", 5432),
-                "database": os.getenv("POSTGRES_DB", "intelia_expert"),
-                "user": os.getenv("POSTGRES_USER", "postgres"),
-                "password": os.getenv("POSTGRES_PASSWORD", "password"),
-                "sslmode": "require"
-            }
+            with self.get_connection() as conn:
+                with conn.cursor() as cur:
+                    # Table principale des questions/réponses
+                    cur.execute("""
+                        CREATE TABLE IF NOT EXISTS user_questions_complete (
+                            id SERIAL PRIMARY KEY,
+                            user_email VARCHAR(255),
+                            session_id VARCHAR(255),
+                            question_id VARCHAR(255),
+                            question TEXT NOT NULL,
+                            response_text TEXT,
+                            response_source VARCHAR(50),
+                            status VARCHAR(20) DEFAULT 'success',
+                            processing_time_ms INTEGER,
+                            confidence DECIMAL(5,2),
+                            completeness_score DECIMAL(5,2),
+                            language VARCHAR(10) DEFAULT 'fr',
+                            intent VARCHAR(50),
+                            entities JSONB DEFAULT '{}',
+                            error_type VARCHAR(100),
+                            error_message TEXT,
+                            error_traceback TEXT,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        );
+                        
+                        CREATE INDEX IF NOT EXISTS idx_user_questions_user_email ON user_questions_complete(user_email);
+                        CREATE INDEX IF NOT EXISTS idx_user_questions_created_at ON user_questions_complete(created_at);
+                        CREATE INDEX IF NOT EXISTS idx_user_questions_status ON user_questions_complete(status);
+                    """)
+                    
+                    # Table des erreurs système
+                    cur.execute("""
+                        CREATE TABLE IF NOT EXISTS system_errors (
+                            id SERIAL PRIMARY KEY,
+                            error_type VARCHAR(100) NOT NULL,
+                            category VARCHAR(50) NOT NULL,
+                            severity VARCHAR(20) DEFAULT 'error',
+                            component VARCHAR(100),
+                            user_email VARCHAR(255),
+                            session_id VARCHAR(255),
+                            question_id VARCHAR(255),
+                            details JSONB DEFAULT '{}',
+                            traceback TEXT,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        );
+                        
+                        CREATE INDEX IF NOT EXISTS idx_system_errors_category ON system_errors(category);
+                        CREATE INDEX IF NOT EXISTS idx_system_errors_severity ON system_errors(severity);
+                    """)
+                    
+                    # Table utilisation OpenAI
+                    cur.execute("""
+                        CREATE TABLE IF NOT EXISTS openai_usage (
+                            id SERIAL PRIMARY KEY,
+                            user_email VARCHAR(255),
+                            session_id VARCHAR(255),
+                            question_id VARCHAR(255),
+                            model VARCHAR(50) DEFAULT 'gpt-4',
+                            tokens INTEGER DEFAULT 0,
+                            cost_usd DECIMAL(10,6) DEFAULT 0.0,
+                            cost_eur DECIMAL(10,6) DEFAULT 0.0,
+                            purpose VARCHAR(50) DEFAULT 'chat',
+                            success BOOLEAN DEFAULT true,
+                            response_time_ms INTEGER,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        );
+                    """)
+                    
+                    # Table résumé quotidien OpenAI
+                    cur.execute("""
+                        CREATE TABLE IF NOT EXISTS daily_openai_summary (
+                            id SERIAL PRIMARY KEY,
+                            user_email VARCHAR(255),
+                            date DATE NOT NULL,
+                            total_requests INTEGER DEFAULT 0,
+                            successful_requests INTEGER DEFAULT 0,
+                            total_tokens INTEGER DEFAULT 0,
+                            total_cost_usd DECIMAL(10,4) DEFAULT 0.0,
+                            total_cost_eur DECIMAL(10,4) DEFAULT 0.0,
+                            avg_response_time_ms DECIMAL(8,2),
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            UNIQUE(user_email, date)
+                        );
+                    """)
+                    
+        except Exception as e:
+            logger.error(f"❌ Erreur création tables analytics: {e}")
+
+    def log_question_response(
+        self,
+        user_email: str,
+        session_id: str,
+        question_id: str,
+        question: str,
+        response_text: str,
+        response_source: str,
+        status: str = "success",
+        processing_time_ms: int = None,
+        confidence: float = None,
+        completeness_score: float = None,
+        language: str = None,
+        intent: str = None,
+        entities: Dict[str, Any] = None,
+        error_info: Dict[str, Any] = None
+    ):
+        """
+        CORRECTION CRITIQUE: Log des questions/réponses avec bug PostgreSQL résolu
+        Sérialise correctement tous les dictionnaires avec Json()
+        """
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cur:
+                    # ✅ SOLUTION: Sérialiser TOUS les dictionnaires avec Json()
+                    entities_json = Json(entities) if entities else None
+                    
+                    # ✅ CORRECTION: Traiter error_info de manière robuste
+                    error_type = None
+                    error_message = None
+                    error_traceback = None
+                    
+                    if error_info:
+                        if isinstance(error_info, dict):
+                            error_type = error_info.get("type")
+                            error_message = error_info.get("message")
+                            error_traceback = error_info.get("traceback")
+                        else:
+                            error_message = str(error_info)
+                    
+                    cur.execute("""
+                        INSERT INTO user_questions_complete (
+                            user_email, session_id, question_id, question, response_text,
+                            response_source, status, processing_time_ms, confidence,
+                            completeness_score, language, intent, entities, 
+                            error_type, error_message, error_traceback, created_at
+                        ) VALUES (
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                        )
+                    """, (
+                        user_email,
+                        session_id,
+                        question_id,
+                        question[:2000] if question else None,
+                        response_text[:5000] if response_text else None,
+                        response_source,
+                        status,
+                        processing_time_ms,
+                        confidence,
+                        completeness_score,
+                        language,
+                        intent,
+                        entities_json,  # ✅ Sérialisé avec Json()
+                        error_type,     # ✅ String simple
+                        error_message,  # ✅ String simple
+                        error_traceback, # ✅ String simple
+                        datetime.now()
+                    ))
+                    
+        except Exception as e:
+            logger.error(f"❌ Erreur log question/réponse: {e}")
+            logger.error(f"🔍 DEBUG: user_email={type(user_email)}, entities={type(entities)}, error_info={type(error_info)}")
+
+    def log_system_error(
+        self,
+        error_type: str,
+        category: str,
+        severity: str = "error",
+        component: str = None,
+        user_email: str = None,
+        session_id: str = None,
+        question_id: str = None,
+        details: Dict[str, Any] = None,
+        traceback_info: str = None
+    ):
+        """Log des erreurs système"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cur:
+                    details_json = Json(details) if details else None
+                    
+                    cur.execute("""
+                        INSERT INTO system_errors (
+                            error_type, category, severity, component, user_email,
+                            session_id, question_id, details, traceback, created_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        error_type, category, severity, component, user_email,
+                        session_id, question_id, details_json, traceback_info, datetime.now()
+                    ))
+                    
+        except Exception as e:
+            logger.error(f"❌ Erreur log système: {e}")
+
+    def log_openai_usage(
+        self,
+        user_email: str,
+        session_id: str = None,
+        question_id: str = None,
+        model: str = "gpt-4",
+        tokens: int = 0,
+        cost_usd: float = 0.0,
+        cost_eur: float = 0.0,
+        purpose: str = "chat",
+        success: bool = True,
+        response_time_ms: int = None
+    ):
+        """Log de l'utilisation OpenAI"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO openai_usage (
+                            user_email, session_id, question_id, model, tokens,
+                            cost_usd, cost_eur, purpose, success, response_time_ms, created_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        user_email, session_id, question_id, model, tokens,
+                        cost_usd, cost_eur, purpose, success, response_time_ms, datetime.now()
+                    ))
+                    
+        except Exception as e:
+            logger.error(f"❌ Erreur log OpenAI: {e}")
+
+    def get_questions_with_filters(
+        self, 
+        page: int = 1, 
+        limit: int = 10,
+        user_email: str = None,
+        start_date: date = None,
+        end_date: date = None,
+        status: str = None,
+        min_confidence: float = None
+    ) -> Dict[str, Any]:
+        """Récupère les questions avec filtres avancés"""
+        try:
+            offset = (page - 1) * limit
+            conditions = []
+            params = []
             
-            # Essayer d'utiliser DATABASE_URL si disponible
-            database_url = os.getenv("DATABASE_URL")
-            if database_url:
-                import psycopg2
-                return LoggingManager(psycopg2.extensions.parse_dsn(database_url))
-            else:
-                return LoggingManager(db_config)
-                
+            if user_email:
+                conditions.append("user_email = %s")
+                params.append(user_email)
+            
+            if start_date:
+                conditions.append("created_at >= %s")
+                params.append(start_date)
+            
+            if end_date:
+                conditions.append("created_at <= %s")
+                params.append(end_date)
+            
+            if status:
+                conditions.append("status = %s")
+                params.append(status)
+            
+            if min_confidence is not None:
+                conditions.append("confidence >= %s")
+                params.append(min_confidence)
+            
+            where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+            
+            with self.get_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    # Count total
+                    count_query = f"SELECT COUNT(*) FROM user_questions_complete {where_clause}"
+                    cur.execute(count_query, params)
+                    total_count = cur.fetchone()[0]
+                    
+                    # Get data
+                    main_query = f"""
+                        SELECT user_email, session_id, question_id, question, response_text,
+                               response_source, status, processing_time_ms, confidence,
+                               completeness_score, language, intent, entities,
+                               error_type, error_message, error_traceback, created_at
+                        FROM user_questions_complete
+                        {where_clause}
+                        ORDER BY created_at DESC
+                        LIMIT %s OFFSET %s
+                    """
+                    params.extend([limit, offset])
+                    cur.execute(main_query, params)
+                    
+                    results = []
+                    for row in cur.fetchall():
+                        row_dict = dict(row)
+                        if row_dict['created_at']:
+                            row_dict['created_at'] = row_dict['created_at'].isoformat()
+                        results.append(row_dict)
+                    
+                    return {
+                        "success": True,
+                        "data": results,
+                        "pagination": {
+                            "page": page,
+                            "limit": limit,
+                            "total": total_count,
+                            "pages": (total_count + limit - 1) // limit
+                        },
+                        "debug": {
+                            "query_executed": True,
+                            "total_found": total_count,
+                            "returned": len(results)
+                        }
+                    }
+                    
         except Exception as e:
-            logger.error(f"❌ Erreur création analytics manager: {e}")
-            return AnalyticsManager()
-    
-    def get_analytics():
-        """Fonction de compatibilité pour les analytics"""
-        try:
-            manager = get_analytics_manager()
-            return {"status": "available", "manager": "basic"}
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-    
-    def log_question_to_analytics(*args, **kwargs):
-        """Fonction critique pour logger les questions"""
-        try:
-            manager = get_analytics_manager()
-            if hasattr(manager, 'log_question_response'):
-                return manager.log_question_response(*args, **kwargs)
-            else:
-                logger.warning("⚠️ log_question_response non disponible sur manager")
-        except Exception as e:
-            logger.error(f"❌ Erreur log question: {e}")
-    
-    def track_openai_call(*args, **kwargs):
-        logger.debug("OpenAI call tracked (basic)")
-
-try:
-    # Router pour les endpoints - CRITIQUE POUR L'API
-    from .logging_endpoints import router, questions_final
-    logger.info("✅ Logging endpoints importés")
-except ImportError as e:
-    logger.error(f"❌ CRITIQUE: Logging endpoints non disponibles: {e}")
-    logger.error("❌ Les endpoints API logging ne seront pas disponibles")
-    
-    # Router de base pour compatibilité
-    from fastapi import APIRouter, HTTPException, Depends
-    from typing import Dict, Any
-    import os
-    
-    router = APIRouter(prefix="/logging", tags=["logging"])
-    
-    @router.get("/questions-final")
-    async def questions_final(page: int = 1, limit: int = 10):
-        """Endpoint de compatibilité pour questions-final"""
-        try:
-            manager = get_analytics_manager()
-            if hasattr(manager, 'get_questions_with_filters'):
-                return manager.get_questions_with_filters(page=page, limit=limit)
-            else:
-                return {
-                    "success": False,
-                    "error": "Manager non disponible",
-                    "data": [],
-                    "pagination": {"page": page, "limit": limit, "total": 0, "pages": 0},
-                    "debug": {"total_found": 0, "manager_available": False}
-                }
-        except Exception as e:
-            logger.error(f"❌ Erreur questions-final: {e}")
+            logger.error(f"❌ Erreur récupération questions: {e}")
             return {
                 "success": False,
                 "error": str(e),
                 "data": [],
-                "pagination": {"page": page, "limit": limit, "total": 0, "pages": 0},
-                "debug": {"total_found": 0, "error": str(e)}
+                "pagination": {"page": page, "limit": limit, "total": 0, "pages": 0}
             }
+
+    def get_user_analytics(self, user_email: str, days: int = 30) -> Dict[str, Any]:
+        """Statistiques détaillées d'un utilisateur avec cache"""
+        cache_key = f"user_analytics_{user_email}_{days}"
+        
+        def compute_analytics():
+            try:
+                with self.get_connection() as conn:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        start_date = datetime.now() - timedelta(days=days)
+                        
+                        # Questions totales
+                        cur.execute("""
+                            SELECT COUNT(*) as total_questions,
+                                   COUNT(CASE WHEN status = 'success' THEN 1 END) as successful_questions,
+                                   AVG(confidence) as avg_confidence,
+                                   AVG(processing_time_ms) as avg_processing_time
+                            FROM user_questions_complete
+                            WHERE user_email = %s AND created_at >= %s
+                        """, (user_email, start_date))
+                        
+                        stats = dict(cur.fetchone() or {})
+                        
+                        # Coûts OpenAI
+                        cur.execute("""
+                            SELECT SUM(cost_usd) as total_cost_usd,
+                                   SUM(cost_eur) as total_cost_eur,
+                                   SUM(tokens) as total_tokens
+                            FROM openai_usage
+                            WHERE user_email = %s AND created_at >= %s
+                        """, (user_email, start_date))
+                        
+                        cost_data = dict(cur.fetchone() or {})
+                        stats.update(cost_data)
+                        
+                        return {
+                            "success": True,
+                            "user_email": user_email,
+                            "period_days": days,
+                            "stats": stats
+                        }
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+        
+        return get_cached_or_compute(cache_key, compute_analytics, ttl_seconds=1800)
+
+    def get_server_performance_analytics(self, hours: int = 24) -> Dict[str, Any]:
+        """Métriques de performance système avec cache"""
+        cache_key = f"server_performance_{hours}"
+        
+        def compute_performance():
+            try:
+                with self.get_connection() as conn:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        start_time = datetime.now() - timedelta(hours=hours)
+                        
+                        cur.execute("""
+                            SELECT 
+                                COUNT(*) as total_requests,
+                                COUNT(CASE WHEN status = 'success' THEN 1 END) as successful_requests,
+                                AVG(processing_time_ms) as avg_response_time,
+                                MAX(processing_time_ms) as max_response_time,
+                                MIN(processing_time_ms) as min_response_time
+                            FROM user_questions_complete
+                            WHERE created_at >= %s
+                        """, (start_time,))
+                        
+                        performance = dict(cur.fetchone() or {})
+                        
+                        return {
+                            "success": True,
+                            "period_hours": hours,
+                            "performance": performance
+                        }
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+        
+        return get_cached_or_compute(cache_key, compute_performance, ttl_seconds=900)
+
+# ============================================================================
+# 🔗 FONCTIONS DE COMPATIBILITÉ ET SINGLETON
+# ============================================================================
+
+# Singleton sécurisé
+_analytics_manager = None
+_initialization_lock = threading.Lock()
+
+def get_analytics_manager(force_init=None) -> LoggingManager:
+    """
+    SINGLETON SÉCURISÉ - Version corrigée avec DATABASE_URL
+    Compatible avec tous les imports existants
+    """
+    global _analytics_manager
     
-    @router.get("/health-check")
-    async def health_check():
-        """Health check du système logging"""
-        return {
-            "status": "degraded",
-            "message": "Logging system en mode compatibilité",
-            "modules_available": {
-                "logging_manager": 'LoggingManager' in globals(),
-                "logging_endpoints": False,
-                "postgresql": bool(os.getenv("DATABASE_URL"))
-            }
-        }
+    if _analytics_manager is None:
+        with _initialization_lock:
+            if _analytics_manager is None:
+                logger.info("🔧 Création du gestionnaire analytics...")
+                
+                # Configuration avec DATABASE_URL
+                database_url = os.getenv("DATABASE_URL")
+                
+                if database_url:
+                    try:
+                        db_config = psycopg2.extensions.parse_dsn(database_url)
+                        logger.info("✅ Configuration PostgreSQL depuis DATABASE_URL")
+                    except Exception as e:
+                        logger.error(f"❌ Erreur parsing DATABASE_URL: {e}")
+                        db_config = {
+                            "host": os.getenv("POSTGRES_HOST", "localhost"),
+                            "port": int(os.getenv("POSTGRES_PORT", 5432)),
+                            "database": os.getenv("POSTGRES_DB", "postgres"),
+                            "user": os.getenv("POSTGRES_USER", "postgres"),
+                            "password": os.getenv("POSTGRES_PASSWORD", "")
+                        }
+                else:
+                    db_config = {
+                        "host": os.getenv("POSTGRES_HOST", "localhost"),
+                        "port": int(os.getenv("POSTGRES_PORT", 5432)),
+                        "database": os.getenv("POSTGRES_DB", "postgres"),
+                        "user": os.getenv("POSTGRES_USER", "postgres"),
+                        "password": os.getenv("POSTGRES_PASSWORD", "")
+                    }
+                
+                _analytics_manager = LoggingManager(db_config)
+                _analytics_manager._ensure_analytics_tables()
+                logger.info("✅ Gestionnaire analytics créé avec correction PostgreSQL")
+    
+    return _analytics_manager
+
+def get_logging_manager(db_config: dict = None) -> LoggingManager:
+    """Alias pour compatibilité avec expert_utils.py"""
+    return get_analytics_manager()
+
+# Alias pour compatibilité totale
+AnalyticsManager = LoggingManager
 
 # ============================================================================
-# 📋 EXPORTS PUBLICS POUR COMPATIBILITÉ
+# 📊 ROUTER ET EXPORTS
 # ============================================================================
 
-# Toutes les classes et fonctions importantes sont exportées
-# pour maintenir la compatibilité avec les imports existants
+try:
+    from .logging_endpoints import router
+    logger.info("✅ Logging endpoints importés")
+except ImportError as e:
+    logger.error(f"❌ ERREUR: logging_endpoints.py manquant: {e}")
+    # Créer un router de base pour compatibilité
+    from fastapi import APIRouter
+    router = APIRouter(prefix="/logging", tags=["logging"])
+
+# ============================================================================
+# 📋 EXPORTS PUBLICS
+# ============================================================================
+
 __all__ = [
-    # Enums et models
+    # Classe principale
+    'LoggingManager',
+    'AnalyticsManager',
+    
+    # Fonctions singleton
+    'get_analytics_manager',
+    'get_logging_manager',
+    
+    # Imports depuis modules spécialisés
     'LogLevel',
     'ResponseSource', 
     'UserRole',
-    
-    # Permissions
+    'Permission',
+    'ROLE_PERMISSIONS',
     'has_permission',
-    'require_permission', 
+    'require_permission',
     'is_admin_user',
-    
-    # Cache
     'get_cached_or_compute',
     'clear_analytics_cache',
     'get_cache_stats',
     
-    # Manager principal
-    'AnalyticsManager',
-    'LoggingManager',
-    
-    # Helpers et singleton
-    'get_analytics_manager',
-    'get_analytics',
-    'log_question_to_analytics',
-    'track_openai_call',
-    
-    # Router
-    'router',
-    'questions_final'
+    # Router API
+    'router'
 ]
 
-# ============================================================================
-# 📝 INFORMATIONS SUR LA NOUVELLE ARCHITECTURE
-# ============================================================================
-
-def get_module_info():
-    """
-    Informations sur l'architecture modulaire et statut de déploiement
-    """
-    return {
-        "status": "modular_architecture_with_corrections",
-        "version": "2.1-corrected",
-        "description": "Système de logging avec corrections PostgreSQL",
-        "deployment_status": {
-            "logging_manager": 'LoggingManager' in globals(),
-            "endpoints_available": 'questions_final' in globals(),
-            "postgresql_configured": bool(os.getenv("DATABASE_URL")),
-            "bug_fix_deployed": True
-        },
-        "critical_fixes": [
-            "Bug 'can't adapt type dict' PostgreSQL résolu",
-            "Sérialisation Json() pour tous les dictionnaires",
-            "Gestion robuste des paramètres error_info",
-            "Log de confirmation au démarrage"
-        ],
-        "modules": {
-            "logging_models.py": "Enums et classes de base",
-            "logging_permissions.py": "Système de permissions et rôles",
-            "logging_cache.py": "Cache intelligent avec TTL",
-            "logging_manager.py": "Gestionnaire analytics principal (BUG FIX)",
-            "logging_helpers.py": "Fonctions helper et singleton",
-            "logging_endpoints.py": "Endpoints API FastAPI",
-            "logging.py": "Point d'entrée principal (ce fichier)"
-        },
-        "compatibility": "100% compatible avec imports existants + corrections",
-        "postgresql_status": "Opérationnel avec corrections bug dict"
-    }
-
-# ============================================================================
-# ⚡ INITIALISATION ET LOGGING DÉTAILLÉ
-# ============================================================================
-
-logger.info("✅ Système de logging modulaire initialisé avec corrections")
-logger.info("🔧 Bug PostgreSQL 'can't adapt type dict' corrigé")
-logger.info("📦 Modules chargés avec fallbacks de compatibilité")
-logger.info("🔗 Compatibilité maintenue avec les imports existants")
-
-# Message de statut détaillé pour debugging
-def _log_deployment_status():
-    """Log détaillé du statut de déploiement"""
-    try:
-        info = get_module_info()
-        deployment = info['deployment_status']
-        
-        logger.info(f"🚀 Architecture modulaire {info['version']} déployée")
-        logger.info(f"📊 Statut déploiement: {deployment}")
-        
-        if deployment['logging_manager']:
-            logger.info("✅ LoggingManager disponible - Bug PostgreSQL corrigé")
-        else:
-            logger.error("❌ LoggingManager indisponible - Bug PostgreSQL non résolu")
-        
-        if deployment['endpoints_available']:
-            logger.info("✅ Endpoints API logging disponibles")
-        else:
-            logger.warning("⚠️ Endpoints API en mode compatibilité")
-        
-        if deployment['postgresql_configured']:
-            logger.info("✅ PostgreSQL configuré")
-        else:
-            logger.warning("⚠️ PostgreSQL non configuré")
-            
-    except Exception as e:
-        logger.error(f"❌ Erreur log deployment status: {e}")
-
-# Log automatique du statut
-_log_deployment_status()
-
-# ============================================================================
-# 🔄 FONCTIONS DE COMPATIBILITÉ ET DIAGNOSTIC
-# ============================================================================
-
-def get_all_exports():
-    """
-    Fonction pour vérifier tous les exports disponibles
-    """
-    return {
-        "total_exports": len(__all__),
-        "exports": __all__,
-        "module_info": get_module_info()
-    }
-
-def validate_imports():
-    """
-    Validation que tous les imports et corrections fonctionnent
-    """
-    validation_results = {}
-    
-    try:
-        # Tester les imports principaux
-        validation_results["models"] = bool(LogLevel and ResponseSource and UserRole)
-        validation_results["permissions"] = callable(has_permission) and callable(require_permission)
-        validation_results["cache"] = callable(get_cached_or_compute) and callable(clear_analytics_cache)
-        validation_results["manager"] = 'LoggingManager' in globals()
-        validation_results["helpers"] = callable(get_analytics_manager) and callable(get_analytics)
-        validation_results["router"] = router is not None
-        validation_results["endpoints"] = callable(questions_final)
-        validation_results["postgresql_fix"] = bool(os.getenv("DATABASE_URL"))
-        
-        validation_results["overall_status"] = all([
-            validation_results["models"],
-            validation_results["manager"], 
-            validation_results["helpers"],
-            validation_results["router"]
-        ])
-        validation_results["validated_components"] = sum(1 for v in validation_results.values() if v == True)
-        
-    except Exception as e:
-        validation_results["error"] = str(e)
-        validation_results["overall_status"] = False
-    
-    return validation_results
-
-def diagnostic_postgresql_bug():
-    """
-    🆕 Diagnostic spécifique du bug PostgreSQL
-    """
-    try:
-        manager = get_analytics_manager()
-        
-        # Test de base
-        test_entities = {"test": "data", "nested": {"key": "value"}}
-        
-        if hasattr(manager, 'log_question_response'):
-            # Simuler un appel (sans vraiment l'exécuter)
-            diagnostic = {
-                "manager_available": True,
-                "log_method_exists": True,
-                "test_entities_type": type(test_entities).__name__,
-                "json_serialization": "should_work_with_psycopg2.Json()",
-                "bug_fix_status": "deployed",
-                "expected_behavior": "no_more_dict_adaptation_errors"
-            }
-        else:
-            diagnostic = {
-                "manager_available": False,
-                "bug_fix_status": "not_deployed",
-                "error": "log_question_response method not available"
-            }
-        
-        return diagnostic
-        
-    except Exception as e:
-        return {
-            "error": str(e),
-            "bug_fix_status": "unknown"
-        }
-
-# Log de validation automatique avec diagnostic PostgreSQL
-try:
-    validation = validate_imports()
-    postgresql_diagnostic = diagnostic_postgresql_bug()
-    
-    if validation["overall_status"]:
-        logger.info(f"✅ Validation réussie: {validation['validated_components']} composants OK")
-        
-        if postgresql_diagnostic.get("manager_available"):
-            logger.info("✅ Bug PostgreSQL: Correction déployée et opérationnelle")
-        else:
-            logger.error("❌ Bug PostgreSQL: Correction non déployée")
-    else:
-        logger.warning(f"⚠️ Validation partielle: {validation}")
-        
-    logger.info(f"🔍 Diagnostic PostgreSQL: {postgresql_diagnostic.get('bug_fix_status', 'unknown')}")
-    
-except Exception as e:
-    logger.error(f"❌ Erreur validation imports: {e}")
-
-# ============================================================================
-# 🎯 POINT D'ENTRÉE PRINCIPAL AVEC STATUS FINAL
-# ============================================================================
-
-# Status final du déploiement
-import os
-final_status = {
-    "logging_system": "operational",
-    "postgresql_bug": "fixed" if 'LoggingManager' in globals() else "pending",
-    "endpoints_available": bool(router),
-    "database_configured": bool(os.getenv("DATABASE_URL")),
-    "compatibility": "maintained"
-}
-
-logger.info(f"🎯 Status final logging system: {final_status}")
-
-if final_status["postgresql_bug"] == "fixed":
-    logger.info("🎉 SUCCÈS: Bug PostgreSQL 'can't adapt type dict' résolu")
-    logger.info("📊 Les questions devraient maintenant être sauvegardées correctement")
-else:
-    logger.error("❌ ATTENTION: Bug PostgreSQL non résolu - logging_manager.py manquant")
-
-# Ce fichier sert de point d'entrée principal pour maintenir la compatibilité
-# Tous les imports existants comme "from app.api.v1.logging import ..." 
-# continueront de fonctionner exactement comme avant.
-
-# NOUVEAUTÉS dans cette version:
-# - Correction critique du bug PostgreSQL 'can't adapt type dict'
-# - Logs de confirmation détaillés
-# - Diagnostic automatique du statut de déploiement
-# - Fallbacks robustes pour compatibilité maximale
+logger.info("✅ Système logging restructuré initialisé - Bug PostgreSQL corrigé")
+logger.info("📊 Architecture modulaire maintenue avec 6 fichiers spécialisés")

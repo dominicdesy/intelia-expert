@@ -221,7 +221,7 @@ def log_question_to_analytics(
     """
     try:
         # Import direct du LoggingManager
-        from app.api.v1.logging_manager import get_logging_manager
+        from app.api.v1.logging import get_logging_manager
         
         # Récupérer l'instance du manager PostgreSQL
         manager = get_logging_manager()

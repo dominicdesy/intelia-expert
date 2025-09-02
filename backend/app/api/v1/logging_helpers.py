@@ -6,80 +6,19 @@
 """
 import os
 import logging
-import threading
 from typing import Dict, Any, Optional
 
-from .logging_manager import LoggingManager
+# ✅ CORRECTION: Import depuis logging.py au lieu de logging_manager.py
+from .logging import LoggingManager, get_analytics_manager
 AnalyticsManager = LoggingManager  # Alias pour compatibilité
 
-from .logging_cache import clear_analytics_cache, get_cache_stats
+from .logging_cache import get_cache_stats
 
 logger = logging.getLogger(__name__)
 
-# 🔒 Singleton sécurisé
-_analytics_manager = None
-_initialization_lock = threading.Lock()
-
-
-def get_analytics_manager(force_init=None) -> AnalyticsManager:
-    """
-    🚀 SINGLETON SÉCURISÉ - Version corrigée avec DATABASE_URL
-    CORRECTION: Utilise DATABASE_URL au lieu de localhost par défaut
-    """
-    global _analytics_manager
-    
-    if _analytics_manager is None:
-        with _initialization_lock:
-            # Double vérification avec lock
-            if _analytics_manager is None:
-                logger.info("🔧 Création du gestionnaire analytics...")
-                
-                # CORRECTION CRITIQUE: Configuration avec DATABASE_URL
-                database_url = os.getenv("DATABASE_URL")
-                
-                if database_url:
-                    # Utiliser DATABASE_URL de Digital Ocean
-                    try:
-                        import psycopg2
-                        db_config = psycopg2.extensions.parse_dsn(database_url)
-                        logger.info("✅ Configuration PostgreSQL depuis DATABASE_URL")
-                    except Exception as e:
-                        logger.error(f"❌ Erreur parsing DATABASE_URL: {e}")
-                        # Fallback vers config manuelle
-                        db_config = {
-                            "host": os.getenv("POSTGRES_HOST", "localhost"),
-                            "port": int(os.getenv("POSTGRES_PORT", 5432)),
-                            "database": os.getenv("POSTGRES_DB", "postgres"),
-                            "user": os.getenv("POSTGRES_USER", "postgres"),
-                            "password": os.getenv("POSTGRES_PASSWORD", "")
-                        }
-                        logger.warning("⚠️ Utilisation config fallback PostgreSQL")
-                else:
-                    # Configuration par défaut (développement)
-                    db_config = {
-                        "host": os.getenv("POSTGRES_HOST", "localhost"),
-                        "port": int(os.getenv("POSTGRES_PORT", 5432)),
-                        "database": os.getenv("POSTGRES_DB", "postgres"),
-                        "user": os.getenv("POSTGRES_USER", "postgres"),
-                        "password": os.getenv("POSTGRES_PASSWORD", "")
-                    }
-                    logger.warning("⚠️ DATABASE_URL manquante, utilisation config par défaut")
-                
-                # Créer le manager avec la bonne configuration
-                _analytics_manager = AnalyticsManager(db_config)
-                logger.info("✅ Gestionnaire analytics créé avec configuration corrigée")
-    
-    return _analytics_manager
-
-
-def reset_analytics_manager():
-    """🆕 NOUVELLE FONCTION - Reset pour tests/redémarrage"""
-    global _analytics_manager
-    with _initialization_lock:
-        _analytics_manager = None
-        clear_analytics_cache()
-        logger.info("🔄 Gestionnaire analytics reset")
-
+# ============================================================================
+# 🔗 FONCTIONS HELPER POUR INTÉGRATION
+# ============================================================================
 
 def get_analytics():
     """Fonction analytics pour compatibilité avec main.py"""
@@ -88,16 +27,15 @@ def get_analytics():
         return {
             "status": "analytics_available",
             "tables_created": True,
-            "dsn_configured": bool(getattr(analytics, 'db_config', None)),
+            "dsn_configured": bool(getattr(analytics, 'dsn', None)),
             "cache_enabled": True,
-            "cache_entries": get_cache_stats()["total_entries"]
+            "cache_entries": get_cache_stats().get("total_entries", 0)
         }
     except Exception as e:
         return {
             "status": "analytics_error",
             "error": str(e)
         }
-
 
 def log_server_performance(**kwargs) -> None:
     """Fonction helper pour logger les performances serveur depuis main.py"""
@@ -108,8 +46,7 @@ def log_server_performance(**kwargs) -> None:
         else:
             logger.warning("⚠️ log_server_performance non disponible sur analytics manager")
     except Exception as e:
-        logger.error(f"⛔ Erreur log server performance helper: {e}")
-
+        logger.error(f"❌ Erreur log server performance helper: {e}")
 
 def get_server_analytics(hours: int = 24) -> Dict[str, Any]:
     """Fonction helper pour récupérer les analytics serveur depuis main.py"""
@@ -121,9 +58,8 @@ def get_server_analytics(hours: int = 24) -> Dict[str, Any]:
             logger.warning("⚠️ get_server_performance_analytics non disponible")
             return {"error": "Method not available"}
     except Exception as e:
-        logger.error(f"⛔ Erreur get server analytics: {e}")
+        logger.error(f"❌ Erreur get server analytics: {e}")
         return {"error": str(e)}
-
 
 def log_question_to_analytics(
     current_user: Optional[Dict[str, Any]],
@@ -185,9 +121,8 @@ def log_question_to_analytics(
         logger.info(f"✅ Question loggée PostgreSQL: {user_email or 'anonymous'}")
         
     except Exception as e:
-        logger.error(f"⛔ Erreur log question to analytics: {e}")
-        logger.error(f"⛔ Détails erreur: user={user_email}, session={session_id}")
-
+        logger.error(f"❌ Erreur log question to analytics: {e}")
+        logger.error(f"❌ Détails erreur: user={user_email}, session={session_id}")
 
 def track_openai_call(
     user_email: str = None,
@@ -220,4 +155,33 @@ def track_openai_call(
         else:
             logger.warning("⚠️ log_openai_usage non disponible sur analytics manager")
     except Exception as e:
-        logger.error(f"⛔ Erreur track OpenAI call: {e}")
+        logger.error(f"❌ Erreur track OpenAI call: {e}")
+
+def reset_analytics_manager():
+    """🆕 NOUVELLE FONCTION - Reset pour tests/redémarrage"""
+    global _analytics_manager
+    from .logging_cache import clear_analytics_cache
+    
+    # Cette fonction doit être appelée sur le singleton dans logging.py
+    try:
+        from .logging import _analytics_manager, _initialization_lock
+        with _initialization_lock:
+            _analytics_manager = None
+            clear_analytics_cache()
+            logger.info("🔄 Gestionnaire analytics reset")
+    except Exception as e:
+        logger.error(f"❌ Erreur reset analytics manager: {e}")
+
+# ============================================================================
+# 📋 EXPORTS
+# ============================================================================
+
+__all__ = [
+    'get_analytics',
+    'log_server_performance',
+    'get_server_analytics',
+    'log_question_to_analytics',
+    'track_openai_call',
+    'reset_analytics_manager',
+    'AnalyticsManager'
+]
