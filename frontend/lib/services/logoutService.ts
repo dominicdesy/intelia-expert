@@ -56,15 +56,11 @@ export const logoutService = {
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i)
         if (key && key !== 'intelia-remember-me-persist' && key !== 'intelia-language') {
-          // ✅ CORRECTION : Exclure aussi 'intelia-language' du nettoyage
+          // ✅ CORRECTION : Nettoyage plus ciblé pour éviter de supprimer les stores Zustand
           if (key.startsWith('supabase-') || 
-              (key.startsWith('intelia-') && 
-               key !== 'intelia-remember-me-persist' && 
-               key !== 'intelia-language') ||
-              key.includes('auth') || 
-              key.includes('session') ||
               key === 'intelia-expert-auth' ||
-              key === 'intelia-chat-storage') {
+              key === 'intelia-chat-storage' ||
+              key.includes('session')) {
             keysToRemove.push(key)
           }
         }
@@ -79,7 +75,23 @@ export const logoutService = {
         }
       })
       
-      console.log(`[LogoutService] ${keysToRemove.length} cles supprimees, RememberMe et Language preserves`)
+      // ✅ NOUVEAU : Réinitialiser le store auth au lieu de le supprimer
+      try {
+        localStorage.setItem('auth-storage', JSON.stringify({
+          state: {
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+            hasHydrated: true
+          },
+          version: 0
+        }))
+        console.log('[LogoutService] Store auth réinitialisé')
+      } catch (error) {
+        console.warn('[LogoutService] Erreur réinitialisation store auth:', error)
+      }
+      
+      console.log(`[LogoutService] ${keysToRemove.length} cles supprimees, RememberMe et Language preserves, Store auth reinitialise`)
 
       // 5. Restaurer RememberMe si necessaire
       if (preservedRememberMe) {
