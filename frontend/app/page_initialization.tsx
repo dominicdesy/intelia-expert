@@ -5,11 +5,21 @@ import { useSearchParams } from 'next/navigation'
 import type { Language } from '@/types'
 import { useTranslation } from '@/lib/languages/i18n'
 import { rememberMeUtils } from './page_hooks'
+import { Suspense } from 'react'
 
-export function usePageInitialization() {
+// Composant qui utilise useSearchParams, wrappé dans Suspense
+function SearchParamsHandler({ onAuthStatus }: { onAuthStatus: (status: string | null) => void }) {
   const searchParams = useSearchParams()
   
-  // PATTERN SIMPLE COMME CONTACTMODAL - Pas de refs complexes
+  useEffect(() => {
+    const authStatus = searchParams?.get('auth')
+    onAuthStatus(authStatus)
+  }, [searchParams, onAuthStatus])
+  
+  return null
+}
+
+function usePageInitializationCore() {
   const { t } = useTranslation()
   
   const [currentLanguage, setCurrentLanguage] = useState<Language>('fr')
@@ -17,6 +27,7 @@ export function usePageInitialization() {
   const [localError, setLocalError] = useState('')
   const [localSuccess, setLocalSuccess] = useState('')
   const [hasHydrated, setHasHydrated] = useState(false)
+  const [authStatusFromUrl, setAuthStatusFromUrl] = useState<string | null>(null)
 
   // Fonction simple comme ContactModal
   const toggleMode = useCallback(() => {
@@ -28,13 +39,18 @@ export function usePageInitialization() {
   // Fonction simple pour changer la langue
   const handleSetCurrentLanguage = useCallback((newLanguage: Language) => {
     setCurrentLanguage(newLanguage)
-    // CORRECTION: Sauvegarder avec la structure attendue par i18n.ts
+    // Sauvegarder avec la structure attendue par i18n.ts
     const langData = {
       state: {
         currentLanguage: newLanguage
       }
     }
     localStorage.setItem('intelia-language', JSON.stringify(langData))
+  }, [])
+
+  // Callback pour recevoir le statut d'auth depuis l'URL
+  const handleAuthStatus = useCallback((status: string | null) => {
+    setAuthStatusFromUrl(status)
   }, [])
 
   // Hydratation simple
@@ -63,16 +79,15 @@ export function usePageInitialization() {
     }
   }, [])
 
-  // Gestion URL callback - VERSION SIMPLE
+  // Gestion du statut d'auth depuis l'URL
   useEffect(() => {
-    const authStatus = searchParams?.get('auth')
-    if (!authStatus) return
+    if (!authStatusFromUrl) return
     
-    if (authStatus === 'success') {
+    if (authStatusFromUrl === 'success') {
       setLocalSuccess(t('auth.success'))
-    } else if (authStatus === 'error') {
+    } else if (authStatusFromUrl === 'error') {
       setLocalError(t('auth.error'))
-    } else if (authStatus === 'incomplete') {
+    } else if (authStatusFromUrl === 'incomplete') {
       setLocalError(t('auth.incomplete'))
     }
     
@@ -89,7 +104,7 @@ export function usePageInitialization() {
       setLocalSuccess('')
       setLocalError('')
     }, 3000)
-  }, [searchParams, t])
+  }, [authStatusFromUrl, t])
 
   // Gestion scroll en mode signup
   useEffect(() => {
@@ -104,8 +119,7 @@ export function usePageInitialization() {
     }
   }, [isSignupMode])
 
-  // Retour simple comme ContactModal
-  return useMemo(() => ({
+  return {
     currentLanguage,
     setCurrentLanguage: handleSetCurrentLanguage,
     t,
@@ -117,15 +131,22 @@ export function usePageInitialization() {
     setLocalSuccess,
     hasHydrated,
     hasInitialized: { current: true }, // Toujours initialisé en mode simple
-    toggleMode
-  }), [
-    currentLanguage,
-    t,
-    isSignupMode,
-    localError,
-    localSuccess,
-    hasHydrated,
-    handleSetCurrentLanguage,
-    toggleMode
-  ])
+    toggleMode,
+    handleAuthStatus
+  }
+}
+
+export function usePageInitialization() {
+  const coreHook = usePageInitializationCore()
+  
+  return {
+    ...coreHook,
+    // Wrapper avec Suspense pour useSearchParams
+    SearchParamsWrapper: ({ children }: { children: React.ReactNode }) => (
+      <Suspense fallback={null}>
+        <SearchParamsHandler onAuthStatus={coreHook.handleAuthStatus} />
+        {children}
+      </Suspense>
+    )
+  }
 }

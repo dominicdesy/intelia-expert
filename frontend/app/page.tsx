@@ -1,45 +1,133 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, Suspense } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslation } from '@/lib/languages/i18n'
 import { useAuthStore } from '@/lib/stores/auth'
 
-// Import des composants corrigés
-import { InteliaLogo, LanguageSelector, AlertMessage, AuthFooter } from './page_components'
-import { SignupModal } from './page_signup_modal'
-import { useAuthenticationLogic } from './page_authentication'
-import { usePageInitialization } from './page_initialization'
+// Logo Intelia
+const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
+  <img 
+    src="/images/favicon.png" 
+    alt="Intelia Logo" 
+    className={className}
+  />
+)
 
-export default function LoginPage() {
+// Sélecteur de langue simple
+const LanguageSelector = () => {
+  const { changeLanguage, currentLanguage } = useTranslation()
+  const [isOpen, setIsOpen] = useState(false)
+
+  const languages = [
+    { code: 'fr', name: 'Français', flag: '🇫🇷' },
+    { code: 'en', name: 'English', flag: '🇺🇸' },
+    { code: 'es', name: 'Español', flag: '🇪🇸' }
+  ]
+
+  const currentLang = languages.find(lang => lang.code === currentLanguage) || languages[0]
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
+      >
+        <span>{currentLang.flag}</span>
+        <span>{currentLang.name}</span>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute top-full right-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+            {languages.map((lang) => (
+              <button
+                key={lang.code}
+                onClick={() => {
+                  changeLanguage(lang.code)
+                  setIsOpen(false)
+                }}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2 ${
+                  lang.code === currentLanguage ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                } first:rounded-t-lg last:rounded-b-lg transition-colors`}
+              >
+                <span>{lang.flag}</span>
+                <span>{lang.name}</span>
+                {lang.code === currentLanguage && (
+                  <svg className="w-4 h-4 text-blue-500 ml-auto" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// Composant qui gère useSearchParams dans Suspense
+function AuthCallbackHandler() {
+  const searchParams = useSearchParams()
+  const [authMessage, setAuthMessage] = useState('')
+
+  React.useEffect(() => {
+    const authStatus = searchParams?.get('auth')
+    if (!authStatus) return
+    
+    if (authStatus === 'success') {
+      setAuthMessage('Connexion réussie !')
+    } else if (authStatus === 'error') {
+      setAuthMessage('Erreur de connexion')
+    } else if (authStatus === 'incomplete') {
+      setAuthMessage('Informations manquantes')
+    }
+    
+    // Nettoyer l'URL
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('auth')
+      window.history.replaceState({}, '', url.pathname)
+    } catch (error) {
+      console.error('Erreur nettoyage URL:', error)
+    }
+    
+    setTimeout(() => {
+      setAuthMessage('')
+    }, 3000)
+  }, [searchParams])
+
+  if (authMessage) {
+    return (
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 text-blue-700 rounded text-sm">
+        {authMessage}
+      </div>
+    )
+  }
+
+  return null
+}
+
+// PAGE LOGIN SIMPLIFIÉE
+function LoginPageContent() {
   const router = useRouter()
-  const { t, currentLanguage } = useTranslation() // Comme ContactModal
+  const { t, currentLanguage } = useTranslation()
   const { login } = useAuthStore()
 
-  // Utilisation des hooks d'initialisation et d'auth
-  const {
-    isSignupMode,
-    toggleMode,
-    localError,
-    localSuccess,
-    hasHydrated
-  } = usePageInitialization()
-
-  const authLogic = useAuthenticationLogic({
-    currentLanguage,
-    t,
-    isSignupMode,
-    setCurrentLanguage: () => {} // Pas utilisé dans ce contexte
-  })
-
-  // États simples pour le login
+  // États simples
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [showSignup, setShowSignup] = useState(false)
 
   // Fonction de connexion simple
   const handleLogin = async () => {
@@ -79,23 +167,41 @@ export default function LoginPage() {
     }
   }
 
-  // Attendre l'hydratation
-  if (!hasHydrated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
-        <div className="text-center">
-          <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">{t('common.loading')}</p>
+  // Modal d'inscription simple
+  const SignupModal = () => (
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold">{t('auth.createAccount')}</h3>
+          <button onClick={() => setShowSignup(false)} className="text-gray-400 hover:text-gray-600">
+            ×
+          </button>
+        </div>
+        <p className="text-gray-600 mb-4">
+          Inscription disponible bientôt. Pour l'instant, contactez-nous pour créer un compte.
+        </p>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => setShowSignup(false)}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+          >
+            {t('modal.cancel') || 'Annuler'}
+          </button>
+          <button
+            onClick={() => window.open('mailto:support@intelia.com?subject=Demande création compte', '_blank')}
+            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Nous contacter
+          </button>
         </div>
       </div>
-    )
-  }
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       
-      {/* Sélecteur de langue unifié */}
+      {/* Sélecteur de langue */}
       <div className="absolute top-4 right-4">
         <LanguageSelector />
       </div>
@@ -112,21 +218,23 @@ export default function LoginPage() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           
-          {/* Messages d'erreur et succès locaux + initialization */}
-          {(error || localError) && (
-            <AlertMessage 
-              type="error" 
-              title={t('error.generic')} 
-              message={error || localError} 
-            />
+          {/* Callback d'auth dans Suspense */}
+          <Suspense fallback={null}>
+            <AuthCallbackHandler />
+          </Suspense>
+          
+          {/* Messages d'erreur */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded text-sm">
+              {error}
+            </div>
           )}
 
-          {(success || localSuccess) && (
-            <AlertMessage 
-              type="success" 
-              title="" 
-              message={success || localSuccess} 
-            />
+          {/* Messages de succès */}
+          {success && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded text-sm">
+              {success}
+            </div>
           )}
 
           <div className="space-y-6">
@@ -234,7 +342,7 @@ export default function LoginPage() {
             <p className="text-sm text-gray-600">
               {t('auth.newToIntelia')}{' '}
               <button
-                onClick={toggleMode}
+                onClick={() => setShowSignup(true)}
                 className="font-medium text-blue-600 hover:text-blue-500"
               >
                 {t('auth.createAccount')}
@@ -243,26 +351,47 @@ export default function LoginPage() {
           </div>
 
           {/* Footer */}
-          <AuthFooter />
+          <div className="mt-6 text-center">
+            <p className="text-xs text-gray-500">
+              En continuant, vous acceptez nos{' '}
+              <Link href="/terms" className="text-blue-600 hover:text-blue-500">
+                Conditions d'utilisation
+              </Link>
+              {' et notre '}
+              <Link href="/privacy" className="text-blue-600 hover:text-blue-500">
+                Politique de confidentialité
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Modal d'inscription VRAIE - connectée aux hooks */}
-      {isSignupMode && (
-        <SignupModal 
-          authLogic={authLogic}
-          localError={localError}
-          localSuccess={localSuccess}
-          toggleMode={toggleMode}
-        />
-      )}
+      {/* Modal d'inscription */}
+      {showSignup && <SignupModal />}
 
       {/* Debug */}
       {process.env.NODE_ENV === 'development' && (
         <div className="fixed bottom-4 left-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-          <strong>Debug:</strong> Langue: {currentLanguage} | Signup: {isSignupMode ? 'ON' : 'OFF'}
+          <strong>Debug:</strong> Langue: {currentLanguage}
         </div>
       )}
     </div>
+  )
+}
+
+// PAGE PRINCIPALE avec Suspense
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Chargement...</p>
+        </div>
+      </div>
+    }>
+      <LoginPageContent />
+    </Suspense>
   )
 }
