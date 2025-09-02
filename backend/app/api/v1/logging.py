@@ -102,7 +102,9 @@ except ImportError as e:
 
 try:
     # Gestionnaire principal - CRITIQUE POUR LE BUG FIX
-    from .logging_manager import AnalyticsManager, LoggingManager
+    from .logging_manager import LoggingManager
+    # Créer l'alias pour compatibilité
+    AnalyticsManager = LoggingManager
     logger.info("✅ Logging manager importé - Bug PostgreSQL corrigé")
 except ImportError as e:
     logger.error(f"❌ CRITIQUE: Logging manager non disponible: {e}")
