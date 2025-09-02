@@ -8,7 +8,6 @@ import { useAuthStore } from '@/lib/stores/auth'
 
 // Import de la vraie SignupModal et des hooks nécessaires
 import { SignupModal } from './page_signup_modal'
-import { useAuthenticationLogic } from './app/auth/login/page_authentication'
 
 // Logo Intelia
 const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
