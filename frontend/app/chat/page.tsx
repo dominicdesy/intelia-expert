@@ -249,10 +249,7 @@ const MessageList = React.memo(({
 MessageList.displayName = 'MessageList'
 
 export default function ChatInterface() {
-  // ✅ CORRECTION PRINCIPALE: Supprimer useRouter - pas de redirections dans cette page
-  // const router = useRouter() // SUPPRIMÉ
-  
-  const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore() // Supprimé initializeSession
+  const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
 
   // Stores Zustand
@@ -298,7 +295,6 @@ export default function ChatInterface() {
   const isMountedRef = useRef(true)
   const inputRef = useRef<HTMLInputElement>(null)
   const hasLoadedConversationsRef = useRef(false)
-  // const isRedirectingRef = useRef(false) // SUPPRIMÉ
 
   // Mémorisation stable des données
   const messages: Message[] = useMemo(() => {
@@ -309,15 +305,51 @@ export default function ChatInterface() {
     return messages.length > 0
   }, [messages.length])
 
-  // ✅ CORRECTION PRINCIPALE: Supprimer les fonctions de redirection
-  // const redirectToLogin = useCallback((reason?: string) => { ... }) // SUPPRIMÉ
-  // const handleAuthError = useCallback((error: any) => { ... }) // SIMPLIFIÉ
-
+  // ✅ MODIFICATION PRINCIPALE: Gestion améliorée des erreurs d'authentification
   const handleAuthError = useCallback((error: any) => {
-    console.error('Auth error:', error)
-    // Plus de redirection - juste log l'erreur
-    // L'AuthProvider au niveau layout gère les redirections
-  }, [])
+    console.error('🚨 [Chat] Auth error détectée:', error)
+    
+    // Vérifier si c'est une erreur de session expirée
+    const isSessionExpired = (
+      error?.status === 401 || 
+      error?.status === 403 ||
+      error?.message?.includes('Token expired') ||
+      error?.message?.includes('Auth session missing') ||
+      error?.message?.includes('Unauthorized') ||
+      error?.message?.includes('Forbidden') ||
+      error?.message?.includes('authentication_failed') ||
+      error?.message?.includes('Session expiree') ||
+      error?.detail === 'Token expired'
+    )
+    
+    if (isSessionExpired) {
+      console.log('🔄 [Chat] Session expirée détectée - déconnexion automatique')
+      
+      // Nettoyer l'état local immédiatement pour éviter les erreurs en cascade
+      if (isMountedRef.current) {
+        setCurrentConversation(null)
+        setClarificationState(null)
+        setInputMessage('')
+        setIsLoadingChat(false)
+      }
+      
+      // Utiliser le service de logout pour une déconnexion propre
+      import('@/lib/services/logoutService').then(({ logoutService }) => {
+        logoutService.performLogout(user)
+      }).catch(err => {
+        console.warn('🔧 [Chat] Fallback - redirection directe:', err)
+        // Fallback : redirection directe si le service échoue
+        setTimeout(() => {
+          window.location.href = '/'
+        }, 100)
+      })
+      
+      return
+    }
+    
+    // Pour les autres erreurs, juste logger sans redirection
+    console.warn('🔧 [Chat] Erreur non-auth (pas de redirection):', error)
+  }, [user, setCurrentConversation, setClarificationState, setInputMessage, setIsLoadingChat])
 
   // Fonctions utilitaires (conservées intégralement)
   const getUserInitials = useCallback((user: any): string => {
@@ -405,10 +437,6 @@ export default function ChatInterface() {
       hasLoadedConversationsRef.current = false
     }
   }, [])
-
-  // ✅ CORRECTION PRINCIPALE: Supprimer les effets de redirection et simplifier
-  // Plus d'initialisation d'auth - l'AuthProvider s'en occupe
-  // Plus de gestion de déconnexion avec redirection - l'AuthProvider s'en occupe
 
   // Détection de device mobile (conservée)
   useEffect(() => {
@@ -609,7 +637,7 @@ export default function ChatInterface() {
             .catch(err => {
               if (isMountedRef.current) {
                 console.error(t('chat.historyLoadError'), err)
-                handleAuthError(err) // Juste log - pas de redirection
+                handleAuthError(err) // Utilise la nouvelle gestion d'erreur améliorée
               }
             })
         }
@@ -726,6 +754,18 @@ export default function ChatInterface() {
 
       if (!isMountedRef.current) return
 
+      // ✅ NOUVEAU : Vérifier si la réponse indique une session expirée
+      if (response?.error === 'authentication_failed' || 
+          response?.detail === 'Token expired' ||
+          response?.message?.includes('Session expiree')) {
+        handleAuthError({ 
+          status: 401, 
+          message: 'Token expired from API response',
+          detail: 'Token expired'
+        })
+        return
+      }
+
       const needsClarification = response.clarification_result?.clarification_requested === true
 
       if (needsClarification) {
@@ -762,7 +802,7 @@ export default function ChatInterface() {
 
     } catch (error) {
       console.error(t('chat.sendError'), error)
-      handleAuthError(error)
+      handleAuthError(error) // Utilise la nouvelle gestion d'erreur améliorée
 
       if (isMountedRef.current) {
         const errorMessage: Message = {
@@ -927,8 +967,7 @@ export default function ChatInterface() {
     }
   }, [isMobileDevice, isKeyboardVisible, keyboardHeight])
 
-  // ✅ CORRECTION PRINCIPALE: Simplifier les états de chargement
-  // Plus de redirection - juste attendre que l'AuthProvider fasse son travail
+  // États de chargement simplifiés
   if (!hasHydrated) {	  
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
