@@ -6,6 +6,10 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslation } from '@/lib/languages/i18n'
 import { useAuthStore } from '@/lib/stores/auth'
 
+// Import de la vraie SignupModal et des hooks nécessaires
+import { SignupModal } from './page_signup_modal'
+import { useAuthenticationLogic } from './app/auth/login/page_authentication'
+
 // Logo Intelia
 const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
   <img 
@@ -129,6 +133,67 @@ function LoginPageContent() {
   const [success, setSuccess] = useState('')
   const [showSignup, setShowSignup] = useState(false)
 
+  // États pour le signup
+  const [signupData, setSignupData] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    firstName: '',
+    lastName: '',
+    linkedinProfile: '',
+    country: '',
+    countryCode: '',
+    areaCode: '',
+    phoneNumber: '',
+    companyName: '',
+    companyWebsite: '',
+    companyLinkedin: ''
+  })
+
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  // Fonctions de validation simples
+  const validatePassword = (password: string) => {
+    const errors = []
+    if (password.length < 8) errors.push('Au moins 8 caractères')
+    if (!/[A-Z]/.test(password)) errors.push('Au moins une majuscule')
+    if (!/[0-9]/.test(password)) errors.push('Au moins un chiffre')
+    return { isValid: errors.length === 0, errors }
+  }
+
+  const validatePhone = (countryCode: string, areaCode: string, phoneNumber: string) => {
+    return countryCode && areaCode && phoneNumber && 
+           areaCode.length >= 2 && phoneNumber.length >= 6
+  }
+
+  // Gestion des changements du formulaire signup
+  const handleSignupChange = (field: string, value: string) => {
+    setSignupData(prev => ({ ...prev, [field]: value }))
+  }
+
+  // Fonction de signup (placeholder pour l'instant)
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault()
+    console.log('Signup attempt:', signupData)
+    // TODO: Implémenter la vraie logique d'inscription avec Supabase
+    throw new Error('Inscription en cours de développement')
+  }
+
+  // Logique d'authentification pour la SignupModal
+  const authLogic = {
+    signupData,
+    showPassword,
+    setShowPassword,
+    showConfirmPassword,
+    setShowConfirmPassword,
+    isLoading: false, // ou utiliser isLoading si partagé
+    handleSignupChange,
+    handleSignup,
+    validatePassword,
+    validatePhone
+  }
+
   // Fonction de connexion simple
   const handleLogin = async () => {
     setError('')
@@ -166,37 +231,6 @@ function LoginPageContent() {
       setIsLoading(false)
     }
   }
-
-  // Modal d'inscription simple
-  const SignupModal = () => (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">{t('auth.createAccount')}</h3>
-          <button onClick={() => setShowSignup(false)} className="text-gray-400 hover:text-gray-600">
-            ×
-          </button>
-        </div>
-        <p className="text-gray-600 mb-4">
-          Inscription disponible bientôt. Pour l'instant, contactez-nous pour créer un compte.
-        </p>
-        <div className="flex space-x-3">
-          <button
-            onClick={() => setShowSignup(false)}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-          >
-            {t('modal.cancel') || 'Annuler'}
-          </button>
-          <button
-            onClick={() => window.open('mailto:support@intelia.com?subject=Demande création compte', '_blank')}
-            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Nous contacter
-          </button>
-        </div>
-      </div>
-    </div>
-  )
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -366,8 +400,15 @@ function LoginPageContent() {
         </div>
       </div>
 
-      {/* Modal d'inscription */}
-      {showSignup && <SignupModal />}
+      {/* Modal d'inscription VRAIE */}
+      {showSignup && (
+        <SignupModal 
+          authLogic={authLogic}
+          localError=""
+          localSuccess=""
+          toggleMode={() => setShowSignup(false)}
+        />
+      )}
 
       {/* Debug */}
       {process.env.NODE_ENV === 'development' && (
