@@ -303,7 +303,7 @@ export function SignupModal({
   localSuccess, 
   toggleMode 
 }: SignupModalProps) {
-  // ✅ UTILISE DIRECTEMENT useTranslation au lieu de recevoir t comme prop
+  // Utilise directement useTranslation au lieu de recevoir t comme prop
   const { t } = useTranslation()
   
   // Chargement des pays uniquement dans SignupModal
