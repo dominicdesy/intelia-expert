@@ -5,10 +5,10 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslation } from '@/lib/languages/i18n'
 import { useAuthStore } from '@/lib/stores/auth'
+import { availableLanguages } from '../lib/languages/config'
 
-// Import de la vraie SignupModal et des hooks nécessaires
+// Import de la vraie SignupModal depuis le même répertoire
 import { SignupModal } from './page_signup_modal'
-import { useAuthenticationLogic } from './app/auth/login/page_authentication'
 
 // Logo Intelia
 const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
@@ -24,7 +24,7 @@ const LanguageSelector = () => {
   const { changeLanguage, currentLanguage } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
 
-  const currentLang = getLanguageByCode(currentLanguage) || availableLanguages[0]
+  const currentLang = availableLanguages.find(lang => lang.code === currentLanguage) || availableLanguages[0]
 
   return (
     <div className="relative">
