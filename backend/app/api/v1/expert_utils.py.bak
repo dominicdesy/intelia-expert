@@ -3,7 +3,7 @@
 """
 Utilitaires et fonctions helper pour expert.py
 VERSION SÉCURISÉE MÉMOIRE - Cache PerfStore drastiquement limité pour éviter OOM
-FIXED: Correction du système de logging PostgreSQL
+FIXED: Correction du paramètre analytics user_email -> email
 """
 
 import logging
@@ -216,33 +216,68 @@ def log_question_to_analytics(
     error_info: Optional[Dict[str, Any]] = None
 ) -> None:
     """
-    VERSION CORRIGÉE: Utilise le système de logging helpers corrigé
-    Connecte le flux principal des questions au système PostgreSQL
+    VERSION CORRIGÉE: Utilise directement LoggingManager pour sauvegarder en PostgreSQL
+    Bypass complètement les fallbacks de logging.py
     """
     try:
-        # Utiliser le système helpers corrigé au lieu de l'import direct
-        from app.api.v1.logging_helpers import log_question_to_analytics as helper_log
+        # Import direct du LoggingManager
+        from app.api.v1.logging import get_logging_manager
         
-        # Appeler la fonction helper qui utilise le bon système de logging
-        helper_log(
-            current_user=current_user,
-            payload=payload,
-            result=result,
-            response_text=response_text,
+        # Récupérer l'instance du manager PostgreSQL
+        manager = get_logging_manager()
+        
+        # Extraire les informations nécessaires
+        user_email = current_user.get('email') if current_user else None
+        session_id = getattr(payload, 'session_id', 'unknown')
+        question = getattr(payload, 'question', '')
+        
+        # Déterminer la source et le statut
+        if error_info:
+            status = "error"
+            source = "error"
+        elif result.get("type") == "quota_exceeded":
+            status = "quota_exceeded"
+            source = "quota_exceeded"
+        elif result.get("type") == "validation_rejected":
+            status = "validation_rejected" 
+            source = "validation_rejected"
+        else:
+            status = "success"
+            answer = result.get("answer", {})
+            source = answer.get("source", "unknown")
+        
+        # Extraire les entités du payload
+        entities = getattr(payload, 'entities', {}) or {}
+        
+        # Préparer les paramètres pour LoggingManager
+        language = getattr(payload, 'lang', 'fr') or 'fr'
+        
+        # APPEL DIRECT au LoggingManager avec toutes nos corrections PostgreSQL
+        manager.log_question_response(
+            user_email=user_email,
+            session_id=session_id,
+            question_id=f"{session_id}_{int(time.time())}", # ID unique
+            question=question,
+            response_text=response_text[:5000],  # Limite selon notre schéma
+            response_source=source,
+            status=status,
             processing_time_ms=processing_time_ms,
-            error_info=error_info
+            confidence=confidence_score,
+            completeness_score=None,  # Pas utilisé pour l'instant
+            language=language,
+            intent=None,  # Pourrait être extrait du result si disponible
+            entities=entities,  # Sera sérialisé avec Json() par notre correction
+            error_info=error_info  # Sera traité correctement par nos corrections
         )
         
-        logger.info("Question loggée dans PostgreSQL: %s", 
-                   current_user.get('email') if current_user else 'anonymous')
+        logger.info(f"Question loggée dans PostgreSQL: {user_email or 'anonymous'}")
         
     except Exception as e:
-        logger.error("Erreur log PostgreSQL: %s", e)
-        logger.error("Détails erreur logging: current_user=%s, payload=%s", 
-                    current_user.get('email') if current_user else 'None',
-                    getattr(payload, 'session_id', 'unknown'))
+        logger.error(f"Erreur log PostgreSQL direct: {e}")
+        logger.error(f"Détails: user_email={user_email}, session_id={session_id}")
         # Ne pas faire échouer la requête principale
         pass
+
 
 async def increment_quota_async(user_email: str) -> bool:
     """Version async pour l'incrémentation du quota"""
@@ -291,7 +326,7 @@ async def log_analytics_async(
         
         # Appel avec la nouvelle signature compatible
         await asyncio.to_thread(
-            log_question_to_analytics,  # Utilise notre fonction corrigée
+            log_question_to_analytics,  # Utilise notre wrapper corrigé
             current_user=current_user,
             payload=payload,
             result=result,
@@ -350,7 +385,7 @@ async def execute_background_tasks_async(
 def validate_analytics_compatibility() -> Dict[str, Any]:
     """Fonction de diagnostic pour valider la compatibilité analytics"""
     try:
-        from app.api.v1.logging_helpers import log_question_to_analytics as log_impl
+        from app.api.v1.logging import log_question_to_analytics as log_impl
         import inspect
         
         # Analyser la signature de la vraie fonction
@@ -363,7 +398,8 @@ def validate_analytics_compatibility() -> Dict[str, Any]:
             "parameters": params,
             "has_confidence": "confidence" in params,
             "has_confidence_score": "confidence_score" in params,
-            "uses_helpers": True,  # NOUVEAU: Indique qu'on utilise le système helpers
+            "has_email_param": "email" in params,  # AJOUT: Vérification du paramètre email
+            "has_user_email_param": "user_email" in params,  # AJOUT: Vérification de l'ancien paramètre
             "signature": str(sig)
         }
         
@@ -383,7 +419,7 @@ def validate_analytics_compatibility() -> Dict[str, Any]:
 def get_expert_utils_status() -> Dict[str, Any]:
     """VERSION SÉCURISÉE: Fonction de diagnostic pour vérifier l'état des utils avec info mémoire"""
     return {
-        "version": "memory_safe_v1.2_logging_fixed",  # Version mise à jour
+        "version": "memory_safe_v1.1_fixed",  # Version mise à jour
         "numpy_available": HAS_NUMPY,
         "store_cache_size": len(_store_cache),
         "store_cache_enabled": _STORE_CACHE_ENABLED,
@@ -401,12 +437,11 @@ def get_expert_utils_status() -> Dict[str, Any]:
             "emergency_cleanup_enabled",
             "garbage_collection_forced"
         ],
-        # NOUVEAU: Informations sur la correction logging
-        "logging_fix": {
-            "system_used": "logging_helpers",
-            "direct_import_removed": True,
-            "fixed_in_version": "v1.2_logging_fixed",
-            "expected_log_message": "Question loggée dans PostgreSQL"
+        # NOUVEAU: Informations sur la correction analytics
+        "analytics_fix": {
+            "parameter_corrected": "user_email -> email",
+            "fixed_in_version": "v1.1_fixed",
+            "expected_log_message": "Question loggée dans analytics avec confidence"
         }
     }
 
