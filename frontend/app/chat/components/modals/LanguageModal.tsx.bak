@@ -1,4 +1,4 @@
-// LanguageModal.tsx - Sans reload forcé, utilise la synchronisation i18n
+// LanguageModal.tsx - Design blanc original avec codes de langue en bleu
 
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation, availableLanguages, getLanguageByCode } from '@/lib/languages/i18n'
@@ -51,27 +51,46 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     try {
       console.log('[LanguageModal] Changement langue:', currentLanguage, '→', languageCode)
       
-      // 1. Changer dans l'interface via le hook
+      // 1. Changer immédiatement dans l'interface
       await changeLanguage(languageCode)
-      console.log('[LanguageModal] Langue changée via hook')
+      console.log('[LanguageModal] Interface mise à jour')
       
-      // 2. Attendre que la synchronisation se fasse
-      await new Promise(resolve => setTimeout(resolve, 300))
+      // 2. Sauvegarder dans localStorage avec la BONNE clé et format
+      if (typeof window !== 'undefined') {
+        // Format Zustand attendu par i18n.ts
+        const languageStore = {
+          state: { currentLanguage: languageCode },
+          version: 0
+        }
+        localStorage.setItem('intelia-language', JSON.stringify(languageStore))
+        console.log('[LanguageModal] localStorage sauvegardé:', languageCode)
+        
+        // ✅ CORRECTION: Attendre un peu avant de recharger pour que le localStorage soit bien écrit
+        setTimeout(() => {
+          window.location.reload()
+        }, 100)
+      }
       
-      // 3. Émettre un événement pour forcer la synchronisation globale
+      // 3. Émettre un événement pour forcer la synchronisation
       window.dispatchEvent(new CustomEvent('languageChanged', { 
         detail: { language: languageCode } 
       }))
       
-      console.log('[LanguageModal] Synchronisation terminée')
+      // 4. Forcer un rechargement des traductions globales
+      if (typeof window !== 'undefined' && (window as any).i18nDebug) {
+        (window as any).i18nDebug.notificationManager.notify()
+      }
       
-      // 4. Fermer la modal
+      // 5. Fermer la modal sans délai (puisqu'on va recharger)
       onClose()
+      console.log('[LanguageModal] Modal fermée')
       
     } catch (error) {
       console.error('[LanguageModal] Erreur changement:', error)
     } finally {
-      setIsUpdating(false)
+      setTimeout(() => {
+        setIsUpdating(false)
+      }, 300)
     }
   }
 
