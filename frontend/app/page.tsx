@@ -8,6 +8,7 @@ import { useAuthStore } from '@/lib/stores/auth'
 
 // Import de la vraie SignupModal et des hooks nécessaires
 import { SignupModal } from './page_signup_modal'
+import { useAuthenticationLogic } from './app/auth/login/page_authentication'
 
 // Logo Intelia
 const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
@@ -18,18 +19,12 @@ const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
   />
 )
 
-// Sélecteur de langue simple
+// Sélecteur de langue utilisant les langues du fichier config.ts
 const LanguageSelector = () => {
   const { changeLanguage, currentLanguage } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
 
-  const languages = [
-    { code: 'fr', name: 'Français', flag: '🇫🇷' },
-    { code: 'en', name: 'English', flag: '🇺🇸' },
-    { code: 'es', name: 'Español', flag: '🇪🇸' }
-  ]
-
-  const currentLang = languages.find(lang => lang.code === currentLanguage) || languages[0]
+  const currentLang = getLanguageByCode(currentLanguage) || availableLanguages[0]
 
   return (
     <div className="relative">
@@ -38,7 +33,7 @@ const LanguageSelector = () => {
         className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
       >
         <span>{currentLang.flag}</span>
-        <span>{currentLang.name}</span>
+        <span>{currentLang.nativeName}</span>
         <svg className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -47,22 +42,25 @@ const LanguageSelector = () => {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute top-full right-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-            {languages.map((lang) => (
+          <div className="absolute top-full right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+            {availableLanguages.map((lang) => (
               <button
                 key={lang.code}
                 onClick={() => {
                   changeLanguage(lang.code)
                   setIsOpen(false)
                 }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2 ${
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-3 ${
                   lang.code === currentLanguage ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
                 } first:rounded-t-lg last:rounded-b-lg transition-colors`}
               >
-                <span>{lang.flag}</span>
-                <span>{lang.name}</span>
+                <span className="text-xl">{lang.flag}</span>
+                <div className="flex-1">
+                  <div className="font-medium">{lang.nativeName}</div>
+                  <div className="text-xs text-gray-500">{lang.region}</div>
+                </div>
                 {lang.code === currentLanguage && (
-                  <svg className="w-4 h-4 text-blue-500 ml-auto" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
                 )}
