@@ -55,10 +55,12 @@ export const logoutService = {
       const keysToRemove = []
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i)
-        if (key && key !== 'intelia-remember-me-persist') {
-          // Supprimer les cles auth/session mais GARDER RememberMe
+        if (key && key !== 'intelia-remember-me-persist' && key !== 'intelia-language') {
+          // ✅ CORRECTION : Exclure aussi 'intelia-language' du nettoyage
           if (key.startsWith('supabase-') || 
-              (key.startsWith('intelia-') && key !== 'intelia-remember-me-persist') ||
+              (key.startsWith('intelia-') && 
+               key !== 'intelia-remember-me-persist' && 
+               key !== 'intelia-language') ||
               key.includes('auth') || 
               key.includes('session') ||
               key === 'intelia-expert-auth' ||
@@ -77,7 +79,7 @@ export const logoutService = {
         }
       })
       
-      console.log(`[LogoutService] ${keysToRemove.length} cles supprimees, RememberMe preserve`)
+      console.log(`[LogoutService] ${keysToRemove.length} cles supprimees, RememberMe et Language preserves`)
 
       // 5. Restaurer RememberMe si necessaire
       if (preservedRememberMe) {
@@ -89,12 +91,11 @@ export const logoutService = {
         }
       }
 
-      // 6. Preserver la langue pour la page d'accueil
+      // 6. Preserver la langue pour la page d'accueil (plus nécessaire car intelia-language est préservé)
       sessionStorage.setItem('recent-logout', Date.now().toString())
       sessionStorage.setItem('logout-complete', 'true')
-      sessionStorage.setItem('logout-language', userLanguage)
       
-      console.log('[LogoutService] Redirection vers page d\'accueil en', userLanguage)
+      console.log('[LogoutService] Redirection vers page d\'accueil, langue preservee:', userLanguage)
       
       // 7. Rediriger vers la page d'accueil (app/page.tsx) dans la bonne langue
       setTimeout(() => {
