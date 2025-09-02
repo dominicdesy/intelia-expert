@@ -216,15 +216,12 @@ def log_question_to_analytics(
     error_info: Optional[Dict[str, Any]] = None
 ) -> None:
     """
-    VERSION CORRIGÉE: Utilise directement LoggingManager pour sauvegarder en PostgreSQL
-    Bypass complètement les fallbacks de logging.py
+    CORRIGÉ: Wrapper pour compatibilité avec la nouvelle signature analytics
+    Correction du paramètre user_email -> email
     """
     try:
-        # Import direct du LoggingManager
-        from app.api.v1.logging_manager import get_logging_manager
-        
-        # Récupérer l'instance du manager PostgreSQL
-        manager = get_logging_manager()
+        # Import de la vraie fonction de logging
+        from app.api.v1.logging import log_question_to_analytics as log_impl
         
         # Extraire les informations nécessaires
         user_email = current_user.get('email') if current_user else None
@@ -246,38 +243,20 @@ def log_question_to_analytics(
             answer = result.get("answer", {})
             source = answer.get("source", "unknown")
         
-        # Extraire les entités du payload
-        entities = getattr(payload, 'entities', {}) or {}
-        
-        # Préparer les paramètres pour LoggingManager
-        language = getattr(payload, 'lang', 'fr') or 'fr'
-        
-        # APPEL DIRECT au LoggingManager avec toutes nos corrections PostgreSQL
-        manager.log_question_response(
-            user_email=user_email,
-            session_id=session_id,
-            question_id=f"{session_id}_{int(time.time())}", # ID unique
-            question=question,
-            response_text=response_text[:5000],  # Limite selon notre schéma
-            response_source=source,
-            status=status,
+        # CORRECTION CRITIQUE: Utiliser uniquement les paramètres acceptés par log_question_to_analytics
+        log_impl(
+            current_user=current_user,
+            payload=payload,
+            result=result,
+            response_text=response_text[:500],  # Limiter la taille
             processing_time_ms=processing_time_ms,
-            confidence=confidence_score,
-            completeness_score=None,  # Pas utilisé pour l'instant
-            language=language,
-            intent=None,  # Pourrait être extrait du result si disponible
-            entities=entities,  # Sera sérialisé avec Json() par notre correction
-            error_info=error_info  # Sera traité correctement par nos corrections
+            error_info=error_info
         )
         
-        logger.info(f"Question loggée dans PostgreSQL: {user_email or 'anonymous'}")
-        
     except Exception as e:
-        logger.error(f"Erreur log PostgreSQL direct: {e}")
-        logger.error(f"Détails: user_email={user_email}, session_id={session_id}")
+        logger.error(f"Erreur log question to analytics (wrapper): {e}")
         # Ne pas faire échouer la requête principale
         pass
-
 
 async def increment_quota_async(user_email: str) -> bool:
     """Version async pour l'incrémentation du quota"""

@@ -1,0 +1,84 @@
+name: Selective Docker Build and Deploy
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'docs/**'
+  workflow_dispatch:
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend-changed: ${{ steps.changes.outputs.frontend }}
+      backend-changed: ${{ steps.changes.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+            backend:
+              - 'backend/**'
+
+  frontend:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.frontend-changed == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Login to DigitalOcean Container Registry
+        run: echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login registry.digitalocean.com -u doctl --password-stdin
+      
+      - name: Build and push frontend image
+        run: |
+          echo "Building frontend (changes detected)"
+          docker build \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
+            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
+            -t registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }} \
+            ./frontend
+          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }}
+          docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }} registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
+          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
+          echo "Frontend deployed"
+
+  backend:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.backend-changed == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Login to DigitalOcean Container Registry
+        run: echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login registry.digitalocean.com -u doctl --password-stdin
+      
+      - name: Build and push backend image
+        run: |
+          echo "Building backend (changes detected)"
+          docker build -t registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }} ./backend
+          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }}
+          docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }} registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
+          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
+          echo "Backend deployed"
+
+  no-changes:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.frontend-changed != 'true' && needs.detect-changes.outputs.backend-changed != 'true'
+    steps:
+      - name: No changes detected
+        run: |
+          echo "No changes detected in frontend/ or backend/"
+          echo "Deployment skipped - infrastructure savings achieved"
