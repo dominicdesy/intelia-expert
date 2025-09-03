@@ -103,35 +103,43 @@ jobs:
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache,mode=max
           build-args: BUILDKIT_INLINE_CACHE=1
 
-  # 📊 Résumé
-  summary:
+  # 🧹 Nettoyage automatique du registry
+  cleanup-registry:
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-frontend, build-backend]
-    if: always()
+    needs: [build-frontend, build-backend]
+    if: always() && (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success')
+    continue-on-error: true
     steps:
-      - name: Deployment Summary
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DOCR_ACCESS_TOKEN }}
+
+      - name: Cleanup old images (keep 4 latest)
         run: |
-          echo "🚀 DEPLOYMENT SUMMARY"
-          echo "===================="
+          echo "🧹 Cleaning registry - keeping 4 latest images per repository..."
           
-          # Frontend
-          if [[ "${{ needs.detect-changes.outputs.frontend-changed }}" == "true" ]]; then
-            if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
-              echo "✅ Frontend: DEPLOYED"
+          for repo in intelia-frontend intelia-backend; do
+            echo "Processing $repo..."
+            
+            # Lister toutes les manifests triées par date (plus récentes en premier)
+            manifests=$(doctl registry repository list-manifests "$repo" --format Digest --no-header 2>/dev/null || true)
+            
+            if [ -n "$manifests" ]; then
+              # Garder les 4 plus récentes, supprimer le reste
+              echo "$manifests" | tail -n +5 | while read digest; do
+                if [ -n "$digest" ]; then
+                  echo "Deleting old manifest: $digest"
+                  doctl registry repository delete-manifest "$repo" "$digest" --force || true
+                fi
+              done
             else
-              echo "❌ Frontend: FAILED"
+              echo "No manifests found for $repo"
             fi
-          else
-            echo "⏸️ Frontend: SKIPPED (no changes)"
-          fi
+          done
           
-          # Backend  
-          if [[ "${{ needs.detect-changes.outputs.backend-changed }}" == "true" ]]; then
-            if [[ "${{ needs.build-backend.result }}" == "success" ]]; then
-              echo "✅ Backend: DEPLOYED"
-            else
-              echo "❌ Backend: FAILED" 
-            fi
-          else
-            echo "⏸️ Backend: SKIPPED (no changes)"
-          fi
+          # Garbage collection pour libérer l'espace
+          echo "🗑️ Running garbage collection..."
+          doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force || true
+          
+          echo "✅ Registry cleanup completed"

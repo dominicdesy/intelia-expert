@@ -1,9 +1,8 @@
 # app/api/v1/stats_updater.py
 # -*- coding: utf-8 -*-
 """
-Version simple et fonctionnelle du collecteur de statistiques
-Remplace la version complexe qui générait l'erreur "0"
-Se contente de faire des requêtes SQL directes - ça marche
+Version simple et fonctionnelle du collecteur de statistiques - CORRIGÉE
+Utilise les VRAIS noms de colonnes de votre base de données
 """
 
 import asyncio
@@ -41,14 +40,14 @@ def safe_str_conversion(value, max_length=100):
 
 class StatisticsUpdater:
     """
-    Version simple du collecteur de statistiques
-    - Pas de détection complexe de colonnes feedback
+    Version simple du collecteur de statistiques - CORRIGÉE
+    - Utilise les vrais noms de colonnes : 'timestamp', 'response_time'
     - Requêtes SQL directes et simples
     - Fallbacks robustes partout
     """
     
     def __init__(self):
-        logger.info("StatisticsUpdater SIMPLE - Initialisation")
+        logger.info("StatisticsUpdater SIMPLE CORRIGÉE - Initialisation")
         
         self.cache = get_stats_cache()
         self.analytics = get_analytics_manager()
@@ -62,12 +61,11 @@ class StatisticsUpdater:
             "initialization_time": datetime.now().isoformat()
         }
         
-        # Pas de détection complexe - on assume que les données sont là
-        logger.info("StatisticsUpdater simple initialisé avec succès")
+        logger.info("StatisticsUpdater simple corrigé initialisé avec succès")
     
     async def update_all_statistics(self) -> Dict[str, Any]:
         """
-        Fonction principale - version simple
+        Fonction principale - version simple corrigée
         """
         if self.update_in_progress:
             logger.warning("Mise à jour déjà en cours")
@@ -78,7 +76,15 @@ class StatisticsUpdater:
         self.update_in_progress = True
         
         try:
-            logger.info(f"Début collecte statistiques simple (RAM: {start_memory}%)")
+            logger.info(f"Début collecte statistiques simple corrigée (RAM: {start_memory}%)")
+            
+            # FORCER L'INVALIDATION DU CACHE
+            try:
+                self.cache.delete_cache("dashboard:main")
+                self.cache.delete_cache("dashboard:snapshot")
+                logger.info("Cache dashboard forcément invalidé")
+            except Exception as cache_error:
+                logger.warning(f"Erreur invalidation cache: {cache_error}")
             
             # Collecte simple des données
             dashboard_data = await self._collect_simple_stats()
@@ -108,13 +114,13 @@ class StatisticsUpdater:
                     "end_memory_percent": end_memory,
                     "memory_delta": end_memory - start_memory
                 },
-                "version": "simple"
+                "version": "simple_corrected"
             }
             
             # Cache le résumé
             self.cache.set_cache("system:last_update_summary", result, ttl_hours=25, source="simple_updater")
             
-            logger.info(f"Collecte simple terminée en {duration_ms}ms")
+            logger.info(f"Collecte simple corrigée terminée en {duration_ms}ms")
             return result
             
         except Exception as e:
@@ -133,8 +139,8 @@ class StatisticsUpdater:
     
     async def _collect_simple_stats(self) -> Dict[str, Any]:
         """
-        Collecte simple et directe depuis la base de données
-        Une seule requête, pas de complications
+        Collecte simple et directe depuis la base de données - CORRIGÉE
+        Utilise les vrais noms de colonnes : timestamp, response_time
         """
         try:
             # Vérifier qu'on a bien un analytics manager avec DSN
@@ -148,18 +154,18 @@ class StatisticsUpdater:
             with psycopg2.connect(self.analytics.dsn, connect_timeout=10) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     
-                    # Requête principale simple et directe
+                    # REQUÊTE PRINCIPALE CORRIGÉE - utilise 'timestamp' et 'response_time'
                     cur.execute("""
                         SELECT 
                             COUNT(*) as total_questions,
-                            COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE) as questions_today,
-                            COUNT(*) FILTER (WHERE created_at >= DATE_TRUNC('week', CURRENT_DATE)) as questions_this_week,
-                            COUNT(*) FILTER (WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)) as questions_this_month,
+                            COUNT(*) FILTER (WHERE DATE(timestamp) = CURRENT_DATE) as questions_today,
+                            COUNT(*) FILTER (WHERE timestamp >= DATE_TRUNC('week', CURRENT_DATE)) as questions_this_week,
+                            COUNT(*) FILTER (WHERE timestamp >= DATE_TRUNC('month', CURRENT_DATE)) as questions_this_month,
                             COUNT(DISTINCT user_email) as unique_users,
-                            AVG(processing_time_ms) FILTER (WHERE processing_time_ms > 0) / 1000 as avg_response_time,
-                            AVG(response_confidence) FILTER (WHERE response_confidence IS NOT NULL) * 100 as avg_confidence
+                            AVG(response_time) FILTER (WHERE response_time > 0) as avg_response_time,
+                            AVG(confidence) FILTER (WHERE confidence IS NOT NULL AND confidence BETWEEN 0 AND 1) * 100 as avg_confidence
                         FROM user_questions_complete 
-                        WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+                        WHERE timestamp >= CURRENT_DATE - INTERVAL '30 days'
                     """)
                     
                     main_result = cur.fetchone()
@@ -168,13 +174,13 @@ class StatisticsUpdater:
                         logger.warning("Aucune donnée trouvée")
                         return {"status": "success", "data": self._get_empty_stats()}
                     
-                    # Requête sources (simple)
+                    # REQUÊTE SOURCES CORRIGÉE - utilise 'timestamp'
                     cur.execute("""
                         SELECT 
                             response_source, 
                             COUNT(*) as count
                         FROM user_questions_complete 
-                        WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
+                        WHERE timestamp >= CURRENT_DATE - INTERVAL '7 days'
                         GROUP BY response_source
                         ORDER BY count DESC
                         LIMIT 5
@@ -193,13 +199,13 @@ class StatisticsUpdater:
                         else:
                             source_distribution[source] = row["count"]
                     
-                    # Requête top users (simple)
+                    # REQUÊTE TOP USERS CORRIGÉE - utilise 'timestamp'
                     cur.execute("""
                         SELECT 
                             user_email,
                             COUNT(*) as question_count
                         FROM user_questions_complete 
-                        WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+                        WHERE timestamp >= CURRENT_DATE - INTERVAL '30 days'
                             AND user_email IS NOT NULL 
                         GROUP BY user_email
                         ORDER BY question_count DESC
@@ -219,7 +225,7 @@ class StatisticsUpdater:
                     # Construire les données finales
                     dashboard_data = {
                         "collected_at": datetime.now().isoformat(),
-                        "source": "simple_direct_query",
+                        "source": "simple_corrected_query",
                         
                         # System Stats
                         "system_health": {
@@ -243,7 +249,7 @@ class StatisticsUpdater:
                             "openai_fallback": True
                         },
                         
-                        # Usage Stats
+                        # Usage Stats - DONNÉES CORRIGÉES
                         "unique_users": main_result["unique_users"] or 0,
                         "unique_active_users": main_result["unique_users"] or 0,
                         "total_questions": main_result["total_questions"] or 0,
@@ -255,7 +261,7 @@ class StatisticsUpdater:
                             datetime.now().strftime("%Y-%m"): main_result["questions_this_month"] or 0
                         },
                         
-                        # Performance Stats
+                        # Performance Stats - DONNÉES CORRIGÉES
                         "avg_response_time": float(main_result["avg_response_time"] or 0),
                         "median_response_time": float(main_result["avg_response_time"] or 0),
                         "min_response_time": 0.5,
@@ -282,12 +288,12 @@ class StatisticsUpdater:
                         }
                     }
                     
-                    logger.info(f"Stats collectées: {main_result['unique_users']} users, {main_result['total_questions']} questions")
+                    logger.info(f"STATS CORRIGÉES collectées: {main_result['unique_users']} users, {main_result['total_questions']} questions")
                     return {"status": "success", "data": dashboard_data}
                     
         except Exception as e:
             error_msg = safe_str_conversion(e)
-            logger.error(f"Erreur collecte simple: {error_msg}")
+            logger.error(f"Erreur collecte simple corrigée: {error_msg}")
             return {"status": "error", "error": error_msg, "data": self._get_empty_stats()}
     
     def _get_empty_stats(self) -> Dict[str, Any]:
@@ -312,21 +318,21 @@ class StatisticsUpdater:
             else:
                 return {
                     "status": "never_updated",
-                    "message": "Version simple - aucune mise à jour effectuée",
+                    "message": "Version simple corrigée - aucune mise à jour effectuée",
                     "update_in_progress": self.update_in_progress,
                     "last_update": self.last_update.isoformat() if self.last_update else None,
-                    "version": "simple"
+                    "version": "simple_corrected"
                 }
                 
         except Exception as e:
             error_msg = safe_str_conversion(e)
             logger.error(f"Erreur récupération statut: {error_msg}")
-            return {"status": "error", "error": error_msg, "version": "simple"}
+            return {"status": "error", "error": error_msg, "version": "simple_corrected"}
 
     async def force_update_component(self, component: str) -> Dict[str, Any]:
-        """Force la mise à jour - version simple"""
+        """Force la mise à jour - version simple corrigée"""
         try:
-            logger.info(f"Force update simple: {component}")
+            logger.info(f"Force update simple corrigé: {component}")
             return await self.update_all_statistics()
             
         except Exception as e:
@@ -338,10 +344,10 @@ class StatisticsUpdater:
 _stats_updater_instance = None
 
 def get_stats_updater():
-    """Récupère l'instance singleton du collecteur simple"""
+    """Récupère l'instance singleton du collecteur simple corrigé"""
     global _stats_updater_instance
     if _stats_updater_instance is None:
-        logger.info("Création instance StatisticsUpdater SIMPLE")
+        logger.info("Création instance StatisticsUpdater SIMPLE CORRIGÉE")
         _stats_updater_instance = StatisticsUpdater()
     return _stats_updater_instance
 
@@ -351,7 +357,7 @@ async def run_update_cycle():
     try:
         updater = get_stats_updater()
         result = await updater.update_all_statistics()
-        logger.info(f"Cycle simple terminé: {result.get('status', 'unknown')}")
+        logger.info(f"Cycle simple corrigé terminé: {result.get('status', 'unknown')}")
         return result
     except Exception as e:
         error_msg = safe_str_conversion(e)
@@ -367,7 +373,7 @@ async def force_update_all():
     try:
         updater = get_stats_updater()
         result = await updater.update_all_statistics()
-        logger.info(f"Force update simple terminé: {result.get('status', 'unknown')}")
+        logger.info(f"Force update simple corrigé terminé: {result.get('status', 'unknown')}")
         return result
     except Exception as e:
         error_msg = safe_str_conversion(e)
