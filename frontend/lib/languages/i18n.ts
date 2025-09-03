@@ -25,9 +25,6 @@ export interface TranslationKeys {
   'auth.newToIntelia': string
   'auth.createAccount': string
 
-  // Dans la section FORM PLACEHOLDERS
-  'placeholder.email': string
-
   // ===========================================
   // COMMON ELEMENTS
   // ===========================================
@@ -584,6 +581,10 @@ export interface TranslationKeys {
   'placeholder.currentPassword': string
   'placeholder.newPassword': string
   'placeholder.confirmPassword': string
+  'placeholder.email': string
+  'placeholder.createSecurePassword': string
+  'placeholder.confirmNewPassword': string
+
 
   // ===========================================
   // DATE & TIME FORMATTING

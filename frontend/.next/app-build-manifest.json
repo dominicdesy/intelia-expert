@@ -12,7 +12,7 @@
       "static/chunks/main-app-4c3f0bbdac42ded9.js",
       "static/css/b8e330e9f2d743fd.css",
       "static/chunks/286-e00fd66ca7280a6e.js",
-      "static/chunks/app/layout-d739951e6578cee2.js"
+      "static/chunks/app/layout-fb17ff1a77321dd8.js"
     ],
     "/admin/statistics/page": [
       "static/chunks/webpack-4fd5336ef26d1a08.js",
@@ -21,25 +21,32 @@
       "static/chunks/286-e00fd66ca7280a6e.js",
       "static/chunks/app/admin/statistics/page-1f9396b1a2ce65c5.js"
     ],
+    "/auth/forgot-password/page": [
+      "static/chunks/webpack-4fd5336ef26d1a08.js",
+      "static/chunks/vendors-9719568e4d0f56cc.js",
+      "static/chunks/main-app-4c3f0bbdac42ded9.js",
+      "static/chunks/733-47bdf2981ffab0d0.js",
+      "static/chunks/app/auth/forgot-password/page-655c9ef049e65d7c.js"
+    ],
     "/auth/invitation/page": [
       "static/chunks/webpack-4fd5336ef26d1a08.js",
       "static/chunks/vendors-9719568e4d0f56cc.js",
       "static/chunks/main-app-4c3f0bbdac42ded9.js",
-      "static/chunks/app/auth/invitation/page-eab4d4b956732e11.js"
+      "static/chunks/app/auth/invitation/page-9c700995b9d1c2e7.js"
     ],
     "/auth/reset-password/page": [
       "static/chunks/webpack-4fd5336ef26d1a08.js",
       "static/chunks/vendors-9719568e4d0f56cc.js",
       "static/chunks/main-app-4c3f0bbdac42ded9.js",
       "static/chunks/286-e00fd66ca7280a6e.js",
-      "static/chunks/app/auth/reset-password/page-49bbb2c9a0bd6426.js"
+      "static/chunks/app/auth/reset-password/page-c4bac7c78842c490.js"
     ],
-    "/auth/forgot-password/page": [
+    "/auth/verify-email/page": [
       "static/chunks/webpack-4fd5336ef26d1a08.js",
       "static/chunks/vendors-9719568e4d0f56cc.js",
       "static/chunks/main-app-4c3f0bbdac42ded9.js",
-      "static/chunks/733-c32b580a6623b0fa.js",
-      "static/chunks/app/auth/forgot-password/page-655c9ef049e65d7c.js"
+      "static/chunks/286-e00fd66ca7280a6e.js",
+      "static/chunks/app/auth/verify-email/page-25f964916c857ca8.js"
     ],
     "/auth/signup/page": [
       "static/chunks/webpack-4fd5336ef26d1a08.js",
@@ -48,25 +55,26 @@
       "static/chunks/286-e00fd66ca7280a6e.js",
       "static/chunks/app/auth/signup/page-f8eda1f503860f6d.js"
     ],
-    "/privacy/page": [
-      "static/chunks/webpack-4fd5336ef26d1a08.js",
-      "static/chunks/vendors-9719568e4d0f56cc.js",
-      "static/chunks/main-app-4c3f0bbdac42ded9.js",
-      "static/chunks/app/privacy/page-06f011aede12fcab.js"
-    ],
-    "/auth/verify-email/page": [
-      "static/chunks/webpack-4fd5336ef26d1a08.js",
-      "static/chunks/vendors-9719568e4d0f56cc.js",
-      "static/chunks/main-app-4c3f0bbdac42ded9.js",
-      "static/chunks/286-e00fd66ca7280a6e.js",
-      "static/chunks/app/auth/verify-email/page-4081a85140d0432c.js"
-    ],
     "/chat/page": [
       "static/chunks/webpack-4fd5336ef26d1a08.js",
       "static/chunks/vendors-9719568e4d0f56cc.js",
       "static/chunks/main-app-4c3f0bbdac42ded9.js",
       "static/chunks/286-e00fd66ca7280a6e.js",
-      "static/chunks/app/chat/page-69a3457b36661fc4.js"
+      "static/chunks/app/chat/page-39e0a26c2c556d43.js"
+    ],
+    "/page": [
+      "static/chunks/webpack-4fd5336ef26d1a08.js",
+      "static/chunks/vendors-9719568e4d0f56cc.js",
+      "static/chunks/main-app-4c3f0bbdac42ded9.js",
+      "static/chunks/286-e00fd66ca7280a6e.js",
+      "static/chunks/733-47bdf2981ffab0d0.js",
+      "static/chunks/app/page-384e76e2d9a8169f.js"
+    ],
+    "/privacy/page": [
+      "static/chunks/webpack-4fd5336ef26d1a08.js",
+      "static/chunks/vendors-9719568e4d0f56cc.js",
+      "static/chunks/main-app-4c3f0bbdac42ded9.js",
+      "static/chunks/app/privacy/page-06f011aede12fcab.js"
     ],
     "/profile/page": [
       "static/chunks/webpack-4fd5336ef26d1a08.js",
@@ -74,14 +82,6 @@
       "static/chunks/main-app-4c3f0bbdac42ded9.js",
       "static/chunks/286-e00fd66ca7280a6e.js",
       "static/chunks/app/profile/page-40c6b9c750ae7c3c.js"
-    ],
-    "/page": [
-      "static/chunks/webpack-4fd5336ef26d1a08.js",
-      "static/chunks/vendors-9719568e4d0f56cc.js",
-      "static/chunks/main-app-4c3f0bbdac42ded9.js",
-      "static/chunks/286-e00fd66ca7280a6e.js",
-      "static/chunks/733-c32b580a6623b0fa.js",
-      "static/chunks/app/page-384e76e2d9a8169f.js"
     ],
     "/terms/page": [
       "static/chunks/webpack-4fd5336ef26d1a08.js",
