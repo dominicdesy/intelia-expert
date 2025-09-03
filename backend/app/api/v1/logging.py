@@ -75,10 +75,13 @@ class LoggingManager:
         CORRECTION CRITIQUE: Connexion PostgreSQL avec DATABASE_URL en priorité
         Résout le bug 'can't adapt type dict'
         """
-        if self.dsn:
-            return psycopg2.connect(self.dsn)
-        else:
+        database_url = os.getenv("DATABASE_URL")
+        if database_url:
+            return psycopg2.connect(database_url)
+        elif self.db_config and any(self.db_config.values()):
             return psycopg2.connect(**self.db_config)
+        else:
+            raise ValueError("Aucune configuration de base de données disponible (DATABASE_URL ou db_config)")
 
     def _ensure_analytics_tables(self):
         """Crée toutes les tables d'analytics nécessaires"""
@@ -483,6 +486,23 @@ class LoggingManager:
 # Singleton sécurisé
 _analytics_manager = None
 _initialization_lock = threading.Lock()
+
+def get_analytics() -> Dict[str, Any]:
+    """Fonction analytics pour compatibilité avec main.py"""
+    try:
+        analytics = get_analytics_manager()
+        return {
+            "status": "analytics_available",
+            "tables_created": True,
+            "dsn_configured": bool(getattr(analytics, 'dsn', None)),
+            "cache_enabled": True,
+            "cache_entries": get_cache_stats().get("total_entries", 0)
+        }
+    except Exception as e:
+        return {
+            "status": "analytics_error",
+            "error": str(e)
+        }
 
 def get_analytics_manager(force_init=None) -> LoggingManager:
     """
