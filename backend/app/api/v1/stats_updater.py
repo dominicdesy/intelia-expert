@@ -375,7 +375,7 @@ class StatisticsUpdater:
             
         return source_distribution
     
-    def _calculate_top_users(self, cur) -> List[Dict[str, Any]]:
+    def _calculate_top_users(self, cur):
         """Top utilisateurs - utilise la bonne table"""
         top_users = []
         
