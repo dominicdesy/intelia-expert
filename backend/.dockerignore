@@ -1,0 +1,62 @@
+# ========== Git et développement ==========
+**/.git
+**/.github
+.gitignore
+README.md
+
+# ========== Python cache et environnements ==========
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.Python
+**/.venv
+**/venv
+**/env
+**/.pytest_cache
+**/.coverage
+**/.mypy_cache
+
+# ========== Models et données lourdes ==========
+**/*.pt
+**/*.pth
+**/*.ckpt
+**/*.bin
+**/*.safetensors
+**/models/
+**/checkpoints/
+
+# ========== Tests et documentation ==========
+tests/
+test_*.py
+*_test.py
+docs/
+**/*.md
+
+# ========== Logs et temporaires ==========
+**/*.log
+**/logs/*.log
+**/.DS_Store
+**/Thumbs.db
+**/.tmp
+**/tmp
+**/*.bak
+**/*.backup
+**/*.old
+
+# ========== IDE et éditeurs ==========
+**/.vscode
+**/.idea
+**/*.swp
+**/*.swo
+
+# ========== Node.js (au cas où) ==========
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# ========== Spécifique à votre projet ==========
+# Gardez rag_index/ car probablement nécessaire au runtime
+# Si rag_index/ contient des gros fichiers de dev, décommentez :
+# rag_index/dev/
+# rag_index/test/

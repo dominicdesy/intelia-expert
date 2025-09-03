@@ -621,28 +621,31 @@ export default function ChatInterface() {
     }
   }, [currentLanguage, t, currentConversation, setCurrentConversation])
 
-
-  // NOUVEAU: useEffect séparé pour les changements de langue (évite le rechargement des conversations)
+  // Chargement des conversations (conservée mais simplifiée)
   useEffect(() => {
-    // Mise à jour du message de bienvenue seulement
-    if (currentConversation?.id === 'welcome' &&
-        currentConversation.messages.length === 1 &&
-        currentConversation.messages[0].content !== t('chat.welcome') &&
-        isMountedRef.current) {
+    if (isAuthenticated && user?.id && isMountedRef.current && !hasLoadedConversationsRef.current) {
+      hasLoadedConversationsRef.current = true
 
-      const updatedMessage: Message = {
-        ...currentConversation.messages[0],
-        content: t('chat.welcome')
-      }
+      const loadingTimeoutId = setTimeout(() => {
+        if (isMountedRef.current) {
+          loadConversations(user.email || user.id)
+            .then(() => {
+              if (isMountedRef.current) {
+                console.log(t('chat.historyLoaded'))
+              }
+            })
+            .catch(err => {
+              if (isMountedRef.current) {
+                console.error(t('chat.historyLoadError'), err)
+                handleAuthError(err) // Utilise la nouvelle gestion d'erreur améliorée
+              }
+            })
+        }
+      }, 800)
 
-      const updatedConversation = {
-        ...currentConversation,
-        messages: [updatedMessage]
-      }
-
-      setCurrentConversation(updatedConversation)
+      return () => clearTimeout(loadingTimeoutId)
     }
-  }, [currentLanguage, t]) // CORRECTION: Séparé du chargement des conversations
+  }, [isAuthenticated, user?.id, loadConversations, handleAuthError, t])
 
   // Fonctions de gestion des messages (toutes conservées)
   const extractAnswerAndSources = useCallback((result: any): [string, any[]] => {

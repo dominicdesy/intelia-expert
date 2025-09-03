@@ -1,8 +1,13 @@
-name: Fixed Docker Build and Deploy
+name: Smart Selective Docker Build and Deploy
 
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'docs/**'
+      - 'README.md'
   workflow_dispatch:
 
 # 🔧 Évite les builds parallèles qui corrompent le registry
@@ -11,39 +16,83 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # 🧹 ÉTAPE 1: Nettoyer le registry AVANT de builder
-  cleanup-registry:
+  # 🔍 ÉTAPE 1: Détecter les changements
+  detect-changes:
     runs-on: ubuntu-latest
+    outputs:
+      frontend-changed: ${{ steps.changes.outputs.frontend }}
+      backend-changed: ${{ steps.changes.outputs.backend }}
+      any-changes: ${{ steps.changes.outputs.frontend == 'true' || steps.changes.outputs.backend == 'true' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Nécessaire pour comparer les changements
+
+      - name: Detect changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/deploy.yml'
+            backend:
+              - 'backend/**'
+              - '.github/workflows/deploy.yml'
+
+      - name: Show detected changes
+        run: |
+          echo "🔍 Changes detected:"
+          echo "Frontend changed: ${{ steps.changes.outputs.frontend }}"
+          echo "Backend changed: ${{ steps.changes.outputs.backend }}"
+          echo "Files changed:"
+          echo "${{ steps.changes.outputs.frontend_files }}"
+          echo "${{ steps.changes.outputs.backend_files }}"
+
+  # 🧹 ÉTAPE 2: Nettoyer le registry (seulement si changements détectés)
+  cleanup-registry:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.any-changes == 'true'
     steps:
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Cleanup old images (prevent corruption)
+      - name: Selective registry cleanup
         run: |
-          echo "🧹 Cleaning registry to prevent corruption..."
+          echo "🧹 Cleaning registry for changed components..."
           
-          # Supprimer les anciennes images (garde les 2 plus récentes)
-          for repo in intelia-frontend intelia-backend; do
-            echo "Cleaning $repo..."
-            
-            # Lister et supprimer les vieilles manifests (garde 2)
-            manifests=$(doctl registry repository list-manifests "$repo" --format Digest --no-header | tail -n +3)
-            
+          # Nettoyer seulement les composants qui ont changé
+          if [[ "${{ needs.detect-changes.outputs.frontend-changed }}" == "true" ]]; then
+            echo "Cleaning frontend images..."
+            manifests=$(doctl registry repository list-manifests intelia-frontend --format Digest --no-header | tail -n +3 || true)
             for manifest in $manifests; do
-              echo "Deleting old manifest: $manifest"
-              doctl registry repository delete-manifest "$repo" "$manifest" --force || true
+              echo "Deleting frontend manifest: $manifest"
+              doctl registry repository delete-manifest intelia-frontend "$manifest" --force || true
             done
-          done
+          fi
           
-          # Force garbage collection
+          if [[ "${{ needs.detect-changes.outputs.backend-changed }}" == "true" ]]; then
+            echo "Cleaning backend images..."
+            manifests=$(doctl registry repository list-manifests intelia-backend --format Digest --no-header | tail -n +3 || true)
+            for manifest in $manifests; do
+              echo "Deleting backend manifest: $manifest"
+              doctl registry repository delete-manifest intelia-backend "$manifest" --force || true
+            done
+          fi
+          
+          # Garbage collection seulement si nécessaire
+          echo "Running garbage collection..."
           doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force --include-untagged-manifests || true
 
-  # 🚀 ÉTAPE 2: Build séquentiel (évite les conflits parallèles)
-  build-and-deploy:
-    needs: cleanup-registry
+  # 🎯 ÉTAPE 3: Build Frontend (seulement si changé)
+  build-frontend:
+    needs: [detect-changes, cleanup-registry]
     runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.frontend-changed == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -51,49 +100,91 @@ jobs:
       - name: Login to DigitalOcean Container Registry
         run: echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login registry.digitalocean.com -u doctl --password-stdin
 
-      # 🎯 Build Frontend (avec timestamp unique pour éviter conflits)
-      - name: Build Frontend
+      - name: Build and push frontend
         run: |
-          echo "🎯 Building frontend..."
+          echo "🎯 Building frontend (changes detected in: ${{ needs.detect-changes.outputs.frontend_files }})"
           TIMESTAMP=$(date +%s)
+          SHORT_SHA=${GITHUB_SHA::8}
           
-          docker build --no-cache \
+          # Build avec cache intelligent
+          docker build \
             --build-arg NEXT_PUBLIC_SUPABASE_URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
             --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
-            -t registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:$TIMESTAMP \
+            --build-arg CACHE_BUST=$TIMESTAMP \
+            -t registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-$SHORT_SHA \
             -t registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main \
             ./frontend
           
-          echo "✅ Frontend built successfully"
-
-      - name: Push Frontend
-        run: |
-          echo "📤 Pushing frontend..."
+          # Push avec les deux tags
+          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-$SHORT_SHA
           docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
-          echo "✅ Frontend pushed"
-
-      # 🎯 Build Backend (après frontend pour éviter parallélisme)
-      - name: Build Backend  
-        run: |
-          echo "🎯 Building backend..."
-          TIMESTAMP=$(date +%s)
           
+          echo "✅ Frontend deployed successfully!"
+
+  # 🎯 ÉTAPE 4: Build Backend (seulement si changé)
+  build-backend:
+    needs: [detect-changes, cleanup-registry]
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.backend-changed == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to DigitalOcean Container Registry
+        run: echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login registry.digitalocean.com -u doctl --password-stdin
+
+      - name: Build and push backend
+        run: |
+          echo "🎯 Building backend (changes detected in: ${{ needs.detect-changes.outputs.backend_files }})"
+          TIMESTAMP=$(date +%s)
+          SHORT_SHA=${GITHUB_SHA::8}
+          
+          # Build sans cache pour éviter corruption + timestamps uniques
           docker build --no-cache \
-            -t registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:$TIMESTAMP \
+            -t registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-$SHORT_SHA \
             -t registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main \
             ./backend
           
-          echo "✅ Backend built successfully"
-
-      - name: Push Backend
-        run: |
-          echo "📤 Pushing backend..."
+          # Push avec les deux tags
+          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-$SHORT_SHA
           docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
-          echo "✅ Backend pushed"
+          
+          echo "✅ Backend deployed successfully!"
 
-      # 🧹 Nettoyage final
-      - name: Final cleanup
+  # 📊 ÉTAPE 5: Résumé du déploiement
+  deployment-summary:
+    needs: [detect-changes, build-frontend, build-backend]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Deployment Summary
         run: |
-          echo "🧹 Final Docker cleanup..."
-          docker system prune -f
-          echo "✅ Build completed successfully!"
+          echo "🚀 DEPLOYMENT SUMMARY"
+          echo "===================="
+          
+          if [[ "${{ needs.detect-changes.outputs.frontend-changed }}" == "true" ]]; then
+            if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
+              echo "✅ Frontend: DEPLOYED (changes detected)"
+            else
+              echo "❌ Frontend: FAILED"
+            fi
+          else
+            echo "⏸️  Frontend: SKIPPED (no changes)"
+          fi
+          
+          if [[ "${{ needs.detect-changes.outputs.backend-changed }}" == "true" ]]; then
+            if [[ "${{ needs.build-backend.result }}" == "success" ]]; then
+              echo "✅ Backend: DEPLOYED (changes detected)" 
+            else
+              echo "❌ Backend: FAILED"
+            fi
+          else
+            echo "⏸️  Backend: SKIPPED (no changes)"
+          fi
+          
+          if [[ "${{ needs.detect-changes.outputs.any-changes }}" != "true" ]]; then
+            echo "💡 No changes detected - Infrastructure costs saved!"
+          fi
+          
+          echo "===================="
+          echo "🔗 View your app: https://[your-app-name].ondigitalocean.app"

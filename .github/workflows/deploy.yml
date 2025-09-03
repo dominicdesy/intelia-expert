@@ -1,4 +1,4 @@
-name: Smart Selective Docker Build and Deploy
+name: Ultra-Fast Selective Docker Build and Deploy
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
       - 'README.md'
   workflow_dispatch:
 
-# 🔧 Évite les builds parallèles qui corrompent le registry
+# 🔧 Évite les builds parallèles
 concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: true
@@ -27,7 +27,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Nécessaire pour comparer les changements
+          fetch-depth: 0
 
       - name: Detect changes
         uses: dorny/paths-filter@v3
@@ -46,110 +46,99 @@ jobs:
           echo "🔍 Changes detected:"
           echo "Frontend changed: ${{ steps.changes.outputs.frontend }}"
           echo "Backend changed: ${{ steps.changes.outputs.backend }}"
-          echo "Files changed:"
-          echo "${{ steps.changes.outputs.frontend_files }}"
-          echo "${{ steps.changes.outputs.backend_files }}"
 
-  # 🧹 ÉTAPE 2: Nettoyer le registry (seulement si changements détectés)
-  cleanup-registry:
+  # 🧰 ÉTAPE 2: Setup Docker commun
+  setup-docker:
     needs: detect-changes
     runs-on: ubuntu-latest
     if: needs.detect-changes.outputs.any-changes == 'true'
     steps:
-      - name: Install doctl
-        uses: digitalocean/action-doctl@v2
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DigitalOcean Container Registry
+        uses: docker/login-action@v3
         with:
-          token: ${{ secrets.DOCR_ACCESS_TOKEN }}
+          registry: registry.digitalocean.com
+          username: doctl
+          password: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Selective registry cleanup
-        run: |
-          echo "🧹 Cleaning registry for changed components..."
-          
-          # Nettoyer seulement les composants qui ont changé
-          if [[ "${{ needs.detect-changes.outputs.frontend-changed }}" == "true" ]]; then
-            echo "Cleaning frontend images..."
-            manifests=$(doctl registry repository list-manifests intelia-frontend --format Digest --no-header | tail -n +3 || true)
-            for manifest in $manifests; do
-              echo "Deleting frontend manifest: $manifest"
-              doctl registry repository delete-manifest intelia-frontend "$manifest" --force || true
-            done
-          fi
-          
-          if [[ "${{ needs.detect-changes.outputs.backend-changed }}" == "true" ]]; then
-            echo "Cleaning backend images..."
-            manifests=$(doctl registry repository list-manifests intelia-backend --format Digest --no-header | tail -n +3 || true)
-            for manifest in $manifests; do
-              echo "Deleting backend manifest: $manifest"
-              doctl registry repository delete-manifest intelia-backend "$manifest" --force || true
-            done
-          fi
-          
-          # Garbage collection seulement si nécessaire
-          echo "Running garbage collection..."
-          doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force --include-untagged-manifests || true
-
-  # 🎯 ÉTAPE 3: Build Frontend (seulement si changé)
+  # 🎯 ÉTAPE 3: Build Frontend (avec cache registry)
   build-frontend:
-    needs: [detect-changes, cleanup-registry]
+    needs: [detect-changes, setup-docker]
     runs-on: ubuntu-latest
     if: needs.detect-changes.outputs.frontend-changed == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Login to DigitalOcean Container Registry
-        run: echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login registry.digitalocean.com -u doctl --password-stdin
+        uses: docker/login-action@v3
+        with:
+          registry: registry.digitalocean.com
+          username: doctl
+          password: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Build and push frontend
-        run: |
-          echo "🎯 Building frontend (changes detected in: ${{ needs.detect-changes.outputs.frontend_files }})"
-          TIMESTAMP=$(date +%s)
-          SHORT_SHA=${GITHUB_SHA::8}
-          
-          # Build avec cache intelligent
-          docker build \
-            --build-arg NEXT_PUBLIC_SUPABASE_URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
-            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
-            --build-arg CACHE_BUST=$TIMESTAMP \
-            -t registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-$SHORT_SHA \
-            -t registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main \
-            ./frontend
-          
-          # Push avec les deux tags
-          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-$SHORT_SHA
-          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
-          
-          echo "✅ Frontend deployed successfully!"
+      - name: Build & push frontend with cache
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          provenance: false
+          tags: |
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }}
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
+          cache-from: |
+            type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache
+          cache-to: |
+            type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache,mode=max
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+            BUILDKIT_INLINE_CACHE=1
 
-  # 🎯 ÉTAPE 4: Build Backend (seulement si changé)
+  # 🎯 ÉTAPE 4: Build Backend (avec cache registry - ULTRA RAPIDE)
   build-backend:
-    needs: [detect-changes, cleanup-registry]
+    needs: [detect-changes, setup-docker]
     runs-on: ubuntu-latest
     if: needs.detect-changes.outputs.backend-changed == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Login to DigitalOcean Container Registry
-        run: echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login registry.digitalocean.com -u doctl --password-stdin
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build and push backend
-        run: |
-          echo "🎯 Building backend (changes detected in: ${{ needs.detect-changes.outputs.backend_files }})"
-          TIMESTAMP=$(date +%s)
-          SHORT_SHA=${GITHUB_SHA::8}
-          
-          # Build sans cache pour éviter corruption + timestamps uniques
-          docker build --no-cache \
-            -t registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-$SHORT_SHA \
-            -t registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main \
-            ./backend
-          
-          # Push avec les deux tags
-          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-$SHORT_SHA
-          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
-          
-          echo "✅ Backend deployed successfully!"
+      - name: Login to DigitalOcean Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: registry.digitalocean.com
+          username: doctl
+          password: ${{ secrets.DOCR_ACCESS_TOKEN }}
+
+      - name: Build & push backend with cache (FAST!)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          provenance: false
+          tags: |
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }}
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
+          cache-from: |
+            type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache
+          cache-to: |
+            type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
 
   # 📊 ÉTAPE 5: Résumé du déploiement
   deployment-summary:
@@ -164,7 +153,7 @@ jobs:
           
           if [[ "${{ needs.detect-changes.outputs.frontend-changed }}" == "true" ]]; then
             if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
-              echo "✅ Frontend: DEPLOYED (changes detected)"
+              echo "✅ Frontend: DEPLOYED with cache optimization"
             else
               echo "❌ Frontend: FAILED"
             fi
@@ -174,7 +163,7 @@ jobs:
           
           if [[ "${{ needs.detect-changes.outputs.backend-changed }}" == "true" ]]; then
             if [[ "${{ needs.build-backend.result }}" == "success" ]]; then
-              echo "✅ Backend: DEPLOYED (changes detected)" 
+              echo "✅ Backend: DEPLOYED with cache optimization (FAST!)" 
             else
               echo "❌ Backend: FAILED"
             fi
@@ -187,4 +176,17 @@ jobs:
           fi
           
           echo "===================="
-          echo "🔗 View your app: https://[your-app-name].ondigitalocean.app"
+          echo "🔗 View your app: https://expert.intelia.com"
+
+  # 🧹 ÉTAPE 6: Garbage Collection (optionnel, manuel uniquement)
+  manual-cleanup:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.cleanup == 'true'
+    steps:
+      - name: Manual Registry Cleanup
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DOCR_ACCESS_TOKEN }}
+      - run: |
+          echo "🧹 Manual cleanup triggered"
+          doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force
