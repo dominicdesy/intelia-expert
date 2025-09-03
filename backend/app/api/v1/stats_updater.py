@@ -87,11 +87,33 @@ class StatisticsUpdater:
     """
     
     def __init__(self):
-        logger.info("DEPLOY-CHECK: Initialisation StatisticsUpdater réécrite - 2025-09-03-23:45")
+        logger.info("DEPLOY-CHECK: Initialisation StatisticsUpdater réécrite avec debug - 2025-09-03-23:45")
         
-        self.cache = get_stats_cache()
-        self.analytics = get_analytics_manager()
-        self.billing = get_billing_manager()
+        # DEBUG INITIAL: Analyser les gestionnaires avant initialisation
+        logger.info("DEBUG-INIT: Récupération des gestionnaires...")
+        
+        try:
+            self.cache = get_stats_cache()
+            logger.info(f"DEBUG-INIT: Cache type: {type(self.cache)}, bool: {bool(self.cache)}")
+        except Exception as cache_error:
+            logger.error(f"DEBUG-INIT: Erreur cache: {type(cache_error)} = {repr(cache_error)}")
+            self.cache = None
+        
+        try:
+            self.analytics = get_analytics_manager()
+            logger.info(f"DEBUG-INIT: Analytics type: {type(self.analytics)}, bool: {bool(self.analytics)}")
+            logger.info(f"DEBUG-INIT: Analytics repr: {repr(self.analytics)}")
+        except Exception as analytics_error:
+            logger.error(f"DEBUG-INIT: Erreur analytics: {type(analytics_error)} = {repr(analytics_error)}")
+            self.analytics = None
+        
+        try:
+            self.billing = get_billing_manager()
+            logger.info(f"DEBUG-INIT: Billing type: {type(self.billing)}, bool: {bool(self.billing)}")
+        except Exception as billing_error:
+            logger.error(f"DEBUG-INIT: Erreur billing: {type(billing_error)} = {repr(billing_error)}")
+            self.billing = None
+        
         self.last_update = None
         self.update_in_progress = False
         
@@ -104,8 +126,10 @@ class StatisticsUpdater:
             "initialization_time": datetime.now().isoformat()
         }
         
-        # CORRECTION CRITIQUE: Initialisation défensive des colonnes feedback
+        # CORRECTION CRITIQUE: Initialisation défensive des colonnes feedback AVEC DEBUG
+        logger.info("DEBUG-INIT: Début initialisation feedback detection")
         self._feedback_columns_available = self._initialize_feedback_detection()
+        logger.info(f"DEBUG-INIT: Feedback detection terminée: {self._feedback_columns_available}")
         
         logger.info(f"StatisticsUpdater initialisé - Feedback: {self._feedback_columns_available}")
     

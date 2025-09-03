@@ -52,6 +52,14 @@ export const availableLanguages: LanguageConfig[] = [
     dateFormat: 'de-DE'
   },
   {
+    code: 'it',
+    name: 'Italian',
+    nativeName: 'Italiano',
+    region: 'Italy',
+    flag: '🇮🇹',
+    dateFormat: 'it-IT'
+  },
+  {
     code: 'nl',
     name: 'Dutch',
     nativeName: 'Nederlands',
@@ -90,6 +98,14 @@ export const availableLanguages: LanguageConfig[] = [
     region: 'China',
     flag: '🇨🇳',
     dateFormat: 'zh-CN'
+  },
+  {
+    code: 'id',
+    name: 'Indonesian',
+    nativeName: 'Bahasa Indonesia',
+    region: 'Indonesia',
+    flag: '🇮🇩',
+    dateFormat: 'id-ID'
   }
 ]
 
@@ -142,8 +158,8 @@ export const isRTLLanguage = (code: string): boolean => {
 
 // Groupement des langues par région (optionnel pour l'interface)
 export const LANGUAGE_REGIONS = {
-  europe: ['fr', 'en', 'es', 'pt', 'de', 'nl', 'pl'] as const,
-  asia: ['th', 'hi', 'zh'] as const,
+  europe: ['fr', 'en', 'es', 'pt', 'de', 'it', 'nl', 'pl'] as const,
+  asia: ['th', 'hi', 'zh', 'id'] as const,
   americas: [] as const, // Si vous ajoutez plus tard pt-BR, en-CA, etc.
   africa: [] as const,
   oceania: [] as const
