@@ -1,19 +1,78 @@
-# Node modules et caches
+# ========== Node.js et caches ==========
 node_modules
 npm-debug.log
 yarn-error.log
 .next/cache
 .cache
+.npm
+.yarn
 *.log
 
-# Tests, docs, configs inutiles en prod
+# ========== Tests, docs, configs dev ==========
 coverage
 *.md
+README.md
+docs/
+test/
+tests/
+__tests__/
+*.test.js
+*.test.ts
+*.test.tsx
+*.spec.js
+*.spec.ts
+*.spec.tsx
 
-# Build outputs
+# ========== Build outputs ==========
 dist
 build
+out
 
-# ⚠️ NE PAS ignorer public et fonts
+# ========== Fichiers de sauvegarde et temporaires ==========
+**/*.bak
+**/*.backup
+**/*.old
+**/*.orig
+**/*.rej
+**/*.tmp
+**/*.temp
+**/.tmp
+**/tmp
+
+# ========== Git et développement ==========
+.git
+.github
+.gitignore
+.env.example
+.env.local
+.env.development
+.env.test
+
+# ========== IDE et éditeurs ==========
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# ========== OS spécifiques ==========
+.DS_Store
+Thumbs.db
+*.lnk
+
+# ========== TypeScript ==========
+*.tsbuildinfo
+.tsbuildinfo
+
+# ========== ESLint et Prettier ==========
+.eslintcache
+
+# ========== Storybook ==========
+.storybook
+storybook-static
+
+# ⚠️ INCLUSIONS EXPLICITES (ne pas ignorer)
 !public/
 !public/fonts/**
+!public/images/**
+!public/locales/**
