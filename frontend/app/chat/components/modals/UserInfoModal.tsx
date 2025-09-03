@@ -725,7 +725,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         
         if (error.message) {
           if (error.message.includes('Failed to fetch')) {
-            errorMessage = t('error.networkError')
+            errorMessage = 'Problème de connexion réseau. Vérifiez votre connexion internet.'
           } else if (error.message.includes('401') || error.message.includes('unauthorized')) {
             errorMessage = t('error.userNotConnected')
           } else {

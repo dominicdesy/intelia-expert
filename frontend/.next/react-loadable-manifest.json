@@ -3,8 +3,8 @@
     "id": 9272,
     "files": []
   },
-  "app\\chat\\components\\modals\\UserInfoModal.tsx -> @/lib/supabase/singleton": {
-    "id": 8225,
+  "app\\chat\\page.tsx -> @/lib/services/logoutService": {
+    "id": 258,
     "files": []
   },
   "lib\\services\\logoutService.ts -> @/lib/supabase/singleton": {
