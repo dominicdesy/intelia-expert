@@ -8,6 +8,7 @@ SAFE: Aucune rupture avec logging.py et billing.py
 Optimisé: Gestion mémoire drastiquement améliorée pour DigitalOcean App Platform
 Memory-safe: Collecte séquentielle, limites strictes, monitoring temps réel
 FIXED: Correction erreur feedback columns et gestion robuste des exceptions
+ERREUR CORRIGÉE: overall_health KeyError résolu avec valeurs par défaut
 """
 
 import asyncio
@@ -118,7 +119,7 @@ class StatisticsUpdater:
         Cache le résultat pour éviter les vérifications répétées.
         Retourne TOUJOURS un dictionnaire valide, jamais 0 ou autre
         """
-        logger.error("PROOF-OF-DEPLOY: Version corrigée feedback detection - 2025-08-26-22:35")
+        logger.error("PROOF-OF-DEPLOY: Version corrigée feedback detection - 2025-09-03")
         
         default_result = {
             "table_exists": False, 
@@ -186,7 +187,7 @@ class StatisticsUpdater:
                 **default_result,
                 "error": str(e)[:100]  # Limiter la taille de l'erreur
             }
-    
+
     def diagnose_database_connection(self) -> Dict[str, Any]:
         """
         Diagnostique complet de la connection base de données
@@ -659,11 +660,12 @@ class StatisticsUpdater:
                     from app.api.v1.logging import get_server_analytics
                     server_stats = get_server_analytics(hours=24)
                     
-                    if "error" not in server_stats:
+                    if server_stats and "error" not in server_stats:
+                        current_status = server_stats.get("current_status", {})
                         dashboard_data.update({
-                            "avg_response_time": server_stats.get("current_status", {}).get("avg_response_time_ms", 0) / 1000,
-                            "error_rate": server_stats.get("current_status", {}).get("error_rate_percent", 0),
-                            "system_health": server_stats.get("current_status", {}).get("overall_health", "healthy")
+                            "avg_response_time": current_status.get("avg_response_time_ms", 0) / 1000,
+                            "error_rate": current_status.get("error_rate_percent", 0),
+                            "system_health": current_status.get("overall_health", "healthy")
                         })
                     
                 except Exception as server_error:
@@ -699,7 +701,7 @@ class StatisticsUpdater:
                         stats_result = cur.fetchone()
                         if stats_result:
                             dashboard_data.update({
-                                "total_users": min(stats_result["total_users"] or 0, 10000),  # Cap arbitraire
+                                "total_users": min(stats_result["total_users"] or 0, 10000),
                                 "unique_active_users": min(stats_result["total_users"] or 0, 10000),
                                 "total_questions": min(stats_result["total_questions"] or 0, 50000),
                                 "questions_today": stats_result["questions_today"] or 0,
@@ -725,7 +727,6 @@ class StatisticsUpdater:
                                 LIMIT 10
                             """)
                         else:
-                            # Version originale conservée
                             cur.execute("""
                                 SELECT response_source, COUNT(*) as count
                                 FROM user_questions_complete 
@@ -769,7 +770,7 @@ class StatisticsUpdater:
                         top_users = []
                         for row in cur.fetchall()[:5]:  # Max 5 pour économiser mémoire
                             top_users.append({
-                                "email": row["user_email"][:50],  # Tronquer email long
+                                "email": row["user_email"][:50],
                                 "question_count": row["question_count"],
                                 "plan": row["plan"]
                             })
@@ -781,7 +782,6 @@ class StatisticsUpdater:
                 
             except Exception as db_error:
                 logger.error(f"Erreur requêtes base de données dashboard: {db_error}")
-                # Continuer avec des valeurs par défaut
                 dashboard_data.update({
                     "total_users": 0,
                     "unique_active_users": 0, 
@@ -969,7 +969,10 @@ class StatisticsUpdater:
             return {"status": "error", "error": str(e)[:100]}
 
     async def _update_server_performance_safe(self) -> Dict[str, Any]:
-        """Collecte performance serveur avec gestion mémoire"""
+        """
+        CORRECTION CRITIQUE: Collecte performance serveur avec gestion défensive
+        Corrige l'erreur 'overall_health' KeyError avec valeurs par défaut robustes
+        """
         try:
             logger.info("Collecte performance serveur safe...")
             
@@ -1001,14 +1004,17 @@ class StatisticsUpdater:
                         total_req = result["total_requests"] or 0
                         failed_req = result["failed_requests"] or 0
                         error_rate = (failed_req / total_req * 100) if total_req > 0 else 0
+                        avg_time = int(result["avg_response_time_ms"] or 0)
                         
+                        # CORRECTION: Valeurs par défaut avec structure complète
                         performance_data = {
                             "period_hours": 24,
                             "current_status": {
-                                "overall_health": "healthy" if error_rate < 5 else "degraded",
-                                "avg_response_time_ms": int(result["avg_response_time_ms"] or 0),
+                                "overall_health": "healthy" if error_rate < 5 else ("warning" if error_rate < 15 else "degraded"),
+                                "avg_response_time_ms": avg_time,
                                 "error_rate_percent": round(error_rate, 2),
-                                "total_errors": failed_req
+                                "total_errors": failed_req,
+                                "status_detail": f"{total_req} requests, {failed_req} errors"
                             },
                             "global_stats": {
                                 "total_requests": total_req,
@@ -1019,38 +1025,72 @@ class StatisticsUpdater:
                             "source": "questions_computed_safe"
                         }
             else:
-                # Version complète conservée
+                # Version complète conservée avec correction
                 try:
                     from app.api.v1.logging import get_server_analytics
                     server_metrics = get_server_analytics(hours=24)
                     
-                    if "error" not in server_metrics:
+                    if server_metrics and "error" not in server_metrics:
+                        # CORRECTION: Vérification défensive de la structure
+                        current_status = server_metrics.get("current_status", {})
+                        if not current_status:
+                            current_status = {
+                                "overall_health": "unknown",
+                                "avg_response_time_ms": 0,
+                                "error_rate_percent": 0,
+                                "total_errors": 0
+                            }
+                        
+                        # S'assurer que overall_health existe
+                        if "overall_health" not in current_status:
+                            current_status["overall_health"] = "healthy"
+                        
+                        global_stats = server_metrics.get("global_stats", {})
+                        if not global_stats:
+                            global_stats = {
+                                "total_requests": 0,
+                                "total_successes": 0,
+                                "total_failures": 0
+                            }
+                        
                         performance_data = {
                             "period_hours": 24,
-                            "current_status": server_metrics.get("current_status", {}),
-                            "global_stats": server_metrics.get("global_stats", {}),
-                            "collected_at": datetime.now().isoformat()
+                            "current_status": current_status,
+                            "global_stats": global_stats,
+                            "collected_at": datetime.now().isoformat(),
+                            "source": "server_analytics_safe"
                         }
                     else:
-                        raise Exception(server_metrics["error"])
+                        raise Exception(server_metrics.get("error", "Données serveur indisponibles"))
                         
-                except Exception:
-                    # Fallback vers version allégée
+                except Exception as server_error:
+                    logger.warning(f"Erreur analytics serveur, fallback local: {server_error}")
+                    # Fallback vers version allégée récursive
+                    UPDATER_CONFIG["SKIP_HEAVY_ANALYTICS"] = True
                     return await self._update_server_performance_safe()
+            
+            # CORRECTION: Vérification finale défensive
+            if not performance_data.get("current_status", {}).get("overall_health"):
+                performance_data.setdefault("current_status", {})["overall_health"] = "unknown"
             
             self.cache.set_cache("server:performance:24h", performance_data, ttl_hours=1, source="computed_safe")
             
-            logger.info(f"Performance serveur collectée safe: {performance_data['current_status']['overall_health']}")
+            # CORRECTION: Accès sécurisé avec get()
+            health_status = performance_data.get("current_status", {}).get("overall_health", "unknown")
+            total_requests = performance_data.get("global_stats", {}).get("total_requests", 0)
+            
+            logger.info(f"Performance serveur collectée safe: {health_status}")
             return {
                 "status": "success", 
-                "health": performance_data["current_status"]["overall_health"],
-                "total_requests": performance_data["global_stats"].get("total_requests", 0)
+                "health": health_status,
+                "total_requests": total_requests
             }
             
         except Exception as e:
             logger.error(f"Erreur collecte performance safe: {e}")
             return {"status": "error", "error": str(e)[:100]}
 
+    # Méthodes utilitaires conservées
     def get_update_status(self) -> Dict[str, Any]:
         """Retourne le statut de la dernière mise à jour"""
         try:
