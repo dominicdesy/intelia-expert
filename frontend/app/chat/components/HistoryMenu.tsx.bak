@@ -37,10 +37,29 @@ export const HistoryMenu = React.memo(() => {
     }
   }, [t])
 
-  // ✅ SUPPRESSION COMPLETE des useEffect de polling automatique
-  // Plus de chargement automatique - seulement chargement manuel lors de l'ouverture
+  // Auto-refresh du compteur quand l'utilisateur change ou qu'une nouvelle conversation est créée
+  React.useEffect(() => {
+    if (user && !isLoadingHistory) {
+      // Charger silencieusement pour mettre à jour le badge
+      loadConversations(user.email || user.id).catch(console.error)
+    }
+  }, [user, loadConversations, isLoadingHistory])
 
-  // CORRECTION: handleToggle sans polling automatique
+  // Rafraîchir périodiquement le compteur
+  React.useEffect(() => {
+    if (!user) return
+
+    const interval = setInterval(() => {
+      if (!isOpen && !isLoadingHistory) {
+        // Mise à jour silencieuse du badge seulement quand le menu est fermé
+        loadConversations(user.email || user.id).catch(console.error)
+      }
+    }, 30000) // Toutes les 30 secondes
+
+    return () => clearInterval(interval)
+  }, [user, isOpen, isLoadingHistory, loadConversations])
+
+  // CORRECTION CRITIQUE: Éviter la boucle infinie dans handleToggle
   const handleToggle = useCallback(async () => {
     console.log(t('history.toggleClicked'), isOpen, t('history.userPresent'), !!user)
     
@@ -48,26 +67,23 @@ export const HistoryMenu = React.memo(() => {
     const newIsOpen = !isOpen
     setIsOpen(newIsOpen)
     
-    // Charger SEULEMENT si on OUVRE le menu ET qu'on a un utilisateur ET pas de données existantes
-    if (newIsOpen && user && !isLoadingHistory && conversationGroups.length === 0) {
-      console.log('🔄 [HistoryMenu] Chargement MANUEL uniquement lors de l\'ouverture')
+    // Charger seulement si on OUVRE le menu et qu'on a un utilisateur
+    if (newIsOpen && user && !isLoadingHistory) {
+      console.log(t('history.loadingConversationsFor'), user.email || user.id)
       try {
         await loadConversations(user.email || user.id)
-        console.log('✅ [HistoryMenu] Conversations chargées manuellement')
+        console.log(t('history.conversationsLoaded'))
       } catch (error) {
-        console.error('❌ [HistoryMenu] Erreur chargement manuel:', error)
+        console.error(t('history.loadingError'), error)
       }
-    } else {
-      console.log('ℹ️ [HistoryMenu] Pas de chargement - données déjà présentes ou menu fermé')
     }
-  }, [isOpen, user, isLoadingHistory, loadConversations, conversationGroups.length, t])
+  }, [isOpen, user, isLoadingHistory, loadConversations, t])
 
   // Mémorisation des handlers pour éviter les re-créations
   const handleRefresh = useCallback(async (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     if (!user) return
-    console.log('🔄 [HistoryMenu] Refresh MANUEL demandé par l\'utilisateur')
     await refreshConversations(user.email || user.id)
   }, [user, refreshConversations])
 
@@ -123,7 +139,7 @@ export const HistoryMenu = React.memo(() => {
     )
   }, [conversationGroups])
 
-  // Logs de debug moins fréquents
+  // Réduire la fréquence des logs de debug
   const debugState = useMemo(() => {
     const state = {
       isOpen,
@@ -133,13 +149,10 @@ export const HistoryMenu = React.memo(() => {
       hasUser: !!user
     }
     
-    // Log uniquement lors des changements importants
-    if (isOpen || totalConversations > 0) {
-      console.log('[HistoryMenu] État actuel:', state)
-    }
+    console.log(t('history.renderState'), state)
     
     return state
-  }, [isOpen, totalConversations, conversationGroups.length, isLoadingHistory, user])
+  }, [isOpen, totalConversations, conversationGroups.length, isLoadingHistory, user, t])
 
   // Mémorisation du rendu des conversations pour optimiser les performances
   const conversationsList = useMemo(() => {
