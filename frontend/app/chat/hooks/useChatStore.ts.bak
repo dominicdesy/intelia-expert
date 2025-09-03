@@ -3,56 +3,14 @@ import { ConversationItem, Conversation, ConversationWithMessages, ConversationG
 import { conversationService } from '../services/conversationService'
 import { loadUserConversations } from '../services/apiService'
 
-// ==================== PROTECTION GLOBALE RENFORCÉE ====================
+// ==================== PROTECTION GLOBALE CONTRE LA BOUCLE ====================
 const globalLoadingProtection = {
   isLoading: false,
   currentUserId: null as string | null,
   lastLoadTime: 0,
-  lastSuccessfulLoad: 0,
-  COOLDOWN_PERIOD: 300000, // 🔧 CORRECTION: 5 minutes au lieu de 3 secondes
-  SUCCESS_CACHE_DURATION: 600000, // 🔧 NOUVEAU: 10 minutes avant de permettre un nouveau chargement
-  MAX_RETRIES: 2, // 🔧 CORRECTION: Réduit de 3 à 2
-  retryCount: 0,
-  
-  // 🔧 NOUVELLE MÉTHODE: Reset manuel seulement
-  forceReset: function() {
-    this.isLoading = false
-    this.retryCount = 0
-    this.lastLoadTime = 0
-    console.log('🔄 [GlobalProtection] Reset forcé')
-  },
-  
-  // 🔧 NOUVELLE MÉTHODE: Vérification stricte
-  canLoad: function(userId: string): boolean {
-    const now = Date.now()
-    
-    // Si chargement en cours pour le même user
-    if (this.isLoading && this.currentUserId === userId) {
-      console.log('🛡️ [GlobalProtection] Chargement déjà en cours, BLOQUÉ')
-      return false
-    }
-    
-    // Si dernier chargement réussi trop récent
-    if (this.lastSuccessfulLoad > 0 && 
-        (now - this.lastSuccessfulLoad) < this.SUCCESS_CACHE_DURATION) {
-      console.log('🛡️ [GlobalProtection] Cache encore valide, BLOQUÉ')
-      return false
-    }
-    
-    // Cooldown entre tentatives
-    if ((now - this.lastLoadTime) < this.COOLDOWN_PERIOD) {
-      console.log('🛡️ [GlobalProtection] Cooldown actif, BLOQUÉ')
-      return false
-    }
-    
-    // Max retries
-    if (this.retryCount >= this.MAX_RETRIES) {
-      console.log('🛡️ [GlobalProtection] Max retries atteint, BLOQUÉ')
-      return false
-    }
-    
-    return true
-  }
+  COOLDOWN_PERIOD: 3000, // 3 secondes entre les chargements
+  MAX_RETRIES: 3,
+  retryCount: 0
 }
 
 // ==================== INTERFACE DU STORE ====================
@@ -85,6 +43,7 @@ const groupConversationsByDate = (conversations: Conversation[]): ConversationGr
   const thisWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
   const thisMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
 
+  // Utilisation de clés de traduction au lieu de textes hardcodés
   const groups: ConversationGroup[] = [
     { title: "today", conversations: [] },
     { title: "yesterday", conversations: [] },
@@ -112,7 +71,7 @@ const groupConversationsByDate = (conversations: Conversation[]): ConversationGr
   return groups.filter(group => group.conversations.length > 0)
 }
 
-// ==================== STORE ZUSTAND AVEC PROTECTION RENFORCÉE ====================
+// ==================== STORE ZUSTAND AVEC PROTECTION ====================
 export const useChatStore = create<ChatStoreState>((set, get) => ({
   conversations: [],
   isLoading: false,
@@ -121,46 +80,53 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   isLoadingHistory: false,
   isLoadingConversation: false,
 
-  // ==================== MÉTHODE loadConversations ULTRA-PROTÉGÉE ====================
+  // ==================== MÉTHODE CORRIGÉE loadConversations ====================
   loadConversations: async (userId: string) => {
     if (!userId) {
-      console.warn('⚠️ [ChatStore] Pas d\'userId fourni')
+      console.warn('⚠️ [ChatStore] Pas d\'userId fourni pour charger les conversations')
       return
     }
 
-    // 🔧 PROTECTION RENFORCÉE: Vérification stricte
-    if (!globalLoadingProtection.canLoad(userId)) {
-      console.log('🚫 [ChatStore] Chargement BLOQUÉ par protection globale')
+    // PROTECTION 1: Vérifier si un chargement est déjà en cours pour ce user
+    if (globalLoadingProtection.isLoading && globalLoadingProtection.currentUserId === userId) {
+      console.log('🛡️ [ChatStore] Chargement déjà en cours pour cet utilisateur, ignoré')
       return
     }
 
-    console.log('🟢 [ChatStore] Protection globale OK - Début du chargement')
-    
-    // Lock immédiat
+    // PROTECTION 2: Cooldown entre les chargements
+    const now = Date.now()
+    if (now - globalLoadingProtection.lastLoadTime < globalLoadingProtection.COOLDOWN_PERIOD) {
+      console.log('🛡️ [ChatStore] Cooldown actif, chargement ignoré')
+      return
+    }
+
+    // PROTECTION 3: Maximum de tentatives
+    if (globalLoadingProtection.retryCount >= globalLoadingProtection.MAX_RETRIES) {
+      console.log('🛡️ [ChatStore] Maximum de tentatives atteint, chargement bloqué')
+      return
+    }
+
+    // Marquer comme en cours de chargement
     globalLoadingProtection.isLoading = true
     globalLoadingProtection.currentUserId = userId
-    globalLoadingProtection.lastLoadTime = Date.now()
+    globalLoadingProtection.lastLoadTime = now
     globalLoadingProtection.retryCount++
 
     set({ isLoading: true, isLoadingHistory: true })
     
     try {
-      console.log('📡 [ChatStore] Appel API loadUserConversations...')
+      console.log('📡 [ChatStore] Chargement conversations pour:', userId)
       
       const conversationsData = await loadUserConversations(userId)
       
-      if (!conversationsData || !conversationsData.conversations) {
-        console.log('📭 [ChatStore] Aucune conversation trouvée')
+      if (!conversationsData || !conversationsData.conversations || conversationsData.conversations.length === 0) {
+        console.log('🔭 [ChatStore] Aucune conversation trouvée')
         set({ 
           conversations: [], 
           conversationGroups: [],
           isLoading: false,
           isLoadingHistory: false
         })
-        
-        // 🔧 SUCCÈS MÊME SANS DONNÉES
-        globalLoadingProtection.lastSuccessfulLoad = Date.now()
-        globalLoadingProtection.retryCount = 0
         return
       }
       
@@ -198,14 +164,13 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         isLoadingHistory: false
       })
       
-      // 🔧 MARQUER LE SUCCÈS
-      globalLoadingProtection.lastSuccessfulLoad = Date.now()
+      console.log('✅ [ChatStore] État mis à jour - Conversations:', sortedConversations.length, 'Groupes:', groups.length)
+      
+      // SUCCÈS: Reset du compteur de retry
       globalLoadingProtection.retryCount = 0
       
-      console.log('✅ [ChatStore] État mis à jour - Cache valide pour 10min')
-      
     } catch (error) {
-      console.error('❌ [ChatStore] Erreur chargement:', error)
+      console.error('❌ [ChatStore] Erreur chargement conversations:', error)
       set({ 
         conversations: [],
         conversationGroups: [],
@@ -213,16 +178,18 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         isLoadingHistory: false
       })
       
-      // 🔧 PAS DE RETRY AUTOMATIQUE
-      console.log('❌ [ChatStore] Erreur - pas de retry automatique')
-      throw error
+      // En cas d'erreur, permettre un nouveau chargement après un délai
+      if (globalLoadingProtection.retryCount < globalLoadingProtection.MAX_RETRIES) {
+        setTimeout(() => {
+          globalLoadingProtection.isLoading = false
+        }, 5000) // 5 secondes avant de permettre un retry
+      }
       
+      throw error
     } finally {
-      // 🔧 UNLOCK DIFFÉRÉ DE 30 SECONDES MINIMUM
-      setTimeout(() => {
-        globalLoadingProtection.isLoading = false
-        console.log('🔓 [ChatStore] Protection unlock après délai')
-      }, 30000) // 30 secondes avant de permettre un nouveau chargement
+      // IMPORTANT: Reset du flag de chargement
+      globalLoadingProtection.isLoading = false
+      globalLoadingProtection.lastLoadTime = Date.now()
     }
   },
 
@@ -255,9 +222,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     try {
       console.log('🗑️ [ChatStore] Suppression toutes conversations')
       
-      // 🔧 RESET DE LA PROTECTION
-      globalLoadingProtection.forceReset()
-      globalLoadingProtection.lastSuccessfulLoad = 0
+      // Reset de la protection globale
+      globalLoadingProtection.isLoading = false
+      globalLoadingProtection.currentUserId = null
+      globalLoadingProtection.retryCount = 0
       
       set({ 
         conversations: [],
@@ -276,15 +244,14 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   },
 
   refreshConversations: async (userId: string) => {
-    // 🔧 RESET POUR REFRESH MANUEL SEULEMENT
-    console.log('🔄 [ChatStore] Refresh manuel - Reset protection')
-    globalLoadingProtection.forceReset()
-    globalLoadingProtection.lastSuccessfulLoad = 0
+    // Reset de la protection pour permettre un refresh manuel
+    globalLoadingProtection.isLoading = false
+    globalLoadingProtection.retryCount = 0
+    globalLoadingProtection.lastLoadTime = 0
     
     await get().loadConversations(userId)
   },
 
-  // Autres méthodes inchangées...
   addConversation: (conversationId: string, question: string, response: string) => {
     const newConversation: ConversationItem = {
       id: conversationId,

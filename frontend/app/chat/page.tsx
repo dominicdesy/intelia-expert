@@ -305,7 +305,7 @@ export default function ChatInterface() {
     return messages.length > 0
   }, [messages.length])
 
-  // ✅ MODIFICATION PRINCIPALE: Gestion améliorée des erreurs d'authentification
+  // Gestion améliorée des erreurs d'authentification
   const handleAuthError = useCallback((error: any) => {
     console.error('🚨 [Chat] Auth error détectée:', error)
     
@@ -573,7 +573,7 @@ export default function ChatInterface() {
     }
   }, [messages.length])
 
-  // Message de bienvenue (conservée)
+  // Message de bienvenue (conservé)
   useEffect(() => {
     if (isAuthenticated && !currentConversation && !hasMessages && isMountedRef.current) {
       const welcomeMessage: Message = {
@@ -600,7 +600,7 @@ export default function ChatInterface() {
     }
   }, [isAuthenticated, currentConversation, hasMessages, t, currentLanguage, setCurrentConversation])
 
-  // Update du message de bienvenue selon la langue (conservée)
+  // CORRECTION: useEffect pour les changements de langue (unifié et corrigé)
   useEffect(() => {
     if (currentConversation?.id === 'welcome' &&
         currentConversation.messages.length === 1 &&
@@ -621,42 +621,38 @@ export default function ChatInterface() {
     }
   }, [currentLanguage, t, currentConversation, setCurrentConversation])
 
-  // NOUVEAU: useEffect séparé pour les changements de langue (évite le rechargement des conversations)
-  useEffect(() => {
-    // Mise à jour du message de bienvenue seulement
-    if (currentConversation?.id === 'welcome' &&
-        currentConversation.messages.length === 1 &&
-        currentConversation.messages[0].content !== t('chat.welcome') &&
-        isMountedRef.current) {
-
-      const updatedMessage: Message = {
-        ...currentConversation.messages[0],
-        content: t('chat.welcome')
-      }
-
-      const updatedConversation = {
-        ...currentConversation,
-        messages: [updatedMessage]
-      }
-
-      setCurrentConversation(updatedConversation)
-    }
-  }, [currentLanguage, t]) // CORRECTION: Séparé du chargement des conversations
-
-
-  // 🔧 NOUVEAU: Chargement initial des conversations (remplace le setInterval)
+  // CORRECTION: Chargement initial des conversations (version finale corrigée)
   useEffect(() => {
     if (isAuthenticated && user?.email && !hasLoadedConversationsRef.current && isMountedRef.current) {
-      console.log('[Chat] Chargement initial des conversations pour:', user.email)
+      console.log('[Chat] 🟢 Chargement initial UNIQUE pour:', user.email)
       hasLoadedConversationsRef.current = true
-    
-      // Chargement unique au démarrage
-      loadConversations(user.email).catch(error => {
-        console.error('[Chat] Erreur chargement initial:', error)
-        handleAuthError(error)
-      })
+
+      // CAPTURE STABLE des valeurs au moment de l'exécution
+      const userEmail = user.email
+      const loadFn = loadConversations
+
+      // FONCTION LOCALE avec valeurs capturées
+      const performInitialLoad = async () => {
+        try {
+          await loadFn(userEmail)
+          console.log('[Chat] ✅ Chargement initial terminé avec succès')
+        } catch (error) {
+          console.error('[Chat] ❌ Erreur chargement initial:', error)
+          
+          // GESTION D'ERREUR LOCALE sans redépendance
+          if (error?.status === 401 || error?.status === 403) {
+            console.log('[Chat] 🚪 Session expirée détectée - redirection')
+            setTimeout(() => {
+              window.location.href = '/'
+            }, 1000)
+          }
+        }
+      }
+
+      // EXÉCUTION UNIQUE avec délai pour éviter les race conditions
+      setTimeout(performInitialLoad, 100)
     }
-  }, [isAuthenticated, user?.email, loadConversations, handleAuthError])
+  }, [isAuthenticated, user?.email]) // Dépendances minimales et stables
 
   // Fonctions de gestion des messages (toutes conservées)
   const extractAnswerAndSources = useCallback((result: any): [string, any[]] => {
@@ -765,7 +761,7 @@ export default function ChatInterface() {
 
       if (!isMountedRef.current) return
 
-      // ✅ NOUVEAU : Vérifier si la réponse indique une session expirée
+      // Vérifier si la réponse indique une session expirée
       if (response?.error === 'authentication_failed' || 
           response?.detail === 'Token expired' ||
           response?.message?.includes('Session expiree')) {
@@ -979,7 +975,7 @@ export default function ChatInterface() {
   }, [isMobileDevice, isKeyboardVisible, keyboardHeight])
 
   // États de chargement simplifiés
-  if (!hasHydrated) {	  
+  if (!hasHydrated) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">

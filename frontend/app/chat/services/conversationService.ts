@@ -9,22 +9,22 @@ import {
   ConversationData
 } from '../../../types'
 
-// 🔧 IMPORT CRITIQUE: Utiliser loadUserConversations d'apiService au lieu de dupliquer la logique
+// Import critique: Utiliser loadUserConversations d'apiService au lieu de dupliquer la logique
 import { loadUserConversations, sendFeedback, deleteConversation } from './apiService'
 
-// 🔧 NOUVELLE INTERFACE: Cache côté frontend pour les conversations
+// Interface cache côté frontend pour les conversations
 interface ConversationCache {
   conversations: Conversation[]
   timestamp: number
   userId: string
 }
 
-// Circuit breaker pour éviter les boucles infinies
+// Circuit breaker corrigé avec reset moins fréquent
 class ConversationLoadingCircuitBreaker {
   private attempts = 0
   private lastAttempt = 0
-  private readonly MAX_ATTEMPTS = 3
-  private readonly RESET_INTERVAL = 30000 // 30 secondes
+  private readonly MAX_ATTEMPTS = 2
+  private readonly RESET_INTERVAL = 600000 // 10 minutes au lieu de 30 secondes
 
   canAttempt(): boolean {
     const now = Date.now()
@@ -34,7 +34,7 @@ class ConversationLoadingCircuitBreaker {
     }
 
     if (this.attempts >= this.MAX_ATTEMPTS) {
-      console.warn('[ConversationService] Circuit breaker: trop de tentatives, arrêt temporaire')
+      console.warn('[ConversationService] Circuit breaker: BLOQUÉ pour 10 minutes')
       return false
     }
 
@@ -83,18 +83,18 @@ function createConversation(data: {
   }
 }
 
-// 🔧 SERVICE CONVERSATIONS CORRIGÉ - UTILISE apiService.ts POUR ÉVITER DUPLICATION
+// Service conversations corrigé - utilise apiService.ts pour éviter duplication
 export class ConversationService {
   private baseUrl: string
   private loggingEnabled = true
   private circuitBreaker = new ConversationLoadingCircuitBreaker()
   
-  // 🔧 NOUVELLES PROPRIÉTÉS: Cache côté frontend
+  // Propriétés cache côté frontend
   private conversationsCache: ConversationCache | null = null
   private readonly CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
   constructor() {
-    // 🔧 CORRECTION: Construction URL plus propre
+    // Construction URL plus propre
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, '') // Enlever trailing slashes
     const apiVersion = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
     
@@ -105,7 +105,7 @@ export class ConversationService {
       return
     }
     
-    // 🔧 CORRECTION: URL construite proprement
+    // URL construite proprement
     this.baseUrl = `${apiBaseUrl}/api/${apiVersion}`
     console.log('ConversationService configuré:', apiBaseUrl)
   }
@@ -146,12 +146,12 @@ export class ConversationService {
     }
   }
 
-  // ✅ CORRECTION: Headers GET nettoyés - pas de Content-Type pour éviter preflight CORS
+  // Headers GET nettoyés - pas de Content-Type pour éviter preflight CORS
   private getHeaders(method: 'GET' | 'POST' | 'PATCH' | 'DELETE' = 'GET'): Record<string, string> {
     const token = this.getAuthToken()
     
     if (method === 'GET') {
-      // ✅ PATCH 2: Seulement Authorization et Accept pour GET - pas de Content-Type
+      // Seulement Authorization et Accept pour GET - pas de Content-Type
       return {
         'Accept': 'application/json',
         ...(token && { 'Authorization': `Bearer ${token}` })
@@ -166,7 +166,7 @@ export class ConversationService {
     }
   }
 
-  // 🔧 NOUVELLE MÉTHODE: Gestion du cache
+  // Gestion du cache
   private getCachedConversations(userId: string): Conversation[] | null {
     if (!this.conversationsCache) {
       return null
@@ -182,21 +182,21 @@ export class ConversationService {
       return null
     }
 
-    console.log('[ConversationService] 💾 Utilisation cache local')
+    console.log('[ConversationService] Utilisation cache local')
     return this.conversationsCache.conversations
   }
 
-  // 🔧 NOUVELLE MÉTHODE: Mise à jour du cache
+  // Mise à jour du cache
   private setCachedConversations(userId: string, conversations: Conversation[]): void {
     this.conversationsCache = {
       conversations: [...conversations], // Copie pour éviter les mutations
       timestamp: Date.now(),
       userId: userId
     }
-    console.log(`[ConversationService] 💾 Cache mis à jour: ${conversations.length} conversations`)
+    console.log(`[ConversationService] Cache mis à jour: ${conversations.length} conversations`)
   }
 
-  // 🔧 NOUVELLE MÉTHODE: Cache avec délégation vers apiService
+  // Cache avec délégation vers apiService
   private async loadConversationsWithCache(userId: string): Promise<{ conversations: Conversation[], fromCache: boolean }> {
     // Vérifier le cache d'abord
     const cached = this.getCachedConversations(userId)
@@ -205,7 +205,7 @@ export class ConversationService {
     }
 
     // Pas de cache valide, appeler l'API
-    console.log('[ConversationService] 🌐 Chargement depuis API...')
+    console.log('[ConversationService] Chargement depuis API...')
     const result = await loadUserConversations(userId)
     
     if (result && result.conversations) {
@@ -387,7 +387,7 @@ export class ConversationService {
     return groups.filter(group => group.conversations.length > 0)
   }
 
-  // 🔧 MÉTHODE CRITIQUE MODIFIÉE - Utilise apiService.ts avec cache
+  // Méthode critique modifiée - utilise apiService.ts avec cache
   async getUserConversations(userId: string, limit = 50): Promise<Conversation[]> {
     if (!this.circuitBreaker.canAttempt()) {
       console.warn('[ConversationService] Circuit breaker actif - tentatives bloquées temporairement')
@@ -395,7 +395,7 @@ export class ConversationService {
       // Même en circuit breaker, essayer le cache
       const cached = this.getCachedConversations(userId)
       if (cached && cached.length > 0) {
-        console.log('[ConversationService] 💾 Utilisation cache malgré circuit breaker')
+        console.log('[ConversationService] Utilisation cache malgré circuit breaker')
         return cached.slice(0, limit)
       }
       
@@ -411,11 +411,11 @@ export class ConversationService {
     this.circuitBreaker.recordAttempt()
 
     try {
-      // 🔧 CORRECTION CRITIQUE: Utiliser la méthode avec cache
+      // Utiliser la méthode avec cache
       const { conversations, fromCache } = await this.loadConversationsWithCache(userId)
       
       if (!conversations || conversations.length === 0) {
-        console.log('[ConversationService] 🔭 Aucune conversation via cache/API, essai fallback localStorage...')
+        console.log('[ConversationService] Aucune conversation via cache/API, essai fallback localStorage...')
         const fallbackResult = await this.getConversationsFromLocalStorage(limit)
         if (fallbackResult.length > 0) {
           // Mettre à jour le cache avec le fallback
@@ -427,18 +427,18 @@ export class ConversationService {
         return fallbackResult
       }
 
-      console.log(`[ConversationService] ✅ ${conversations.length} conversations récupérées ${fromCache ? '(cache)' : '(API)'}`)
+      console.log(`[ConversationService] ${conversations.length} conversations récupérées ${fromCache ? '(cache)' : '(API)'}`)
       
       this.circuitBreaker.recordSuccess()
       return conversations.slice(0, limit)
       
     } catch (error) {
-      console.error('[ConversationService] ❌ Erreur cache/API, fallback localStorage...', error)
+      console.error('[ConversationService] Erreur cache/API, fallback localStorage...', error)
       
       // En cas d'erreur, essayer le cache en dernier recours
       const cached = this.getCachedConversations(userId)
       if (cached && cached.length > 0) {
-        console.log('[ConversationService] 💾 Utilisation cache en fallback d\'erreur')
+        console.log('[ConversationService] Utilisation cache en fallback d\'erreur')
         this.circuitBreaker.recordSuccess()
         return cached.slice(0, limit)
       }
@@ -708,7 +708,7 @@ export class ConversationService {
     }
   }
 
-  // 🔧 MÉTHODE MODIFIÉE: Invalidation du cache après sauvegarde
+  // Invalidation du cache après sauvegarde
   async saveConversation(data: ConversationData): Promise<void> {
     if (!this.loggingEnabled) {
       console.log('Logging désactivé - conversation non sauvegardée:', data.conversation_id)
@@ -743,7 +743,7 @@ export class ConversationService {
       const result = await response.json()
       console.log('Conversation sauvegardée:', result.message)
       
-      // 🔧 NOUVEAU: Invalidation du cache après sauvegarde
+      // Invalidation du cache après sauvegarde
       this.invalidateCache()
       
     } catch (error) {
@@ -751,17 +751,17 @@ export class ConversationService {
     }
   }
 
-  // 🔧 DÉLÉGATION VERS apiService.ts
+  // Délégation vers apiService.ts
   async sendFeedback(conversationId: string, feedback: 1 | -1): Promise<void> {
     if (!this.loggingEnabled) {
       console.log('Logging désactivé - feedback non envoyé:', conversationId)
       return
     }
 
-    console.log('[ConversationService] 🔄 Délégation feedback vers apiService...')
+    console.log('[ConversationService] Délégation feedback vers apiService...')
     await sendFeedback(conversationId, feedback)
     
-    // 🔧 NOUVEAU: Invalidation du cache après feedback
+    // Invalidation du cache après feedback
     this.invalidateCache()
   }
 
@@ -796,7 +796,7 @@ export class ConversationService {
       const result = await response.json()
       console.log('Commentaire feedback enregistré:', result.message)
       
-      // 🔧 NOUVEAU: Invalidation du cache après commentaire
+      // Invalidation du cache après commentaire
       this.invalidateCache()
       
     } catch (error) {
@@ -844,7 +844,7 @@ export class ConversationService {
       const result = await response.json()
       console.log('Feedback avec commentaire enregistré:', result.message)
       
-      // 🔧 NOUVEAU: Invalidation du cache après feedback combiné
+      // Invalidation du cache après feedback combiné
       this.invalidateCache()
       
     } catch (error) {
@@ -853,17 +853,17 @@ export class ConversationService {
     }
   }
 
-  // 🔧 MÉTHODE MODIFIÉE: Invalidation du cache après suppression
+  // Invalidation du cache après suppression
   async deleteConversation(conversationId: string): Promise<void> {
     if (!this.loggingEnabled) {
       console.log('Logging désactivé - conversation non supprimée:', conversationId)
       return
     }
 
-    console.log('[ConversationService] 🔄 Délégation suppression vers apiService...')
+    console.log('[ConversationService] Délégation suppression vers apiService...')
     await deleteConversation(conversationId)
     
-    // 🔧 NOUVEAU: Invalidation du cache après suppression
+    // Invalidation du cache après suppression
     this.invalidateCache()
   }
 
@@ -890,7 +890,7 @@ export class ConversationService {
       const result = await response.json()
       console.log('Toutes conversations supprimées du serveur:', result.message, 'Count:', result.deleted_count)
       
-      // 🔧 NOUVEAU: Invalidation du cache après suppression globale
+      // Invalidation du cache après suppression globale
       this.invalidateCache()
       
     } catch (error) {
@@ -970,21 +970,21 @@ export class ConversationService {
     }
   }
 
-  // 🔧 NOUVELLES MÉTHODES: Gestion du cache
+  // Gestion du cache
   
   /**
    * Invalidation manuelle du cache
    */
   invalidateCache(): void {
     this.conversationsCache = null
-    console.log('[ConversationService] 🗑️ Cache invalidé manuellement')
+    console.log('[ConversationService] Cache invalidé manuellement')
   }
 
   /**
    * Forcer le rechargement en ignorant le cache
    */
   async forceReload(userId: string, limit = 50): Promise<Conversation[]> {
-    console.log('[ConversationService] 🔄 Rechargement forcé demandé')
+    console.log('[ConversationService] Rechargement forcé demandé')
     this.invalidateCache()
     return await this.getUserConversations(userId, limit)
   }

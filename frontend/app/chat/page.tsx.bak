@@ -621,31 +621,42 @@ export default function ChatInterface() {
     }
   }, [currentLanguage, t, currentConversation, setCurrentConversation])
 
-  // Chargement des conversations (conservée mais simplifiée)
+  // NOUVEAU: useEffect séparé pour les changements de langue (évite le rechargement des conversations)
   useEffect(() => {
-    if (isAuthenticated && user?.id && isMountedRef.current && !hasLoadedConversationsRef.current) {
-      hasLoadedConversationsRef.current = true
+    // Mise à jour du message de bienvenue seulement
+    if (currentConversation?.id === 'welcome' &&
+        currentConversation.messages.length === 1 &&
+        currentConversation.messages[0].content !== t('chat.welcome') &&
+        isMountedRef.current) {
 
-      const loadingTimeoutId = setTimeout(() => {
-        if (isMountedRef.current) {
-          loadConversations(user.email || user.id)
-            .then(() => {
-              if (isMountedRef.current) {
-                console.log(t('chat.historyLoaded'))
-              }
-            })
-            .catch(err => {
-              if (isMountedRef.current) {
-                console.error(t('chat.historyLoadError'), err)
-                handleAuthError(err) // Utilise la nouvelle gestion d'erreur améliorée
-              }
-            })
-        }
-      }, 800)
+      const updatedMessage: Message = {
+        ...currentConversation.messages[0],
+        content: t('chat.welcome')
+      }
 
-      return () => clearTimeout(loadingTimeoutId)
+      const updatedConversation = {
+        ...currentConversation,
+        messages: [updatedMessage]
+      }
+
+      setCurrentConversation(updatedConversation)
     }
-  }, [isAuthenticated, user?.id, loadConversations, handleAuthError, t])
+  }, [currentLanguage, t]) // CORRECTION: Séparé du chargement des conversations
+
+
+  // 🔧 NOUVEAU: Chargement initial des conversations (remplace le setInterval)
+  useEffect(() => {
+    if (isAuthenticated && user?.email && !hasLoadedConversationsRef.current && isMountedRef.current) {
+      console.log('[Chat] Chargement initial des conversations pour:', user.email)
+      hasLoadedConversationsRef.current = true
+    
+      // Chargement unique au démarrage
+      loadConversations(user.email).catch(error => {
+        console.error('[Chat] Erreur chargement initial:', error)
+        handleAuthError(error)
+      })
+    }
+  }, [isAuthenticated, user?.email, loadConversations, handleAuthError])
 
   // Fonctions de gestion des messages (toutes conservées)
   const extractAnswerAndSources = useCallback((result: any): [string, any[]] => {
