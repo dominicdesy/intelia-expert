@@ -109,7 +109,7 @@ async def get_user_profile(
 ):
     """Récupère le profil complet de l'utilisateur connecté"""
     
-    logger.info(f"🔍 [get_user_profile] Récupération profil pour {current_user.get('email')}")
+    logger.info(f"[get_user_profile] Récupération profil pour {current_user.get('email')}")
     
     try:
         supabase = get_supabase_admin_client()
@@ -130,10 +130,10 @@ async def get_user_profile(
             
             create_response = supabase.table('users').insert(default_profile).execute()
             profile_data = create_response.data[0] if create_response.data else default_profile
-            logger.info(f"✅ [get_user_profile] Profil par défaut créé pour {current_user['email']}")
+            logger.info(f"[get_user_profile] Profil par défaut créé pour {current_user['email']}")
         else:
             profile_data = response.data
-            logger.info(f"✅ [get_user_profile] Profil trouvé pour {current_user['email']}")
+            logger.info(f"[get_user_profile] Profil trouvé pour {current_user['email']}")
         
         # Construire la réponse standardisée
         return UserProfileData(
@@ -159,7 +159,7 @@ async def get_user_profile(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ [get_user_profile] Erreur : {str(e)}")
+        logger.error(f"[get_user_profile] Erreur : {str(e)}")
         raise HTTPException(status_code=500, detail="Erreur récupération profil utilisateur")
 
 @router.put("/profile", response_model=UserProfileResponse)
@@ -169,7 +169,7 @@ async def update_user_profile(
 ):
     """Met à jour le profil de l'utilisateur connecté - ENDPOINT MANQUANT PRINCIPAL"""
     
-    logger.info(f"🔄 [update_user_profile] Mise à jour profil pour {current_user.get('email')}")
+    logger.info(f"[update_user_profile] Mise à jour profil pour {current_user.get('email')}")
     
     try:
         supabase = get_supabase_admin_client()
@@ -218,7 +218,7 @@ async def update_user_profile(
         if not update_data:
             raise HTTPException(status_code=400, detail="Aucune donnée à mettre à jour")
         
-        logger.info(f"🔄 [update_user_profile] Champs à mettre à jour : {list(update_data.keys())}")
+        logger.info(f"[update_user_profile] Champs à mettre à jour : {list(update_data.keys())}")
         
         # Effectuer la mise à jour
         response = supabase.table('users').update(update_data).eq('auth_user_id', current_user['user_id']).execute()
@@ -237,12 +237,12 @@ async def update_user_profile(
                 
                 create_response = supabase.table('users').insert(create_data).execute()
                 updated_profile = create_response.data[0] if create_response.data else create_data
-                logger.info(f"✅ [update_user_profile] Profil créé pour {current_user['email']}")
+                logger.info(f"[update_user_profile] Profil créé pour {current_user['email']}")
             else:
                 raise HTTPException(status_code=500, detail="Erreur mise à jour profil")
         else:
             updated_profile = response.data[0]
-            logger.info(f"✅ [update_user_profile] Profil mis à jour pour {current_user['email']}")
+            logger.info(f"[update_user_profile] Profil mis à jour pour {current_user['email']}")
         
         return UserProfileResponse(
             success=True,
@@ -253,7 +253,7 @@ async def update_user_profile(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ [update_user_profile] Erreur : {str(e)}")
+        logger.error(f"[update_user_profile] Erreur : {str(e)}")
         raise HTTPException(status_code=500, detail="Erreur mise à jour profil utilisateur")
 
 @router.delete("/profile", response_model=UserProfileResponse)
@@ -262,7 +262,7 @@ async def delete_user_profile(
 ):
     """Supprime le profil utilisateur (RGPD)"""
     
-    logger.info(f"🗑️ [delete_user_profile] Suppression profil pour {current_user.get('email')}")
+    logger.info(f"[delete_user_profile] Suppression profil pour {current_user.get('email')}")
     
     try:
         supabase = get_supabase_admin_client()
@@ -273,11 +273,11 @@ async def delete_user_profile(
         # Supprimer aussi l'utilisateur auth (optionnel - à débattre)
         try:
             supabase.auth.admin.delete_user(current_user['user_id'])
-            logger.info(f"✅ [delete_user_profile] Utilisateur auth supprimé pour {current_user['email']}")
+            logger.info(f"[delete_user_profile] Utilisateur auth supprimé pour {current_user['email']}")
         except Exception as auth_error:
-            logger.warning(f"⚠️ [delete_user_profile] Erreur suppression auth : {auth_error}")
+            logger.warning(f"[delete_user_profile] Erreur suppression auth : {auth_error}")
         
-        logger.info(f"✅ [delete_user_profile] Profil supprimé pour {current_user['email']}")
+        logger.info(f"[delete_user_profile] Profil supprimé pour {current_user['email']}")
         
         return UserProfileResponse(
             success=True,
@@ -285,7 +285,7 @@ async def delete_user_profile(
         )
         
     except Exception as e:
-        logger.error(f"❌ [delete_user_profile] Erreur : {str(e)}")
+        logger.error(f"[delete_user_profile] Erreur : {str(e)}")
         raise HTTPException(status_code=500, detail="Erreur suppression profil utilisateur")
 
 @router.get("/export", response_model=Dict[str, Any])
@@ -294,7 +294,7 @@ async def export_user_data(
 ):
     """Exporte toutes les données utilisateur (RGPD)"""
     
-    logger.info(f"📤 [export_user_data] Export données pour {current_user.get('email')}")
+    logger.info(f"[export_user_data] Export données pour {current_user.get('email')}")
     
     try:
         supabase = get_supabase_admin_client()
@@ -316,12 +316,12 @@ async def export_user_data(
             "email": current_user['email']
         }
         
-        logger.info(f"✅ [export_user_data] Données exportées pour {current_user['email']}")
+        logger.info(f"[export_user_data] Données exportées pour {current_user['email']}")
         
         return export_data
         
     except Exception as e:
-        logger.error(f"❌ [export_user_data] Erreur : {str(e)}")
+        logger.error(f"[export_user_data] Erreur : {str(e)}")
         raise HTTPException(status_code=500, detail="Erreur export données utilisateur")
 
 @router.get("/debug/profile")
@@ -345,7 +345,7 @@ async def debug_user_profile(
         }
         
     except Exception as e:
-        logger.error(f"❌ [debug_user_profile] Erreur : {str(e)}")
+        logger.error(f"[debug_user_profile] Erreur : {str(e)}")
         return {
             "error": str(e),
             "current_user_token_data": current_user,

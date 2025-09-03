@@ -1,8 +1,10 @@
+#
 # app/main.py - VERSION 4.1 COMPLÈTE AVEC TOUTES LES FONCTIONNALITÉS
 # ✅ FUSION: Détection RAG corrigée + Toutes les fonctionnalités du backup
 # 🚀 NOUVEAU: Système de cache statistiques automatique
 # 🔧 CORRECTION CORS POUR CREDENTIALS: 'INCLUDE' - VERSION FINALE CONSERVÉE
 # 🎯 COMPLET: Tous les endpoints, middleware, monitoring, auth, etc.
+#
 
 from __future__ import annotations
 
