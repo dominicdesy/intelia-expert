@@ -142,4 +142,5 @@ jobs:
           echo "🗑️ Running garbage collection..."
           doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force || true
           
-          echo "✅ Registry cleanup completed"
+        run: |
+          echo "Registry cleanup and garbage collection completed automatically after successful builds"

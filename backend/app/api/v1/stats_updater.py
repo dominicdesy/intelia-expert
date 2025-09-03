@@ -163,7 +163,7 @@ class StatisticsUpdater:
                             COUNT(*) FILTER (WHERE timestamp >= DATE_TRUNC('month', CURRENT_DATE)) as questions_this_month,
                             COUNT(DISTINCT user_email) as unique_users,
                             AVG(response_time) FILTER (WHERE response_time > 0) as avg_response_time,
-                            AVG(confidence) FILTER (WHERE confidence IS NOT NULL AND confidence BETWEEN 0 AND 1) * 100 as avg_confidence
+                            AVG(confidence_score) FILTER (WHERE confidence_score IS NOT NULL AND confidence_score BETWEEN 0 AND 1) * 100 as avg_confidence
                         FROM user_questions_complete 
                         WHERE timestamp >= CURRENT_DATE - INTERVAL '30 days'
                     """)
