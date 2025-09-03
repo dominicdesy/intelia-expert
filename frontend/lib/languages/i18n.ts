@@ -179,6 +179,8 @@ export interface TranslationKeys {
   'nav.account': string
   'nav.settings': string
   'nav.statistics': string
+  'nav.conversationSidebar': string
+  'nav.closeSidebar': string
 
   // ===========================================
   // CHAT INTERFACE
@@ -584,7 +586,6 @@ export interface TranslationKeys {
   'placeholder.email': string
   'placeholder.createSecurePassword': string
   'placeholder.confirmNewPassword': string
-
 
   // ===========================================
   // DATE & TIME FORMATTING
