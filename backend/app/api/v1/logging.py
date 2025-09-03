@@ -55,7 +55,7 @@ except ImportError as e:
     raise
 
 # ============================================================================
-# 🏗️ CLASSE PRINCIPALE LOGGINGMANAGER
+# 🗃️ CLASSE PRINCIPALE LOGGINGMANAGER
 # ============================================================================
 
 class LoggingManager:
@@ -100,7 +100,7 @@ class LoggingManager:
                             response_source VARCHAR(50),
                             status VARCHAR(20) DEFAULT 'success',
                             processing_time_ms INTEGER,
-                            confidence DECIMAL(5,2),
+                            response_confidence DECIMAL(5,2),
                             completeness_score DECIMAL(5,2),
                             language VARCHAR(10) DEFAULT 'fr',
                             intent VARCHAR(50),
@@ -310,6 +310,15 @@ class LoggingManager:
         except Exception as e:
             logger.error(f"❌ Erreur log OpenAI: {e}")
 
+    def log_server_performance(self, **kwargs):
+        """Log des métriques de performance serveur"""
+        try:
+            # Implémentation pour compatibilité avec main.py
+            logger.debug(f"Métriques serveur loggées: {kwargs}")
+            # TODO: Implémenter la sauvegarde en base si nécessaire
+        except Exception as e:
+            logger.error(f"Erreur log server performance: {e}")
+
     def get_questions_with_filters(
         self, 
         page: int = 1, 
@@ -343,7 +352,7 @@ class LoggingManager:
                 params.append(status)
             
             if min_confidence is not None:
-                conditions.append("confidence >= %s")
+                conditions.append("response_confidence >= %s")
                 params.append(min_confidence)
             
             where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
@@ -358,7 +367,7 @@ class LoggingManager:
                     # Get data
                     main_query = f"""
                         SELECT user_email, session_id, question_id, question, response_text,
-                               response_source, status, processing_time_ms, confidence,
+                               response_source, status, processing_time_ms, response_confidence,
                                completeness_score, language, intent, entities,
                                error_type, error_message, error_traceback, created_at
                         FROM user_questions_complete
@@ -415,7 +424,7 @@ class LoggingManager:
                         cur.execute("""
                             SELECT COUNT(*) as total_questions,
                                    COUNT(CASE WHEN status = 'success' THEN 1 END) as successful_questions,
-                                   AVG(confidence) as avg_confidence,
+                                   AVG(response_confidence) as avg_confidence,
                                    AVG(processing_time_ms) as avg_processing_time
                             FROM user_questions_complete
                             WHERE user_email = %s AND created_at >= %s
@@ -482,6 +491,14 @@ class LoggingManager:
 # ============================================================================
 # 🔗 FONCTIONS DE COMPATIBILITÉ ET SINGLETON
 # ============================================================================
+
+def get_server_analytics(hours: int = 24) -> Dict[str, Any]:
+    """Récupère les analytics serveur pour compatibilité avec stats_updater.py"""
+    try:
+        analytics = get_analytics_manager()
+        return analytics.get_server_performance_analytics(hours)
+    except Exception as e:
+        return {"error": str(e), "hours": hours}
 
 # Singleton sécurisé
 _analytics_manager = None
@@ -579,7 +596,8 @@ __all__ = [
     # Fonctions singleton
     'get_analytics_manager',
     'get_logging_manager',
-    'get_analytics',  # ✅ AJOUTÉ pour compatibilité main.py
+    'get_analytics',
+    'get_server_analytics',  # Ajouté pour stats_updater.py
     
     # Imports depuis modules spécialisés
     'LogLevel',
