@@ -487,7 +487,7 @@ class StatisticsUpdater:
         return {"success": False, "costs": {"total": 0}}
     
     def _get_safe_feedback_stats(self, cur) -> Dict[str, Any]:
-        """Stats feedback sécurisées - ne crash jamais"""
+        """Stats feedback sécurisées - corrigée pour user_questions"""
         feedback_stats = {
             "total": 0,
             "positive": 0,
@@ -497,12 +497,12 @@ class StatisticsUpdater:
         }
         
         try:
-            cur.execute(f"""
+            cur.execute("""
                 SELECT 
                     COUNT(*) as total_feedback,
                     COUNT(*) FILTER (WHERE feedback IS NOT NULL) as with_feedback,
                     COUNT(*) FILTER (WHERE feedback_comment IS NOT NULL AND feedback_comment != '') as with_comments
-                FROM {self._correct_table_name}
+                FROM user_questions
                 WHERE timestamp >= CURRENT_DATE - INTERVAL '30 days'
             """)
             

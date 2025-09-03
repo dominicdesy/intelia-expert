@@ -12,52 +12,12 @@ export interface LanguageConfig {
 
 export const availableLanguages: LanguageConfig[] = [
   {
-    code: 'fr',
-    name: 'French',
-    nativeName: 'Français',
-    region: 'France',
-    flag: '🇫🇷',
-    dateFormat: 'fr-FR'
-  },
-  {
-    code: 'en',
-    name: 'English',
-    nativeName: 'English',
-    region: 'United States',
-    flag: '🇺🇸',
-    dateFormat: 'en-US'
-  },
-  {
-    code: 'es',
-    name: 'Spanish',
-    nativeName: 'Español',
-    region: 'Spain',
-    flag: '🇪🇸',
-    dateFormat: 'es-ES'
-  },
-  {
-    code: 'pt',
-    name: 'Portuguese',
-    nativeName: 'Português',
-    region: 'Portugal',
-    flag: '🇵🇹',
-    dateFormat: 'pt-PT'
-  },
-  {
-    code: 'de',
-    name: 'German',
-    nativeName: 'Deutsch',
-    region: 'Germany',
-    flag: '🇩🇪',
-    dateFormat: 'de-DE'
-  },
-  {
-    code: 'it',
-    name: 'Italian',
-    nativeName: 'Italiano',
-    region: 'Italy',
-    flag: '🇮🇹',
-    dateFormat: 'it-IT'
+    code: 'zh',
+    name: 'Chinese (Mandarin)',
+    nativeName: '中文',
+    region: 'China',
+    flag: '🇨🇳',
+    dateFormat: 'zh-CN'
   },
   {
     code: 'nl',
@@ -68,20 +28,28 @@ export const availableLanguages: LanguageConfig[] = [
     dateFormat: 'nl-NL'
   },
   {
-    code: 'pl',
-    name: 'Polish',
-    nativeName: 'Polski',
-    region: 'Poland',
-    flag: '🇵🇱',
-    dateFormat: 'pl-PL'
+    code: 'en',
+    name: 'English',
+    nativeName: 'English',
+    region: 'United States',
+    flag: '🇺🇸',
+    dateFormat: 'en-US'
   },
   {
-    code: 'th',
-    name: 'Thai',
-    nativeName: 'ไทย',
-    region: 'Thailand',
-    flag: '🇹🇭',
-    dateFormat: 'th-TH'
+    code: 'fr',
+    name: 'French',
+    nativeName: 'Français',
+    region: 'France',
+    flag: '🇫🇷',
+    dateFormat: 'fr-FR'
+  },
+  {
+    code: 'de',
+    name: 'German',
+    nativeName: 'Deutsch',
+    region: 'Germany',
+    flag: '🇩🇪',
+    dateFormat: 'de-DE'
   },
   {
     code: 'hi',
@@ -92,25 +60,57 @@ export const availableLanguages: LanguageConfig[] = [
     dateFormat: 'hi-IN'
   },
   {
-    code: 'zh',
-    name: 'Chinese (Mandarin)',
-    nativeName: '中文',
-    region: 'China',
-    flag: '🇨🇳',
-    dateFormat: 'zh-CN'
-  },
-  {
     code: 'id',
     name: 'Indonesian',
     nativeName: 'Bahasa Indonesia',
     region: 'Indonesia',
     flag: '🇮🇩',
     dateFormat: 'id-ID'
+  },
+  {
+    code: 'it',
+    name: 'Italian',
+    nativeName: 'Italiano',
+    region: 'Italy',
+    flag: '🇮🇹',
+    dateFormat: 'it-IT'
+  },
+  {
+    code: 'pl',
+    name: 'Polish',
+    nativeName: 'Polski',
+    region: 'Poland',
+    flag: '🇵🇱',
+    dateFormat: 'pl-PL'
+  },
+  {
+    code: 'pt',
+    name: 'Portuguese',
+    nativeName: 'Português',
+    region: 'Portugal',
+    flag: '🇵🇹',
+    dateFormat: 'pt-PT'
+  },
+  {
+    code: 'es',
+    name: 'Spanish',
+    nativeName: 'Español',
+    region: 'Spain',
+    flag: '🇪🇸',
+    dateFormat: 'es-ES'
+  },
+  {
+    code: 'th',
+    name: 'Thai',
+    nativeName: 'ไทย',
+    region: 'Thailand',
+    flag: '🇹🇭',
+    dateFormat: 'th-TH'
   }
 ]
 
 // Langue par défaut
-export const DEFAULT_LANGUAGE = 'en'
+export const DEFAULT_LANGUAGE = detectBrowserLanguage()
 
 // Fonction utilitaire pour obtenir une langue par son code
 export const getLanguageByCode = (code: string): LanguageConfig | undefined => {
@@ -156,10 +156,10 @@ export const isRTLLanguage = (code: string): boolean => {
   return RTL_LANGUAGES.has(code)
 }
 
-// Groupement des langues par région (optionnel pour l'interface)
+// Groupement des langues par région (mis à jour par ordre alphabétique)
 export const LANGUAGE_REGIONS = {
-  europe: ['fr', 'en', 'es', 'pt', 'de', 'it', 'nl', 'pl'] as const,
-  asia: ['th', 'hi', 'zh', 'id'] as const,
+  europe: ['de', 'en', 'es', 'fr', 'it', 'nl', 'pl', 'pt'] as const,
+  asia: ['hi', 'id', 'th', 'zh'] as const,
   americas: [] as const, // Si vous ajoutez plus tard pt-BR, en-CA, etc.
   africa: [] as const,
   oceania: [] as const

@@ -8,6 +8,7 @@ const supabase = getSupabaseClient()
 
 // Types pour le système de traduction - VERSION ORGANISÉE PAR CATÉGORIES
 export interface TranslationKeys {
+  // [... tous les types restent identiques ...]
   // ===========================================
   // PAGE TITLES
   // ===========================================
@@ -661,10 +662,11 @@ const translationsCache: Record<string, TranslationKeys> = {}
 // Cache des erreurs pour éviter les boucles infinies
 const errorCache = new Set<string>()
 
-// Variables globales pour la synchronisation (UTILISER DEFAULT_LANGUAGE)
+// Variables globales pour la synchronisation - MODIFIÉ POUR UTILISER LE NAVIGATEUR
 let globalTranslations: TranslationKeys = {} as TranslationKeys
 let globalLoading = true
-let globalLanguage = DEFAULT_LANGUAGE
+// CHANGEMENT CRITIQUE : utiliser detectBrowserLanguage() au lieu de DEFAULT_LANGUAGE
+let globalLanguage = typeof window !== 'undefined' ? detectBrowserLanguage() : DEFAULT_LANGUAGE
 
 // EXPOSER LES VARIABLES POUR LE DEBUG (seulement en développement)
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
@@ -685,12 +687,12 @@ const getStoredLanguage = (): string => {
     const storedLang = localStorage.getItem('intelia-language')
     if (storedLang) {
       const parsed = JSON.parse(storedLang)
-      return parsed?.state?.currentLanguage || DEFAULT_LANGUAGE
+      return parsed?.state?.currentLanguage || detectBrowserLanguage()
     }
   } catch (error) {
     console.warn('Erreur lecture langue stockée:', error)
   }
-  return DEFAULT_LANGUAGE
+  return detectBrowserLanguage()
 }
 
 // Fonction pour charger les traductions depuis les fichiers JSON - AVEC PROTECTION ANTI-BOUCLE
@@ -736,30 +738,33 @@ async function loadTranslations(language: string): Promise<TranslationKeys> {
     // NOTIFIER TOUS LES COMPOSANTS
     notificationManager.notify()
     
-    console.log(`[i18n] ✅ Traductions chargées pour ${language}: ${Object.keys(translations).length} clés`)
+    console.log(`[i18n] Traductions chargées pour ${language}: ${Object.keys(translations).length} clés`)
     return translations
     
   } catch (error) {
-    console.error(`[i18n] ❌ Could not load translations for ${language}:`, error)
+    console.error(`[i18n] Could not load translations for ${language}:`, error)
     
     // Ajouter à la cache des erreurs pour éviter les boucles
     errorCache.add(language)
     
     // Fallback vers la langue par défaut
     if (language !== DEFAULT_LANGUAGE) {
-      console.warn(`[i18n] 🔄 Falling back to ${DEFAULT_LANGUAGE}`)
+      console.warn(`[i18n] Falling back to ${DEFAULT_LANGUAGE}`)
       return loadTranslations(DEFAULT_LANGUAGE)
     }
     
     // Si même la langue par défaut échoue, retourner des clés vides
-    console.error(`[i18n] 💥 Even ${DEFAULT_LANGUAGE} failed to load, returning empty translations`)
+    console.error(`[i18n] Even ${DEFAULT_LANGUAGE} failed to load, returning empty translations`)
     return {} as TranslationKeys
   }
 }
 
-// Hook de traduction - VERSION CORRIGÉE POUR PRIORITÉ LOCALSTORAGE
+// Hook de traduction - MODIFIÉ POUR PRIORITÉ NAVIGATEUR
 export const useTranslation = () => {
-  const [currentLanguage, setCurrentLanguage] = useState<string>(DEFAULT_LANGUAGE)
+  // CHANGEMENT CRITIQUE : initialiser avec la langue du navigateur
+  const [currentLanguage, setCurrentLanguage] = useState<string>(
+    typeof window !== 'undefined' ? detectBrowserLanguage() : DEFAULT_LANGUAGE
+  )
   const [translations, setTranslations] = useState<TranslationKeys>({} as TranslationKeys)
   const [loading, setLoading] = useState(true)
   const [, forceRender] = useState({}) // Pour forcer les re-renders
@@ -773,35 +778,45 @@ export const useTranslation = () => {
     return unsubscribe
   }, [])
 
-  // ✅ CORRECTION CRITIQUE : Initialiser avec PRIORITÉ ABSOLUE AU LOCALSTORAGE
+  // LOGIQUE MODIFIÉE : PRIORITÉ 1 = localStorage, PRIORITÉ 2 = Navigateur
   useEffect(() => {
     const getUserLanguage = async () => {
       try {
-        // PRIORITÉ 1: localStorage (EXCLUSIF)
+        // PRIORITÉ 1: localStorage (choix explicite de l'utilisateur)
         const storedLang = getStoredLanguage()
         if (storedLang && isValidLanguageCode(storedLang)) {
-          console.log(`[i18n] 📦 Initialisation avec langue stockée: ${storedLang}`)
-          setCurrentLanguage(storedLang)
-          return // ✅ ARRÊT OBLIGATOIRE - ne pas continuer
+          // Vérifier si ce n'est PAS la détection automatique du navigateur
+          const browserLang = detectBrowserLanguage()
+          if (storedLang !== browserLang) {
+            // L'utilisateur a fait un choix explicite différent du navigateur
+            console.log(`[i18n] Choix utilisateur (localStorage): ${storedLang}`)
+            setCurrentLanguage(storedLang)
+            return
+          }
         }
 
-        // PRIORITÉ 2: Supabase (seulement si localStorage vide)
-        const { data: { session } } = await supabase.auth.getSession()
-        const userLang = session?.user?.user_metadata?.language
-        
-        if (userLang && isValidLanguageCode(userLang)) {
-          console.log(`[i18n] 📦 Initialisation avec langue Supabase: ${userLang}`)
-          setCurrentLanguage(userLang)
-          return // ✅ ARRÊT
-        }
-
-        // PRIORITÉ 3: Navigateur (dernier recours)
+        // PRIORITÉ 2: Navigateur (nouveau défaut)
         const browserLang = detectBrowserLanguage()
-        console.log(`[i18n] 📦 Initialisation avec langue navigateur: ${browserLang}`)
+        console.log(`[i18n] Langue du navigateur détectée: ${browserLang}`)
         setCurrentLanguage(browserLang)
+
+        // PRIORITÉ 3: Supabase (optionnel)
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          const userLang = session?.user?.user_metadata?.language
+          
+          if (userLang && isValidLanguageCode(userLang) && !storedLang) {
+            console.log(`[i18n] Langue Supabase utilisée: ${userLang}`)
+            setCurrentLanguage(userLang)
+            return
+          }
+        } catch (error) {
+          // Ignorer les erreurs Supabase, continuer avec le navigateur
+          console.log('Pas de session Supabase, utilisation langue navigateur')
+        }
         
       } catch (error) {
-        console.log('Erreur initialisation langue, utilisation navigateur')
+        console.log('Erreur initialisation langue, utilisation navigateur par défaut')
         const browserLang = detectBrowserLanguage()
         setCurrentLanguage(browserLang)
       }
@@ -809,13 +824,13 @@ export const useTranslation = () => {
     getUserLanguage()
   }, [])
 
-  // ✅ NOUVEAU: Vérification continue de localStorage pour éviter le cache corrompu
+  // Vérification continue de localStorage pour éviter le cache corrompu
   useEffect(() => {
     // Intervalle pour vérifier périodiquement les changements du localStorage
     const checkLocalStorageInterval = setInterval(() => {
       const storedLang = getStoredLanguage()
       if (storedLang && storedLang !== currentLanguage && isValidLanguageCode(storedLang)) {
-        console.log(`[i18n] 🔄 Resynchronisation détectée: ${currentLanguage} → ${storedLang}`)
+        console.log(`[i18n] Resynchronisation détectée: ${currentLanguage} → ${storedLang}`)
         setCurrentLanguage(storedLang)
       }
     }, 1000) // Vérifier toutes les secondes
@@ -826,7 +841,7 @@ export const useTranslation = () => {
     }
   }, [currentLanguage])
 
-  // ✅ AMÉLIORÉ: Écouter les événements de localStorage pour une réactivité immédiate
+  // Écouter les événements de localStorage pour une réactivité immédiate
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'intelia-language' && e.newValue) {
@@ -835,7 +850,7 @@ export const useTranslation = () => {
           const newLang = parsed?.state?.currentLanguage
           
           if (newLang && newLang !== currentLanguage && isValidLanguageCode(newLang)) {
-            console.log(`[i18n] 🔄 Changement localStorage détecté: ${currentLanguage} → ${newLang}`)
+            console.log(`[i18n] Changement localStorage détecté: ${currentLanguage} → ${newLang}`)
             setCurrentLanguage(newLang)
           }
         } catch (error) {
