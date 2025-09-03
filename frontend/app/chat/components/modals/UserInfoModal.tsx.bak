@@ -40,8 +40,8 @@ interface Country {
   flag?: string
 }
 
-// Interface TypeScript pour les données utilisateur API
-interface UserProfileUpdate {
+// Interface TypeScript pour les données utilisateur
+interface UserUpdateData {
   first_name?: string
   last_name?: string
   full_name?: string
@@ -53,8 +53,6 @@ interface UserProfileUpdate {
   company_name?: string
   company_website?: string
   linkedin_corporate?: string
-  user_type?: string
-  language?: string
 }
 
 const useCountries = () => {
@@ -253,48 +251,6 @@ const ErrorDisplay: React.FC<{ errors: string[]; title: string }> = ({ errors, t
       </div>
     </div>
   )
-}
-
-// NOUVELLE FONCTION: Récupération du token d'authentification
-const getAuthToken = (): string | null => {
-  try {
-    // Méthode 1: Récupérer depuis intelia-expert-auth (priorité)
-    console.log('[UserInfoModal] Récupération token depuis intelia-expert-auth...')
-    const authData = localStorage.getItem('intelia-expert-auth')
-    if (authData) {
-      const parsed = JSON.parse(authData)
-      if (parsed.access_token) {
-        console.log('[UserInfoModal] Token récupéré depuis intelia-expert-auth')
-        return parsed.access_token
-      }
-    }
-    
-    // Méthode 2: Fallback vers supabase-auth-store
-    console.log('[UserInfoModal] Tentative fallback vers supabase-auth-store...')
-    const supabaseStore = localStorage.getItem('supabase-auth-store')
-    if (supabaseStore) {
-      const parsed = JSON.parse(supabaseStore)
-      const possibleTokens = [
-        parsed.state?.session?.access_token,
-        parsed.state?.user?.access_token,
-        parsed.access_token
-      ]
-      
-      for (const token of possibleTokens) {
-        if (token && typeof token === 'string' && token.length > 20) {
-          console.log('[UserInfoModal] Token fallback trouvé dans supabase-auth-store')
-          return token
-        }
-      }
-    }
-    
-    console.error('[UserInfoModal] Aucun token trouvé')
-    return null
-    
-  } catch (error) {
-    console.error('[UserInfoModal] Erreur récupération token:', error)
-    return null
-  }
 }
 
 // Main component
@@ -565,7 +521,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     }))
   }, [])
 
-  // FONCTION handleProfileSave CORRIGÉE - UTILISE L'API BACKEND
+  // Fonction handleProfileSave corrigée avec traductions et sécurité TypeScript
   const handleProfileSave = useCallback(async () => {
     if (!isMountedRef.current || isLoading) return
     setIsLoading(true)
@@ -626,85 +582,68 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         return
       }
 
-      // NOUVEAU: Récupérer le token d'authentification
-      const authToken = getAuthToken()
-      if (!authToken) {
+      // API call direct sans passer par le store auth
+      const { useAuthStore } = await import('@/lib/stores/auth')
+      const get = useAuthStore.getState
+      const currentUser = get().user
+      
+      // Vérification explicite de currentUser
+      if (!currentUser?.id) {
         if (isMountedRef.current) setFormErrors([t('error.userNotConnected')])
         return
       }
 
-      // NOUVEAU: Validation des données avant envoi selon l'API backend
-      const apiData: UserProfileUpdate = {}
+      // Validation des données avant envoi avec interface TypeScript
+      const validatedData: UserUpdateData = {}
 
       if (formData.firstName !== undefined) {
-        apiData.first_name = String(formData.firstName).trim()
+        validatedData.first_name = String(formData.firstName).trim()
       }
 
       if (formData.lastName !== undefined) {
-        apiData.last_name = String(formData.lastName).trim()
+        validatedData.last_name = String(formData.lastName).trim()
       }
 
-      // Construire full_name à partir des composants
       if (formData.firstName !== undefined || formData.lastName !== undefined) {
         const fullName = `${formData.firstName || ''} ${formData.lastName || ''}`.trim()
-        apiData.full_name = fullName
+        validatedData.full_name = fullName
       }
 
       // Ajouter les autres champs
-      if (formData.country_code !== undefined) apiData.country_code = formData.country_code
-      if (formData.area_code !== undefined) apiData.area_code = formData.area_code
-      if (formData.phone_number !== undefined) apiData.phone_number = formData.phone_number
-      if (formData.country !== undefined) apiData.country = formData.country
-      if (formData.linkedinProfile !== undefined) apiData.linkedin_profile = formData.linkedinProfile
-      if (formData.companyName !== undefined) apiData.company_name = formData.companyName
-      if (formData.companyWebsite !== undefined) apiData.company_website = formData.companyWebsite
-      if (formData.linkedinCorporate !== undefined) apiData.linkedin_corporate = formData.linkedinCorporate
+      if (formData.country_code !== undefined) validatedData.country_code = formData.country_code
+      if (formData.area_code !== undefined) validatedData.area_code = formData.area_code
+      if (formData.phone_number !== undefined) validatedData.phone_number = formData.phone_number
+      if (formData.country !== undefined) validatedData.country = formData.country
+      if (formData.linkedinProfile !== undefined) validatedData.linkedin_profile = formData.linkedinProfile
+      if (formData.companyName !== undefined) validatedData.company_name = formData.companyName
+      if (formData.companyWebsite !== undefined) validatedData.company_website = formData.companyWebsite
+      if (formData.linkedinCorporate !== undefined) validatedData.linkedin_corporate = formData.linkedinCorporate
 
-      console.log('[UserInfoModal] Envoi vers API backend:', '/api/v1/users/profile')
-      console.log('[UserInfoModal] Données à envoyer:', Object.keys(apiData))
+      // API call Supabase direct avec typage explicite
+      const { getSupabaseClient } = await import('@/lib/supabase/singleton')
+      const supabase = getSupabaseClient()
 
-      // NOUVEAU: Appel à l'API backend au lieu de Supabase direct
-      const response = await fetch('/api/v1/users/profile', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-          'Origin': 'https://expert.intelia.com'
-        },
-        body: JSON.stringify(apiData)
-      })
+      const { error } = await (supabase as any)
+        .from('users')
+        .update(validatedData)
+        .eq('auth_user_id', currentUser.id)
 
-      console.log('[UserInfoModal] Réponse API status:', response.status)
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        let errorMessage = t('error.updateProfile')
-        
-        try {
-          const errorData = JSON.parse(errorText)
-          errorMessage = errorData.detail || errorData.message || errorMessage
-        } catch {
-          errorMessage = errorText || errorMessage
-        }
-        
-        console.error('[UserInfoModal] Erreur API:', errorMessage)
-        if (isMountedRef.current) setFormErrors([errorMessage])
+      if (error) {
+        if (isMountedRef.current) setFormErrors([error.message || t('error.updateProfile')])
         return
       }
 
-      const result = await response.json()
-      console.log('[UserInfoModal] Profil mis à jour avec succès:', result.success)
-
       if (!isMountedRef.current) return
+
+      console.log(t('success.profileUpdated'))
 
       // Recharger les données utilisateur dans le store
       setTimeout(async () => {
         try {
-          const { useAuthStore } = await import('@/lib/stores/auth')
           const authStore = useAuthStore.getState()
           if (authStore.checkAuth) {
             await authStore.checkAuth()
-            console.log('[UserInfoModal] Auth synchronisé après mise à jour')
+            console.log(t('success.authSynchronized'))
           }
         } catch (err) {
           console.warn('Erreur rechargement profil:', err)
@@ -721,19 +660,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     } catch (error: any) {
       if (isMountedRef.current) {
         console.error('Erreur mise à jour profil:', error)
-        let errorMessage = t('common.unexpectedError')
-        
-        if (error.message) {
-          if (error.message.includes('Failed to fetch')) {
-            errorMessage = t('error.networkError')
-          } else if (error.message.includes('401') || error.message.includes('unauthorized')) {
-            errorMessage = t('error.userNotConnected')
-          } else {
-            errorMessage = error.message
-          }
-        }
-        
-        setFormErrors([errorMessage])
+        setFormErrors([t('common.unexpectedError')])
       }
     } finally {
       if (isMountedRef.current) {
