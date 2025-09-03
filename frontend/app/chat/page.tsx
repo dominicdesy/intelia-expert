@@ -621,19 +621,26 @@ export default function ChatInterface() {
     }
   }, [currentLanguage, t, currentConversation, setCurrentConversation])
 
-  // CORRECTION: Chargement initial des conversations (version finale corrigée)
+
+// ✅ CORRECTION FINALE: Chargement initial VRAIMENT unique
   useEffect(() => {
-    if (isAuthenticated && user?.email && !hasLoadedConversationsRef.current && isMountedRef.current) {
-      console.log('[Chat] 🟢 Chargement initial UNIQUE pour:', user.email)
+    // Protection absolue : ne charger QU'UNE SEULE FOIS
+    if (isAuthenticated && 
+        user?.email && 
+        !hasLoadedConversationsRef.current && 
+        isMountedRef.current) {
+      
+      console.log('[Chat] 🔄 Chargement initial UNIQUE pour:', user.email)
       hasLoadedConversationsRef.current = true
 
       // CAPTURE STABLE des valeurs au moment de l'exécution
       const userEmail = user.email
-      const loadFn = loadConversations
 
-      // FONCTION LOCALE avec valeurs capturées
+      // FONCTION LOCALE qui utilise le store directement
       const performInitialLoad = async () => {
         try {
+          // ✅ CORRECTION: Appeler le store directement sans capturer la fonction
+          const { loadConversations: loadFn } = useChatStore.getState()
           await loadFn(userEmail)
           console.log('[Chat] ✅ Chargement initial terminé avec succès')
         } catch (error) {
@@ -642,9 +649,13 @@ export default function ChatInterface() {
           // GESTION D'ERREUR LOCALE sans redépendance
           if (error?.status === 401 || error?.status === 403) {
             console.log('[Chat] 🚪 Session expirée détectée - redirection')
+            hasLoadedConversationsRef.current = false // Permettre de réessayer
             setTimeout(() => {
               window.location.href = '/'
             }, 1000)
+          } else {
+            // En cas d'autre erreur, permettre de réessayer
+            hasLoadedConversationsRef.current = false
           }
         }
       }
@@ -652,7 +663,9 @@ export default function ChatInterface() {
       // EXÉCUTION UNIQUE avec délai pour éviter les race conditions
       setTimeout(performInitialLoad, 100)
     }
-  }, [isAuthenticated, user?.email]) // Dépendances minimales et stables
+  }, [isAuthenticated, user?.email]) // ✅ Dépendances stables uniquement
+
+
 
   // Fonctions de gestion des messages (toutes conservées)
   const extractAnswerAndSources = useCallback((result: any): [string, any[]] => {

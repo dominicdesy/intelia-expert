@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useChatStore } from '@/lib/stores/chat'
+import { useState, useEffect, useCallback } from 'react'
+import { useChatStore } from '@/app/chat/hooks/useChatStore'
 import type { Conversation, Message } from '@/types'
 
 // Icônes SVG
@@ -30,26 +30,34 @@ interface ConversationSidebarProps {
 }
 
 export default function ConversationSidebar({ isOpen, onClose }: ConversationSidebarProps) {
-  const { 
-    conversations, 
-    currentConversation, 
-    loadConversations,
-    loadConversation,
-    deleteConversation,
-    clearAllConversations,
-    createConversation
-  } = useChatStore()
+  // Utilisation du hook correct avec la bonne destructuration
+  const { conversationGroups } = useChatStore(state => ({ 
+    conversationGroups: state.conversationGroups 
+  }))
+  const { currentConversation } = useChatStore(state => ({
+    currentConversation: state.currentConversation
+  }))
+  const { loadConversation } = useChatStore(state => ({
+    loadConversation: state.loadConversation
+  }))
+  const { deleteConversation } = useChatStore(state => ({
+    deleteConversation: state.deleteConversation
+  }))
+  const { clearAllConversations } = useChatStore(state => ({
+    clearAllConversations: state.clearAllConversations
+  }))
+  const { createNewConversation } = useChatStore(state => ({
+    createNewConversation: state.createNewConversation
+  }))
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
-  // Charger les conversations au montage
-  useEffect(() => {
-    if (isOpen) {
-      loadConversations()
-    }
-  }, [isOpen, loadConversations])
+  // PAS de useEffect automatique - seulement chargement manuel via les boutons
+
+  // Récupérer toutes les conversations depuis les groupes
+  const allConversations = conversationGroups.flatMap(group => group.conversations)
 
   // Gérer la sélection d'une conversation
   const handleSelectConversation = async (conversationId: string) => {
@@ -99,7 +107,7 @@ export default function ConversationSidebar({ isOpen, onClose }: ConversationSid
   // Créer une nouvelle conversation
   const handleNewConversation = () => {
     if (isLoading) return
-    createConversation()
+    createNewConversation()
     onClose()
   }
 
@@ -133,27 +141,9 @@ export default function ConversationSidebar({ isOpen, onClose }: ConversationSid
     }
   }
 
-  // ✅ CORRECTION: Générer un aperçu en utilisant les vrais types
+  // Générer un aperçu en utilisant les vrais types
   const getConversationPreview = (conversation: Conversation): string => {
     try {
-      // Vérifier si la conversation a des messages
-      if (!conversation.messages || conversation.messages.length === 0) {
-        return conversation.preview || "Nouvelle conversation"
-      }
-      
-      // Chercher le premier message utilisateur avec la structure correcte
-      const firstUserMessage = conversation.messages.find(message => 
-        message && message.isUser === true && message.content
-      )
-      
-      if (firstUserMessage && firstUserMessage.content) {
-        const content = firstUserMessage.content.trim()
-        if (content.length > 50) {
-          return content.substring(0, 50) + "..."
-        }
-        return content
-      }
-      
       return conversation.title || conversation.preview || "Conversation sans titre"
     } catch (error) {
       console.error('Erreur lors de la génération de l\'aperçu:', error)
@@ -161,14 +151,10 @@ export default function ConversationSidebar({ isOpen, onClose }: ConversationSid
     }
   }
 
-  // ✅ CORRECTION: Compter les messages avec les vrais types
+  // Compter les messages avec les vrais types
   const getMessageCount = (conversation: Conversation): number => {
     try {
-      // Utiliser message_count si disponible, sinon compter les messages
-      if (typeof conversation.message_count === 'number') {
-        return conversation.message_count
-      }
-      return conversation.messages?.length || 0
+      return conversation.message_count || 0
     } catch (error) {
       console.error('Erreur lors du comptage des messages:', error)
       return 0
@@ -225,7 +211,7 @@ export default function ConversationSidebar({ isOpen, onClose }: ConversationSid
 
         {/* Liste des conversations */}
         <div className="flex-1 overflow-y-auto">
-          {conversations.length === 0 ? (
+          {allConversations.length === 0 ? (
             <div className="p-6 text-center text-gray-500">
               <ChatBubbleLeftRightIcon className="w-12 h-12 mx-auto mb-4 text-gray-300" />
               <h3 className="text-sm font-medium text-gray-900 mb-1">
@@ -237,7 +223,7 @@ export default function ConversationSidebar({ isOpen, onClose }: ConversationSid
             </div>
           ) : (
             <div className="p-2 space-y-1">
-              {conversations.map((conversation) => {
+              {allConversations.map((conversation) => {
                 const isCurrentConversation = currentConversation?.id === conversation.id
                 const messageCount = getMessageCount(conversation)
                 const preview = getConversationPreview(conversation)
@@ -330,7 +316,7 @@ export default function ConversationSidebar({ isOpen, onClose }: ConversationSid
         </div>
 
         {/* Footer avec action de nettoyage global */}
-        {conversations.length > 0 && (
+        {allConversations.length > 0 && (
           <div className="p-4 border-t border-gray-200 bg-gray-50">
             {!showClearAllConfirm ? (
               <button
