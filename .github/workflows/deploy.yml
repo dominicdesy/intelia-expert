@@ -123,13 +123,13 @@ jobs:
           username: doctl
           password: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Build & push backend with cache (FAST!)
+      - name: Build backend image
         uses: docker/build-push-action@v6
         with:
           context: ./backend
           file: ./backend/Dockerfile
-          push: true
-          provenance: false
+          push: false  # Ne pas push encore
+          load: true   # Charger dans Docker local
           tags: |
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }}
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
@@ -139,6 +139,18 @@ jobs:
             type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache,mode=max
           build-args: |
             BUILDKIT_INLINE_CACHE=1
+
+      - name: Push backend image to registry
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true   # Push seulement
+          tags: |
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }}
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
+          cache-from: |
+            type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache
 
   # 📊 ÉTAPE 5: Résumé du déploiement
   deployment-summary:

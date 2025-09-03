@@ -621,7 +621,6 @@ export default function ChatInterface() {
     }
   }, [currentLanguage, t, currentConversation, setCurrentConversation])
 
-
   // NOUVEAU: useEffect séparé pour les changements de langue (évite le rechargement des conversations)
   useEffect(() => {
     // Mise à jour du message de bienvenue seulement
@@ -643,6 +642,21 @@ export default function ChatInterface() {
       setCurrentConversation(updatedConversation)
     }
   }, [currentLanguage, t]) // CORRECTION: Séparé du chargement des conversations
+
+
+  // 🔧 NOUVEAU: Chargement initial des conversations (remplace le setInterval)
+  useEffect(() => {
+    if (isAuthenticated && user?.email && !hasLoadedConversationsRef.current && isMountedRef.current) {
+      console.log('[Chat] Chargement initial des conversations pour:', user.email)
+      hasLoadedConversationsRef.current = true
+    
+      // Chargement unique au démarrage
+      loadConversations(user.email).catch(error => {
+        console.error('[Chat] Erreur chargement initial:', error)
+        handleAuthError(error)
+      })
+    }
+  }, [isAuthenticated, user?.email, loadConversations, handleAuthError])
 
   // Fonctions de gestion des messages (toutes conservées)
   const extractAnswerAndSources = useCallback((result: any): [string, any[]] => {
