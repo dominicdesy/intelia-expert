@@ -1,8 +1,11 @@
+#
 # app/api/v1/stats_updater.py
 # -*- coding: utf-8 -*-
 """
+
 Version simple et fonctionnelle du collecteur de statistiques - CORRIGÉE
 Utilise les VRAIS noms de colonnes de votre base de données
+
 """
 
 import asyncio
