@@ -151,9 +151,7 @@ async def get_user_profile(
             company_website=profile_data.get('company_website'),
             linkedin_corporate=profile_data.get('linkedin_corporate'),
             user_type=profile_data.get('user_type', 'producer'),
-            language=profile_data.get('language', 'fr'),
-            created_at=profile_data.get('created_at'),
-            updated_at=profile_data.get('updated_at')
+            language=profile_data.get('language', 'fr')
         )
         
     except HTTPException:
