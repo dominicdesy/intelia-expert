@@ -10,6 +10,16 @@
   "auth.newToIntelia": "Nieuw bij Intelia Expert?",
   "auth.createAccount": "Account aanmaken",
 
+  "placeholder.createSecurePassword": "Maak een veilig wachtwoord",
+  "placeholder.confirmNewPassword": "Bevestig je nieuwe wachtwoord",
+  "validation.password.minLength": "Minimaal 8 tekens",
+  "validation.password.uppercase": "Minimaal één hoofdletter",
+  "validation.password.lowercase": "Minimaal één kleine letter", 
+  "validation.password.number": "Minimaal één cijfer",
+  "validation.password.special": "Minimaal één speciaal teken",
+  "nav.conversationSidebar": "Gesprekken zijbalk",
+  "nav.closeSidebar": "Zijbalk sluiten",
+
   "common.or": "of",
   "common.optional": "optioneel",
   "common.appName": "Intelia Expert",

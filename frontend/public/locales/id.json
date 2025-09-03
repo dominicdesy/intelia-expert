@@ -10,6 +10,16 @@
   "auth.newToIntelia": "Baru di Intelia Expert?",
   "auth.createAccount": "Buat akun",
 
+  "placeholder.createSecurePassword": "Buat kata sandi yang aman",
+  "placeholder.confirmNewPassword": "Konfirmasi kata sandi baru Anda",
+  "validation.password.minLength": "Minimal 8 karakter",
+  "validation.password.uppercase": "Minimal satu huruf kapital",
+  "validation.password.lowercase": "Minimal satu huruf kecil", 
+  "validation.password.number": "Minimal satu angka",
+  "validation.password.special": "Minimal satu karakter khusus",
+  "nav.conversationSidebar": "Sidebar percakapan",
+  "nav.closeSidebar": "Tutup sidebar",
+
   "common.or": "atau",
   "common.optional": "opsional",
   "common.appName": "Intelia Expert",

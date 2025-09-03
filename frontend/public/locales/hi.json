@@ -10,6 +10,16 @@
   "auth.newToIntelia": "Intelia Expert में नए हैं?",
   "auth.createAccount": "खाता बनाएं",
 
+  "placeholder.createSecurePassword": "एक सुरक्षित पासवर्ड बनाएं",
+  "placeholder.confirmNewPassword": "अपने नए पासवर्ड की पुष्टि करें",
+  "validation.password.minLength": "कम से कम 8 अक्षर",
+  "validation.password.uppercase": "कम से कम एक बड़ा अक्षर",
+  "validation.password.lowercase": "कम से कम एक छोटा अक्षर", 
+  "validation.password.number": "कम से कम एक संख्या",
+  "validation.password.special": "कम से कम एक विशेष चिह्न",
+  "nav.conversationSidebar": "बातचीत साइडबार",
+  "nav.closeSidebar": "साइडबार बंद करें",
+
   "common.or": "या",
   "common.optional": "वैकल्पिक",
   "common.appName": "Intelia Expert",

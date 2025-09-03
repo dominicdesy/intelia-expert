@@ -10,6 +10,16 @@
   "auth.newToIntelia": "Intelia Expert新用户?",
   "auth.createAccount": "创建账户",
 
+  "placeholder.createSecurePassword": "创建安全密码",
+  "placeholder.confirmNewPassword": "确认您的新密码",
+  "validation.password.minLength": "至少8个字符",
+  "validation.password.uppercase": "至少一个大写字母",
+  "validation.password.lowercase": "至少一个小写字母", 
+  "validation.password.number": "至少一个数字",
+  "validation.password.special": "至少一个特殊字符",
+  "nav.conversationSidebar": "对话侧边栏",
+  "nav.closeSidebar": "关闭侧边栏",
+
   "common.or": "或",
   "common.optional": "可选",
   "common.appName": "Intelia Expert",

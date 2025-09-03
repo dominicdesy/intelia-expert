@@ -10,6 +10,16 @@
   "auth.newToIntelia": "ใหม่กับ Intelia Expert?",
   "auth.createAccount": "สร้างบัญชี",
 
+  "placeholder.createSecurePassword": "สร้างรหัสผ่านที่ปลอดภัย",
+  "placeholder.confirmNewPassword": "ยืนยันรหัสผ่านใหม่ของคุณ",
+  "validation.password.minLength": "อย่างน้อย 8 ตัวอักษร",
+  "validation.password.uppercase": "อย่างน้อยหนึ่งตัวพิมพ์ใหญ่",
+  "validation.password.lowercase": "อย่างน้อยหนึ่งตัวพิมพ์เล็ก", 
+  "validation.password.number": "อย่างน้อยหนึ่งตัวเลข",
+  "validation.password.special": "อย่างน้อยหนึ่งตัวอักษรพิเศษ",
+  "nav.conversationSidebar": "แถบด้านข้างการสนทนา",
+  "nav.closeSidebar": "ปิดแถบด้านข้าง",
+
   "common.or": "หรือ",
   "common.optional": "ไม่บังคับ",
   "common.appName": "Intelia Expert",

@@ -1,7 +1,10 @@
 import { ModalProps } from '../../../types'
+import { useTranslation } from '@/lib/languages/i18n'
 
 // ==================== MODAL CORRIGÉE - PROBLÈME DU CARRÉ RÉSOLU ====================
 export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
+  const { t } = useTranslation()
+  
   if (!isOpen) return null
 
   return (
@@ -24,8 +27,8 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 text-2xl"
-              aria-label="Fermer la modal"
-              title="Fermer"
+              aria-label={t('modal.close')}
+              title={t('modal.close')}
             >
               ×
             </button>

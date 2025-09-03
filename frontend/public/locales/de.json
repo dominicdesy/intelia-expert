@@ -10,6 +10,16 @@
   "auth.newToIntelia": "Neu bei Intelia Expert?",
   "auth.createAccount": "Konto erstellen",
 
+  "placeholder.createSecurePassword": "Erstellen Sie ein sicheres Passwort",
+  "placeholder.confirmNewPassword": "Bestätigen Sie Ihr neues Passwort",
+  "validation.password.minLength": "Mindestens 8 Zeichen",
+  "validation.password.uppercase": "Mindestens ein Großbuchstabe",
+  "validation.password.lowercase": "Mindestens ein Kleinbuchstabe", 
+  "validation.password.number": "Mindestens eine Zahl",
+  "validation.password.special": "Mindestens ein Sonderzeichen",
+  "nav.conversationSidebar": "Gespräche-Seitenleiste",
+  "nav.closeSidebar": "Seitenleiste schließen",
+
   "common.or": "oder",
   "common.optional": "optional",
   "common.appName": "Intelia Expert",

@@ -12,6 +12,16 @@
 
   "placeholder.email": "su@email.com",
 
+  "placeholder.createSecurePassword": "Crea una contraseña segura",
+  "placeholder.confirmNewPassword": "Confirma tu nueva contraseña",
+  "validation.password.minLength": "Al menos 8 caracteres",
+  "validation.password.uppercase": "Al menos una letra mayúscula",
+  "validation.password.lowercase": "Al menos una letra minúscula", 
+  "validation.password.number": "Al menos un número",
+  "validation.password.special": "Al menos un carácter especial",
+  "nav.conversationSidebar": "Barra lateral de conversaciones",
+  "nav.closeSidebar": "Cerrar barra lateral",
+
   "common.or": "o",
   "common.optional": "opcional",
   "common.appName": "Intelia Expert",

@@ -443,22 +443,20 @@ async def get_questions(
                         logger.error(f"Erreur formatage question {i}: {format_error}")
                         # Ajouter une question d'erreur au lieu d'ignorer
                         questions.append({
-                            "id": str(row["id"]),
-                            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-                            "timestamp": row["created_at"].isoformat() if row["created_at"] else None,
-                            "user_email": row["user_email"] or "",
-                            "user_name": (row["user_email"] or "").split('@')[0].replace('.', ' ').title(),
-                            "question": row["question"] or "",
-                            "response": row["response_text"] or "",
-                            "response_source": row["response_source"] or "unknown",
-                            "confidence_score": float(row["response_confidence"] or 0),
-                            "response_time": int(row["processing_time_ms"] or 0) / 1000,
-                            "language": row["language"] or "fr",
-                            "session_id": row["session_id"] or "",
-                            "status": row["status"] or "unknown",
+                            "id": f"error_{i}",
+                            "timestamp": None,
+                            "user_email": "FORMAT_ERROR",
+                            "user_name": "Error",
+                            "question": f"Erreur formatage: {str(format_error)}",
+                            "response": "",
+                            "response_source": "error",
+                            "confidence_score": 0,
+                            "response_time": 0,
+                            "language": "fr",
+                            "session_id": "",
+                            "status": "error",
                             "feedback": None,
-                            "feedback_comment": None,
-                            "processing_time_ms": int(row["processing_time_ms"] or 0)
+                            "feedback_comment": None
                         })
                 
                 # Calculer pagination
