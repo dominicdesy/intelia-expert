@@ -219,7 +219,7 @@ class LoggingManager:
                     cur.execute("""
                         INSERT INTO user_questions_complete (
                             user_email, session_id, question_id, question, response_text,
-                            response_source, status, processing_time_ms, confidence,
+                            response_source, status, processing_time_ms, response_confidence,
                             completeness_score, language, intent, entities, 
                             error_type, error_message, error_traceback, created_at
                         ) VALUES (
