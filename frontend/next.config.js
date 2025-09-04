@@ -1,3 +1,5 @@
+// next.config
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // 🔧 Configuration de base
