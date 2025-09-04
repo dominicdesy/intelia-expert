@@ -92,8 +92,7 @@ const nextConfig = {
               "base-uri 'self'",
               "form-action 'self'",
               "frame-ancestors 'none'",
-              // 🔧 CORRECTION: Ajout de https://expert.intelia.com
-              "connect-src 'self' https://*.supabase.co https://expert-app-cngws.ondigitalocean.app https://expert.intelia.com https://salesiq.zohopublic.com https://*.zoho.com wss://*.zoho.com wss://vts.zohopublic.com wss://salesiq.zohopublic.com https://*.zohostatic.com https://restcountries.com"
+              "connect-src 'self' https://*.supabase.co https://expert-app-cngws.ondigitalocean.app https://salesiq.zohopublic.com https://*.zoho.com wss://*.zoho.com wss://vts.zohopublic.com wss://salesiq.zohopublic.com https://*.zohostatic.com https://restcountries.com"
             ].join('; ')
           }
         ]
@@ -191,7 +190,7 @@ const nextConfig = {
     return config
   },
 
-  // 🔄 Redirections
+  // 📄 Redirections
   async redirects() {
     return []
   },
@@ -202,10 +201,9 @@ const nextConfig = {
   },
 }
 
-// 📊 Validation de la configuration
+// 🔍 Validation de la configuration
 console.log('🚀 Next.js config loaded for environment:', process.env.NODE_ENV)
 console.log('🔧 SWC compilation: enabled, Terser minification: enabled')
 console.log('🖼️ Image optimization:', nextConfig.images.unoptimized ? 'disabled' : 'enabled')
-console.log('🔒 CSP updated with expert.intelia.com support')
 
 module.exports = nextConfig
