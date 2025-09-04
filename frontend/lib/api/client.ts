@@ -11,7 +11,7 @@ class ApiClient {
     // 🔧 CORRECTION CRITIQUE: 
     // 1. Utiliser NEXT_PUBLIC_API_BASE_URL (avec _BASE)
     // 2. Fallback SANS /api pour éviter le double /api/api/
-    this.baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
+    this.baseURL = process.env.NEXT_PUBLIC_API_BASE_URL
     this.defaultHeaders = {
       'Content-Type': 'application/json',
       'Origin': 'https://expert.intelia.com', // 🔧 AJOUT: Header CORS obligatoire

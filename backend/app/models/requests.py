@@ -1,4 +1,4 @@
-﻿import os
+import os
 from pydantic import BaseModel, Field
 from typing import Optional
 

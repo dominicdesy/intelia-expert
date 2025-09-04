@@ -6,7 +6,7 @@ import { getSupabaseClient } from '@/lib/supabase/singleton'
 
 // Configuration API propre
 const getApiConfig = () => {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
   const version = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
   
   // Enlever /api s'il est deja present pour eviter /api/api/

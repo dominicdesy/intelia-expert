@@ -416,7 +416,7 @@ function ResetPasswordPageContent() {
     setErrors([])
     
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app/api'}/v1/auth/confirm-reset-password`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/v1/auth/confirm-reset-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -56,7 +56,7 @@ const nextConfig = {
     ignoreDuringBuilds: false,
   },
 
-  // 🔒 Headers de sécurité
+  // 🔐 Headers de sécurité
   async headers() {
     return [
       {
@@ -95,7 +95,8 @@ const nextConfig = {
               "form-action 'self'",
               "frame-ancestors 'none'",
               // 🔧 CORRECTION: Ajout de https://expert.intelia.com
-              "connect-src 'self' https://*.supabase.co https://expert-app-cngws.ondigitalocean.app https://expert.intelia.com https://salesiq.zohopublic.com https://*.zoho.com wss://*.zoho.com wss://vts.zohopublic.com wss://salesiq.zohopublic.com https://*.zohostatic.com https://restcountries.com"
+              "connect-src 'self' https://*.supabase.co https://expert.intelia.com https://salesiq.zohopublic.com https://*.zoho.com wss://*.zoho.com wss://vts.zohopublic.com wss://salesiq.zohopublic.com https://*.zohostatic.com https://restcountries.com"
+
             ].join('; ')
           }
         ]
@@ -138,7 +139,7 @@ const nextConfig = {
       }
     }
     
-    // 🌍 Fallbacks pour le navigateur
+    // 🌐 Fallbacks pour le navigateur
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -193,14 +194,19 @@ const nextConfig = {
     return config
   },
 
-  // 🔄 Redirections
+  // 📄 Redirections
   async redirects() {
     return []
   },
 
-  // ✨ Rewrites
+  // ✨ Rewrites - NOUVEAU: Redirection API vers backend
   async rewrites() {
-    return []
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'https://expert-app-cngws.ondigitalocean.app/api/:path*'
+      }
+    ]
   },
 }
 
@@ -208,6 +214,7 @@ const nextConfig = {
 console.log('🚀 Next.js config loaded for environment:', process.env.NODE_ENV)
 console.log('🔧 SWC compilation: enabled, Terser minification: enabled')
 console.log('🖼️ Image optimization:', nextConfig.images.unoptimized ? 'disabled' : 'enabled')
-console.log('🔒 CSP updated with expert.intelia.com support')
+console.log('🔐 CSP updated with expert.intelia.com support')
+console.log('🔄 API rewrites configured: /api/* → expert-app-cngws.ondigitalocean.app/api/*')
 
 module.exports = nextConfig

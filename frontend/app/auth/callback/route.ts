@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
       console.log('🔄 [Auth Callback] Échange du code via backend...')
       
       // ✅ NOUVEAU: Appel au backend au lieu de Supabase direct
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app/api'}/v1/auth/oauth-callback`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/v1/auth/oauth-callback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -575,7 +575,7 @@ async def request_password_reset(request: ForgotPasswordRequest):
     
     try:
         # 🔧 CORRECTION : Configurer l'URL de redirection avec fallback intelligent
-        redirect_url = os.getenv("RESET_PASSWORD_REDIRECT_URL", "https://expert-app-cngws.ondigitalocean.app/auth/reset-password")
+        redirect_url = os.getenv("RESET_PASSWORD_REDIRECT_URL", "https://expert.intelia.com/auth/reset-password")
         
         # Essayer la nouvelle API Supabase d'abord
         try:
@@ -1017,7 +1017,7 @@ async def debug_reset_config():
     """Debug temporaire pour voir la configuration de reset password"""
     
     # Récupérer exactement comme dans la fonction reset-password
-    redirect_url = os.getenv("RESET_PASSWORD_REDIRECT_URL", "https://expert-app-cngws.ondigitalocean.app/auth/reset-password")
+    redirect_url = os.getenv("RESET_PASSWORD_REDIRECT_URL", "https://expert.intelia.com/auth/reset-password")
     
     return {
         "redirect_url_configured": redirect_url,

@@ -238,7 +238,7 @@ function VerifyEmailPageContent() {
         setMessage(t('verification.verifying'))
         
         // APPEL API pour vérifier l'email
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app/api'}/v1/auth/verify-email`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/v1/auth/verify-email`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -357,7 +357,7 @@ function VerifyEmailPageContent() {
             <br />• Status: {status}
             <br />• Email: {email || 'Non défini'}
             <br />• Message: {message}
-            <br />• API URL: {process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app/api'}
+            <br />• API URL: {process.env.NEXT_PUBLIC_API_BASE_URL}
           </div>
         )}
       </div>

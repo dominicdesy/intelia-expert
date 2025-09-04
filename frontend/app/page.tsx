@@ -209,7 +209,7 @@ function LoginPageContent() {
       console.log('📤 Envoi vers backend API:', registrationData)
 
       // CHANGEMENT 1: Construction intelligente de l'URL API
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://expert-app-cngws.ondigitalocean.app'
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
       
       // Construire l'URL intelligemment pour éviter les doubles /api/
       let apiUrl = API_BASE_URL

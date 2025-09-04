@@ -369,7 +369,7 @@ def create_cors_headers(origin: str = None) -> Dict[str, str]:
     # Liste des origins autorises
     allowed_origins = [
         "https://expert.intelia.com",
-        "https://expert-app-cngws.ondigitalocean.app", 
+        "https://expert.intelia.com", 
         "http://localhost:3000",
         "http://localhost:8080"
     ]

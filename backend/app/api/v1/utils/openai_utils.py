@@ -1,8 +1,8 @@
-ï»¿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
-openai_utils.py â€” GPT-5 safe, backwards-compatible utilities
+openai_utils.py — GPT-5 safe, backwards-compatible utilities
 
-VERSION CORRIGÃ‰E - Toutes les fonctions manquantes ajoutÃ©es pour rÃ©soudre les erreurs d'import
+VERSION CORRIGÉE - Toutes les fonctions manquantes ajoutées pour résoudre les erreurs d'import
 
 This module preserves original public function names and behavior while fixing:
 - Temperature handling for models that only support the default temperature (e.g., GPT-5 families)
@@ -267,7 +267,7 @@ def complete(
 
     # Retry removing temperature if model refuses custom values
     if _is_temp_unsupported_error(err_msg):
-        logger.warning(f"TempÃ©rature non supportÃ©e par {model} â†’ retry sans 'temperature'")
+        logger.warning(f"Température non supportée par {model} ? retry sans 'temperature'")
         payload.pop("temperature", None)
         with httpx.Client(timeout=timeout) as client:
             r3 = client.post(url, headers=headers, json=payload)
@@ -283,7 +283,7 @@ def complete(
     try:
         r.raise_for_status()
     except httpx.HTTPStatusError as e:  # noqa: BLE001
-        raise RuntimeError(f"RequÃªte OpenAI invalide: {e.response.text}") from None
+        raise RuntimeError(f"Requête OpenAI invalide: {e.response.text}") from None
     return r.json()
 
 
@@ -302,7 +302,7 @@ def complete_text(
     Applies safe temperature and tolerant output parsing.
     """
     if not prompt or not prompt.strip():
-        raise ValueError("Le prompt ne peut pas Ãªtre vide")
+        raise ValueError("Le prompt ne peut pas être vide")
 
     model = model or os.getenv("OPENAI_SYNTHESIS_MODEL", _DEFAULT_MODEL)
     safe_temp = _get_safe_temperature(temperature, model)
@@ -327,9 +327,9 @@ def complete_text(
         {
             "role": "system",
             "content": (
-                "Tu es un expert en synthÃ¨se de contenu technique avicole. "
-                "RÃ©ponds de maniÃ¨re concise, prÃ©cise et professionnelle. "
-                "Utilise un franÃ§ais clair et structure ton texte avec du Markdown si appropriÃ©."
+                "Tu es un expert en synthèse de contenu technique avicole. "
+                "Réponds de manière concise, précise et professionnelle. "
+                "Utilise un français clair et structure ton texte avec du Markdown si approprié."
             ),
         },
         {"role": "user", "content": prompt.strip()},
@@ -348,27 +348,27 @@ def complete_text(
         logger.info(f"model={model}, max_tokens={max_tokens}, temp={safe_temp}, prompt_len={len(prompt)}")
 
     if not response or not response.get("choices"):
-        raise RuntimeError("RÃ©ponse OpenAI vide")
+        raise RuntimeError("Réponse OpenAI vide")
 
     choice = (response.get("choices") or [{}])[0]
     content = ((choice.get("message") or {}).get("content")) or choice.get("text") or ""
 
     if not content:
         finish_reason = choice.get("finish_reason", "unknown")
-        logger.error(f"RÃ©ponse sans 'content'. Model: {model}, finish_reason: {finish_reason}, AperÃ§u: {str(response)[:500]}")
+        logger.error(f"Réponse sans 'content'. Model: {model}, finish_reason: {finish_reason}, Aperçu: {str(response)[:500]}")
         
-        # Retry avec plus de tokens si coupÃ© par la limite
+        # Retry avec plus de tokens si coupé par la limite
         if finish_reason == "length" and max_tokens < 3000:
-            logger.warning(f"Retry avec max_tokens augmentÃ©: {max_tokens} -> {max_tokens * 2}")
+            logger.warning(f"Retry avec max_tokens augmenté: {max_tokens} -> {max_tokens * 2}")
             return complete_text(prompt, temperature, max_tokens * 2, model)
         
-        raise RuntimeError(f"Contenu de rÃ©ponse vide (finish_reason: {finish_reason})")
+        raise RuntimeError(f"Contenu de réponse vide (finish_reason: {finish_reason})")
 
     return content.strip()
 
 
 # ----------------------------------------------------------------------------
-# SDK path (keeps original signature) â€” safe_chat_completion
+# SDK path (keeps original signature) — safe_chat_completion
 # ----------------------------------------------------------------------------
 
 @openai_retry(max_retries=2, delay=1.0)
@@ -381,10 +381,10 @@ def safe_chat_completion(**kwargs) -> Any:
     """
     if "model" not in kwargs:
         kwargs["model"] = _DEFAULT_MODEL
-        logger.debug(f"ModÃ¨le par dÃ©faut utilisÃ©: {kwargs['model']}")
+        logger.debug(f"Modèle par défaut utilisé: {kwargs['model']}")
 
     if "messages" not in kwargs or not kwargs["messages"]:
-        raise ValueError("Le paramÃ¨tre 'messages' est requis et ne peut pas Ãªtre vide")
+        raise ValueError("Le paramètre 'messages' est requis et ne peut pas être vide")
 
     model = kwargs["model"]
 
@@ -415,7 +415,7 @@ def safe_chat_completion(**kwargs) -> Any:
         msg = str(e)
         # Retry if temp unsupported
         if _is_temp_unsupported_error(msg):
-            logger.warning(f"TempÃ©rature non supportÃ©e par {model} â†’ retry sans 'temperature'")
+            logger.warning(f"Température non supportée par {model} ? retry sans 'temperature'")
             kwargs.pop("temperature", None)
             resp = openai.chat.completions.create(**kwargs)
         # Retry if wrong token param name
@@ -431,15 +431,15 @@ def safe_chat_completion(**kwargs) -> Any:
             raise
 
     elapsed = time.time() - start
-    logger.debug(f"RÃ©ponse OpenAI Chat reÃ§ue en {elapsed:.2f}s")
+    logger.debug(f"Réponse OpenAI Chat reçue en {elapsed:.2f}s")
 
     if not resp or not getattr(resp, "choices", None):
-        raise RuntimeError("RÃ©ponse OpenAI vide ou malformÃ©e")
+        raise RuntimeError("Réponse OpenAI vide ou malformée")
     return resp
 
 
 # ----------------------------------------------------------------------------
-# CoT path (keeps signature) â€” complete_with_cot
+# CoT path (keeps signature) — complete_with_cot
 # ----------------------------------------------------------------------------
 
 def _parse_cot_sections(raw: str) -> Dict[str, str]:
@@ -457,13 +457,13 @@ def _parse_cot_sections(raw: str) -> Dict[str, str]:
 
 def _extract_final_answer(raw: str, sections: Dict[str, str]) -> str:
     """Extract final answer from CoT response, preferring structured sections."""
-    # PrÃ©fÃ©rer answer > recommendations > raw content
+    # Préférer answer > recommendations > raw content
     if "answer" in sections and sections["answer"]:
         return sections["answer"]
     elif "recommendations" in sections and sections["recommendations"]:
         return sections["recommendations"]
     else:
-        # Fallback: extraire ce qui vient aprÃ¨s la derniÃ¨re balise fermante
+        # Fallback: extraire ce qui vient après la dernière balise fermante
         last_tag_match = re.search(r'</\w+>\s*(.+)$', raw, re.S | re.I)
         if last_tag_match:
             return last_tag_match.group(1).strip()
@@ -482,7 +482,7 @@ def complete_with_cot(
     Returns dict with raw_response, parsed_sections, final_answer, model_used.
     """
     if not prompt or not prompt.strip():
-        raise ValueError("Le prompt CoT ne peut pas Ãªtre vide")
+        raise ValueError("Le prompt CoT ne peut pas être vide")
 
     model = model or os.getenv("OPENAI_COT_MODEL", _DEFAULT_MODEL)
 
@@ -498,9 +498,9 @@ def complete_with_cot(
         {
             "role": "system",
             "content": (
-                "Tu es un expert vÃ©tÃ©rinaire avicole avec une approche mÃ©thodologique rigoureuse. "
-                "Suis prÃ©cisÃ©ment la structure de raisonnement demandÃ©e avec les balises XML. "
-                "Reste factuel, prÃ©cis et professionnel dans ton analyse."
+                "Tu es un expert vétérinaire avicole avec une approche méthodologique rigoureuse. "
+                "Suis précisément la structure de raisonnement demandée avec les balises XML. "
+                "Reste factuel, précis et professionnel dans ton analyse."
             ),
         },
         {"role": "user", "content": prompt.strip()},
@@ -525,7 +525,7 @@ def complete_with_cot(
     except Exception as e:  # noqa: BLE001
         msg = str(e)
         if _is_temp_unsupported_error(msg):
-            logger.warning(f"TempÃ©rature non supportÃ©e par {model} â†’ retry sans 'temperature'")
+            logger.warning(f"Température non supportée par {model} ? retry sans 'temperature'")
             call_kwargs.pop("temperature", None)
             response = openai.chat.completions.create(**call_kwargs)
         elif "unsupported_parameter" in msg.lower() and (
@@ -539,7 +539,7 @@ def complete_with_cot(
             raise
 
     if not response or not response.choices:
-        raise RuntimeError("RÃ©ponse OpenAI CoT vide")
+        raise RuntimeError("Réponse OpenAI CoT vide")
 
     raw_content = response.choices[0].message.content
     if not raw_content:
@@ -579,7 +579,7 @@ def safe_embedding_create(input: Any, model: str | None = None, **kwargs) -> Lis
     Accepts str or list[str]. Preserves existing signature.
     """
     if input is None:
-        raise ValueError("Le paramÃ¨tre 'input' ne peut pas Ãªtre vide")
+        raise ValueError("Le paramètre 'input' ne peut pas être vide")
 
     if isinstance(input, str):
         inputs = [input]
@@ -588,11 +588,11 @@ def safe_embedding_create(input: Any, model: str | None = None, **kwargs) -> Lis
         inputs = input
         single = False
     else:
-        raise ValueError("'input' doit Ãªtre une string ou une liste de strings")
+        raise ValueError("'input' doit être une string ou une liste de strings")
 
     inputs = [s.strip() for s in inputs if isinstance(s, str) and s.strip()]
     if not inputs:
-        raise ValueError("Aucun texte valide aprÃ¨s filtrage")
+        raise ValueError("Aucun texte valide après filtrage")
 
     model = model or os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 
@@ -612,45 +612,45 @@ def safe_embedding_create(input: Any, model: str | None = None, **kwargs) -> Lis
 
 
 # ----------------------------------------------------------------------------
-# NOUVELLES FONCTIONS POUR DIALOGUE_MANAGER (CORRIGÃ‰ES ET AJOUTÃ‰ES)
+# NOUVELLES FONCTIONS POUR DIALOGUE_MANAGER (CORRIGÉES ET AJOUTÉES)
 # ----------------------------------------------------------------------------
 
 def synthesize_rag_content(question: str, raw_content: str, max_length: int = 300) -> str:
     """
-    SynthÃ¨se spÃ©cialisÃ©e pour le contenu RAG du dialogue_manager
+    Synthèse spécialisée pour le contenu RAG du dialogue_manager
     
-    OptimisÃ©e pour nettoyer et reformater le contenu brut des PDFs avicoles.
-    Cette fonction Ã©tait manquante dans le fichier actuel !
+    Optimisée pour nettoyer et reformater le contenu brut des PDFs avicoles.
+    Cette fonction était manquante dans le fichier actuel !
     """
     if not raw_content or not raw_content.strip():
         return "Informations techniques disponibles."
     
-    # Prompt spÃ©cialisÃ© pour le contenu avicole
-    synthesis_prompt = f"""SynthÃ©tise ces informations techniques avicoles de maniÃ¨re claire et professionnelle.
+    # Prompt spécialisé pour le contenu avicole
+    synthesis_prompt = f"""Synthétise ces informations techniques avicoles de manière claire et professionnelle.
 
 INSTRUCTIONS CRITIQUES :
-- NE JAMAIS mentionner de sources, fichiers PDF ou rÃ©fÃ©rences dans ta rÃ©ponse
-- NE JAMAIS inclure de fragments de tableaux mal formatÃ©s
+- NE JAMAIS mentionner de sources, fichiers PDF ou références dans ta réponse
+- NE JAMAIS inclure de fragments de tableaux mal formatés
 - Utiliser du Markdown pour la structure (##, **, -)
-- RÃ©ponse concise (~{max_length} mots maximum)
-- Si donnÃ©es incertaines, donner une fourchette
-- Garder uniquement les informations pertinentes Ã  la question
+- Réponse concise (~{max_length} mots maximum)
+- Si données incertaines, donner une fourchette
+- Garder uniquement les informations pertinentes à la question
 
 Question utilisateur : {question}
 
-Contenu technique Ã  synthÃ©tiser :
+Contenu technique à synthétiser :
 {raw_content[:1500]}
 
-RÃ©ponse synthÃ©tique (format Markdown, sans sources) :"""
+Réponse synthétique (format Markdown, sans sources) :"""
 
     try:
         return complete_text(
             prompt=synthesis_prompt, 
-            temperature=0.2,  # Peu de crÃ©ativitÃ© pour info technique
+            temperature=0.2,  # Peu de créativité pour info technique
             max_tokens=min(400, max_length + 100)  # Marge pour le formatage
         )
     except Exception as e:
-        logger.warning(f"Ã‰chec synthÃ¨se RAG, fallback: {e}")
+        logger.warning(f"Échec synthèse RAG, fallback: {e}")
         # Fallback simple : nettoyage basique
         cleaned = raw_content.strip()[:max_length]
         if len(raw_content) > max_length:
@@ -660,30 +660,30 @@ RÃ©ponse synthÃ©tique (format Markdown, sans sources) :"""
 
 def generate_clarification_response(intent: str, missing_fields: List[str], general_info: str = "") -> str:
     """
-    GÃ©nÃ¨re des rÃ©ponses de clarification intelligentes
-    Cette fonction Ã©tait aussi manquante !
+    Génère des réponses de clarification intelligentes
+    Cette fonction était aussi manquante !
     """
-    prompt = f"""GÃ©nÃ¨re une rÃ©ponse de clarification courte et utile pour un systÃ¨me d'expertise avicole.
+    prompt = f"""Génère une réponse de clarification courte et utile pour un système d'expertise avicole.
 
 CONTEXTE :
-- Intention dÃ©tectÃ©e : {intent}
+- Intention détectée : {intent}
 - Informations manquantes : {', '.join(missing_fields)}
-- Info gÃ©nÃ©rale disponible : {general_info[:200] if general_info else 'Aucune'}
+- Info générale disponible : {general_info[:200] if general_info else 'Aucune'}
 
 INSTRUCTIONS :
-- RÃ©ponse en 2-3 phrases maximum
+- Réponse en 2-3 phrases maximum
 - Expliquer pourquoi ces infos sont importantes
 - Ton professionnel mais accessible
 - Pas de mention de sources
 
-RÃ©ponse de clarification :"""
+Réponse de clarification :"""
 
     try:
         return complete_text(prompt=prompt, temperature=0.3, max_tokens=150)
     except Exception as e:
-        logger.warning(f"Ã‰chec gÃ©nÃ©ration clarification: {e}")
-        # Fallback gÃ©nÃ©rique
-        return f"Pour vous donner une rÃ©ponse prÃ©cise sur {intent}, j'aurais besoin de quelques prÃ©cisions supplÃ©mentaires."
+        logger.warning(f"Échec génération clarification: {e}")
+        # Fallback générique
+        return f"Pour vous donner une réponse précise sur {intent}, j'aurais besoin de quelques précisions supplémentaires."
 
 
 def test_cot_pipeline() -> Dict[str, Any]:
@@ -692,35 +692,35 @@ def test_cot_pipeline() -> Dict[str, Any]:
     
     Test complet du pipeline Chain-of-Thought
     
-    CORRECTION CRITIQUE: Cette fonction Ã©tait manquante et causait l'erreur d'import:
+    CORRECTION CRITIQUE: Cette fonction était manquante et causait l'erreur d'import:
     "cannot import name 'test_cot_pipeline' from 'app.api.v1.utils.openai_utils'"
     
-    UtilisÃ©e par cot_fallback_processor.py pour valider le systÃ¨me CoT.
+    Utilisée par cot_fallback_processor.py pour valider le système CoT.
     """
     try:
         # Test prompt CoT avec structure XML
-        test_cot_prompt = """Analyse cette question test du systÃ¨me CoT:
+        test_cot_prompt = """Analyse cette question test du système CoT:
 
 <thinking>
 Ceci est un test du parsing des sections CoT.
-Je dois structurer ma rÃ©ponse avec les balises XML appropriÃ©es.
+Je dois structurer ma réponse avec les balises XML appropriées.
 </thinking>
 
 <analysis>
-Le systÃ¨me doit dÃ©tecter et parser:
-- thinking: rÃ©flexion initiale
-- analysis: analyse dÃ©taillÃ©e
+Le système doit détecter et parser:
+- thinking: réflexion initiale
+- analysis: analyse détaillée
 - recommendations: conseils finaux
 </analysis>
 
 <recommendations>
-Le test CoT est fonctionnel si cette structure est correctement parsÃ©e.
-Les sections doivent Ãªtre extraites sans erreur.
+Le test CoT est fonctionnel si cette structure est correctement parsée.
+Les sections doivent être extraites sans erreur.
 </recommendations>
 
-Quelle est la performance attendue d'un poulet Ã  35 jours ?"""
+Quelle est la performance attendue d'un poulet à 35 jours ?"""
 
-        # Test complete_with_cot avec parsing activÃ©
+        # Test complete_with_cot avec parsing activé
         cot_result = complete_with_cot(
             prompt=test_cot_prompt,
             temperature=0.2,
@@ -728,12 +728,12 @@ Quelle est la performance attendue d'un poulet Ã  35 jours ?"""
             parse_cot=True
         )
         
-        # Analyser les rÃ©sultats du parsing
+        # Analyser les résultats du parsing
         sections_found = len(cot_result.get("parsed_sections", {}))
         has_final_answer = bool(cot_result.get("final_answer"))
         raw_length = len(cot_result.get("raw_response", ""))
         
-        # Test complete_text() avec dÃ©tection automatique
+        # Test complete_text() avec détection automatique
         simple_test = complete_text(
             prompt="Test simple: quel est le poids moyen d'un poulet de chair ?",
             temperature=0.2,
@@ -750,7 +750,7 @@ Quelle est la performance attendue d'un poulet Ã  35 jours ?"""
         
         return {
             "status": "success",
-            "message": "Pipeline CoT entiÃ¨rement fonctionnel",
+            "message": "Pipeline CoT entièrement fonctionnel",
             "cot_structured_test": {
                 "success": True,
                 "sections_parsed": sections_found,
@@ -778,7 +778,7 @@ Quelle est la performance attendue d'un poulet Ã  35 jours ?"""
     except Exception as e:
         return {
             "status": "error",
-            "message": f"Ã‰chec test pipeline CoT: {str(e)}",
+            "message": f"Échec test pipeline CoT: {str(e)}",
             "error_type": type(e).__name__,
             "error_details": {
                 "function": "test_cot_pipeline",
@@ -789,20 +789,20 @@ Quelle est la performance attendue d'un poulet Ã  35 jours ?"""
 
 def test_synthesis_pipeline() -> Dict[str, Any]:
     """
-    Test complet du pipeline de synthÃ¨se pour dialogue_manager
+    Test complet du pipeline de synthèse pour dialogue_manager
     """
     try:
         # Test de la fonction complete_text()
         test_response = complete_text(
-            prompt="Test de synthÃ¨se : rÃ©sume en une phrase que les poules pondent des Å“ufs.",
+            prompt="Test de synthèse : résume en une phrase que les poules pondent des œufs.",
             temperature=0.2,
             max_tokens=50
         )
         
-        # Test de synthÃ¨se RAG
+        # Test de synthèse RAG
         rag_test = synthesize_rag_content(
-            question="Poids idÃ©al poule?",
-            raw_content="Les poules Ross 308 atteignent un poids optimal de 2.2kg Ã  42 jours selon les standards techniques...",
+            question="Poids idéal poule?",
+            raw_content="Les poules Ross 308 atteignent un poids optimal de 2.2kg à 42 jours selon les standards techniques...",
             max_length=100
         )
         
@@ -827,20 +827,20 @@ def test_synthesis_pipeline() -> Dict[str, Any]:
                 "success": True,
                 "response": clarification_test[:100] + "..." if len(clarification_test) > 100 else clarification_test
             },
-            "message": "Pipeline de synthÃ¨se fonctionnel"
+            "message": "Pipeline de synthèse fonctionnel"
         }
         
     except Exception as e:
         return {
             "status": "error",
-            "message": f"Ã‰chec test pipeline synthÃ¨se: {str(e)}",
+            "message": f"Échec test pipeline synthèse: {str(e)}",
             "error_type": type(e).__name__
         }
 
 
 def get_openai_status() -> Dict[str, Any]:
     """
-    Status complet du systÃ¨me OpenAI avec support nouvelles fonctions
+    Status complet du système OpenAI avec support nouvelles fonctions
     """
     return {
         "api_key_configured": bool(os.getenv("OPENAI_API_KEY")),
@@ -867,7 +867,7 @@ def get_openai_status() -> Dict[str, Any]:
             "synthesize_rag_content": True,
             "generate_clarification_response": True,
             "test_synthesis_pipeline": True,
-            "test_cot_pipeline": True  # AJOUTÃ‰ - fonction critique manquante
+            "test_cot_pipeline": True  # AJOUTÉ - fonction critique manquante
         },
         "retry_config": {
             "max_retries": 2,
@@ -887,7 +887,7 @@ def get_openai_models() -> List[str]:
         models = openai.models.list()
         return [m.id for m in models.data if getattr(m, "id", None)]
     except Exception as e:  # noqa: BLE001
-        logger.error(f"Erreur rÃ©cupÃ©ration modÃ¨les: {e}")
+        logger.error(f"Erreur récupération modèles: {e}")
         return []
 
 
@@ -897,7 +897,7 @@ def get_openai_models() -> List[str]:
 
 def test_openai_connection() -> Dict[str, Any]:
     try:
-        logger.info("Test de connexion OpenAIâ€¦")
+        logger.info("Test de connexion OpenAI…")
         test_model = os.getenv("OPENAI_TEST_MODEL", _DEFAULT_MODEL)
         try:
             resp = safe_chat_completion(
@@ -906,7 +906,7 @@ def test_openai_connection() -> Dict[str, Any]:
                 max_tokens=5,
             )
         except Exception:
-            # fallback lÃ©ger
+            # fallback léger
             resp = safe_chat_completion(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": "Test"}],
@@ -929,6 +929,6 @@ def test_openai_connection() -> Dict[str, Any]:
     except Exception as e:  # noqa: BLE001
         return {
             "status": "error",
-            "message": f"Ã‰chec connexion OpenAI: {e}",
+            "message": f"Échec connexion OpenAI: {e}",
             "error_type": type(e).__name__,
         }

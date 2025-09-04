@@ -531,7 +531,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://expert.intelia.com",
-        "https://expert-app-cngws.ondigitalocean.app",
+        "https://expert.intelia.com",
         "http://localhost:3000",
         "http://localhost:8080",
     ],
@@ -1245,7 +1245,7 @@ async def http_exc_handler(request: Request, exc: HTTPException):
     origin = request.headers.get("Origin")
     allowed_origins = [
         "https://expert.intelia.com",
-        "https://expert-app-cngws.ondigitalocean.app",
+        "https://expert.intelia.com",
         "http://localhost:3000",
         "http://localhost:8080"
     ]
@@ -1275,7 +1275,7 @@ async def generic_exc_handler(request: Request, exc: Exception):
     origin = request.headers.get("Origin")
     allowed_origins = [
         "https://expert.intelia.com",
-        "https://expert-app-cngws.ondigitalocean.app",
+        "https://expert.intelia.com",
         "http://localhost:3000",
         "http://localhost:8080"
     ]
