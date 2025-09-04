@@ -312,78 +312,31 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  // FONCTION POUR RÉCUPÉRER LES HEADERS D'AUTHENTIFICATION - IDENTIQUE
+  // FONCTION SIMPLIFIÉE POUR RÉCUPÉRER LES HEADERS D'AUTHENTIFICATION
   const getAuthHeaders = async (): Promise<Record<string, string>> => {
     try {
-      console.log('🔍 getAuthHeaders: Début...')
+      console.log('🔍 getAuthHeaders: Utilisation localStorage direct');
       
-      try {
-        const supabase = getSupabaseClient()
-        console.log('🔍 getAuthHeaders: Supabase client récupéré')
-        
-        const { data: { session }, error } = await supabase.auth.getSession()
-        console.log('🔍 getAuthHeaders: Session récupérée:', { 
-          hasSession: !!session, 
-          hasError: !!error,
-          hasAccessToken: !!session?.access_token,
-          errorMessage: error?.message
-        })
-        
-        if (session?.access_token && !error) {
-          console.log('✅ Token trouvé via Supabase getSession()')
-          return {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      } catch (supabaseError) {
-        console.log('⚠️ Supabase getSession() échoué, essai cookies...')
-      }
-      
-      console.log('🍪 Tentative récupération token depuis cookies...')
-      const cookieToken = getCookieToken()
-      if (cookieToken) {
-        console.log('✅ Token trouvé dans cookies')
-        return {
-          'Authorization': `Bearer ${cookieToken}`,
-          'Content-Type': 'application/json'
-        }
-      }
-      
-      console.error('❌ Aucun token trouvé (ni Supabase ni cookies)')
-      return {}
-      
-    } catch (error) {
-      console.error('❌ Erreur getAuthHeaders:', error)
-      return {}
-    }
-  }
-
-  // FONCTION HELPER POUR EXTRAIRE LE TOKEN - SELON INSTRUCTIONS PROJET
-  const getCookieToken = (): string | null => {
-    try {
-      // Utiliser la méthode du projet Intelia Expert
       const authData = localStorage.getItem('intelia-expert-auth');
-      if (!authData) {
-        console.log('❌ Non connecté à Intelia Expert');
-        return null;
+      if (authData) {
+        const parsed = JSON.parse(authData);
+        if (parsed.access_token) {
+          console.log('✅ Token récupéré depuis localStorage');
+          return {
+            'Authorization': `Bearer ${parsed.access_token}`,
+            'Content-Type': 'application/json'
+          };
+        }
       }
       
-      const parsed = JSON.parse(authData);
-      const token = parsed.access_token;
+      console.log('❌ Pas de token trouvé');
+      return {};
       
-      if (token) {
-        console.log('✅ Token récupéré depuis localStorage');
-        return token;
-      }
-      
-      console.log('❌ Token non trouvé dans intelia-expert-auth');
-      return null;
     } catch (error) {
-      console.error('❌ Erreur récupération token:', error);
-      return null;
+      console.error('❌ Erreur getAuthHeaders:', error);
+      return {};
     }
-  }
+  };
 
   // Charger toutes les statistiques - AVEC PROTECTION CONTRE LES DOUBLONS
   const loadAllStatistics = async () => {
@@ -503,7 +456,7 @@ export const StatisticsPage: React.FC = () => {
   // Charger les questions - AVEC PROTECTION CONTRE LES DOUBLONS
   const loadQuestionLogs = async () => {
     if (questionsLoading) {
-      console.log('🔍 [Questions] Chargement déjà en cours, annulation...')
+      console.log('📝 [Questions] Chargement déjà en cours, annulation...')
       return
     }
     
