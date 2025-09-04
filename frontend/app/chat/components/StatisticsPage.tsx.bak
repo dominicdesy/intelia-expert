@@ -504,7 +504,7 @@ export const StatisticsPage: React.FC = () => {
   // Charger les questions - AVEC PROTECTION CONTRE LES DOUBLONS
   const loadQuestionLogs = async () => {
     if (questionsLoading) {
-      console.log('🔍 [Questions] Chargement déjà en cours, annulation...')
+      console.log('📝 [Questions] Chargement déjà en cours, annulation...')
       return
     }
     
@@ -519,7 +519,7 @@ export const StatisticsPage: React.FC = () => {
         limit: questionsPerPage.toString()
       })
 
-      const fastResponse = await fetch(`/api/v1/stats-fast/questions?${params}`, { headers })
+      const fastResponse = await fetch(`/api/v1/logging/questions?${params}`, { headers })
       
       if (!fastResponse.ok) {
         throw new Error(`Erreur questions: ${fastResponse.status} - ${fastResponse.statusText}`)
@@ -590,9 +590,9 @@ export const StatisticsPage: React.FC = () => {
         throw new Error('Pas de token d\'authentification disponible')
       }
 
-      console.log('⚡ Tentative endpoint cache: ' + STATS_ENDPOINTS.INVITATIONS)
+      console.log('⚡ Tentative endpoint cache: /api/v1/stats-fast/invitations')
       
-      const fastResponse = await fetch(STATS_ENDPOINTS.INVITATIONS, { headers })
+      const fastResponse = await fetch('/api/v1/stats-fast/invitations', { headers })
       
       if (!fastResponse.ok) {
         throw new Error(`Erreur cache invitations: ${fastResponse.status} - ${fastResponse.statusText}`)
