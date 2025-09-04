@@ -287,20 +287,8 @@ export function SignupModal({
   localSuccess, 
   toggleMode 
 }: SignupModalProps) {
-  // Récupérer les traductions ET l'état de chargement
-  const { t, loading } = useTranslation()
-  
-  // NOUVEAU : Attendre que les traductions soient prêtes
-  if (loading) {
-    return (
-      <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
-        <div className="bg-white p-6 rounded-lg flex items-center space-x-3">
-          <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-gray-700">Chargement...</span>
-        </div>
-      </div>
-    )
-  }
+  // Utilise directement useTranslation au lieu de recevoir t comme prop
+  const { t } = useTranslation()
   
   // Chargement des pays uniquement dans SignupModal
   const { countries, loading: countriesLoading, usingFallback } = useCountries()
@@ -395,20 +383,20 @@ export function SignupModal({
   }
 
   // Fonction pour obtenir les classes CSS du bouton selon l'état
-  const getButtonClasses = () => {
-    const baseClasses = "flex justify-center items-center rounded-md border border-transparent py-2 px-4 text-sm font-medium text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 ease-in-out"
-
-    switch (buttonState) {
-      case 'loading':
-        return `${baseClasses} bg-blue-500 hover:bg-blue-600 focus:ring-blue-500 animate-pulse`
-      case 'success':
-        return `${baseClasses} bg-green-500 hover:bg-green-600 focus:ring-green-500 scale-105`
-      case 'error':
-        return `${baseClasses} bg-red-500 hover:bg-red-600 focus:ring-red-500 animate-shake`
-      default:
-        return `${baseClasses} bg-green-600 hover:bg-green-700 focus:ring-green-500 hover:scale-105`
-    }
-  }
+     const getButtonClasses = () => {
+       const baseClasses = "flex justify-center items-center rounded-md border border-transparent py-2 px-4 text-sm font-medium text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 ease-in-out"
+  
+       switch (buttonState) {
+         case 'loading':
+           return `${baseClasses} bg-blue-500 hover:bg-blue-600 focus:ring-blue-500 animate-pulse`
+         case 'success':
+           return `${baseClasses} bg-green-500 hover:bg-green-600 focus:ring-green-500 scale-105`
+         case 'error':
+           return `${baseClasses} bg-red-500 hover:bg-red-600 focus:ring-red-500 animate-shake`
+         default:
+           return `${baseClasses} bg-green-600 hover:bg-green-700 focus:ring-green-500 hover:scale-105`
+       }
+     }
 
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 p-4 overflow-hidden overscroll-none">
