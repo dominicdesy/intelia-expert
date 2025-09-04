@@ -173,8 +173,9 @@ function LoginPageContent() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     console.log('Signup attempt:', signupData)
-    setError('')
-    setSuccess('')
+    
+    // NE PAS nettoyer les messages de la page login ici
+    // Les erreurs signup doivent rester dans la modal
 
     try {
       // Validation côté client
@@ -253,13 +254,17 @@ function LoginPageContent() {
 
       // Vérifier que le backend a bien créé le compte
       if (result.success && result.token) {
-        setSuccess(t('verification.pending.emailSent') || 'Un email de confirmation vous a été envoyé. Vérifiez votre email pour confirmer votre compte.')
-        
-        // Optionnel : connecter automatiquement l'utilisateur
-        // Si votre backend retourne un token, vous pourriez l'utiliser ici
+        // Succès : afficher le message dans la modal, pas sur la page login
+        return {
+          success: true,
+          message: t('verification.pending.emailSent') || 'Un email de confirmation vous a été envoyé. Vérifiez votre email pour confirmer votre compte.'
+        }
         
       } else if (result.success) {
-        setSuccess(t('verification.pending.emailSent') || 'Un email de confirmation vous a été envoyé. Vérifiez votre email pour confirmer votre compte.')
+        return {
+          success: true,
+          message: t('verification.pending.emailSent') || 'Un email de confirmation vous a été envoyé. Vérifiez votre email pour confirmer votre compte.'
+        }
       } else {
         throw new Error('Réponse inattendue du serveur')
       }
@@ -285,7 +290,8 @@ function LoginPageContent() {
         errorMessage = 'Service temporairement indisponible. Réessayez dans quelques minutes.'
       }
       
-      setError(errorMessage)
+      // Retourner l'erreur au lieu de la définir globalement
+      throw new Error(errorMessage)
     }
   }
 

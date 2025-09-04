@@ -349,13 +349,16 @@ export function SignupModal({
     setFormSuccess('')
 
     try {
-      await handleSignup(e)
-      setFormSuccess(t('auth.success'))
+      const result = await handleSignup(e)
       
-      // Passer en mode login après 4 secondes
-      setTimeout(() => {
-        toggleMode()
-      }, 4000)
+      if (result && result.success) {
+        setFormSuccess(result.message || t('auth.success'))
+        
+        // Passer en mode login après 4 secondes
+        setTimeout(() => {
+          toggleMode()
+        }, 4000)
+      }
       
     } catch (error: any) {
       setFormError(error.message)
