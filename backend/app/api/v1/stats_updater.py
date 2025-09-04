@@ -210,8 +210,6 @@ class StatisticsUpdater:
                         FROM user_questions_complete 
                         WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
                         AND processing_time_ms IS NOT NULL
-                        AND response_text IS NOT NULL
-                        AND response_text != ''
                     """
                     
                     cur.execute(main_query)
