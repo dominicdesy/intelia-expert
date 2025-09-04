@@ -253,13 +253,13 @@ function LoginPageContent() {
 
       // Vérifier que le backend a bien créé le compte
       if (result.success && result.token) {
-        setSuccess('Compte créé avec succès ! Vous pouvez maintenant vous connecter.')
+        setSuccess(t('verification.pending.emailSent') || 'Un email de confirmation vous a été envoyé. Vérifiez votre email pour confirmer votre compte.')
         
         // Optionnel : connecter automatiquement l'utilisateur
         // Si votre backend retourne un token, vous pourriez l'utiliser ici
         
       } else if (result.success) {
-        setSuccess('Compte créé avec succès ! Vérifiez votre email pour confirmer votre inscription.')
+        setSuccess(t('verification.pending.emailSent') || 'Un email de confirmation vous a été envoyé. Vérifiez votre email pour confirmer votre compte.')
       } else {
         throw new Error('Réponse inattendue du serveur')
       }
