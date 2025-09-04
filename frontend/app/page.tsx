@@ -169,12 +169,116 @@ function LoginPageContent() {
     setSignupData(prev => ({ ...prev, [field]: value }))
   }
 
-  // Fonction de signup (placeholder pour l'instant)
+  // FONCTION SIGNUP CORRIGÉE - Appel Backend API
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     console.log('Signup attempt:', signupData)
-    // TODO: Implémenter la vraie logique d'inscription avec Supabase
-    throw new Error('Inscription en cours de développement')
+    setError('')
+    setSuccess('')
+
+    try {
+      // Validation côté client
+      if (!signupData.email || !signupData.password || !signupData.firstName || !signupData.lastName) {
+        throw new Error('Tous les champs obligatoires doivent être remplis')
+      }
+
+      if (signupData.password !== signupData.confirmPassword) {
+        throw new Error('Les mots de passe ne correspondent pas')
+      }
+
+      // Validation du mot de passe
+      const passwordValidation = validatePassword(signupData.password)
+      if (!passwordValidation.isValid) {
+        throw new Error(passwordValidation.errors[0])
+      }
+
+      // Préparer les données pour l'API backend (format UserRegister)
+      const registrationData = {
+        email: signupData.email,
+        password: signupData.password,
+        first_name: signupData.firstName,
+        last_name: signupData.lastName,
+        full_name: `${signupData.firstName} ${signupData.lastName}`,
+        company: signupData.companyName || undefined,
+        phone: (signupData.countryCode && signupData.areaCode && signupData.phoneNumber) 
+          ? `${signupData.countryCode}${signupData.areaCode}${signupData.phoneNumber}`
+          : undefined
+      }
+
+      console.log('📤 Envoi vers backend API:', registrationData)
+
+      // Appel à votre endpoint backend /api/v1/auth/register
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://expert-app-cngws.ondigitalocean.app'
+      
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(registrationData),
+        credentials: 'omit' // Éviter les problèmes CORS
+      })
+
+      console.log('📥 Réponse backend:', response.status, response.statusText)
+
+      // Lire la réponse
+      const responseText = await response.text()
+      console.log('📄 Corps de réponse:', responseText)
+
+      if (!response.ok) {
+        let errorMessage = `Erreur serveur (${response.status})`
+        
+        try {
+          const errorData = JSON.parse(responseText)
+          errorMessage = errorData.detail || errorData.message || errorMessage
+        } catch {
+          // Si ce n'est pas du JSON, utiliser le texte brut
+          errorMessage = responseText || errorMessage
+        }
+        
+        throw new Error(errorMessage)
+      }
+
+      // Parser la réponse de succès
+      const result = JSON.parse(responseText)
+      console.log('✅ Inscription réussie:', result)
+
+      // Vérifier que le backend a bien créé le compte
+      if (result.success && result.token) {
+        setSuccess('Compte créé avec succès ! Vous pouvez maintenant vous connecter.')
+        
+        // Optionnel : connecter automatiquement l'utilisateur
+        // Si votre backend retourne un token, vous pourriez l'utiliser ici
+        
+      } else if (result.success) {
+        setSuccess('Compte créé avec succès ! Vérifiez votre email pour confirmer votre inscription.')
+      } else {
+        throw new Error('Réponse inattendue du serveur')
+      }
+
+    } catch (error: any) {
+      console.error('❌ Erreur inscription:', error)
+      
+      // Messages d'erreur personnalisés
+      let errorMessage = error.message || 'Erreur lors de la création du compte'
+      
+      // Messages spécifiques selon les erreurs backend
+      if (errorMessage.includes('already registered') || 
+          errorMessage.includes('already exists') || 
+          errorMessage.includes('User already exists')) {
+        errorMessage = 'Cette adresse email est déjà utilisée'
+      } else if (errorMessage.includes('Password') || errorMessage.includes('password')) {
+        errorMessage = 'Le mot de passe ne respecte pas les critères requis'
+      } else if (errorMessage.includes('Invalid email') || errorMessage.includes('email')) {
+        errorMessage = 'Adresse email invalide'
+      } else if (errorMessage.includes('NetworkError') || errorMessage.includes('fetch')) {
+        errorMessage = 'Impossible de joindre le serveur. Vérifiez votre connexion.'
+      } else if (errorMessage.includes('502') || errorMessage.includes('503')) {
+        errorMessage = 'Service temporairement indisponible. Réessayez dans quelques minutes.'
+      }
+      
+      setError(errorMessage)
+    }
   }
 
   // Logique d'authentification pour la SignupModal
