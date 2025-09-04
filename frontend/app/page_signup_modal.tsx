@@ -287,19 +287,33 @@ export function SignupModal({
   localSuccess, 
   toggleMode 
 }: SignupModalProps) {
-  // Récupérer les traductions ET l'état de chargement
-  const { t, loading } = useTranslation()
+  // CORRECTION : Utiliser seulement t, pas loading pour éviter la boucle
+  const { t } = useTranslation()
   
-  // NOUVEAU : Attendre que les traductions soient prêtes
-  if (loading) {
-    return (
-      <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
-        <div className="bg-white p-6 rounded-lg flex items-center space-x-3">
-          <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-gray-700">Chargement...</span>
-        </div>
-      </div>
-    )
+  // Fonction de fallback pour les traductions
+  const safeT = (key: string) => {
+    const translation = t(key as any)
+    // Si la traduction retourne la clé elle-même, c'est qu'elle n'est pas encore chargée
+    if (translation === key) {
+      // Fallbacks en français pour les clés principales
+      const fallbacks: Record<string, string> = {
+        'auth.createAccount': 'Créer un compte',
+        'profile.firstName': 'Prénom',
+        'profile.lastName': 'Nom de famille',
+        'profile.email': 'Email',
+        'profile.country': 'Pays',
+        'profile.password': 'Mot de passe',
+        'profile.confirmPassword': 'Confirmer le mot de passe',
+        'form.required': '*',
+        'modal.back': 'Retour',
+        'common.loading': 'Chargement...',
+        'placeholder.countrySelect': 'Sélectionner un pays',
+        'error.generic': 'Erreur',
+        'auth.success': 'Succès'
+      }
+      return fallbacks[key] || key
+    }
+    return translation
   }
   
   // Chargement des pays uniquement dans SignupModal
@@ -336,7 +350,7 @@ export function SignupModal({
       
       if (result && result.success) {
         setButtonState('success')
-        setFormSuccess(result.message || t('auth.success'))
+        setFormSuccess(result.message || safeT('auth.success'))
         
         // Passer en mode login après 4 secondes
         setTimeout(() => {
@@ -390,7 +404,7 @@ export function SignupModal({
           </div>
         )
       default:
-        return t('auth.createAccount')
+        return safeT('auth.createAccount')
     }
   }
 
@@ -428,7 +442,7 @@ export function SignupModal({
         
         {/* Header de la modale avec bouton fermer */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-lg">
-          <h3 className="text-lg font-semibold text-gray-900">{t('auth.createAccount')}</h3>
+          <h3 className="text-lg font-semibold text-gray-900">{safeT('auth.createAccount')}</h3>
           <button
             onClick={toggleMode}
             className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
@@ -446,7 +460,7 @@ export function SignupModal({
           {(localError || formError) && (
             <AlertMessage 
               type="error" 
-              title={t('error.generic')} 
+              title={safeT('error.generic')} 
               message={localError || formError} 
             />
           )}
@@ -480,7 +494,7 @@ export function SignupModal({
               {/* Prénom */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">
-                  {t('profile.firstName')} <span className="text-red-500">{t('form.required')}</span>
+                  {safeT('profile.firstName')} <span className="text-red-500">{safeT('form.required')}</span>
                 </label>
                 <input
                   type="text"
@@ -495,7 +509,7 @@ export function SignupModal({
               {/* Nom */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">
-                  {t('profile.lastName')} <span className="text-red-500">{t('form.required')}</span>
+                  {safeT('profile.lastName')} <span className="text-red-500">{safeT('form.required')}</span>
                 </label>
                 <input
                   type="text"
@@ -510,7 +524,7 @@ export function SignupModal({
               {/* Email */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">
-                  {t('profile.email')} <span className="text-red-500">{t('form.required')}</span>
+                  {safeT('profile.email')} <span className="text-red-500">{safeT('form.required')}</span>
                 </label>
                 <input
                   type="email"
@@ -525,14 +539,14 @@ export function SignupModal({
               {/* Sélecteur de pays */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('profile.country')} <span className="text-red-500">{t('form.required')}</span>
+                  {safeT('profile.country')} <span className="text-red-500">{safeT('form.required')}</span>
                 </label>
                 
                 {countriesLoading ? (
                   <div className="block w-full rounded-md border border-gray-300 px-3 py-2 bg-gray-50">
                     <div className="flex items-center space-x-2">
                       <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                      <span className="text-sm text-gray-600">{t('common.loading')}</span>
+                      <span className="text-sm text-gray-600">{safeT('common.loading')}</span>
                     </div>
                   </div>
                 ) : (
@@ -540,7 +554,7 @@ export function SignupModal({
                     countries={countries}
                     value={signupData.country}
                     onChange={handleCountryChange}
-                    placeholder={t('placeholder.countrySelect')}
+                    placeholder={safeT('placeholder.countrySelect')}
                     className="w-full"
                   />
                 )}
@@ -549,7 +563,7 @@ export function SignupModal({
               {/* Mot de passe */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">
-                  {t('profile.password')} <span className="text-red-500">{t('form.required')}</span>
+                  {safeT('profile.password')} <span className="text-red-500">{safeT('form.required')}</span>
                 </label>
                 <div className="mt-1 relative">
                   <input
@@ -583,7 +597,7 @@ export function SignupModal({
               {/* Confirmer mot de passe */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">
-                  {t('profile.confirmPassword')} <span className="text-red-500">{t('form.required')}</span>
+                  {safeT('profile.confirmPassword')} <span className="text-red-500">{safeT('form.required')}</span>
                 </label>
                 <div className="mt-1 relative">
                   <input
@@ -639,7 +653,7 @@ export function SignupModal({
               onClick={toggleMode}
               className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
-              {t('modal.back')}
+              {safeT('modal.back')}
             </button>
             <button
               onClick={onSubmit}
