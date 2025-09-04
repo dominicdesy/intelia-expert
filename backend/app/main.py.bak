@@ -640,23 +640,22 @@ except ImportError as e:
     except Exception as e:
         logger.error(f"⌛ Erreur inattendue auth router: {e}")
     
-    # 🚀 Router stats_fast (toujours inclus)
-    try:
-        from app.api.v1.stats_fast import router as stats_fast_router
-        temp_v1_router.include_router(stats_fast_router, prefix="/stats-fast", tags=["statistics-fast"])
-        logger.info("✅ Stats Fast router ajouté (endpoints ultra-rapides)")
-    except ImportError as e:
-        logger.warning(f"⚠️ Stats Fast router non disponible: {e}")
-
-    # 🚀 Router stats_admin (optionnel)
+    # 🚀 Routers cache statistiques (SAFE)
     if STATS_CACHE_AVAILABLE:
+        try:
+            from app.api.v1.stats_fast import router as stats_fast_router
+            temp_v1_router.include_router(stats_fast_router, tags=["statistics-fast"])
+            logger.info("✅ Stats Fast router ajouté (endpoints ultra-rapides)")
+        except ImportError as e:
+            logger.warning(f"⚠️ Stats Fast router non disponible: {e}")
+        
         try:
             from app.api.v1.stats_admin import router as stats_admin_router
             temp_v1_router.include_router(stats_admin_router, tags=["statistics-admin"])
             logger.info("✅ Stats Admin router ajouté (administration cache)")
         except ImportError as e:
             logger.warning(f"⚠️ Stats Admin router non disponible: {e}")
-   
+    
     # Autres routers
     for router_info in [
         ("users", "users"),
