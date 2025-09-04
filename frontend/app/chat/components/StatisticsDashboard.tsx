@@ -106,7 +106,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
   return (
     <>
       {/* KPIs Row - Avec indicateurs discrets de cache */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {/* Utilisateurs Actifs */}
         <div className="bg-white border border-gray-200 p-4 relative">
           <div>
@@ -142,23 +142,6 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
               <div className="absolute top-2 right-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Temps de Réponse */}
-        <div className="bg-white border border-gray-200 p-4 relative">
-          <div>
-            <p className="text-sm text-gray-600 mb-1">Temps de Réponse</p>
-            <p className="text-2xl font-semibold text-gray-900">{performanceStats?.avg_response_time || 0}s</p>
-            {cacheStatus ? (
-              <div className="absolute top-2 right-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  cacheStatus.is_available ? 'bg-green-500' : 'bg-red-500'
-                }`}></div>
-              </div>
-            ) : (
-              <p className="text-xs text-gray-500 mt-1">Mode standard</p>
             )}
           </div>
         </div>
@@ -238,15 +221,6 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
                 </span>
               </div>
               
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Taux de succès</span>
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-medium text-green-600">
-                    {performanceStats?.cache_hit_rate?.toFixed(1) || '0.0'}%
-                  </span>
-                </div>
-              </div>
-              
               <div className="pt-3 border-t border-gray-200">
                 <p className="text-sm font-medium text-gray-900 mb-2">Services RAG</p>
                 <div className="space-y-2">
@@ -260,14 +234,12 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
                   ))}
                 </div>
               </div>
-
-              {/* Section performance du système - SUPPRIMÉE */}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Tables Section - Version complète conservée */}
+      {/* Tables Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         {/* Top Users Table */}
         <div className="bg-white border border-gray-200">
@@ -336,8 +308,6 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
                 </div>
               ))}
             </div>
-
-            {/* Information sur la source des données - SUPPRIMÉE */}
           </div>
         </div>
       </div>
@@ -348,7 +318,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
           <h3 className="text-base font-medium text-gray-900">Coûts et Performance</h3>
         </div>
         <div className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Coûts OpenAI */}
             <div className="text-center p-3 bg-white border border-gray-200">
               <p className="text-lg font-semibold text-gray-900">${performanceStats?.openai_costs?.toFixed(2) || '0.00'}</p>
@@ -366,19 +336,13 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
               <p className="text-lg font-semibold text-gray-900">{systemStats?.system_health?.total_requests || 0}</p>
               <p className="text-xs text-gray-600">Requêtes Totales</p>
             </div>
-
-            {/* Questions Aujourd'hui */}
-            <div className="text-center p-3 bg-white border border-gray-200">
-              <p className="text-lg font-semibold text-gray-900">{usageStats?.questions_today || 0}</p>
-              <p className="text-xs text-gray-600">Questions Aujourd'hui</p>
-            </div>
           </div>
 
-          {/* Section de métriques de performance détaillées - CONSERVÉE */}
+          {/* Section de métriques de performance détaillées */}
           {performanceStats && (
             <div className="mt-6 pt-4 border-t border-gray-200">
               <h4 className="text-sm font-medium text-gray-900 mb-3">Métriques de Performance Détaillées</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 
                 <div className="bg-white border border-gray-200 p-3">
                   <div className="flex items-center justify-between mb-2">
@@ -406,18 +370,6 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
 
                 <div className="bg-white border border-gray-200 p-3">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-indigo-800">Échantillons</span>
-                  </div>
-                  <p className="text-lg font-semibold text-indigo-900">
-                    {performanceStats.response_time_count || 0}
-                  </p>
-                  <p className="text-xs text-indigo-700 mt-1">
-                    Nombre de mesures
-                  </p>
-                </div>
-
-                <div className="bg-white border border-gray-200 p-3">
-                  <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-purple-800">Cache Hit</span>
                   </div>
                   <p className="text-lg font-semibold text-purple-900">
@@ -430,7 +382,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
 
               </div>
 
-              {/* Barre de progression des performances - CONSERVÉE */}
+              {/* Barre de progression des performances */}
               {performanceStats.avg_response_time && (
                 <div className="mt-4">
                   <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
@@ -462,8 +414,6 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
               )}
             </div>
           )}
-
-          {/* Section détaillée de métriques de cache - SUPPRIMÉE POUR PRODUCTION */}
         </div>
       </div>
     </>

@@ -21,7 +21,7 @@ try:
     AUTH_AVAILABLE = True
     logger.info("✅ Auth module importé avec succès")
 except ImportError as e:
-    logger.warning(f"⚠️ Auth module non disponible: {e}")
+    logger.warning(f⚠️ Auth module non disponible: {e}")
     verify_super_admin_token = None
     AUTH_AVAILABLE = False
 
@@ -618,7 +618,7 @@ async def get_questions_fast(
                         "response_source": row["response_source"] or "unknown",
                         "confidence_score": float(row["confidence_score"] or 0),
                         "response_time": float(row["response_time"] or 0),
-                        "language": "fr",
+                        "language": row["language"] or "fr",
                         "session_id": row["session_id"] or str(row["id"]),
                         "feedback": row["feedback"],
                         "feedback_comment": row["feedback_comment"]
