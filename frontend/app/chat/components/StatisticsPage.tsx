@@ -359,30 +359,29 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  // FONCTION HELPER POUR EXTRAIRE LE TOKEN DES COOKIES - IDENTIQUE
+  // FONCTION HELPER POUR EXTRAIRE LE TOKEN - SELON INSTRUCTIONS PROJET
   const getCookieToken = (): string | null => {
     try {
-      const cookies = document.cookie.split(';')
-      const sbCookie = cookies.find(cookie => 
-        cookie.trim().startsWith('sb-cdrmjshmkdfwwtsfdvbl-auth-token=')
-      )
-      
-      if (sbCookie) {
-        const cookieValue = sbCookie.split('=')[1]
-        const decodedValue = decodeURIComponent(cookieValue)
-        const parsed = JSON.parse(decodedValue)
-        
-        if (parsed && parsed.access_token) {
-          console.log('🍪 Token extrait des cookies avec succès')
-          return parsed.access_token
-        }
+      // Utiliser la méthode du projet Intelia Expert
+      const authData = localStorage.getItem('intelia-expert-auth');
+      if (!authData) {
+        console.log('❌ Non connecté à Intelia Expert');
+        return null;
       }
       
-      console.log('🍪 Pas de cookie Supabase trouvé')
-      return null
+      const parsed = JSON.parse(authData);
+      const token = parsed.access_token;
+      
+      if (token) {
+        console.log('✅ Token récupéré depuis localStorage');
+        return token;
+      }
+      
+      console.log('❌ Token non trouvé dans intelia-expert-auth');
+      return null;
     } catch (error) {
-      console.error('❌ Erreur parsing cookie:', error)
-      return null
+      console.error('❌ Erreur récupération token:', error);
+      return null;
     }
   }
 
