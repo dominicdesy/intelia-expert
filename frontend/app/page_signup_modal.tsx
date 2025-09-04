@@ -151,6 +151,7 @@ export function SignupModal({
 
   const [formError, setFormError] = React.useState('')
   const [formSuccess, setFormSuccess] = React.useState('')
+  const [buttonState, setButtonState] = React.useState<'idle' | 'loading' | 'success' | 'error'>('idle')
 
   // Gestion locale simplifiée de l'auto-remplissage country
   const handleCountryChange = React.useCallback((value: string) => {
@@ -161,11 +162,13 @@ export function SignupModal({
     e.preventDefault()
     setFormError('')
     setFormSuccess('')
+    setButtonState('loading')
 
     try {
       const result = await handleSignup(e)
       
       if (result && result.success) {
+        setButtonState('success')
         setFormSuccess(result.message || t('auth.success'))
         
         // Passer en mode login après 4 secondes
@@ -175,7 +178,13 @@ export function SignupModal({
       }
       
     } catch (error: any) {
+      setButtonState('error')
       setFormError(error.message)
+      
+      // Revenir à l'état normal après 3 secondes
+      setTimeout(() => {
+        setButtonState('idle')
+      }, 3000)
     }
   }
 
@@ -185,8 +194,69 @@ export function SignupModal({
     }
   }
 
+  // Fonction pour obtenir le contenu du bouton selon l'état
+  const getButtonContent = () => {
+    switch (buttonState) {
+      case 'loading':
+        return (
+          <div className="flex items-center space-x-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            <span>Création en cours...</span>
+          </div>
+        )
+      case 'success':
+        return (
+          <div className="flex items-center space-x-2">
+            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+            <span>Compte créé!</span>
+          </div>
+        )
+      case 'error':
+        return (
+          <div className="flex items-center space-x-2">
+            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+            <span>Erreur</span>
+          </div>
+        )
+      default:
+        return t('auth.createAccount')
+    }
+  }
+
+  // Fonction pour obtenir les classes CSS du bouton selon l'état
+  const getButtonClasses = () => {
+    const baseClasses = "flex justify-center rounded-md border border-transparent py-2 px-4 text-sm font-medium text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 ease-in-out"
+    
+    switch (buttonState) {
+      case 'loading':
+        return `${baseClasses} bg-blue-500 hover:bg-blue-600 focus:ring-blue-500 animate-pulse`
+      case 'success':
+        return `${baseClasses} bg-green-500 hover:bg-green-600 focus:ring-green-500 scale-105`
+      case 'error':
+        return `${baseClasses} bg-red-500 hover:bg-red-600 focus:ring-red-500 animate-shake`
+      default:
+        return `${baseClasses} bg-green-600 hover:bg-green-700 focus:ring-green-500 hover:scale-105`
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 p-4 overflow-hidden overscroll-none">
+      {/* Styles CSS pour l'animation shake */}
+      <style jsx>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-4px); }
+          75% { transform: translateX(4px); }
+        }
+        .animate-shake {
+          animation: shake 0.5s ease-in-out;
+        }
+      `}</style>
+
       <div className="w-full max-w-md mx-auto bg-white rounded-lg shadow-xl max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain">
         
         {/* Header de la modale avec bouton fermer */}
@@ -424,17 +494,10 @@ export function SignupModal({
             </button>
             <button
               onClick={onSubmit}
-              disabled={isLoading}
-              className="flex justify-center rounded-md border border-transparent bg-green-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading || buttonState !== 'idle'}
+              className={getButtonClasses()}
             >
-              {isLoading ? (
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Création en cours...</span>
-                </div>
-              ) : (
-                t('auth.createAccount')
-              )}
+              {getButtonContent()}
             </button>
           </div>
         </div>
