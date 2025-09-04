@@ -287,7 +287,7 @@ const PasswordStrengthIndicator: React.FC<{ password: string }> = ({ password })
             {!/[A-Z]/.test(password) && !/[a-z]/.test(password) && (
               <li>• Mélangez majuscules et minuscules</li>
             )}
-            {!/[!@#$%^&*()_+\\-=\\[\\]{};':\"\\|,.<>?]/.test(password) && (
+            {!/[!@#$%^&*()_+=\[\]{};':"|,.<>?-]/.test(password) && (
               <li>• Les caractères spéciaux renforcent la sécurité (optionnel)</li>
             )}
           </ul>
