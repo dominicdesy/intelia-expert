@@ -157,10 +157,10 @@ export const isRTLLanguage = (code: string): boolean => {
   return RTL_LANGUAGES.has(code)
 }
 
-// Groupement des langues par région (mis à jour par ordre alphabétique)
+// Groupement des langues par région (mis à jour par ordre alphabétique des noms)
 export const LANGUAGE_REGIONS = {
-  europe: ['de', 'en', 'es', 'fr', 'it', 'nl', 'pl', 'pt'] as const,
-  asia: ['hi', 'id', 'th', 'zh'] as const,
+  europe: ['en', 'fr', 'de', 'it', 'nl', 'pl', 'pt', 'es'] as const,
+  asia: ['zh', 'hi', 'id', 'th'] as const,
   americas: [] as const, // Si vous ajoutez plus tard pt-BR, en-CA, etc.
   africa: [] as const,
   oceania: [] as const
