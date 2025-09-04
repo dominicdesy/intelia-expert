@@ -1,9 +1,9 @@
 # app/api/v1/stats_updater.py
 # -*- coding: utf-8 -*-
 """
-Version CORRIGÉE - Force l'utilisation de user_questions basé sur diagnostic
-OBJECTIF: Utiliser directement la table user_questions qui contient les données réelles
-CORRECTIONS: Supprime l'auto-détection qui échoue, force user_questions
+Version CORRIGÉE - Force l'utilisation de user_questions_complete basé sur diagnostic
+OBJECTIF: Utiliser directement la table user_questions_complete qui contient les données réelles
+CORRECTIONS: Supprime l'auto-détection qui échoue, force user_questions_complete
 """
 
 import asyncio
@@ -42,11 +42,11 @@ def safe_str_conversion(value, max_length=100):
 
 class StatisticsUpdater:
     """
-    Version CORRIGÉE qui utilise directement user_questions
+    Version CORRIGÉE qui utilise directement user_questions_complete
     """
     
     def __init__(self):
-        logger.info("StatisticsUpdater CORRIGÉ - Utilise directement user_questions")
+        logger.info("StatisticsUpdater CORRIGÉ - Utilise directement user_questions_complete")
         
         self.cache = get_stats_cache()
         self.analytics = get_analytics_manager()
@@ -54,17 +54,17 @@ class StatisticsUpdater:
         self.last_update = None
         self.update_in_progress = False
         
-        # Table fixe basée sur le diagnostic
-        self._correct_table_name = "user_questions"
+        # Table fixe basée sur le diagnostic - CORRECTION 1
+        self._correct_table_name = "user_questions_complete"
         
         self.collection_stats = {
             "total_collections": 0,
             "successful_collections": 0,
             "initialization_time": datetime.now().isoformat(),
-            "version": "corrigé_user_questions"
+            "version": "corrigé_user_questions_complete"
         }
         
-        logger.info("StatisticsUpdater CORRIGÉ initialisé avec table user_questions")
+        logger.info("StatisticsUpdater CORRIGÉ initialisé avec table user_questions_complete")
     
     async def update_all_statistics(self) -> Dict[str, Any]:
         """
@@ -79,7 +79,7 @@ class StatisticsUpdater:
         self.update_in_progress = True
         
         try:
-            logger.info(f"DÉBUT collecte corrigée avec user_questions (RAM: {start_memory}%)")
+            logger.info(f"DÉBUT collecte corrigée avec user_questions_complete (RAM: {start_memory}%)")
             
             # FORCER L'INVALIDATION DU CACHE
             try:
@@ -89,7 +89,7 @@ class StatisticsUpdater:
             except Exception as cache_error:
                 logger.warning(f"Erreur invalidation cache: {cache_error}")
             
-            # Collecte avec table fixe user_questions
+            # Collecte avec table fixe user_questions_complete
             dashboard_data = await self._collect_corrected_stats()
             
             if dashboard_data.get("status") == "success":
@@ -118,7 +118,7 @@ class StatisticsUpdater:
                     "end_memory_percent": end_memory,
                     "memory_delta": end_memory - start_memory
                 },
-                "version": "corrigé_user_questions",
+                "version": "corrigé_user_questions_complete",
                 "table_used": self._correct_table_name
             }
             
@@ -143,7 +143,7 @@ class StatisticsUpdater:
     
     async def _collect_corrected_stats(self) -> Dict[str, Any]:
         """
-        Collecte corrigée : utilise directement user_questions + intégrations health/billing
+        Collecte corrigée : utilise directement user_questions_complete + intégrations health/billing
         """
         try:
             if not self.analytics or not hasattr(self.analytics, 'dsn') or not self.analytics.dsn:
@@ -158,38 +158,38 @@ class StatisticsUpdater:
                     
                     logger.info(f"Utilisation forcée de la table: {self._correct_table_name}")
                     
-                    # REQUÊTE PRINCIPALE CORRIGÉE - utilise directement user_questions
+                    # REQUÊTE PRINCIPALE CORRIGÉE - CORRECTION 2
                     main_query = """
                         SELECT 
                             COUNT(*) as total_questions,
-                            COUNT(*) FILTER (WHERE DATE(timestamp) = CURRENT_DATE) as questions_today,
-                            COUNT(*) FILTER (WHERE timestamp >= DATE_TRUNC('week', CURRENT_DATE)) as questions_this_week,
-                            COUNT(*) FILTER (WHERE timestamp >= DATE_TRUNC('month', CURRENT_DATE)) as questions_this_month,
+                            COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE) as questions_today,
+                            COUNT(*) FILTER (WHERE created_at >= DATE_TRUNC('week', CURRENT_DATE)) as questions_this_week,
+                            COUNT(*) FILTER (WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)) as questions_this_month,
                             COUNT(DISTINCT user_email) as unique_users,
-                            COUNT(DISTINCT user_email) FILTER (WHERE timestamp >= CURRENT_DATE - INTERVAL '7 days') as active_users_week,
-                            AVG(response_time) as avg_response_time,
-                            MIN(response_time) as min_response_time,
-                            MAX(response_time) as max_response_time,
-                            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY response_time) as median_response_time,
-                            AVG(confidence_score) * 100 as avg_confidence
-                        FROM user_questions 
-                        WHERE timestamp >= CURRENT_DATE - INTERVAL '30 days'
-                        AND response_time IS NOT NULL
-                        AND response IS NOT NULL
-                        AND response != ''
+                            COUNT(DISTINCT user_email) FILTER (WHERE created_at >= CURRENT_DATE - INTERVAL '7 days') as active_users_week,
+                            AVG(processing_time_ms / 1000.0) as avg_response_time,
+                            MIN(processing_time_ms / 1000.0) as min_response_time,
+                            MAX(processing_time_ms / 1000.0) as max_response_time,
+                            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY processing_time_ms / 1000.0) as median_response_time,
+                            AVG(response_confidence) * 100 as avg_confidence
+                        FROM user_questions_complete 
+                        WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+                        AND processing_time_ms IS NOT NULL
+                        AND response_text IS NOT NULL
+                        AND response_text != ''
                     """
                     
                     cur.execute(main_query)
                     main_result = cur.fetchone()
                     
                     if not main_result or main_result["total_questions"] == 0:
-                        logger.warning(f"Aucune donnée dans user_questions")
+                        logger.warning(f"Aucune donnée dans user_questions_complete")
                         return {"status": "success", "data": self._get_empty_stats()}
                     
-                    # SOURCES DE RÉPONSES - utilise user_questions directement
+                    # SOURCES DE RÉPONSES - utilise user_questions_complete directement
                     source_distribution = self._calculate_source_distribution(cur)
                     
-                    # TOP UTILISATEURS - utilise user_questions directement
+                    # TOP UTILISATEURS - utilise user_questions_complete directement
                     top_users = self._calculate_top_users(cur)
                     
                     # INTÉGRATION HEALTH.PY - CONSERVÉE
@@ -198,7 +198,7 @@ class StatisticsUpdater:
                     # INTÉGRATION BILLING_OPENAI.PY - CONSERVÉE  
                     openai_costs = await self._get_real_openai_costs()
                     
-                    # STATS DE FEEDBACK SÉCURISÉES - utilise user_questions directement
+                    # STATS DE FEEDBACK SÉCURISÉES - utilise user_questions_complete directement
                     feedback_stats = self._get_safe_feedback_stats(cur)
                     
                     # STRUCTURE FINALE
@@ -207,7 +207,7 @@ class StatisticsUpdater:
                         "meta": {
                             "collected_at": datetime.now().isoformat(),
                             "data_source": f"corrected_{self._correct_table_name}",
-                            "version": "corrigé_user_questions",
+                            "version": "corrigé_user_questions_complete",
                             "table_used": self._correct_table_name
                         },
                         
@@ -231,7 +231,7 @@ class StatisticsUpdater:
                             })
                         },
                         
-                        # Usage Stats - DONNÉES RÉELLES DE user_questions
+                        # Usage Stats - DONNÉES RÉELLES DE user_questions_complete
                         "usageStats": {
                             "unique_users": main_result["unique_users"] or 0,
                             "unique_active_users": main_result["active_users_week"] or 0,
@@ -286,7 +286,7 @@ class StatisticsUpdater:
             return {"status": "error", "error": error_msg, "data": self._get_empty_stats()}
     
     def _calculate_source_distribution(self, cur) -> Dict[str, int]:
-        """Distribution des sources - utilise user_questions directement"""
+        """Distribution des sources - utilise user_questions_complete directement - CORRECTION 3"""
         source_distribution = {}
         
         try:
@@ -294,8 +294,8 @@ class StatisticsUpdater:
                 SELECT 
                     response_source, 
                     COUNT(*) as count
-                FROM user_questions 
-                WHERE timestamp >= CURRENT_DATE - INTERVAL '7 days'
+                FROM user_questions_complete 
+                WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
                 AND response_source IS NOT NULL
                 GROUP BY response_source
                 ORDER BY count DESC
@@ -320,7 +320,7 @@ class StatisticsUpdater:
         return source_distribution
     
     def _calculate_top_users(self, cur):
-        """Top utilisateurs - utilise user_questions directement"""
+        """Top utilisateurs - utilise user_questions_complete directement - CORRECTION 4"""
         top_users = []
         
         try:
@@ -328,8 +328,8 @@ class StatisticsUpdater:
                 SELECT 
                     user_email,
                     COUNT(*) as question_count
-                FROM user_questions 
-                WHERE timestamp >= CURRENT_DATE - INTERVAL '30 days'
+                FROM user_questions_complete 
+                WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
                     AND user_email IS NOT NULL 
                 GROUP BY user_email
                 ORDER BY question_count DESC
@@ -431,7 +431,7 @@ class StatisticsUpdater:
         return {"success": False, "costs": {"total": 0}}
     
     def _get_safe_feedback_stats(self, cur) -> Dict[str, Any]:
-        """Stats feedback sécurisées - utilise user_questions_complete avec bonnes colonnes"""
+        """Stats feedback sécurisées - utilise user_questions_complete avec bonnes colonnes - CORRECTION 5"""
         feedback_stats = {
             "total": 0,
             "positive": 0,
@@ -466,7 +466,7 @@ class StatisticsUpdater:
             "meta": {
                 "collected_at": datetime.now().isoformat(),
                 "data_source": "fallback_empty",
-                "version": "corrigé_user_questions"
+                "version": "corrigé_user_questions_complete"
             },
             "systemStats": {
                 "system_health": {"uptime_hours": 0, "total_requests": 0, "error_rate": 0},
@@ -497,7 +497,7 @@ class StatisticsUpdater:
                     "message": "Version corrigée - jamais exécutée",
                     "update_in_progress": self.update_in_progress,
                     "last_update": self.last_update.isoformat() if self.last_update else None,
-                    "version": "corrigé_user_questions",
+                    "version": "corrigé_user_questions_complete",
                     "table_used": self._correct_table_name
                 }
                 
