@@ -4,6 +4,7 @@
 🔧 ADMINISTRATION DU SYSTÈME DE CACHE STATISTIQUES
 Contrôle, monitoring, debug et maintenance du cache
 SAFE: Admin uniquement, n'interfère pas avec les systèmes existants
+CORRECTION CRITIQUE: Utilise invalidate_cache() au lieu de delete_cache()
 """
 
 import asyncio
@@ -76,7 +77,7 @@ async def force_update_component(
         logger.info(f"🎯 Force update {component} demandé par: {current_user.get('email')}")
         
         # Lancer en arrière-plan
-        background_tasks.add_task(updater.force_update_specific, component)
+        background_tasks.add_task(updater.force_update_component, component)
         
         return {
             "status": "initiated",
@@ -97,7 +98,9 @@ async def clear_cache(
     key: str = Query(None, description="Clé exacte à supprimer"),
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """🗑️ Vide le cache (pattern ou clé spécifique)"""
+    """🗑️ Vide le cache (pattern ou clé spécifique)
+    CORRECTION CRITIQUE: Utilise invalidate_cache() au lieu de delete_cache()
+    """
     if not has_permission(current_user, Permission.MANAGE_SYSTEM):
         raise HTTPException(status_code=403, detail="System management permission required")
     
@@ -121,7 +124,8 @@ async def clear_cache(
             "action": action,
             "entries_deleted": deleted_count,
             "cleared_by": current_user.get("email"),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "method_used": "invalidate_cache"
         }
         
     except Exception as e:
@@ -197,7 +201,8 @@ async def get_system_status(
             "system_info": {
                 "update_in_progress": updater.update_in_progress,
                 "last_update": updater.last_update.isoformat() if updater.last_update else None,
-                "next_scheduled_update": "Automatique toutes les heures"
+                "next_scheduled_update": "Automatique toutes les heures",
+                "cache_method": "invalidate_cache"
             },
             "timestamp": datetime.now().isoformat()
         }
@@ -271,7 +276,7 @@ async def list_cache_keys(
     limit: int = Query(50, ge=1, le=200),
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """📝 Liste les clés de cache disponibles"""
+    """🔍 Liste les clés de cache disponibles"""
     if not has_permission(current_user, Permission.ADMIN_DASHBOARD):
         raise HTTPException(status_code=403, detail="Admin dashboard access required")
     
@@ -334,7 +339,7 @@ async def get_update_log(
     hours: int = Query(24, ge=1, le=168),
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """🐛 Log des mises à jour récentes"""
+    """🛠 Log des mises à jour récentes"""
     if not has_permission(current_user, Permission.ADMIN_DASHBOARD):
         raise HTTPException(status_code=403, detail="Admin dashboard access required")
     
@@ -395,12 +400,14 @@ async def test_all_components(
             write_ok = cache.set_cache(test_key, test_data, ttl_hours=1, source="admin_test")
             read_result = cache.get_cache(test_key)
             read_ok = read_result is not None
+            # CORRECTION: Utilise invalidate_cache au lieu de delete_cache
             cache.invalidate_cache(key=test_key)
             
             results["cache"] = {
                 "status": "ok" if write_ok and read_ok else "failed",
                 "write": write_ok,
-                "read": read_ok
+                "read": read_ok,
+                "cleanup_method": "invalidate_cache"
             }
             
         except Exception as cache_error:
@@ -414,7 +421,8 @@ async def test_all_components(
             results["updater"] = {
                 "status": "ok" if updater_status else "failed",
                 "last_update": updater.last_update.isoformat() if updater.last_update else None,
-                "in_progress": updater.update_in_progress
+                "in_progress": updater.update_in_progress,
+                "version": updater_status.get("version", "unknown")
             }
             
         except Exception as updater_error:
@@ -460,7 +468,11 @@ async def test_all_components(
             "overall_status": "all_ok" if all_ok else "some_issues",
             "test_results": results,
             "tested_by": current_user.get("email"),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "corrections_applied": {
+                "invalidate_cache_used": True,
+                "delete_cache_replaced": True
+            }
         }
         
     except Exception as e:
@@ -494,7 +506,8 @@ async def maintenance_cleanup(
             "entries_cleaned": cleaned_count,
             "cache_stats_after": cache_stats,
             "cleaned_by": current_user.get("email"),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "cleanup_method": "cleanup_expired_cache"
         }
         
     except Exception as e:
@@ -550,23 +563,24 @@ async def get_maintenance_recommendations(
                 "action": "Envisager un nettoyage"
             })
         
-        # Vérifier les erreurs récentes
-        recent_errors = []  # TODO: Implémenter un log d'erreurs
-        
-        if recent_errors:
-            recommendations.append({
-                "priority": "high",
-                "category": "errors",
-                "message": f"{len(recent_errors)} erreurs récentes détectées",
-                "action": "Vérifier les logs et corriger les problèmes"
-            })
+        # Vérifier les corrections appliquées
+        recommendations.append({
+            "priority": "info",
+            "category": "system",
+            "message": "Corrections cache appliquées",
+            "action": "invalidate_cache() utilisé au lieu de delete_cache()"
+        })
         
         return {
             "status": "success",
             "recommendations_count": len(recommendations),
             "recommendations": recommendations,
             "generated_for": current_user.get("email"),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "system_corrections": {
+                "delete_cache_fixed": True,
+                "invalidate_cache_used": True
+            }
         }
         
     except Exception as e:

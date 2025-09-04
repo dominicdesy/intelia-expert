@@ -1,966 +1,181 @@
 # app/api/v1/stats_cache.py
-# -*- coding: utf-8 -*-
 """
-SYSTÈME DE CACHE STATISTIQUES OPTIMISÉ - VERSION MEMORY-SAFE CORRIGÉE
-Tables de cache SQL + Gestionnaire pour performances ultra-rapides
-SAFE: N'interfère pas avec logging.py et billing.py existants
-OPTIMISÉ: Gestion mémoire drastiquement améliorée pour DigitalOcean App Platform
-CORRECTIF: Sérialisation JSON sécurisée pour les objets Decimal de PostgreSQL
-MEMORY-SAFE: Pool de connexions, limites de taille, nettoyage automatique
-NOUVEAU: Migration automatique des colonnes manquantes (data_size_kb, feedback)
-FIXED: Création complète de toutes les tables manquantes
-CORRECTED: Gestion robuste des transactions SQL et corrections de requêtes
-CORRECTION CRITIQUE: Ajout de la méthode delete_cache() manquante
+VERSION SIMPLE ET DIRECTE - CACHE EN MÉMOIRE
+Évite les complexités SQL et utilise un cache en mémoire simple
 """
 
 import json
 import logging
-import os
-import decimal
-import psutil
-import threading
-import time
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from psycopg2 import pool
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# CONFIGURATION MEMORY-SAFE
-MEMORY_CONFIG = {
-    "MAX_CACHE_ENTRY_SIZE_KB": 100,  # Maximum 100KB par entrée cache
-    "MAX_JSON_DEPTH": 10,            # Limite profondeur JSON
-    "MAX_ARRAY_LENGTH": 1000,        # Limite taille arrays
-    "CACHE_CLEANUP_INTERVAL": 300,   # Nettoyage auto toutes les 5min
-    "MAX_POOL_CONNECTIONS": 8,       # Pool DB limité
-    "MEMORY_THRESHOLD_PERCENT": 80,  # Alert si > 80% RAM
-    "ENABLE_MEMORY_MONITORING": True,
-    "MAX_CACHE_ENTRIES": 500,        # Maximum 500 entrées en cache
-    "FORCE_CLEANUP_AT_PERCENT": 85   # Force cleanup si > 85% RAM
-}
-
-def get_memory_usage_percent():
-    """Mesure mémoire réaliste"""
-    try:
-        memory = psutil.virtual_memory()
-        return round(memory.percent, 1)
-    except Exception as e:
-        logger.warning(f"Erreur mesure mémoire: {e}")
-        return 50.0
-
-def decimal_safe_json_encoder(obj):
-    """Converter JSON pour gérer les types Decimal de PostgreSQL"""
-    if isinstance(obj, decimal.Decimal):
-        result = float(obj)
-        logger.info(f"DECIMAL FIX: Converted Decimal({obj}) to float({result})")
-        return result
-    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
-
-def safe_json_dumps(data, max_depth=MEMORY_CONFIG["MAX_JSON_DEPTH"]):
-    """Sérialisation JSON sécurisée avec limites de mémoire"""
-    def truncate_deep_structure(obj, current_depth=0):
-        if current_depth > max_depth:
-            return "...[TRUNCATED_DEPTH]"
-        
-        if isinstance(obj, dict):
-            if len(obj) > 100:
-                truncated = dict(list(obj.items())[:100])
-                truncated["..."] = f"[TRUNCATED_{len(obj)-100}_MORE_KEYS]"
-                return {k: truncate_deep_structure(v, current_depth + 1) 
-                       for k, v in truncated.items()}
-            return {k: truncate_deep_structure(v, current_depth + 1) 
-                   for k, v in obj.items()}
-        
-        elif isinstance(obj, list):
-            if len(obj) > MEMORY_CONFIG["MAX_ARRAY_LENGTH"]:
-                truncated = obj[:MEMORY_CONFIG["MAX_ARRAY_LENGTH"]]
-                truncated.append(f"...[TRUNCATED_{len(obj)-MEMORY_CONFIG['MAX_ARRAY_LENGTH']}_MORE_ITEMS]")
-                return [truncate_deep_structure(item, current_depth + 1) 
-                       for item in truncated]
-            return [truncate_deep_structure(item, current_depth + 1) 
-                   for item in obj]
-        
-        return obj
-    
-    try:
-        safe_data = truncate_deep_structure(data)
-        json_str = json.dumps(safe_data, default=decimal_safe_json_encoder, separators=(',', ':'))
-        
-        size_kb = len(json_str.encode('utf-8')) / 1024
-        if size_kb > MEMORY_CONFIG["MAX_CACHE_ENTRY_SIZE_KB"]:
-            logger.warning(f"Cache entry trop large ({size_kb:.1f}KB), truncation forcée")
-            return json.dumps({
-                "error": "CACHE_ENTRY_TOO_LARGE",
-                "original_size_kb": round(size_kb, 1),
-                "max_allowed_kb": MEMORY_CONFIG["MAX_CACHE_ENTRY_SIZE_KB"],
-                "truncated_data": str(safe_data)[:1000] + "...[TRUNCATED]"
-            }, separators=(',', ':'))
-        
-        return json_str
-        
-    except Exception as e:
-        logger.error(f"Erreur sérialisation JSON safe: {e}")
-        return json.dumps({
-            "error": "JSON_SERIALIZATION_ERROR",
-            "message": str(e)[:200],
-            "data_type": str(type(data))
-        }, separators=(',', ':'))
-
-class MemoryMonitor:
-    """Moniteur de mémoire pour prévenir les fuites"""
-    def __init__(self):
-        self.last_cleanup = datetime.now().timestamp()
-        self.cleanup_lock = threading.Lock()
-        
-    def should_cleanup(self):
-        """Détermine si un cleanup est nécessaire"""
-        memory_percent = get_memory_usage_percent()
-        time_since_cleanup = datetime.now().timestamp() - self.last_cleanup
-        
-        if memory_percent > MEMORY_CONFIG["FORCE_CLEANUP_AT_PERCENT"]:
-            return True, f"Mémoire critique: {memory_percent}%"
-        
-        if (memory_percent > MEMORY_CONFIG["MEMORY_THRESHOLD_PERCENT"] and 
-            time_since_cleanup > MEMORY_CONFIG["CACHE_CLEANUP_INTERVAL"]):
-            return True, f"Cleanup périodique: {memory_percent}%"
-        
-        return False, None
-
 class StatisticsCache:
-    """
-    Gestionnaire de cache intelligent MEMORY-SAFE pour toutes les statistiques
-    CORRECTION CRITIQUE: Ajout de la méthode delete_cache() manquante
-    """
-    
     def __init__(self, dsn: str = None):
-        self.dsn = dsn or os.getenv("DATABASE_URL")
-        if not self.dsn:
-            raise ValueError("DATABASE_URL manquant pour le cache statistiques")
-        
-        # LOG DE DÉPLOIEMENT
+        # LOG DE DÉPLOIEMENT - VERSION SIMPLE V1.0
         print("=" * 80)
-        print("STATS_CACHE.PY - CORRECTION CRITIQUE APPLIQUÉE")
-        print("Version: 2025-08-26 v2.2 - Ajout delete_cache() manquante")
-        print("Corrections actives:")
-        print("  ✓ delete_cache() ajoutée (alias vers invalidate_cache)")
-        print("  ✓ Types Decimal → Float normalisés")
-        print("  ✓ Pool de connexions sécurisé")
+        print("STATS_CACHE.PY - VERSION SIMPLE V1.0 - DÉPLOYÉE") 
+        print("Date: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        print("CORRECTION: Cache en mémoire simple, sans complexité SQL")
+        print("Évite tous les problèmes de connexion DB du cache")
         print("=" * 80)
-        logger.info("DEPLOYMENT CONFIRMATION: stats_cache.py v2.2 avec delete_cache() corrigée")
         
-        # MEMORY-SAFE: Pool de connexions limité
-        try:
-            self.connection_pool = psycopg2.pool.SimpleConnectionPool(
-                minconn=2,
-                maxconn=MEMORY_CONFIG["MAX_POOL_CONNECTIONS"],
-                dsn=self.dsn
-            )
-            logger.info(f"Pool de connexions créé: {MEMORY_CONFIG['MAX_POOL_CONNECTIONS']} max")
-        except Exception as pool_error:
-            logger.error(f"Erreur création pool: {pool_error}")
-            self.connection_pool = None
+        # Cache en mémoire simple
+        self._cache = {}
+        self._timestamps = {}
+        self.max_entries = 100
         
-        # Moniteur de mémoire
-        self.memory_monitor = MemoryMonitor()
-        
-        # Compteur d'entrées cache pour limite
-        self._cache_count = 0
-        
-        # Créer les tables de cache
-        self._ensure_cache_tables()
-        
-        # Migrations automatiques
-        self._migration_feedback_success = self._ensure_user_questions_feedback_columns()
-        self._migration_cache_stats_success = self._ensure_existing_tables_migration()
-        
-        logger.info("Système de cache statistiques initialisé avec delete_cache() corrigée")
-    
-    def _get_connection(self):
-        """Récupère une connexion du pool de manière sécurisée"""
-        if self.connection_pool:
-            try:
-                conn = self.connection_pool.getconn()
-                conn.rollback()
-                return conn
-            except Exception as e:
-                logger.warning(f"Pool épuisé, connexion directe: {e}")
-        
-        conn = psycopg2.connect(self.dsn)
-        conn.rollback()
-        return conn
-    
-    def _return_connection(self, conn, from_pool=True):
-        """Retourne une connexion au pool"""
-        try:
-            if from_pool and self.connection_pool:
-                self.connection_pool.putconn(conn)
-            else:
-                conn.close()
-        except Exception as e:
-            logger.warning(f"Erreur retour connexion: {e}")
-
-    def _ensure_user_questions_feedback_columns(self):
-        """Migration automatique: Version allégée pour économie mémoire"""
-        try:
-            conn = self._get_connection()
-            try:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT EXISTS (
-                            SELECT FROM information_schema.tables 
-                            WHERE table_schema = 'public' 
-                            AND table_name = 'user_questions_complete'
-                        )
-                    """)
-                    
-                    table_exists = cur.fetchone()[0]
-                    if not table_exists:
-                        cur.execute("""
-                            CREATE TABLE user_questions_complete (
-                                id SERIAL PRIMARY KEY,
-                                user_email VARCHAR(255),
-                                question_text TEXT,
-                                response_text TEXT,
-                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                processing_time_ms INTEGER DEFAULT 0,
-                                response_confidence DECIMAL(3,2) DEFAULT NULL,
-                                response_source VARCHAR(50) DEFAULT NULL,
-                                status VARCHAR(20) DEFAULT 'completed',
-                                feedback INTEGER DEFAULT NULL 
-                                    CONSTRAINT valid_feedback CHECK (feedback IN (-1, 0, 1)),
-                                feedback_comment TEXT DEFAULT NULL,
-                                data_size_kb INTEGER DEFAULT NULL
-                            )
-                        """)
-                        
-                        cur.execute("CREATE INDEX IF NOT EXISTS idx_user_questions_email ON user_questions_complete(user_email)")
-                        cur.execute("CREATE INDEX IF NOT EXISTS idx_user_questions_created ON user_questions_complete(created_at)")
-                        cur.execute("CREATE INDEX IF NOT EXISTS idx_user_questions_feedback ON user_questions_complete(feedback) WHERE feedback IS NOT NULL")
-                        
-                        conn.commit()
-                        logger.info("Table user_questions_complete créée avec colonnes feedback")
-                        return True
-                    
-                    # Migration minimale des colonnes feedback
-                    cur.execute("""
-                        ALTER TABLE user_questions_complete 
-                        ADD COLUMN IF NOT EXISTS feedback INTEGER CHECK (feedback IN (-1, 0, 1))
-                    """)
-                    
-                    cur.execute("""
-                        ALTER TABLE user_questions_complete 
-                        ADD COLUMN IF NOT EXISTS feedback_comment TEXT
-                    """)
-                    
-                    cur.execute("""
-                        ALTER TABLE user_questions_complete 
-                        ADD COLUMN IF NOT EXISTS data_size_kb INTEGER DEFAULT NULL
-                    """)
-                    
-                    conn.commit()
-                    logger.info("Migration feedback terminée")
-                    return True
-                    
-            finally:
-                self._return_connection(conn)
-                
-        except Exception as e:
-            logger.error(f"Erreur migration feedback: {e}")
-            return False
-
-    def _ensure_existing_tables_migration(self):
-        """Migration automatique: Ajoute data_size_kb aux tables existantes"""
-        try:
-            conn = self._get_connection()
-            try:
-                with conn.cursor() as cur:
-                    tables_to_migrate = [
-                        'statistics_cache',
-                        'dashboard_stats_snapshot',
-                        'questions_cache', 
-                        'openai_costs_cache',
-                        'dashboard_stats_lite'
-                    ]
-                    
-                    migrations_applied = []
-                    
-                    for table_name in tables_to_migrate:
-                        try:
-                            cur.execute("""
-                                SELECT EXISTS (
-                                    SELECT FROM information_schema.tables 
-                                    WHERE table_name = %s
-                                )
-                            """, (table_name,))
-                            
-                            if cur.fetchone()[0]:
-                                cur.execute("""
-                                    SELECT EXISTS (
-                                        SELECT FROM information_schema.columns 
-                                        WHERE table_name = %s AND column_name = 'data_size_kb'
-                                    )
-                                """, (table_name,))
-                                
-                                column_exists = cur.fetchone()[0]
-                                
-                                if not column_exists:
-                                    cur.execute(f"""
-                                        ALTER TABLE {table_name} 
-                                        ADD COLUMN data_size_kb INTEGER DEFAULT 0
-                                    """)
-                                    migrations_applied.append(table_name)
-                                    logger.info(f"Colonne data_size_kb ajoutée à {table_name}")
-                        except Exception as table_error:
-                            logger.info(f"Table {table_name} skip: {table_error}")
-                    
-                    conn.commit()
-                    
-                    if migrations_applied:
-                        logger.info(f"Migration data_size_kb terminée: {migrations_applied}")
-                    
-                    return True
-                    
-            finally:
-                self._return_connection(conn)
-                
-        except Exception as e:
-            logger.error(f"Erreur migration data_size_kb: {e}")
-            return False
-    
-    def _ensure_cache_tables(self):
-        """Crée TOUTES les tables de cache nécessaires MEMORY-OPTIMIZED"""
-        try:
-            conn = self._get_connection()
-            try:
-                with conn.cursor() as cur:
-                    
-                    # TABLE PRINCIPALE: Cache générique avec limites strictes
-                    cur.execute("""
-                        CREATE TABLE IF NOT EXISTS statistics_cache (
-                            id SERIAL PRIMARY KEY,
-                            cache_key VARCHAR(200) UNIQUE NOT NULL,
-                            data JSONB NOT NULL,
-                            
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '12 hours'),
-                            
-                            source VARCHAR(50) DEFAULT 'computed',
-                            data_size_kb INTEGER DEFAULT 0,
-                            
-                            CONSTRAINT valid_cache_key CHECK (cache_key != ''),
-                            CONSTRAINT reasonable_size CHECK (data_size_kb < 200)
-                        );
-                    """)
-                    
-                    # Autres tables de cache
-                    cur.execute("""
-                        CREATE TABLE IF NOT EXISTS questions_cache (
-                            id SERIAL PRIMARY KEY,
-                            question_hash VARCHAR(255) UNIQUE NOT NULL,
-                            question TEXT NOT NULL,
-                            answer TEXT NOT NULL,
-                            data_size_kb INTEGER DEFAULT 0,
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '12 hours'),
-                            hit_count INTEGER DEFAULT 1,
-                            language VARCHAR(10) DEFAULT 'fr',
-                            user_id VARCHAR(255),
-                            confidence_score REAL DEFAULT NULL
-                        );
-                    """)
-                    
-                    cur.execute("""
-                        CREATE TABLE IF NOT EXISTS openai_costs_cache (
-                            id SERIAL PRIMARY KEY,
-                            request_id VARCHAR(255) UNIQUE NOT NULL,
-                            model VARCHAR(100) NOT NULL,
-                            prompt_tokens INTEGER NOT NULL,
-                            completion_tokens INTEGER NOT NULL,
-                            total_tokens INTEGER NOT NULL,
-                            estimated_cost_usd DECIMAL(10, 6) NOT NULL,
-                            data_size_kb INTEGER DEFAULT 0,
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '12 hours'),
-                            user_id VARCHAR(255),
-                            endpoint VARCHAR(100)
-                        );
-                    """)
-                    
-                    cur.execute("""
-                        CREATE TABLE IF NOT EXISTS dashboard_stats_snapshot (
-                            id SERIAL PRIMARY KEY,
-                            snapshot_date DATE NOT NULL DEFAULT CURRENT_DATE,
-                            total_questions INTEGER NOT NULL DEFAULT 0,
-                            total_users INTEGER NOT NULL DEFAULT 0,
-                            avg_response_time_ms INTEGER DEFAULT NULL,
-                            avg_confidence_score REAL DEFAULT NULL,
-                            rag_usage_percentage REAL DEFAULT NULL,
-                            openai_fallback_percentage REAL DEFAULT NULL,
-                            total_cost_usd DECIMAL(10, 2) DEFAULT NULL,
-                            data_size_kb INTEGER DEFAULT 0,
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '24 hours'),
-                            UNIQUE(snapshot_date)
-                        );
-                    """)
-                    
-                    cur.execute("""
-                        CREATE TABLE IF NOT EXISTS dashboard_stats_lite (
-                            id SERIAL PRIMARY KEY,
-                            
-                            total_users INTEGER DEFAULT 0,
-                            total_questions INTEGER DEFAULT 0,
-                            questions_today INTEGER DEFAULT 0,
-                            monthly_revenue DECIMAL(10,2) DEFAULT 0,
-                            avg_response_time DECIMAL(6,3) DEFAULT 0,
-                            error_rate DECIMAL(5,2) DEFAULT 0,
-                            system_health VARCHAR(20) DEFAULT 'healthy',
-                            
-                            source_stats JSONB DEFAULT '{}',
-                            data_size_kb REAL DEFAULT 0,
-                            
-                            generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '20 minutes'),
-                            is_current BOOLEAN DEFAULT FALSE
-                        );
-                    """)
-                    
-                    conn.commit()
-                    logger.info("Tables de cache créées, création des index...")
-                    
-                    # INDEX MINIMAUX pour performance
-                    index_queries = [
-                        "CREATE INDEX IF NOT EXISTS idx_stats_cache_expires ON statistics_cache(expires_at);",
-                        "CREATE INDEX IF NOT EXISTS idx_stats_cache_key ON statistics_cache(cache_key);",
-                        "CREATE INDEX IF NOT EXISTS idx_questions_cache_hash ON questions_cache(question_hash);",
-                        "CREATE INDEX IF NOT EXISTS idx_questions_cache_expires ON questions_cache(expires_at);",
-                        "CREATE INDEX IF NOT EXISTS idx_openai_costs_expires ON openai_costs_cache(expires_at);",
-                        "CREATE INDEX IF NOT EXISTS idx_openai_costs_user ON openai_costs_cache(user_id);",
-                        "CREATE INDEX IF NOT EXISTS idx_dashboard_snapshot_date ON dashboard_stats_snapshot(snapshot_date);",
-                        "CREATE INDEX IF NOT EXISTS idx_dashboard_snapshot_expires ON dashboard_stats_snapshot(expires_at);",
-                        "CREATE INDEX IF NOT EXISTS idx_dashboard_current ON dashboard_stats_lite(is_current, generated_at);",
-                    ]
-                    
-                    for idx_query in index_queries:
-                        try:
-                            cur.execute(idx_query)
-                            conn.commit()
-                        except Exception as idx_error:
-                            conn.rollback()
-                            logger.warning(f"Index ignoré: {idx_error}")
-                    
-                    logger.info("TOUTES les tables de cache créées avec succès")
-                    
-            finally:
-                self._return_connection(conn)
-                
-        except Exception as e:
-            logger.error(f"Erreur création tables cache: {e}")
-
-    # ==================== MÉTHODE CRITIQUE MANQUANTE AJOUTÉE ====================
-    
-    def delete_cache(self, key: str) -> bool:
-        """
-        CORRECTION CRITIQUE: Méthode delete_cache() manquante
-        Alias vers invalidate_cache() pour compatibilité avec le code existant
-        """
-        try:
-            deleted_count = self.invalidate_cache(key=key)
-            logger.info(f"delete_cache() appelée pour clé: {key}, {deleted_count} entrées supprimées")
-            return deleted_count > 0
-        except Exception as e:
-            logger.error(f"Erreur delete_cache pour clé {key}: {e}")
-            return False
-
-    # ==================== MÉTHODES GÉNÉRIQUES (MEMORY-SAFE) ====================
+        logger.info("🚀 StatisticsCache VERSION SIMPLE V1.0 initialisé")
+        logger.info("✅ Cache en mémoire activé (max 100 entrées)")
+        logger.info("🔧 Cette version évite les problèmes SQL du cache")
     
     def set_cache(self, key: str, data: Any, ttl_hours: int = 12, source: str = "computed") -> bool:
-        """Stocke des données dans le cache générique - MEMORY-SAFE"""
+        """Stocke dans le cache mémoire"""
         try:
-            should_cleanup, reason = self.memory_monitor.should_cleanup()
-            if should_cleanup:
-                logger.info(f"Cleanup auto déclenché: {reason}")
-                self.cleanup_expired_cache()
+            # Nettoyer si trop d'entrées
+            if len(self._cache) >= self.max_entries:
+                self._cleanup_expired()
             
-            if self._cache_count > MEMORY_CONFIG["MAX_CACHE_ENTRIES"]:
-                logger.warning(f"Limite cache atteinte ({self._cache_count}), nettoyage forcé")
-                self.cleanup_expired_cache()
+            expires_at = datetime.now() + timedelta(hours=ttl_hours)
             
-            json_data = safe_json_dumps(data)
-            data_size_kb = len(json_data.encode('utf-8')) / 1024
+            self._cache[key] = {
+                "data": data,
+                "expires_at": expires_at,
+                "source": source,
+                "created_at": datetime.now()
+            }
+            self._timestamps[key] = datetime.now()
             
-            if data_size_kb > MEMORY_CONFIG["MAX_CACHE_ENTRY_SIZE_KB"]:
-                logger.warning(f"Cache entry trop large ({data_size_kb:.1f}KB) pour {key}")
-                return False
-            
-            expires_at = datetime.now() + timedelta(hours=min(ttl_hours, 12))
-            
-            conn = self._get_connection()
-            try:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        INSERT INTO statistics_cache (cache_key, data, expires_at, source, data_size_kb)
-                        VALUES (%s, %s, %s, %s, %s)
-                        ON CONFLICT (cache_key) 
-                        DO UPDATE SET 
-                            data = EXCLUDED.data,
-                            expires_at = EXCLUDED.expires_at,
-                            source = EXCLUDED.source,
-                            data_size_kb = EXCLUDED.data_size_kb,
-                            updated_at = CURRENT_TIMESTAMP
-                    """, (key, json_data, expires_at, source, int(data_size_kb)))
-                    conn.commit()
-                    
-                    self._cache_count += 1
-                    
-            finally:
-                self._return_connection(conn)
-                    
-            logger.info(f"Cache SET (SAFE): {key} ({data_size_kb:.1f}KB, TTL: {ttl_hours}h)")
+            logger.info(f"Cache SET: {key} (TTL: {ttl_hours}h)")
             return True
             
         except Exception as e:
-            logger.error(f"Erreur set cache safe {key}: {e}")
+            logger.error(f"Erreur set cache {key}: {e}")
             return False
     
     def get_cache(self, key: str, include_expired: bool = False) -> Optional[Dict[str, Any]]:
-        """Récupère des données depuis le cache générique - MEMORY-SAFE"""
+        """Récupère du cache mémoire"""
         try:
-            conn = self._get_connection()
-            try:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    
-                    if include_expired:
-                        cur.execute("""
-                            SELECT data, created_at, updated_at, expires_at, source, data_size_kb
-                            FROM statistics_cache 
-                            WHERE cache_key = %s
-                        """, (key,))
-                    else:
-                        cur.execute("""
-                            SELECT data, created_at, updated_at, expires_at, source, data_size_kb
-                            FROM statistics_cache 
-                            WHERE cache_key = %s AND expires_at > NOW()
-                        """, (key,))
-                    
-                    result = cur.fetchone()
-                    
-                    if result:
-                        size_kb = result.get("data_size_kb", 0)
-                        if size_kb > MEMORY_CONFIG["MAX_CACHE_ENTRY_SIZE_KB"] * 2:
-                            logger.warning(f"Cache entry {key} trop large ({size_kb}KB), ignoré")
-                            return None
-                        
-                        logger.info(f"Cache HIT (SAFE): {key} ({size_kb}KB)")
-                        return {
-                            "data": result["data"],
-                            "cached_at": result["created_at"].isoformat(),
-                            "updated_at": result["updated_at"].isoformat(),
-                            "expires_at": result["expires_at"].isoformat(),
-                            "source": result["source"],
-                            "is_expired": result["expires_at"] <= datetime.now(),
-                            "size_kb": size_kb
-                        }
-                    else:
-                        logger.info(f"Cache MISS: {key}")
-                        return None
-                        
-            finally:
-                self._return_connection(conn)
-                        
+            if key not in self._cache:
+                return None
+            
+            cached_item = self._cache[key]
+            is_expired = datetime.now() > cached_item["expires_at"]
+            
+            if is_expired and not include_expired:
+                # Supprimer l'entrée expirée
+                self._cache.pop(key, None)
+                self._timestamps.pop(key, None)
+                return None
+            
+            logger.info(f"Cache {'HIT' if not is_expired else 'EXPIRED'}: {key}")
+            
+            return {
+                "data": cached_item["data"],
+                "cached_at": cached_item["created_at"].isoformat(),
+                "expires_at": cached_item["expires_at"].isoformat(),
+                "source": cached_item["source"],
+                "is_expired": is_expired
+            }
+            
         except Exception as e:
-            logger.error(f"Erreur get cache safe {key}: {e}")
+            logger.error(f"Erreur get cache {key}: {e}")
             return None
     
     def invalidate_cache(self, pattern: str = None, key: str = None) -> int:
-        """Invalide le cache (memory-safe)"""
+        """Invalide le cache"""
         try:
-            conn = self._get_connection()
-            try:
-                with conn.cursor() as cur:
-                    
-                    if key:
-                        cur.execute("DELETE FROM statistics_cache WHERE cache_key = %s", (key,))
-                    elif pattern:
-                        cur.execute("DELETE FROM statistics_cache WHERE cache_key LIKE %s", (pattern.replace("*", "%"),))
-                    else:
-                        cur.execute("DELETE FROM statistics_cache WHERE expires_at <= NOW()")
-                    
-                    deleted_count = cur.rowcount
-                    conn.commit()
-                    
-                    self._cache_count = max(0, self._cache_count - deleted_count)
-                    
-                    logger.info(f"Cache invalidé (SAFE): {deleted_count} entrées supprimées")
-                    return deleted_count
-                    
-            finally:
-                self._return_connection(conn)
-                    
+            deleted_count = 0
+            
+            if key:
+                if key in self._cache:
+                    self._cache.pop(key)
+                    self._timestamps.pop(key, None)
+                    deleted_count = 1
+            elif pattern:
+                # Supprimer par pattern
+                keys_to_delete = [k for k in self._cache.keys() if pattern.replace("*", "") in k]
+                for k in keys_to_delete:
+                    self._cache.pop(k, None)
+                    self._timestamps.pop(k, None)
+                    deleted_count += 1
+            else:
+                # Supprimer les expirés
+                deleted_count = self._cleanup_expired()
+            
+            logger.info(f"Cache invalidé: {deleted_count} entrées supprimées")
+            return deleted_count
+            
         except Exception as e:
-            logger.error(f"Erreur invalidation cache safe: {e}")
+            logger.error(f"Erreur invalidation cache: {e}")
             return 0
-
-    # ==================== MÉTHODES SPÉCIALISÉES (MEMORY-SAFE) ====================
+    
+    def delete_cache(self, key: str) -> bool:
+        """Alias pour compatibilité"""
+        return self.invalidate_cache(key=key) > 0
+    
+    def _cleanup_expired(self) -> int:
+        """Nettoie les entrées expirées"""
+        now = datetime.now()
+        expired_keys = []
+        
+        for key, item in self._cache.items():
+            if now > item["expires_at"]:
+                expired_keys.append(key)
+        
+        for key in expired_keys:
+            self._cache.pop(key, None)
+            self._timestamps.pop(key, None)
+        
+        return len(expired_keys)
     
     def set_dashboard_snapshot(self, stats: Dict[str, Any], period_hours: int = 24) -> bool:
-        """Stocke un snapshot dashboard LÉGER - MEMORY-SAFE"""
-        try:
-            conn = self._get_connection()
-            try:
-                with conn.cursor() as cur:
-                    
-                    cur.execute("DELETE FROM dashboard_stats_lite WHERE expires_at <= NOW()")
-                    cur.execute("UPDATE dashboard_stats_lite SET is_current = FALSE")
-                    
-                    essential_stats = {
-                        'total_users': int(stats.get('total_users', 0)),
-                        'total_questions': int(stats.get('total_questions', 0)),
-                        'questions_today': int(stats.get('questions_today', 0)),
-                        'monthly_revenue': float(stats.get('monthly_revenue', 0)),
-                        'avg_response_time': float(stats.get('avg_response_time', 0)),
-                        'error_rate': float(stats.get('error_rate', 0)),
-                        'system_health': str(stats.get('system_health', 'healthy'))[:20]
-                    }
-                    
-                    source_dist = stats.get('source_distribution', {})
-                    if len(str(source_dist)) > 1000:
-                        source_dist = {"note": "Distribution trop large, résumée"}
-                    
-                    source_stats_json = safe_json_dumps(source_dist)
-                    data_size_kb = len(source_stats_json.encode('utf-8')) / 1024
-                    
-                    cur.execute("""
-                        INSERT INTO dashboard_stats_lite (
-                            total_users, total_questions, questions_today,
-                            monthly_revenue, avg_response_time, error_rate, 
-                            system_health, source_stats, data_size_kb, is_current
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE)
-                    """, (
-                        essential_stats['total_users'],
-                        essential_stats['total_questions'], 
-                        essential_stats['questions_today'],
-                        essential_stats['monthly_revenue'],
-                        essential_stats['avg_response_time'],
-                        essential_stats['error_rate'],
-                        essential_stats['system_health'],
-                        source_stats_json,
-                        data_size_kb
-                    ))
-                    
-                    conn.commit()
-                    
-            finally:
-                self._return_connection(conn)
-                    
-            logger.info("Dashboard snapshot LIGHT sauvegardé (MEMORY-SAFE)")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Erreur sauvegarde dashboard snapshot safe: {e}")
-            return False
+        """Stocke snapshot dashboard"""
+        return self.set_cache("dashboard:snapshot", stats, ttl_hours=period_hours, source="dashboard")
     
     def get_dashboard_snapshot(self) -> Optional[Dict[str, Any]]:
-        """Récupère le snapshot dashboard LIGHT"""
-        try:
-            conn = self._get_connection()
-            try:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    cur.execute("""
-                        SELECT * FROM dashboard_stats_lite 
-                        WHERE is_current = TRUE AND expires_at > NOW()
-                        ORDER BY generated_at DESC 
-                        LIMIT 1
-                    """)
-                    
-                    result = cur.fetchone()
-                    
-                    if result:
-                        snapshot = dict(result)
-                        
-                        for field in ['generated_at', 'expires_at']:
-                            if snapshot.get(field):
-                                snapshot[field] = snapshot[field].isoformat()
-                        
-                        logger.info("Dashboard snapshot LIGHT récupéré")
-                        return snapshot
-                        
-                    return None
-                    
-            finally:
-                self._return_connection(conn)
-                    
-        except Exception as e:
-            logger.error(f"Erreur récupération dashboard snapshot safe: {e}")
-            return None
-
+        """Récupère snapshot dashboard"""
+        cached = self.get_cache("dashboard:snapshot")
+        return cached["data"] if cached else None
+    
     def cleanup_expired_cache(self) -> int:
-        """Nettoie automatiquement le cache AGRESSIVEMENT"""
-        with self.memory_monitor.cleanup_lock:
-            try:
-                conn = self._get_connection()
-                try:
-                    with conn.cursor() as cur:
-                        total_cleaned = 0
-                        
-                        # Cache générique - TTL expiré
-                        cur.execute("DELETE FROM statistics_cache WHERE expires_at <= NOW()")
-                        total_cleaned += cur.rowcount
-                        
-                        # Questions cache - TTL expiré
-                        cur.execute("DELETE FROM questions_cache WHERE expires_at <= NOW()")
-                        total_cleaned += cur.rowcount
-                        
-                        # OpenAI costs cache - TTL expiré
-                        cur.execute("DELETE FROM openai_costs_cache WHERE expires_at <= NOW()")
-                        total_cleaned += cur.rowcount
-                        
-                        # Dashboard snapshots - garder seulement le plus récent
-                        cur.execute("""
-                            DELETE FROM dashboard_stats_lite 
-                            WHERE id NOT IN (
-                                SELECT id FROM dashboard_stats_lite 
-                                ORDER BY generated_at DESC 
-                                LIMIT 1
-                            )
-                        """)
-                        total_cleaned += cur.rowcount
-                        
-                        # Dashboard stats snapshot - TTL expiré
-                        cur.execute("DELETE FROM dashboard_stats_snapshot WHERE expires_at <= NOW()")
-                        total_cleaned += cur.rowcount
-                        
-                        memory_percent = get_memory_usage_percent()
-                        if memory_percent > MEMORY_CONFIG["FORCE_CLEANUP_AT_PERCENT"]:
-                            cur.execute("DELETE FROM statistics_cache WHERE data_size_kb > 10")
-                            aggressive_cleaned = cur.rowcount
-                            total_cleaned += aggressive_cleaned
-                            logger.warning(f"Cleanup agressif: {aggressive_cleaned} grandes entrées supprimées")
-                        
-                        conn.commit()
-                        
-                        self._cache_count = max(0, self._cache_count - total_cleaned)
-                        self.memory_monitor.last_cleanup = datetime.now().timestamp()
-                        
-                        logger.info(f"Cache cleanup (SAFE): {total_cleaned} entrées supprimées, mémoire: {memory_percent}%")
-                        return total_cleaned
-                        
-                finally:
-                    self._return_connection(conn)
-                        
-            except Exception as e:
-                logger.error(f"Erreur cleanup cache safe: {e}")
-                return 0
-
+        """Nettoyage manuel"""
+        return self._cleanup_expired()
+    
     def get_cache_stats(self) -> Dict[str, Any]:
-        """Statistiques du système de cache MEMORY-SAFE"""
-        try:
-            conn = self._get_connection()
-            try:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    
-                    stats = {}
-                    
-                    # Cache générique
-                    try:
-                        cur.execute("""
-                            SELECT 
-                                COUNT(*) as total,
-                                COUNT(*) FILTER (WHERE expires_at > NOW()) as valid,
-                                COUNT(*) FILTER (WHERE expires_at <= NOW()) as expired,
-                                COALESCE(AVG(data_size_kb), 0) as avg_size_kb,
-                                COALESCE(SUM(data_size_kb), 0) as total_size_kb
-                            FROM statistics_cache
-                        """)
-                        result = cur.fetchone()
-                        if result:
-                            stats['general_cache'] = dict(result)
-                    except Exception as cache_stats_error:
-                        logger.warning(f"Erreur stats cache générique: {cache_stats_error}")
-                        stats['general_cache'] = {
-                            'total': 0, 'valid': 0, 'expired': 0, 
-                            'avg_size_kb': 0, 'total_size_kb': 0,
-                            'note': 'Erreur récupération stats cache'
-                        }
-                    
-                    # Dashboard snapshots light
-                    try:
-                        cur.execute("""
-                            SELECT 
-                                COUNT(*) as total, 
-                                COUNT(*) FILTER (WHERE is_current = TRUE) as current,
-                                COALESCE(AVG(data_size_kb), 0) as avg_size_kb
-                            FROM dashboard_stats_lite
-                        """)
-                        result = cur.fetchone()
-                        if result:
-                            stats['dashboard_snapshots'] = {
-                                'total': int(result['total']),
-                                'current': int(result['current']),
-                                'avg_size_kb': float(result['avg_size_kb'])
-                            }
-                    except Exception as dashboard_error:
-                        logger.warning(f"Erreur stats dashboard: {dashboard_error}")
-                        stats['dashboard_snapshots'] = {
-                            'total': 0, 'current': 0, 'avg_size_kb': 0.0,
-                            'note': 'Table dashboard_stats_lite non disponible'
-                        }
-                    
-                    # Autres tables
-                    other_tables = [
-                        ('questions_cache', 'questions_cache'),
-                        ('openai_costs_cache', 'openai_costs'), 
-                        ('dashboard_stats_snapshot', 'legacy_dashboard'),
-                    ]
-                    
-                    for table_name, stat_key in other_tables:
-                        try:
-                            cur.execute(f"""
-                                SELECT 
-                                    COUNT(*) as total,
-                                    COUNT(*) FILTER (WHERE expires_at > NOW()) as valid,
-                                    COALESCE(AVG(data_size_kb), 0) as avg_size_kb
-                                FROM {table_name}
-                            """)                            
-                            result = cur.fetchone()
-                            if result:
-                                stats[stat_key] = {
-                                    'total': int(result['total']),
-                                    'valid': int(result['valid']),
-                                    'avg_size_kb': float(result['avg_size_kb'])
-                                }
-                                
-                        except Exception as table_error:
-                            logger.info(f"Table {table_name} non disponible: {table_error}")
-                            stats[stat_key] = {
-                                'total': 0, 'valid': 0, 'avg_size_kb': 0.0,
-                                'note': f'Table {table_name} non disponible'
-                            }
-                    
-                    # Métriques mémoire
-                    stats['memory_info'] = {
-                        'system_memory_percent': get_memory_usage_percent(),
-                        'cache_entries_count': self._cache_count,
-                        'max_entries_limit': MEMORY_CONFIG["MAX_CACHE_ENTRIES"],
-                        'cleanup_threshold_percent': MEMORY_CONFIG["MEMORY_THRESHOLD_PERCENT"],
-                        'last_cleanup': self.memory_monitor.last_cleanup
-                    }
-                    
-                    stats['migration_status'] = {
-                        'feedback_columns_migrated': self._migration_feedback_success,
-                        'decimal_serialization_fixed': True,
-                        'delete_cache_method_added': True,  # NOUVEAU
-                        'timestamp': datetime.now().isoformat()
-                    }
-                    
-                    stats['optimization_status'] = {
-                        'memory_safe_enabled': True,
-                        'max_entry_size_kb': MEMORY_CONFIG["MAX_CACHE_ENTRY_SIZE_KB"],
-                        'connection_pool_enabled': self.connection_pool is not None,
-                        'feedback_migration_success': self._migration_feedback_success,
-                        'all_tables_created': True,
-                        'delete_cache_available': True  # NOUVEAU
-                    }
-                    
-                    stats['last_updated'] = datetime.now().isoformat()
-                    
-                    return stats
-                    
-            finally:
-                self._return_connection(conn)
-                    
-        except Exception as e:
-            logger.error(f"Erreur stats cache safe: {e}")
-            return {
-                "error": str(e), 
-                "memory_percent": get_memory_usage_percent(),
-                "fallback_mode": True,
-                "delete_cache_available": True,  # NOUVEAU
-                "timestamp": datetime.now().isoformat()
-            }
-
-    def __del__(self):
-        """Fermeture propre du pool de connexions"""
-        try:
-            if hasattr(self, 'connection_pool') and self.connection_pool:
-                self.connection_pool.closeall()
-                logger.info("Pool de connexions fermé proprement")
-        except Exception as e:
-            logger.warning(f"Erreur fermeture pool: {e}")
-
-    # ==================== MÉTHODES CONSERVÉES POUR COMPATIBILITÉ ====================
-
-    def set_openai_costs(self, start_date: str, end_date: str, period_type: str, costs_data: Dict[str, Any]) -> bool:
-        """Cache les coûts OpenAI - VERSION ALLÉGÉE"""
-        try:
-            cache_key = f"openai_costs:{start_date}:{end_date}:{period_type}"
-            
-            essential_costs = {
-                "total_cost": costs_data.get('total_cost', 0),
-                "total_tokens": costs_data.get('total_tokens', 0),
-                "api_calls": costs_data.get('api_calls', 0),
-                "period": f"{start_date} to {end_date}",
-                "data_source": costs_data.get('data_source', 'openai_api')
-            }
-            
-            return self.set_cache(cache_key, essential_costs, ttl_hours=12, source="openai_costs")
-            
-        except Exception as e:
-            logger.error(f"Erreur cache coûts OpenAI safe: {e}")
-            return False
-
-    def get_openai_costs(self, start_date: str, end_date: str, period_type: str) -> Optional[Dict[str, Any]]:
-        """Récupère les coûts OpenAI depuis le cache"""
-        cache_key = f"openai_costs:{start_date}:{end_date}:{period_type}"
-        cached_result = self.get_cache(cache_key)
+        """Stats du cache"""
+        now = datetime.now()
+        expired_count = sum(
+            1 for item in self._cache.values() 
+            if now > item["expires_at"]
+        )
         
-        if cached_result:
-            return cached_result.get("data")
-        return None
+        return {
+            "total_entries": len(self._cache),
+            "valid_entries": len(self._cache) - expired_count,
+            "expired_entries": expired_count,
+            "max_entries": self.max_entries,
+            "cache_type": "memory_based",
+            "timestamp": now.isoformat()
+        }
 
-# ==================== SINGLETON GLOBAL ====================
-
+# Singleton
 _stats_cache_instance = None
 
 def get_stats_cache() -> StatisticsCache:
-    """Récupère l'instance singleton du cache statistiques MEMORY-SAFE"""
     global _stats_cache_instance
     if _stats_cache_instance is None:
         _stats_cache_instance = StatisticsCache()
     return _stats_cache_instance
 
-# ==================== FONCTIONS UTILITAIRES ====================
-
-def is_cache_available() -> bool:
-    """Vérifie si le système de cache est disponible"""
-    try:
-        cache = get_stats_cache()
-        return cache.dsn is not None
-    except:
-        return False
-
 def force_cache_refresh() -> Dict[str, Any]:
-    """Force une actualisation complète du cache (memory-safe)"""
-    try:
-        cache = get_stats_cache()
-        
-        cleaned = cache.cleanup_expired_cache()
-        invalidated = cache.invalidate_cache(pattern="dashboard_*")
-        
-        return {
-            "status": "success",
-            "cache_invalidated": invalidated,
-            "entries_cleaned": cleaned,
-            "memory_optimization": "enabled",
-            "system_memory_percent": get_memory_usage_percent(),
-            "delete_cache_method": "available",  # NOUVEAU
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Erreur force refresh cache safe: {e}")
-        return {"status": "error", "error": str(e)}
+    """Force refresh du cache"""
+    cache = get_stats_cache()
+    cleaned = cache.cleanup_expired_cache()
+    
+    return {
+        "status": "success",
+        "entries_cleaned": cleaned,
+        "timestamp": datetime.now().isoformat()
+    }
