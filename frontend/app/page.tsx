@@ -207,10 +207,18 @@ function LoginPageContent() {
 
       console.log('📤 Envoi vers backend API:', registrationData)
 
-      // Appel à votre endpoint backend /api/v1/auth/register
+      // CHANGEMENT 1: Construction intelligente de l'URL API
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://expert-app-cngws.ondigitalocean.app'
       
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
+      // Construire l'URL intelligemment pour éviter les doubles /api/
+      let apiUrl = API_BASE_URL
+      if (apiUrl.endsWith('/api')) {
+        apiUrl = `${apiUrl}/v1/auth/register`
+      } else {
+        apiUrl = `${apiUrl}/api/v1/auth/register`
+      }
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -219,7 +227,7 @@ function LoginPageContent() {
         credentials: 'omit' // Éviter les problèmes CORS
       })
 
-      console.log('📥 Réponse backend:', response.status, response.statusText)
+      console.log('🔥 Réponse backend:', response.status, response.statusText)
 
       // Lire la réponse
       const responseText = await response.text()
