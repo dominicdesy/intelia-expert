@@ -5,6 +5,7 @@ Version CORRIGÉE - Force l'utilisation de user_questions_complete basé sur dia
 OBJECTIF: Utiliser directement la table user_questions_complete qui contient les données réelles
 CORRECTIONS: Supprime l'auto-détection qui échoue, force user_questions_complete
 CORRECTION CRITIQUE: Remplace delete_cache() par invalidate_cache()
+NOUVELLE CORRECTION: URLs internes configurables pour éviter localhost:8000
 """
 
 import asyncio
@@ -41,10 +42,34 @@ def safe_str_conversion(value, max_length=100):
     except Exception:
         return "conversion_error"
 
+def get_internal_api_base_url():
+    """
+    NOUVELLE FONCTION: Récupère l'URL de base pour les appels internes
+    Résout le problème localhost:8000 sur serveur de production
+    """
+    # Priorité 1: Variable d'environnement explicite
+    internal_url = os.getenv("INTERNAL_API_BASE_URL")
+    if internal_url:
+        return internal_url.rstrip('/')
+    
+    # Priorité 2: URL publique de l'API
+    public_api_url = os.getenv("NEXT_PUBLIC_API_BASE_URL") 
+    if public_api_url:
+        return public_api_url.rstrip('/')
+    
+    # Priorité 3: Construction depuis FRONTEND_URL
+    frontend_url = os.getenv("FRONTEND_URL")
+    if frontend_url:
+        return f"{frontend_url.rstrip('/')}/api"
+    
+    # Fallback: localhost pour développement local
+    return "http://localhost:8000"
+
 class StatisticsUpdater:
     """
     Version CORRIGÉE qui utilise directement user_questions_complete
     CORRECTION CRITIQUE: Utilise invalidate_cache() au lieu de delete_cache()
+    NOUVELLE CORRECTION: URLs internes configurables
     """
     
     def __init__(self):
@@ -59,14 +84,19 @@ class StatisticsUpdater:
         # Table fixe basée sur le diagnostic
         self._correct_table_name = "user_questions_complete"
         
+        # NOUVELLE CORRECTION: URL de base configurable
+        self._internal_api_base = get_internal_api_base_url()
+        logger.info(f"URL API interne configurée: {self._internal_api_base}")
+        
         self.collection_stats = {
             "total_collections": 0,
             "successful_collections": 0,
             "initialization_time": datetime.now().isoformat(),
-            "version": "corrigé_user_questions_complete_v2"
+            "version": "corrigé_user_questions_complete_v3_urls_fixes",
+            "internal_api_base": self._internal_api_base
         }
         
-        logger.info("StatisticsUpdater CORRIGÉ initialisé avec table user_questions_complete + cache fixé")
+        logger.info("StatisticsUpdater CORRIGÉ initialisé avec table user_questions_complete + URLs fixes")
     
     async def update_all_statistics(self) -> Dict[str, Any]:
         """
@@ -121,9 +151,10 @@ class StatisticsUpdater:
                     "end_memory_percent": end_memory,
                     "memory_delta": end_memory - start_memory
                 },
-                "version": "corrigé_user_questions_complete_v2",
+                "version": "corrigé_user_questions_complete_v3_urls_fixes",
                 "table_used": self._correct_table_name,
-                "cache_method_fixed": "invalidate_cache"
+                "cache_method_fixed": "invalidate_cache",
+                "internal_api_base": self._internal_api_base
             }
             
             self.cache.set_cache("system:last_update_summary", result, ttl_hours=25, source="corrected_updater")
@@ -196,10 +227,10 @@ class StatisticsUpdater:
                     # TOP UTILISATEURS - utilise user_questions_complete directement
                     top_users = self._calculate_top_users(cur)
                     
-                    # INTÉGRATION HEALTH.PY - CONSERVÉE
+                    # INTÉGRATION HEALTH.PY - CORRIGÉE AVEC NOUVELLE URL
                     system_health_data = await self._get_system_health_data()
                     
-                    # INTÉGRATION BILLING_OPENAI.PY - CONSERVÉE  
+                    # INTÉGRATION BILLING_OPENAI.PY - CORRIGÉE AVEC NOUVELLE URL  
                     openai_costs = await self._get_real_openai_costs()
                     
                     # STATS DE FEEDBACK SÉCURISÉES - utilise user_questions_complete directement
@@ -211,12 +242,13 @@ class StatisticsUpdater:
                         "meta": {
                             "collected_at": datetime.now().isoformat(),
                             "data_source": f"corrected_{self._correct_table_name}",
-                            "version": "corrigé_user_questions_complete_v2",
+                            "version": "corrigé_user_questions_complete_v3_urls_fixes",
                             "table_used": self._correct_table_name,
-                            "cache_method": "invalidate_cache"
+                            "cache_method": "invalidate_cache",
+                            "internal_api_base": self._internal_api_base
                         },
                         
-                        # System Stats - INTÉGRATION HEALTH.PY CONSERVÉE
+                        # System Stats - INTÉGRATION HEALTH.PY CORRIGÉE
                         "systemStats": {
                             "system_health": {
                                 "uptime_hours": system_health_data.get("uptime_hours", 0),
@@ -278,7 +310,7 @@ class StatisticsUpdater:
                         "cache_info": {
                             "generated_at": datetime.now().isoformat(),
                             "ttl_hours": 1,
-                            "source": "corrected_updater_v2",
+                            "source": "corrected_updater_v3",
                             "cache_invalidation_method": "invalidate_cache"
                         }
                     }
@@ -360,13 +392,13 @@ class StatisticsUpdater:
     
     async def _get_system_health_data(self) -> Dict[str, Any]:
         """
-        INTÉGRATION HEALTH.PY - CONSERVÉE
+        INTÉGRATION HEALTH.PY - CORRIGÉE AVEC URL CONFIGURABLE
         """
         try:
-            response = requests.get(
-                "http://localhost:8000/api/v1/health/detailed",
-                timeout=10
-            )
+            health_url = f"{self._internal_api_base}/api/v1/health/detailed"
+            logger.debug(f"Appel health endpoint: {health_url}")
+            
+            response = requests.get(health_url, timeout=10)
             
             if response.status_code == 200:
                 health_data = response.json()
@@ -393,7 +425,7 @@ class StatisticsUpdater:
                 return system_health
                 
         except Exception as e:
-            logger.warning(f"Erreur intégration health.py: {e}")
+            logger.warning(f"Erreur intégration health.py (URL: {self._internal_api_base}): {e}")
             
         # Fallback si health.py indisponible
         return {
@@ -407,13 +439,13 @@ class StatisticsUpdater:
     
     async def _get_real_openai_costs(self) -> Dict[str, Any]:
         """
-        INTÉGRATION BILLING_OPENAI.PY - CONSERVÉE
+        INTÉGRATION BILLING_OPENAI.PY - CORRIGÉE AVEC URL CONFIGURABLE
         """
         try:
-            response = requests.get(
-                "http://localhost:8000/api/v1/billing/openai-usage/current-month-light",
-                timeout=15
-            )
+            billing_url = f"{self._internal_api_base}/api/v1/billing/openai-usage/current-month-light"
+            logger.debug(f"Appel billing endpoint: {billing_url}")
+            
+            response = requests.get(billing_url, timeout=15)
             
             if response.status_code == 200:
                 billing_data = response.json()
@@ -432,7 +464,7 @@ class StatisticsUpdater:
                 return costs_data
                 
         except Exception as e:
-            logger.warning(f"Erreur intégration billing_openai.py: {e}")
+            logger.warning(f"Erreur intégration billing_openai.py (URL: {self._internal_api_base}): {e}")
             
         return {"success": False, "costs": {"total": 0}}
     
@@ -472,8 +504,9 @@ class StatisticsUpdater:
             "meta": {
                 "collected_at": datetime.now().isoformat(),
                 "data_source": "fallback_empty",
-                "version": "corrigé_user_questions_complete_v2",
-                "cache_method": "invalidate_cache"
+                "version": "corrigé_user_questions_complete_v3_urls_fixes",
+                "cache_method": "invalidate_cache",
+                "internal_api_base": self._internal_api_base
             },
             "systemStats": {
                 "system_health": {"uptime_hours": 0, "total_requests": 0, "error_rate": 0},
@@ -504,9 +537,10 @@ class StatisticsUpdater:
                     "message": "Version corrigée - jamais exécutée",
                     "update_in_progress": self.update_in_progress,
                     "last_update": self.last_update.isoformat() if self.last_update else None,
-                    "version": "corrigé_user_questions_complete_v2",
+                    "version": "corrigé_user_questions_complete_v3_urls_fixes",
                     "table_used": self._correct_table_name,
-                    "cache_method": "invalidate_cache"
+                    "cache_method": "invalidate_cache",
+                    "internal_api_base": self._internal_api_base
                 }
                 
         except Exception as e:
