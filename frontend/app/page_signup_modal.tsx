@@ -125,6 +125,162 @@ const CountrySelect: React.FC<CountrySelectProps> = ({
   )
 }
 
+// Nouvelle fonction de validation de mot de passe
+const validatePassword = (password: string) => {
+  const errors = []
+  
+  // Vérifier que le mot de passe n'est pas vide ou seulement des espaces
+  if (!password || password.trim().length === 0) {
+    errors.push('Le mot de passe est requis')
+    return { isValid: false, errors }
+  }
+  
+  // Minimum 8 caractères
+  if (password.length < 8) {
+    errors.push('Au moins 8 caractères requis')
+  }
+  
+  // Maximum 128 caractères (sécurité contre les attaques DoS)
+  if (password.length > 128) {
+    errors.push('Maximum 128 caractères autorisés')
+  }
+  
+  // Au moins une lettre (majuscule ou minuscule)
+  if (!/[a-zA-Z]/.test(password)) {
+    errors.push('Au moins une lettre requise')
+  }
+  
+  // Au moins un chiffre
+  if (!/\d/.test(password)) {
+    errors.push('Au moins un chiffre requis')
+  }
+  
+  // Vérifier les mots de passe faibles courants
+  const commonPasswords = [
+    'password', '12345678', 'qwerty123', 'abc123456', 
+    'password1', 'password123', '123456789', 'motdepasse',
+    'azerty123', '11111111', '00000000'
+  ]
+  if (commonPasswords.some(common => 
+    password.toLowerCase().includes(common.toLowerCase())
+  )) {
+    errors.push('Mot de passe trop commun')
+  }
+  
+  // Vérifier la répétition excessive (plus de 3 caractères identiques consécutifs)
+  if (/(.)\1{3,}/.test(password)) {
+    errors.push('Trop de caractères identiques consécutifs')
+  }
+  
+  // Bonus: Vérifier que ce n'est pas que des caractères séquentiels
+  const sequentialPatterns = [
+    '12345678', '87654321', 'abcdefgh', 'zyxwvuts',
+    'qwertyui', 'asdfghjk', 'zxcvbnm'
+  ]
+  if (sequentialPatterns.some(pattern => 
+    password.toLowerCase().includes(pattern)
+  )) {
+    errors.push('Évitez les séquences de caractères')
+  }
+  
+  return { isValid: errors.length === 0, errors }
+}
+
+// Composant d'indicateur de force du mot de passe
+const PasswordStrengthIndicator: React.FC<{ password: string }> = ({ password }) => {
+  const validation = validatePassword(password)
+  
+  const requirements = [
+    { test: password.length >= 8, label: 'Au moins 8 caractères' },
+    { test: /[a-zA-Z]/.test(password), label: 'Au moins une lettre' },
+    { test: /\d/.test(password), label: 'Au moins un chiffre' },
+    { test: !/(.)\\1{3,}/.test(password), label: 'Pas de répétitions excessives' },
+    { test: password.length <= 128, label: 'Longueur raisonnable' }
+  ]
+
+  // Calculer le score de force
+  const passedRequirements = requirements.filter(req => req.test).length
+  const strength = passedRequirements / requirements.length
+  
+  const getStrengthColor = () => {
+    if (strength < 0.4) return 'bg-red-500'
+    if (strength < 0.7) return 'bg-yellow-500'
+    if (strength < 0.9) return 'bg-blue-500'
+    return 'bg-green-500'
+  }
+  
+  const getStrengthLabel = () => {
+    if (strength < 0.4) return 'Faible'
+    if (strength < 0.7) return 'Moyen'
+    if (strength < 0.9) return 'Bon'
+    return 'Excellent'
+  }
+
+  return (
+    <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-medium text-gray-700">
+          Force du mot de passe
+        </p>
+        <span className={`text-xs font-medium ${
+          strength < 0.4 ? 'text-red-600' :
+          strength < 0.7 ? 'text-yellow-600' :
+          strength < 0.9 ? 'text-blue-600' : 'text-green-600'
+        }`}>
+          {getStrengthLabel()}
+        </span>
+      </div>
+      
+      {/* Barre de progression */}
+      <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+        <div 
+          className={`h-2 rounded-full transition-all duration-300 ${getStrengthColor()}`}
+          style={{ width: `${strength * 100}%` }}
+        ></div>
+      </div>
+      
+      {/* Liste des exigences */}
+      <div className="grid grid-cols-1 gap-1 text-xs">
+        {requirements.map((req, index) => (
+          <div
+            key={index}
+            className={`flex items-center ${req.test ? 'text-green-600' : 'text-gray-400'}`}
+          >
+            <span className="mr-2 text-sm">{req.test ? '✅' : '⭕'}</span>
+            <span>{req.label}</span>
+          </div>
+        ))}
+        
+        {/* Afficher les erreurs spécifiques */}
+        {validation.errors.map((error, index) => (
+          <div key={`error-${index}`} className="flex items-center text-red-600">
+            <span className="mr-2 text-sm">❌</span>
+            <span>{error}</span>
+          </div>
+        ))}
+      </div>
+      
+      {/* Conseils pour améliorer le mot de passe */}
+      {strength < 1 && (
+        <div className="mt-3 pt-2 border-t border-gray-200">
+          <p className="text-xs text-gray-600 font-medium mb-1">Conseils :</p>
+          <ul className="text-xs text-gray-600 space-y-1">
+            {password.length < 12 && (
+              <li>• Utilisez 12+ caractères pour plus de sécurité</li>
+            )}
+            {!/[A-Z]/.test(password) && !/[a-z]/.test(password) && (
+              <li>• Mélangez majuscules et minuscules</li>
+            )}
+            {!/[!@#$%^&*()_+\\-=\\[\\]{};':\"\\|,.<>?]/.test(password) && (
+              <li>• Les caractères spéciaux renforcent la sécurité (optionnel)</li>
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function SignupModal({ 
   authLogic, 
   localError, 
@@ -145,8 +301,7 @@ export function SignupModal({
     setShowConfirmPassword,
     isLoading,
     handleSignupChange,
-    handleSignup,
-    validatePassword
+    handleSignup
   } = authLogic
 
   const [formError, setFormError] = React.useState('')
@@ -228,20 +383,20 @@ export function SignupModal({
   }
 
   // Fonction pour obtenir les classes CSS du bouton selon l'état
-  const getButtonClasses = () => {
-    const baseClasses = "flex justify-center rounded-md border border-transparent py-2 px-4 text-sm font-medium text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 ease-in-out"
-    
-    switch (buttonState) {
-      case 'loading':
-        return `${baseClasses} bg-blue-500 hover:bg-blue-600 focus:ring-blue-500 animate-pulse`
-      case 'success':
-        return `${baseClasses} bg-green-500 hover:bg-green-600 focus:ring-green-500 scale-105`
-      case 'error':
-        return `${baseClasses} bg-red-500 hover:bg-red-600 focus:ring-red-500 animate-shake`
-      default:
-        return `${baseClasses} bg-green-600 hover:bg-green-700 focus:ring-green-500 hover:scale-105`
-    }
-  }
+     const getButtonClasses = () => {
+       const baseClasses = "flex justify-center items-center rounded-md border border-transparent py-2 px-4 text-sm font-medium text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 ease-in-out"
+  
+       switch (buttonState) {
+         case 'loading':
+           return `${baseClasses} bg-blue-500 hover:bg-blue-600 focus:ring-blue-500 animate-pulse`
+         case 'success':
+           return `${baseClasses} bg-green-500 hover:bg-green-600 focus:ring-green-500 scale-105`
+         case 'error':
+           return `${baseClasses} bg-red-500 hover:bg-red-600 focus:ring-red-500 animate-shake`
+         default:
+           return `${baseClasses} bg-green-600 hover:bg-green-700 focus:ring-green-500 hover:scale-105`
+       }
+     }
 
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 p-4 overflow-hidden overscroll-none">
@@ -406,28 +561,10 @@ export function SignupModal({
                     </svg>
                   </button>
                 </div>
+                
+                {/* Indicateur de force du mot de passe moderne */}
                 {signupData.password && (
-                  <div className="mt-2 space-y-1">
-                    {(() => {
-                      const validation = validatePassword(signupData.password)
-                      return validation.errors.map((error: string, index: number) => (
-                        <div key={index} className="flex items-center text-xs text-red-600">
-                          <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                          </svg>
-                          {error}
-                        </div>
-                      ))
-                    })()}
-                    {validatePassword(signupData.password).isValid && (
-                      <div className="flex items-center text-xs text-green-600">
-                        <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        Mot de passe valide
-                      </div>
-                    )}
-                  </div>
+                  <PasswordStrengthIndicator password={signupData.password} />
                 )}
               </div>
 

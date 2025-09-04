@@ -6,24 +6,62 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '@/lib/languages/i18n'
 
-// ==================== VALIDATION MOT DE PASSE ====================
+// ==================== VALIDATION MOT DE PASSE MODERNE ====================
 const validatePassword = (password: string): string[] => {
   const errors: string[] = []
   
+  // Vérifier que le mot de passe n'est pas vide ou seulement des espaces
+  if (!password || password.trim().length === 0) {
+    errors.push('Le mot de passe est requis')
+    return errors
+  }
+  
+  // Minimum 8 caractères
   if (password.length < 8) {
-    errors.push('Le mot de passe doit contenir au moins 8 caracteres')
+    errors.push('Au moins 8 caractères requis')
   }
-  if (!/[A-Z]/.test(password)) {
-    errors.push('Le mot de passe doit contenir au moins une majuscule')
+  
+  // Maximum 128 caractères (sécurité contre les attaques DoS)
+  if (password.length > 128) {
+    errors.push('Maximum 128 caractères autorisés')
   }
-  if (!/[a-z]/.test(password)) {
-    errors.push('Le mot de passe doit contenir au moins une minuscule')
+  
+  // Au moins une lettre (majuscule ou minuscule)
+  if (!/[a-zA-Z]/.test(password)) {
+    errors.push('Au moins une lettre requise')
   }
+  
+  // Au moins un chiffre
   if (!/\d/.test(password)) {
-    errors.push('Le mot de passe doit contenir au moins un chiffre')
+    errors.push('Au moins un chiffre requis')
   }
-  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-    errors.push('Le mot de passe doit contenir au moins un caractere special')
+  
+  // Vérifier les mots de passe faibles courants
+  const commonPasswords = [
+    'password', '12345678', 'qwerty123', 'abc123456', 
+    'password1', 'password123', '123456789', 'motdepasse',
+    'azerty123', '11111111', '00000000'
+  ]
+  if (commonPasswords.some(common => 
+    password.toLowerCase().includes(common.toLowerCase())
+  )) {
+    errors.push('Mot de passe trop commun')
+  }
+  
+  // Vérifier la répétition excessive (plus de 3 caractères identiques consécutifs)
+  if (/(.)\1{3,}/.test(password)) {
+    errors.push('Trop de caractères identiques consécutifs')
+  }
+  
+  // Bonus: Vérifier que ce n'est pas que des caractères séquentiels
+  const sequentialPatterns = [
+    '12345678', '87654321', 'abcdefgh', 'zyxwvuts',
+    'qwertyui', 'asdfghjk', 'zxcvbnm'
+  ]
+  if (sequentialPatterns.some(pattern => 
+    password.toLowerCase().includes(pattern)
+  )) {
+    errors.push('Évitez les séquences de caractères')
   }
   
   return errors
@@ -52,7 +90,102 @@ const EyeSlashIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
   </svg>
 )
 
-// ==================== COMPOSANT CHAMP MOT DE PASSE ====================
+// ==================== INDICATEUR DE FORCE MODERNE ====================
+const PasswordStrengthIndicator: React.FC<{ password: string }> = ({ password }) => {
+  const validation = { errors: validatePassword(password) }
+  
+  const requirements = [
+    { test: password.length >= 8, label: 'Au moins 8 caractères' },
+    { test: /[a-zA-Z]/.test(password), label: 'Au moins une lettre' },
+    { test: /\d/.test(password), label: 'Au moins un chiffre' },
+    { test: !/(.)\\1{3,}/.test(password), label: 'Pas de répétitions excessives' },
+    { test: password.length <= 128, label: 'Longueur raisonnable' }
+  ]
+
+  // Calculer le score de force
+  const passedRequirements = requirements.filter(req => req.test).length
+  const strength = passedRequirements / requirements.length
+  
+  const getStrengthColor = () => {
+    if (strength < 0.4) return 'bg-red-500'
+    if (strength < 0.7) return 'bg-yellow-500'
+    if (strength < 0.9) return 'bg-blue-500'
+    return 'bg-green-500'
+  }
+  
+  const getStrengthLabel = () => {
+    if (strength < 0.4) return 'Faible'
+    if (strength < 0.7) return 'Moyen'
+    if (strength < 0.9) return 'Bon'
+    return 'Excellent'
+  }
+
+  return (
+    <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-medium text-gray-700">
+          Force du mot de passe
+        </p>
+        <span className={`text-xs font-medium ${
+          strength < 0.4 ? 'text-red-600' :
+          strength < 0.7 ? 'text-yellow-600' :
+          strength < 0.9 ? 'text-blue-600' : 'text-green-600'
+        }`}>
+          {getStrengthLabel()}
+        </span>
+      </div>
+      
+      {/* Barre de progression */}
+      <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+        <div 
+          className={`h-2 rounded-full transition-all duration-300 ${getStrengthColor()}`}
+          style={{ width: `${strength * 100}%` }}
+        ></div>
+      </div>
+      
+      {/* Liste des exigences */}
+      <div className="grid grid-cols-1 gap-1 text-xs">
+        {requirements.map((req, index) => (
+          <div
+            key={index}
+            className={`flex items-center ${req.test ? 'text-green-600' : 'text-gray-400'}`}
+          >
+            <span className="mr-2 text-sm">{req.test ? '✅' : '⭕'}</span>
+            <span>{req.label}</span>
+          </div>
+        ))}
+        
+        {/* Afficher les erreurs spécifiques */}
+        {validation.errors.map((error, index) => (
+          <div key={`error-${index}`} className="flex items-center text-red-600">
+            <span className="mr-2 text-sm">❌</span>
+            <span>{error}</span>
+          </div>
+        ))}
+      </div>
+      
+      {/* Conseils pour améliorer le mot de passe */}
+      {strength < 1 && (
+        <div className="mt-3 pt-2 border-t border-gray-200">
+          <p className="text-xs text-gray-600 font-medium mb-1">Conseils :</p>
+          <ul className="text-xs text-gray-600 space-y-1">
+            {password.length < 12 && (
+              <li>• Utilisez 12+ caractères pour plus de sécurité</li>
+            )}
+            {!/[A-Z]/.test(password) && !/[a-z]/.test(password) && (
+              <li>• Mélangez majuscules et minuscules</li>
+            )}
+            {!/[!@#$%^&*()_+\\-=\\[\\]{};':\"\\|,.<>?]/.test(password) && (
+              <li>• Les caractères spéciaux renforcent la sécurité (optionnel)</li>
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ==================== COMPOSANT CHAMP MOT DE PASSE MODERNE ====================
 interface PasswordFieldProps {
   value: string
   onChange: (value: string) => void
@@ -60,7 +193,6 @@ interface PasswordFieldProps {
   label: string
   disabled?: boolean
   showStrength?: boolean
-  showRequirements?: boolean
   confirmValue?: string
   isConfirmField?: boolean
 }
@@ -72,15 +204,10 @@ const PasswordField: React.FC<PasswordFieldProps> = ({
   label,
   disabled = false,
   showStrength = false,
-  showRequirements = false,
   confirmValue,
   isConfirmField = false
 }) => {
   const [showPassword, setShowPassword] = useState(false)
-  const { t } = useTranslation()
-  
-  const passwordErrors = validatePassword(value)
-  const strength = value ? 5 - passwordErrors.length : 0
   
   return (
     <div>
@@ -111,38 +238,9 @@ const PasswordField: React.FC<PasswordFieldProps> = ({
         </button>
       </div>
       
-      {/* Indicateur de force du mot de passe */}
+      {/* Indicateur de force du mot de passe moderne */}
       {showStrength && value && (
-        <div className="mt-2">
-          <div className="text-xs text-gray-600 mb-1">Force du mot de passe :</div>
-          <div className="flex space-x-1">
-            {[1, 2, 3, 4, 5].map((level) => (
-              <div
-                key={level}
-                className={`h-1 flex-1 rounded ${
-                  level <= strength
-                    ? strength <= 1
-                      ? 'bg-red-500'
-                      : strength <= 2
-                      ? 'bg-orange-500'
-                      : strength <= 3
-                      ? 'bg-yellow-500'
-                      : strength <= 4
-                      ? 'bg-blue-500'
-                      : 'bg-green-500'
-                    : 'bg-gray-200'
-                }`}
-              />
-            ))}
-          </div>
-          <div className="text-xs mt-1 text-gray-600">
-            {strength <= 1 && 'Tres faible'}
-            {strength === 2 && 'Faible'}
-            {strength === 3 && 'Moyen'}
-            {strength === 4 && 'Fort'}
-            {strength === 5 && 'Tres fort'}
-          </div>
-        </div>
+        <PasswordStrengthIndicator password={value} />
       )}
       
       {/* Indicateur de correspondance pour confirmation */}
@@ -163,45 +261,6 @@ const PasswordField: React.FC<PasswordFieldProps> = ({
               Les mots de passe ne correspondent pas
             </span>
           )}
-        </div>
-      )}
-      
-      {/* Exigences du mot de passe */}
-      {showRequirements && (
-        <div className="mt-3 bg-gray-50 rounded-lg p-3">
-          <h5 className="text-sm font-medium text-gray-900 mb-2">Exigences du mot de passe :</h5>
-          <ul className="text-xs text-gray-600 space-y-1">
-            <li className="flex items-center space-x-2">
-              <span className={value.length >= 8 ? 'text-green-600' : 'text-gray-400'}>
-                {value.length >= 8 ? '✓' : '○'}
-              </span>
-              <span>{t('validation.password.minLength')}</span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <span className={/[A-Z]/.test(value) ? 'text-green-600' : 'text-gray-400'}>
-                {/[A-Z]/.test(value) ? '✓' : '○'}
-              </span>
-              <span>{t('validation.password.uppercase')}</span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <span className={/[a-z]/.test(value) ? 'text-green-600' : 'text-gray-400'}>
-                {/[a-z]/.test(value) ? '✓' : '○'}
-              </span>
-              <span>{t('validation.password.lowercase')}</span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <span className={/\d/.test(value) ? 'text-green-600' : 'text-gray-400'}>
-                {/\d/.test(value) ? '✓' : '○'}
-              </span>
-              <span>{t('validation.password.number')}</span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <span className={/[!@#$%^&*(),.?":{}|<>]/.test(value) ? 'text-green-600' : 'text-gray-400'}>
-                {/[!@#$%^&*(),.?":{}|<>]/.test(value) ? '✓' : '○'}
-              </span>
-              <span>{t('validation.password.special')}</span>
-            </li>
-          </ul>
         </div>
       )}
     </div>
@@ -363,7 +422,7 @@ function ResetPasswordPageContent() {
       validationErrors.push('Les mots de passe ne correspondent pas')
     }
     
-    // Validation de la force du mot de passe
+    // NOUVELLE VALIDATION MODERNE
     const passwordValidationErrors = validatePassword(formData.newPassword)
     validationErrors.push(...passwordValidationErrors)
     
@@ -497,14 +556,13 @@ function ResetPasswordPageContent() {
         {/* Formulaire */}
         <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
           <div className="space-y-6">
-            {/* Nouveau mot de passe */}
+            {/* Nouveau mot de passe avec indicateur moderne */}
             <PasswordField
               value={formData.newPassword}
               onChange={(value) => handleInputChange('newPassword', value)}
               label="Nouveau mot de passe"
               placeholder={t('placeholder.createSecurePassword')}
               showStrength={true}
-              showRequirements={true}
               disabled={isLoading}
             />
 
@@ -550,12 +608,12 @@ function ResetPasswordPageContent() {
           </Link>
         </div>
 
-        {/* Information securite */}
+        {/* Information securite moderne */}
         <div className="mt-6 text-center">
           <p className="text-xs text-gray-500 leading-relaxed">
-            🔒 Votre nouveau mot de passe respecte les plus hauts standards de securite.
+            🔒 Votre nouveau mot de passe suit les standards de sécurité modernes.
             <br />
-            Il sera automatiquement chiffre et stocke de maniere securisee.
+            Plus accessible et tout aussi sécurisé.
           </p>
         </div>
 
