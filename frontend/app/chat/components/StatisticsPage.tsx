@@ -589,9 +589,9 @@ export const StatisticsPage: React.FC = () => {
         throw new Error('Pas de token d\'authentification disponible')
       }
 
-      console.log('⚡ Tentative endpoint cache: ' + STATS_ENDPOINTS.INVITATIONS)
+      console.log('⚡ Tentative endpoint cache: /api/v1/stats-fast/invitations')
       
-      const fastResponse = await fetch(STATS_ENDPOINTS.INVITATIONS, { headers })
+      const fastResponse = await fetch('/api/v1/stats-fast/invitations', { headers })
       
       if (!fastResponse.ok) {
         throw new Error(`Erreur cache invitations: ${fastResponse.status} - ${fastResponse.statusText}`)
