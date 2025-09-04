@@ -1,8 +1,9 @@
 # app/api/v1/stats_updater.py
 # -*- coding: utf-8 -*-
 """
-Version HYBRIDE - Garde les bonnes intégrations mais corrige la détection de table
-OBJECTIF: Utiliser les mêmes données que /logging/questions + garder health.py et billing.py
+Version CORRIGÉE - Force l'utilisation de user_questions basé sur diagnostic
+OBJECTIF: Utiliser directement la table user_questions qui contient les données réelles
+CORRECTIONS: Supprime l'auto-détection qui échoue, force user_questions
 """
 
 import asyncio
@@ -41,11 +42,11 @@ def safe_str_conversion(value, max_length=100):
 
 class StatisticsUpdater:
     """
-    Version HYBRIDE qui utilise les bonnes données ET garde les intégrations
+    Version CORRIGÉE qui utilise directement user_questions
     """
     
     def __init__(self):
-        logger.info("StatisticsUpdater HYBRIDE - Mêmes données que /logging/questions + intégrations")
+        logger.info("StatisticsUpdater CORRIGÉ - Utilise directement user_questions")
         
         self.cache = get_stats_cache()
         self.analytics = get_analytics_manager()
@@ -53,21 +54,21 @@ class StatisticsUpdater:
         self.last_update = None
         self.update_in_progress = False
         
-        # Identifier la vraie table utilisée par analytics_manager
-        self._correct_table_name = None
+        # Table fixe basée sur le diagnostic
+        self._correct_table_name = "user_questions"
         
         self.collection_stats = {
             "total_collections": 0,
             "successful_collections": 0,
             "initialization_time": datetime.now().isoformat(),
-            "version": "hybride_fixed"
+            "version": "corrigé_user_questions"
         }
         
-        logger.info("StatisticsUpdater HYBRIDE initialisé")
+        logger.info("StatisticsUpdater CORRIGÉ initialisé avec table user_questions")
     
     async def update_all_statistics(self) -> Dict[str, Any]:
         """
-        Fonction principale hybride
+        Fonction principale corrigée
         """
         if self.update_in_progress:
             logger.warning("Mise à jour déjà en cours")
@@ -78,7 +79,7 @@ class StatisticsUpdater:
         self.update_in_progress = True
         
         try:
-            logger.info(f"DÉBUT collecte hybride (RAM: {start_memory}%)")
+            logger.info(f"DÉBUT collecte corrigée avec user_questions (RAM: {start_memory}%)")
             
             # FORCER L'INVALIDATION DU CACHE
             try:
@@ -88,14 +89,14 @@ class StatisticsUpdater:
             except Exception as cache_error:
                 logger.warning(f"Erreur invalidation cache: {cache_error}")
             
-            # Collecte hybride avec toutes les intégrations
-            dashboard_data = await self._collect_hybrid_stats()
+            # Collecte avec table fixe user_questions
+            dashboard_data = await self._collect_corrected_stats()
             
             if dashboard_data.get("status") == "success":
                 final_data = dashboard_data.get("data", {})
                 
                 self.cache.set_dashboard_snapshot(final_data, period_hours=24)
-                self.cache.set_cache("dashboard:main", final_data, ttl_hours=1, source="hybrid_updater")
+                self.cache.set_cache("dashboard:main", final_data, ttl_hours=1, source="corrected_updater")
                 
                 self.collection_stats["successful_collections"] += 1
                 
@@ -117,18 +118,18 @@ class StatisticsUpdater:
                     "end_memory_percent": end_memory,
                     "memory_delta": end_memory - start_memory
                 },
-                "version": "hybride_fixed",
+                "version": "corrigé_user_questions",
                 "table_used": self._correct_table_name
             }
             
-            self.cache.set_cache("system:last_update_summary", result, ttl_hours=25, source="hybrid_updater")
+            self.cache.set_cache("system:last_update_summary", result, ttl_hours=25, source="corrected_updater")
             
-            logger.info(f"Collecte HYBRIDE terminée en {duration_ms}ms avec table: {self._correct_table_name}")
+            logger.info(f"Collecte CORRIGÉE terminée en {duration_ms}ms avec table: {self._correct_table_name}")
             return result
             
         except Exception as e:
             error_msg = safe_str_conversion(e)
-            logger.error(f"Erreur collecte hybride: {error_msg}")
+            logger.error(f"Erreur collecte corrigée: {error_msg}")
             
             return {
                 "status": "failed",
@@ -140,12 +141,11 @@ class StatisticsUpdater:
         finally:
             self.update_in_progress = False
     
-    async def _collect_hybrid_stats(self) -> Dict[str, Any]:
+    async def _collect_corrected_stats(self) -> Dict[str, Any]:
         """
-        Collecte hybride : utilise les bonnes données + intégrations health/billing
+        Collecte corrigée : utilise directement user_questions + intégrations health/billing
         """
         try:
-            # Méthode 1: Utiliser analytics_manager pour identifier la vraie table
             if not self.analytics or not hasattr(self.analytics, 'dsn') or not self.analytics.dsn:
                 logger.warning("Analytics manager non disponible")
                 return {"status": "error", "error": "no_analytics_manager"}
@@ -156,17 +156,10 @@ class StatisticsUpdater:
             with psycopg2.connect(self.analytics.dsn, connect_timeout=15) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     
-                    # IDENTIFIER LA VRAIE TABLE
-                    self._correct_table_name = self._find_correct_table(cur)
+                    logger.info(f"Utilisation forcée de la table: {self._correct_table_name}")
                     
-                    if not self._correct_table_name:
-                        logger.error("Impossible de trouver la table avec données")
-                        return {"status": "error", "error": "no_data_table", "data": self._get_empty_stats()}
-                    
-                    logger.info(f"✅ Table identifiée: {self._correct_table_name}")
-                    
-                    # REQUÊTE PRINCIPALE AVEC LA BONNE TABLE
-                    main_query = f"""
+                    # REQUÊTE PRINCIPALE CORRIGÉE - utilise directement user_questions
+                    main_query = """
                         SELECT 
                             COUNT(*) as total_questions,
                             COUNT(*) FILTER (WHERE DATE(timestamp) = CURRENT_DATE) as questions_today,
@@ -179,22 +172,24 @@ class StatisticsUpdater:
                             MAX(response_time) as max_response_time,
                             PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY response_time) as median_response_time,
                             AVG(confidence_score) * 100 as avg_confidence
-                        FROM {self._correct_table_name} 
+                        FROM user_questions 
                         WHERE timestamp >= CURRENT_DATE - INTERVAL '30 days'
                         AND response_time IS NOT NULL
+                        AND response IS NOT NULL
+                        AND response != ''
                     """
                     
                     cur.execute(main_query)
                     main_result = cur.fetchone()
                     
                     if not main_result or main_result["total_questions"] == 0:
-                        logger.warning(f"Aucune donnée dans {self._correct_table_name}")
+                        logger.warning(f"Aucune donnée dans user_questions")
                         return {"status": "success", "data": self._get_empty_stats()}
                     
-                    # SOURCES DE RÉPONSES
+                    # SOURCES DE RÉPONSES - utilise user_questions directement
                     source_distribution = self._calculate_source_distribution(cur)
                     
-                    # TOP UTILISATEURS avec la bonne table
+                    # TOP UTILISATEURS - utilise user_questions directement
                     top_users = self._calculate_top_users(cur)
                     
                     # INTÉGRATION HEALTH.PY - CONSERVÉE
@@ -203,16 +198,16 @@ class StatisticsUpdater:
                     # INTÉGRATION BILLING_OPENAI.PY - CONSERVÉE  
                     openai_costs = await self._get_real_openai_costs()
                     
-                    # STATS DE FEEDBACK SÉCURISÉES
+                    # STATS DE FEEDBACK SÉCURISÉES - utilise user_questions directement
                     feedback_stats = self._get_safe_feedback_stats(cur)
                     
-                    # STRUCTURE FINALE IDENTIQUE À LA VERSION PRÉCÉDENTE
+                    # STRUCTURE FINALE
                     final_dashboard_data = {
                         # Meta-informations
                         "meta": {
                             "collected_at": datetime.now().isoformat(),
-                            "data_source": f"hybrid_corrected_{self._correct_table_name}",
-                            "version": "hybride_fixed",
+                            "data_source": f"corrected_{self._correct_table_name}",
+                            "version": "corrigé_user_questions",
                             "table_used": self._correct_table_name
                         },
                         
@@ -236,7 +231,7 @@ class StatisticsUpdater:
                             })
                         },
                         
-                        # Usage Stats - DONNÉES RÉELLES DE LA BONNE TABLE
+                        # Usage Stats - DONNÉES RÉELLES DE user_questions
                         "usageStats": {
                             "unique_users": main_result["unique_users"] or 0,
                             "unique_active_users": main_result["active_users_week"] or 0,
@@ -278,81 +273,30 @@ class StatisticsUpdater:
                         "cache_info": {
                             "generated_at": datetime.now().isoformat(),
                             "ttl_hours": 1,
-                            "source": "hybrid_updater"
+                            "source": "corrected_updater"
                         }
                     }
                     
-                    logger.info(f"✅ STATS HYBRIDES: {main_result['unique_users']} users, {main_result['total_questions']} questions, table={self._correct_table_name}")
+                    logger.info(f"STATS CORRIGÉES: {main_result['unique_users']} users, {main_result['total_questions']} questions")
                     return {"status": "success", "data": final_dashboard_data}
                     
         except Exception as e:
             error_msg = safe_str_conversion(e)
-            logger.error(f"Erreur collecte hybride: {error_msg}")
+            logger.error(f"Erreur collecte corrigée: {error_msg}")
             return {"status": "error", "error": error_msg, "data": self._get_empty_stats()}
     
-    def _find_correct_table(self, cur) -> Optional[str]:
-        """
-        Trouve la table qui contient vraiment vos données
-        Utilise la même logique que analytics_manager
-        """
-        # D'abord essayer la table par défaut utilisée par analytics_manager
-        try:
-            # Test avec la même structure que vos données de diagnostic
-            cur.execute("""
-                SELECT COUNT(*) as count, 
-                       COUNT(DISTINCT user_email) as users,
-                       AVG(response_time) as avg_time
-                FROM user_questions 
-                WHERE timestamp >= CURRENT_DATE - INTERVAL '7 days'
-                AND user_email IS NOT NULL
-                AND response_time > 0
-                LIMIT 1
-            """)
-            
-            result = cur.fetchone()
-            if result and result["count"] > 0 and result["users"] > 0:
-                logger.info(f"✅ Table 'user_questions' trouvée: {result['count']} questions, {result['users']} users")
-                return "user_questions"
-                
-        except Exception:
-            pass
-        
-        # Essayer d'autres noms possibles
-        possible_tables = ["questions", "user_questions_complete", "analytics_questions"]
-        
-        for table_name in possible_tables:
-            try:
-                cur.execute(f"""
-                    SELECT COUNT(*) as count, 
-                           COUNT(DISTINCT user_email) as users
-                    FROM {table_name} 
-                    WHERE timestamp >= CURRENT_DATE - INTERVAL '7 days'
-                    AND user_email IS NOT NULL
-                    LIMIT 1
-                """)
-                
-                result = cur.fetchone()
-                if result and result["count"] > 0 and result["users"] > 0:
-                    logger.info(f"✅ Table '{table_name}' trouvée: {result['count']} questions, {result['users']} users")
-                    return table_name
-                    
-            except Exception:
-                continue
-        
-        logger.error("❌ Aucune table trouvée avec des données")
-        return None
-    
     def _calculate_source_distribution(self, cur) -> Dict[str, int]:
-        """Distribution des sources - utilise la bonne table"""
+        """Distribution des sources - utilise user_questions directement"""
         source_distribution = {}
         
         try:
-            cur.execute(f"""
+            cur.execute("""
                 SELECT 
                     response_source, 
                     COUNT(*) as count
-                FROM {self._correct_table_name} 
+                FROM user_questions 
                 WHERE timestamp >= CURRENT_DATE - INTERVAL '7 days'
+                AND response_source IS NOT NULL
                 GROUP BY response_source
                 ORDER BY count DESC
                 LIMIT 10
@@ -376,15 +320,15 @@ class StatisticsUpdater:
         return source_distribution
     
     def _calculate_top_users(self, cur):
-        """Top utilisateurs - utilise la bonne table"""
+        """Top utilisateurs - utilise user_questions directement"""
         top_users = []
         
         try:
-            cur.execute(f"""
+            cur.execute("""
                 SELECT 
                     user_email,
                     COUNT(*) as question_count
-                FROM {self._correct_table_name} 
+                FROM user_questions 
                 WHERE timestamp >= CURRENT_DATE - INTERVAL '30 days'
                     AND user_email IS NOT NULL 
                 GROUP BY user_email
@@ -395,13 +339,13 @@ class StatisticsUpdater:
             top_users_raw = cur.fetchall()
             for row in top_users_raw:
                 user_data = {
-                    "email": row["user_email"][:50],
+                    "email": row["user_email"][:50] if row["user_email"] else "unknown",
                     "question_count": row["question_count"],
                     "plan": "free"
                 }
                 top_users.append(user_data)
                 
-            logger.info(f"✅ Top users calculés: {len(top_users)} utilisateurs")
+            logger.info(f"Top users calculés: {len(top_users)} utilisateurs")
                 
         except Exception as e:
             logger.warning(f"Erreur calcul top users: {e}")
@@ -410,7 +354,7 @@ class StatisticsUpdater:
     
     async def _get_system_health_data(self) -> Dict[str, Any]:
         """
-        INTÉGRATION HEALTH.PY - CONSERVÉE de la version précédente
+        INTÉGRATION HEALTH.PY - CONSERVÉE
         """
         try:
             response = requests.get(
@@ -439,7 +383,7 @@ class StatisticsUpdater:
                     }
                 }
                 
-                logger.info(f"✅ Health.py intégré: uptime={system_health['uptime_hours']}h")
+                logger.info(f"Health.py intégré: uptime={system_health['uptime_hours']}h")
                 return system_health
                 
         except Exception as e:
@@ -457,7 +401,7 @@ class StatisticsUpdater:
     
     async def _get_real_openai_costs(self) -> Dict[str, Any]:
         """
-        INTÉGRATION BILLING_OPENAI.PY - CONSERVÉE de la version précédente
+        INTÉGRATION BILLING_OPENAI.PY - CONSERVÉE
         """
         try:
             response = requests.get(
@@ -478,7 +422,7 @@ class StatisticsUpdater:
                     }
                 }
                 
-                logger.info(f"✅ Billing OpenAI intégré: ${costs_data['costs']['total']:.2f}")
+                logger.info(f"Billing OpenAI intégré: ${costs_data['costs']['total']:.2f}")
                 return costs_data
                 
         except Exception as e:
@@ -487,7 +431,7 @@ class StatisticsUpdater:
         return {"success": False, "costs": {"total": 0}}
     
     def _get_safe_feedback_stats(self, cur) -> Dict[str, Any]:
-        """Stats feedback sécurisées - corrigée pour user_questions"""
+        """Stats feedback sécurisées - utilise user_questions directement"""
         feedback_stats = {
             "total": 0,
             "positive": 0,
@@ -522,7 +466,7 @@ class StatisticsUpdater:
             "meta": {
                 "collected_at": datetime.now().isoformat(),
                 "data_source": "fallback_empty",
-                "version": "hybride_fixed"
+                "version": "corrigé_user_questions"
             },
             "systemStats": {
                 "system_health": {"uptime_hours": 0, "total_requests": 0, "error_rate": 0},
@@ -550,11 +494,11 @@ class StatisticsUpdater:
             else:
                 return {
                     "status": "never_updated",
-                    "message": "Version hybride - jamais exécutée",
+                    "message": "Version corrigée - jamais exécutée",
                     "update_in_progress": self.update_in_progress,
                     "last_update": self.last_update.isoformat() if self.last_update else None,
-                    "version": "hybride_fixed",
-                    "detected_table": self._correct_table_name
+                    "version": "corrigé_user_questions",
+                    "table_used": self._correct_table_name
                 }
                 
         except Exception as e:
@@ -565,7 +509,7 @@ class StatisticsUpdater:
     async def force_update_component(self, component: str) -> Dict[str, Any]:
         """Force la mise à jour"""
         try:
-            logger.info(f"Force update hybride: {component}")
+            logger.info(f"Force update corrigé: {component}")
             return await self.update_all_statistics()
             
         except Exception as e:
@@ -577,24 +521,24 @@ class StatisticsUpdater:
 _stats_updater_instance = None
 
 def get_stats_updater():
-    """Récupère l'instance singleton hybride"""
+    """Récupère l'instance singleton corrigée"""
     global _stats_updater_instance
     if _stats_updater_instance is None:
-        logger.info("Création instance StatisticsUpdater HYBRIDE")
+        logger.info("Création instance StatisticsUpdater CORRIGÉE")
         _stats_updater_instance = StatisticsUpdater()
     return _stats_updater_instance
 
 # Fonctions utilitaires
 async def run_update_cycle():
-    """Exécute un cycle de mise à jour hybride"""
+    """Exécute un cycle de mise à jour corrigé"""
     try:
         updater = get_stats_updater()
         result = await updater.update_all_statistics()
-        logger.info(f"Cycle hybride terminé: {result.get('status', 'unknown')}")
+        logger.info(f"Cycle corrigé terminé: {result.get('status', 'unknown')}")
         return result
     except Exception as e:
         error_msg = safe_str_conversion(e)
-        logger.error(f"Erreur cycle hybride: {error_msg}")
+        logger.error(f"Erreur cycle corrigé: {error_msg}")
         return {
             "status": "failed",
             "error": error_msg,
@@ -602,15 +546,15 @@ async def run_update_cycle():
         }
 
 async def force_update_all():
-    """Force une mise à jour immédiate hybride"""
+    """Force une mise à jour immédiate corrigée"""
     try:
         updater = get_stats_updater()
         result = await updater.update_all_statistics()
-        logger.info(f"Force update hybride terminé: {result.get('status', 'unknown')}")
+        logger.info(f"Force update corrigé terminé: {result.get('status', 'unknown')}")
         return result
     except Exception as e:
         error_msg = safe_str_conversion(e)
-        logger.error(f"Erreur force update hybride: {error_msg}")
+        logger.error(f"Erreur force update corrigé: {error_msg}")
         return {
             "status": "failed",
             "error": error_msg,

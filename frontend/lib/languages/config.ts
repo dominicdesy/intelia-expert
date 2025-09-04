@@ -10,22 +10,29 @@ export interface LanguageConfig {
   dateFormat: string
 }
 
+// Fonction pour détecter la langue du navigateur - DÉPLACÉE AU DÉBUT
+export const detectBrowserLanguage = (): string => {
+  if (typeof window === 'undefined') return 'en'
+  
+  const browserLang = navigator.language || navigator.languages?.[0]
+  if (!browserLang) return 'en'
+  
+  // Extraire le code de langue (ex: 'en-US' -> 'en')
+  const langCode = browserLang.split('-')[0].toLowerCase()
+  
+  // Vérifier si cette langue est supportée
+  return isValidLanguageCode(langCode) ? langCode : 'en'
+}
+
+// Langues triées par ordre alphabétique du code
 export const availableLanguages: LanguageConfig[] = [
   {
-    code: 'zh',
-    name: 'Chinese (Mandarin)',
-    nativeName: '中文',
-    region: 'China',
-    flag: '🇨🇳',
-    dateFormat: 'zh-CN'
-  },
-  {
-    code: 'nl',
-    name: 'Dutch',
-    nativeName: 'Nederlands',
-    region: 'Netherlands',
-    flag: '🇳🇱',
-    dateFormat: 'nl-NL'
+    code: 'de',
+    name: 'German',
+    nativeName: 'Deutsch',
+    region: 'Germany',
+    flag: '🇩🇪',
+    dateFormat: 'de-DE'
   },
   {
     code: 'en',
@@ -36,6 +43,14 @@ export const availableLanguages: LanguageConfig[] = [
     dateFormat: 'en-US'
   },
   {
+    code: 'es',
+    name: 'Spanish',
+    nativeName: 'Español',
+    region: 'Spain',
+    flag: '🇪🇸',
+    dateFormat: 'es-ES'
+  },
+  {
     code: 'fr',
     name: 'French',
     nativeName: 'Français',
@@ -44,17 +59,9 @@ export const availableLanguages: LanguageConfig[] = [
     dateFormat: 'fr-FR'
   },
   {
-    code: 'de',
-    name: 'German',
-    nativeName: 'Deutsch',
-    region: 'Germany',
-    flag: '🇩🇪',
-    dateFormat: 'de-DE'
-  },
-  {
     code: 'hi',
     name: 'Hindi',
-    nativeName: 'हिंदी',
+    nativeName: 'हिन्दी',
     region: 'India',
     flag: '🇮🇳',
     dateFormat: 'hi-IN'
@@ -76,6 +83,14 @@ export const availableLanguages: LanguageConfig[] = [
     dateFormat: 'it-IT'
   },
   {
+    code: 'nl',
+    name: 'Dutch',
+    nativeName: 'Nederlands',
+    region: 'Netherlands',
+    flag: '🇳🇱',
+    dateFormat: 'nl-NL'
+  },
+  {
     code: 'pl',
     name: 'Polish',
     nativeName: 'Polski',
@@ -92,34 +107,34 @@ export const availableLanguages: LanguageConfig[] = [
     dateFormat: 'pt-PT'
   },
   {
-    code: 'es',
-    name: 'Spanish',
-    nativeName: 'Español',
-    region: 'Spain',
-    flag: '🇪🇸',
-    dateFormat: 'es-ES'
-  },
-  {
     code: 'th',
     name: 'Thai',
     nativeName: 'ไทย',
     region: 'Thailand',
     flag: '🇹🇭',
     dateFormat: 'th-TH'
+  },
+  {
+    code: 'zh',
+    name: 'Chinese (Mandarin)',
+    nativeName: '中文',
+    region: 'China',
+    flag: '🇨🇳',
+    dateFormat: 'zh-CN'
   }
 ]
 
-// Langue par défaut
-export const DEFAULT_LANGUAGE = detectBrowserLanguage()
+// Fonction utilitaire pour valider un code de langue - DÉPLACÉE AVANT DEFAULT_LANGUAGE
+export const isValidLanguageCode = (code: string): boolean => {
+  return availableLanguages.some(lang => lang.code === code)
+}
+
+// Langue par défaut - CORRECTION: constante statique
+export const DEFAULT_LANGUAGE = 'en'
 
 // Fonction utilitaire pour obtenir une langue par son code
 export const getLanguageByCode = (code: string): LanguageConfig | undefined => {
   return availableLanguages.find(lang => lang.code === code)
-}
-
-// Fonction utilitaire pour valider un code de langue
-export const isValidLanguageCode = (code: string): boolean => {
-  return availableLanguages.some(lang => lang.code === code)
 }
 
 // Fonction pour obtenir la langue par défaut si le code n'est pas valide
@@ -133,20 +148,6 @@ export const getAvailableLanguages = () => availableLanguages.map(lang => ({
   name: lang.nativeName,
   region: lang.region
 }))
-
-// Fonction pour détecter la langue du navigateur
-export const detectBrowserLanguage = (): string => {
-  if (typeof window === 'undefined') return DEFAULT_LANGUAGE
-  
-  const browserLang = navigator.language || navigator.languages?.[0]
-  if (!browserLang) return DEFAULT_LANGUAGE
-  
-  // Extraire le code de langue (ex: 'en-US' -> 'en')
-  const langCode = browserLang.split('-')[0].toLowerCase()
-  
-  // Vérifier si cette langue est supportée
-  return isValidLanguageCode(langCode) ? langCode : DEFAULT_LANGUAGE
-}
 
 // Langues avec support RTL (Right-to-Left)
 export const RTL_LANGUAGES = new Set(['ar', 'he', 'fa', 'ur'])

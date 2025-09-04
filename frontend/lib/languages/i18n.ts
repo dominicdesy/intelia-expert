@@ -759,12 +759,10 @@ async function loadTranslations(language: string): Promise<TranslationKeys> {
   }
 }
 
-// Hook de traduction - MODIFIÉ POUR PRIORITÉ NAVIGATEUR
+  // Hook de traduction - VERSION CORRIGÉE POUR DÉTECTER LA LANGUE DU NAVIGATEUR
 export const useTranslation = () => {
-  // CHANGEMENT CRITIQUE : initialiser avec la langue du navigateur
-  const [currentLanguage, setCurrentLanguage] = useState<string>(
-    typeof window !== 'undefined' ? detectBrowserLanguage() : DEFAULT_LANGUAGE
-  )
+  // Initialiser avec DEFAULT_LANGUAGE comme valeur statique
+  const [currentLanguage, setCurrentLanguage] = useState<string>(DEFAULT_LANGUAGE)
   const [translations, setTranslations] = useState<TranslationKeys>({} as TranslationKeys)
   const [loading, setLoading] = useState(true)
   const [, forceRender] = useState({}) // Pour forcer les re-renders
