@@ -1,7 +1,8 @@
-# app/api/v1/__init__.py - VERSION 5.1 AVEC SYSTEME DE CACHE + USERS
+# app/api/v1/__init__.py - VERSION 5.2 AVEC SYSTEME DE CACHE + USERS
 # CONSERVATION INTEGRALE DU CODE ORIGINAL + AJOUTS USERS
 # Support des routers de cache statistiques ultra-rapides
 # NOUVEAU: Support du router users pour gestion profils
+# SUPPRESSION: auth_invitations router (fonctionnalités intégrées dans invitations)
 
 from fastapi import APIRouter
 import logging
@@ -75,32 +76,6 @@ except Exception as e:
     users_router = None
     USERS_AVAILABLE = False
 
-# Auth invitations router
-try:
-    logger.info("Tentative import auth_invitations router...")
-    from .auth_invitations import router as auth_invitations_router
-    logger.info("Auth invitations router importe avec succes!")
-    logger.info("Auth invitations router a %d routes", len(auth_invitations_router.routes))
-    logger.info("Auth invitations router prefix: %s", getattr(auth_invitations_router, 'prefix', 'None'))
-    auth_inv_routes = [f"{route.path} ({', '.join(route.methods)})" for route in auth_invitations_router.routes[:3]]
-    logger.info("Auth invitations routes echantillon: %s", auth_inv_routes)
-except ImportError as ie:
-    logger.error("IMPORT ERROR auth_invitations router: %s", ie)
-    logger.error("Le module auth_invitations.py n'a pas pu etre importe")
-    import traceback
-    logger.error("Traceback import auth_invitations: %s", traceback.format_exc())
-    auth_invitations_router = None
-except AttributeError as ae:
-    logger.error("ATTRIBUTE ERROR auth_invitations router: %s", ae)
-    logger.error("Le module auth_invitations.py n'exporte pas 'router'")
-    auth_invitations_router = None
-except Exception as e:
-    logger.error("ERREUR GENERALE auth_invitations router: %s", e)
-    logger.error("Type d'erreur: %s", type(e).__name__)
-    import traceback
-    logger.error("Traceback complet auth_invitations: %s", traceback.format_exc())
-    auth_invitations_router = None
-
 # Stats Fast router (endpoints ultra-rapides)
 STATS_FAST_AVAILABLE = False
 try:
@@ -163,10 +138,11 @@ except Exception as e:
     logger.error("ERREUR import health router: %s", e)
     health_router = None
 
-# Invitations router
+# Invitations router (MAINTENANT AVEC FONCTIONS D'AUTH INTÉGRÉES)
 try:
     from .invitations import router as invitations_router
     logger.info("Invitations router importe avec %d routes", len(invitations_router.routes))
+    logger.info("Invitations router inclut maintenant les fonctions d'auth invitations")
 except Exception as e:
     logger.error("ERREUR import invitations router: %s", e)
     invitations_router = None
@@ -261,19 +237,6 @@ else:
     else:
         logger.error("Users router NON MONTE - import a echoue")
 
-# Auth invitations - AVEC DEBUG COMPLET
-if auth_invitations_router:
-    try:
-        router.include_router(auth_invitations_router, tags=["Auth-Invitations"])
-        logger.info("Auth invitations router monte avec succes!")
-        logger.info("Auth invitations router maintenant disponible sur /v1/auth/invitations/*")
-    except Exception as e:
-        logger.error("ERREUR montage auth_invitations router: %s", e)
-        import traceback
-        logger.error("Traceback montage auth_invitations: %s", traceback.format_exc())
-else:
-    logger.error("Auth invitations router NON MONTE - import a echoue")
-
 # Stats Fast router (endpoints ultra-rapides)
 if STATS_FAST_AVAILABLE and stats_fast_router:
     try:
@@ -318,10 +281,13 @@ if health_router:
     router.include_router(health_router, tags=["Health"])
     logger.info("Health router monte")
 
-# Invitations
+# Invitations (MAINTENANT UNIFIÉ AVEC AUTH INVITATIONS)
 if invitations_router:
     router.include_router(invitations_router, tags=["Invitations"])
-    logger.info("Invitations router monte")
+    logger.info("Invitations router monte (inclut auth invitations)")
+    logger.info("Invitations router disponible sur /v1/invitations/*")
+else:
+    logger.error("Invitations router NON MONTE - import a echoue")
 
 # Logging
 if logging_router:
@@ -373,15 +339,16 @@ if users_route_count > 0:
 else:
     logger.info("Aucune route users detectee - systeme non encore deploye")
 
-# Debug des routes auth invitations specifiquement
-auth_inv_route_count = len([r for r in router.routes if '/auth/invitations' in r.path])
-logger.info("Routes auth invitations detectees: %d", auth_inv_route_count)
+# Debug des routes invitations specifiquement (MAINTENANT UNIFIÉ)
+invitations_route_count = len([r for r in router.routes if '/invitations' in r.path])
+logger.info("Routes invitations detectees: %d", invitations_route_count)
 
-if auth_inv_route_count > 0:
-    auth_inv_routes_debug = [f"{r.path} ({', '.join(r.methods)})" for r in router.routes if '/auth/invitations' in r.path]
-    logger.info("Routes auth invitations disponibles: %s", auth_inv_routes_debug)
+if invitations_route_count > 0:
+    invitations_routes_debug = [f"{r.path} ({', '.join(r.methods)})" for r in router.routes if '/invitations' in r.path]
+    logger.info("Routes invitations disponibles: %s", invitations_routes_debug)
+    logger.info("Systeme invitations unifie ACTIF (inclut auth invitations)!")
 else:
-    logger.error("AUCUNE route auth invitations detectee dans le router final!")
+    logger.error("AUCUNE route invitations detectee dans le router final!")
 
 # Debug des routes stats cache specifiquement
 stats_route_count = len([r for r in router.routes if '/stats-' in r.path])
@@ -402,7 +369,8 @@ system_status = {
     "conversations": CONVERSATIONS_AVAILABLE,
     "total_routes": total_routes,
     "users_routes": users_route_count,
-    "cache_routes": stats_route_count
+    "cache_routes": stats_route_count,
+    "invitations_unified": invitations_route_count > 0
 }
 logger.info("Status systemes: %s", system_status)
 
@@ -416,5 +384,9 @@ if STATS_FAST_AVAILABLE or STATS_ADMIN_AVAILABLE:
     logger.info("Administration: Controle cache disponible")
 else:
     logger.info("Systeme de cache non disponible - fonctionnement normal maintenu")
+
+# Log de la refactorisation
+logger.info("REFACTORISATION COMPLETE: auth_invitations supprime, fonctions integrees dans invitations")
+logger.info("Architecture simplifiee: un seul service pour toutes les fonctions d'invitation")
 
 __all__ = ["router"]

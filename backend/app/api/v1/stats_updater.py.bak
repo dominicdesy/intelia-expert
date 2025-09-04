@@ -4,7 +4,6 @@
 Version CORRIGÉE - Force l'utilisation de user_questions_complete basé sur diagnostic
 OBJECTIF: Utiliser directement la table user_questions_complete qui contient les données réelles
 CORRECTIONS: Supprime l'auto-détection qui échoue, force user_questions_complete
-CORRECTION CRITIQUE: Remplace delete_cache() par invalidate_cache()
 """
 
 import asyncio
@@ -44,11 +43,10 @@ def safe_str_conversion(value, max_length=100):
 class StatisticsUpdater:
     """
     Version CORRIGÉE qui utilise directement user_questions_complete
-    CORRECTION CRITIQUE: Utilise invalidate_cache() au lieu de delete_cache()
     """
     
     def __init__(self):
-        logger.info("StatisticsUpdater CORRIGÉ - Utilise directement user_questions_complete + invalidate_cache")
+        logger.info("StatisticsUpdater CORRIGÉ - Utilise directement user_questions_complete")
         
         self.cache = get_stats_cache()
         self.analytics = get_analytics_manager()
@@ -56,22 +54,21 @@ class StatisticsUpdater:
         self.last_update = None
         self.update_in_progress = False
         
-        # Table fixe basée sur le diagnostic
+        # Table fixe basée sur le diagnostic - CORRECTION 1
         self._correct_table_name = "user_questions_complete"
         
         self.collection_stats = {
             "total_collections": 0,
             "successful_collections": 0,
             "initialization_time": datetime.now().isoformat(),
-            "version": "corrigé_user_questions_complete_v2"
+            "version": "corrigé_user_questions_complete"
         }
         
-        logger.info("StatisticsUpdater CORRIGÉ initialisé avec table user_questions_complete + cache fixé")
+        logger.info("StatisticsUpdater CORRIGÉ initialisé avec table user_questions_complete")
     
     async def update_all_statistics(self) -> Dict[str, Any]:
         """
         Fonction principale corrigée
-        CORRECTION CRITIQUE: Utilise invalidate_cache() au lieu de delete_cache()
         """
         if self.update_in_progress:
             logger.warning("Mise à jour déjà en cours")
@@ -84,11 +81,11 @@ class StatisticsUpdater:
         try:
             logger.info(f"DÉBUT collecte corrigée avec user_questions_complete (RAM: {start_memory}%)")
             
-            # CORRECTION CRITIQUE: invalidate_cache() au lieu de delete_cache()
+            # FORCER L'INVALIDATION DU CACHE
             try:
-                self.cache.invalidate_cache(key="dashboard:main")
-                self.cache.invalidate_cache(key="dashboard:snapshot")
-                logger.info("Cache dashboard invalidé avec invalidate_cache()")
+                self.cache.delete_cache("dashboard:main")
+                self.cache.delete_cache("dashboard:snapshot")
+                logger.info("Cache dashboard invalidé")
             except Exception as cache_error:
                 logger.warning(f"Erreur invalidation cache: {cache_error}")
             
@@ -121,9 +118,8 @@ class StatisticsUpdater:
                     "end_memory_percent": end_memory,
                     "memory_delta": end_memory - start_memory
                 },
-                "version": "corrigé_user_questions_complete_v2",
-                "table_used": self._correct_table_name,
-                "cache_method_fixed": "invalidate_cache"
+                "version": "corrigé_user_questions_complete",
+                "table_used": self._correct_table_name
             }
             
             self.cache.set_cache("system:last_update_summary", result, ttl_hours=25, source="corrected_updater")
@@ -162,7 +158,7 @@ class StatisticsUpdater:
                     
                     logger.info(f"Utilisation forcée de la table: {self._correct_table_name}")
                     
-                    # REQUÊTE PRINCIPALE CORRIGÉE
+                    # REQUÊTE PRINCIPALE CORRIGÉE - CORRECTION 2
                     main_query = """
                         SELECT 
                             COUNT(*) as total_questions,
@@ -211,9 +207,8 @@ class StatisticsUpdater:
                         "meta": {
                             "collected_at": datetime.now().isoformat(),
                             "data_source": f"corrected_{self._correct_table_name}",
-                            "version": "corrigé_user_questions_complete_v2",
-                            "table_used": self._correct_table_name,
-                            "cache_method": "invalidate_cache"
+                            "version": "corrigé_user_questions_complete",
+                            "table_used": self._correct_table_name
                         },
                         
                         # System Stats - INTÉGRATION HEALTH.PY CONSERVÉE
@@ -278,8 +273,7 @@ class StatisticsUpdater:
                         "cache_info": {
                             "generated_at": datetime.now().isoformat(),
                             "ttl_hours": 1,
-                            "source": "corrected_updater_v2",
-                            "cache_invalidation_method": "invalidate_cache"
+                            "source": "corrected_updater"
                         }
                     }
                     
@@ -292,7 +286,7 @@ class StatisticsUpdater:
             return {"status": "error", "error": error_msg, "data": self._get_empty_stats()}
     
     def _calculate_source_distribution(self, cur) -> Dict[str, int]:
-        """Distribution des sources - utilise user_questions_complete directement"""
+        """Distribution des sources - utilise user_questions_complete directement - CORRECTION 3"""
         source_distribution = {}
         
         try:
@@ -326,7 +320,7 @@ class StatisticsUpdater:
         return source_distribution
     
     def _calculate_top_users(self, cur):
-        """Top utilisateurs - utilise user_questions_complete directement"""
+        """Top utilisateurs - utilise user_questions_complete directement - CORRECTION 4"""
         top_users = []
         
         try:
@@ -437,7 +431,7 @@ class StatisticsUpdater:
         return {"success": False, "costs": {"total": 0}}
     
     def _get_safe_feedback_stats(self, cur) -> Dict[str, Any]:
-        """Stats feedback sécurisées - utilise user_questions_complete avec bonnes colonnes"""
+        """Stats feedback sécurisées - utilise user_questions_complete avec bonnes colonnes - CORRECTION 5"""
         feedback_stats = {
             "total": 0,
             "positive": 0,
@@ -472,8 +466,7 @@ class StatisticsUpdater:
             "meta": {
                 "collected_at": datetime.now().isoformat(),
                 "data_source": "fallback_empty",
-                "version": "corrigé_user_questions_complete_v2",
-                "cache_method": "invalidate_cache"
+                "version": "corrigé_user_questions_complete"
             },
             "systemStats": {
                 "system_health": {"uptime_hours": 0, "total_requests": 0, "error_rate": 0},
@@ -504,9 +497,8 @@ class StatisticsUpdater:
                     "message": "Version corrigée - jamais exécutée",
                     "update_in_progress": self.update_in_progress,
                     "last_update": self.last_update.isoformat() if self.last_update else None,
-                    "version": "corrigé_user_questions_complete_v2",
-                    "table_used": self._correct_table_name,
-                    "cache_method": "invalidate_cache"
+                    "version": "corrigé_user_questions_complete",
+                    "table_used": self._correct_table_name
                 }
                 
         except Exception as e:

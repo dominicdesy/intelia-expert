@@ -663,7 +663,6 @@ except ImportError as e:
         ("system", "system"),
         ("admin", "admin"),
         ("invitations", "invitations"),
-        ("auth_invitations", "auth-invitations"),
         ("logging", "logging"),
         ("conversations", "conversations"),
         ("billing", "billing"),
