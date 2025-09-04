@@ -1,6 +1,62 @@
 {
   "page.title": "Bei Intelia Expert anmelden",
 
+  "resetPassword.title": "Neues Passwort",
+  "resetPassword.description": "Wählen Sie ein sicheres neues Passwort für Ihr Intelia Expert-Konto",
+  "resetPassword.newPassword": "Neues Passwort",
+  "resetPassword.confirmPassword": "Neues Passwort bestätigen",
+  "resetPassword.updateButton": "Passwort aktualisieren",
+  "resetPassword.updating": "Aktualisierung...",
+  "resetPassword.backToLogin": "Zurück zur Anmeldung",
+  "resetPassword.needHelp": "Problem mit der Zurücksetzung?",
+  "resetPassword.contactSupport": "Support kontaktieren",
+  "resetPassword.validatingLink": "Link wird validiert...",
+  "resetPassword.securityInfo": "Ihr neues Passwort folgt modernen Sicherheitsstandards. Zugänglicher und genauso sicher.",
+
+  "resetPassword.validation.maxLength": "Maximal 128 Zeichen erlaubt",
+  "resetPassword.validation.letterRequired": "Mindestens ein Buchstabe erforderlich",
+  "resetPassword.validation.tooCommon": "Passwort zu häufig verwendet",
+  "resetPassword.validation.tooRepetitive": "Zu viele aufeinanderfolgende identische Zeichen",
+  "resetPassword.validation.avoidSequences": "Vermeiden Sie Zeichenfolgen",
+
+  "resetPassword.requirements.hasLetter": "Mindestens ein Buchstabe",
+  "resetPassword.requirements.noRepetition": "Keine übermäßigen Wiederholungen",
+  "resetPassword.requirements.reasonableLength": "Angemessene Länge",
+
+  "resetPassword.strength.weak": "Schwach",
+  "resetPassword.strength.medium": "Mittel",
+  "resetPassword.strength.good": "Gut",
+  "resetPassword.strength.excellent": "Ausgezeichnet",
+
+  "resetPassword.passwordStrength": "Passwortstärke",
+  "resetPassword.tips": "Tipps",
+
+  "resetPassword.tip.longerPassword": "Verwenden Sie 12+ Zeichen für mehr Sicherheit",
+  "resetPassword.tip.mixCase": "Mischen Sie Groß- und Kleinbuchstaben",
+  "resetPassword.tip.specialChars": "Sonderzeichen verstärken die Sicherheit (optional)",
+
+  "resetPassword.success.description": "Ihr Passwort wurde erfolgreich aktualisiert. Sie werden in wenigen Sekunden zu expert.intelia.com weitergeleitet.",
+  "resetPassword.success.goToSite": "Jetzt zu expert.intelia.com gehen",
+
+  "resetPassword.invalidToken.title": "Abgelaufener oder ungültiger Link",
+  "resetPassword.invalidToken.description": "Dieser Zurücksetzungslink ist nicht mehr gültig. Er könnte abgelaufen oder bereits verwendet worden sein.",
+  "resetPassword.invalidToken.requestNew": "Neuen Link anfordern",
+  "resetPassword.invalidToken.backToSite": "Zurück zu expert.intelia.com",
+
+  "resetPassword.errors.tokenExpired": "Token abgelaufen oder ungültig. Fordern Sie einen neuen Zurücksetzungslink an.",
+  "resetPassword.errors.tooManyAttempts": "Zu viele Versuche. Bitte versuchen Sie es in einigen Minuten erneut.",
+  "resetPassword.errors.connectionProblem": "Verbindungsproblem. Überprüfen Sie Ihre Internetverbindung.",
+  "resetPassword.errors.generic": "Fehler beim Zurücksetzen des Passworts",
+
+  "error.serverError": "Serverfehler",
+  "error.unexpectedResponse": "Unerwartete Antwort vom Server",
+  "error.checkConnection": "Überprüfen Sie Ihre Verbindung",
+  "error.serviceUnavailable": "Service vorübergehend nicht verfügbar. Versuchen Sie es in einigen Minuten erneut",
+  "auth.emailAlreadyExists": "Diese E-Mail-Adresse wird bereits verwendet",
+  "auth.invalidCredentials": "E-Mail oder Passwort falsch",
+  "auth.emailNotConfirmed": "E-Mail nicht bestätigt. Überprüfen Sie Ihre E-Mails",
+  "auth.passwordRequirementsNotMet": "Das Passwort entspricht nicht den erforderlichen Kriterien",
+
   "auth.success": "Anmeldung erfolgreich",
   "auth.error": "Anmeldungsfehler",
   "auth.incomplete": "Unvollständige Anmeldung",
@@ -337,11 +393,6 @@
   "validation.invalidData": "Ungültige Daten",
   
   "validation.password.requirements": "Passwort-Anforderungen",
-  "validation.password.minLength": "Mindestens 8 Zeichen",
-  "validation.password.uppercase": "Mindestens ein Großbuchstabe",
-  "validation.password.lowercase": "Mindestens ein Kleinbuchstabe",
-  "validation.password.number": "Mindestens eine Ziffer",
-  "validation.password.special": "Mindestens ein Sonderzeichen",
   "validation.password.match": "Passwörter stimmen überein",
   "validation.password.mismatch": "Passwörter stimmen nicht überein",
   

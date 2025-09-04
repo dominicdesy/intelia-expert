@@ -8,11 +8,66 @@ const supabase = getSupabaseClient()
 
 // Types pour le système de traduction - VERSION ORGANISÉE PAR CATÉGORIES
 export interface TranslationKeys {
-  // [... tous les types restent identiques ...]
   // ===========================================
   // PAGE TITLES
   // ===========================================
   'page.title': string
+
+  // ===========================================
+  // RESET PASSWORD - NOUVELLES CLÉS AJOUTÉES
+  // ===========================================
+  'resetPassword.title': string
+  'resetPassword.description': string
+  'resetPassword.newPassword': string
+  'resetPassword.confirmPassword': string
+  'resetPassword.updateButton': string
+  'resetPassword.updating': string
+  'resetPassword.backToLogin': string
+  'resetPassword.needHelp': string
+  'resetPassword.contactSupport': string
+  'resetPassword.validatingLink': string
+  'resetPassword.securityInfo': string
+  
+  // Validation de mot de passe
+  'resetPassword.validation.maxLength': string
+  'resetPassword.validation.letterRequired': string
+  'resetPassword.validation.tooCommon': string
+  'resetPassword.validation.tooRepetitive': string
+  'resetPassword.validation.avoidSequences': string
+  
+  // Exigences mot de passe
+  'resetPassword.requirements.hasLetter': string
+  'resetPassword.requirements.noRepetition': string
+  'resetPassword.requirements.reasonableLength': string
+  
+  // Force du mot de passe
+  'resetPassword.strength.weak': string
+  'resetPassword.strength.medium': string
+  'resetPassword.strength.good': string
+  'resetPassword.strength.excellent': string
+  'resetPassword.passwordStrength': string
+  'resetPassword.tips': string
+  
+  // Conseils
+  'resetPassword.tip.longerPassword': string
+  'resetPassword.tip.mixCase': string
+  'resetPassword.tip.specialChars': string
+  
+  // Messages de succès
+  'resetPassword.success.description': string
+  'resetPassword.success.goToSite': string
+  
+  // Token invalide
+  'resetPassword.invalidToken.title': string
+  'resetPassword.invalidToken.description': string
+  'resetPassword.invalidToken.requestNew': string
+  'resetPassword.invalidToken.backToSite': string
+  
+  // Erreurs reset password
+  'resetPassword.errors.tokenExpired': string
+  'resetPassword.errors.tooManyAttempts': string
+  'resetPassword.errors.connectionProblem': string
+  'resetPassword.errors.generic': string
 
   // ===========================================
   // AUTHENTICATION & AUTH FLOWS
@@ -184,7 +239,7 @@ export interface TranslationKeys {
   'nav.closeSidebar': string
 
   // ===========================================
-  // CHAT INTERFACE
+  // CHAT INTERFACE - CLÉS AJOUTÉES/MODIFIÉES
   // ===========================================
   'chat.welcome': string
   'chat.placeholder': string
@@ -204,7 +259,7 @@ export interface TranslationKeys {
   'chat.sending': string
   'chat.noMessages': string
   'chat.feedbackThanks': string
-  'chat.feedbackComment': string
+  'chat.feedbackCommentPrefix': string  // NOUVELLE CLÉ
   'chat.scrollToBottom': string
   'chat.startQuestion': string
   'chat.redirectingLogin': string
@@ -225,7 +280,7 @@ export interface TranslationKeys {
   'chat.redirectingInProgress': string
 
   // ===========================================
-  // CONVERSATION HISTORY
+  // CONVERSATION HISTORY - NOUVELLES CLÉS AJOUTÉES
   // ===========================================
   'history.confirmClearAll': string
   'history.loadingConversations': string
@@ -249,6 +304,13 @@ export interface TranslationKeys {
   'history.conversationsLoaded': string
   'history.loadingError': string
   'history.renderState': string
+  
+  // Groupes de l'historique - NOUVELLES CLÉS
+  'history.groups.today': string
+  'history.groups.yesterday': string
+  'history.groups.thisWeek': string
+  'history.groups.thisMonth': string
+  'history.groups.older': string
 
   // ===========================================
   // USER PROFILE
@@ -476,6 +538,18 @@ export interface TranslationKeys {
   'error.passwordServerError': string
   'error.userNotConnected': string
   'error.validationErrors': string
+  'error.serverError': string
+  'error.unexpectedResponse': string
+  'error.checkConnection': string
+  'error.serviceUnavailable': string
+
+  // ===========================================
+  // AUTH ERROR MESSAGES - NOUVELLES CLÉS
+  // ===========================================
+  'auth.emailAlreadyExists': string
+  'auth.invalidCredentials': string
+  'auth.emailNotConfirmed': string
+  'auth.passwordRequirementsNotMet': string
 
   // ===========================================
   // VALIDATION RULES & MESSAGES
@@ -571,7 +645,7 @@ export interface TranslationKeys {
   'user.account': string
 
   // ===========================================
-  // FORM PLACEHOLDERS
+  // FORM PLACEHOLDERS - NOUVELLES CLÉS AJOUTÉES
   // ===========================================
   'placeholder.firstName': string
   'placeholder.lastName': string
@@ -602,7 +676,7 @@ export interface TranslationKeys {
   'plan.max': string
 
   // ===========================================
-  // GDPR & LEGAL
+  // GDPR & LEGAL - NOUVELLES CLÉS AJOUTÉES
   // ===========================================
   'gdpr.notice': string
   'gdpr.deleteAccount': string
@@ -613,7 +687,7 @@ export interface TranslationKeys {
   'legal.privacy': string
 
   // ===========================================
-  // COUNTRIES LIST
+  // COUNTRIES LIST - NOUVELLES CLÉS AJOUTÉES
   // ===========================================
   'country.canada': string
   'country.usa': string

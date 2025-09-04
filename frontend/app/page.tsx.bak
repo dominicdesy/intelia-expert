@@ -280,9 +280,9 @@ function LoginPageContent() {
           errorMessage.includes('already exists') || 
           errorMessage.includes('User already exists')) {
         errorMessage = t('auth.emailAlreadyExists') || 'Cette adresse email est déjà utilisée'
-	  } else if (errorMessage.includes('Password') || errorMessage.includes('password')) {
-	    errorMessage = t('auth.passwordRequirementsNotMet') || 'Le mot de passe ne respecte pas les critères requis'      
-	  } else if (errorMessage.includes('Invalid email') || errorMessage.includes('email')) {
+      } else if (errorMessage.includes('Password') || errorMessage.includes('password')) {
+        errorMessage = t('validation.password.requirements') || 'Le mot de passe ne respecte pas les critères requis'
+      } else if (errorMessage.includes('Invalid email') || errorMessage.includes('email')) {
         errorMessage = t('error.emailInvalid')
       } else if (errorMessage.includes('NetworkError') || errorMessage.includes('fetch')) {
         errorMessage = t('error.connection') + '. ' + t('error.checkConnection')

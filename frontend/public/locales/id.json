@@ -1,6 +1,62 @@
 {
   "page.title": "Masuk ke Intelia Expert",
 
+  "resetPassword.title": "Kata Sandi Baru",
+  "resetPassword.description": "Pilih kata sandi baru yang aman untuk akun Intelia Expert Anda",
+  "resetPassword.newPassword": "Kata sandi baru",
+  "resetPassword.confirmPassword": "Konfirmasi kata sandi baru",
+  "resetPassword.updateButton": "Perbarui kata sandi",
+  "resetPassword.updating": "Memperbarui...",
+  "resetPassword.backToLogin": "Kembali ke login",
+  "resetPassword.needHelp": "Masalah dengan reset?",
+  "resetPassword.contactSupport": "Hubungi dukungan",
+  "resetPassword.validatingLink": "Memvalidasi tautan...",
+  "resetPassword.securityInfo": "Kata sandi baru Anda mengikuti standar keamanan modern. Lebih mudah diakses dan sama amannya.",
+
+  "resetPassword.validation.maxLength": "Maksimal 128 karakter diizinkan",
+  "resetPassword.validation.letterRequired": "Setidaknya satu huruf diperlukan",
+  "resetPassword.validation.tooCommon": "Kata sandi terlalu umum",
+  "resetPassword.validation.tooRepetitive": "Terlalu banyak karakter identik berturut-turut",
+  "resetPassword.validation.avoidSequences": "Hindari urutan karakter",
+
+  "resetPassword.requirements.hasLetter": "Setidaknya satu huruf",
+  "resetPassword.requirements.noRepetition": "Tidak ada pengulangan berlebihan",
+  "resetPassword.requirements.reasonableLength": "Panjang yang wajar",
+
+  "resetPassword.strength.weak": "Lemah",
+  "resetPassword.strength.medium": "Sedang",
+  "resetPassword.strength.good": "Baik",
+  "resetPassword.strength.excellent": "Sangat Baik",
+
+  "resetPassword.passwordStrength": "Kekuatan kata sandi",
+  "resetPassword.tips": "Tips",
+
+  "resetPassword.tip.longerPassword": "Gunakan 12+ karakter untuk keamanan yang lebih baik",
+  "resetPassword.tip.mixCase": "Campurkan huruf besar dan kecil",
+  "resetPassword.tip.specialChars": "Karakter khusus meningkatkan keamanan (opsional)",
+
+  "resetPassword.success.description": "Kata sandi Anda telah berhasil diperbarui. Anda akan dialihkan ke expert.intelia.com dalam beberapa detik.",
+  "resetPassword.success.goToSite": "Pergi ke expert.intelia.com sekarang",
+
+  "resetPassword.invalidToken.title": "Tautan kedaluwarsa atau tidak valid",
+  "resetPassword.invalidToken.description": "Tautan reset ini tidak lagi valid. Mungkin sudah kedaluwarsa atau sudah digunakan.",
+  "resetPassword.invalidToken.requestNew": "Minta tautan baru",
+  "resetPassword.invalidToken.backToSite": "Kembali ke expert.intelia.com",
+
+  "resetPassword.errors.tokenExpired": "Token kedaluwarsa atau tidak valid. Minta tautan reset baru.",
+  "resetPassword.errors.tooManyAttempts": "Terlalu banyak percobaan. Silakan coba lagi dalam beberapa menit.",
+  "resetPassword.errors.connectionProblem": "Masalah koneksi. Periksa koneksi internet Anda.",
+  "resetPassword.errors.generic": "Kesalahan saat mereset kata sandi",
+
+  "error.serverError": "Kesalahan server",
+  "error.unexpectedResponse": "Respons server yang tidak diharapkan",
+  "error.checkConnection": "Periksa koneksi Anda",
+  "error.serviceUnavailable": "Layanan sementara tidak tersedia. Coba lagi dalam beberapa menit",
+  "auth.emailAlreadyExists": "Alamat email ini sudah digunakan",
+  "auth.invalidCredentials": "Email atau kata sandi salah",
+  "auth.emailNotConfirmed": "Email belum dikonfirmasi. Periksa email Anda",
+  "auth.passwordRequirementsNotMet": "Kata sandi tidak memenuhi kriteria yang diperlukan",
+
   "auth.success": "Masuk berhasil",
   "auth.error": "Gagal masuk",
   "auth.incomplete": "Masuk tidak lengkap",
@@ -338,11 +394,6 @@
   "validation.invalidData": "Data tidak valid",
   
   "validation.password.requirements": "Persyaratan kata sandi",
-  "validation.password.minLength": "Minimal 8 karakter",
-  "validation.password.uppercase": "Minimal satu huruf besar",
-  "validation.password.lowercase": "Minimal satu huruf kecil",
-  "validation.password.number": "Minimal satu angka",
-  "validation.password.special": "Minimal satu karakter khusus",
   "validation.password.match": "Kata sandi cocok",
   "validation.password.mismatch": "Kata sandi tidak cocok",
   

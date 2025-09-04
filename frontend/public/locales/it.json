@@ -1,6 +1,63 @@
 {
   "page.title": "Accedi a Intelia Expert",
 
+  "resetPassword.title": "Nuova password",
+  "resetPassword.description": "Scegli una nuova password sicura per il tuo account Intelia Expert",
+  "resetPassword.newPassword": "Nuova password",
+  "resetPassword.confirmPassword": "Conferma nuova password",
+  "resetPassword.updateButton": "Aggiorna password",
+  "resetPassword.updating": "Aggiornamento...",
+  "resetPassword.backToLogin": "Torna al login",
+  "resetPassword.needHelp": "Problema con il reset?",
+  "resetPassword.contactSupport": "Contatta il supporto",
+  "resetPassword.validatingLink": "Validazione link...",
+  "resetPassword.securityInfo": "La tua nuova password segue gli standard di sicurezza moderni. Più accessibile e altrettanto sicura.",
+
+  "resetPassword.validation.maxLength": "Massimo 128 caratteri consentiti",
+  "resetPassword.validation.letterRequired": "Almeno una lettera richiesta",
+  "resetPassword.validation.tooCommon": "Password troppo comune",
+  "resetPassword.validation.tooRepetitive": "Troppi caratteri identici consecutivi",
+  "resetPassword.validation.avoidSequences": "Evita sequenze di caratteri",
+
+  "resetPassword.requirements.hasLetter": "Almeno una lettera",
+  "resetPassword.requirements.noRepetition": "Nessuna ripetizione eccessiva",
+  "resetPassword.requirements.reasonableLength": "Lunghezza ragionevole",
+
+  "resetPassword.strength.weak": "Debole",
+  "resetPassword.strength.medium": "Medio",
+  "resetPassword.strength.good": "Buono",
+  "resetPassword.strength.excellent": "Eccellente",
+
+  "resetPassword.passwordStrength": "Forza della password",
+  "resetPassword.tips": "Suggerimenti",
+
+  "resetPassword.tip.longerPassword": "Usa 12+ caratteri per maggiore sicurezza",
+  "resetPassword.tip.mixCase": "Mescola maiuscole e minuscole",
+  "resetPassword.tip.specialChars": "I caratteri speciali migliorano la sicurezza (opzionale)",
+
+  "resetPassword.success.description": "La tua password è stata aggiornata con successo. Sarai reindirizzato a expert.intelia.com tra pochi secondi.",
+  "resetPassword.success.goToSite": "Vai a expert.intelia.com ora",
+
+  "resetPassword.invalidToken.title": "Link scaduto o non valido",
+  "resetPassword.invalidToken.description": "Questo link di reset non è più valido. Potrebbe essere scaduto o già utilizzato.",
+  "resetPassword.invalidToken.requestNew": "Richiedi nuovo link",
+  "resetPassword.invalidToken.backToSite": "Torna a expert.intelia.com",
+
+  "resetPassword.errors.tokenExpired": "Token scaduto o non valido. Richiedi un nuovo link di reset.",
+  "resetPassword.errors.tooManyAttempts": "Troppi tentativi. Riprova tra qualche minuto.",
+  "resetPassword.errors.connectionProblem": "Problema di connessione. Controlla la tua connessione internet.",
+  "resetPassword.errors.generic": "Errore durante il reset della password",
+
+  "error.serverError": "Errore del server",
+  "error.unexpectedResponse": "Risposta inaspettata del server",
+  "error.checkConnection": "Controlla la tua connessione",
+  "error.serviceUnavailable": "Servizio temporaneamente non disponibile. Riprova tra qualche minuto",
+  "auth.emailAlreadyExists": "Questo indirizzo email è già in uso",
+  "auth.invalidCredentials": "Email o password errata",
+  "auth.emailNotConfirmed": "Email non confermata. Controlla le tue email",
+  "auth.passwordRequirementsNotMet": "La password non soddisfa i criteri richiesti",
+
+
   "auth.success": "Accesso riuscito",
   "auth.error": "Errore di accesso",
   "auth.incomplete": "Accesso incompleto",
@@ -338,11 +395,6 @@
   "validation.invalidData": "Dati non validi",
   
   "validation.password.requirements": "Requisiti password",
-  "validation.password.minLength": "Almeno 8 caratteri",
-  "validation.password.uppercase": "Almeno una maiuscola",
-  "validation.password.lowercase": "Almeno una minuscola",
-  "validation.password.number": "Almeno un numero",
-  "validation.password.special": "Almeno un carattere speciale",
   "validation.password.match": "Le password corrispondono",
   "validation.password.mismatch": "Le password non corrispondono",
   

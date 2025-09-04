@@ -1,6 +1,62 @@
 {
   "page.title": "Sign in to Intelia Expert",
 
+  "resetPassword.title": "New Password",
+  "resetPassword.description": "Choose a secure new password for your Intelia Expert account",
+  "resetPassword.newPassword": "New password",
+  "resetPassword.confirmPassword": "Confirm new password",
+  "resetPassword.updateButton": "Update password",
+  "resetPassword.updating": "Updating...",
+  "resetPassword.backToLogin": "Back to login",
+  "resetPassword.needHelp": "Problem with reset?",
+  "resetPassword.contactSupport": "Contact support",
+  "resetPassword.validatingLink": "Validating link...",
+  "resetPassword.securityInfo": "Your new password follows modern security standards. More accessible and just as secure.",
+
+  "resetPassword.validation.maxLength": "Maximum 128 characters allowed",
+  "resetPassword.validation.letterRequired": "At least one letter required",
+  "resetPassword.validation.tooCommon": "Password too common",
+  "resetPassword.validation.tooRepetitive": "Too many consecutive identical characters",
+  "resetPassword.validation.avoidSequences": "Avoid character sequences",
+
+  "resetPassword.requirements.hasLetter": "At least one letter",
+  "resetPassword.requirements.noRepetition": "No excessive repetition",
+  "resetPassword.requirements.reasonableLength": "Reasonable length",
+
+  "resetPassword.strength.weak": "Weak",
+  "resetPassword.strength.medium": "Medium",
+  "resetPassword.strength.good": "Good",
+  "resetPassword.strength.excellent": "Excellent",
+
+  "resetPassword.passwordStrength": "Password strength",
+  "resetPassword.tips": "Tips",
+
+  "resetPassword.tip.longerPassword": "Use 12+ characters for better security",
+  "resetPassword.tip.mixCase": "Mix uppercase and lowercase",
+  "resetPassword.tip.specialChars": "Special characters enhance security (optional)",
+
+  "resetPassword.success.description": "Your password has been updated successfully. You will be redirected to expert.intelia.com in a few seconds.",
+  "resetPassword.success.goToSite": "Go to expert.intelia.com now",
+
+  "resetPassword.invalidToken.title": "Expired or invalid link",
+  "resetPassword.invalidToken.description": "This reset link is no longer valid. It may have expired or already been used.",
+  "resetPassword.invalidToken.requestNew": "Request new link",
+  "resetPassword.invalidToken.backToSite": "Back to expert.intelia.com",
+
+  "resetPassword.errors.tokenExpired": "Token expired or invalid. Request a new reset link.",
+  "resetPassword.errors.tooManyAttempts": "Too many attempts. Please try again in a few minutes.",
+  "resetPassword.errors.connectionProblem": "Connection problem. Check your internet connection.",
+  "resetPassword.errors.generic": "Error resetting password",
+
+  "error.serverError": "Server error",
+  "error.unexpectedResponse": "Unexpected server response",
+  "error.checkConnection": "Check your connection",
+  "error.serviceUnavailable": "Service temporarily unavailable. Try again in a few minutes",
+  "auth.emailAlreadyExists": "This email address is already in use",
+  "auth.invalidCredentials": "Incorrect email or password",
+  "auth.emailNotConfirmed": "Email not confirmed. Check your emails",
+  "auth.passwordRequirementsNotMet": "Password does not meet the required criteria",
+
   "auth.success": "Login successful",
   "auth.error": "Login error",
   "auth.incomplete": "Incomplete login",
@@ -338,11 +394,6 @@
   "validation.invalidData": "Invalid data",
   
   "validation.password.requirements": "Password requirements",
-  "validation.password.minLength": "At least 8 characters",
-  "validation.password.uppercase": "At least one uppercase",
-  "validation.password.lowercase": "At least one lowercase",
-  "validation.password.number": "At least one digit",
-  "validation.password.special": "At least one special character",
   "validation.password.match": "Passwords match",
   "validation.password.mismatch": "Passwords do not match",
   

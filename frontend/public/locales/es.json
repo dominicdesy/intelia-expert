@@ -1,6 +1,62 @@
 {
   "page.title": "Iniciar sesión en Intelia Expert",
 
+  "resetPassword.title": "Nueva contraseña",
+  "resetPassword.description": "Elija una contraseña segura nueva para su cuenta Intelia Expert",
+  "resetPassword.newPassword": "Nueva contraseña",
+  "resetPassword.confirmPassword": "Confirmar nueva contraseña",
+  "resetPassword.updateButton": "Actualizar contraseña",
+  "resetPassword.updating": "Actualizando...",
+  "resetPassword.backToLogin": "Volver al inicio de sesión",
+  "resetPassword.needHelp": "¿Problema con el restablecimiento?",
+  "resetPassword.contactSupport": "Contactar soporte",
+  "resetPassword.validatingLink": "Validando enlace...",
+  "resetPassword.securityInfo": "Su nueva contraseña sigue los estándares de seguridad modernos. Más accesible e igual de segura.",
+
+  "resetPassword.validation.maxLength": "Máximo 128 caracteres permitidos",
+  "resetPassword.validation.letterRequired": "Al menos una letra requerida",
+  "resetPassword.validation.tooCommon": "Contraseña demasiado común",
+  "resetPassword.validation.tooRepetitive": "Demasiados caracteres idénticos consecutivos",
+  "resetPassword.validation.avoidSequences": "Evite secuencias de caracteres",
+
+  "resetPassword.requirements.hasLetter": "Al menos una letra",
+  "resetPassword.requirements.noRepetition": "Sin repeticiones excesivas",
+  "resetPassword.requirements.reasonableLength": "Longitud razonable",
+
+  "resetPassword.strength.weak": "Débil",
+  "resetPassword.strength.medium": "Medio",
+  "resetPassword.strength.good": "Bueno",
+  "resetPassword.strength.excellent": "Excelente",
+
+  "resetPassword.passwordStrength": "Fuerza de la contraseña",
+  "resetPassword.tips": "Consejos",
+
+  "resetPassword.tip.longerPassword": "Use 12+ caracteres para mayor seguridad",
+  "resetPassword.tip.mixCase": "Mezcle mayúsculas y minúsculas",
+  "resetPassword.tip.specialChars": "Los caracteres especiales mejoran la seguridad (opcional)",
+
+  "resetPassword.success.description": "Su contraseña ha sido actualizada con éxito. Será redirigido a expert.intelia.com en unos segundos.",
+  "resetPassword.success.goToSite": "Ir a expert.intelia.com ahora",
+
+  "resetPassword.invalidToken.title": "Enlace expirado o inválido",
+  "resetPassword.invalidToken.description": "Este enlace de restablecimiento ya no es válido. Puede haber expirado o ya haber sido usado.",
+  "resetPassword.invalidToken.requestNew": "Solicitar nuevo enlace",
+  "resetPassword.invalidToken.backToSite": "Volver a expert.intelia.com",
+
+  "resetPassword.errors.tokenExpired": "Token expirado o inválido. Solicite un nuevo enlace de restablecimiento.",
+  "resetPassword.errors.tooManyAttempts": "Demasiados intentos. Inténtelo de nuevo en unos minutos.",
+  "resetPassword.errors.connectionProblem": "Problema de conexión. Verifique su conexión a internet.",
+  "resetPassword.errors.generic": "Error al restablecer la contraseña",
+
+  "error.serverError": "Error del servidor",
+  "error.unexpectedResponse": "Respuesta inesperada del servidor",
+  "error.checkConnection": "Verifique su conexión",
+  "error.serviceUnavailable": "Servicio temporalmente no disponible. Intente de nuevo en unos minutos",
+  "auth.emailAlreadyExists": "Esta dirección de correo ya está en uso",
+  "auth.invalidCredentials": "Email o contraseña incorrectos",
+  "auth.emailNotConfirmed": "Email no confirmado. Verifique sus correos",
+  "auth.passwordRequirementsNotMet": "La contraseña no cumple los criterios requeridos",
+
   "auth.success": "Inicio de sesión exitoso",
   "auth.error": "Error de inicio de sesión", 
   "auth.incomplete": "Inicio de sesión incompleto",
@@ -430,12 +486,8 @@
   "validation.required.accessToken": "Token de acceso requerido",
   "validation.correctErrors": "Por favor corrija los siguientes errores:",
   "validation.invalidData": "Datos inválidos",
+
   "validation.password.requirements": "Requisitos de contraseña",
-  "validation.password.minLength": "Al menos 8 caracteres",
-  "validation.password.uppercase": "Al menos una mayúscula",
-  "validation.password.lowercase": "Al menos una minúscula",
-  "validation.password.number": "Al menos un dígito",
-  "validation.password.special": "Al menos un carácter especial",
   "validation.password.match": "Las contraseñas coinciden",
   "validation.password.mismatch": "Las contraseñas no coinciden",
   "validation.phone.incomplete": "Teléfono incompleto",

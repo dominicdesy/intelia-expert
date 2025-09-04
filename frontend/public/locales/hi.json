@@ -1,6 +1,62 @@
 {
   "page.title": "Intelia Expert में साइन इन करें",
 
+  "resetPassword.title": "नया पासवर्ड",
+  "resetPassword.description": "अपने Intelia Expert खाते के लिए एक सुरक्षित नया पासवर्ड चुनें",
+  "resetPassword.newPassword": "नया पासवर्ड",
+  "resetPassword.confirmPassword": "नए पासवर्ड की पुष्टि करें",
+  "resetPassword.updateButton": "पासवर्ड अपडेट करें",
+  "resetPassword.updating": "अपडेट हो रहा है...",
+  "resetPassword.backToLogin": "लॉगिन पर वापस जाएं",
+  "resetPassword.needHelp": "रीसेट में समस्या?",
+  "resetPassword.contactSupport": "सहायता से संपर्क करें",
+  "resetPassword.validatingLink": "लिंक की जांच हो रही है...",
+  "resetPassword.securityInfo": "आपका नया पासवर्ड आधुनिक सुरक्षा मानकों का पालन करता है। अधिक सुलभ और उतना ही सुरक्षित।",
+
+  "resetPassword.validation.maxLength": "अधिकतम 128 वर्ण अनुमतित",
+  "resetPassword.validation.letterRequired": "कम से कम एक अक्षर आवश्यक",
+  "resetPassword.validation.tooCommon": "पासवर्ड बहुत सामान्य है",
+  "resetPassword.validation.tooRepetitive": "बहुत सारे लगातार समान वर्ण",
+  "resetPassword.validation.avoidSequences": "वर्ण अनुक्रमों से बचें",
+
+  "resetPassword.requirements.hasLetter": "कम से कम एक अक्षर",
+  "resetPassword.requirements.noRepetition": "अत्यधिक दोहराव नहीं",
+  "resetPassword.requirements.reasonableLength": "उचित लंबाई",
+
+  "resetPassword.strength.weak": "कमजोर",
+  "resetPassword.strength.medium": "मध्यम",
+  "resetPassword.strength.good": "अच्छा",
+  "resetPassword.strength.excellent": "उत्कृष्ट",
+
+  "resetPassword.passwordStrength": "पासवर्ड की मजबूती",
+  "resetPassword.tips": "सुझाव",
+
+  "resetPassword.tip.longerPassword": "बेहतर सुरक्षा के लिए 12+ वर्ण का उपयोग करें",
+  "resetPassword.tip.mixCase": "बड़े और छोटे अक्षर मिलाएं",
+  "resetPassword.tip.specialChars": "विशेष वर्ण सुरक्षा बढ़ाते हैं (वैकल्पिक)",
+
+  "resetPassword.success.description": "आपका पासवर्ड सफलतापूर्वक अपडेट हो गया है। आप कुछ सेकंड में expert.intelia.com पर रीडायरेक्ट हो जाएंगे।",
+  "resetPassword.success.goToSite": "अब expert.intelia.com पर जाएं",
+
+  "resetPassword.invalidToken.title": "समाप्त या अमान्य लिंक",
+  "resetPassword.invalidToken.description": "यह रीसेट लिंक अब मान्य नहीं है। यह समाप्त हो गया हो या पहले से उपयोग किया जा चुका हो।",
+  "resetPassword.invalidToken.requestNew": "नया लिंक मांगें",
+  "resetPassword.invalidToken.backToSite": "expert.intelia.com पर वापस जाएं",
+
+  "resetPassword.errors.tokenExpired": "टोकन समाप्त या अमान्य। एक नया रीसेट लिंक मांगें।",
+  "resetPassword.errors.tooManyAttempts": "बहुत सारे प्रयास। कृपया कुछ मिनट बाद फिर कोशिश करें।",
+  "resetPassword.errors.connectionProblem": "कनेक्शन समस्या। अपना इंटरनेट कनेक्शन जांचें।",
+  "resetPassword.errors.generic": "पासवर्ड रीसेट करने में त्रुटि",
+
+  "error.serverError": "सर्वर त्रुटि",
+  "error.unexpectedResponse": "सर्वर से अप्रत्याशित प्रतिक्रिया",
+  "error.checkConnection": "अपना कनेक्शन जांचें",
+  "error.serviceUnavailable": "सेवा अस्थायी रूप से अनुपलब्ध। कुछ मिनट बाद फिर कोशिश करें",
+  "auth.emailAlreadyExists": "यह ईमेल पता पहले से उपयोग में है",
+  "auth.invalidCredentials": "गलत ईमेल या पासवर्ड",
+  "auth.emailNotConfirmed": "ईमेल की पुष्टि नहीं हुई। अपने ईमेल जांचें",
+  "auth.passwordRequirementsNotMet": "पासवर्ड आवश्यक मानदंडों को पूरा नहीं करता",
+
   "auth.success": "लॉगिन सफल",
   "auth.error": "लॉगिन त्रुटि",
   "auth.incomplete": "अधूरा लॉगिन",
@@ -338,11 +394,6 @@
   "validation.invalidData": "अमान्य डेटा",
   
   "validation.password.requirements": "पासवर्ड आवश्यकताएं",
-  "validation.password.minLength": "कम से कम 8 अक्षर",
-  "validation.password.uppercase": "कम से कम एक बड़ा अक्षर",
-  "validation.password.lowercase": "कम से कम एक छोटा अक्षर",
-  "validation.password.number": "कम से कम एक अंक",
-  "validation.password.special": "कम से कम एक विशेष अक्षर",
   "validation.password.match": "पासवर्ड मेल खाते हैं",
   "validation.password.mismatch": "पासवर्ड मेल नहीं खाते",
   

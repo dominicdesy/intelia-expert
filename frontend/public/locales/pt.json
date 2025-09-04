@@ -1,6 +1,62 @@
 {
   "page.title": "Fazer login no Intelia Expert",
 
+  "resetPassword.title": "Nova palavra-passe",
+  "resetPassword.description": "Escolha uma nova palavra-passe segura para a sua conta Intelia Expert",
+  "resetPassword.newPassword": "Nova palavra-passe",
+  "resetPassword.confirmPassword": "Confirmar nova palavra-passe",
+  "resetPassword.updateButton": "Atualizar palavra-passe",
+  "resetPassword.updating": "Atualizando...",
+  "resetPassword.backToLogin": "Voltar ao login",
+  "resetPassword.needHelp": "Problema com o reset?",
+  "resetPassword.contactSupport": "Contactar suporte",
+  "resetPassword.validatingLink": "Validando ligação...",
+  "resetPassword.securityInfo": "A sua nova palavra-passe segue os padrões de segurança modernos. Mais acessível e igualmente segura.",
+
+  "resetPassword.validation.maxLength": "Máximo de 128 caracteres permitidos",
+  "resetPassword.validation.letterRequired": "Pelo menos uma letra necessária",
+  "resetPassword.validation.tooCommon": "Palavra-passe demasiado comum",
+  "resetPassword.validation.tooRepetitive": "Demasiados caracteres idênticos consecutivos",
+  "resetPassword.validation.avoidSequences": "Evite sequências de caracteres",
+
+  "resetPassword.requirements.hasLetter": "Pelo menos uma letra",
+  "resetPassword.requirements.noRepetition": "Sem repetições excessivas",
+  "resetPassword.requirements.reasonableLength": "Comprimento razoável",
+
+  "resetPassword.strength.weak": "Fraca",
+  "resetPassword.strength.medium": "Média",
+  "resetPassword.strength.good": "Boa",
+  "resetPassword.strength.excellent": "Excelente",
+
+  "resetPassword.passwordStrength": "Força da palavra-passe",
+  "resetPassword.tips": "Dicas",
+
+  "resetPassword.tip.longerPassword": "Use 12+ caracteres para melhor segurança",
+  "resetPassword.tip.mixCase": "Misture maiúsculas e minúsculas",
+  "resetPassword.tip.specialChars": "Caracteres especiais melhoram a segurança (opcional)",
+
+  "resetPassword.success.description": "A sua palavra-passe foi atualizada com sucesso. Será redirecionado para expert.intelia.com em poucos segundos.",
+  "resetPassword.success.goToSite": "Ir para expert.intelia.com agora",
+
+  "resetPassword.invalidToken.title": "Ligação expirada ou inválida",
+  "resetPassword.invalidToken.description": "Esta ligação de reset já não é válida. Pode ter expirado ou já ter sido usada.",
+  "resetPassword.invalidToken.requestNew": "Solicitar nova ligação",
+  "resetPassword.invalidToken.backToSite": "Voltar a expert.intelia.com",
+
+  "resetPassword.errors.tokenExpired": "Token expirado ou inválido. Solicite uma nova ligação de reset.",
+  "resetPassword.errors.tooManyAttempts": "Demasiadas tentativas. Tente novamente em alguns minutos.",
+  "resetPassword.errors.connectionProblem": "Problema de conexão. Verifique a sua conexão à internet.",
+  "resetPassword.errors.generic": "Erro ao redefinir palavra-passe",
+
+  "error.serverError": "Erro do servidor",
+  "error.unexpectedResponse": "Resposta inesperada do servidor",
+  "error.checkConnection": "Verifique a sua conexão",
+  "error.serviceUnavailable": "Serviço temporariamente indisponível. Tente novamente em alguns minutos",
+  "auth.emailAlreadyExists": "Este endereço de email já está em uso",
+  "auth.invalidCredentials": "Email ou palavra-passe incorretos",
+  "auth.emailNotConfirmed": "Email não confirmado. Verifique os seus emails",
+  "auth.passwordRequirementsNotMet": "A palavra-passe não cumpre os critérios necessários",
+
   "auth.success": "Login bem-sucedido",
   "auth.error": "Erro de login",
   "auth.incomplete": "Login incompleto",
@@ -336,11 +392,6 @@
   "validation.invalidData": "Dados inválidos",
   
   "validation.password.requirements": "Requisitos da senha",
-  "validation.password.minLength": "Pelo menos 8 caracteres",
-  "validation.password.uppercase": "Pelo menos uma maiúscula",
-  "validation.password.lowercase": "Pelo menos uma minúscula",
-  "validation.password.number": "Pelo menos um dígito",
-  "validation.password.special": "Pelo menos um caractere especial",
   "validation.password.match": "Senhas coincidem",
   "validation.password.mismatch": "Senhas não coincidem",
   

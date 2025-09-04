@@ -1,6 +1,62 @@
 {
   "page.title": "เข้าสู่ระบบ Intelia Expert",
 
+  "resetPassword.title": "รหัสผ่านใหม่",
+  "resetPassword.description": "เลือกรหัสผ่านใหม่ที่ปลอดภัยสำหรับบัญชี Intelia Expert ของคุณ",
+  "resetPassword.newPassword": "รหัสผ่านใหม่",
+  "resetPassword.confirmPassword": "ยืนยันรหัสผ่านใหม่",
+  "resetPassword.updateButton": "อัปเดตรหัสผ่าน",
+  "resetPassword.updating": "กำลังอัปเดต...",
+  "resetPassword.backToLogin": "กลับไปหน้าเข้าสู่ระบบ",
+  "resetPassword.needHelp": "มีปัญหาในการรีเซ็ต?",
+  "resetPassword.contactSupport": "ติดต่อฝ่ายสนับสนุน",
+  "resetPassword.validatingLink": "กำลังตรวจสอบลิงก์...",
+  "resetPassword.securityInfo": "รหัสผ่านใหม่ของคุณเป็นไปตามมาตรฐานความปลอดภัยสมัยใหม่ เข้าถึงได้ง่ายขึ้นและปลอดภัยเท่าเดิม",
+
+  "resetPassword.validation.maxLength": "อนุญาตได้สูงสุด 128 ตัวอักษร",
+  "resetPassword.validation.letterRequired": "ต้องมีตัวอักษรอย่างน้อยหนึ่งตัว",
+  "resetPassword.validation.tooCommon": "รหัสผ่านธรรมดาเกินไป",
+  "resetPassword.validation.tooRepetitive": "มีตัวอักษรเดียวกันติดกันมากเกินไป",
+  "resetPassword.validation.avoidSequences": "หลีกเลี่ยงลำดับตัวอักษร",
+
+  "resetPassword.requirements.hasLetter": "อย่างน้อยหนึ่งตัวอักษร",
+  "resetPassword.requirements.noRepetition": "ไม่มีการทำซ้ำมากเกินไป",
+  "resetPassword.requirements.reasonableLength": "ความยาวที่เหมาะสม",
+
+  "resetPassword.strength.weak": "อ่อน",
+  "resetPassword.strength.medium": "ปานกลาง",
+  "resetPassword.strength.good": "ดี",
+  "resetPassword.strength.excellent": "ยอดเยี่ยม",
+
+  "resetPassword.passwordStrength": "ความแข็งแกร่งของรหัสผ่าน",
+  "resetPassword.tips": "คำแนะนำ",
+
+  "resetPassword.tip.longerPassword": "ใช้ 12+ ตัวอักษรเพื่อความปลอดภัยที่ดีขึ้น",
+  "resetPassword.tip.mixCase": "ผสมตัวอักษรใหญ่และเล็ก",
+  "resetPassword.tip.specialChars": "อักขระพิเศษช่วยเพิ่มความปลอดภัย (ไม่บังคับ)",
+
+  "resetPassword.success.description": "รหัสผ่านของคุณได้รับการอัปเดตเรียบร้อยแล้ว คุณจะถูกเปลี่ยนเส้นทางไปยัง expert.intelia.com ในไม่กี่วินาที",
+  "resetPassword.success.goToSite": "ไปที่ expert.intelia.com เลย",
+
+  "resetPassword.invalidToken.title": "ลิงก์หมดอายุหรือไม่ถูกต้อง",
+  "resetPassword.invalidToken.description": "ลิงก์รีเซ็ตนี้ไม่ถูกต้องแล้ว อาจหมดอายุหรือถูกใช้ไปแล้ว",
+  "resetPassword.invalidToken.requestNew": "ขอลิงก์ใหม่",
+  "resetPassword.invalidToken.backToSite": "กลับไป expert.intelia.com",
+
+  "resetPassword.errors.tokenExpired": "โทเค็นหมดอายุหรือไม่ถูกต้อง ขอลิงก์รีเซ็ตใหม่",
+  "resetPassword.errors.tooManyAttempts": "พยายามมากเกินไป กรุณาลองใหม่ในอีกสักครู่",
+  "resetPassword.errors.connectionProblem": "ปัญหาการเชื่อมต่อ ตรวจสอบการเชื่อมต่ออินเทอร์เน็ตของคุณ",
+  "resetPassword.errors.generic": "เกิดข้อผิดพลาดในการรีเซ็ตรหัสผ่าน",
+
+  "error.serverError": "ข้อผิดพลาดเซิร์ฟเวอร์",
+  "error.unexpectedResponse": "การตอบสนองที่ไม่คาดคิดจากเซิร์ฟเวอร์",
+  "error.checkConnection": "ตรวจสอบการเชื่อมต่อของคุณ",
+  "error.serviceUnavailable": "บริการไม่พร้อมใช้งานชั่วคราว ลองใหม่ในอีกสักครู่",
+  "auth.emailAlreadyExists": "ที่อยู่อีเมลนี้ถูกใช้แล้ว",
+  "auth.invalidCredentials": "อีเมลหรือรหัสผ่านไม่ถูกต้อง",
+  "auth.emailNotConfirmed": "อีเมลยังไม่ได้รับการยืนยัน ตรวจสอบอีเมลของคุณ",
+  "auth.passwordRequirementsNotMet": "รหัสผ่านไม่ตรงตามเกณฑ์ที่กำหนด",
+
   "auth.success": "เข้าสู่ระบบสำเร็จ",
   "auth.error": "ข้อผิดพลาดในการเข้าสู่ระบบ",
   "auth.incomplete": "การเข้าสู่ระบบไม่สมบูรณ์",
@@ -337,11 +393,6 @@
   "validation.invalidData": "ข้อมูลไม่ถูกต้อง",
   
   "validation.password.requirements": "ข้อกำหนดรหัสผ่าน",
-  "validation.password.minLength": "อย่างน้อย 8 ตัวอักษร",
-  "validation.password.uppercase": "อย่างน้อยหนึ่งตัวพิมพ์ใหญ่",
-  "validation.password.lowercase": "อย่างน้อยหนึ่งตัวพิมพ์เล็ก",
-  "validation.password.number": "อย่างน้อยหนึ่งตัวเลข",
-  "validation.password.special": "อย่างน้อยหนึ่งอักขระพิเศษ",
   "validation.password.match": "รหัสผ่านตรงกัน",
   "validation.password.mismatch": "รหัสผ่านไม่ตรงกัน",
   

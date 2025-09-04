@@ -1,6 +1,62 @@
 {
   "page.title": "登录 Intelia Expert",
 
+  "resetPassword.title": "新密码",
+  "resetPassword.description": "为您的 Intelia Expert 账户选择一个安全的新密码",
+  "resetPassword.newPassword": "新密码",
+  "resetPassword.confirmPassword": "确认新密码",
+  "resetPassword.updateButton": "更新密码",
+  "resetPassword.updating": "更新中...",
+  "resetPassword.backToLogin": "返回登录",
+  "resetPassword.needHelp": "重置有问题？",
+  "resetPassword.contactSupport": "联系支持",
+  "resetPassword.validatingLink": "验证链接中...",
+  "resetPassword.securityInfo": "您的新密码遵循现代安全标准。更易访问且同样安全。",
+
+  "resetPassword.validation.maxLength": "最多允许128个字符",
+  "resetPassword.validation.letterRequired": "至少需要一个字母",
+  "resetPassword.validation.tooCommon": "密码太常见",
+  "resetPassword.validation.tooRepetitive": "连续相同字符过多",
+  "resetPassword.validation.avoidSequences": "避免字符序列",
+
+  "resetPassword.requirements.hasLetter": "至少一个字母",
+  "resetPassword.requirements.noRepetition": "无过度重复",
+  "resetPassword.requirements.reasonableLength": "合理长度",
+
+  "resetPassword.strength.weak": "弱",
+  "resetPassword.strength.medium": "中等",
+  "resetPassword.strength.good": "良好",
+  "resetPassword.strength.excellent": "优秀",
+
+  "resetPassword.passwordStrength": "密码强度",
+  "resetPassword.tips": "提示",
+
+  "resetPassword.tip.longerPassword": "使用12+字符以获得更好的安全性",
+  "resetPassword.tip.mixCase": "混合大小写字母",
+  "resetPassword.tip.specialChars": "特殊字符增强安全性（可选）",
+
+  "resetPassword.success.description": "您的密码已成功更新。几秒钟内您将被重定向到 expert.intelia.com。",
+  "resetPassword.success.goToSite": "立即前往 expert.intelia.com",
+
+  "resetPassword.invalidToken.title": "链接过期或无效",
+  "resetPassword.invalidToken.description": "此重置链接不再有效。可能已过期或已被使用。",
+  "resetPassword.invalidToken.requestNew": "请求新链接",
+  "resetPassword.invalidToken.backToSite": "返回 expert.intelia.com",
+
+  "resetPassword.errors.tokenExpired": "令牌过期或无效。请求新的重置链接。",
+  "resetPassword.errors.tooManyAttempts": "尝试次数过多。请几分钟后重试。",
+  "resetPassword.errors.connectionProblem": "连接问题。检查您的网络连接。",
+  "resetPassword.errors.generic": "重置密码时出错",
+
+  "error.serverError": "服务器错误",
+  "error.unexpectedResponse": "服务器意外响应",
+  "error.checkConnection": "检查您的连接",
+  "error.serviceUnavailable": "服务暂时不可用。请几分钟后重试",
+  "auth.emailAlreadyExists": "此邮箱地址已被使用",
+  "auth.invalidCredentials": "邮箱或密码错误",
+  "auth.emailNotConfirmed": "邮箱未确认。请检查您的邮件",
+  "auth.passwordRequirementsNotMet": "密码不符合所需标准",
+
   "auth.success": "登录成功",
   "auth.error": "登录错误",
   "auth.incomplete": "登录不完整",
@@ -337,11 +393,6 @@
   "validation.invalidData": "无效数据",
   
   "validation.password.requirements": "密码要求",
-  "validation.password.minLength": "至少8个字符",
-  "validation.password.uppercase": "至少一个大写字母",
-  "validation.password.lowercase": "至少一个小写字母",
-  "validation.password.number": "至少一个数字",
-  "validation.password.special": "至少一个特殊字符",
   "validation.password.match": "密码匹配",
   "validation.password.mismatch": "密码不匹配",
   

@@ -1,6 +1,62 @@
 {
   "page.title": "Zaloguj się do Intelia Expert",
 
+  "resetPassword.title": "Nowe hasło",
+  "resetPassword.description": "Wybierz bezpieczne nowe hasło dla swojego konta Intelia Expert",
+  "resetPassword.newPassword": "Nowe hasło",
+  "resetPassword.confirmPassword": "Potwierdź nowe hasło",
+  "resetPassword.updateButton": "Zaktualizuj hasło",
+  "resetPassword.updating": "Aktualizowanie...",
+  "resetPassword.backToLogin": "Powrót do logowania",
+  "resetPassword.needHelp": "Problem z resetowaniem?",
+  "resetPassword.contactSupport": "Skontaktuj się z pomocą",
+  "resetPassword.validatingLink": "Weryfikowanie linku...",
+  "resetPassword.securityInfo": "Twoje nowe hasło jest zgodne z nowoczesnymi standardami bezpieczeństwa. Bardziej dostępne i równie bezpieczne.",
+
+  "resetPassword.validation.maxLength": "Maksymalnie 128 znaków dozwolonych",
+  "resetPassword.validation.letterRequired": "Wymagana co najmniej jedna litera",
+  "resetPassword.validation.tooCommon": "Hasło zbyt powszechne",
+  "resetPassword.validation.tooRepetitive": "Zbyt wiele kolejnych identycznych znaków",
+  "resetPassword.validation.avoidSequences": "Unikaj sekwencji znaków",
+
+  "resetPassword.requirements.hasLetter": "Co najmniej jedna litera",
+  "resetPassword.requirements.noRepetition": "Brak nadmiernych powtórzeń",
+  "resetPassword.requirements.reasonableLength": "Rozsądna długość",
+
+  "resetPassword.strength.weak": "Słabe",
+  "resetPassword.strength.medium": "Średnie",
+  "resetPassword.strength.good": "Dobre",
+  "resetPassword.strength.excellent": "Doskonałe",
+
+  "resetPassword.passwordStrength": "Siła hasła",
+  "resetPassword.tips": "Porady",
+
+  "resetPassword.tip.longerPassword": "Użyj 12+ znaków dla lepszego bezpieczeństwa",
+  "resetPassword.tip.mixCase": "Mieszaj duże i małe litery",
+  "resetPassword.tip.specialChars": "Znaki specjalne zwiększają bezpieczeństwo (opcjonalne)",
+
+  "resetPassword.success.description": "Twoje hasło zostało pomyślnie zaktualizowane. Za kilka sekund zostaniesz przekierowany na expert.intelia.com.",
+  "resetPassword.success.goToSite": "Przejdź do expert.intelia.com teraz",
+
+  "resetPassword.invalidToken.title": "Link wygasł lub jest nieprawidłowy",
+  "resetPassword.invalidToken.description": "Ten link resetowania nie jest już ważny. Mógł wygasnąć lub już zostać użyty.",
+  "resetPassword.invalidToken.requestNew": "Poproś o nowy link",
+  "resetPassword.invalidToken.backToSite": "Powrót do expert.intelia.com",
+
+  "resetPassword.errors.tokenExpired": "Token wygasł lub jest nieprawidłowy. Poproś o nowy link resetowania.",
+  "resetPassword.errors.tooManyAttempts": "Zbyt wiele prób. Spróbuj ponownie za kilka minut.",
+  "resetPassword.errors.connectionProblem": "Problem z połączeniem. Sprawdź połączenie internetowe.",
+  "resetPassword.errors.generic": "Błąd podczas resetowania hasła",
+
+  "error.serverError": "Błąd serwera",
+  "error.unexpectedResponse": "Nieoczekiwana odpowiedź serwera",
+  "error.checkConnection": "Sprawdź połączenie",
+  "error.serviceUnavailable": "Usługa tymczasowo niedostępna. Spróbuj ponownie za kilka minut",
+  "auth.emailAlreadyExists": "Ten adres email jest już używany",
+  "auth.invalidCredentials": "Nieprawidłowy email lub hasło",
+  "auth.emailNotConfirmed": "Email nie został potwierdzony. Sprawdź swoje wiadomości",
+  "auth.passwordRequirementsNotMet": "Hasło nie spełnia wymaganych kryteriów",
+
   "auth.success": "Logowanie pomyślne",
   "auth.error": "Błąd logowania",
   "auth.incomplete": "Niepełne logowanie",
@@ -337,11 +393,6 @@
   "validation.invalidData": "Nieprawidłowe dane",
   
   "validation.password.requirements": "Wymagania hasła",
-  "validation.password.minLength": "Co najmniej 8 znaków",
-  "validation.password.uppercase": "Co najmniej jedna wielka litera",
-  "validation.password.lowercase": "Co najmniej jedna mała litera",
-  "validation.password.number": "Co najmniej jedna cyfra",
-  "validation.password.special": "Co najmniej jeden znak specjalny",
   "validation.password.match": "Hasła pasują do siebie",
   "validation.password.mismatch": "Hasła nie pasują do siebie",
   

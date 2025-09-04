@@ -1,6 +1,62 @@
 {
   "page.title": "Inloggen bij Intelia Expert",
 
+  "resetPassword.title": "Nieuw wachtwoord",
+  "resetPassword.description": "Kies een veilig nieuw wachtwoord voor uw Intelia Expert-account",
+  "resetPassword.newPassword": "Nieuw wachtwoord",
+  "resetPassword.confirmPassword": "Nieuw wachtwoord bevestigen",
+  "resetPassword.updateButton": "Wachtwoord bijwerken",
+  "resetPassword.updating": "Bijwerken...",
+  "resetPassword.backToLogin": "Terug naar inloggen",
+  "resetPassword.needHelp": "Probleem met reset?",
+  "resetPassword.contactSupport": "Contact opnemen met ondersteuning",
+  "resetPassword.validatingLink": "Link valideren...",
+  "resetPassword.securityInfo": "Uw nieuwe wachtwoord volgt moderne beveiligingsstandaarden. Toegankelijker en even veilig.",
+
+  "resetPassword.validation.maxLength": "Maximaal 128 tekens toegestaan",
+  "resetPassword.validation.letterRequired": "Minimaal één letter vereist",
+  "resetPassword.validation.tooCommon": "Wachtwoord te gebruikelijk",
+  "resetPassword.validation.tooRepetitive": "Te veel opeenvolgende identieke tekens",
+  "resetPassword.validation.avoidSequences": "Vermijd tekenreeksen",
+
+  "resetPassword.requirements.hasLetter": "Minimaal één letter",
+  "resetPassword.requirements.noRepetition": "Geen buitensporige herhaling",
+  "resetPassword.requirements.reasonableLength": "Redelijke lengte",
+
+  "resetPassword.strength.weak": "Zwak",
+  "resetPassword.strength.medium": "Gemiddeld",
+  "resetPassword.strength.good": "Goed",
+  "resetPassword.strength.excellent": "Uitstekend",
+
+  "resetPassword.passwordStrength": "Wachtwoordsterkte",
+  "resetPassword.tips": "Tips",
+
+  "resetPassword.tip.longerPassword": "Gebruik 12+ tekens voor betere beveiliging",
+  "resetPassword.tip.mixCase": "Mix hoofdletters en kleine letters",
+  "resetPassword.tip.specialChars": "Speciale tekens verbeteren de beveiliging (optioneel)",
+
+  "resetPassword.success.description": "Uw wachtwoord is succesvol bijgewerkt. U wordt over enkele seconden doorgestuurd naar expert.intelia.com.",
+  "resetPassword.success.goToSite": "Ga nu naar expert.intelia.com",
+
+  "resetPassword.invalidToken.title": "Verlopen of ongeldige link",
+  "resetPassword.invalidToken.description": "Deze resetlink is niet meer geldig. Deze kan verlopen zijn of al gebruikt zijn.",
+  "resetPassword.invalidToken.requestNew": "Nieuwe link aanvragen",
+  "resetPassword.invalidToken.backToSite": "Terug naar expert.intelia.com",
+
+  "resetPassword.errors.tokenExpired": "Token verlopen of ongeldig. Vraag een nieuwe resetlink aan.",
+  "resetPassword.errors.tooManyAttempts": "Te veel pogingen. Probeer het over een paar minuten opnieuw.",
+  "resetPassword.errors.connectionProblem": "Verbindingsprobleem. Controleer uw internetverbinding.",
+  "resetPassword.errors.generic": "Fout bij het resetten van het wachtwoord",
+
+  "error.serverError": "Serverfout",
+  "error.unexpectedResponse": "Onverwacht serverantwoord",
+  "error.checkConnection": "Controleer uw verbinding",
+  "error.serviceUnavailable": "Service tijdelijk niet beschikbaar. Probeer het over een paar minuten opnieuw",
+  "auth.emailAlreadyExists": "Dit e-mailadres is al in gebruik",
+  "auth.invalidCredentials": "Onjuiste e-mail of wachtwoord",
+  "auth.emailNotConfirmed": "E-mail niet bevestigd. Controleer uw e-mails",
+  "auth.passwordRequirementsNotMet": "Wachtwoord voldoet niet aan de vereiste criteria",
+
   "auth.success": "Inloggen succesvol",
   "auth.error": "Inlogfout",
   "auth.incomplete": "Onvolledige inlog",
@@ -337,11 +393,6 @@
   "validation.invalidData": "Ongeldige gegevens",
   
   "validation.password.requirements": "Wachtwoord vereisten",
-  "validation.password.minLength": "Ten minste 8 karakters",
-  "validation.password.uppercase": "Ten minste één hoofdletter",
-  "validation.password.lowercase": "Ten minste één kleine letter",
-  "validation.password.number": "Ten minste één cijfer",
-  "validation.password.special": "Ten minste één speciaal karakter",
   "validation.password.match": "Wachtwoorden komen overeen",
   "validation.password.mismatch": "Wachtwoorden komen niet overeen",
   

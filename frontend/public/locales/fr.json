@@ -1,6 +1,53 @@
 {
   "page.title": "Connexion à Intelia Expert",
 
+  "resetPassword.title": "Nouveau mot de passe",
+  "resetPassword.description": "Choisissez un nouveau mot de passe sécurisé pour votre compte Intelia Expert",
+  "resetPassword.newPassword": "Nouveau mot de passe",
+  "resetPassword.confirmPassword": "Confirmer le nouveau mot de passe",
+  "resetPassword.updateButton": "Mettre à jour le mot de passe",
+  "resetPassword.updating": "Mise à jour...",
+  "resetPassword.backToLogin": "Retour à la connexion",
+  "resetPassword.needHelp": "Problème avec la réinitialisation ?",
+  "resetPassword.contactSupport": "Contactez le support",
+  "resetPassword.validatingLink": "Validation du lien en cours...",
+  "resetPassword.securityInfo": "Votre nouveau mot de passe suit les standards de sécurité modernes. Plus accessible et tout aussi sécurisé.",
+
+  "resetPassword.validation.maxLength": "Maximum 128 caractères autorisés",
+  "resetPassword.validation.letterRequired": "Au moins une lettre requise",
+  "resetPassword.validation.tooCommon": "Mot de passe trop commun",
+  "resetPassword.validation.tooRepetitive": "Trop de caractères identiques consécutifs",
+  "resetPassword.validation.avoidSequences": "Évitez les séquences de caractères",
+
+  "resetPassword.requirements.hasLetter": "Au moins une lettre",
+  "resetPassword.requirements.noRepetition": "Pas de répétitions excessives",
+  "resetPassword.requirements.reasonableLength": "Longueur raisonnable",
+
+  "resetPassword.strength.weak": "Faible",
+  "resetPassword.strength.medium": "Moyen",
+  "resetPassword.strength.good": "Bon",
+  "resetPassword.strength.excellent": "Excellent",
+
+  "resetPassword.passwordStrength": "Force du mot de passe",
+  "resetPassword.tips": "Conseils",
+
+  "resetPassword.tip.longerPassword": "Utilisez 12+ caractères pour plus de sécurité",
+  "resetPassword.tip.mixCase": "Mélangez majuscules et minuscules",
+  "resetPassword.tip.specialChars": "Les caractères spéciaux renforcent la sécurité (optionnel)",
+
+  "resetPassword.success.description": "Votre mot de passe a été mis à jour avec succès. Vous allez être redirigé vers expert.intelia.com dans quelques secondes.",
+  "resetPassword.success.goToSite": "Aller à expert.intelia.com maintenant",
+
+  "resetPassword.invalidToken.title": "Lien expiré ou invalide",
+  "resetPassword.invalidToken.description": "Ce lien de réinitialisation n'est plus valide. Il a peut-être expiré ou déjà été utilisé.",
+  "resetPassword.invalidToken.requestNew": "Demander un nouveau lien",
+  "resetPassword.invalidToken.backToSite": "Retour à expert.intelia.com",
+
+  "resetPassword.errors.tokenExpired": "Token expiré ou invalide. Demandez un nouveau lien de réinitialisation.",
+  "resetPassword.errors.tooManyAttempts": "Trop de tentatives. Veuillez réessayer dans quelques minutes.",
+  "resetPassword.errors.connectionProblem": "Problème de connexion. Vérifiez votre connexion internet.",
+  "resetPassword.errors.generic": "Erreur lors de la réinitialisation du mot de passe",
+
   "auth.success": "Connexion réussie",
   "auth.error": "Erreur de connexion",
   "auth.incomplete": "Connexion incomplète",
@@ -9,6 +56,15 @@
   "auth.forgotPassword": "Mot de passe oublié ?",
   "auth.newToIntelia": "Nouveau sur Intelia Expert ?",
   "auth.createAccount": "Créer un compte",
+
+  "error.serverError": "Erreur serveur",
+  "error.unexpectedResponse": "Réponse inattendue du serveur",
+  "error.checkConnection": "Vérifiez votre connexion",
+  "error.serviceUnavailable": "Service temporairement indisponible. Réessayez dans quelques minutes",
+  "auth.emailAlreadyExists": "Cette adresse email est déjà utilisée",
+  "auth.invalidCredentials": "Email ou mot de passe incorrect",
+  "auth.emailNotConfirmed": "Email non confirmé. Vérifiez votre boîte mail",
+  "auth.passwordRequirementsNotMet": "Le mot de passe ne respecte pas les critères requis",
 
   "placeholder.createSecurePassword": "Créez un mot de passe sécurisé",
   "placeholder.confirmNewPassword": "Confirmez votre nouveau mot de passe",
@@ -338,11 +394,6 @@
   "validation.invalidData": "Données invalides",
   
   "validation.password.requirements": "Exigences du mot de passe",
-  "validation.password.minLength": "Au moins 8 caractères",
-  "validation.password.uppercase": "Au moins une majuscule",
-  "validation.password.lowercase": "Au moins une minuscule",
-  "validation.password.number": "Au moins un chiffre",
-  "validation.password.special": "Au moins un caractère spécial",
   "validation.password.match": "Les mots de passe correspondent",
   "validation.password.mismatch": "Les mots de passe ne correspondent pas",
   
