@@ -1,10 +1,11 @@
 # app/middleware/auth_middleware.py
 """
 Middleware d'authentification globale pour l'API Intelia Expert
-Version 4.2 - CORRECTION DES PERMISSIONS UTILISATEUR
-Support des endpoints conversations et expert pour utilisateurs authentifiés
+Version 4.1 - Ajout du support des endpoints users
+Support des endpoints de cache ultra-rapides
+Support des endpoints /api/v1/auth/ (vrais endpoints du backend)
 CORS compatible avec credentials: 'include'
-CORRECTION: Conversations et expert/ask maintenant accessibles aux utilisateurs authentifiés
+CORRECTION: Permissions stats-fast ajustées pour permettre l'accès aux utilisateurs authentifiés
 """
 
 from fastapi import HTTPException, Request
@@ -58,9 +59,6 @@ PUBLIC_ENDPOINTS = {
     "/api/v1/conversations/test-public",
     "/api/v1/conversations/test-public-post",
     
-    # === EXPERT PUBLICS ===
-    "/api/v1/expert/ask-public",          # Questions expert publiques
-    
     # === ENDPOINTS SANS PREFIX /api (compatibilite) ===
     "/ask-public",
     "/v1/ask-public",
@@ -94,21 +92,17 @@ PUBLIC_ENDPOINTS = {
     
     # === CONVERSATIONS SANS PREFIX ===
     "/v1/conversations/test-public",
-    "/v1/conversations/test-public-post",
-    
-    # === EXPERT SANS PREFIX ===
-    "/v1/expert/ask-public",              # Questions expert publiques
+    "/v1/conversations/test-public-post"
 }
 
-# PATTERNS D'ENDPOINTS PROTEGES ETENDUS (authentification ADMIN requise)
+# PATTERNS D'ENDPOINTS PROTEGES ETENDUS (authentification requise)
 PROTECTED_PATTERNS = [
-    # === ENDPOINTS BUSINESS CORE ADMIN UNIQUEMENT ===
+    # === ENDPOINTS BUSINESS CORE ===
     "/api/v1/billing/",                # Facturation
     "/api/v1/logging/analytics/",      # Analytics
     "/api/v1/logging/questions",       # Questions (ancien endpoint)
-    "/api/v1/conversations/admin/",    # ✅ MODIFIÉ - Administration conversations uniquement
-    # RETIRÉ: "/api/v1/conversations/", (trop large - maintenant dans AUTHENTICATED_USER_PATTERNS)
-    # RETIRÉ: "/api/v1/expert/ask",     (utilisateurs ont besoin - maintenant dans AUTHENTICATED_USER_PATTERNS)
+    "/api/v1/conversations/",          # Conversations (sauf test-public)
+    "/api/v1/expert/ask",              # Questions expert
     "/api/v1/admin/",                  # Administration
     "/api/v1/invitations/",            # Invitations
     
@@ -138,9 +132,8 @@ PROTECTED_PATTERNS = [
     "/v1/billing/",
     "/v1/logging/analytics/",
     "/v1/logging/questions",           # Questions
-    "/v1/conversations/admin/",        # ✅ MODIFIÉ - Administration conversations uniquement
-    # RETIRÉ: "/v1/conversations/",    (maintenant dans AUTHENTICATED_USER_PATTERNS)
-    # RETIRÉ: "/v1/expert/ask",        (maintenant dans AUTHENTICATED_USER_PATTERNS)
+    "/v1/conversations/",
+    "/v1/expert/ask",
     "/v1/admin/",
     "/v1/invitations/",
     
@@ -170,13 +163,6 @@ AUTHENTICATED_USER_PATTERNS = [
     "/api/v1/stats-fast/performance",     # Performance
     "/api/v1/stats-fast/my-analytics",    # Analytics personnelles
     
-    # === ✅ NOUVEAUX: ENDPOINTS CONVERSATIONS UTILISATEUR ===
-    "/api/v1/conversations/user/",        # Conversations personnelles
-    "/api/v1/conversations/",             # ✅ AJOUTÉ - Accès général avec vérif dans endpoint
-    
-    # === ✅ NOUVEAUX: ENDPOINTS EXPERT ===
-    "/api/v1/expert/ask",                 # ✅ AJOUTÉ - Questions expert
-    
     # === PATTERNS SANS PREFIX ===
     "/v1/stats-fast/",                    # Stats-fast sans /api
     "/v1/stats-fast/dashboard",
@@ -185,11 +171,6 @@ AUTHENTICATED_USER_PATTERNS = [
     "/v1/stats-fast/openai-costs/",
     "/v1/stats-fast/performance",
     "/v1/stats-fast/my-analytics",
-    
-    # === ✅ NOUVEAUX: PATTERNS SANS PREFIX ===
-    "/v1/conversations/user/",            # ✅ AJOUTÉ - Conversations utilisateur
-    "/v1/conversations/",                 # ✅ AJOUTÉ - Accès général
-    "/v1/expert/ask",                     # ✅ AJOUTÉ - Questions expert
     
     # === AUTRES ENDPOINTS POUR UTILISATEURS AUTHENTIFIÉS ===
     "/api/admin/stats",                   # Stats basiques (pas admin cache)
@@ -463,7 +444,7 @@ def has_admin_permission(user_info: Dict[str, Any]) -> bool:
 
 def is_authenticated_user(user_info: Dict[str, Any]) -> bool:
     """
-    NOUVEAU: Verifie si l'utilisateur est authentifié (pour conversations et expert)
+    NOUVEAU: Verifie si l'utilisateur est authentifié (pour stats-fast)
     
     Args:
         user_info: Informations utilisateur depuis le token
@@ -471,17 +452,17 @@ def is_authenticated_user(user_info: Dict[str, Any]) -> bool:
     Returns:
         bool: True si l'utilisateur est authentifié validement
     """
-    # Tout utilisateur avec un token valide peut accéder aux endpoints utilisateur
+    # Tout utilisateur avec un token valide peut accéder aux stats-fast
     return bool(user_info and user_info.get("email"))
 
 async def auth_middleware(request: Request, call_next):
     """
-    Middleware d'authentification globale pour l'API Intelia Expert - VERSION 4.2 CORRIGÉE
+    Middleware d'authentification globale pour l'API Intelia Expert - VERSION 4.1 CORRIGÉE
     
     Logique CORRIGÉE:
     1. Gere les endpoints inexistants (404)
     2. Skip l'auth pour les endpoints publics et OPTIONS
-    3. Authentification basique pour les endpoints utilisateur (conversations, expert/ask)
+    3. Authentification basique pour les endpoints stats-fast (tout utilisateur authentifié)
     4. Authentification admin pour les endpoints protégés (admin uniquement)
     5. Support complet des endpoints users
     6. Laisse passer les autres endpoints (FastAPI gere les 404)
@@ -556,7 +537,7 @@ async def auth_middleware(request: Request, call_next):
             
         return response
     
-    # ETAPE 3: NOUVEAU - Verifier l'auth pour les endpoints utilisateur authentifié (conversations, expert)
+    # ETAPE 3: NOUVEAU - Verifier l'auth pour les endpoints utilisateur authentifié (stats-fast)
     if is_authenticated_user_endpoint(request.url.path):
         try:
             logger.debug(f"Authenticated user endpoint detected: {request.url.path}")
@@ -581,7 +562,7 @@ async def auth_middleware(request: Request, call_next):
             request.state.user = user_info
             
             logger.info(
-                f"User authenticated: {user_info.get('email')} "
+                f"User authenticated for stats-fast: {user_info.get('email')} "
                 f"(type: {user_info.get('user_type')}) "
                 f"for {request.url.path}"
             )
@@ -597,7 +578,7 @@ async def auth_middleware(request: Request, call_next):
             
         except HTTPException as e:
             logger.warning(
-                f"Auth failed for user endpoint {request.url.path}: "
+                f"Auth failed for stats-fast {request.url.path}: "
                 f"Status {e.status_code} - {e.detail}"
             )
             return JSONResponse(
@@ -611,7 +592,7 @@ async def auth_middleware(request: Request, call_next):
             )
             
         except Exception as e:
-            logger.error(f"Auth middleware unexpected error for user endpoint {request.url.path}: {e}")
+            logger.error(f"Auth middleware unexpected error for stats-fast {request.url.path}: {e}")
             return JSONResponse(
                 status_code=401,
                 content={
@@ -773,13 +754,6 @@ def debug_middleware_config() -> Dict[str, Any]:
                 "/api/v1/users/debug/"
             ]
         },
-        "conversations_and_expert_endpoints": {
-            "authenticated_user_patterns": [
-                "/api/v1/conversations/user/",
-                "/api/v1/conversations/",
-                "/api/v1/expert/ask"
-            ]
-        },
         "stats_endpoints": {
             "authenticated_user_patterns": [
                 "/api/v1/stats-fast/",
@@ -792,12 +766,12 @@ def debug_middleware_config() -> Dict[str, Any]:
                 "/api/admin/cache/force-update"
             ]
         },
-        "middleware_version": "4.2-fixed-conversations-expert-permissions",
+        "middleware_version": "4.1-corrected-stats-fast-permissions",
         "key_changes": [
-            "FIXED: conversations and expert/ask endpoints now accessible to authenticated users",
-            "SEPARATED: admin endpoints (/conversations/admin/) still require admin permissions",
-            "IMPROVED: Better endpoint classification for user vs admin access",
-            "MAINTAINED: Security checks within endpoints remain intact",
-            "ADDED: Support for expert/ask-public as public endpoint"
+            "CORRECTED: stats-fast endpoints now accessible to any authenticated user",
+            "SEPARATED: stats-admin endpoints still require admin permissions",
+            "ADDED: New permission level for authenticated users",
+            "IMPROVED: Better error messages for permission levels",
+            "MAINTAINED: Full support for users endpoints"
         ]
     }

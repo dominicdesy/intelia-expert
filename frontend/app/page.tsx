@@ -413,39 +413,23 @@ function LoginPageContent() {
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-white">
-      {/* Background avec lignes de démarcation bleues */}
-      <div className="absolute inset-0">
-        {/* Lignes diagonales */}
-        <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="diagonal-lines" patternUnits="userSpaceOnUse" width="60" height="60" patternTransform="rotate(45)">
-              <line x1="0" y1="0" x2="0" y2="60" stroke="#E3F2FD" strokeWidth="1"/>
-            </pattern>
-            <pattern id="grid-pattern" patternUnits="userSpaceOnUse" width="100" height="100">
-              <line x1="0" y1="0" x2="100" y2="0" stroke="#BBDEFB" strokeWidth="0.5"/>
-              <line x1="0" y1="0" x2="0" y2="100" stroke="#BBDEFB" strokeWidth="0.5"/>
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#diagonal-lines)" opacity="0.3"/>
-          <rect width="100%" height="100%" fill="url(#grid-pattern)" opacity="0.2"/>
-        </svg>
-        
-        {/* Formes géométriques bleues subtiles */}
-        <div className="absolute top-20 left-20 w-32 h-32 bg-blue-100/30 rounded-full blur-xl"></div>
-        <div className="absolute bottom-20 right-20 w-40 h-40 bg-blue-200/20 rounded-full blur-xl"></div>
-        <div className="absolute top-1/2 left-1/3 w-24 h-24 bg-blue-300/15 rounded-full blur-lg"></div>
-        
-        {/* Lignes décoratives */}
-        <div className="absolute top-0 left-1/4 w-px h-full bg-gradient-to-b from-transparent via-blue-200 to-transparent opacity-30"></div>
-        <div className="absolute top-0 right-1/4 w-px h-full bg-gradient-to-b from-transparent via-blue-300 to-transparent opacity-20"></div>
-        <div className="absolute left-0 top-1/3 w-full h-px bg-gradient-to-r from-transparent via-blue-200 to-transparent opacity-20"></div>
-        <div className="absolute left-0 bottom-1/3 w-full h-px bg-gradient-to-r from-transparent via-blue-300 to-transparent opacity-15"></div>
-      </div>
+    {/* Background avec lignes de démarcation bleues */}
+    <div className="absolute inset-0 pointer-events-none">
+      {/* Lignes diagonales */}
+      <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+        {/* ... contenu SVG ... */}
+      </svg>
+  
+      {/* Formes géométriques bleues subtiles */}
+      <div className="absolute top-20 left-20 w-32 h-32 bg-blue-100/30 rounded-full blur-xl"></div>
+      {/* ... autres éléments décoratifs ... */}
+    </div>
 
-      {/* Sélecteur de langue */}
-      <div className="absolute top-6 right-6 z-10">
-        <LanguageSelector />
-      </div>
+    {/* Sélecteur de langue */}
+    <div className="absolute top-6 right-6 z-[1000]">
+      <LanguageSelector />
+    </div>
+
 
       {/* Contenu principal */}
       <div className="relative z-10 flex flex-col justify-center items-center min-h-screen px-4 sm:px-6 lg:px-8">
