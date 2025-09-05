@@ -1,26 +1,8 @@
-// page_hooks.ts - Version avec support multilingue basé sur useTranslation
+// page_hooks.ts - Version avec correction définitive du re-render + RememberMe intégré
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { useTranslation } from '@/lib/languages/i18n'
 import type { Country } from './page_types'
 
-// Mapping des codes de langue vers les codes utilisés par REST Countries
-const getLanguageCode = (currentLanguage: string): string => {
-  const mapping: Record<string, string> = {
-    'fr': 'fra',   // Français
-    'es': 'spa',   // Espagnol
-    'de': 'deu',   // Allemand
-    'pt': 'por',   // Portugais
-    'nl': 'nld',   // Néerlandais
-    'pl': 'pol',   // Polonais
-    'zh': 'zho',   // Chinois
-    'hi': 'hin',   // Hindi
-    'th': 'tha',   // Thaï
-    'en': 'eng'    // Anglais (fallback)
-  }
-  return mapping[currentLanguage] || 'eng'
-}
-
-// Fallback countries avec noms par défaut en français
+// Fallback countries
 const fallbackCountries: Country[] = [
   { value: 'CA', label: 'Canada', phoneCode: '+1', flag: '🇨🇦' },
   { value: 'US', label: 'États-Unis', phoneCode: '+1', flag: '🇺🇸' },
@@ -44,10 +26,10 @@ const fallbackCountries: Country[] = [
   { value: 'FI', label: 'Finlande', phoneCode: '+358', flag: '🇫🇮' }
 ]
 
-// Cache global pour éviter les multiples appels API - MODIFIÉ pour inclure la langue
-let countriesCache: Record<string, Country[]> = {}
+// Cache global pour éviter les multiples appels API
+let countriesCache: Country[] | null = null
 let isLoadingGlobal = false
-let loadingPromises: Record<string, Promise<Country[]>> = {}
+let loadingPromise: Promise<Country[]> | null = null
 
 // Version optimisée des logs pour réduire le "bruit"
 const DEBUG_MODE = process.env.NODE_ENV === 'development'
@@ -64,27 +46,27 @@ const debugLog = (category: string, message: string, data?: any) => {
     countries: '🌍'
   }
   
-  console.log(`${emoji[category] || '📝'} [${category}] ${message}`, data ? data : '')
+  console.log(`${emoji[category] || '🔍'} [${category}] ${message}`, data ? data : '')
 }
 
-// Fonction de fetch avec support multilingue
-const fetchCountriesGlobal = async (languageCode: string): Promise<Country[]> => {
-  // Si on a déjà les données en cache pour cette langue, les retourner
-  if (countriesCache[languageCode]) {
-    debugLog('countries', `Données déjà en cache pour ${languageCode}`)
-    return countriesCache[languageCode]
+// CORRECTION CRITIQUE : Fonction de fetch hors du hook pour éviter les re-créations
+const fetchCountriesGlobal = async (): Promise<Country[]> => {
+  // Si on a déjà les données en cache, les retourner
+  if (countriesCache) {
+    debugLog('countries', 'Données déjà en cache')
+    return countriesCache
   }
 
-  // Si un chargement est déjà en cours pour cette langue, attendre sa fin
-  if (loadingPromises[languageCode]) {
-    debugLog('countries', `Chargement en cours pour ${languageCode}, attente...`)
-    return loadingPromises[languageCode]
+  // Si un chargement est déjà en cours, attendre sa fin
+  if (loadingPromise) {
+    debugLog('countries', 'Chargement en cours, attente...')
+    return loadingPromise
   }
 
-  // Créer une nouvelle promesse de chargement pour cette langue
-  loadingPromises[languageCode] = new Promise(async (resolve) => {
+  // Créer une nouvelle promesse de chargement
+  loadingPromise = new Promise(async (resolve) => {
     try {
-      debugLog('countries', `Début du chargement depuis l'API REST Countries en ${languageCode}...`)
+      debugLog('countries', 'Début du chargement depuis l\'API REST Countries...')
       
       isLoadingGlobal = true
       
@@ -128,21 +110,9 @@ const fetchCountriesGlobal = async (languageCode: string): Promise<Country[]> =>
             }
           }
           
-          // MODIFICATION PRINCIPALE : Récupération du nom selon la langue
-          let countryName = country.name?.common || country.cca2
-          
-          // Essayer d'abord la traduction dans la langue demandée
-          if (country.translations && country.translations[languageCode]) {
-            countryName = country.translations[languageCode].common || country.translations[languageCode].official
-          }
-          // Si pas de traduction dans la langue demandée, essayer l'anglais
-          else if (country.name?.common) {
-            countryName = country.name.common
-          }
-          
           return {
             value: country.cca2,
-            label: countryName,
+            label: country.translations?.fra?.common || country.name?.common || country.cca2,
             phoneCode: phoneCode,
             flag: country.flag || ''
           }
@@ -162,27 +132,15 @@ const fetchCountriesGlobal = async (languageCode: string): Promise<Country[]> =>
           
           return hasValidCode && hasValidInfo
         })
-        .sort((a: Country, b: Country) => {
-          // Tri selon la langue actuelle
-          const locale = languageCode === 'fra' ? 'fr' : 
-                        languageCode === 'spa' ? 'es' :
-                        languageCode === 'deu' ? 'de' :
-                        languageCode === 'por' ? 'pt' :
-                        languageCode === 'nld' ? 'nl' :
-                        languageCode === 'pol' ? 'pl' :
-                        languageCode === 'zho' ? 'zh' :
-                        'en'
-          
-          return a.label.localeCompare(b.label, locale, { numeric: true })
-        })
+        .sort((a: Country, b: Country) => a.label.localeCompare(b.label, 'fr', { numeric: true }))
       
       debugLog('countries', `Pays valides après filtrage: ${formattedCountries.length}`)
       
       if (formattedCountries.length >= 50) {
-        debugLog('success', `API validée! Utilisation des données complètes en ${languageCode}`)
+        debugLog('success', 'API validée! Utilisation des données complètes')
         
-        // Mise en cache globale pour cette langue
-        countriesCache[languageCode] = formattedCountries
+        // Mise en cache globale
+        countriesCache = formattedCountries
         resolve(formattedCountries)
       } else {
         debugLog('error', `Pas assez de pays valides: ${formattedCountries.length}/50`)
@@ -194,52 +152,49 @@ const fetchCountriesGlobal = async (languageCode: string): Promise<Country[]> =>
       debugLog('countries', 'Passage en mode fallback')
       
       // Même le fallback va en cache pour éviter les re-fetch
-      countriesCache[languageCode] = fallbackCountries
+      countriesCache = fallbackCountries
       resolve(fallbackCountries)
     } finally {
       debugLog('countries', 'Chargement terminé')
       isLoadingGlobal = false
       // Nettoyer la promesse après utilisation
-      delete loadingPromises[languageCode]
+      loadingPromise = null
     }
   })
 
-  return loadingPromises[languageCode]
+  return loadingPromise
 }
 
-// Hook pour charger les pays depuis l'API REST Countries - VERSION MULTILINGUE
+// Hook pour charger les pays depuis l'API REST Countries - VERSION DÉFINITIVEMENT CORRIGÉE
 export const useCountries = () => {
-  const { currentLanguage } = useTranslation()
-  const languageCode = getLanguageCode(currentLanguage)
+  debugLog('countries', 'Hook useCountries appelé!')
   
-  debugLog('countries', `Hook useCountries appelé pour la langue: ${currentLanguage} (${languageCode})`)
-  
-  // État initial basé sur le cache pour cette langue
+  // État initial basé sur le cache
   const [countries, setCountries] = useState<Country[]>(() => 
-    countriesCache[languageCode] || fallbackCountries
+    countriesCache || fallbackCountries
   )
-  const [loading, setLoading] = useState(() => !countriesCache[languageCode])
-  const [usingFallback, setUsingFallback] = useState(() => !countriesCache[languageCode])
+  const [loading, setLoading] = useState(() => countriesCache === null)
+  const [usingFallback, setUsingFallback] = useState(() => countriesCache === null)
   
   // Références pour éviter les re-renders
-  const hasFetched = useRef<Record<string, boolean>>({})
+  const hasFetched = useRef(false)
   const isMounted = useRef(true)
 
-  // MODIFICATION : useEffect qui réagit au changement de langue
+  // CORRECTION CRITIQUE : useEffect sans dépendances pour éviter les re-déclenchements
   useEffect(() => {
-    // Éviter les doubles appels pour la même langue
-    if (hasFetched.current[languageCode]) {
-      debugLog('countries', `Fetch déjà effectué pour ${languageCode}, skip`)
+    // Éviter les doubles appels en mode strict
+    if (hasFetched.current) {
+      debugLog('countries', 'Fetch déjà effectué, skip')
       return
     }
     
-    hasFetched.current[languageCode] = true
-    debugLog('countries', `DÉMARRAGE du processus de chargement des pays pour ${languageCode}`)
+    hasFetched.current = true
+    debugLog('countries', 'DÉMARRAGE du processus de chargement des pays')
     
-    // Si on a déjà les données en cache pour cette langue, les utiliser immédiatement
-    if (countriesCache[languageCode]) {
-      debugLog('countries', `Utilisation du cache existant pour ${languageCode}`)
-      setCountries(countriesCache[languageCode])
+    // Si on a déjà les données en cache, les utiliser immédiatement
+    if (countriesCache) {
+      debugLog('countries', 'Utilisation du cache existant')
+      setCountries(countriesCache)
       setUsingFallback(false)
       setLoading(false)
       return
@@ -248,10 +203,9 @@ export const useCountries = () => {
     // Délai pour éviter les conflits avec l'hydratation
     const timer = setTimeout(async () => {
       if (isMounted.current) {
-        debugLog('countries', `Démarrage après délai de 100ms pour ${languageCode}`)
-        setLoading(true)
+        debugLog('countries', 'Démarrage après délai de 100ms')
         try {
-          const result = await fetchCountriesGlobal(languageCode)
+          const result = await fetchCountriesGlobal()
           if (isMounted.current) {
             setCountries(result)
             setUsingFallback(result === fallbackCountries)
@@ -271,8 +225,9 @@ export const useCountries = () => {
     // Cleanup function
     return () => {
       clearTimeout(timer)
+      isMounted.current = false
     }
-  }, [languageCode]) // MODIFICATION : Dépendance sur languageCode pour recharger quand la langue change
+  }, []) // CORRECTION CRITIQUE : Aucune dépendance pour éviter les re-déclenchements
 
   // Cleanup au démontage
   useEffect(() => {
@@ -281,7 +236,7 @@ export const useCountries = () => {
     }
   }, [])
 
-  debugLog('countries', `Render - ${countries.length} pays en ${languageCode}, loading:${loading}, fallback:${usingFallback}`)
+  debugLog('countries', `Render - ${countries.length} pays, loading:${loading}, fallback:${usingFallback}`)
   
   // Mémoisation du retour pour éviter les re-renders des composants parents
   return useMemo(() => ({
@@ -291,7 +246,7 @@ export const useCountries = () => {
   }), [countries, loading, usingFallback])
 }
 
-// Le reste du code reste identique...
+// Hook pour créer le mapping des codes téléphoniques - OPTIMISÉ
 export const useCountryCodeMap = (countries: Country[]) => {
   return useMemo(() => {
     const mapping = countries.reduce((acc, country) => {
@@ -305,6 +260,7 @@ export const useCountryCodeMap = (countries: Country[]) => {
   }, [countries])
 }
 
+// Fonctions de validation - INCHANGÉES
 export const validateEmail = (email: string): boolean => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
@@ -350,6 +306,7 @@ export const validatePhone = (countryCode: string, areaCode: string, phoneNumber
   return true
 }
 
+// Nouvelles fonctions de validation ajoutées du backup - INCHANGÉES
 export const validateLinkedIn = (url: string): boolean => {
   if (!url.trim()) return true
   return /^(https?:\/\/)?(www\.)?linkedin\.com\/(in|company)\/[\w\-]+\/?$/.test(url)
@@ -360,10 +317,13 @@ export const validateWebsite = (url: string): boolean => {
   return /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/.test(url)
 }
 
-// ===== SECTION RememberMe Utils inchangée =====
+// ===== NOUVELLE SECTION: RememberMe Utils avec préservation lors de la déconnexion =====
+
 export const rememberMeUtils = {
+  // Clé de stockage spécifique pour éviter la suppression lors du logout
   STORAGE_KEY: 'intelia-remember-me-persist',
 
+  // Sauvegarder les données remember me
   save: (email: string, rememberMe: boolean): void => {
     try {
       if (!rememberMe || !email.trim()) {
@@ -386,6 +346,7 @@ export const rememberMeUtils = {
     }
   },
 
+  // Charger les données remember me
   load: (): { rememberMe: boolean; lastEmail: string } => {
     try {
       const stored = localStorage.getItem(rememberMeUtils.STORAGE_KEY)
@@ -397,12 +358,14 @@ export const rememberMeUtils = {
 
       const data = JSON.parse(stored)
       
+      // Vérifier l'intégrité des données
       if (!data.email || typeof data.rememberMe !== 'boolean') {
         debugLog('error', 'Données corrompues, nettoyage')
         localStorage.removeItem(rememberMeUtils.STORAGE_KEY)
         return { rememberMe: false, lastEmail: '' }
       }
 
+      // Vérifier l'âge des données (30 jours max)
       const age = Date.now() - (data.timestamp || 0)
       const maxAge = 30 * 24 * 60 * 60 * 1000
 
@@ -433,6 +396,7 @@ export const rememberMeUtils = {
     }
   },
 
+  // Nettoyer explicitement les données
   clear: (): void => {
     try {
       localStorage.removeItem(rememberMeUtils.STORAGE_KEY)
@@ -442,6 +406,7 @@ export const rememberMeUtils = {
     }
   },
 
+  // NOUVELLE FONCTION : Préserver RememberMe lors de la déconnexion
   preserveOnLogout: (): { email: string; rememberMe: boolean } | null => {
     const current = rememberMeUtils.load()
     if (current.rememberMe && current.lastEmail) {
@@ -453,6 +418,7 @@ export const rememberMeUtils = {
     return null
   },
 
+  // NOUVELLE FONCTION : Restaurer après déconnexion
   restoreAfterLogout: (preservedData: { email: string; rememberMe: boolean } | null): void => {
     if (preservedData && preservedData.rememberMe) {
       rememberMeUtils.save(preservedData.email, true)
@@ -460,6 +426,8 @@ export const rememberMeUtils = {
     }
   }
 }
+
+// NOUVELLES FONCTIONS : Gestion de la déconnexion avec préservation RememberMe
 
 export const preserveRememberMeOnLogout = () => {
   const preserved = rememberMeUtils.preserveOnLogout()
@@ -477,30 +445,37 @@ export const logoutWithRememberMePreservation = async (customLogoutFn?: () => Pr
   try {
     debugLog('auth', 'Début déconnexion coordonnée')
     
+    // ÉTAPE 1 : Préserver les données RememberMe AVANT le nettoyage
     const preservedRememberMe = rememberMeUtils.preserveOnLogout()
     debugLog('auth', 'Données RememberMe préservées:', preservedRememberMe)
     
+    // ÉTAPE 2 : Nettoyage localStorage sélectif
     debugLog('auth', 'Nettoyage localStorage sélectif')
     
+    // Supprimer toutes les clés auth SAUF remember-me
     const keysToRemove = []
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
       if (key && key !== rememberMeUtils.STORAGE_KEY) {
+        // Garder seulement la clé remember-me
         if (key.startsWith('intelia-') || key.includes('auth') || key.includes('session') || key.includes('supabase')) {
           keysToRemove.push(key)
         }
       }
     }
     
+    // Supprimer les clés identifiées
     keysToRemove.forEach(key => {
       localStorage.removeItem(key)
       debugLog('auth', `Supprimé: ${key}`)
     })
     
+    // ÉTAPE 3 : Déconnexion personnalisée si fournie
     if (customLogoutFn) {
       await customLogoutFn()
     }
     
+    // ÉTAPE 4 : Restaurer les données RememberMe APRÈS le nettoyage
     if (preservedRememberMe) {
       setTimeout(() => {
         rememberMeUtils.restoreAfterLogout(preservedRememberMe)
@@ -508,13 +483,16 @@ export const logoutWithRememberMePreservation = async (customLogoutFn?: () => Pr
       }, 100)
     }
     
+    // ÉTAPE 5 : Redirection
     debugLog('auth', 'Redirection pour éviter callbacks')
     window.location.href = '/'
     
   } catch (error) {
     debugLog('error', 'Erreur lors de la déconnexion:', error)
+    // En cas d'erreur, forcer quand même la redirection
     window.location.href = '/'
   }
 }
 
+// Export pour compatibilité avec le code existant
 export { debugLog }
