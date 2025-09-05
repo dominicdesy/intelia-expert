@@ -21,7 +21,7 @@ const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
   </div>
 )
 
-// Sélecteur de langue moderne avec glassmorphism
+// Sélecteur de langue moderne
 const LanguageSelector = () => {
   const { changeLanguage, currentLanguage } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
@@ -32,7 +32,7 @@ const LanguageSelector = () => {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 px-4 py-2.5 text-sm bg-white/10 backdrop-blur-md border border-white/20 rounded-xl shadow-lg hover:bg-white/20 transition-all duration-300 text-white"
+        className="flex items-center space-x-2 px-4 py-2.5 text-sm bg-white border border-blue-200 rounded-xl shadow-sm hover:bg-blue-50 transition-all duration-300 text-blue-700"
       >
         <span>{currentLang.flag}</span>
         <span>{currentLang.nativeName}</span>
@@ -44,7 +44,7 @@ const LanguageSelector = () => {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute top-full right-0 mt-1 w-48 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto">
+          <div className="absolute top-full right-0 mt-1 w-48 bg-white border border-blue-200 rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto">
             {availableLanguages.map((lang) => (
               <button
                 key={lang.code}
@@ -52,17 +52,17 @@ const LanguageSelector = () => {
                   changeLanguage(lang.code)
                   setIsOpen(false)
                 }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-white/20 flex items-center space-x-3 ${
-                  lang.code === currentLanguage ? 'bg-white/20 text-white' : 'text-white/90'
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center space-x-3 ${
+                  lang.code === currentLanguage ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
                 } first:rounded-t-xl last:rounded-b-xl transition-colors`}
               >
                 <span className="text-xl">{lang.flag}</span>
                 <div className="flex-1">
                   <div className="font-medium">{lang.nativeName}</div>
-                  <div className="text-xs text-white/60">{lang.region}</div>
+                  <div className="text-xs text-gray-500">{lang.region}</div>
                 </div>
                 {lang.code === currentLanguage && (
-                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
                 )}
@@ -109,7 +109,7 @@ function AuthCallbackHandler() {
 
   if (authMessage) {
     return (
-      <div className="mb-4 p-3 bg-blue-50/80 backdrop-blur-sm border border-blue-200/50 text-blue-700 rounded-xl text-sm">
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl text-sm">
         {authMessage}
       </div>
     )
@@ -118,7 +118,7 @@ function AuthCallbackHandler() {
   return null
 }
 
-// PAGE LOGIN COMPLÈTE avec design moderne
+// PAGE LOGIN COMPLÈTE avec design blanc et lignes bleues
 function LoginPageContent() {
   const router = useRouter()
   const { t, currentLanguage } = useTranslation()
@@ -340,20 +340,34 @@ function LoginPageContent() {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      {/* Background avec gradient animé */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-700 to-indigo-800">
-        <div 
-          className="absolute inset-0 opacity-30"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-          }}
-        ></div>
+    <div className="min-h-screen relative overflow-hidden bg-white">
+      {/* Background avec lignes de démarcation bleues */}
+      <div className="absolute inset-0">
+        {/* Lignes diagonales */}
+        <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="diagonal-lines" patternUnits="userSpaceOnUse" width="60" height="60" patternTransform="rotate(45)">
+              <line x1="0" y1="0" x2="0" y2="60" stroke="#E3F2FD" strokeWidth="1"/>
+            </pattern>
+            <pattern id="grid-pattern" patternUnits="userSpaceOnUse" width="100" height="100">
+              <line x1="0" y1="0" x2="100" y2="0" stroke="#BBDEFB" strokeWidth="0.5"/>
+              <line x1="0" y1="0" x2="0" y2="100" stroke="#BBDEFB" strokeWidth="0.5"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#diagonal-lines)" opacity="0.3"/>
+          <rect width="100%" height="100%" fill="url(#grid-pattern)" opacity="0.2"/>
+        </svg>
         
-        {/* Formes géométriques flottantes */}
-        <div className="absolute top-20 left-20 w-32 h-32 bg-white/10 rounded-full blur-xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-20 w-40 h-40 bg-purple-400/20 rounded-full blur-xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/3 w-24 h-24 bg-blue-300/15 rounded-full blur-lg animate-pulse delay-500"></div>
+        {/* Formes géométriques bleues subtiles */}
+        <div className="absolute top-20 left-20 w-32 h-32 bg-blue-100/30 rounded-full blur-xl"></div>
+        <div className="absolute bottom-20 right-20 w-40 h-40 bg-blue-200/20 rounded-full blur-xl"></div>
+        <div className="absolute top-1/2 left-1/3 w-24 h-24 bg-blue-300/15 rounded-full blur-lg"></div>
+        
+        {/* Lignes décoratives */}
+        <div className="absolute top-0 left-1/4 w-px h-full bg-gradient-to-b from-transparent via-blue-200 to-transparent opacity-30"></div>
+        <div className="absolute top-0 right-1/4 w-px h-full bg-gradient-to-b from-transparent via-blue-300 to-transparent opacity-20"></div>
+        <div className="absolute left-0 top-1/3 w-full h-px bg-gradient-to-r from-transparent via-blue-200 to-transparent opacity-20"></div>
+        <div className="absolute left-0 bottom-1/3 w-full h-px bg-gradient-to-r from-transparent via-blue-300 to-transparent opacity-15"></div>
       </div>
 
       {/* Sélecteur de langue */}
@@ -371,45 +385,48 @@ function LoginPageContent() {
             <div className="flex justify-center mb-6">
               <InteliaLogo className="w-16 h-16" />
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">
               {t('page.title')}
             </h1>
-            <p className="text-blue-100/80 text-lg">
+            <p className="text-gray-600 text-lg">
               Votre assistant IA spécialisé en agriculture
             </p>
           </div>
 
-          {/* Card principale avec glassmorphism */}
-          <div className="bg-white/10 backdrop-blur-2xl border border-white/20 rounded-3xl shadow-2xl p-8">
+          {/* Card principale avec bordures bleues */}
+          <div className="bg-white border-2 border-blue-100 rounded-3xl shadow-xl p-8 relative overflow-hidden">
+            
+            {/* Bordure décorative interne */}
+            <div className="absolute inset-2 border border-blue-50 rounded-2xl pointer-events-none"></div>
             
             {/* Callback d'auth dans Suspense - CONSERVÉ */}
             <Suspense fallback={null}>
               <AuthCallbackHandler />
             </Suspense>
             
-            {/* Messages d'erreur - CONSERVÉS avec style moderne */}
+            {/* Messages d'erreur - CONSERVÉS avec style adapté au blanc */}
             {error && (
-              <div className="mb-4 p-3 bg-red-500/20 backdrop-blur-sm border border-red-300/50 text-red-100 rounded-xl text-sm">
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
                 {error}
               </div>
             )}
 
-            {/* Messages de succès - CONSERVÉS avec style moderne */}
+            {/* Messages de succès - CONSERVÉS avec style adapté au blanc */}
             {success && (
-              <div className="mb-4 p-3 bg-green-500/20 backdrop-blur-sm border border-green-300/50 text-green-100 rounded-xl text-sm">
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm">
                 {success}
               </div>
             )}
 
-            <div className="space-y-6">
+            <div className="space-y-6 relative z-10">
               {/* Email */}
               <div className="space-y-2">
-                <label htmlFor="email" className="block text-sm font-medium text-white/90">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                   {t('login.emailLabel')}
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-5 w-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
                     </svg>
                   </div>
@@ -419,7 +436,7 @@ function LoginPageContent() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
-                    className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/60 focus:border-white/40 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm"
+                    className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-blue-100 rounded-2xl text-gray-800 placeholder-gray-500 focus:border-blue-300 focus:bg-white transition-all duration-300"
                     placeholder={t('login.emailPlaceholder')}
                   />
                 </div>
@@ -427,12 +444,12 @@ function LoginPageContent() {
 
               {/* Mot de passe */}
               <div className="space-y-2">
-                <label htmlFor="password" className="block text-sm font-medium text-white/90">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                   {t('login.passwordLabel')}
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-5 w-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                   </div>
@@ -442,13 +459,13 @@ function LoginPageContent() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
-                    className="w-full pl-12 pr-12 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/60 focus:border-white/40 focus:bg-white/15 transition-all duration-300 backdrop-blur-sm"
+                    className="w-full pl-12 pr-12 py-4 bg-gray-50 border-2 border-blue-100 rounded-2xl text-gray-800 placeholder-gray-500 focus:border-blue-300 focus:bg-white transition-all duration-300"
                     placeholder={t('login.passwordPlaceholder')}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-white/60 hover:text-white/80 transition-colors"
+                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-blue-400 hover:text-blue-600 transition-colors"
                   >
                     {showPassword ? (
                       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -471,19 +488,19 @@ function LoginPageContent() {
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 rounded border-white/30 bg-white/10 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+                    className="w-4 h-4 rounded border-blue-300 bg-gray-50 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
                   />
-                  <span className="ml-3 text-sm text-white/90">{t('login.rememberMe')}</span>
+                  <span className="ml-3 text-sm text-gray-700">{t('login.rememberMe')}</span>
                 </label>
                 <Link 
                   href="/auth/forgot-password"
-                  className="text-sm text-blue-200 hover:text-white transition-colors"
+                  className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
                 >
                   {t('auth.forgotPassword')}
                 </Link>
               </div>
 
-              {/* Bouton de connexion - CONSERVÉ avec style moderne */}
+              {/* Bouton de connexion - CONSERVÉ avec style adapté au blanc */}
               <button
                 onClick={handleLogin}
                 disabled={isLoading}
@@ -507,10 +524,10 @@ function LoginPageContent() {
               {/* Séparateur */}
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-white/20"></div>
+                  <div className="w-full border-t border-blue-200"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-transparent text-white/70">{t('common.or')}</span>
+                  <span className="px-4 bg-white text-gray-500">{t('common.or')}</span>
                 </div>
               </div>
 
@@ -548,17 +565,17 @@ function LoginPageContent() {
               {/* Nouveau séparateur */}
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-white/20"></div>
+                  <div className="w-full border-t border-blue-200"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-transparent text-white/70">Pas encore de compte ?</span>
+                  <span className="px-4 bg-white text-gray-500">Pas encore de compte ?</span>
                 </div>
               </div>
 
               {/* Bouton d'inscription */}
               <button
                 onClick={() => setShowSignup(true)}
-                className="w-full py-4 px-6 bg-white/10 hover:bg-white/15 border border-white/20 hover:border-white/30 text-white font-medium rounded-2xl transition-all duration-300 transform hover:scale-[1.02]"
+                className="w-full py-4 px-6 bg-gray-50 hover:bg-blue-50 border-2 border-blue-100 hover:border-blue-200 text-blue-700 font-medium rounded-2xl transition-all duration-300 transform hover:scale-[1.02]"
               >
                 <span className="flex items-center justify-center space-x-2">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -620,7 +637,7 @@ function LoginPageContent() {
 
       {/* Debug - CONSERVÉ */}
       {process.env.NODE_ENV === 'development' && (
-        <div className="fixed bottom-4 left-4 p-2 bg-black/20 backdrop-blur-sm border border-white/20 rounded text-xs text-white">
+        <div className="fixed bottom-4 left-4 p-2 bg-white/90 border border-blue-200 rounded text-xs text-gray-700">
           <strong>Debug:</strong> Langue: {currentLanguage}
         </div>
       )}
@@ -628,13 +645,13 @@ function LoginPageContent() {
   )
 }
 
-// Composant fallback - CONSERVÉ avec style moderne
+// Composant fallback - CONSERVÉ avec style adapté au blanc
 const LoadingFallback = () => (
-  <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-700 to-indigo-800 flex items-center justify-center">
+  <div className="min-h-screen bg-white flex items-center justify-center">
     <div className="text-center">
       <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
-      <div className="w-12 h-12 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-      <p className="text-white">Chargement...</p>
+      <div className="w-12 h-12 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+      <p className="text-gray-600">Chargement...</p>
     </div>
   </div>
 )
