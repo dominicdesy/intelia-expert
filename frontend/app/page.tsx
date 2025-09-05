@@ -10,16 +10,15 @@ import { availableLanguages } from '../lib/languages/config'
 // Import de la vraie SignupModal depuis le même répertoire
 import { SignupModal } from './page_signup_modal'
 
-// Logo Intelia moderne avec gradient
+// Logo Intelia sans fond
 const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
-  <div className={`${className} bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-lg`}>
-    <img 
-      src="/images/favicon.png" 
-      alt="Intelia Logo" 
-      className="w-10 h-10 object-contain"
-    />
-  </div>
+  <img 
+    src="/images/logo.png" 
+    alt="Intelia Logo" 
+    className={`${className} object-contain drop-shadow-lg`}
+  />
 )
+
 
 // Sélecteur de langue moderne
 const LanguageSelector = () => {
