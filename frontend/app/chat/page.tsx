@@ -448,7 +448,7 @@ function ChatInterface() {
     }
   }, [])
 
-  // NOUVEAU: Gestionnaire OAuth dans la page chat
+  // Gestionnaire OAuth dans la page chat
   useEffect(() => {
     const handleOAuthCallback = async () => {
       const authStatus = searchParams?.get('auth')
@@ -1072,7 +1072,7 @@ function ChatInterface() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">
-            {isProcessingOAuth ? 'Finalisation OAuth...' : t('chat.loading')}
+            {isProcessingOAuth ? 'Finalisation OAuth LinkedIn...' : t('chat.loading')}
           </p>
         </div>
       </div>

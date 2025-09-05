@@ -1,7 +1,6 @@
-// app/auth/callback/route.ts
+// app/auth/callback/route.ts - Route de callback pour OAuth via backend
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { getSupabaseClient } from '@/lib/supabase/singleton'
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
@@ -9,100 +8,60 @@ export async function GET(request: NextRequest) {
   const error = requestUrl.searchParams.get('error')
   const error_description = requestUrl.searchParams.get('error_description')
 
-  console.log('[Auth Callback] Code:', !!code, 'Error:', error)
-
-  // URL de base pour la redirection
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://expert.intelia.com'
-  
-  console.log('[Auth Callback] Base URL:', baseUrl)
+  console.log('🔄 [Auth Callback] Code:', !!code, 'Error:', error)
 
   if (error) {
-    console.error('[Auth Callback] Erreur d\'authentification:', error, error_description)
-    return NextResponse.redirect(
-      new URL(`/?auth=error&message=${encodeURIComponent(error_description || error)}`, baseUrl)
-    )
+    console.error('❌ [Auth Callback] Erreur d\'authentification:', error, error_description)
+    // Rediriger vers la page de login avec l'erreur
+    return NextResponse.redirect(new URL(`/auth/login?error=${encodeURIComponent(error_description || error)}`, request.url))
   }
 
   if (code) {
     try {
-      console.log('[Auth Callback] Début du traitement du code OAuth...')
+      console.log('🔄 [Auth Callback] Échange du code via backend...')
       
-      // Vérifier que getSupabaseClient fonctionne
-      console.log('[Auth Callback] Récupération du client Supabase...')
-      const supabase = getSupabaseClient()
-      
-      if (!supabase) {
-        throw new Error('Client Supabase non disponible')
-      }
-      
-      console.log('[Auth Callback] Client Supabase récupéré avec succès')
-      console.log('[Auth Callback] Début de l\'échange du code OAuth...')
-      
-      // Échanger le code contre une session
-      const exchangeResult = await supabase.auth.exchangeCodeForSession(code)
-      
-      console.log('[Auth Callback] Échange terminé, résultat:', {
-        hasData: !!exchangeResult.data,
-        hasUser: !!exchangeResult.data?.user,
-        hasSession: !!exchangeResult.data?.session,
-        hasError: !!exchangeResult.error
-      })
-      
-      const { data, error: exchangeError } = exchangeResult
-      
-      if (exchangeError) {
-        console.error('[Auth Callback] Erreur échange de code:', {
-          message: exchangeError.message,
-          name: exchangeError.name,
-          status: exchangeError.status
+      // ✅ NOUVEAU: Appel au backend au lieu de Supabase direct
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/v1/auth/oauth-callback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: code,
+          redirect_url: `${requestUrl.origin}/auth/callback`
         })
-        return NextResponse.redirect(
-          new URL(`/?auth=error&message=${encodeURIComponent(`exchange_error: ${exchangeError.message}`)}`, baseUrl)
-        )
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('❌ [Auth Callback] Erreur échange code:', errorData)
+        return NextResponse.redirect(new URL(`/auth/login?error=${encodeURIComponent(errorData.detail || 'Erreur d\'authentification')}`, request.url))
       }
 
-      if (data?.user && data?.session) {
-        console.log('[Auth Callback] Session créée avec succès pour:', {
-          email: data.user.email,
-          id: data.user.id,
-          provider: data.user.app_metadata?.provider
-        })
+      const data = await response.json()
+      console.log('✅ [Auth Callback] Session créée via backend')
+
+      if (data.access_token) {
+        // Créer une réponse avec redirection vers le chat
+        const redirectResponse = NextResponse.redirect(new URL('/chat', request.url))
         
-        console.log('[Auth Callback] Redirection vers chat...')
-        
-        // Redirection vers chat avec succès
-        return NextResponse.redirect(new URL('/chat?auth=success', baseUrl))
-      } else {
-        console.error('[Auth Callback] Données manquantes:', {
-          hasUser: !!data?.user,
-          hasSession: !!data?.session,
-          userData: data?.user ? 'present' : 'missing',
-          sessionData: data?.session ? 'present' : 'missing'
+        // Optionnel: stocker le token dans un cookie sécurisé
+        redirectResponse.cookies.set('access_token', data.access_token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 7 // 7 jours
         })
-        return NextResponse.redirect(
-          new URL('/?auth=error&message=incomplete_oauth_data', baseUrl)
-        )
+
+        return redirectResponse
       }
-      
-    } catch (error: any) {
-      console.error('[Auth Callback] Erreur détaillée dans le catch:', {
-        message: error.message,
-        name: error.name,
-        stack: error.stack,
-        toString: error.toString(),
-        type: typeof error
-      })
-      
-      // Créer un message d'erreur plus descriptif
-      const errorMessage = error.message || error.toString() || 'unknown_callback_error'
-      
-      return NextResponse.redirect(
-        new URL(`/?auth=error&message=${encodeURIComponent(`callback_error: ${errorMessage}`)}`, baseUrl)
-      )
+    } catch (error) {
+      console.error('❌ [Auth Callback] Erreur inattendue:', error)
+      return NextResponse.redirect(new URL(`/auth/login?error=${encodeURIComponent('Erreur d\'authentification')}`, request.url))
     }
   }
 
-  // Fallback: pas de code reçu
-  console.warn('[Auth Callback] Pas de code reçu, redirection vers login')
-  return NextResponse.redirect(new URL('/?auth=error&message=missing_oauth_code', baseUrl))
+  // Fallback: rediriger vers login
+  console.warn('⚠️ [Auth Callback] Pas de code reçu, redirection vers login')
+  return NextResponse.redirect(new URL('/auth/login', request.url))
 }
