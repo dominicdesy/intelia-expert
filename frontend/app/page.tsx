@@ -1,12 +1,13 @@
 'use client'
 
-import React, { useState, Suspense } from 'react'
+import React, { useState, Suspense, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslation } from '@/lib/languages/i18n'
 import { useAuthStore } from '@/lib/stores/auth'
 import { availableLanguages } from '../lib/languages/config'
 import { getSupabaseClient } from '@/lib/supabase/singleton'
+import { rememberMeUtils } from './page_hooks' // ✅ AJOUT MANQUANT
 
 // Import de la vraie SignupModal depuis le même répertoire
 import { SignupModal } from './page_signup_modal'
@@ -21,7 +22,6 @@ const InteliaLogo = ({ className = "w-20 h-20" }: { className?: string }) => (
     />
   </div>
 )
-
 
 // Sélecteur de langue moderne
 const LanguageSelector = () => {
@@ -136,6 +136,15 @@ function LoginPageContent() {
   const [success, setSuccess] = useState('')
   const [showSignup, setShowSignup] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+
+  // ✅ AJOUT : Chargement du rememberMe au démarrage
+  useEffect(() => {
+    const savedData = rememberMeUtils.load()
+    if (savedData.rememberMe && savedData.lastEmail) {
+      setEmail(savedData.lastEmail)
+      setRememberMe(true)
+    }
+  }, [])
 
   // États pour le signup
   const [signupData, setSignupData] = useState({
@@ -273,7 +282,7 @@ function LoginPageContent() {
         credentials: 'omit'
       })
 
-      console.log('📥 Réponse backend:', response.status, response.statusText)
+      console.log('🔥 Réponse backend:', response.status, response.statusText)
 
       const responseText = await response.text()
       console.log('📄 Corps de réponse:', responseText)
@@ -364,6 +373,10 @@ function LoginPageContent() {
 
     try {
       await login(email.trim(), password)
+      
+      // ✅ AJOUT : Sauvegarde du rememberMe après succès
+      rememberMeUtils.save(email.trim(), rememberMe)
+      
       setSuccess(t('auth.success'))
       
       setTimeout(() => {
@@ -383,6 +396,7 @@ function LoginPageContent() {
     }
   }
 
+  // [Le reste du JSX reste identique...]
   return (
     <div className="min-h-screen relative overflow-hidden bg-white">
       {/* Background avec lignes de démarcation bleues */}
@@ -701,9 +715,9 @@ function LoginPageContent() {
   )
 }
 
-// Composant fallback corrigé (lignes ~700-720)
+// Composant fallback corrigé 
 const LoadingFallback = () => {
-  const { t } = useTranslation(); // ✅ Ajout du hook manquant
+  const { t } = useTranslation()
   
   return (
     <div className="min-h-screen bg-white flex items-center justify-center">
@@ -714,12 +728,11 @@ const LoadingFallback = () => {
           className="w-16 h-16 mx-auto mb-4 object-contain drop-shadow-lg"
         />
         <div className="w-12 h-12 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-gray-600">{t('common.loading')}</p>  {/* ✅ FONCTIONNE */}
+        <p className="text-gray-600">{t('common.loading')}</p>
       </div>
     </div>
   )
 }
-
 
 // PAGE PRINCIPALE avec Suspense
 export default function LoginPage() {
