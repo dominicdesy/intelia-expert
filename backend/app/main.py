@@ -643,7 +643,7 @@ except ImportError as e:
     # 🚀 Router stats_fast (toujours inclus)
     try:
         from app.api.v1.stats_fast import router as stats_fast_router
-        temp_v1_router.include_router(stats_fast_router, prefix="/stats-fast", tags=["statistics-fast"])
+        temp_v1_router.include_router(stats_fast_router, tags=["statistics-fast"])
         logger.info("✅ Stats Fast router ajouté (endpoints ultra-rapides)")
     except ImportError as e:
         logger.warning(f"⚠️ Stats Fast router non disponible: {e}")

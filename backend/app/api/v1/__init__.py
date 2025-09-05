@@ -240,7 +240,7 @@ else:
 # Stats Fast router (endpoints ultra-rapides)
 if STATS_FAST_AVAILABLE and stats_fast_router:
     try:
-        router.include_router(stats_fast_router, prefix="/stats-fast", tags=["Stats-Fast"])
+        router.include_router(stats_fast_router, tags=["Stats-Fast"])
         logger.info("Stats Fast router monte avec succes!")
         logger.info("Stats Fast router maintenant disponible sur /v1/stats-fast/*")
         logger.info("Endpoints ultra-rapides actives (<100ms vs 10-30s)")

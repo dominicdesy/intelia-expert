@@ -57,7 +57,7 @@ def get_internal_api_base_url():
 
 INTERNAL_API_BASE = get_internal_api_base_url()
 
-router = APIRouter(tags=["statistics-fast"])
+router = APIRouter(prefix="/stats-fast", tags=["statistics-fast"])
 
 # Cache local temporaire pour éviter les appels répétés
 _local_cache = {}
