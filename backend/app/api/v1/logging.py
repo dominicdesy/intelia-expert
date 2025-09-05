@@ -1,9 +1,6 @@
 # app/api/v1/logging.py
-# -*- coding: utf-8 -*-
 """
 🚀 SYSTÈME DE LOGGING - POINT D'ENTRÉE PRINCIPAL
-📊 Architecture modulaire avec classe LoggingManager principale
-🔧 CORRECTION: Bug PostgreSQL 'can't adapt type dict' résolu
 """
 import os
 import logging
@@ -57,7 +54,6 @@ except ImportError as e:
 class LoggingManager:
     """
     Gestionnaire principal des analytics et logging
-    CORRECTION CRITIQUE: Bug PostgreSQL 'can't adapt type dict' résolu
     """
     
     def __init__(self, db_config: dict = None):
