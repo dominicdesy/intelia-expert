@@ -14,7 +14,8 @@
   "lib\\stores\\auth.ts -> @/app/page_hooks": {
     "id": 9953,
     "files": [
-      "static/chunks/953.0c60b3d113bf2174.js"
+      "static/chunks/667-ef5bf7ae2daad6df.js",
+      "static/chunks/953-0fe3a623a454cf77.js"
     ]
   },
   "node_modules\\@supabase\\auth-js\\dist\\module\\lib\\helpers.js -> @supabase/node-fetch": {

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useTranslation } from '@/lib/languages/i18n'
-import { useCountries } from '../hooks/page_hooks' // Ajustez le chemin selon votre structure
+import { useCountries } from '../../page_hooks' // Fichier dans frontend/app/page_hooks.ts
 
 interface Country {
   value: string
