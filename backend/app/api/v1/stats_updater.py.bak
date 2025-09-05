@@ -2,13 +2,11 @@
 """
 VERSION SIMPLE ET DIRECTE - UTILISE DATABASE_URL DIRECTEMENT
 Corrige le problème de DSN en utilisant la même connexion que vos données réelles
-AJOUT DES FONCTIONS MANQUANTES: run_update_cycle, update_all_statistics
 """
 
 import os
 import logging
 import psycopg2
-import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, Any
 from psycopg2.extras import RealDictCursor
@@ -17,12 +15,11 @@ logger = logging.getLogger(__name__)
 
 class StatisticsUpdater:
     def __init__(self):
-        # LOG DE DÉPLOIEMENT - VERSION SIMPLE V1.1 AVEC FONCTIONS MANQUANTES
+        # LOG DE DÉPLOIEMENT - VERSION SIMPLE V1.0
         print("=" * 80)
-        print("STATS_UPDATER.PY - VERSION SIMPLE V1.1 - DÉPLOYÉE")
+        print("STATS_UPDATER.PY - VERSION SIMPLE V1.0 - DÉPLOYÉE")
         print("Date: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         print("CORRECTION CRITIQUE: Utilise DATABASE_URL au lieu de analytics.dsn")
-        print("AJOUT: run_update_cycle, update_all_statistics, async support")
         print("Cette version devrait corriger le problème des statistiques à 0")
         print("=" * 80)
         
@@ -31,10 +28,9 @@ class StatisticsUpdater:
         if not self.dsn:
             raise ValueError("DATABASE_URL manquant")
         
-        logger.info("🚀 StatisticsUpdater VERSION SIMPLE V1.1 initialisé")
+        logger.info("🚀 StatisticsUpdater VERSION SIMPLE V1.0 initialisé")
         logger.info(f"✅ DSN configuré depuis DATABASE_URL (longueur: {len(self.dsn)} chars)")
         logger.info("🔧 Cette version corrige le bug DSN analytics vs DATABASE_URL")
-        logger.info("➕ Ajout des fonctions manquantes pour main.py")
         
         self.last_update = None
         self.update_in_progress = False
@@ -96,7 +92,7 @@ class StatisticsUpdater:
                             }
                         }
                     else:
-                        logger.warning("⚠️ Aucune donnée trouvée dans user_questions_complete")
+                        logger.warning("❌ Aucune donnée trouvée dans user_questions_complete")
                         return self._get_empty_stats()
                         
         except Exception as e:
@@ -137,27 +133,19 @@ class StatisticsUpdater:
         }
 
     async def update_all_statistics(self) -> Dict[str, Any]:
-        """
-        AJOUTÉE: Force une mise à jour des statistiques (version async)
-        Cette fonction était manquante et causait l'erreur d'import
-        """
+        """Force une mise à jour des statistiques"""
         if self.update_in_progress:
             return {"status": "skipped", "reason": "already_in_progress"}
         
         self.update_in_progress = True
         try:
-            logger.info("🔄 Début mise à jour complète des statistiques")
             stats = self.get_stats()
             self.last_update = datetime.now()
-            
-            logger.info(f"✅ Mise à jour terminée: {stats['usageStats']['total_questions']} questions")
             
             return {
                 "status": "success",
                 "data": stats,
-                "last_update": self.last_update.isoformat(),
-                "total_questions": stats['usageStats']['total_questions'],
-                "unique_users": stats['usageStats']['unique_users']
+                "last_update": self.last_update.isoformat()
             }
         except Exception as e:
             logger.error(f"❌ Erreur update_all_statistics: {e}")
@@ -165,47 +153,16 @@ class StatisticsUpdater:
         finally:
             self.update_in_progress = False
 
-    def get_status(self) -> Dict[str, Any]:
-        """Retourne le statut actuel du collecteur"""
-        return {
-            "status": "running",
-            "last_update": self.last_update.isoformat() if self.last_update else None,
-            "update_in_progress": self.update_in_progress,
-            "dsn_configured": bool(self.dsn),
-            "version": "simple_v1.1"
-        }
-
 # Singleton global
 _stats_updater_instance = None
 
 def get_stats_updater():
-    """Récupère l'instance singleton"""
     global _stats_updater_instance
     if _stats_updater_instance is None:
         _stats_updater_instance = StatisticsUpdater()
     return _stats_updater_instance
 
-async def run_update_cycle():
-    """
-    AJOUTÉE: Fonction helper pour le scheduler
-    Cette fonction était manquante et causait l'erreur d'import dans main.py
-    """
-    logger.info("🔄 Lancement cycle de mise à jour depuis scheduler")
-    updater = get_stats_updater()
-    result = await updater.update_all_statistics()
-    logger.info(f"🔄 Cycle terminé: {result.get('status')}")
-    return result
-
 async def force_update_all():
-    """AJOUTÉE: Force une mise à jour immédiate"""
-    logger.info("🔧 Force update demandée")
+    """Force une mise à jour immédiate"""
     updater = get_stats_updater()
     return await updater.update_all_statistics()
-
-def get_updater_status():
-    """Retourne le statut du collecteur"""
-    try:
-        updater = get_stats_updater()
-        return updater.get_status()
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
