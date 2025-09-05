@@ -37,12 +37,16 @@ const LanguageSelector = () => {
 
   return (
     <div className="relative language-selector">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 px-4 py-2.5 text-sm bg-white border border-blue-200 rounded-xl shadow-sm hover:bg-blue-50 transition-all duration-300 text-blue-700"
-        aria-expanded={isOpen}
-        aria-haspopup="listbox"
-      >
+       <button
+         onClick={(e) => {
+           e.preventDefault()
+           e.stopPropagation()
+           setIsOpen(!isOpen)
+         }}
+         className="flex items-center space-x-2 px-4 py-2.5 text-sm bg-white border border-blue-200 rounded-xl shadow-sm hover:bg-blue-50 transition-all duration-300 text-blue-700 relative z-50"
+         aria-expanded={isOpen}
+         aria-haspopup="listbox"
+       >
         <span>{currentLang.flag}</span>
         <span>{currentLang.nativeName}</span>
         <svg 
