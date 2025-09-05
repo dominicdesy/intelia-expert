@@ -5,24 +5,24 @@
   "devFiles": [],
   "ampDevFiles": [],
   "lowPriorityFiles": [
-    "static/intelia-expert-1757078200547/_buildManifest.js",
-    "static/intelia-expert-1757078200547/_ssgManifest.js"
+    "static/intelia-expert-1757079039851/_buildManifest.js",
+    "static/intelia-expert-1757079039851/_ssgManifest.js"
   ],
   "rootMainFiles": [
-    "static/chunks/webpack-ce696714831cdeae.js",
-    "static/chunks/vendors-8f09c6e4557aca0f.js",
+    "static/chunks/webpack-71a5b534b23abe16.js",
+    "static/chunks/vendors-b62756299cbbc3ab.js",
     "static/chunks/main-app-4c3f0bbdac42ded9.js"
   ],
   "pages": {
     "/_app": [
-      "static/chunks/webpack-ce696714831cdeae.js",
-      "static/chunks/vendors-8f09c6e4557aca0f.js",
+      "static/chunks/webpack-71a5b534b23abe16.js",
+      "static/chunks/vendors-b62756299cbbc3ab.js",
       "static/chunks/main-2469bcd16fd54e0b.js",
       "static/chunks/pages/_app-0c0d221b8f8237fa.js"
     ],
     "/_error": [
-      "static/chunks/webpack-ce696714831cdeae.js",
-      "static/chunks/vendors-8f09c6e4557aca0f.js",
+      "static/chunks/webpack-71a5b534b23abe16.js",
+      "static/chunks/vendors-b62756299cbbc3ab.js",
       "static/chunks/main-2469bcd16fd54e0b.js",
       "static/chunks/pages/_error-e5b4d61ed02fe2b7.js"
     ]

@@ -10,34 +10,104 @@ const debugLog = (category: string, message: string, data?: any) => {
   return
 }
 
-const fallbackCountries = [
-  { value: 'CA', label: 'Canada', phoneCode: '+1', flag: '🇨🇦' },
-  { value: 'US', label: 'États-Unis', phoneCode: '+1', flag: '🇺🇸' },
-  { value: 'FR', label: 'France', phoneCode: '+33', flag: '🇫🇷' },
-  { value: 'GB', label: 'Royaume-Uni', phoneCode: '+44', flag: '🇬🇧' },
-  { value: 'DE', label: 'Allemagne', phoneCode: '+49', flag: '🇩🇪' },
-  { value: 'IT', label: 'Italie', phoneCode: '+39', flag: '🇮🇹' },
-  { value: 'ES', label: 'Espagne', phoneCode: '+34', flag: '🇪🇸' },
-  { value: 'BE', label: 'Belgique', phoneCode: '+32', flag: '🇧🇪' },
-  { value: 'CH', label: 'Suisse', phoneCode: '+41', flag: '🇨🇭' },
-  { value: 'MX', label: 'Mexique', phoneCode: '+52', flag: '🇲🇽' },
-  { value: 'BR', label: 'Brésil', phoneCode: '+55', flag: '🇧🇷' },
-  { value: 'AU', label: 'Australie', phoneCode: '+61', flag: '🇦🇺' },
-  { value: 'JP', label: 'Japon', phoneCode: '+81', flag: '🇯🇵' },
-  { value: 'CN', label: 'Chine', phoneCode: '+86', flag: '🇨🇳' },
-  { value: 'IN', label: 'Inde', phoneCode: '+91', flag: '🇮🇳' },
-  { value: 'NL', label: 'Pays-Bas', phoneCode: '+31', flag: '🇳🇱' },
-  { value: 'SE', label: 'Suède', phoneCode: '+46', flag: '🇸🇪' },
-  { value: 'NO', label: 'Norvège', phoneCode: '+47', flag: '🇳🇴' },
-  { value: 'DK', label: 'Danemark', phoneCode: '+45', flag: '🇩🇰' },
-  { value: 'FI', label: 'Finlande', phoneCode: '+358', flag: '🇫🇮' }
-]
-
 interface Country {
   value: string
   label: string
   phoneCode: string
   flag?: string
+}
+
+// Mapping des codes de langue vers les codes utilisés par REST Countries
+const getLanguageCode = (currentLanguage: string): string => {
+  const mapping: Record<string, string> = {
+    'fr': 'fra',   // Français
+    'es': 'spa',   // Espagnol
+    'de': 'deu',   // Allemand
+    'pt': 'por',   // Portugais
+    'nl': 'nld',   // Néerlandais
+    'pl': 'pol',   // Polonais
+    'zh': 'zho',   // Chinois
+    'hi': 'hin',   // Hindi
+    'th': 'tha',   // Thaï
+    'en': 'eng'    // Anglais (fallback)
+  }
+  return mapping[currentLanguage] || 'eng'
+}
+
+// Fallback countries avec traductions multilingues
+const getFallbackCountries = (currentLanguage: string): Country[] => {
+  const translations: Record<string, Record<string, string>> = {
+    en: {
+      'CA': 'Canada',
+      'US': 'United States',
+      'FR': 'France',
+      'GB': 'United Kingdom',
+      'DE': 'Germany',
+      'IT': 'Italy',
+      'ES': 'Spain',
+      'BE': 'Belgium',
+      'CH': 'Switzerland',
+      'MX': 'Mexico',
+      'BR': 'Brazil',
+      'AU': 'Australia',
+      'JP': 'Japan',
+      'CN': 'China',
+      'IN': 'India',
+      'NL': 'Netherlands',
+      'SE': 'Sweden',
+      'NO': 'Norway',
+      'DK': 'Denmark',
+      'FI': 'Finland'
+    },
+    fr: {
+      'CA': 'Canada',
+      'US': 'États-Unis',
+      'FR': 'France',
+      'GB': 'Royaume-Uni',
+      'DE': 'Allemagne',
+      'IT': 'Italie',
+      'ES': 'Espagne',
+      'BE': 'Belgique',
+      'CH': 'Suisse',
+      'MX': 'Mexique',
+      'BR': 'Brésil',
+      'AU': 'Australie',
+      'JP': 'Japon',
+      'CN': 'Chine',
+      'IN': 'Inde',
+      'NL': 'Pays-Bas',
+      'SE': 'Suède',
+      'NO': 'Norvège',
+      'DK': 'Danemark',
+      'FI': 'Finlande'
+    }
+  }
+
+  const phoneCodesMap: Record<string, string> = {
+    'CA': '+1', 'US': '+1', 'FR': '+33', 'GB': '+44', 'DE': '+49',
+    'IT': '+39', 'ES': '+34', 'BE': '+32', 'CH': '+41', 'MX': '+52',
+    'BR': '+55', 'AU': '+61', 'JP': '+81', 'CN': '+86', 'IN': '+91',
+    'NL': '+31', 'SE': '+46', 'NO': '+47', 'DK': '+45', 'FI': '+358'
+  }
+
+  const flagsMap: Record<string, string> = {
+    'CA': '🇨🇦', 'US': '🇺🇸', 'FR': '🇫🇷', 'GB': '🇬🇧', 'DE': '🇩🇪',
+    'IT': '🇮🇹', 'ES': '🇪🇸', 'BE': '🇧🇪', 'CH': '🇨🇭', 'MX': '🇲🇽',
+    'BR': '🇧🇷', 'AU': '🇦🇺', 'JP': '🇯🇵', 'CN': '🇨🇳', 'IN': '🇮🇳',
+    'NL': '🇳🇱', 'SE': '🇸🇪', 'NO': '🇳🇴', 'DK': '🇩🇰', 'FI': '🇫🇮'
+  }
+
+  const langTranslations = translations[currentLanguage] || translations.en
+  
+  return Object.keys(langTranslations).map(code => ({
+    value: code,
+    label: langTranslations[code],
+    phoneCode: phoneCodesMap[code],
+    flag: flagsMap[code]
+  })).sort((a, b) => {
+    const locale = currentLanguage === 'fr' ? 'fr' : 'en'
+    return a.label.localeCompare(b.label, locale, { numeric: true })
+  })
 }
 
 // Interface TypeScript pour les données utilisateur API
@@ -58,13 +128,16 @@ interface UserProfileUpdate {
 }
 
 const useCountries = () => {
-  const [countries, setCountries] = useState<Country[]>(fallbackCountries)
+  const { currentLanguage } = useTranslation()
+  const languageCode = getLanguageCode(currentLanguage)
+  
+  const [countries, setCountries] = useState<Country[]>(() => getFallbackCountries(currentLanguage))
   const [loading, setLoading] = useState(false)
   const [usingFallback, setUsingFallback] = useState(true)
   const abortControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
-    debugLog('COUNTRIES', 'Hook initialized')
+    debugLog('COUNTRIES', 'Hook initialized with language', currentLanguage)
     
     const fetchCountries = async () => {
       if (abortControllerRef.current) {
@@ -76,11 +149,19 @@ const useCountries = () => {
       const signal = abortControllerRef.current.signal
 
       try {
-        debugLog('COUNTRIES', 'Starting fetch')
+        debugLog('COUNTRIES', `Starting fetch for language: ${currentLanguage} (${languageCode})`)
         setLoading(true)
+        
         const response = await fetch(
           'https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations',
-          { signal }
+          { 
+            signal,
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (compatible; Intelia/1.0)',
+              'Cache-Control': 'no-cache'
+            }
+          }
         )
         
         debugLog('COUNTRIES', 'Fetch response', { ok: response.ok, status: response.status })
@@ -93,32 +174,87 @@ const useCountries = () => {
         if (signal.aborted) return
         
         const formattedCountries = data
-          .map((country: any) => ({
-            value: country.cca2,
-            label: country.translations?.fra?.common || country.name.common,
-            phoneCode: (country.idd?.root || '') + (country.idd?.suffixes?.[0] || ''),
-            flag: country.flag
-          }))
-          .filter((country: Country) => 
-            country.phoneCode && 
-            country.phoneCode.length > 1 &&
-            country.phoneCode.startsWith('+') &&
-            country.value && 
-            country.label
-          )
-          .sort((a: Country, b: Country) => a.label.localeCompare(b.label))
+          .map((country: any) => {
+            let phoneCode = ''
+            if (country.idd?.root) {
+              phoneCode = country.idd.root
+              if (country.idd.suffixes && country.idd.suffixes[0]) {
+                phoneCode += country.idd.suffixes[0]
+              }
+            }
+            
+            // Récupération du nom selon la langue
+            let countryName = country.name?.common || country.cca2
+            
+            // Essayer d'abord la traduction dans la langue demandée
+            if (country.translations && country.translations[languageCode]) {
+              countryName = country.translations[languageCode].common || country.translations[languageCode].official
+            }
+            // Si pas de traduction dans la langue demandée, utiliser l'anglais
+            else if (country.name?.common) {
+              countryName = country.name.common
+            }
+            
+            return {
+              value: country.cca2,
+              label: countryName,
+              phoneCode: phoneCode,
+              flag: country.flag || ''
+            }
+          })
+          .filter((country: Country) => {
+            const hasValidCode = country.phoneCode && 
+                                country.phoneCode !== 'undefined' && 
+                                country.phoneCode !== 'null' &&
+                                country.phoneCode.length > 1 &&
+                                country.phoneCode.startsWith('+') &&
+                                /^\+\d+$/.test(country.phoneCode)
+            
+            const hasValidInfo = country.value && 
+                                country.value.length === 2 &&
+                                country.label && 
+                                country.label.length > 1
+            
+            return hasValidCode && hasValidInfo
+          })
+          .sort((a: Country, b: Country) => {
+            // Tri selon la langue actuelle
+            const locale = languageCode === 'fra' ? 'fr' : 
+                          languageCode === 'spa' ? 'es' :
+                          languageCode === 'deu' ? 'de' :
+                          languageCode === 'por' ? 'pt' :
+                          languageCode === 'nld' ? 'nl' :
+                          languageCode === 'pol' ? 'pl' :
+                          languageCode === 'zho' ? 'zh' :
+                          'en'
+            
+            return a.label.localeCompare(b.label, locale, { numeric: true })
+          })
         
         debugLog('COUNTRIES', 'Countries processed', { count: formattedCountries.length })
         
         if (formattedCountries.length >= 50 && !signal.aborted) {
           setCountries(formattedCountries)
           setUsingFallback(false)
-          debugLog('COUNTRIES', 'Using API countries')
+          debugLog('COUNTRIES', `Using API countries in ${currentLanguage}`)
+          
+          // Logs de debug pour vérifier les traductions
+          const france = formattedCountries.find(c => c.value === 'FR')
+          const usa = formattedCountries.find(c => c.value === 'US')
+          const germany = formattedCountries.find(c => c.value === 'DE')
+          
+          console.log(`[UserInfoModal-Countries] Exemples en ${currentLanguage}:`)
+          console.log('  France:', france?.label)
+          console.log('  USA:', usa?.label)
+          console.log('  Germany:', germany?.label)
         }
         
       } catch (error) {
-        if (error instanceof Error && error.name !== 'AbortError') {
-          debugLog('COUNTRIES', 'Fetch error', error.message)
+        if (error instanceof Error && error.name !== 'AbortError' && !signal.aborted) {
+          debugLog('COUNTRIES', 'Fetch error, using fallback', error.message)
+          // En cas d'erreur, utiliser le fallback dans la bonne langue
+          setCountries(getFallbackCountries(currentLanguage))
+          setUsingFallback(true)
         }
       } finally {
         if (!signal.aborted) {
@@ -128,6 +264,9 @@ const useCountries = () => {
       }
     }
 
+    // Toujours commencer par mettre à jour le fallback dans la bonne langue
+    setCountries(getFallbackCountries(currentLanguage))
+    
     fetchCountries()
     
     return () => {
@@ -136,7 +275,7 @@ const useCountries = () => {
         abortControllerRef.current.abort()
       }
     }
-  }, [])
+  }, [currentLanguage, languageCode]) // Se redéclenche quand la langue change
 
   return { countries, loading, usingFallback }
 }
@@ -962,7 +1101,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
 
   const tabs = useMemo(() => [
     { id: 'profile', label: t('nav.profile'), icon: '👤' },
-    { id: 'password', label: t('profile.password'), icon: '🔒' }
+    { id: 'password', label: t('profile.password'), icon: '🔑' }
   ], [t])
 
   // Keyboard handling
@@ -1339,6 +1478,3 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
           </div>
         </div>
       </div>
-    </>
-  )
-}
