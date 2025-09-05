@@ -11,13 +11,15 @@ import { getSupabaseClient } from '@/lib/supabase/singleton'
 // Import de la vraie SignupModal depuis le même répertoire
 import { SignupModal } from './page_signup_modal'
 
-// Logo Intelia sans fond
-const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
-  <img 
-    src="/images/favicon.png" 
-    alt="Intelia Logo" 
-    className={`${className} object-contain drop-shadow-lg`}
-  />
+// Logo Intelia dans un carré avec bordure bleue
+const InteliaLogo = ({ className = "w-20 h-20" }: { className?: string }) => (
+  <div className={`${className} bg-white border-2 border-blue-100 rounded-2xl shadow-lg flex items-center justify-center p-3`}>
+    <img 
+      src="/images/favicon.png" 
+      alt="Intelia Logo" 
+      className="w-full h-full object-contain"
+    />
+  </div>
 )
 
 
