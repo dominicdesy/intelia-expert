@@ -5,6 +5,7 @@ Version 4.1 - Ajout du support des endpoints users
 Support des endpoints de cache ultra-rapides
 Support des endpoints /api/v1/auth/ (vrais endpoints du backend)
 CORS compatible avec credentials: 'include'
+CORRECTION: Permissions stats-fast ajustées pour permettre l'accès aux utilisateurs authentifiés
 """
 
 from fastapi import HTTPException, Request
@@ -111,19 +112,14 @@ PROTECTED_PATTERNS = [
     "/api/v1/users/export",            # Export donnees utilisateur
     "/api/v1/users/debug/",            # Debug endpoints users
     
-    # === ENDPOINTS CACHE PROTEGES (super admin) ===
-    "/api/v1/stats-fast/",                # Endpoints ultra-rapides (admin+)
-    "/api/v1/stats-admin/",               # Administration cache (super admin)
-    "/api/v1/stats-fast/dashboard",       # Dashboard rapide
-    "/api/v1/stats-fast/questions",      # Questions rapides
-    "/api/v1/stats-fast/invitations/stats", # Invitations rapides
-    "/api/v1/stats-fast/openai-costs/",  # Couts OpenAI rapides
-    "/api/v1/stats-fast/performance",    # Performance rapide
-    "/api/v1/stats-fast/my-analytics",   # Analytics personnelles
-    "/api/v1/stats-admin/force-update/", # Force update cache
-    "/api/v1/stats-admin/cache/",        # Controle cache
-    "/api/v1/stats-admin/status",        # Status admin cache
-    "/api/admin/cache/",                  # Controle admin dans main.py
+    # === ENDPOINTS CACHE PROTEGES - CORRECTION DES PERMISSIONS ===
+    # Note: stats-fast maintenant accessible aux utilisateurs authentifiés
+    # Seuls stats-admin restent super admin uniquement
+    "/api/v1/stats-admin/",               # Administration cache (super admin uniquement)
+    "/api/v1/stats-admin/force-update/", # Force update cache (super admin)
+    "/api/v1/stats-admin/cache/",        # Controle cache (super admin)
+    "/api/v1/stats-admin/status",        # Status admin cache (super admin)
+    "/api/admin/cache/force-update",      # Force update dans main.py (super admin)
     
     # === ENDPOINTS AUTH PROTEGES CORRIGES - VRAIS ENDPOINTS ===
     "/api/v1/auth/me",                 # Profil utilisateur (VRAI endpoint)
@@ -147,14 +143,37 @@ PROTECTED_PATTERNS = [
     "/v1/users/export",                # Export donnees utilisateur
     "/v1/users/debug/",                # Debug endpoints users
     
-    # === CACHE SANS PREFIX ===
-    "/v1/stats-fast/",                    # Endpoints cache rapides
-    "/v1/stats-admin/",                   # Admin cache
-    "/admin/cache/",                      # Admin cache direct
+    # === CACHE SANS PREFIX - CORRECTION ===
+    "/v1/stats-admin/",                   # Admin cache uniquement
+    "/admin/cache/force-update",          # Force update direct
     
     "/v1/auth/me",                     # Sans /api
     "/v1/auth/delete-data",            # Sans /api
     "/auth-temp/me",                   # Auth temp sans /api
+]
+
+# NOUVEAU: PATTERNS POUR UTILISATEURS AUTHENTIFIÉS (niveau intermédiaire)
+AUTHENTICATED_USER_PATTERNS = [
+    # === ENDPOINTS STATS-FAST - MAINTENANT ACCESSIBLE AUX USERS AUTHENTIFIÉS ===
+    "/api/v1/stats-fast/",                # Tous les endpoints stats-fast
+    "/api/v1/stats-fast/dashboard",       # Dashboard rapide
+    "/api/v1/stats-fast/questions",       # Questions rapides
+    "/api/v1/stats-fast/invitations",     # Invitations rapides
+    "/api/v1/stats-fast/openai-costs/",   # Coûts OpenAI
+    "/api/v1/stats-fast/performance",     # Performance
+    "/api/v1/stats-fast/my-analytics",    # Analytics personnelles
+    
+    # === PATTERNS SANS PREFIX ===
+    "/v1/stats-fast/",                    # Stats-fast sans /api
+    "/v1/stats-fast/dashboard",
+    "/v1/stats-fast/questions", 
+    "/v1/stats-fast/invitations",
+    "/v1/stats-fast/openai-costs/",
+    "/v1/stats-fast/performance",
+    "/v1/stats-fast/my-analytics",
+    
+    # === AUTRES ENDPOINTS POUR UTILISATEURS AUTHENTIFIÉS ===
+    "/api/admin/stats",                   # Stats basiques (pas admin cache)
 ]
 
 # PATTERNS D'ENDPOINTS INEXISTANTS (retourner 404 au lieu de 405)
@@ -321,20 +340,38 @@ def is_public_endpoint(path: str) -> bool:
 
 def is_protected_endpoint(path: str) -> bool:
     """
-    Verifie si un endpoint necessite une authentification
+    Verifie si un endpoint necessite une authentification ADMIN
     
     Args:
         path: Chemin de l'endpoint a verifier
         
     Returns:
-        bool: True si l'endpoint necessite une authentification
+        bool: True si l'endpoint necessite une authentification admin
     """
     for pattern in PROTECTED_PATTERNS:
         if path.startswith(pattern):
-            logger.debug(f"Protected pattern match: {path} -> {pattern}")
+            logger.debug(f"Admin protected pattern match: {path} -> {pattern}")
             return True
     
-    logger.debug(f"Not a protected endpoint: {path}")
+    logger.debug(f"Not an admin protected endpoint: {path}")
+    return False
+
+def is_authenticated_user_endpoint(path: str) -> bool:
+    """
+    NOUVEAU: Verifie si un endpoint necessite une authentification utilisateur basique
+    
+    Args:
+        path: Chemin de l'endpoint a verifier
+        
+    Returns:
+        bool: True si l'endpoint necessite une authentification utilisateur
+    """
+    for pattern in AUTHENTICATED_USER_PATTERNS:
+        if path.startswith(pattern):
+            logger.debug(f"User authenticated pattern match: {path} -> {pattern}")
+            return True
+    
+    logger.debug(f"Not a user authenticated endpoint: {path}")
     return False
 
 def is_nonexistent_endpoint(path: str) -> bool:
@@ -369,7 +406,6 @@ def create_cors_headers(origin: str = None) -> Dict[str, str]:
     # Liste des origins autorises
     allowed_origins = [
         "https://expert.intelia.com",
-        "https://expert.intelia.com", 
         "http://localhost:3000",
         "http://localhost:8080"
     ]
@@ -389,16 +425,16 @@ def create_cors_headers(origin: str = None) -> Dict[str, str]:
         "Access-Control-Allow-Credentials": cors_credentials,
     }
 
-# Fonction pour verifier les permissions cache
-def has_cache_admin_permission(user_info: Dict[str, Any]) -> bool:
+# Fonctions pour verifier les permissions - CORRIGÉES
+def has_admin_permission(user_info: Dict[str, Any]) -> bool:
     """
-    Verifie si l'utilisateur a les permissions pour les endpoints d'administration cache
+    Verifie si l'utilisateur a les permissions admin (pour stats-admin uniquement)
     
     Args:
         user_info: Informations utilisateur depuis le token
         
     Returns:
-        bool: True si l'utilisateur peut acceder aux endpoints admin cache
+        bool: True si l'utilisateur peut acceder aux endpoints admin
     """
     user_type = user_info.get("user_type", "user")
     is_admin = user_info.get("is_admin", False)
@@ -406,31 +442,29 @@ def has_cache_admin_permission(user_info: Dict[str, Any]) -> bool:
     # Super admin ou admin avec flag explicite
     return user_type in ["super_admin", "admin"] or is_admin
 
-def has_cache_view_permission(user_info: Dict[str, Any]) -> bool:
+def is_authenticated_user(user_info: Dict[str, Any]) -> bool:
     """
-    Verifie si l'utilisateur peut voir les statistiques en cache
+    NOUVEAU: Verifie si l'utilisateur est authentifié (pour stats-fast)
     
     Args:
         user_info: Informations utilisateur depuis le token
         
     Returns:
-        bool: True si l'utilisateur peut voir les stats
+        bool: True si l'utilisateur est authentifié validement
     """
-    user_type = user_info.get("user_type", "user")
-    
-    # Admin+ ou utilisateur avec permissions analytics
-    return user_type in ["super_admin", "admin", "moderator"]
+    # Tout utilisateur avec un token valide peut accéder aux stats-fast
+    return bool(user_info and user_info.get("email"))
 
 async def auth_middleware(request: Request, call_next):
     """
-    Middleware d'authentification globale pour l'API Intelia Expert - VERSION 4.1 AVEC USERS
+    Middleware d'authentification globale pour l'API Intelia Expert - VERSION 4.1 CORRIGÉE
     
-    Logique:
+    Logique CORRIGÉE:
     1. Gere les endpoints inexistants (404)
     2. Skip l'auth pour les endpoints publics et OPTIONS
-    3. Verifie l'auth pour les endpoints proteges
-    4. Gestion speciale pour les endpoints de cache
-    5. NOUVEAU: Support complet des endpoints users
+    3. Authentification basique pour les endpoints stats-fast (tout utilisateur authentifié)
+    4. Authentification admin pour les endpoints protégés (admin uniquement)
+    5. Support complet des endpoints users
     6. Laisse passer les autres endpoints (FastAPI gere les 404)
     
     Args:
@@ -459,7 +493,7 @@ async def auth_middleware(request: Request, call_next):
         # Message special pour les anciens endpoints
         suggestion = "Verifiez l'URL ou consultez /docs pour les endpoints disponibles"
         if "/stats/" in request.url.path and "/stats-fast/" not in request.url.path:
-            suggestion = "Les endpoints stats sont maintenant sur /v1/stats-fast/ (ultra-rapides) et /v1/stats-admin/ (administration)"
+            suggestion = "Les endpoints stats sont maintenant sur /v1/stats-fast/ (utilisateurs authentifiés) et /v1/stats-admin/ (admin uniquement)"
         elif "/cache/" in request.url.path:
             suggestion = "Les endpoints cache sont sur /v1/stats-admin/ pour l'administration"
         elif "/auth/" in request.url.path and "/v1/auth/" not in request.url.path:
@@ -474,11 +508,10 @@ async def auth_middleware(request: Request, call_next):
                 "error": "endpoint_not_found",
                 "path": request.url.path,
                 "suggestion": suggestion,
-                "available_user_endpoints": [
-                    "/v1/users/profile (GET/PUT - gestion profil)",
-                    "/v1/users/export (GET - export donnees)",
-                    "/v1/users/debug/profile (GET - debug profil)"
-                ] if "/user" in request.url.path or "/profile" in request.url.path else None
+                "available_stats_endpoints": [
+                    "/v1/stats-fast/* (utilisateurs authentifiés)",
+                    "/v1/stats-admin/* (admin uniquement)"
+                ] if "/stats" in request.url.path else None
             },
             headers=create_cors_headers(request_origin)
         )
@@ -504,51 +537,32 @@ async def auth_middleware(request: Request, call_next):
             
         return response
     
-    # ETAPE 3: Verifier l'auth pour les endpoints proteges
-    if is_protected_endpoint(request.url.path):
+    # ETAPE 3: NOUVEAU - Verifier l'auth pour les endpoints utilisateur authentifié (stats-fast)
+    if is_authenticated_user_endpoint(request.url.path):
         try:
-            logger.debug(f"Protected endpoint detected: {request.url.path}")
+            logger.debug(f"Authenticated user endpoint detected: {request.url.path}")
             
             # Verifier le token d'authentification
             user_info = await verify_supabase_token(request)
             
-            # Verification speciale pour les endpoints cache admin
-            if "/stats-admin/" in request.url.path or "/admin/cache/" in request.url.path:
-                if not has_cache_admin_permission(user_info):
-                    logger.warning(f"Cache admin permission denied for {user_info.get('email')} on {request.url.path}")
-                    return JSONResponse(
-                        status_code=403,
-                        content={
-                            "detail": "Cache administration requires super_admin permissions",
-                            "error": "insufficient_permissions",
-                            "required_permission": "super_admin",
-                            "user_type": user_info.get("user_type"),
-                            "path": request.url.path
-                        },
-                        headers=create_cors_headers(request_origin)
-                    )
+            # Vérifier que l'utilisateur est authentifié
+            if not is_authenticated_user(user_info):
+                logger.warning(f"Invalid user authentication for {user_info.get('email')} on {request.url.path}")
+                return JSONResponse(
+                    status_code=401,
+                    content={
+                        "detail": "Valid authentication required",
+                        "error": "authentication_required",
+                        "path": request.url.path
+                    },
+                    headers=create_cors_headers(request_origin)
+                )
             
-            # Verification pour les endpoints stats-fast
-            elif "/stats-fast/" in request.url.path:
-                if not has_cache_view_permission(user_info):
-                    logger.warning(f"Cache view permission denied for {user_info.get('email')} on {request.url.path}")
-                    return JSONResponse(
-                        status_code=403,
-                        content={
-                            "detail": "Statistics access requires admin+ permissions",
-                            "error": "insufficient_permissions", 
-                            "required_permission": "admin",
-                            "user_type": user_info.get("user_type"),
-                            "path": request.url.path
-                        },
-                        headers=create_cors_headers(request_origin)
-                    )
-            
-            # Ajouter les infos utilisateur a la request pour les endpoints suivants
+            # Ajouter les infos utilisateur a la request
             request.state.user = user_info
             
             logger.info(
-                f"User authenticated: {user_info.get('email')} "
+                f"User authenticated for stats-fast: {user_info.get('email')} "
                 f"(type: {user_info.get('user_type')}) "
                 f"for {request.url.path}"
             )
@@ -556,7 +570,7 @@ async def auth_middleware(request: Request, call_next):
             # Continuer vers l'endpoint
             response = await call_next(request)
             
-            # Ajouter les headers CORS aux reponses protegees
+            # Ajouter les headers CORS
             for key, value in create_cors_headers(request_origin).items():
                 response.headers[key] = value
                 
@@ -564,7 +578,7 @@ async def auth_middleware(request: Request, call_next):
             
         except HTTPException as e:
             logger.warning(
-                f"Auth failed for {request.url.path}: "
+                f"Auth failed for stats-fast {request.url.path}: "
                 f"Status {e.status_code} - {e.detail}"
             )
             return JSONResponse(
@@ -578,7 +592,7 @@ async def auth_middleware(request: Request, call_next):
             )
             
         except Exception as e:
-            logger.error(f"Auth middleware unexpected error for {request.url.path}: {e}")
+            logger.error(f"Auth middleware unexpected error for stats-fast {request.url.path}: {e}")
             return JSONResponse(
                 status_code=401,
                 content={
@@ -589,7 +603,75 @@ async def auth_middleware(request: Request, call_next):
                 headers=create_cors_headers(request_origin)
             )
     
-    # ETAPE 4: Pour tous les autres endpoints (non proteges, non publics)
+    # ETAPE 4: Verifier l'auth ADMIN pour les endpoints proteges
+    if is_protected_endpoint(request.url.path):
+        try:
+            logger.debug(f"Admin protected endpoint detected: {request.url.path}")
+            
+            # Verifier le token d'authentification
+            user_info = await verify_supabase_token(request)
+            
+            # Verification pour les endpoints admin
+            if not has_admin_permission(user_info):
+                logger.warning(f"Admin permission denied for {user_info.get('email')} on {request.url.path}")
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "detail": "Admin permissions required",
+                        "error": "insufficient_permissions",
+                        "required_permission": "admin",
+                        "user_type": user_info.get("user_type"),
+                        "path": request.url.path
+                    },
+                    headers=create_cors_headers(request_origin)
+                )
+            
+            # Ajouter les infos utilisateur a la request
+            request.state.user = user_info
+            
+            logger.info(
+                f"Admin authenticated: {user_info.get('email')} "
+                f"(type: {user_info.get('user_type')}) "
+                f"for {request.url.path}"
+            )
+            
+            # Continuer vers l'endpoint
+            response = await call_next(request)
+            
+            # Ajouter les headers CORS
+            for key, value in create_cors_headers(request_origin).items():
+                response.headers[key] = value
+                
+            return response
+            
+        except HTTPException as e:
+            logger.warning(
+                f"Admin auth failed for {request.url.path}: "
+                f"Status {e.status_code} - {e.detail}"
+            )
+            return JSONResponse(
+                status_code=e.status_code,
+                content={
+                    "detail": e.detail, 
+                    "error": "authentication_failed",
+                    "path": request.url.path
+                },
+                headers=create_cors_headers(request_origin)
+            )
+            
+        except Exception as e:
+            logger.error(f"Admin auth middleware unexpected error for {request.url.path}: {e}")
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "detail": "Authentication failed", 
+                    "error": "internal_auth_error",
+                    "path": request.url.path
+                },
+                headers=create_cors_headers(request_origin)
+            )
+    
+    # ETAPE 5: Pour tous les autres endpoints (non proteges, non publics)
     # Laisser passer - FastAPI gerera naturellement les 404 pour les routes inexistantes
     logger.debug(f"Endpoint non-protege - Passage libre: {request.url.path}")
     
@@ -658,38 +740,38 @@ def debug_middleware_config() -> Dict[str, Any]:
     return {
         "public_endpoints_count": len(PUBLIC_ENDPOINTS),
         "protected_patterns_count": len(PROTECTED_PATTERNS),
+        "authenticated_user_patterns_count": len(AUTHENTICATED_USER_PATTERNS),
         "nonexistent_patterns_count": len(NONEXISTENT_PATTERNS),
         "extended_public_patterns_count": len(EXTENDED_PUBLIC_PATTERNS),
-        "sample_public_endpoints": list(PUBLIC_ENDPOINTS)[:15],
-        "sample_protected_patterns": PROTECTED_PATTERNS[:15],
+        "sample_public_endpoints": list(PUBLIC_ENDPOINTS)[:10],
+        "sample_protected_patterns": PROTECTED_PATTERNS[:10],
+        "sample_authenticated_user_patterns": AUTHENTICATED_USER_PATTERNS[:10],
         "users_endpoints": {
             "protected_patterns": [
                 "/api/v1/users/",
                 "/api/v1/users/profile",
                 "/api/v1/users/export",
-                "/api/v1/users/debug/",
-                "/v1/users/",
-                "/v1/users/profile",
-                "/v1/users/export",
-                "/v1/users/debug/"
-            ],
-            "nonexistent_patterns": [
-                "/api/v1/user/",
-                "/api/v1/profile/",
-                "/api/v1/account/",
-                "/v1/user/",
-                "/v1/profile/",
-                "/v1/account/"
+                "/api/v1/users/debug/"
             ]
         },
-        "middleware_version": "4.1-with-users-support",
+        "stats_endpoints": {
+            "authenticated_user_patterns": [
+                "/api/v1/stats-fast/",
+                "/api/v1/stats-fast/dashboard",
+                "/api/v1/stats-fast/questions",
+                "/api/v1/stats-fast/invitations"
+            ],
+            "admin_only_patterns": [
+                "/api/v1/stats-admin/",
+                "/api/admin/cache/force-update"
+            ]
+        },
+        "middleware_version": "4.1-corrected-stats-fast-permissions",
         "key_changes": [
-            "ADDED: Full support for /api/v1/users/* endpoints",
-            "ADDED: /api/v1/users/profile as protected endpoint", 
-            "ADDED: /api/v1/users/export as protected endpoint",
-            "ADDED: /api/v1/users/debug/* as protected endpoints",
-            "ADDED: Users patterns without /api prefix for compatibility",
-            "UPDATED: Nonexistent patterns to redirect old user endpoints",
-            "FIXED: Better error messages for old user endpoint patterns"
+            "CORRECTED: stats-fast endpoints now accessible to any authenticated user",
+            "SEPARATED: stats-admin endpoints still require admin permissions",
+            "ADDED: New permission level for authenticated users",
+            "IMPROVED: Better error messages for permission levels",
+            "MAINTAINED: Full support for users endpoints"
         ]
     }
