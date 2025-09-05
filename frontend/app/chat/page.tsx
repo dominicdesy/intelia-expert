@@ -2,7 +2,7 @@
 
 import { useSearchParams } from 'next/navigation'
 import { useRouter } from 'next/navigation'
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Message } from '../../types'
 import { useAuthStore } from '@/lib/stores/auth'
@@ -250,7 +250,8 @@ const MessageList = React.memo(({
 
 MessageList.displayName = 'MessageList'
 
-export default function ChatInterface() {
+// Composant principal ChatInterface (renommé depuis l'export par défaut)
+function ChatInterface() {
   const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
   const searchParams = useSearchParams()
@@ -671,7 +672,7 @@ export default function ChatInterface() {
   }, [isAuthenticated, user?.email]) // ✅ Dépendances stables uniquement
 
 
-  // 🔐 Gestion OAuth (LinkedIn/Facebook) - À placer après le dernier useEffect
+  // 🔍 Gestion OAuth (LinkedIn/Facebook) - À placer après le dernier useEffect
   useEffect(() => {
     const handleOAuthAuth = async () => {
       const oauthComplete = searchParams?.get('oauth_complete')
@@ -1207,5 +1208,26 @@ export default function ChatInterface() {
         isSubmitting={isSubmittingFeedback}
       />
     </>
+  )
+}
+
+// Composant de chargement
+function ChatLoading() {
+  return (
+    <div className="h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">Chargement du chat...</p>
+      </div>
+    </div>
+  )
+}
+
+// Export par défaut avec Suspense - CETTE PARTIE EST NOUVELLE
+export default function ChatPage() {
+  return (
+    <Suspense fallback={<ChatLoading />}>
+      <ChatInterface />
+    </Suspense>
   )
 }
