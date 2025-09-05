@@ -199,17 +199,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
         } catch (error) {
           console.warn('[AuthProvider] Erreur unsubscribe:', error)
         }
-        subscriptionRef.current = null  // AJOUT CRITIQUE
       }
       
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
-        intervalRef.current = null  // AJOUT CRITIQUE
       }
       
       if (logoutTimeoutRef.current) {
         clearTimeout(logoutTimeoutRef.current)
-        logoutTimeoutRef.current = null  // AJOUT CRITIQUE
       }
       
       console.log('[AuthProvider] Nettoyage subscription et interval')

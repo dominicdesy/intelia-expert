@@ -1,6 +1,6 @@
 // ==================== SYSTÈME DE TRADUCTION INTELIA EXPERT ====================
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getSupabaseClient } from '@/lib/supabase/singleton'
 import { availableLanguages, DEFAULT_LANGUAGE, getLanguageByCode, isValidLanguageCode, detectBrowserLanguage } from './config'
 
@@ -835,6 +835,10 @@ async function loadTranslations(language: string): Promise<TranslationKeys> {
 
   // Hook de traduction - VERSION CORRIGÉE POUR DÉTECTER LA LANGUE DU NAVIGATEUR
 export const useTranslation = () => {
+  // AJOUT: Refs pour cleanup
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const isMountedRef = useRef(true)
+
   // Initialiser avec DEFAULT_LANGUAGE comme valeur statique
   const [currentLanguage, setCurrentLanguage] = useState<string>(DEFAULT_LANGUAGE)
   const [translations, setTranslations] = useState<TranslationKeys>({} as TranslationKeys)
@@ -844,7 +848,9 @@ export const useTranslation = () => {
   // S'ABONNER AUX NOTIFICATIONS
   useEffect(() => {
     const unsubscribe = notificationManager.subscribe(() => {
-      forceRender({}) // Force un re-render
+      if (isMountedRef.current) {  // AJOUT: protection démontage
+        forceRender({})
+      }
     })
 
     return unsubscribe
@@ -900,6 +906,8 @@ export const useTranslation = () => {
   useEffect(() => {
     // Intervalle pour vérifier périodiquement les changements du localStorage
     const checkLocalStorageInterval = setInterval(() => {
+      if (!isMountedRef.current) return  // AJOUT: protection démontage
+      
       const storedLang = getStoredLanguage()
       if (storedLang && storedLang !== currentLanguage && isValidLanguageCode(storedLang)) {
         console.log(`[i18n] Resynchronisation détectée: ${currentLanguage} → ${storedLang}`)
@@ -907,15 +915,22 @@ export const useTranslation = () => {
       }
     }, 1000) // Vérifier toutes les secondes
 
-    // Nettoyer l'intervalle au démontage
+    intervalRef.current = checkLocalStorageInterval  // AJOUT
+
+    // AJOUT: Nettoyer l'intervalle au démontage
     return () => {
-      clearInterval(checkLocalStorageInterval)
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
     }
   }, [currentLanguage])
 
   // Écouter les événements de localStorage pour une réactivité immédiate
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
+      if (!isMountedRef.current) return  // AJOUT: protection démontage
+      
       if (e.key === 'intelia-language' && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue)
@@ -962,6 +977,7 @@ export const useTranslation = () => {
   // Écouter les changements de langue
   useEffect(() => {
     const handleLanguageChange = (event: CustomEvent) => {
+      if (!isMountedRef.current) return  // AJOUT: protection démontage
       setCurrentLanguage(event.detail.language)
     }
 
@@ -969,6 +985,21 @@ export const useTranslation = () => {
     
     return () => {
       window.removeEventListener('languageChanged', handleLanguageChange as EventListener)
+    }
+  }, [])
+
+  // AJOUT: Effect de démontage pour nettoyer les refs
+  useEffect(() => {
+    isMountedRef.current = true
+    
+    return () => {
+      isMountedRef.current = false
+      
+      // Cleanup final de l'interval si nécessaire
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
     }
   }, [])
 

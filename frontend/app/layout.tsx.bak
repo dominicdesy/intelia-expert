@@ -1,4 +1,4 @@
-// app/layout.tsx - VERSION AVEC ANTI-FLASH INTÉGRÉ ET EVENT LISTENERS CORRIGÉS
+// app/layout.tsx - VERSION AVEC ANTI-FLASH INTÉGRÉ
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
@@ -60,44 +60,10 @@ export const metadata: Metadata = {
   },
 }
 
-// Script anti-flash optimisé avec gestion correcte des event listeners
+// Script anti-flash optimisé pour votre système Zustand
 const antiFlashScript = `
   (function() {
     console.log('[AntiFlash] Initialisation...');
-    
-    // Variables pour stocker les références des handlers
-    let languageReadyHandler = null;
-    let domContentLoadedHandler = null;
-    let safetyTimer = null;
-    let isReady = false;
-    
-    // Fonction pour nettoyer tous les event listeners
-    function cleanupEventListeners() {
-      if (languageReadyHandler) {
-        window.removeEventListener('languageReady', languageReadyHandler);
-        languageReadyHandler = null;
-      }
-      if (domContentLoadedHandler) {
-        document.removeEventListener('DOMContentLoaded', domContentLoadedHandler);
-        domContentLoadedHandler = null;
-      }
-      if (safetyTimer) {
-        clearTimeout(safetyTimer);
-        safetyTimer = null;
-      }
-    }
-    
-    // Fonction pour marquer comme prêt et nettoyer
-    function markAsReady(source) {
-      if (isReady) return; // Éviter les appels multiples
-      isReady = true;
-      
-      document.documentElement.classList.add('language-ready');
-      console.log('[AntiFlash] ✅ Interface prête (' + source + ')');
-      
-      // Nettoyer tous les event listeners
-      cleanupEventListeners();
-    }
     
     // Fonction pour obtenir la langue préférée (même logique que LanguageProvider)
     function getPreferredLanguage() {
@@ -138,47 +104,39 @@ const antiFlashScript = `
     
     // Timeout de sécurité absolu (3 secondes max)
     const SAFETY_TIMEOUT = 3000;
-    safetyTimer = setTimeout(function() {
-      console.warn('[AntiFlash] ⚠️ Timeout sécurité - Affichage forcé');
-      markAsReady('safety-timeout');
+    const safetyTimer = setTimeout(function() {
+      if (!document.documentElement.classList.contains('language-ready')) {
+        console.warn('[AntiFlash] ⚠️ Timeout sécurité - Affichage forcé');
+        document.documentElement.classList.add('language-ready');
+      }
     }, SAFETY_TIMEOUT);
 
-    // Handler pour l'événement languageReady
-    languageReadyHandler = function() {
-      markAsReady('language-ready-event');
-    };
-    
     // Écouter l'événement de fin d'initialisation
-    window.addEventListener('languageReady', languageReadyHandler);
-
-    // Handler pour DOM ready
-    domContentLoadedHandler = function() {
-      setTimeout(function() {
-        if (!isReady) {
-          console.warn('[AntiFlash] ⚠️ Timeout DOM - Affichage forcé');
-          markAsReady('dom-content-loaded');
-        }
-      }, 500);
-    };
+    window.addEventListener('languageReady', function() {
+      clearTimeout(safetyTimer);
+      document.documentElement.classList.add('language-ready');
+      console.log('[AntiFlash] ✅ Interface prête');
+    });
 
     // Fallback DOM ready
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', domContentLoadedHandler);
+      document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+          if (!document.documentElement.classList.contains('language-ready')) {
+            console.warn('[AntiFlash] ⚠️ Timeout DOM - Affichage forcé');
+            document.documentElement.classList.add('language-ready');
+          }
+        }, 500);
+      });
     } else {
       // Document déjà prêt
       setTimeout(function() {
-        if (!isReady) {
+        if (!document.documentElement.classList.contains('language-ready')) {
           console.warn('[AntiFlash] ⚠️ Document ready - Affichage forcé');
-          markAsReady('document-already-ready');
+          document.documentElement.classList.add('language-ready');
         }
       }, 100);
     }
-    
-    // Cleanup automatique si la page est quittée
-    window.addEventListener('beforeunload', cleanupEventListeners, { once: true });
-    
-    // Cleanup pour les SPA (Single Page Applications)
-    window.addEventListener('pagehide', cleanupEventListeners, { once: true });
   })();
 `;
 
