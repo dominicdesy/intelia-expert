@@ -65,41 +65,6 @@ const globalLoadingProtection = {
   }
 }
 
-// PROTECTION CONTRE LA SYNCHRONISATION EXCESSIVE
-const syncProtection = {
-  lastSyncTime: 0,
-  syncCooldown: 5000, // 5 secondes entre synchronisations
-  recentSyncIds: new Set<string>(),
-  
-  canSync: function(conversationId: string): boolean {
-    const now = Date.now()
-    
-    // Vérifier le cooldown global
-    if (now - this.lastSyncTime < this.syncCooldown) {
-      console.log('🔒 [SyncProtection] Cooldown actif - sync bloquée')
-      return false
-    }
-    
-    // Vérifier si cette conversation a été sync récemment
-    if (this.recentSyncIds.has(conversationId)) {
-      console.log('🔒 [SyncProtection] Conversation déjà synchronisée récemment')
-      return false
-    }
-    
-    return true
-  },
-  
-  recordSync: function(conversationId: string) {
-    this.lastSyncTime = Date.now()
-    this.recentSyncIds.add(conversationId)
-    
-    // Nettoyer les IDs anciens après 30 secondes
-    setTimeout(() => {
-      this.recentSyncIds.delete(conversationId)
-    }, 30000)
-  }
-}
-
 // Interface du store
 interface ChatStoreState {
   conversations: ConversationItem[]
@@ -155,98 +120,6 @@ const groupConversationsByDate = (conversations: Conversation[]): ConversationGr
   })
 
   return groups.filter(group => group.conversations.length > 0)
-}
-
-// 🛡️ Fonction de validation pour synchronisation
-const shouldSyncWithGroups = (
-  message: Message, 
-  conversation: ConversationWithMessages, 
-  state: ChatStoreState
-): boolean => {
-  // Ne synchroniser que si :
-  // 1. Le message a un conversation_id valide
-  // 2. Ce n'est pas une conversation temporaire
-  // 3. C'est un message d'IA (pour éviter les doublons)
-  // 4. La protection anti-spam est OK
-  
-  if (!message.conversation_id || 
-      message.conversation_id.startsWith('temp-') || 
-      message.isUser) {
-    return false
-  }
-  
-  // Vérifier la protection contre la synchronisation excessive
-  if (!syncProtection.canSync(conversation.id)) {
-    return false
-  }
-  
-  return true
-}
-
-// 🛡️ Fonction de synchronisation sécurisée
-const syncConversationGroups = (
-  conversation: ConversationWithMessages,
-  state: ChatStoreState,
-  set: (fn: (state: ChatStoreState) => Partial<ChatStoreState>) => void
-) => {
-  try {
-    console.log('🔄 [ChatStore] Synchronisation sécurisée des groupes pour:', conversation.id)
-    
-    const conversationForGroups: Conversation = {
-      id: conversation.id,
-      title: conversation.title,
-      preview: conversation.preview,
-      message_count: conversation.message_count,
-      created_at: conversation.created_at,
-      updated_at: conversation.updated_at,
-      language: conversation.language,
-      status: conversation.status,
-      last_message_preview: conversation.last_message_preview || ''
-    }
-    
-    const allConversations = state.conversationGroups.flatMap(g => g.conversations)
-    
-    // 🛡️ PROTECTION: Éviter les doublons avec Set
-    const conversationIds = new Set(allConversations.map(c => c.id))
-    
-    let updatedAllConversations: Conversation[]
-    
-    if (conversationIds.has(conversationForGroups.id)) {
-      // Remplacer SEULEMENT la conversation existante
-      updatedAllConversations = allConversations.map(c => 
-        c.id === conversationForGroups.id ? conversationForGroups : c
-      )
-      console.log('📝 [ChatStore] Conversation existante mise à jour')
-    } else {
-      // Ajouter en tête SEULEMENT si vraiment nouvelle
-      updatedAllConversations = [conversationForGroups, ...allConversations]
-      console.log('➕ [ChatStore] Nouvelle conversation ajoutée aux groupes')
-    }
-    
-    // 🛡️ PROTECTION: Limiter le nombre de conversations en mémoire
-    const MAX_CONVERSATIONS = 100
-    if (updatedAllConversations.length > MAX_CONVERSATIONS) {
-      updatedAllConversations = updatedAllConversations.slice(0, MAX_CONVERSATIONS)
-      console.log('✂️ [ChatStore] Conversations limitées à', MAX_CONVERSATIONS)
-    }
-    
-    const updatedGroups = groupConversationsByDate(updatedAllConversations)
-    
-    // 🛡️ PROTECTION: Update atomique avec fonction callback
-    set((prevState: ChatStoreState) => ({
-      ...prevState,
-      conversationGroups: updatedGroups
-    }))
-    
-    // Enregistrer la synchronisation
-    syncProtection.recordSync(conversation.id)
-    
-    console.log('✅ [ChatStore] Groupes synchronisés avec succès')
-    
-  } catch (error) {
-    console.error('❌ [ChatStore] Erreur synchronisation groupes:', error)
-    // Ne pas faire planter l'application si la sync échoue
-  }
 }
 
 // STORE ZUSTAND AVEC PROTECTION ANTI-POLLING MAXIMALE
@@ -542,17 +415,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     set({ currentConversation: null })
   },
 
-  // 🛡️ ADDMESSAGE SÉCURISÉ AVEC SYNCHRONISATION
   addMessage: (message: Message) => {
     console.log('💬 [ChatStore] Ajout message:', message.id, 'User:', message.isUser)
     
     const state = get()
-    
-    // 🛡️ PROTECTION 1: Éviter les doublons
-    if (state.currentConversation?.messages?.some(m => m.id === message.id)) {
-      console.log('⚠️ [ChatStore] Message déjà existant, ignoré')
-      return
-    }
     
     if (!state.currentConversation) {
       const tempConversation: ConversationWithMessages = {
@@ -569,6 +435,12 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       
       set({ currentConversation: tempConversation })
       console.log('🆕 [ChatStore] Conversation temporaire créée:', tempConversation.id)
+      return
+    }
+    
+    const messageExists = state.currentConversation.messages?.some(m => m.id === message.id)
+    if (messageExists) {
+      console.log('⚠️ [ChatStore] Message déjà existant, ignoré')
       return
     }
     
@@ -597,13 +469,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         : state.currentConversation.last_message_preview || state.currentConversation.preview
     }
     
-    // 🛡️ MISE À JOUR ATOMIQUE de currentConversation
     set({ currentConversation: updatedConversation })
-    
-    // 🛡️ SYNCHRONISATION SÉCURISÉE avec conversationGroups
-    if (shouldSyncWithGroups(message, updatedConversation, state)) {
-      syncConversationGroups(updatedConversation, state, set)
-    }
     
     console.log('✅ [ChatStore] Message ajouté - Total:', updatedMessages.length, 'Conv ID:', updatedConversation.id)
   },
