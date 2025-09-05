@@ -551,7 +551,7 @@ async def get_questions_fast(
                 params = []
                 
                 if search:
-                    where_conditions.append("(question_text ILIKE %s OR response_text ILIKE %s)")
+                    where_conditions.append("(question ILIKE %s OR response_text ILIKE %s)")
                     search_param = f"%{search[:50]}%"
                     params.extend([search_param, search_param])
                 
@@ -584,13 +584,13 @@ async def get_questions_fast(
                         id,
                         created_at as timestamp,
                         user_email,
-                        question_text as question,
-                        response_text as response,
+                        question,                    -- Pas question_text
+                        response_text as response,   -- Garder response_text
                         response_source,
                         response_confidence as confidence_score,
                         processing_time_ms / 1000.0 as response_time,
-                        'fr' as language,
-                        id::text as session_id,
+                        language,
+                        session_id,
                         feedback,
                         feedback_comment
                     FROM user_questions_complete
