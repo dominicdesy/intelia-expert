@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useTranslation } from '@/lib/languages/i18n'
-import { useCountries } from '../../page_hooks' // Fichier dans frontend/app/page_hooks.ts
 
 interface Country {
   value: string
@@ -14,7 +13,165 @@ interface CountrySelectProps {
   onChange: (value: string) => void
   placeholder?: string
   className?: string
-  countries?: Country[] // Optionnel maintenant - si fourni, utilisera cette liste au lieu de useCountries
+  countries?: Country[] // Si fourni, utilise cette liste au lieu de charger depuis l'API
+}
+
+// Mapping des codes de langue vers les codes utilisés par REST Countries
+const getLanguageCode = (currentLanguage: string): string => {
+  const mapping: Record<string, string> = {
+    'fr': 'fra',   // Français
+    'es': 'spa',   // Espagnol
+    'de': 'deu',   // Allemand
+    'pt': 'por',   // Portugais
+    'nl': 'nld',   // Néerlandais
+    'pl': 'pol',   // Polonais
+    'zh': 'zho',   // Chinois
+    'hi': 'hin',   // Hindi
+    'th': 'tha',   // Thaï
+    'en': 'eng'    // Anglais (fallback)
+  }
+  return mapping[currentLanguage] || 'eng'
+}
+
+// Hook autonome pour les pays - SANS FALLBACK
+const useCountriesAutonomous = () => {
+  const { currentLanguage } = useTranslation()
+  const languageCode = getLanguageCode(currentLanguage)
+  
+  const [countries, setCountries] = useState<Country[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    const fetchCountries = async () => {
+      // Annuler la requête précédente si elle existe
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+      
+      abortControllerRef.current = new AbortController()
+      const signal = abortControllerRef.current.signal
+
+      try {
+        console.log(`[CountrySelect] Chargement des pays en ${currentLanguage} (${languageCode})...`)
+        setLoading(true)
+        setError(null)
+        
+        const response = await fetch('https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations', {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (compatible; Intelia/1.0)',
+            'Cache-Control': 'no-cache'
+          },
+          signal
+        })
+        
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.status} ${response.statusText}`)
+        }
+        
+        const data = await response.json()
+        console.log(`[CountrySelect] Données reçues: ${data.length} pays`)
+        
+        if (signal.aborted) return
+        
+        const formattedCountries = data
+          .map((country: any) => {
+            let phoneCode = ''
+            if (country.idd?.root) {
+              phoneCode = country.idd.root
+              if (country.idd.suffixes && country.idd.suffixes[0]) {
+                phoneCode += country.idd.suffixes[0]
+              }
+            }
+            
+            // Récupération du nom selon la langue
+            let countryName = country.name?.common || country.cca2
+            
+            // Essayer d'abord la traduction dans la langue demandée
+            if (country.translations && country.translations[languageCode]) {
+              countryName = country.translations[languageCode].common || country.translations[languageCode].official
+            }
+            // Si pas de traduction dans la langue demandée, utiliser l'anglais
+            else if (country.name?.common) {
+              countryName = country.name.common
+            }
+            
+            return {
+              value: country.cca2,
+              label: countryName,
+              phoneCode: phoneCode,
+              flag: country.flag || ''
+            }
+          })
+          .filter((country: Country) => {
+            const hasValidCode = country.phoneCode && 
+                                country.phoneCode !== 'undefined' && 
+                                country.phoneCode !== 'null' &&
+                                country.phoneCode.length > 1 &&
+                                country.phoneCode.startsWith('+') &&
+                                /^\+\d+$/.test(country.phoneCode)
+            
+            const hasValidInfo = country.value && 
+                                country.value.length === 2 &&
+                                country.label && 
+                                country.label.length > 1
+            
+            return hasValidCode && hasValidInfo
+          })
+          .sort((a: Country, b: Country) => {
+            // Tri selon la langue actuelle
+            const locale = languageCode === 'fra' ? 'fr' : 
+                          languageCode === 'spa' ? 'es' :
+                          languageCode === 'deu' ? 'de' :
+                          languageCode === 'por' ? 'pt' :
+                          languageCode === 'nld' ? 'nl' :
+                          languageCode === 'pol' ? 'pl' :
+                          languageCode === 'zho' ? 'zh' :
+                          'en'
+            
+            return a.label.localeCompare(b.label, locale, { numeric: true })
+          })
+        
+        console.log(`[CountrySelect] Pays traités: ${formattedCountries.length}`)
+        
+        if (!signal.aborted) {
+          setCountries(formattedCountries)
+          
+          // Logs de debug pour vérifier les traductions
+          const france = formattedCountries.find(c => c.value === 'FR')
+          const usa = formattedCountries.find(c => c.value === 'US')
+          const germany = formattedCountries.find(c => c.value === 'DE')
+          
+          console.log(`[CountrySelect] Exemples en ${currentLanguage}:`)
+          console.log('  France:', france?.label)
+          console.log('  USA:', usa?.label)
+          console.log('  Germany:', germany?.label)
+        }
+        
+      } catch (err: any) {
+        if (err.name !== 'AbortError' && !signal.aborted) {
+          console.error('[CountrySelect] Erreur:', err)
+          setError(err.message || 'Erreur de chargement des pays')
+        }
+      } finally {
+        if (!signal.aborted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    fetchCountries()
+    
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
+  }, [currentLanguage, languageCode]) // Se redéclenche quand la langue change
+
+  return { countries, loading, error }
 }
 
 export const CountrySelect: React.FC<CountrySelectProps> = ({
@@ -24,25 +181,10 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
   className = "",
   countries: providedCountries
 }) => {
-  const { t, currentLanguage } = useTranslation()
+  const { t } = useTranslation()
   
   // Utiliser les pays fournis ou charger automatiquement selon la langue
-  const { countries: autoCountries, loading, usingFallback } = useCountries()
-  
-  // Debug: vérifier la langue détectée
-  React.useEffect(() => {
-    console.log('[CountrySelect] Langue détectée:', currentLanguage)
-    console.log('[CountrySelect] Nombre de pays chargés:', autoCountries.length)
-    if (autoCountries.length > 0) {
-      const france = autoCountries.find(c => c.value === 'FR')
-      const usa = autoCountries.find(c => c.value === 'US')
-      const germany = autoCountries.find(c => c.value === 'DE')
-      console.log('[CountrySelect] Exemples de noms:')
-      console.log('  France:', france?.label)
-      console.log('  USA:', usa?.label)
-      console.log('  Germany:', germany?.label)
-    }
-  }, [currentLanguage, autoCountries])
+  const { countries: autoCountries, loading, error } = useCountriesAutonomous()
   const countries = providedCountries || autoCountries
   
   const [isOpen, setIsOpen] = useState(false)
@@ -141,7 +283,7 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
     setHighlightedIndex(-1)
   }
 
-  // Afficher un état de chargement si nécessaire
+  // Afficher un état de chargement
   if (!providedCountries && loading) {
     return (
       <div className={`relative ${className}`}>
@@ -153,15 +295,22 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
     )
   }
 
+  // Afficher l'erreur de chargement
+  if (!providedCountries && error) {
+    return (
+      <div className={`relative ${className}`}>
+        <div className="w-full px-3 py-2 border border-red-300 rounded-lg bg-red-50 flex items-center">
+          <svg className="w-4 h-4 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
+          <span className="text-red-700 text-sm">{t('countries.loadingError')}</span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div ref={selectRef} className={`relative ${className}`}>
-      {/* Indicateur de fallback si l'API externe n'est pas disponible */}
-      {!providedCountries && usingFallback && (
-        <div className="mb-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-          {t('countries.fallbackWarning')}
-        </div>
-      )}
-      
       {/* Bouton principal */}
       <button
         type="button"
@@ -173,7 +322,7 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
         aria-label={selectedCountry ? selectedCountry.label : finalPlaceholder}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
-        disabled={!providedCountries && loading}
+        disabled={!providedCountries && (loading || !!error)}
       >
         <span className={selectedCountry ? 'text-gray-900' : 'text-gray-500'}>
           {selectedCountry ? (
