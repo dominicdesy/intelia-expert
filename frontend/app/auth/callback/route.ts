@@ -33,3 +33,4 @@ export async function GET(request: NextRequest) {
   // Fallback: rediriger vers login
   console.warn('⚠️ [Auth Callback] Pas de code reçu, redirection vers login')
   return NextResponse.redirect(new URL('/auth/login', baseUrl))
+}
