@@ -1,4 +1,4 @@
-// app/auth/callback/route.ts - Route de callback pour OAuth avec redirection simplifiée
+// app/auth/callback/route.ts - Route de callback pour OAuth avec redirection vers production
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -10,19 +10,22 @@ export async function GET(request: NextRequest) {
 
   console.log('🔄 [Auth Callback] Code:', !!code, 'Error:', error)
 
+  // URL de base pour la redirection (production)
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://expert.intelia.com'
+
   if (error) {
     console.error('❌ [Auth Callback] Erreur d\'authentification:', error, error_description)
     // Rediriger vers la page de login avec l'erreur
-    return NextResponse.redirect(new URL(`/auth/login?error=${encodeURIComponent(error_description || error)}`, request.url))
+    return NextResponse.redirect(new URL(`/auth/login?error=${encodeURIComponent(error_description || error)}`, baseUrl))
   }
 
   if (code) {
-    // ✅ NOUVEAU: Redirection directe vers chat avec paramètre OAuth
-    console.log('🔄 [Auth Callback] Redirection directe vers chat avec OAuth...')
-    return NextResponse.redirect(new URL('/chat?oauth_complete=true', request.url))
+    // ✅ Redirection vers chat avec paramètre OAuth sur le bon domaine
+    console.log('🔄 [Auth Callback] Redirection vers chat avec OAuth...')
+    return NextResponse.redirect(new URL('/chat?oauth_complete=true', baseUrl))
   }
 
   // Fallback: rediriger vers login
   console.warn('⚠️ [Auth Callback] Pas de code reçu, redirection vers login')
-  return NextResponse.redirect(new URL('/auth/login', request.url))
+  return NextResponse.redirect(new URL('/auth/login', baseUrl))
 }
