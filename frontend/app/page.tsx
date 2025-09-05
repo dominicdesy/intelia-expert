@@ -7,7 +7,7 @@ import { useTranslation } from '@/lib/languages/i18n'
 import { useAuthStore } from '@/lib/stores/auth'
 import { availableLanguages } from '../lib/languages/config'
 import { getSupabaseClient } from '@/lib/supabase/singleton'
-import { rememberMeUtils } from './page_hooks' // ✅ AJOUT MANQUANT
+import { rememberMeUtils } from './page_hooks'
 
 // Import de la vraie SignupModal depuis le même répertoire
 import { SignupModal } from './page_signup_modal'
@@ -23,55 +23,78 @@ const InteliaLogo = ({ className = "w-20 h-20" }: { className?: string }) => (
   </div>
 )
 
-// Sélecteur de langue moderne
+// Sélecteur de langue moderne - VERSION CORRIGÉE
 const LanguageSelector = () => {
   const { changeLanguage, currentLanguage } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
 
   const currentLang = availableLanguages.find(lang => lang.code === currentLanguage) || availableLanguages[0]
 
+  // Fermer le dropdown quand on clique ailleurs
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element
+      if (!target.closest('.language-selector')) {
+        setIsOpen(false)
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isOpen])
+
+  const handleLanguageChange = (langCode: string) => {
+    changeLanguage(langCode)
+    setIsOpen(false)
+  }
+
   return (
-    <div className="relative">
+    <div className="relative language-selector">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center space-x-2 px-4 py-2.5 text-sm bg-white border border-blue-200 rounded-xl shadow-sm hover:bg-blue-50 transition-all duration-300 text-blue-700"
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
       >
         <span>{currentLang.flag}</span>
         <span>{currentLang.nativeName}</span>
-        <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg 
+          className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
       {isOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute top-full right-0 mt-1 w-48 bg-white border border-blue-200 rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto">
-            {availableLanguages.map((lang) => (
-              <button
-                key={lang.code}
-                onClick={() => {
-                  changeLanguage(lang.code)
-                  setIsOpen(false)
-                }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center space-x-3 ${
-                  lang.code === currentLanguage ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                } first:rounded-t-xl last:rounded-b-xl transition-colors`}
-              >
-                <span className="text-xl">{lang.flag}</span>
-                <div className="flex-1">
-                  <div className="font-medium">{lang.nativeName}</div>
-                  <div className="text-xs text-gray-500">{lang.region}</div>
-                </div>
-                {lang.code === currentLanguage && (
-                  <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                )}
-              </button>
-            ))}
-          </div>
-        </>
+        <div className="absolute top-full right-0 mt-1 w-48 bg-white border border-blue-200 rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto">
+          {availableLanguages.map((lang) => (
+            <button
+              key={lang.code}
+              onClick={() => handleLanguageChange(lang.code)}
+              className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center space-x-3 transition-colors duration-150 ${
+                lang.code === currentLanguage ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+              } first:rounded-t-xl last:rounded-b-xl`}
+              role="option"
+              aria-selected={lang.code === currentLanguage}
+            >
+              <span className="text-xl">{lang.flag}</span>
+              <div className="flex-1">
+                <div className="font-medium">{lang.nativeName}</div>
+                <div className="text-xs text-gray-500">{lang.region}</div>
+              </div>
+              {lang.code === currentLanguage && (
+                <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   )
@@ -137,7 +160,7 @@ function LoginPageContent() {
   const [showSignup, setShowSignup] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
-  // ✅ AJOUT : Chargement du rememberMe au démarrage
+  // Chargement du rememberMe au démarrage
   useEffect(() => {
     const savedData = rememberMeUtils.load()
     if (savedData.rememberMe && savedData.lastEmail) {
@@ -282,7 +305,7 @@ function LoginPageContent() {
         credentials: 'omit'
       })
 
-      console.log('🔥 Réponse backend:', response.status, response.statusText)
+      console.log('📥 Réponse backend:', response.status, response.statusText)
 
       const responseText = await response.text()
       console.log('📄 Corps de réponse:', responseText)
@@ -374,7 +397,7 @@ function LoginPageContent() {
     try {
       await login(email.trim(), password)
       
-      // ✅ AJOUT : Sauvegarde du rememberMe après succès
+      // Sauvegarde du rememberMe après succès
       rememberMeUtils.save(email.trim(), rememberMe)
       
       setSuccess(t('auth.success'))
@@ -396,7 +419,6 @@ function LoginPageContent() {
     }
   }
 
-  // [Le reste du JSX reste identique...]
   return (
     <div className="min-h-screen relative overflow-hidden bg-white">
       {/* Background avec lignes de démarcation bleues */}
