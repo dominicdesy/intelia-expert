@@ -21,7 +21,7 @@ try:
     AUTH_AVAILABLE = True
     logger.info("✅ Auth module importé avec succès")
 except ImportError as e:
-    logger.warning(f⚠️ Auth module non disponible: {e}")
+    logger.warning(f"⚠️ Auth module non disponible: {e}")
     verify_super_admin_token = None
     AUTH_AVAILABLE = False
 
