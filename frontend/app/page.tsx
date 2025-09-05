@@ -196,7 +196,7 @@ function LoginPageContent() {
     } catch (error: any) {
       console.error(`Erreur connexion ${provider}:`, error)
       if (error.message?.includes('OAuth')) {
-        setError(t('auth.oauthError') || `Erreur de connexion avec ${provider}`)
+        setError(t('auth.error') || `Erreur de connexion avec ${provider}`)
       } else {
         setError(error.message || t('auth.error'))
       }
