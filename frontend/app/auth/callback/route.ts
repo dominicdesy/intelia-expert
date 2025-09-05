@@ -20,12 +20,16 @@ export async function GET(request: NextRequest) {
   }
 
   if (code) {
-    // ✅ Redirection vers chat avec paramètre OAuth sur le bon domaine
+    // ✅ Conserver tous les paramètres (code, state, etc.)
     console.log('🔄 [Auth Callback] Redirection vers chat avec OAuth...')
-    return NextResponse.redirect(new URL('/chat?oauth_complete=true', baseUrl))
+    const qs = requestUrl.searchParams.toString()
+    const target = qs
+      ? new URL(`/chat?oauth_complete=true&${qs}`, baseUrl)
+      : new URL('/chat?oauth_complete=true', baseUrl)
+    
+    return NextResponse.redirect(target)
   }
 
   // Fallback: rediriger vers login
   console.warn('⚠️ [Auth Callback] Pas de code reçu, redirection vers login')
   return NextResponse.redirect(new URL('/auth/login', baseUrl))
-}

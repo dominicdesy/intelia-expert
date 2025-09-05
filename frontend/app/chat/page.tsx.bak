@@ -277,6 +277,8 @@ function ChatInterface() {
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
   const [viewportHeight, setViewportHeight] = useState(0)
+  // ✅ AJOUT: État pour traiter l'OAuth
+  const [isOAuthProcessing, setIsOAuthProcessing] = useState(false)
 
   const [clarificationState, setClarificationState] = useState<{
     messageId: string
@@ -636,7 +638,7 @@ function ChatInterface() {
         !hasLoadedConversationsRef.current && 
         isMountedRef.current) {
       
-      console.log('[Chat] 🔄 Chargement initial UNIQUE pour:', user.email)
+      console.log('[Chat] 📄 Chargement initial UNIQUE pour:', user.email)
       hasLoadedConversationsRef.current = true
 
       // CAPTURE STABLE des valeurs au moment de l'exécution
@@ -672,13 +674,14 @@ function ChatInterface() {
   }, [isAuthenticated, user?.email]) // ✅ Dépendances stables uniquement
 
 
-  // 🔍 Gestion OAuth (LinkedIn/Facebook) - À placer après le dernier useEffect
+  // ✅ MODIFICATION: Gestion OAuth améliorée (LinkedIn/Facebook)
   useEffect(() => {
     const handleOAuthAuth = async () => {
       const oauthComplete = searchParams?.get('oauth_complete')
     
       if (oauthComplete === 'true') {
         console.log('[OAuth] Finalisation authentification (LinkedIn/Facebook)...')
+        setIsOAuthProcessing(true) // Indiquer qu'on traite l'OAuth
       
         try {
           const success = await initializeSession()
@@ -687,12 +690,20 @@ function ChatInterface() {
             sessionStorage.removeItem('recent-logout')
             window.dispatchEvent(new Event('auth-state-changed'))
             console.log('[OAuth] Authentification finalisée avec succès')
+            
+            // Petite attente pour que l'état se propage
+            setTimeout(() => {
+              setIsOAuthProcessing(false)
+            }, 500)
           } else {
+            console.error('[OAuth] Échec de l\'initialisation de session')
+            setIsOAuthProcessing(false)
             router.push('/?error=oauth_session_failed')
             return
           }
         } catch (error) {
           console.error('[OAuth] Erreur finalisation:', error)
+          setIsOAuthProcessing(false)
           router.push('/?error=oauth_auth_error')
           return
         }
@@ -1052,8 +1063,21 @@ function ChatInterface() {
     )
   }
 
+  // ✅ MODIFICATION: Condition de rendu améliorée pour OAuth
   if (!isAuthenticated || !user) {
-    // Ne pas faire de redirection - laisser l'AuthProvider gérer
+    // Si on est en train de traiter l'OAuth, afficher le loader sans redirection
+    if (isOAuthProcessing) {
+      return (
+        <div className="h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Finalisation OAuth...</p>
+          </div>
+        </div>
+      )
+    }
+    
+    // Sinon, afficher le loader normal et laisser l'AuthProvider gérer
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -1223,7 +1247,7 @@ function ChatLoading() {
   )
 }
 
-// Export par défaut avec Suspense - CETTE PARTIE EST NOUVELLE
+// Export par défaut avec Suspense
 export default function ChatPage() {
   return (
     <Suspense fallback={<ChatLoading />}>

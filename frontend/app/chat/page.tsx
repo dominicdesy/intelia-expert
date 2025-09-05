@@ -674,23 +674,34 @@ function ChatInterface() {
   }, [isAuthenticated, user?.email]) // ✅ Dépendances stables uniquement
 
 
+
   // ✅ MODIFICATION: Gestion OAuth améliorée (LinkedIn/Facebook)
   useEffect(() => {
-    const handleOAuthAuth = async () => {
+    const finalizeOAuth = async () => {
       const oauthComplete = searchParams?.get('oauth_complete')
-    
+      const code = searchParams?.get('code')  // ← NOUVEAU: Récupération du code
+  
       if (oauthComplete === 'true') {
         console.log('[OAuth] Finalisation authentification (LinkedIn/Facebook)...')
         setIsOAuthProcessing(true) // Indiquer qu'on traite l'OAuth
-      
+    
         try {
+          if (code) {  // ← NOUVEAU: Vérification de la présence du code
+            // ✅ Étape manquante : échanger le code contre une session
+            const { getSupabaseClient } = await import('@/lib/supabase/singleton')
+            const supabase = getSupabaseClient()
+            const { error } = await supabase.auth.exchangeCodeForSession(code)
+            if (error) throw error
+            console.log('[OAuth] Code échangé avec succès contre une session')
+          }  // ← FIN du nouveau bloc
+
           const success = await initializeSession()
-        
+      
           if (success) {
             sessionStorage.removeItem('recent-logout')
             window.dispatchEvent(new Event('auth-state-changed'))
             console.log('[OAuth] Authentification finalisée avec succès')
-            
+          
             // Petite attente pour que l'état se propage
             setTimeout(() => {
               setIsOAuthProcessing(false)
@@ -707,17 +718,18 @@ function ChatInterface() {
           router.push('/?error=oauth_auth_error')
           return
         }
-      
-        // Nettoyer l'URL du paramètre OAuth
+    
+        // Nettoyer l'URL des paramètres OAuth
         const url = new URL(window.location.href)
         url.searchParams.delete('oauth_complete')
+        url.searchParams.delete('code')      // ← NOUVEAU: Suppression du code
+        url.searchParams.delete('state')     // ← NOUVEAU: Suppression du state
         window.history.replaceState({}, '', url.pathname)
       }
     }
 
-    handleOAuthAuth()
+    finalizeOAuth()  // ← NOUVEAU: Nom de fonction plus explicite
   }, [searchParams, initializeSession, router])
-
 
 
   // Fonctions de gestion des messages (toutes conservées)
