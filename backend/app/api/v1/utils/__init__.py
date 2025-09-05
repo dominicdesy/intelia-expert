@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # app/api/v1/utils/__init__.py
 """
 Utils package — fonctions utilitaires pour le pipeline, la validation et l'intégration.
@@ -10,7 +11,7 @@ Exemples :
 Notes :
 - On expose au niveau package quelques fonctions "courantes" de formulas.
 - On garde les imports module-level pour éviter les boucles d'import (pas d'import du pipeline ici).
-- Alias de rétro‑compatibilité : estimate_water_intake_l_per_1000 -> conso_eau_j(..., effectif=1000).
+- Alias de rétro-compatibilité : estimate_water_intake_l_per_1000 -> conso_eau_j(..., effectif=1000).
 """
 
 # --- Modules utilitaires (importables tels quels) ---
@@ -25,6 +26,7 @@ from . import question_classifier
 from . import formulas
 from . import units
 from . import taxonomy
+
 # Optionnels (présents dans ton arbo)
 try:
     from . import context_validator     # si utilisé par ailleurs
