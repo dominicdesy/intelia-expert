@@ -1,6 +1,11 @@
 {
   "page.title": "เข้าสู่ระบบ Intelia Expert",
 
+  "app.description": "ผู้เชี่ยวชาญด้านสัตว์ปีกเฉพาะของคุณ",
+  "auth.continueWith": "ดำเนินการต่อด้วย",
+  "auth.noAccountYet": "ยังไม่มีบัญชี?",
+  "auth.oauthError": "ข้อผิดพลาดการเชื่อมต่อ OAuth ตรวจสอบการเชื่อมต่อของคุณ",
+  
   "resetPassword.title": "รหัสผ่านใหม่",
   "resetPassword.description": "เลือกรหัสผ่านใหม่ที่ปลอดภัยสำหรับบัญชี Intelia Expert ของคุณ",
   "resetPassword.newPassword": "รหัสผ่านใหม่",

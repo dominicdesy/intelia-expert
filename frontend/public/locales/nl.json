@@ -1,6 +1,11 @@
 {
   "page.title": "Inloggen bij Intelia Expert",
 
+  "app.description": "Uw gespecialiseerde pluimvee-expert",
+  "auth.continueWith": "Doorgaan met",
+  "auth.noAccountYet": "Nog geen account?",
+  "auth.oauthError": "OAuth-verbindingsfout. Controleer uw verbinding",
+  
   "resetPassword.title": "Nieuw wachtwoord",
   "resetPassword.description": "Kies een veilig nieuw wachtwoord voor uw Intelia Expert-account",
   "resetPassword.newPassword": "Nieuw wachtwoord",

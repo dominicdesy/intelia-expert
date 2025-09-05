@@ -1,6 +1,11 @@
 {
   "page.title": "Bei Intelia Expert anmelden",
 
+  "app.description": "Ihr spezialisierter Geflügelzucht-Experte",
+  "auth.continueWith": "Weiter mit",
+  "auth.noAccountYet": "Noch kein Konto?",
+  "auth.oauthError": "OAuth-Verbindungsfehler. Überprüfen Sie Ihre Verbindung",
+  
   "resetPassword.title": "Neues Passwort",
   "resetPassword.description": "Wählen Sie ein sicheres neues Passwort für Ihr Intelia Expert-Konto",
   "resetPassword.newPassword": "Neues Passwort",

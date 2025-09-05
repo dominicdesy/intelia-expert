@@ -1,6 +1,11 @@
 {
   "page.title": "Masuk ke Intelia Expert",
 
+  "app.description": "Ahli unggas khusus Anda",
+  "auth.continueWith": "Lanjutkan dengan",
+  "auth.noAccountYet": "Belum punya akun?",
+  "auth.oauthError": "Kesalahan koneksi OAuth. Periksa koneksi Anda",
+  
   "resetPassword.title": "Kata Sandi Baru",
   "resetPassword.description": "Pilih kata sandi baru yang aman untuk akun Intelia Expert Anda",
   "resetPassword.newPassword": "Kata sandi baru",

@@ -9,9 +9,10 @@ const supabase = getSupabaseClient()
 // Types pour le système de traduction - VERSION ORGANISÉE PAR CATÉGORIES
 export interface TranslationKeys {
   // ===========================================
-  // PAGE TITLES
+  // PAGE TITLES & APP INFO
   // ===========================================
   'page.title': string
+  'app.description': string
 
   // ===========================================
   // RESET PASSWORD - NOUVELLES CLÉS AJOUTÉES
@@ -70,7 +71,7 @@ export interface TranslationKeys {
   'resetPassword.errors.generic': string
 
   // ===========================================
-  // AUTHENTICATION & AUTH FLOWS
+  // AUTHENTICATION & AUTH FLOWS - NOUVEAUX CHAMPS AJOUTÉS
   // ===========================================
   'auth.success': string
   'auth.error': string
@@ -80,6 +81,9 @@ export interface TranslationKeys {
   'auth.forgotPassword': string
   'auth.newToIntelia': string
   'auth.createAccount': string
+  'auth.continueWith': string
+  'auth.noAccountYet': string
+  'auth.oauthError': string
 
   // ===========================================
   // COMMON ELEMENTS

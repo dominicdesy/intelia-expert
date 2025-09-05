@@ -1,6 +1,11 @@
 {
   "page.title": "Iniciar sesión en Intelia Expert",
 
+  "app.description": "Su experto especializado en avicultura",
+  "auth.continueWith": "Continuar con",
+  "auth.noAccountYet": "¿Aún no tienes cuenta?",
+  "auth.oauthError": "Error de conexión OAuth. Verifique su conexión",
+  
   "resetPassword.title": "Nueva contraseña",
   "resetPassword.description": "Elija una contraseña segura nueva para su cuenta Intelia Expert",
   "resetPassword.newPassword": "Nueva contraseña",

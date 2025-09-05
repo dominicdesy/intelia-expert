@@ -1,6 +1,11 @@
 {
   "page.title": "登录 Intelia Expert",
 
+  "app.description": "您的专业家禽专家",
+  "auth.continueWith": "继续使用",
+  "auth.noAccountYet": "还没有账户？",
+  "auth.oauthError": "OAuth连接错误。请检查您的连接",
+  
   "resetPassword.title": "新密码",
   "resetPassword.description": "为您的 Intelia Expert 账户选择一个安全的新密码",
   "resetPassword.newPassword": "新密码",

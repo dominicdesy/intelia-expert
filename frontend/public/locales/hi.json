@@ -1,6 +1,11 @@
 {
   "page.title": "Intelia Expert में साइन इन करें",
 
+  "app.description": "आपका विशेषज्ञ मुर्गी पालन विशेषज्ञ",
+  "auth.continueWith": "के साथ जारी रखें",
+  "auth.noAccountYet": "अभी तक कोई खाता नहीं है?",
+  "auth.oauthError": "OAuth कनेक्शन त्रुटि। अपना कनेक्शन जांचें",
+  
   "resetPassword.title": "नया पासवर्ड",
   "resetPassword.description": "अपने Intelia Expert खाते के लिए एक सुरक्षित नया पासवर्ड चुनें",
   "resetPassword.newPassword": "नया पासवर्ड",

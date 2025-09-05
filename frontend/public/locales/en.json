@@ -1,6 +1,11 @@
 {
   "page.title": "Sign in to Intelia Expert",
 
+  "app.description": "Your specialized poultry expert",
+  "auth.continueWith": "Continue with",
+  "auth.noAccountYet": "No account yet?",
+  "auth.oauthError": "OAuth connection error. Check your connection",
+  
   "resetPassword.title": "New Password",
   "resetPassword.description": "Choose a secure new password for your Intelia Expert account",
   "resetPassword.newPassword": "New password",

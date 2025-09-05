@@ -1,6 +1,11 @@
 {
   "page.title": "Zaloguj się do Intelia Expert",
 
+  "app.description": "Twój specjalistyczny ekspert od drobiu",
+  "auth.continueWith": "Kontynuuj z",
+  "auth.noAccountYet": "Nie masz jeszcze konta?",
+  "auth.oauthError": "Błąd połączenia OAuth. Sprawdź swoje połączenie",
+  
   "resetPassword.title": "Nowe hasło",
   "resetPassword.description": "Wybierz bezpieczne nowe hasło dla swojego konta Intelia Expert",
   "resetPassword.newPassword": "Nowe hasło",
