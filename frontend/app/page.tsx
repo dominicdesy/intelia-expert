@@ -174,27 +174,38 @@ function LoginPageContent() {
     setSignupData(prev => ({ ...prev, [field]: value }))
   }
 
-  // Fonction de connexion OAuth
+  // Fonction de connexion OAuth AVEC DÉBOGAGE
   const handleOAuthLogin = async (provider: 'linkedin_oidc' | 'facebook') => {
+    console.log(`🚀 [OAuth] Début de connexion ${provider}`)
+    
     setError('')
     setIsOAuthLoading(provider)
 
     try {
+      console.log(`📡 [OAuth] Initialisation client Supabase pour ${provider}`)
       const supabase = getSupabaseClient()
-      const { error } = await supabase.auth.signInWithOAuth({
+      
+      console.log(`🔗 [OAuth] Appel signInWithOAuth pour ${provider}`)
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: `${window.location.origin}/auth/callback`
         }
       })
 
+      console.log(`📊 [OAuth] Réponse Supabase:`, { data, error })
+
       if (error) {
+        console.error(`❌ [OAuth] Erreur Supabase:`, error)
         throw error
       }
 
+      console.log(`✅ [OAuth] Redirection vers ${provider} initiée`)
       // La redirection se fera automatiquement vers le provider OAuth
+      
     } catch (error: any) {
-      console.error(`Erreur connexion ${provider}:`, error)
+      console.error(`💥 [OAuth] Erreur connexion ${provider}:`, error)
+      
       if (error.message?.includes('OAuth')) {
         setError(t('auth.error') || `Erreur de connexion avec ${provider}`)
       } else {
