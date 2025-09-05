@@ -14,11 +14,12 @@ import { SignupModal } from './page_signup_modal'
 // Logo Intelia sans fond
 const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
   <img 
-    src="/images/logo.png" 
+    src="/images/favicon.png" 
     alt="Intelia Logo" 
     className={`${className} object-contain drop-shadow-lg`}
   />
 )
+
 
 // Sélecteur de langue moderne
 const LanguageSelector = () => {
