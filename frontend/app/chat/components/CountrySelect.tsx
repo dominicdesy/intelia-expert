@@ -24,10 +24,25 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
   className = "",
   countries: providedCountries
 }) => {
-  const { t } = useTranslation()
+  const { t, currentLanguage } = useTranslation()
   
   // Utiliser les pays fournis ou charger automatiquement selon la langue
   const { countries: autoCountries, loading, usingFallback } = useCountries()
+  
+  // Debug: vérifier la langue détectée
+  React.useEffect(() => {
+    console.log('[CountrySelect] Langue détectée:', currentLanguage)
+    console.log('[CountrySelect] Nombre de pays chargés:', autoCountries.length)
+    if (autoCountries.length > 0) {
+      const france = autoCountries.find(c => c.value === 'FR')
+      const usa = autoCountries.find(c => c.value === 'US')
+      const germany = autoCountries.find(c => c.value === 'DE')
+      console.log('[CountrySelect] Exemples de noms:')
+      console.log('  France:', france?.label)
+      console.log('  USA:', usa?.label)
+      console.log('  Germany:', germany?.label)
+    }
+  }, [currentLanguage, autoCountries])
   const countries = providedCountries || autoCountries
   
   const [isOpen, setIsOpen] = useState(false)
