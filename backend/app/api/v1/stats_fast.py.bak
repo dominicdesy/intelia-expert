@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Import conditionnel pour éviter les erreurs si les modules n'existent pas
 try:
-    from auth import verify_super_admin_token  # auth.py est dans le même dossier
+    from app.utils.auth import verify_super_admin_token
     AUTH_AVAILABLE = True
     logger.info("✅ Auth module importé avec succès")
 except ImportError as e:
@@ -26,7 +26,7 @@ except ImportError as e:
     AUTH_AVAILABLE = False
 
 try:
-    from stats_cache import get_stats_cache  # stats_cache.py est dans le même dossier
+    from app.stats.stats_cache import get_stats_cache
     CACHE_AVAILABLE = True
     logger.info("✅ Stats cache module importé avec succès")
 except ImportError as e:

@@ -18,10 +18,6 @@ import traceback
 
 logger = logging.getLogger(__name__)
 
-# 🚀 LOG DE CONFIRMATION VERSION DÉPLOYÉE
-logger.error("🚀 LOGGING SYSTEM - VERSION RESTRUCTURÉE ACTIVE - 2025-09-02-21:30")
-logger.error("🔧 CORRECTION: Bug PostgreSQL résolu avec architecture modulaire")
-
 # ============================================================================
 # 📦 IMPORTS DEPUIS LES MODULES SPÉCIALISÉS
 # ============================================================================
@@ -667,6 +663,3 @@ __all__ = [
     # Router API
     'router'
 ]
-
-logger.info("✅ Système logging restructuré initialisé - Bug PostgreSQL corrigé")
-logger.info("📊 Architecture modulaire maintenue avec 6 fichiers spécialisés")
