@@ -396,9 +396,6 @@ function LoginPageContent() {
           {/* Card principale avec bordures bleues */}
           <div className="bg-white border-2 border-blue-100 rounded-3xl shadow-xl p-8 relative overflow-hidden">
             
-            {/* Bordure décorative interne */}
-            <div className="absolute inset-2 border border-blue-50 rounded-2xl pointer-events-none"></div>
-            
             {/* Callback d'auth dans Suspense - CONSERVÉ */}
             <Suspense fallback={null}>
               <AuthCallbackHandler />
@@ -649,7 +646,11 @@ function LoginPageContent() {
 const LoadingFallback = () => (
   <div className="min-h-screen bg-white flex items-center justify-center">
     <div className="text-center">
-      <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
+      <img 
+        src="/images/logo.png" 
+        alt="Intelia Logo" 
+        className="w-16 h-16 mx-auto mb-4 object-contain drop-shadow-lg"
+      />
       <div className="w-12 h-12 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
       <p className="text-gray-600">Chargement...</p>
     </div>
