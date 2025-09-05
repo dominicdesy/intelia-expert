@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslation } from '@/lib/languages/i18n'
 import { useAuthStore } from '@/lib/stores/auth'
 import { availableLanguages } from '../lib/languages/config'
+import { getSupabaseClient } from '@/lib/supabase/singleton'
 
 // Import de la vraie SignupModal depuis le même répertoire
 import { SignupModal } from './page_signup_modal'
@@ -18,7 +19,6 @@ const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
     className={`${className} object-contain drop-shadow-lg`}
   />
 )
-
 
 // Sélecteur de langue moderne
 const LanguageSelector = () => {
@@ -74,7 +74,7 @@ const LanguageSelector = () => {
   )
 }
 
-// Composant qui gère useSearchParams dans Suspense - CONSERVÉ INTÉGRALEMENT
+// Composant qui gère useSearchParams dans Suspense
 function AuthCallbackHandler() {
   const searchParams = useSearchParams()
   const { t } = useTranslation()
@@ -117,23 +117,24 @@ function AuthCallbackHandler() {
   return null
 }
 
-// PAGE LOGIN COMPLÈTE avec design blanc et lignes bleues
+// PAGE LOGIN COMPLÈTE avec OAuth intégré
 function LoginPageContent() {
   const router = useRouter()
   const { t, currentLanguage } = useTranslation()
   const { login } = useAuthStore()
 
-  // États simples - CONSERVÉS
+  // États simples
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isOAuthLoading, setIsOAuthLoading] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [showSignup, setShowSignup] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
-  // États pour le signup - CONSERVÉS
+  // États pour le signup
   const [signupData, setSignupData] = useState({
     email: '',
     password: '',
@@ -152,7 +153,7 @@ function LoginPageContent() {
 
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
-  // Fonctions de validation - CONSERVÉES INTÉGRALEMENT
+  // Fonctions de validation
   const validatePassword = (password: string) => {
     const errors = []
     if (password.length < 8) errors.push(t('validation.password.minLength'))
@@ -168,12 +169,42 @@ function LoginPageContent() {
            areaCode.length >= 2 && phoneNumber.length >= 6
   }
 
-  // Gestion des changements du formulaire signup - CONSERVÉE
+  // Gestion des changements du formulaire signup
   const handleSignupChange = (field: string, value: string) => {
     setSignupData(prev => ({ ...prev, [field]: value }))
   }
 
-  // FONCTION SIGNUP COMPLÈTE - CONSERVÉE INTÉGRALEMENT
+  // Fonction de connexion OAuth
+  const handleOAuthLogin = async (provider: 'linkedin_oidc' | 'facebook') => {
+    setError('')
+    setIsOAuthLoading(provider)
+
+    try {
+      const supabase = getSupabaseClient()
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
+      })
+
+      if (error) {
+        throw error
+      }
+
+      // La redirection se fera automatiquement vers le provider OAuth
+    } catch (error: any) {
+      console.error(`Erreur connexion ${provider}:`, error)
+      if (error.message?.includes('OAuth')) {
+        setError(t('auth.oauthError') || `Erreur de connexion avec ${provider}`)
+      } else {
+        setError(error.message || t('auth.error'))
+      }
+      setIsOAuthLoading(null)
+    }
+  }
+
+  // FONCTION SIGNUP COMPLÈTE
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     console.log('Signup attempt:', signupData)
@@ -286,7 +317,7 @@ function LoginPageContent() {
     }
   }
 
-  // Logique d'authentification pour la SignupModal - CONSERVÉE
+  // Logique d'authentification pour la SignupModal
   const authLogic = {
     signupData,
     showPassword,
@@ -300,7 +331,7 @@ function LoginPageContent() {
     validatePhone
   }
 
-  // Fonction de connexion - CONSERVÉE INTÉGRALEMENT
+  // Fonction de connexion
   const handleLogin = async () => {
     setError('')
     setSuccess('')
@@ -395,19 +426,19 @@ function LoginPageContent() {
           {/* Card principale avec bordures bleues */}
           <div className="bg-white border-2 border-blue-100 rounded-3xl shadow-xl p-8 relative overflow-hidden">
             
-            {/* Callback d'auth dans Suspense - CONSERVÉ */}
+            {/* Callback d'auth dans Suspense */}
             <Suspense fallback={null}>
               <AuthCallbackHandler />
             </Suspense>
             
-            {/* Messages d'erreur - CONSERVÉS avec style adapté au blanc */}
+            {/* Messages d'erreur */}
             {error && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
                 {error}
               </div>
             )}
 
-            {/* Messages de succès - CONSERVÉS avec style adapté au blanc */}
+            {/* Messages de succès */}
             {success && (
               <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm">
                 {success}
@@ -415,6 +446,61 @@ function LoginPageContent() {
             )}
 
             <div className="space-y-6 relative z-10">
+              {/* Boutons de connexion sociale en premier */}
+              <div className="space-y-3">
+                {/* LinkedIn */}
+                <button
+                  onClick={() => handleOAuthLogin('linkedin_oidc')}
+                  disabled={isOAuthLoading !== null}
+                  className="w-full py-4 px-6 bg-[#0A66C2] hover:bg-[#004182] text-white font-medium rounded-2xl transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                >
+                  {isOAuthLoading === 'linkedin_oidc' ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Connexion en cours...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                      </svg>
+                      <span>Continuer avec LinkedIn</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Facebook */}
+                <button
+                  onClick={() => handleOAuthLogin('facebook')}
+                  disabled={isOAuthLoading !== null}
+                  className="w-full py-4 px-6 bg-[#1877F2] hover:bg-[#166FE5] text-white font-medium rounded-2xl transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                >
+                  {isOAuthLoading === 'facebook' ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Connexion en cours...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                      </svg>
+                      <span>Continuer avec Facebook</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Séparateur */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-blue-200"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-4 bg-white text-gray-500">{t('common.or')}</span>
+                </div>
+              </div>
+
               {/* Email */}
               <div className="space-y-2">
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -477,7 +563,7 @@ function LoginPageContent() {
                 </div>
               </div>
 
-              {/* Remember me & Mot de passe oublié - CONSERVÉS */}
+              {/* Remember me & Mot de passe oublié */}
               <div className="flex items-center justify-between">
                 <label className="flex items-center">
                   <input
@@ -496,10 +582,10 @@ function LoginPageContent() {
                 </Link>
               </div>
 
-              {/* Bouton de connexion - CONSERVÉ avec style adapté au blanc */}
+              {/* Bouton de connexion */}
               <button
                 onClick={handleLogin}
-                disabled={isLoading}
+                disabled={isLoading || isOAuthLoading !== null}
                 className="w-full relative py-4 px-6 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 {isLoading ? (
@@ -517,47 +603,6 @@ function LoginPageContent() {
                 )}
               </button>
 
-              {/* Séparateur */}
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-blue-200"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-white text-gray-500">{t('common.or')}</span>
-                </div>
-              </div>
-
-              {/* Boutons de connexion sociale */}
-              <div className="space-y-3">
-                {/* LinkedIn */}
-                <button
-                  onClick={() => {
-                    // TODO: Implémenter la connexion LinkedIn
-                    console.log('LinkedIn login clicked')
-                  }}
-                  className="w-full py-4 px-6 bg-[#0A66C2] hover:bg-[#004182] text-white font-medium rounded-2xl transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center space-x-3"
-                >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                  </svg>
-                  <span>Continuer avec LinkedIn</span>
-                </button>
-
-                {/* Facebook */}
-                <button
-                  onClick={() => {
-                    // TODO: Implémenter la connexion Facebook
-                    console.log('Facebook login clicked')
-                  }}
-                  className="w-full py-4 px-6 bg-[#1877F2] hover:bg-[#166FE5] text-white font-medium rounded-2xl transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center space-x-3"
-                >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                  </svg>
-                  <span>Continuer avec Facebook</span>
-                </button>
-              </div>
-
               {/* Nouveau séparateur */}
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
@@ -571,7 +616,8 @@ function LoginPageContent() {
               {/* Bouton d'inscription */}
               <button
                 onClick={() => setShowSignup(true)}
-                className="w-full py-4 px-6 bg-gray-50 hover:bg-blue-50 border-2 border-blue-100 hover:border-blue-200 text-blue-700 font-medium rounded-2xl transition-all duration-300 transform hover:scale-[1.02]"
+                disabled={isOAuthLoading !== null}
+                className="w-full py-4 px-6 bg-gray-50 hover:bg-blue-50 border-2 border-blue-100 hover:border-blue-200 text-blue-700 font-medium rounded-2xl transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 <span className="flex items-center justify-center space-x-2">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -583,7 +629,7 @@ function LoginPageContent() {
             </div>
           </div>
 
-          {/* Footer - Couleurs adaptées au fond blanc */}
+          {/* Footer */}
           <div className="mt-8 text-center">
             <p className="text-xs text-gray-500">
               {t('gdpr.notice')}
@@ -621,7 +667,7 @@ function LoginPageContent() {
         </div>
       </div>
 
-      {/* Modal d'inscription VRAIE - CONSERVÉE INTÉGRALEMENT */}
+      {/* Modal d'inscription */}
       {showSignup && (
         <SignupModal 
           authLogic={authLogic}
@@ -631,7 +677,7 @@ function LoginPageContent() {
         />
       )}
 
-      {/* Debug - CONSERVÉ */}
+      {/* Debug */}
       {process.env.NODE_ENV === 'development' && (
         <div className="fixed bottom-4 left-4 p-2 bg-white/90 border border-blue-200 rounded text-xs text-gray-700">
           <strong>Debug:</strong> Langue: {currentLanguage}
@@ -641,7 +687,7 @@ function LoginPageContent() {
   )
 }
 
-// Composant fallback - CONSERVÉ avec style adapté au blanc
+// Composant fallback
 const LoadingFallback = () => (
   <div className="min-h-screen bg-white flex items-center justify-center">
     <div className="text-center">
@@ -656,7 +702,7 @@ const LoadingFallback = () => (
   </div>
 )
 
-// PAGE PRINCIPALE avec Suspense - CONSERVÉE
+// PAGE PRINCIPALE avec Suspense
 export default function LoginPage() {
   return (
     <Suspense fallback={<LoadingFallback />}>
