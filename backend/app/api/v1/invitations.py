@@ -1,10 +1,11 @@
-# app/api/v1/invitations.py - VERSION SUPABASE COMPLÈTE CORRIGÉE
+# app/api/v1/invitations.py - VERSION CORRIGÉE AVEC AUTH UNIFIÉE
 """
 Router Invitations pour Intelia Expert - VERSION SUPABASE NATIVE
 Utilise les invitations intégrées de Supabase Auth avec détection d'utilisateurs existants
-CORRIGÉ : Suppression des redondances et imports inutiles
+CORRIGÉ : Authentification unifiée avec auth.py
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
@@ -33,6 +34,9 @@ except ImportError:
     auth_get_current_user = None
     AUTH_CENTRALIZED = False
     logger.warning("Système d'auth centralisé non disponible")
+
+# Security scheme for HTTPBearer
+security = HTTPBearer()
 
 # ==================== CONFIGURATION SUPABASE ====================
 def get_supabase_client() -> Client:
@@ -67,76 +71,160 @@ def get_supabase_anon_client() -> Client:
     
     return create_client(url, anon_key)
 
-# ==================== AUTH HELPER UNIQUE ====================
-def get_current_user_from_token(request: Request):
-    """Extraction sécurisée de l'utilisateur depuis le token JWT Supabase"""
-    try:
-        auth_header = request.headers.get("Authorization")
-        if not auth_header:
-            raise HTTPException(status_code=401, detail="Token d'authentification manquant")
-        
-        token = auth_header[7:] if auth_header.startswith("Bearer ") else auth_header
-        
-        # Vérification sécurisée du JWT avec clé Supabase
-        supabase_jwt_secret = os.getenv("SUPABASE_JWT_SECRET")
-        
-        if supabase_jwt_secret:
-            try:
-                payload = jwt.decode(token, supabase_jwt_secret, algorithms=["HS256"])
-                logger.info("Token JWT vérifié avec clé sécurisée")
-            except jwt.ExpiredSignatureError:
-                raise HTTPException(status_code=401, detail="Token expiré")
-            except jwt.InvalidTokenError as e:
-                raise HTTPException(status_code=401, detail=f"Token invalide: {str(e)}")
-        else:
-            try:
-                payload = jwt.decode(token, options={"verify_signature": False})
-                logger.warning("JWT décodé sans vérification - configurez SUPABASE_JWT_SECRET en production")
-            except jwt.InvalidTokenError as e:
-                raise HTTPException(status_code=401, detail=f"Token malformé: {str(e)}")
-        
-        # Extraction des données utilisateur
-        user_email = payload.get('email')
-        user_id = payload.get('sub') or payload.get('user_id')
-        user_metadata = payload.get('user_metadata', {})
-        user_name = user_metadata.get('name') or payload.get('name') or payload.get('full_name')
-        
-        # Validation des données critiques
-        if not user_email:
-            raise HTTPException(status_code=401, detail="Token invalide - email manquant")
-        
-        if not user_id:
-            raise HTTPException(status_code=401, detail="Token invalide - ID utilisateur manquant")
-        
-        # Validation expiration
-        exp = payload.get('exp')
-        if exp and time.time() > exp:
-            raise HTTPException(status_code=401, detail="Token expiré")
-        
-        # Création de l'objet utilisateur
-        return type('User', (), {
-            'email': user_email,
-            'id': user_id,
-            'name': user_name or user_email.split('@')[0],
-            'metadata': user_metadata,
-            'token_exp': exp
-        })()
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erreur authentification inattendue: {e}")
-        raise HTTPException(status_code=401, detail="Erreur d'authentification")
+# ==================== AUTH HELPER UNIFIÉ ====================
+def get_current_user_from_token_fallback(credentials: HTTPAuthorizationCredentials):
+    """Version fallback de l'authentification locale - Compatible avec auth.py"""
+    token = credentials.credentials
+    
+    if not token or not isinstance(token, str):
+        logger.warning("Token vide ou invalide")
+        raise HTTPException(
+            status_code=401, 
+            detail="Authentication failed",
+            headers={"error": "internal_auth_error", "path": "/api/v1/invitations/send"}
+        )
+    
+    # Utiliser la même logique multi-secrets que auth.py
+    jwt_secrets = []
+    
+    # 1. Secret auth-temp (utilisé par vos endpoints /auth-temp/*)
+    auth_temp_secret = os.getenv("SUPABASE_JWT_SECRET") or os.getenv("JWT_SECRET")
+    if auth_temp_secret:
+        jwt_secrets.append(("AUTH_TEMP", auth_temp_secret))
+    
+    # 2. Secrets Supabase traditionnels
+    supabase_jwt_secret = os.getenv("SUPABASE_JWT_SECRET")
+    if supabase_jwt_secret and supabase_jwt_secret != auth_temp_secret:
+        jwt_secrets.append(("SUPABASE_JWT_SECRET", supabase_jwt_secret))
+    
+    supabase_anon = os.getenv("SUPABASE_ANON_KEY")
+    if supabase_anon and supabase_anon not in [s[1] for s in jwt_secrets]:
+        jwt_secrets.append(("SUPABASE_ANON_KEY", supabase_anon))
+    
+    service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if service_role_key and service_role_key not in [s[1] for s in jwt_secrets]:
+        jwt_secrets.append(("SUPABASE_SERVICE_ROLE_KEY", service_role_key))
+    
+    # Fallback
+    if not jwt_secrets:
+        jwt_secrets.append(("FALLBACK", "development-secret-change-in-production-12345"))
+        logger.error("Aucun JWT secret configuré - utilisation fallback")
+    
+    # Essayer tous les secrets comme dans auth.py
+    for secret_name, secret_value in jwt_secrets:
+        if not secret_value:
+            continue
+            
+        try:
+            logger.debug(f"Tentative décodage avec {secret_name}")
+            
+            # Essayer différentes options de décodage comme dans auth.py
+            decode_options = [
+                {"options": {"verify_aud": False}},  # Sans vérifier audience (auth-temp)
+                {"audience": "authenticated"},       # Standard Supabase
+                {}                                  # Sans options spéciales
+            ]
+            
+            payload = None
+            for option_set in decode_options:
+                try:
+                    if "options" in option_set:
+                        payload = jwt.decode(token, secret_value, algorithms=["HS256"], **option_set)
+                    elif "audience" in option_set:
+                        payload = jwt.decode(token, secret_value, algorithms=["HS256"], audience=option_set["audience"])
+                    else:
+                        payload = jwt.decode(token, secret_value, algorithms=["HS256"])
+                    break
+                except jwt.InvalidAudienceError:
+                    continue
+                except Exception:
+                    continue
+            
+            if not payload:
+                continue
+                
+            logger.info(f"Token décodé avec succès avec {secret_name}")
+            
+            # Extraction des données utilisateur
+            user_email = payload.get('email')
+            user_id = payload.get('sub') or payload.get('user_id')
+            user_metadata = payload.get('user_metadata', {})
+            user_name = user_metadata.get('name') or payload.get('name') or payload.get('full_name')
+            
+            # Validation des données critiques
+            if not user_email or not user_id:
+                continue
+            
+            # Validation expiration
+            exp = payload.get('exp')
+            if exp and time.time() > exp:
+                raise HTTPException(
+                    status_code=401, 
+                    detail="Authentication failed",
+                    headers={"error": "internal_auth_error", "path": "/api/v1/invitations/send"}
+                )
+            
+            logger.info(f"Utilisateur authentifié: {user_email} (secret: {secret_name})")
+            
+            # Créer l'objet utilisateur compatible
+            return type('User', (), {
+                'email': user_email,
+                'id': user_id,
+                'name': user_name or user_email.split('@')[0],
+                'metadata': user_metadata,
+                'token_exp': exp
+            })()
+            
+        except jwt.ExpiredSignatureError:
+            logger.warning(f"Token expiré (testé avec {secret_name})")
+            raise HTTPException(
+                status_code=401, 
+                detail="Authentication failed",
+                headers={"error": "internal_auth_error", "path": "/api/v1/invitations/send"}
+            )
+        except jwt.InvalidSignatureError:
+            logger.debug(f"Signature invalide avec {secret_name}")
+            continue
+        except jwt.InvalidTokenError as e:
+            logger.debug(f"Token invalide avec {secret_name}: {e}")
+            continue
+        except Exception as e:
+            logger.debug(f"Erreur inattendue avec {secret_name}: {e}")
+            continue
+    
+    # Si aucun secret n'a fonctionné
+    logger.error("Impossible de décoder le token avec tous les secrets disponibles")
+    logger.error(f"Secrets essayés: {[s[0] for s in jwt_secrets]}")
+    
+    raise HTTPException(
+        status_code=401, 
+        detail="Authentication failed",
+        headers={"error": "internal_auth_error", "path": "/api/v1/invitations/send"}
+    )
 
-# Dependency principale pour les endpoints
-async def get_current_user(request: Request):
-    """Dependency unifiée pour récupérer l'utilisateur connecté"""
+# Dependency principale pour les endpoints - VERSION CORRIGÉE
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Dependency unifiée pour récupérer l'utilisateur connecté - VERSION CORRIGÉE"""
     if AUTH_CENTRALIZED and auth_get_current_user:
-        # Utiliser le système centralisé si disponible
-        return await auth_get_current_user(request)
-    else:
-        # Fallback sur l'auth local
-        return get_current_user_from_token(request)
+        # Utiliser le système centralisé correctement
+        try:
+            user_data = await auth_get_current_user(credentials)
+            # Convertir en objet compatible avec le service d'invitation
+            return type('User', (), {
+                'email': user_data.get('email'),
+                'id': user_data.get('user_id'),
+                'name': user_data.get('full_name') or user_data.get('email', '').split('@')[0],
+                'metadata': user_data.get('preferences', {}),
+                'token_exp': user_data.get('exp'),
+                'user_type': user_data.get('user_type', 'user')
+            })()
+        except Exception as e:
+            logger.error(f"Erreur système d'auth centralisé: {e}")
+            # Fallback sur l'auth local en cas d'erreur
+            pass
+    
+    # Fallback sur l'auth local si centralisé non disponible
+    return get_current_user_from_token_fallback(credentials)
 
 # ==================== MODÈLES PYDANTIC ====================
 class InvitationRequest(BaseModel):
@@ -286,7 +374,7 @@ class SupabaseInvitationService:
     async def validate_email_before_invitation(self, email: str, inviter_email: str) -> Dict[str, Any]:
         """Validation complète avant d'envoyer une invitation"""
         
-        # 1. Vérifier si l'utilisateur existe déjà  
+        # 1. Vérifier si l'utilisateur existe déjà   
         user_check = await self.check_user_exists(email)
         
         if user_check["exists"]:
