@@ -442,13 +442,13 @@ export const StatisticsPage: React.FC = () => {
     const startTime = performance.now()
   
     try {
-      const params = {
+      const params = new URLSearchParams({
         page: currentPage.toString(),
         limit: questionsPerPage.toString()
-      }
+      })
 
-      // CORRECTION: Utilise apiClient.get() avec params
-      const response = await apiClient.get<FastQuestionsResponse>('/api/v1/stats-fast/questions', params)
+      // CORRECTION: Utilise apiClient.get() avec URL complète
+      const response = await apiClient.get<FastQuestionsResponse>(`/api/v1/stats-fast/questions?${params}`)
     
       if (!response.success) {
         throw new Error(response.error?.message || 'Erreur lors du chargement des questions')
