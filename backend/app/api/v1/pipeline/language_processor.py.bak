@@ -368,15 +368,38 @@ Analysis in user's language:"""
         return response_text
 
 def finalize_response_with_language(response: Dict[str, Any], question: str, effective_language: str, detected_language: str, force_conversation_language: bool = True) -> Dict[str, Any]:
-    """
-    🔧 VERSION CORRIGÉE: Helper pour appliquer l'adaptation linguistique à toute réponse finale.
-    CORRECTION PRINCIPALE: Force l'adaptation même pour les réponses non-OpenAI fallback.
-    """
+    """CONSERVATION INTÉGRALE: Helper pour appliquer l'adaptation linguistique à toute réponse finale."""
     # Ajouter les métadonnées de langue pour toutes les réponses
     if response.get("type") == "answer" and "answer" in response:
         response["answer"]["meta"] = response["answer"].get("meta", {})
         response["answer"]["meta"]["detected_language"] = detected_language
         response["answer"]["meta"]["effective_language"] = effective_language
+        
+        # 🔧 CONSERVÉ: Détecter si adaptation forcée nécessaire
+        answer_text = response["answer"].get("text", "")
+        if answer_text and force_conversation_language:
+            # Détecter la langue actuelle du texte de réponse
+            current_response_lang = detect_question_language(answer_text) if len(answer_text) > 20 else effective_language
+            
+            # Si langues différentes et ce n'est pas déjà un fallback OpenAI → adapter
+            if (current_response_lang != effective_language and 
+                response["answer"].get("source") not in ["openai_fallback", "cot_analysis"]):
+                
+                logger.info(f"🌍 Adaptation forcée détectée {current_response_lang} → {effective_language}")
+                
+                # Marquer l'adaptation dans les métadonnées
+                response["answer"]["meta"]["language_adaptation"] = {
+                    "from": current_response_lang,
+                    "to": effective_language,
+                    "forced": True
+                }
+        
+        # Si c'est déjà un fallback OpenAI avec la bonne langue, pas besoin d'adaptation
+        if response["answer"].get("source") in ["openai_fallback", "cot_analysis"]:
+            target_lang_in_meta = response["answer"]["meta"].get("target_language", "fr")
+            if target_lang_in_meta == effective_language:
+                logger.info(f"✅ Fallback OpenAI déjà généré dans la langue cible: {effective_language}")
+                return response
         
     elif response.get("type") == "partial_answer":
         response["language_metadata"] = {
@@ -385,45 +408,34 @@ def finalize_response_with_language(response: Dict[str, Any], question: str, eff
             "force_conversation_language": force_conversation_language
         }
     
-    # 🔧 CORRECTION: Si français, pas de traitement supplémentaire nécessaire
+    # Si français, pas de traitement supplémentaire nécessaire
     if effective_language == "fr":
         return response
     
-    # 🔧 CORRECTION PRINCIPALE: Adapter le texte pour TOUTES les sources (sauf exceptions spécifiques)
+    # Adapter le texte principal selon le type de réponse
     if response.get("type") == "answer" and response.get("answer", {}).get("text"):
         answer = response["answer"]
         original_text = answer["text"]
         source_type = answer.get("source", "unknown")
         
-        # 🔧 CORRECTION: Vérifier si c'est vraiment un fallback OpenAI avec la bonne langue
-        skip_adaptation = False
+        # Ne pas re-adapter les fallbacks OpenAI qui sont déjà dans la bonne langue
         if source_type in ["openai_fallback", "cot_analysis"]:
-            target_lang_in_meta = answer.get("meta", {}).get("target_language", "")
-            if target_lang_in_meta == effective_language:
-                logger.info(f"✅ Fallback OpenAI/CoT déjà dans la langue cible: {effective_language}")
-                skip_adaptation = True
+            logger.info("⏸️ Fallback OpenAI/CoT - adaptation linguistique déjà effectuée")
+            return response
         
-        if not skip_adaptation:
-            logger.info(f"🌐 Adaptation linguistique forcée: {source_type} → {effective_language}")
-            
-            adapted_text = adapt_response_to_language(
-                response_text=original_text,
-                source_type=source_type,
-                target_language=effective_language,
-                original_question=question
-            )
-            
-            # Mettre à jour la réponse
-            response["answer"]["text"] = adapted_text
-            
-            # Marquer l'adaptation
-            if adapted_text != original_text:
-                response["answer"]["meta"]["language_adapted"] = True
-                response["answer"]["meta"]["language_adaptation"] = {
-                    "from": "fr",
-                    "to": effective_language,
-                    "forced": True
-                }
+        adapted_text = adapt_response_to_language(
+            response_text=original_text,
+            source_type=source_type,
+            target_language=effective_language,
+            original_question=question
+        )
+        
+        # Mettre à jour la réponse
+        response["answer"]["text"] = adapted_text
+        
+        # 🔧 CONSERVÉ: Marquer l'adaptation
+        if adapted_text != original_text:
+            response["answer"]["meta"]["language_adapted"] = True
         
     elif response.get("type") == "partial_answer" and response.get("general_answer", {}).get("text"):
         # Pour le mode hybride
@@ -438,7 +450,7 @@ def finalize_response_with_language(response: Dict[str, Any], question: str, eff
         
         response["general_answer"]["text"] = adapted_text
         
-        # Marquer l'adaptation
+        # 🔧 CONSERVÉ: Marquer l'adaptation
         if adapted_text != original_text:
             response["language_metadata"]["adapted"] = True
     
@@ -460,7 +472,7 @@ def get_language_processing_status() -> Dict[str, Any]:
             "forced_adaptation": True
         },
         "technical_terms_count": 20,  # Nombre de termes techniques reconnus
-        "version": "memory_safe_v1.0_language_fix",
+        "version": "memory_safe_v1.0",
         # 🚨 SÉCURISÉ: Informations sur le cache de langue limitées
         "language_cache": {
             "enabled": LANGUAGE_CACHE_ENABLED,
