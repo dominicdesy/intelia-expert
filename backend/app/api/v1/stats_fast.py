@@ -15,12 +15,12 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
-logger.info("🔄 STATS_FAST.PY VERSION CORRIGÉE v2.1 - 2025-09-06 13:50 - AUTH + AIOHTTP FIXES")
+logger.info("🔄 STATS_FAST.PY VERSION CORRIGÉE v2.1 - 2025-09-06 14:00 - AUTH + AIOHTTP FIXES")
 
 
 # Import conditionnel pour éviter les erreurs si les modules n'existent pas
 try:
-    from auth import get_current_user  # Fonction qui existe vraiment dans auth.py
+    from app.api.v1.auth import get_current_user    
     AUTH_AVAILABLE = True
     logger.info("✅ Auth module importé avec succès")
     
@@ -32,7 +32,7 @@ except ImportError as e:
     AUTH_AVAILABLE = False
 
 try:
-    from stats_cache import get_stats_cache  # stats_cache.py est dans le même dossier
+    from app.api.v1.stats_cache import get_stats_cache
     CACHE_AVAILABLE = True
     logger.info("✅ Stats cache module importé avec succès")
 except ImportError as e:
