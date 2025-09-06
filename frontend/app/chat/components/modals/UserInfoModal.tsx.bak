@@ -10,34 +10,104 @@ const debugLog = (category: string, message: string, data?: any) => {
   return
 }
 
-const fallbackCountries = [
-  { value: 'CA', label: 'Canada', phoneCode: '+1', flag: '🇨🇦' },
-  { value: 'US', label: 'États-Unis', phoneCode: '+1', flag: '🇺🇸' },
-  { value: 'FR', label: 'France', phoneCode: '+33', flag: '🇫🇷' },
-  { value: 'GB', label: 'Royaume-Uni', phoneCode: '+44', flag: '🇬🇧' },
-  { value: 'DE', label: 'Allemagne', phoneCode: '+49', flag: '🇩🇪' },
-  { value: 'IT', label: 'Italie', phoneCode: '+39', flag: '🇮🇹' },
-  { value: 'ES', label: 'Espagne', phoneCode: '+34', flag: '🇪🇸' },
-  { value: 'BE', label: 'Belgique', phoneCode: '+32', flag: '🇧🇪' },
-  { value: 'CH', label: 'Suisse', phoneCode: '+41', flag: '🇨🇭' },
-  { value: 'MX', label: 'Mexique', phoneCode: '+52', flag: '🇲🇽' },
-  { value: 'BR', label: 'Brésil', phoneCode: '+55', flag: '🇧🇷' },
-  { value: 'AU', label: 'Australie', phoneCode: '+61', flag: '🇦🇺' },
-  { value: 'JP', label: 'Japon', phoneCode: '+81', flag: '🇯🇵' },
-  { value: 'CN', label: 'Chine', phoneCode: '+86', flag: '🇨🇳' },
-  { value: 'IN', label: 'Inde', phoneCode: '+91', flag: '🇮🇳' },
-  { value: 'NL', label: 'Pays-Bas', phoneCode: '+31', flag: '🇳🇱' },
-  { value: 'SE', label: 'Suède', phoneCode: '+46', flag: '🇸🇪' },
-  { value: 'NO', label: 'Norvège', phoneCode: '+47', flag: '🇳🇴' },
-  { value: 'DK', label: 'Danemark', phoneCode: '+45', flag: '🇩🇰' },
-  { value: 'FI', label: 'Finlande', phoneCode: '+358', flag: '🇫🇮' }
-]
-
 interface Country {
   value: string
   label: string
   phoneCode: string
   flag?: string
+}
+
+// Mapping des codes de langue vers les codes utilisés par REST Countries
+const getLanguageCode = (currentLanguage: string): string => {
+  const mapping: Record<string, string> = {
+    'fr': 'fra',   // Français
+    'es': 'spa',   // Espagnol
+    'de': 'deu',   // Allemand
+    'pt': 'por',   // Portugais
+    'nl': 'nld',   // Néerlandais
+    'pl': 'pol',   // Polonais
+    'zh': 'zho',   // Chinois
+    'hi': 'hin',   // Hindi
+    'th': 'tha',   // Thaï
+    'en': 'eng'    // Anglais (fallback)
+  }
+  return mapping[currentLanguage] || 'eng'
+}
+
+// Fallback countries avec traductions multilingues
+const getFallbackCountries = (currentLanguage: string): Country[] => {
+  const translations: Record<string, Record<string, string>> = {
+    en: {
+      'CA': 'Canada',
+      'US': 'United States',
+      'FR': 'France',
+      'GB': 'United Kingdom',
+      'DE': 'Germany',
+      'IT': 'Italy',
+      'ES': 'Spain',
+      'BE': 'Belgium',
+      'CH': 'Switzerland',
+      'MX': 'Mexico',
+      'BR': 'Brazil',
+      'AU': 'Australia',
+      'JP': 'Japan',
+      'CN': 'China',
+      'IN': 'India',
+      'NL': 'Netherlands',
+      'SE': 'Sweden',
+      'NO': 'Norway',
+      'DK': 'Denmark',
+      'FI': 'Finland'
+    },
+    fr: {
+      'CA': 'Canada',
+      'US': 'États-Unis',
+      'FR': 'France',
+      'GB': 'Royaume-Uni',
+      'DE': 'Allemagne',
+      'IT': 'Italie',
+      'ES': 'Espagne',
+      'BE': 'Belgique',
+      'CH': 'Suisse',
+      'MX': 'Mexique',
+      'BR': 'Brésil',
+      'AU': 'Australie',
+      'JP': 'Japon',
+      'CN': 'Chine',
+      'IN': 'Inde',
+      'NL': 'Pays-Bas',
+      'SE': 'Suède',
+      'NO': 'Norvège',
+      'DK': 'Danemark',
+      'FI': 'Finlande'
+    }
+  }
+
+  const phoneCodesMap: Record<string, string> = {
+    'CA': '+1', 'US': '+1', 'FR': '+33', 'GB': '+44', 'DE': '+49',
+    'IT': '+39', 'ES': '+34', 'BE': '+32', 'CH': '+41', 'MX': '+52',
+    'BR': '+55', 'AU': '+61', 'JP': '+81', 'CN': '+86', 'IN': '+91',
+    'NL': '+31', 'SE': '+46', 'NO': '+47', 'DK': '+45', 'FI': '+358'
+  }
+
+  const flagsMap: Record<string, string> = {
+    'CA': '🇨🇦', 'US': '🇺🇸', 'FR': '🇫🇷', 'GB': '🇬🇧', 'DE': '🇩🇪',
+    'IT': '🇮🇹', 'ES': '🇪🇸', 'BE': '🇧🇪', 'CH': '🇨🇭', 'MX': '🇲🇽',
+    'BR': '🇧🇷', 'AU': '🇦🇺', 'JP': '🇯🇵', 'CN': '🇨🇳', 'IN': '🇮🇳',
+    'NL': '🇳🇱', 'SE': '🇸🇪', 'NO': '🇳🇴', 'DK': '🇩🇰', 'FI': '🇫🇮'
+  }
+
+  const langTranslations = translations[currentLanguage] || translations.en
+  
+  return Object.keys(langTranslations).map(code => ({
+    value: code,
+    label: langTranslations[code],
+    phoneCode: phoneCodesMap[code],
+    flag: flagsMap[code]
+  })).sort((a, b) => {
+    const locale = currentLanguage === 'fr' ? 'fr' : 'en'
+    return a.label.localeCompare(b.label, locale, { numeric: true })
+  })
 }
 
 // Interface TypeScript pour les données utilisateur API
@@ -58,13 +128,16 @@ interface UserProfileUpdate {
 }
 
 const useCountries = () => {
-  const [countries, setCountries] = useState<Country[]>(fallbackCountries)
+  const { currentLanguage } = useTranslation()
+  const languageCode = getLanguageCode(currentLanguage)
+  
+  const [countries, setCountries] = useState<Country[]>(() => getFallbackCountries(currentLanguage))
   const [loading, setLoading] = useState(false)
   const [usingFallback, setUsingFallback] = useState(true)
   const abortControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
-    debugLog('COUNTRIES', 'Hook initialized')
+    debugLog('COUNTRIES', 'Hook initialized with language', currentLanguage)
     
     const fetchCountries = async () => {
       if (abortControllerRef.current) {
@@ -76,11 +149,19 @@ const useCountries = () => {
       const signal = abortControllerRef.current.signal
 
       try {
-        debugLog('COUNTRIES', 'Starting fetch')
+        debugLog('COUNTRIES', `Starting fetch for language: ${currentLanguage} (${languageCode})`)
         setLoading(true)
+        
         const response = await fetch(
           'https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations',
-          { signal }
+          { 
+            signal,
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (compatible; Intelia/1.0)',
+              'Cache-Control': 'no-cache'
+            }
+          }
         )
         
         debugLog('COUNTRIES', 'Fetch response', { ok: response.ok, status: response.status })
@@ -93,32 +174,87 @@ const useCountries = () => {
         if (signal.aborted) return
         
         const formattedCountries = data
-          .map((country: any) => ({
-            value: country.cca2,
-            label: country.translations?.fra?.common || country.name.common,
-            phoneCode: (country.idd?.root || '') + (country.idd?.suffixes?.[0] || ''),
-            flag: country.flag
-          }))
-          .filter((country: Country) => 
-            country.phoneCode && 
-            country.phoneCode.length > 1 &&
-            country.phoneCode.startsWith('+') &&
-            country.value && 
-            country.label
-          )
-          .sort((a: Country, b: Country) => a.label.localeCompare(b.label))
+          .map((country: any) => {
+            let phoneCode = ''
+            if (country.idd?.root) {
+              phoneCode = country.idd.root
+              if (country.idd.suffixes && country.idd.suffixes[0]) {
+                phoneCode += country.idd.suffixes[0]
+              }
+            }
+            
+            // Récupération du nom selon la langue
+            let countryName = country.name?.common || country.cca2
+            
+            // Essayer d'abord la traduction dans la langue demandée
+            if (country.translations && country.translations[languageCode]) {
+              countryName = country.translations[languageCode].common || country.translations[languageCode].official
+            }
+            // Si pas de traduction dans la langue demandée, utiliser l'anglais
+            else if (country.name?.common) {
+              countryName = country.name.common
+            }
+            
+            return {
+              value: country.cca2,
+              label: countryName,
+              phoneCode: phoneCode,
+              flag: country.flag || ''
+            }
+          })
+          .filter((country: Country) => {
+            const hasValidCode = country.phoneCode && 
+                                country.phoneCode !== 'undefined' && 
+                                country.phoneCode !== 'null' &&
+                                country.phoneCode.length > 1 &&
+                                country.phoneCode.startsWith('+') &&
+                                /^\+\d+$/.test(country.phoneCode)
+            
+            const hasValidInfo = country.value && 
+                                country.value.length === 2 &&
+                                country.label && 
+                                country.label.length > 1
+            
+            return hasValidCode && hasValidInfo
+          })
+          .sort((a: Country, b: Country) => {
+            // Tri selon la langue actuelle
+            const locale = languageCode === 'fra' ? 'fr' : 
+                          languageCode === 'spa' ? 'es' :
+                          languageCode === 'deu' ? 'de' :
+                          languageCode === 'por' ? 'pt' :
+                          languageCode === 'nld' ? 'nl' :
+                          languageCode === 'pol' ? 'pl' :
+                          languageCode === 'zho' ? 'zh' :
+                          'en'
+            
+            return a.label.localeCompare(b.label, locale, { numeric: true })
+          })
         
         debugLog('COUNTRIES', 'Countries processed', { count: formattedCountries.length })
         
         if (formattedCountries.length >= 50 && !signal.aborted) {
           setCountries(formattedCountries)
           setUsingFallback(false)
-          debugLog('COUNTRIES', 'Using API countries')
+          debugLog('COUNTRIES', `Using API countries in ${currentLanguage}`)
+          
+          // Logs de debug pour vérifier les traductions
+          const france = formattedCountries.find(c => c.value === 'FR')
+          const usa = formattedCountries.find(c => c.value === 'US')
+          const germany = formattedCountries.find(c => c.value === 'DE')
+          
+          console.log(`[UserInfoModal-Countries] Exemples en ${currentLanguage}:`)
+          console.log('  France:', france?.label)
+          console.log('  USA:', usa?.label)
+          console.log('  Germany:', germany?.label)
         }
         
       } catch (error) {
-        if (error instanceof Error && error.name !== 'AbortError') {
-          debugLog('COUNTRIES', 'Fetch error', error.message)
+        if (error instanceof Error && error.name !== 'AbortError' && !signal.aborted) {
+          debugLog('COUNTRIES', 'Fetch error, using fallback', error.message)
+          // En cas d'erreur, utiliser le fallback dans la bonne langue
+          setCountries(getFallbackCountries(currentLanguage))
+          setUsingFallback(true)
         }
       } finally {
         if (!signal.aborted) {
@@ -128,6 +264,9 @@ const useCountries = () => {
       }
     }
 
+    // Toujours commencer par mettre à jour le fallback dans la bonne langue
+    setCountries(getFallbackCountries(currentLanguage))
+    
     fetchCountries()
     
     return () => {
@@ -136,7 +275,7 @@ const useCountries = () => {
         abortControllerRef.current.abort()
       }
     }
-  }, [])
+  }, [currentLanguage, languageCode]) // Se redéclenche quand la langue change
 
   return { countries, loading, usingFallback }
 }
@@ -461,7 +600,6 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       overlay.style.setProperty('bottom', '0', 'important')
       overlay.style.setProperty('background-color', 'rgba(0, 0, 0, 0.5)', 'important')
       overlay.style.setProperty('backdrop-filter', 'blur(2px)', 'important')
-      overlay.style.setProperty('animation', 'fadeIn 0.2s ease-out', 'important')
       overlay.style.setProperty('display', 'flex', 'important')
       overlay.style.setProperty('align-items', 'center', 'important')
       overlay.style.setProperty('justify-content', 'center', 'important')
@@ -469,7 +607,6 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       
       const content = overlay.querySelector('[data-modal="user-info"]') as HTMLElement
       if (content) {
-        content.style.setProperty('animation', 'modalSlideIn 0.3s ease-out', 'important')
         content.style.setProperty('width', '95vw', 'important')
         content.style.setProperty('max-width', '700px', 'important')
         content.style.setProperty('max-height', '85vh', 'important')
@@ -962,7 +1099,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
 
   const tabs = useMemo(() => [
     { id: 'profile', label: t('nav.profile'), icon: '👤' },
-    { id: 'password', label: t('profile.password'), icon: '🔒' }
+    { id: 'password', label: t('profile.password'), icon: '🔑' }
   ], [t])
 
   // Keyboard handling
@@ -997,348 +1134,322 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
   })
 
   return (
-    <>
-      {/* Styles CSS pour les animations */}
-      <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        
-        @keyframes modalSlideIn {
-          from { 
-            opacity: 0; 
-            transform: translateY(-20px) scale(0.95); 
-          }
-          to { 
-            opacity: 1; 
-            transform: translateY(0) scale(1); 
-          }
-        }
-        
-        .modal-content {
-          background-color: white !important;
-        }
-      `}</style>
-
-      {/* OVERLAY CORRIGÉ - Flexbox nécessaire pour le centrage */}
+    <div 
+      ref={overlayRef}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backdropFilter: 'blur(2px)'
+      }}
+      onClick={handleOverlayClick}
+      data-debug="modal-overlay"
+    >
+      {/* MODAL CONTAINER */}
       <div 
-        ref={overlayRef}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        style={{
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          backdropFilter: 'blur(2px)'
-        }}
-        onClick={handleOverlayClick}
-        data-debug="modal-overlay"
+        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+        data-modal="user-info"
+        data-debug="modal-content"
       >
-        {/* MODAL CONTAINER - SUPPRIMER TOUS LES STYLES INLINE PROBLÉMATIQUES */}
-        <div 
-          className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-          onClick={(e) => e.stopPropagation()}
-          data-modal="user-info"
-          data-debug="modal-content"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">
-              {t('profile.title')}
-            </h2>
-            <button
-              onClick={handleClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"
-              aria-label={t('modal.close')}
-              title={t('modal.close')}
-              disabled={isLoading}
-              data-debug="close-button"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <h2 className="text-xl font-semibold text-gray-900">
+            {t('profile.title')}
+          </h2>
+          <button
+            onClick={handleClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"
+            aria-label={t('modal.close')}
+            title={t('modal.close')}
+            disabled={isLoading}
+            data-debug="close-button"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
 
-          {/* Tabs */}
-          <div className="border-b border-gray-200">
-            <nav className="flex px-6" data-debug="tabs-nav">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    debugLog('INTERACTION', `Tab clicked: ${tab.id}`)
-                    setActiveTab(tab.id)
-                  }}
-                  className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                  data-debug={`tab-${tab.id}`}
-                >
-                  <span className="mr-2">{tab.icon}</span>
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
-          </div>
+        {/* Tabs */}
+        <div className="border-b border-gray-200">
+          <nav className="flex px-6" data-debug="tabs-nav">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  debugLog('INTERACTION', `Tab clicked: ${tab.id}`)
+                  setActiveTab(tab.id)
+                }}
+                className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+                data-debug={`tab-${tab.id}`}
+              >
+                <span className="mr-2">{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        </div>
 
-          {/* Content */}
-          <div className="p-6" data-debug="modal-body">
-            <div className="space-y-6">
-              
-              {/* Errors */}
-              <ErrorDisplay errors={formErrors} title={t('error.validationErrors')} />
+        {/* Content */}
+        <div className="p-6" data-debug="modal-body">
+          <div className="space-y-6">
+            
+            {/* Errors */}
+            <ErrorDisplay errors={formErrors} title={t('error.validationErrors')} />
 
-              {/* Fallback Warning */}
-              {usingFallback && !countriesLoading && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-                  <div className="flex items-center space-x-2">
-                    <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                    <span className="text-sm text-yellow-800">
-                      {t('countries.fallbackWarning')}
-                    </span>
-                  </div>
+            {/* Fallback Warning */}
+            {usingFallback && !countriesLoading && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                <div className="flex items-center space-x-2">
+                  <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <span className="text-sm text-yellow-800">
+                    {t('countries.fallbackWarning')}
+                  </span>
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Profile Tab */}
-              {activeTab === 'profile' && (
-                <div className="space-y-6" data-debug="profile-tab">
+            {/* Profile Tab */}
+            {activeTab === 'profile' && (
+              <div className="space-y-6" data-debug="profile-tab">
+                
+                {/* Personal Info */}
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                    <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                    {t('profile.personalInfo')}
+                    <span className="text-red-500 ml-1">*</span>
+                  </h3>
                   
-                  {/* Personal Info */}
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                      <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
-                      {t('profile.personalInfo')}
-                      <span className="text-red-500 ml-1">*</span>
-                    </h3>
-                    
-                    <div className="grid grid-cols-1 gap-4 mb-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          {t('profile.firstName')}
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.firstName}
-                          onChange={(e) => handleFormDataChange('firstName', e.target.value)}
-                          className="input-primary"
-                          required
-                          data-debug="firstName-input"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          {t('profile.lastName')}
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.lastName}
-                          onChange={(e) => handleFormDataChange('lastName', e.target.value)}
-                          className="input-primary"
-                          required
-                          data-debug="lastName-input"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mb-4">
+                  <div className="grid grid-cols-1 gap-4 mb-4">
+                    <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {t('profile.email')}
+                        {t('profile.firstName')}
                       </label>
                       <input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => handleFormDataChange('email', e.target.value)}
+                        type="text"
+                        value={formData.firstName}
+                        onChange={(e) => handleFormDataChange('firstName', e.target.value)}
                         className="input-primary"
                         required
-                        data-debug="email-input"
+                        data-debug="firstName-input"
                       />
                     </div>
-
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-3">
-                        {t('profile.phone')} <span className="text-gray-500 text-sm">({t('common.optional')})</span>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('profile.lastName')}
                       </label>
-                      <div data-debug="phone-input">
-                        <PhoneInput
-                          countryCode={formData.country_code}
-                          areaCode={formData.area_code}
-                          phoneNumber={formData.phone_number}
-                          onChange={handlePhoneChange}
-                          countries={countries}
-                          countriesLoading={countriesLoading}
-                          usingFallback={usingFallback}
-                        />
-                      </div>
+                      <input
+                        type="text"
+                        value={formData.lastName}
+                        onChange={(e) => handleFormDataChange('lastName', e.target.value)}
+                        className="input-primary"
+                        required
+                        data-debug="lastName-input"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {t('profile.email')}
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => handleFormDataChange('email', e.target.value)}
+                      className="input-primary"
+                      required
+                      data-debug="email-input"
+                    />
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      {t('profile.phone')} <span className="text-gray-500 text-sm">({t('common.optional')})</span>
+                    </label>
+                    <div data-debug="phone-input">
+                      <PhoneInput
+                        countryCode={formData.country_code}
+                        areaCode={formData.area_code}
+                        phoneNumber={formData.phone_number}
+                        onChange={handlePhoneChange}
+                        countries={countries}
+                        countriesLoading={countriesLoading}
+                        usingFallback={usingFallback}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {t('profile.country')} <span className="text-gray-500 text-sm">({t('common.optional')})</span>
+                    </label>
+                    <div data-debug="country-select">
+                      <CountrySelect
+                        countries={countries}
+                        value={formData.country}
+                        onChange={(countryValue: string) => handleFormDataChange('country', countryValue)}
+                        placeholder={t('placeholder.countrySelect')}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Professional Info */}
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                    {t('profile.professionalInfo')}
+                    <span className="text-gray-500 text-sm ml-2">({t('common.optional')})</span>
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('profile.linkedinProfile')}
+                      </label>
+                      <input
+                        type="url"
+                        value={formData.linkedinProfile}
+                        onChange={(e) => handleFormDataChange('linkedinProfile', e.target.value)}
+                        placeholder={t('placeholder.linkedinPersonal')}
+                        className="input-primary"
+                        data-debug="linkedin-input"
+                      />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {t('profile.country')} <span className="text-gray-500 text-sm">({t('common.optional')})</span>
+                        {t('profile.companyName')}
                       </label>
-                      <div data-debug="country-select">
-                        <CountrySelect
-                          countries={countries}
-                          value={formData.country}
-                          onChange={(countryValue: string) => handleFormDataChange('country', countryValue)}
-                          placeholder={t('placeholder.countrySelect')}
-                        />
-                      </div>
+                      <input
+                        type="text"
+                        value={formData.companyName}
+                        onChange={(e) => handleFormDataChange('companyName', e.target.value)}
+                        placeholder={t('placeholder.companyName')}
+                        className="input-primary"
+                        data-debug="company-name-input"
+                      />
                     </div>
-                  </div>
 
-                  {/* Professional Info */}
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                      <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                      {t('profile.professionalInfo')}
-                      <span className="text-gray-500 text-sm ml-2">({t('common.optional')})</span>
-                    </h3>
-                    
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          {t('profile.linkedinProfile')}
-                        </label>
-                        <input
-                          type="url"
-                          value={formData.linkedinProfile}
-                          onChange={(e) => handleFormDataChange('linkedinProfile', e.target.value)}
-                          placeholder={t('placeholder.linkedinPersonal')}
-                          className="input-primary"
-                          data-debug="linkedin-input"
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('profile.companyWebsite')}
+                      </label>
+                      <input
+                        type="url"
+                        value={formData.companyWebsite}
+                        onChange={(e) => handleFormDataChange('companyWebsite', e.target.value)}
+                        placeholder={t('placeholder.companyWebsite')}
+                        className="input-primary"
+                        data-debug="company-website-input"
+                      />
+                    </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          {t('profile.companyName')}
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.companyName}
-                          onChange={(e) => handleFormDataChange('companyName', e.target.value)}
-                          placeholder={t('placeholder.companyName')}
-                          className="input-primary"
-                          data-debug="company-name-input"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          {t('profile.companyWebsite')}
-                        </label>
-                        <input
-                          type="url"
-                          value={formData.companyWebsite}
-                          onChange={(e) => handleFormDataChange('companyWebsite', e.target.value)}
-                          placeholder={t('placeholder.companyWebsite')}
-                          className="input-primary"
-                          data-debug="company-website-input"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          {t('profile.linkedinCorporate')}
-                        </label>
-                        <input
-                          type="url"
-                          value={formData.linkedinCorporate}
-                          onChange={(e) => handleFormDataChange('linkedinCorporate', e.target.value)}
-                          placeholder={t('placeholder.linkedinCorporate')}
-                          className="input-primary"
-                          data-debug="linkedin-corporate-input"
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('profile.linkedinCorporate')}
+                      </label>
+                      <input
+                        type="url"
+                        value={formData.linkedinCorporate}
+                        onChange={(e) => handleFormDataChange('linkedinCorporate', e.target.value)}
+                        placeholder={t('placeholder.linkedinCorporate')}
+                        className="input-primary"
+                        data-debug="linkedin-corporate-input"
+                      />
                     </div>
                   </div>
                 </div>
-              )}
-
-              {/* Password Tab */}
-              {activeTab === 'password' && (
-                <div className="space-y-6" data-debug="password-tab">
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                      <span className="w-2 h-2 bg-orange-500 rounded-full mr-2"></span>
-                      {t('profile.password')}
-                    </h3>
-                    
-                    <div className="space-y-4">
-                      <PasswordInput
-                        id="currentPassword"
-                        label={t('profile.currentPassword')}
-                        value={passwordData.currentPassword}
-                        onChange={(value) => handlePasswordDataChange('currentPassword', value)}
-                        placeholder={t('placeholder.currentPassword')}
-                        autoComplete="current-password"
-                        required
-                        showPassword={showPasswords.currentPassword}
-                        onToggleShow={() => handleShowPasswordToggle('currentPassword')}
-                      />
-                      
-                      <PasswordInput
-                        id="newPassword"
-                        label={t('profile.newPassword')}
-                        value={passwordData.newPassword}
-                        onChange={(value) => handlePasswordDataChange('newPassword', value)}
-                        placeholder={t('placeholder.newPassword')}
-                        autoComplete="new-password"
-                        required
-                        showStrength
-                        showPassword={showPasswords.newPassword}
-                        onToggleShow={() => handleShowPasswordToggle('newPassword')}
-                      />
-                      
-                      <PasswordInput
-                        id="confirmPassword"
-                        label={t('profile.confirmPassword')}
-                        value={passwordData.confirmPassword}
-                        onChange={(value) => handlePasswordDataChange('confirmPassword', value)}
-                        placeholder={t('placeholder.confirmPassword')}
-                        autoComplete="new-password"
-                        required
-                        showPassword={showPasswords.confirmPassword}
-                        onToggleShow={() => handleShowPasswordToggle('confirmPassword')}
-                      />
-                    </div>
-                  </div>
-                  
-                  <ErrorDisplay errors={passwordErrors} title={t('profile.passwordErrors')} />
-                </div>
-              )}
-
-              {/* Footer Buttons */}
-              <div className="flex justify-end space-x-3 pt-4 pb-8" data-debug="footer">
-                <button
-                  onClick={handleClose}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
-                  disabled={isLoading}
-                  data-debug="cancel-button"
-                >
-                  {t('modal.cancel')}
-                </button>
-                <button
-                  onClick={activeTab === 'profile' ? handleProfileSave : handlePasswordChange}
-                  disabled={isLoading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors flex items-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  data-debug="save-button"
-                >
-                  {isLoading && (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                  )}
-                  {isLoading ? t('modal.loading') : t('modal.save')}
-                </button>
               </div>
+            )}
+
+            {/* Password Tab */}
+            {activeTab === 'password' && (
+              <div className="space-y-6" data-debug="password-tab">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                    <span className="w-2 h-2 bg-orange-500 rounded-full mr-2"></span>
+                    {t('profile.password')}
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <PasswordInput
+                      id="currentPassword"
+                      label={t('profile.currentPassword')}
+                      value={passwordData.currentPassword}
+                      onChange={(value) => handlePasswordDataChange('currentPassword', value)}
+                      placeholder={t('placeholder.currentPassword')}
+                      autoComplete="current-password"
+                      required
+                      showPassword={showPasswords.currentPassword}
+                      onToggleShow={() => handleShowPasswordToggle('currentPassword')}
+                    />
+                    
+                    <PasswordInput
+                      id="newPassword"
+                      label={t('profile.newPassword')}
+                      value={passwordData.newPassword}
+                      onChange={(value) => handlePasswordDataChange('newPassword', value)}
+                      placeholder={t('placeholder.newPassword')}
+                      autoComplete="new-password"
+                      required
+                      showStrength
+                      showPassword={showPasswords.newPassword}
+                      onToggleShow={() => handleShowPasswordToggle('newPassword')}
+                    />
+                    
+                    <PasswordInput
+                      id="confirmPassword"
+                      label={t('profile.confirmPassword')}
+                      value={passwordData.confirmPassword}
+                      onChange={(value) => handlePasswordDataChange('confirmPassword', value)}
+                      placeholder={t('placeholder.confirmPassword')}
+                      autoComplete="new-password"
+                      required
+                      showPassword={showPasswords.confirmPassword}
+                      onToggleShow={() => handleShowPasswordToggle('confirmPassword')}
+                    />
+                  </div>
+                </div>
+                
+                <ErrorDisplay errors={passwordErrors} title={t('profile.passwordErrors')} />
+              </div>
+            )}
+
+            {/* Footer Buttons */}
+            <div className="flex justify-end space-x-3 pt-4 pb-8" data-debug="footer">
+              <button
+                onClick={handleClose}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
+                disabled={isLoading}
+                data-debug="cancel-button"
+              >
+                {t('modal.cancel')}
+              </button>
+              <button
+                onClick={activeTab === 'profile' ? handleProfileSave : handlePasswordChange}
+                disabled={isLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors flex items-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                data-debug="save-button"
+              >
+                {isLoading && (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                )}
+                {isLoading ? t('modal.loading') : t('modal.save')}
+              </button>
             </div>
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }

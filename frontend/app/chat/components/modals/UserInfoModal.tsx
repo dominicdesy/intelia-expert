@@ -516,40 +516,64 @@ const ErrorDisplay: React.FC<{ errors: string[]; title: string }> = ({ errors, t
   )
 }
 
-// NOUVELLE FONCTION: Récupération du token d'authentification
+// FONCTION getAuthToken CORRIGÉE - Utilise la même logique que InviteFriendModal
 const getAuthToken = (): string | null => {
   try {
-    // Méthode 1: Récupérer depuis intelia-expert-auth (priorité)
-    console.log('[UserInfoModal] Récupération token depuis intelia-expert-auth...')
-    const authData = localStorage.getItem('intelia-expert-auth')
-    if (authData) {
-      const parsed = JSON.parse(authData)
-      if (parsed.access_token) {
-        console.log('[UserInfoModal] Token récupéré depuis intelia-expert-auth')
-        return parsed.access_token
-      }
-    }
+    console.log('[UserInfoModal] === DÉBUT RÉCUPÉRATION TOKEN (méthode InviteFriendModal) ===')
     
-    // Méthode 2: Fallback vers supabase-auth-store
-    console.log('[UserInfoModal] Tentative fallback vers supabase-auth-store...')
-    const supabaseStore = localStorage.getItem('supabase-auth-store')
-    if (supabaseStore) {
-      const parsed = JSON.parse(supabaseStore)
-      const possibleTokens = [
-        parsed.state?.session?.access_token,
-        parsed.state?.user?.access_token,
-        parsed.access_token
-      ]
-      
-      for (const token of possibleTokens) {
-        if (token && typeof token === 'string' && token.length > 20) {
-          console.log('[UserInfoModal] Token fallback trouvé dans supabase-auth-store')
-          return token
+    // COPIE EXACTE de la logique InviteFriendModal qui fonctionne
+    const authKeys = ['supabase.auth.token', 'intelia-expert-auth']  // ⚠️ CLÉS CORRECTES
+    
+    for (const key of authKeys) {
+      console.log(`[UserInfoModal] Tentative clé: ${key}`)
+      const stored = localStorage.getItem(key) || sessionStorage.getItem(key)
+      if (stored) {
+        console.log(`[UserInfoModal] Données trouvées pour ${key}, parsing...`)
+        try {
+          const authData = JSON.parse(stored)
+          console.log(`[UserInfoModal] ${key} keys:`, Object.keys(authData))
+          
+          let userEmail, userName, userId, userLanguage, accessToken
+          
+          // Format Supabase
+          if (authData.user?.email) {
+            userEmail = authData.user.email
+            userName = authData.user.user_metadata?.name || authData.user.name || userEmail.split('@')[0]
+            userId = authData.user.id
+            userLanguage = authData.user.user_metadata?.language || 'fr'
+            // Récupérer le token selon la structure Supabase
+            accessToken = authData.session?.access_token || authData.access_token
+          }
+          // Format Intelia
+          else if (authData.access_token && authData.user) {
+            userEmail = authData.user.email
+            userName = authData.user.name || userEmail.split('@')[0]
+            userId = authData.user.id
+            userLanguage = authData.user.language || 'fr'
+            accessToken = authData.access_token
+          }
+          // Format direct avec juste access_token
+          else if (authData.access_token) {
+            accessToken = authData.access_token
+            console.log('[UserInfoModal] Token direct trouvé')
+          }
+          
+          if (accessToken && typeof accessToken === 'string' && accessToken.length > 20) {
+            console.log(`[UserInfoModal] ✅ Token récupéré depuis ${key}`)
+            console.log(`[UserInfoModal] Token (30 premiers chars): ${accessToken.substring(0, 30)}...`)
+            return accessToken
+          }
+        } catch (parseError) {
+          console.warn(`[UserInfoModal] Erreur parsing ${key}:`, parseError)
+          continue
         }
+      } else {
+        console.log(`[UserInfoModal] Aucune donnée pour ${key}`)
       }
     }
     
-    console.error('[UserInfoModal] Aucun token trouvé')
+    console.error('[UserInfoModal] ❌ Aucun token trouvé dans toutes les sources')
+    console.error('[UserInfoModal] Sources testées:', authKeys)
     return null
     
   } catch (error) {
@@ -1099,7 +1123,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
 
   const tabs = useMemo(() => [
     { id: 'profile', label: t('nav.profile'), icon: '👤' },
-    { id: 'password', label: t('profile.password'), icon: '🔑' }
+    { id: 'password', label: t('profile.password'), icon: '🔒' }
   ], [t])
 
   // Keyboard handling
