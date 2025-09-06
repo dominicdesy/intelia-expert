@@ -1,7 +1,7 @@
 """
-🚀 API Stats Fast - Cache Ultra-Rapide COMPLET
+API Stats Fast - Cache Ultra-Rapide COMPLET
 Endpoints optimisés avec cache en mémoire + intégration health/billing/openai
-COMPLET: Inclut toutes les données manquantes (Sources, Utilisateurs Actifs, Plans, Health, Billing)
+CORRIGÉ: Pool de connexions PostgreSQL et timeouts aiohttp typés
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -9,34 +9,70 @@ from fastapi.responses import JSONResponse
 import logging
 import asyncio
 import aiohttp
-import requests  # Gardé pour compatibilité si nécessaire
+import psycopg2.pool
+from contextlib import contextmanager
 import os
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
-logger.info("🔄 STATS_FAST.PY VERSION CORRIGÉE v2.1 - 2025-09-06 14:00 - AUTH + AIOHTTP FIXES")
+logger.info("STATS_FAST.PY VERSION CORRIGÉE v2.2 - 2025-09-06 - POOL DB + AIOHTTP FIXES")
 
+# Pool de connexions PostgreSQL global
+_connection_pool = None
+
+def get_db_pool():
+    """Initialise le pool de connexions PostgreSQL"""
+    global _connection_pool
+    if _connection_pool is None:
+        dsn = os.getenv("DATABASE_URL")
+        if dsn:
+            try:
+                _connection_pool = psycopg2.pool.SimpleConnectionPool(
+                    minconn=2,
+                    maxconn=10,
+                    dsn=dsn
+                )
+                logger.info("Pool de connexions PostgreSQL initialisé (2-10 connexions)")
+            except Exception as e:
+                logger.error(f"Erreur initialisation pool DB: {e}")
+                _connection_pool = None
+    return _connection_pool
+
+@contextmanager
+def get_db_connection():
+    """Context manager pour obtenir une connexion du pool"""
+    pool = get_db_pool()
+    if not pool:
+        raise Exception("Pool de connexions non disponible")
+    
+    conn = None
+    try:
+        conn = pool.getconn()
+        yield conn
+    finally:
+        if conn:
+            pool.putconn(conn)
 
 # Import conditionnel pour éviter les erreurs si les modules n'existent pas
 try:
     from app.api.v1.auth import get_current_user    
     AUTH_AVAILABLE = True
-    logger.info("✅ Auth module importé avec succès")
+    logger.info("Auth module importé avec succès")
     
     # Alias pour compatibilité avec le code existant
     verify_super_admin_token = get_current_user
 except ImportError as e:
-    logger.warning(f"⚠️ Auth module non disponible: {e}")
+    logger.warning(f"Auth module non disponible: {e}")
     verify_super_admin_token = None
     AUTH_AVAILABLE = False
 
 try:
     from app.api.v1.stats_cache import get_stats_cache
     CACHE_AVAILABLE = True
-    logger.info("✅ Stats cache module importé avec succès")
+    logger.info("Stats cache module importé avec succès")
 except ImportError as e:
-    logger.warning(f"⚠️ Stats cache module non disponible: {e}")
+    logger.warning(f"Stats cache module non disponible: {e}")
     get_stats_cache = None
     CACHE_AVAILABLE = False
 
@@ -105,8 +141,9 @@ async def get_system_health_data() -> Dict[str, Any]:
         health_url = f"{INTERNAL_API_BASE}/api/v1/health/detailed"
         logger.debug(f"Appel health endpoint: {health_url}")
         
-        async with aiohttp.ClientSession() as session:
-            async with session.get(health_url, timeout=10) as response:
+        timeout = aiohttp.ClientTimeout(total=10)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(health_url) as response:
                 if response.status == 200:
                     health_data = await response.json()
                     
@@ -155,8 +192,9 @@ async def get_openai_billing_data() -> Dict[str, Any]:
         billing_url = f"{INTERNAL_API_BASE}/api/v1/billing/openai-usage/current-month-light"
         logger.debug(f"Appel billing endpoint: {billing_url}")
         
-        async with aiohttp.ClientSession() as session:
-            async with session.get(billing_url, timeout=15) as response:
+        timeout = aiohttp.ClientTimeout(total=15)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(billing_url) as response:
                 if response.status == 200:
                     billing_data = await response.json()
                     
@@ -189,15 +227,9 @@ async def get_openai_billing_data() -> Dict[str, Any]:
 async def get_billing_plans_data() -> Dict[str, Any]:
     """Récupère les données de plans et revenus depuis la base de données"""
     try:
-        # Utiliser la même méthode que dans stats_updater pour récupérer les données
-        dsn = os.getenv("DATABASE_URL")
-        if not dsn:
-            return {"plans": {"free": 1}, "total_revenue": 0.0, "top_users": []}
-        
-        import psycopg2
         from psycopg2.extras import RealDictCursor
         
-        with psycopg2.connect(dsn, connect_timeout=10) as conn:
+        with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 
                 # Top utilisateurs avec leur plan
@@ -255,14 +287,9 @@ async def get_billing_plans_data() -> Dict[str, Any]:
 async def get_enhanced_usage_stats() -> Dict[str, Any]:
     """Récupère les statistiques d'usage enrichies avec sources de réponses"""
     try:
-        dsn = os.getenv("DATABASE_URL")
-        if not dsn:
-            return {}
-        
-        import psycopg2
         from psycopg2.extras import RealDictCursor
         
-        with psycopg2.connect(dsn, connect_timeout=10) as conn:
+        with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 
                 # Requête principale pour les stats d'usage
@@ -343,14 +370,9 @@ async def get_enhanced_usage_stats() -> Dict[str, Any]:
 async def get_performance_stats() -> Dict[str, Any]:
     """Récupère les statistiques de performance depuis la base de données"""
     try:
-        dsn = os.getenv("DATABASE_URL")
-        if not dsn:
-            return {}
-        
-        import psycopg2
         from psycopg2.extras import RealDictCursor
         
-        with psycopg2.connect(dsn, connect_timeout=10) as conn:
+        with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 
                 # Stats de performance
@@ -401,13 +423,13 @@ async def get_performance_stats() -> Dict[str, Any]:
 async def get_dashboard_fast(
     current_user: dict = Depends(get_current_user) if AUTH_AVAILABLE else None
 ) -> Dict[str, Any]:
-    """🚀 DASHBOARD COMPLET avec toutes les données manquantes"""
+    """DASHBOARD COMPLET avec toutes les données manquantes"""
     
     # Vérifier cache local d'abord
     cache_key = f"dashboard_complete:{current_user.get('email') if current_user else 'anonymous'}"
     local_cached = get_local_cache(cache_key)
     if local_cached:
-        logger.info("📦 Dashboard cache local HIT")
+        logger.info("Dashboard cache local HIT")
         return local_cached
     
     try:
@@ -515,11 +537,11 @@ async def get_dashboard_fast(
         
         set_local_cache(cache_key, formatted_response, ttl_minutes=5)
         
-        logger.info(f"📊 Dashboard complet généré: {usage_stats.get('unique_users', 0)} users, {usage_stats.get('total_questions', 0)} questions")
+        logger.info(f"Dashboard complet généré: {usage_stats.get('unique_users', 0)} users, {usage_stats.get('total_questions', 0)} questions")
         return formatted_response
         
     except Exception as e:
-        logger.error(f"❌ Erreur dashboard complet: {e}")
+        logger.error(f"Erreur dashboard complet: {e}")
         raise HTTPException(status_code=500, detail="Erreur lors de la génération du dashboard complet")
 
 @router.get("/questions")
@@ -533,7 +555,7 @@ async def get_questions_fast(
     user: str = Query("all", description="Filtrer par utilisateur"),
     current_user: dict = Depends(get_current_user) if AUTH_AVAILABLE else None
 ) -> Dict[str, Any]:
-    """🚀 Questions avec données complètes depuis la base de données"""
+    """Questions avec données complètes depuis la base de données"""
     
     # Cache local avec paramètres
     cache_key = f"questions:{page}:{limit}:{hash(f'{search}{source}{confidence}{feedback}{user}')}"
@@ -542,14 +564,9 @@ async def get_questions_fast(
         return local_cached
     
     try:
-        dsn = os.getenv("DATABASE_URL")
-        if not dsn:
-            raise HTTPException(status_code=500, detail="Database not configured")
-        
-        import psycopg2
         from psycopg2.extras import RealDictCursor
         
-        with psycopg2.connect(dsn, connect_timeout=15) as conn:
+        with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 
                 # Construction de la requête avec filtres
@@ -663,18 +680,18 @@ async def get_questions_fast(
                 
                 set_local_cache(cache_key, response, ttl_minutes=3)
                 
-                logger.info(f"📋 Questions complètes récupérées: {len(questions_list)} résultats (page {page}/{pages})")
+                logger.info(f"Questions complètes récupérées: {len(questions_list)} résultats (page {page}/{pages})")
                 return response
                 
     except Exception as e:
-        logger.error(f"❌ Erreur questions complètes: {e}")
+        logger.error(f"Erreur questions complètes: {e}")
         raise HTTPException(status_code=500, detail="Erreur lors de la récupération des questions")
 
 @router.get("/invitations")
 async def get_invitations_fast(
     current_user: dict = Depends(get_current_user) if AUTH_AVAILABLE else None
 ) -> Dict[str, Any]:
-    """🚀 Statistiques invitations complètes"""
+    """Statistiques invitations complètes"""
     
     cache_key = f"invitations_complete:{current_user.get('email') if current_user else 'anon'}"
     local_cached = get_local_cache(cache_key)
@@ -682,14 +699,9 @@ async def get_invitations_fast(
         return local_cached
     
     try:
-        dsn = os.getenv("DATABASE_URL")
-        if not dsn:
-            raise HTTPException(status_code=500, detail="Database not configured")
-        
-        import psycopg2
         from psycopg2.extras import RealDictCursor
         
-        with psycopg2.connect(dsn, connect_timeout=15) as conn:
+        with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 
                 # Vérifier si la table invitations existe
@@ -772,16 +784,16 @@ async def get_invitations_fast(
                 
                 set_local_cache(cache_key, result, ttl_minutes=10)
                 
-                logger.info(f"📨 Invitations complètes: {total_sent} sent, {total_accepted} accepted")
+                logger.info(f"Invitations complètes: {total_sent} sent, {total_accepted} accepted")
                 return result
                 
     except Exception as e:
-        logger.error(f"❌ Erreur invitations complètes: {e}")
+        logger.error(f"Erreur invitations complètes: {e}")
         raise HTTPException(status_code=500, detail="Erreur lors de la récupération des invitations")
 
 @router.get("/health")
 async def cache_health() -> Dict[str, Any]:
-    """🏥 Health check complet"""
+    """Health check complet"""
     try:
         local_cached = get_local_cache("health_check_complete")
         if local_cached:
@@ -791,14 +803,11 @@ async def cache_health() -> Dict[str, Any]:
         # Tester la connexion base de données
         db_test = {"status": "unknown"}
         try:
-            dsn = os.getenv("DATABASE_URL")
-            if dsn:
-                import psycopg2
-                with psycopg2.connect(dsn, connect_timeout=5) as conn:
-                    with conn.cursor() as cur:
-                        cur.execute("SELECT 1 as test")
-                        result = cur.fetchone()
-                        db_test = {"status": "ok", "connection": "successful"}
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1 as test")
+                    result = cur.fetchone()
+                    db_test = {"status": "ok", "connection": "successful"}
         except Exception as db_error:
             db_test = {"status": "error", "error": str(db_error)[:100]}
         
@@ -827,15 +836,15 @@ async def cache_health() -> Dict[str, Any]:
         
         set_local_cache("health_check_complete", health_status, ttl_minutes=2)
         
-        logger.info("🏥 Health check complet terminé")
+        logger.info("Health check complet terminé")
         return health_status
         
     except Exception as e:
-        logger.error(f"❌ Erreur health check complet: {e}")
+        logger.error(f"Erreur health check complet: {e}")
         return {
             "status": "error",
             "error": str(e)[:100],
             "timestamp": datetime.now().isoformat()
         }
 
-logger.info("✅ stats_fast.py COMPLET chargé avec succès - Toutes les intégrations actives")
+logger.info("stats_fast.py COMPLET chargé avec succès - Toutes les intégrations actives")

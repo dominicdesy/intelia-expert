@@ -8,25 +8,31 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 import logging
 import asyncio
-import requests
+import aiohttp
+import requests  # Gardé pour compatibilité si nécessaire
 import os
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
+logger.info("🔄 STATS_FAST.PY VERSION CORRIGÉE v2.1 - 2025-09-06 14:00 - AUTH + AIOHTTP FIXES")
+
 
 # Import conditionnel pour éviter les erreurs si les modules n'existent pas
 try:
-    from auth import verify_super_admin_token  # auth.py est dans le même dossier
+    from app.api.v1.auth import get_current_user    
     AUTH_AVAILABLE = True
     logger.info("✅ Auth module importé avec succès")
+    
+    # Alias pour compatibilité avec le code existant
+    verify_super_admin_token = get_current_user
 except ImportError as e:
     logger.warning(f"⚠️ Auth module non disponible: {e}")
     verify_super_admin_token = None
     AUTH_AVAILABLE = False
 
 try:
-    from stats_cache import get_stats_cache  # stats_cache.py est dans le même dossier
+    from app.api.v1.stats_cache import get_stats_cache
     CACHE_AVAILABLE = True
     logger.info("✅ Stats cache module importé avec succès")
 except ImportError as e:
@@ -99,31 +105,31 @@ async def get_system_health_data() -> Dict[str, Any]:
         health_url = f"{INTERNAL_API_BASE}/api/v1/health/detailed"
         logger.debug(f"Appel health endpoint: {health_url}")
         
-        response = requests.get(health_url, timeout=10)
-        
-        if response.status_code == 200:
-            health_data = response.json()
-            
-            system_health = {
-                "uptime_hours": health_data.get("uptime_hours", 0),
-                "error_rate": health_data.get("error_rate_percent", 0),
-                "cache_hit_rate": health_data.get("cache_hit_rate", 85.0),
-                "error_count": health_data.get("error_count_24h", 0),
-                "rag_status": {
-                    "global": health_data.get("rag_configured", True),
-                    "broiler": health_data.get("rag_broiler_ready", True),
-                    "layer": health_data.get("rag_layer_ready", True)
-                },
-                "features_enabled": {
-                    "analytics": health_data.get("analytics_ready", True),
-                    "billing": health_data.get("billing_ready", True),
-                    "authentication": health_data.get("auth_ready", True),
-                    "openai_fallback": health_data.get("openai_configured", True)
-                }
-            }
-            
-            logger.info(f"Health.py intégré: uptime={system_health['uptime_hours']}h")
-            return system_health
+        async with aiohttp.ClientSession() as session:
+            async with session.get(health_url, timeout=10) as response:
+                if response.status == 200:
+                    health_data = await response.json()
+                    
+                    system_health = {
+                        "uptime_hours": health_data.get("uptime_hours", 0),
+                        "error_rate": health_data.get("error_rate_percent", 0),
+                        "cache_hit_rate": health_data.get("cache_hit_rate", 85.0),
+                        "error_count": health_data.get("error_count_24h", 0),
+                        "rag_status": {
+                            "global": health_data.get("rag_configured", True),
+                            "broiler": health_data.get("rag_broiler_ready", True),
+                            "layer": health_data.get("rag_layer_ready", True)
+                        },
+                        "features_enabled": {
+                            "analytics": health_data.get("analytics_ready", True),
+                            "billing": health_data.get("billing_ready", True),
+                            "authentication": health_data.get("auth_ready", True),
+                            "openai_fallback": health_data.get("openai_configured", True)
+                        }
+                    }
+                    
+                    logger.info(f"Health.py intégré: uptime={system_health['uptime_hours']}h")
+                    return system_health
             
     except Exception as e:
         logger.warning(f"Erreur intégration health.py: {e}")
@@ -149,23 +155,23 @@ async def get_openai_billing_data() -> Dict[str, Any]:
         billing_url = f"{INTERNAL_API_BASE}/api/v1/billing/openai-usage/current-month-light"
         logger.debug(f"Appel billing endpoint: {billing_url}")
         
-        response = requests.get(billing_url, timeout=15)
-        
-        if response.status_code == 200:
-            billing_data = response.json()
-            
-            costs_data = {
-                "success": True,
-                "total_cost": billing_data.get("total_cost", 0),
-                "input_tokens": billing_data.get("total_input_tokens", 0),
-                "output_tokens": billing_data.get("total_output_tokens", 0),
-                "total_tokens": billing_data.get("total_input_tokens", 0) + billing_data.get("total_output_tokens", 0),
-                "requests": billing_data.get("total_requests", 0),
-                "models_usage": billing_data.get("models_usage", {})
-            }
-            
-            logger.info(f"Billing OpenAI intégré: ${costs_data['total_cost']:.2f}")
-            return costs_data
+        async with aiohttp.ClientSession() as session:
+            async with session.get(billing_url, timeout=15) as response:
+                if response.status == 200:
+                    billing_data = await response.json()
+                    
+                    costs_data = {
+                        "success": True,
+                        "total_cost": billing_data.get("total_cost", 0),
+                        "input_tokens": billing_data.get("total_input_tokens", 0),
+                        "output_tokens": billing_data.get("total_output_tokens", 0),
+                        "total_tokens": billing_data.get("total_input_tokens", 0) + billing_data.get("total_output_tokens", 0),
+                        "requests": billing_data.get("total_requests", 0),
+                        "models_usage": billing_data.get("models_usage", {})
+                    }
+                    
+                    logger.info(f"Billing OpenAI intégré: ${costs_data['total_cost']:.2f}")
+                    return costs_data
             
     except Exception as e:
         logger.warning(f"Erreur intégration billing_openai.py: {e}")
@@ -393,7 +399,7 @@ async def get_performance_stats() -> Dict[str, Any]:
 
 @router.get("/dashboard")
 async def get_dashboard_fast(
-    current_user: dict = Depends(verify_super_admin_token) if AUTH_AVAILABLE else None
+    current_user: dict = Depends(get_current_user) if AUTH_AVAILABLE else None
 ) -> Dict[str, Any]:
     """🚀 DASHBOARD COMPLET avec toutes les données manquantes"""
     
@@ -525,7 +531,7 @@ async def get_questions_fast(
     confidence: str = Query("all", description="Filtrer par confiance"),
     feedback: str = Query("all", description="Filtrer par feedback"),
     user: str = Query("all", description="Filtrer par utilisateur"),
-    current_user: dict = Depends(verify_super_admin_token) if AUTH_AVAILABLE else None
+    current_user: dict = Depends(get_current_user) if AUTH_AVAILABLE else None
 ) -> Dict[str, Any]:
     """🚀 Questions avec données complètes depuis la base de données"""
     
@@ -666,7 +672,7 @@ async def get_questions_fast(
 
 @router.get("/invitations")
 async def get_invitations_fast(
-    current_user: dict = Depends(verify_super_admin_token) if AUTH_AVAILABLE else None
+    current_user: dict = Depends(get_current_user) if AUTH_AVAILABLE else None
 ) -> Dict[str, Any]:
     """🚀 Statistiques invitations complètes"""
     

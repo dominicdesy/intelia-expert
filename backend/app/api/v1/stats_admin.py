@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # Imports conditionnels simples
 try:
-    from auth import get_current_user  # Import direct cohérent avec stats_fast.py
+    from app.api.v1.auth import get_current_user
     AUTH_AVAILABLE = True
 except ImportError:
     AUTH_AVAILABLE = False
