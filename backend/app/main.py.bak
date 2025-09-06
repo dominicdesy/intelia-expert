@@ -728,68 +728,6 @@ async def rag_debug():
     except Exception as e:
         return {"error": str(e)}
 
-
-@app.get("/debug/memory-comparison", tags=["Debug"])
-async def debug_memory_comparison():
-    """Compare les différentes méthodes de calcul mémoire"""
-    try:
-        import subprocess
-        
-        # psutil data
-        memory = psutil.virtual_memory()
-        cpu_percent = psutil.cpu_percent(interval=0.1)
-        
-        # free command
-        try:
-            free_result = subprocess.run(['free', '-h'], capture_output=True, text=True, timeout=5)
-            free_lines = free_result.stdout.strip().split('\n')
-            mem_line = free_lines[1].split() if len(free_lines) > 1 else []
-        except:
-            free_lines = []
-            mem_line = []
-        
-        # Différents calculs
-        psutil_used_percent = (memory.used / memory.total) * 100
-        psutil_available_percent = (memory.available / memory.total) * 100
-        
-        return {
-            "raw_data": {
-                "psutil_total": memory.total,
-                "psutil_used": memory.used,
-                "psutil_available": memory.available,
-                "psutil_percent": memory.percent,
-                "free_command": free_result.stdout if 'free_result' in locals() else "N/A"
-            },
-            "calculations": {
-                "total_mb": memory.total // 1024 // 1024,
-                "used_mb": memory.used // 1024 // 1024,
-                "available_mb": memory.available // 1024 // 1024,
-                "psutil_percent": memory.percent,
-                "calculated_used_percent": round(psutil_used_percent, 1),
-                "calculated_available_percent": round(psutil_available_percent, 1),
-                "cpu_percent": round(cpu_percent, 1)
-            },
-            "interpretations": {
-                "if_psutil_percent_is_used": f"{memory.percent:.1f}% used = {100-memory.percent:.1f}% free",
-                "if_psutil_percent_is_free": f"{memory.percent:.1f}% free = {100-memory.percent:.1f}% used"
-            },
-            "digital_ocean_reference": {
-                "backend_shown": "10% RAM usage",
-                "expected_free": "~90%"
-            }
-        }
-    except Exception as e:
-        return {"error": str(e)}
-
-# === ENDPOINTS PRINCIPAUX (RESTAURÉS) ===
-@app.get("/health/complete", tags=["Health"])
-async def complete_health_check():
-
-
-
-
-
-
 # === ENDPOINTS PRINCIPAUX (RESTAURÉS) ===
 @app.get("/health/complete", tags=["Health"])
 async def complete_health_check():
