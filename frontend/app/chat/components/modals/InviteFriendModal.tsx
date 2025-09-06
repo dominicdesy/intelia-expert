@@ -31,8 +31,9 @@ interface InvitationResponse {
   results: InvitationResult[];
 }
 
-// SERVICE D'INVITATION CORRIGÉ - UTILISE SUPABASE DIRECTEMENT
+// ==================== SERVICE D'INVITATION ISOLÉ ====================
 const invitationService = {
+  // Flag pour éviter les conflits avec le ChatStore
   isProcessing: false,
   
   async sendInvitation(emails: string[], personalMessage: string, inviterInfo: any) {
@@ -45,13 +46,13 @@ const invitationService = {
     this.isProcessing = true
     
     try {
-      console.log('📧 [InvitationService] Début envoi invitation (Supabase):', { 
+      console.log('📧 [InvitationService] Début envoi invitation (isolé):', { 
         emails, 
         hasMessage: !!personalMessage,
         inviterEmail: inviterInfo.email 
       })
       
-      // ✅ MÉTHODE QUI FONCTIONNE - Récupération via Supabase directement
+      // Récupération de session DIRECTE sans passer par les stores
       const supabase = getSupabaseClient()
       
       // Méthode robuste de récupération de session
@@ -88,19 +89,18 @@ const invitationService = {
         throw new Error('Session expirée - reconnexion nécessaire')
       }
 
-      console.log('✅ [InvitationService] Session validée via Supabase')
+      console.log('✅ [InvitationService] Session validée')
       
-      // 🔧 CORRECTION: Construction d'URL qui fonctionnait dans le backup
+      // Configuration de l'URL d'API
       const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert.intelia.com/api'
       const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, '')
       const inviteUrl = `${cleanBaseUrl}/api/v1/invitations/send`
       
-      console.log('🌍 [InvitationService] URL d\'envoi:', inviteUrl)
-      console.log('🔧 [InvitationService] Base URL utilisée:', baseUrl)
-      console.log('🔧 [InvitationService] Clean Base URL:', cleanBaseUrl)
+      console.log('🌐 [InvitationService] URL d\'envoi:', inviteUrl)
       
       const headers = {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json',
         'Authorization': `Bearer ${session.access_token}`
       }
       
@@ -117,14 +117,13 @@ const invitationService = {
       
       // Configuration fetch avec timeout
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000)
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 secondes
       
       const response = await fetch(inviteUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody),
         signal: controller.signal
-        // Pas de credentials: 'include' car c'est une requête cross-origin
       })
 
       clearTimeout(timeoutId)
@@ -140,6 +139,7 @@ const invitationService = {
         console.error('❌ [InvitationService] Erreur HTTP:', response.status, errorText)
         
         if (response.status === 401) {
+          // Ne pas déclencher de logout automatique, juste informer
           throw new Error('Session expirée. Veuillez vous reconnecter.')
         }
         
@@ -168,7 +168,7 @@ const invitationService = {
   }
 }
 
-// COMPOSANT PRINCIPAL
+// ==================== MODAL INVITATION CORRIGÉE ====================
 export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose }) => {
   const { t } = useTranslation()
   const { user } = useAuthStore() 
@@ -205,16 +205,16 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     }
   }, [])
 
-  // Calcul de currentUser amélioré avec Supabase
+  // Calcul de currentUser (isolation des stores)
   const currentUser = useMemo(() => {
     // Priorité 1: Store Zustand
     if (user?.email) {
       return user
     }
     
-    // Priorité 2: Session storage direct avec supabase-auth-store
+    // Priorité 2: Session storage direct
     try {
-      const authKeys = ['supabase-auth-store', 'supabase.auth.token', 'intelia-expert-auth']
+      const authKeys = ['supabase.auth.token', 'intelia-expert-auth']
       
       for (const key of authKeys) {
         const stored = localStorage.getItem(key) || sessionStorage.getItem(key)
@@ -223,16 +223,8 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
           
           let userEmail, userName, userId, userLanguage
           
-          // Format supabase-auth-store
-          if (authData.state?.session?.user) {
-            const sessionUser = authData.state.session.user
-            userEmail = sessionUser.email
-            userName = sessionUser.user_metadata?.name || sessionUser.name || userEmail.split('@')[0]
-            userId = sessionUser.id
-            userLanguage = sessionUser.user_metadata?.language || 'fr'
-          }
-          // Format Supabase standard
-          else if (authData.user?.email) {
+          // Format Supabase
+          if (authData.user?.email) {
             userEmail = authData.user.email
             userName = authData.user.user_metadata?.name || authData.user.name || userEmail.split('@')[0]
             userId = authData.user.id
@@ -295,7 +287,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
   }
 
   const handleSendInvitations = async () => {
-    console.log('🖱️ [InviteFriendModal] Bouton "Envoyer" cliqué (version Supabase)')
+    console.log('🖱️ [InviteFriendModal] Bouton "Envoyer" cliqué (version corrigée)')
     
     setErrors([])
     setResults(null)
@@ -339,7 +331,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
         language: currentUser.language || 'fr'
       }
       
-      console.log('🚀 [InviteFriendModal] Appel service Supabase')
+      console.log('🚀 [InviteFriendModal] Appel service isolé')
       
       const result = await invitationService.sendInvitation(
         valid, 
@@ -551,7 +543,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
                         <div className="flex items-start space-x-3">
                           <span className="text-2xl mt-1">
                             {result.success && result.status === 'sent' ? '✅' : 
-                             result.status === 'skipped' ? '💤' : '❌'}
+                             result.status === 'skipped' ? '👤' : '❌'}
                           </span>
                           <div className="flex-1">
                             <p className="text-sm text-gray-800 font-medium">
