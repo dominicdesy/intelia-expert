@@ -146,9 +146,25 @@ Respond with ONLY the JSON object, no other text."""
         )
         
         if response:
+            # Nettoyer la réponse d'OpenAI (supprimer les balises markdown)
+            cleaned_response = response.strip()
+            
+            # Supprimer les balises ```json et ``` si présentes
+            if cleaned_response.startswith('```json'):
+                cleaned_response = cleaned_response[7:]  # Supprimer "```json"
+            if cleaned_response.startswith('```'):
+                cleaned_response = cleaned_response[3:]   # Supprimer "```" simple
+            if cleaned_response.endswith('```'):
+                cleaned_response = cleaned_response[:-3]  # Supprimer "```" de fin
+            
+            cleaned_response = cleaned_response.strip()
+            
             # Parse JSON response
             try:
-                result = json.loads(response.strip())
+                result = json.loads(cleaned_response)
+                
+                # Logging pour debug
+                logger.info(f"🧹 Réponse nettoyée et parsée avec succès")
                 
                 # Validate and normalize
                 intent_str = result.get("intent", "AmbiguousGeneral")
@@ -180,7 +196,8 @@ Respond with ONLY the JSON object, no other text."""
                 
             except json.JSONDecodeError as e:
                 logger.error(f"❌ JSON parsing error: {e}")
-                logger.error(f"Response was: {response[:200]}...")
+                logger.error(f"Response was: {response[:500]}...")  # Afficher plus de contexte
+                logger.error(f"Cleaned response was: {cleaned_response[:500]}...")
                 return _minimal_fallback(question)
                 
     except Exception as e:

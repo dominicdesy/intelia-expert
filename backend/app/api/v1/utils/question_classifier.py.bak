@@ -1,94 +1,29 @@
 # -*- coding: utf-8 -*-
 """
-Intent & entity classifier with Chain-of-Thought complexity detection.
-- Provides Intention enum and REQUIRED_FIELDS_BY_TYPE
-- classify() returns {"intent": Intention, "entities": {...}, "complexity": {...}}
-- Designed to be lightweight and robust with regex + keywords
-- 🆕 NEW: Complexity scoring for CoT routing
-- 🔧 FIXED: Multilingual support for PerfTargets detection
+Intent & entity classifier powered by OpenAI - FULLY MULTILINGUAL
+- Zero hardcoded keywords - everything goes through OpenAI
+- Supports any language naturally
+- Maintains same interface as original for compatibility
+- Includes complexity detection and entity extraction
 """
 from enum import Enum
 import re
+import json
+import logging
 from typing import Dict, Any, List, Optional, Tuple
 
-# --- Lexicons ---
-LINES = [
-    "ross 308", "ross308", "ross 708", "ross708",
-    "cobb 500", "cobb500",
-    "isa brown", "lohmann brown", "lohmann white",
-    "hy-line brown", "hy line brown", "hyline brown"
-]
+logger = logging.getLogger(__name__)
 
-PHASES = ["starter", "démarrage", "grower", "croissance", "finisher", "finition"]
-HOUSING = ["tunnel", "ventilation naturelle", "naturelle", "plein air", "free range"]
-
-# 🔧 NEW: Multilingual keywords for better classification
-PERF_TARGETS_KEYWORDS = [
-    # Français
-    "poids", "fcr", "indice de consommation", "gain de poids", "iep", 
-    "pourcentage de ponte", "poids d'œuf", "poids d'oeuf",
-    # English - CRITICAL FIX
-    "weight", "target weight", "body weight", "feed conversion", "feed conversion ratio",
-    "weight gain", "egg production", "egg weight", "laying rate", "production rate"
-]
-
-NUTRITION_KEYWORDS = [
-    # Français
-    "protéine", "lysine", "kcal/kg", "énergie", "calcium", "phosphore", "formulation",
-    # English
-    "protein", "lysine", "energy", "kcal/kg", "calcium", "phosphorus", "formulation"
-]
-
-DIAGNOSTIC_KEYWORDS = [
-    # Français
-    "diagnostic", "symptôme", "symptomes", "symptômes", "diarrhée", "dyspnée", 
-    "coquilles molles", "picorent", "mortalité",
-    # English
-    "diagnosis", "diagnostic", "symptom", "symptoms", "diarrhea", "mortality", 
-    "soft shells", "dyspnea", "respiratory"
-]
-
-WATER_FEED_KEYWORDS = [
-    # Français
-    "consommation d'eau", "débit d'eau", "consommation d'aliment",
-    # English
-    "water consumption", "water intake", "feed intake", "feed consumption"
-]
-
-ENV_KEYWORDS = [
-    # Français
-    "température", "humidité", "co2", "nh3", "ammoniac", "éclairage", "lumens", "lux",
-    # English
-    "temperature", "humidity", "co2", "nh3", "ammonia", "lighting", "lumens", "lux"
-]
-
-VENTILATION_KEYWORDS = [
-    # Français
-    "ventilation minimale", "débit d'air", "m³/h", "m3/h", "tunnel",
-    # English
-    "minimum ventilation", "air flow", "m3/h", "tunnel", "ventilation"
-]
-
-EQUIPMENT_KEYWORDS = [
-    # Français
-    "espace mangeoire", "mangeoires", "abreuvoirs", "nipples", "calibrage chaîne",
-    # English
-    "feeder space", "feeders", "drinkers", "nipples", "equipment"
-]
-
-TREATMENT_KEYWORDS = [
-    # Français
-    "dosage", "dose", "posologie", "enrofloxacine", "amoxicilline", "tylosine",
-    # English
-    "dosage", "dose", "treatment", "enrofloxacin", "amoxicillin", "tylosin"
-]
-
-ECONOMICS_KEYWORDS = [
-    # Français
-    "coût", "rentabilité", "combien coûte",
-    # English
-    "cost", "profitability", "how much", "economics", "roi"
-]
+# Import conditionnel OpenAI
+try:
+    from ..utils.openai_utils import complete_text as openai_complete
+    OPENAI_AVAILABLE = True
+    logger.info("✅ OpenAI disponible pour classification multilingue")
+except ImportError as e:
+    logger.warning(f"⚠️ OpenAI indisponible pour classification: {e}")
+    OPENAI_AVAILABLE = False
+    def openai_complete(*args, **kwargs):
+        return None
 
 class Intention(str, Enum):
     PerfTargets = "PerfTargets"
@@ -104,14 +39,14 @@ class Intention(str, Enum):
     Compliance = "Compliance"
     Operations = "Operations"
     AmbiguousGeneral = "AmbiguousGeneral"
-    # 🆕 NOUVELLES INTENTIONS COMPLEXES
+    # Intentions complexes pour CoT
     HealthDiagnosis = "HealthDiagnosis"
     OptimizationStrategy = "OptimizationStrategy"
     TroubleshootingMultiple = "TroubleshootingMultiple"
     ProductionAnalysis = "ProductionAnalysis"
     MultiFactor = "MultiFactor"
 
-# Required fields per intent (fields ending with '?' are optional)
+# Required fields per intent (compatibility)
 REQUIRED_FIELDS_BY_TYPE: Dict[str, List[str]] = {
     Intention.PerfTargets: ["species", "line", "age", "sex?"],
     Intention.NutritionSpecs: ["species", "phase", "line?", "age?"],
@@ -126,7 +61,6 @@ REQUIRED_FIELDS_BY_TYPE: Dict[str, List[str]] = {
     Intention.Compliance: ["scheme", "species", "age_or_slaughter_age?"],
     Intention.Operations: ["housing", "flock_size?", "age?", "problem"],
     Intention.AmbiguousGeneral: [],
-    # 🆕 NOUVEAUX CHAMPS POUR INTENTIONS COMPLEXES
     Intention.HealthDiagnosis: ["species", "age", "symptoms", "history?"],
     Intention.OptimizationStrategy: ["species", "current_performance", "target?", "constraints?"],
     Intention.TroubleshootingMultiple: ["species", "problems", "timeline?", "context?"],
@@ -134,317 +68,332 @@ REQUIRED_FIELDS_BY_TYPE: Dict[str, List[str]] = {
     Intention.MultiFactor: ["species", "factors", "objective?"]
 }
 
-# 🆕 NOUVEAUX PATTERNS POUR DÉTECTION DE COMPLEXITÉ
-COMPLEXITY_INDICATORS = {
-    "multi_symptoms": [
-        r"\bet\b.*\bet\b",  # "symptôme A et symptôme B"
-        r"plusieurs.*(?:symptômes|problèmes|signes)",
-        r"(?:mortalité|ponte).*(?:baisse|chute).*(?:poids|fcr|croissance)"
-    ],
-    "optimization_keywords": [
-        "optimiser", "améliorer", "maximiser", "minimiser", "rentabilité",
-        "efficacité", "performance", "stratégie", "comment réduire",
-        "comment augmenter", "meilleure façon"
-    ],
-    "causal_reasoning": [
-        "pourquoi", "comment", "quelle.*cause", "qu'est-ce qui",
-        "facteurs", "raisons", "origine", "expliquer"
-    ],
-    "comparative_analysis": [
-        "comparer", "différence", "mieux que", "versus", "vs",
-        "par rapport", "comparé", "alternative"
-    ],
-    "multistep_indicators": [
-        "d'abord.*puis", "ensuite", "étapes", "procédure", "protocole",
-        "plan", "stratégie", "méthode", "approche"
-    ]
-}
-
-DIAGNOSTIC_COMPLEXITY_PATTERNS = [
-    r"diagnostic.*différentiel",
-    r"(?:mortalité|perte).*(?:\d+%|\d+\s*pour\s*cent)",
-    r"(?:baisse|chute|diminution).*(?:ponte|production|croissance)",
-    r"(?:symptômes?|signes?).*(?:multiples?|divers|variés)",
-    r"(?:analyse|évaluation).*(?:complète|approfondie|détaillée)"
-]
-
-# --- Regex helpers (code original conservé + améliorations) ---
-# 🔧 IMPROVED: Better age detection patterns including English
-AGE_DAYS_RE = re.compile(r"\b(\d{1,2})\s*(?:j|jours?|day|days?)\b", re.I)
-AGE_WEEKS_RE = re.compile(r"\b(\d{1,2})\s*(?:sem|semaines?|wk|wks|weeks?)\b", re.I)
-# 🔧 NEW: Support for "X-day-old" and "X-week-old" patterns
-AGE_DAY_OLD_RE = re.compile(r"\b(\d{1,2})-day-old\b", re.I)
-AGE_WEEK_OLD_RE = re.compile(r"\b(\d{1,2})-week-old\b", re.I)
-
-FLOCK_RE = re.compile(r"\b(\d{2,6})\s*(?:oiseaux?|birds?|poulets?)\b", re.I)
-
-def _normalize_line(q: str) -> Optional[str]:
-    ql = q.lower()
-    for ln in LINES:
-        if ln in ql:
-            return ln.replace(" ", "")
-    return None
-
-def _infer_species(q: str) -> Optional[str]:
-    ql = q.lower()
-    if any(k in ql for k in ["isa", "lohmann", "œuf", "oeuf", "egg", "hy-line", "hy line", "hyline", "pondeuse", "layer"]):
-        return "layer"
-    if any(k in ql for k in ["ross", "cobb", "broiler", "chair", "chicken"]):  # Added "chicken"
-        return "broiler"
-    return None
-
-def _extract_age(q: str) -> Dict[str, Optional[int]]:
-    """🔧 IMPROVED: Better age extraction with English support"""
-    # Try day-old patterns first (most specific)
-    day_old_match = AGE_DAY_OLD_RE.search(q)
-    if day_old_match:
-        return {"age_days": int(day_old_match.group(1)), "age_weeks": None}
-    
-    # Try week-old patterns
-    week_old_match = AGE_WEEK_OLD_RE.search(q)
-    if week_old_match:
-        weeks = int(week_old_match.group(1))
-        return {"age_days": weeks * 7, "age_weeks": weeks}
-    
-    # Fallback to original patterns
-    d = AGE_DAYS_RE.search(q)
-    w = AGE_WEEKS_RE.search(q)
-    return {"age_days": int(d.group(1)) if d else None, "age_weeks": int(w.group(1)) if w else None}
-
-def _detect_phase(q: str) -> Optional[str]:
-    ql = q.lower()
-    for p in PHASES:
-        if p in ql:
-            if p.startswith("dém"): return "starter"
-            if p == "croissance": return "grower"
-            if p == "finition": return "finisher"
-            return p
-    return None
-
-def _detect_housing(q: str) -> Optional[str]:
-    ql = q.lower()
-    for h in HOUSING:
-        if h in ql:
-            if "naturelle" in h: return "naturally_ventilated"
-            if "plein air" in h or "free range" in h: return "free_range"
-            return h
-    return None
-
-def _detect_sex(q: str) -> Optional[str]:
-    """🔧 IMPROVED: Better sex detection with English support"""
-    ql = q.lower()
-    if "mâle" in ql or "males" in ql or "male" in ql: return "male"
-    if "femelle" in ql or "females" in ql or "female" in ql: return "female"
-    if "mixte" in ql or "mixed" in ql: return "mixed"
-    return None
-
-def _detect_program_type(q: str) -> Optional[str]:
-    ql = q.lower()
-    if "vaccin" in ql or "vaccination" in ql: return "vaccination"
-    if "éclairage" in ql or "lumière" in ql or "lighting" in ql: return "lighting"
-    if "démarrage" in ql or "brooding" in ql: return "brooding"
-    if "alimentation" in ql and "programme" in ql: return "feeding_program"
-    return None
-
-def _has_any(ql: str, words: List[str]) -> bool:
-    """🔧 IMPROVED: Case-insensitive matching"""
-    ql_lower = ql.lower()
-    return any(w.lower() in ql_lower for w in words)
-
-# 🆕 NOUVELLES FONCTIONS DE DÉTECTION DE COMPLEXITÉ
-
-def _detect_complexity_score(q: str) -> Dict[str, Any]:
+def _classify_with_openai(question: str) -> Dict[str, Any]:
     """
-    Calcule un score de complexité pour déterminer si CoT est nécessaire
+    Classification complète via OpenAI - intentions + entités + complexité
     """
-    ql = q.lower()
-    complexity_score = 0
-    complexity_factors = []
+    if not OPENAI_AVAILABLE or not question.strip():
+        return _minimal_fallback(question)
     
-    # 1. Multi-symptômes / Multi-problèmes (+30 points)
-    for pattern in COMPLEXITY_INDICATORS["multi_symptoms"]:
-        if re.search(pattern, ql, re.I):
-            complexity_score += 30
-            complexity_factors.append("multi_symptoms")
-            break
+    try:
+        # Prompt unifié pour classification + extraction + complexité
+        classification_prompt = f"""You are an expert poultry farming assistant. Analyze this question and provide a complete analysis in JSON format.
+
+**QUESTION:** "{question}"
+
+**TASK:** Provide intent classification, entity extraction, and complexity analysis.
+
+**INTENT CATEGORIES:**
+- **PerfTargets**: Weight targets, growth rates, FCR, production standards for specific breeds/ages
+- **NutritionSpecs**: Feed composition, nutritional requirements, feed formulations  
+- **WaterFeedIntake**: Water/feed consumption amounts, intake calculations
+- **EnvSetpoints**: Temperature, humidity, lighting, environmental settings
+- **VentilationSizing**: Ventilation systems, air flow requirements
+- **EquipmentSizing**: Feeders, drinkers, equipment dimensioning
+- **Diagnostics**: Disease symptoms, health issues identification
+- **Treatments**: Medication dosages, treatment protocols
+- **Economics**: Costs, profitability, financial analysis
+- **HealthDiagnosis**: Complex health diagnostic requiring analysis
+- **OptimizationStrategy**: Performance optimization, strategy questions
+- **TroubleshootingMultiple**: Complex multi-problem troubleshooting
+- **ProductionAnalysis**: Performance analysis and comparisons
+- **MultiFactor**: Questions involving multiple interrelated factors
+- **AmbiguousGeneral**: Unclear or general questions
+
+**ENTITIES TO EXTRACT:**
+- species: "broiler", "layer", "breeder", etc.
+- line: "ross308", "cobb500", "isabrown", etc. (normalize to lowercase, no spaces)
+- sex: "male", "female", "mixed"
+- age_days: Age in days (integer)
+- age_weeks: Age in weeks (integer) 
+- phase: "starter", "grower", "finisher", "pre-lay", "peak", "post-peak"
+- housing: "tunnel", "naturally_ventilated", "free_range"
+- program_type: "vaccination", "lighting", "brooding", "feeding_program"
+- flock_size: Number of birds (integer)
+
+**COMPLEXITY FACTORS:**
+- multi_symptoms: Multiple symptoms or problems mentioned
+- optimization: Optimization/improvement questions
+- causal_reasoning: Why/how/cause questions
+- comparative: Comparison questions
+- multistep: Multi-step procedures
+- complex_diagnostic: Complex diagnostic patterns
+- quantified_problem: Numbers/percentages with problems
+
+**OUTPUT FORMAT (valid JSON only):**
+{{
+  "intent": "IntentName",
+  "confidence": 0.85,
+  "entities": {{
+    "species": "broiler",
+    "line": "cobb500", 
+    "age_days": 21,
+    "sex": "male"
+  }},
+  "complexity": {{
+    "score": 25,
+    "level": "medium",
+    "needs_cot": false,
+    "factors": ["optimization"]
+  }}
+}}
+
+Respond with ONLY the JSON object, no other text."""
+
+        response = openai_complete(
+            prompt=classification_prompt,
+            max_tokens=300  # Sufficient for JSON response
+        )
+        
+        if response:
+            # Parse JSON response
+            try:
+                result = json.loads(response.strip())
+                
+                # Validate and normalize
+                intent_str = result.get("intent", "AmbiguousGeneral")
+                try:
+                    intent = Intention(intent_str)
+                except ValueError:
+                    logger.warning(f"Invalid intent from OpenAI: {intent_str}")
+                    intent = Intention.AmbiguousGeneral
+                
+                entities = result.get("entities", {})
+                complexity = result.get("complexity", {
+                    "score": 0,
+                    "level": "simple", 
+                    "needs_cot": False,
+                    "factors": []
+                })
+                
+                confidence = float(result.get("confidence", 0.7))
+                
+                logger.info(f"🤖 OpenAI Classification: {intent.value} (confidence: {confidence:.2f})")
+                
+                return {
+                    "intent": intent,
+                    "entities": _clean_entities(entities),
+                    "complexity": complexity,
+                    "confidence": confidence,
+                    "method": "openai_unified"
+                }
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"❌ JSON parsing error: {e}")
+                logger.error(f"Response was: {response[:200]}...")
+                return _minimal_fallback(question)
+                
+    except Exception as e:
+        logger.error(f"❌ OpenAI classification error: {e}")
+        return _minimal_fallback(question)
     
-    # 2. Mots-clés d'optimisation (+25 points)
-    optimization_matches = sum(1 for kw in COMPLEXITY_INDICATORS["optimization_keywords"] if kw in ql)
-    if optimization_matches > 0:
-        complexity_score += min(25, optimization_matches * 10)
-        complexity_factors.append("optimization")
+    return _minimal_fallback(question)
+
+def _clean_entities(entities: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Nettoie et normalise les entités extraites par OpenAI
+    """
+    cleaned = {}
     
-    # 3. Raisonnement causal (+20 points)
-    causal_matches = sum(1 for pattern in COMPLEXITY_INDICATORS["causal_reasoning"] if re.search(pattern, ql, re.I))
-    if causal_matches > 0:
-        complexity_score += min(20, causal_matches * 8)
-        complexity_factors.append("causal_reasoning")
-    
-    # 4. Analyse comparative (+15 points)
-    comparative_matches = sum(1 for kw in COMPLEXITY_INDICATORS["comparative_analysis"] if kw in ql)
-    if comparative_matches > 0:
-        complexity_score += min(15, comparative_matches * 7)
-        complexity_factors.append("comparative")
-    
-    # 5. Indicateurs multi-étapes (+20 points)
-    multistep_matches = sum(1 for kw in COMPLEXITY_INDICATORS["multistep_indicators"] if kw in ql)
-    if multistep_matches > 0:
-        complexity_score += min(20, multistep_matches * 10)
-        complexity_factors.append("multistep")
-    
-    # 6. Patterns de diagnostic complexe (+25 points)
-    diagnostic_matches = sum(1 for pattern in DIAGNOSTIC_COMPLEXITY_PATTERNS if re.search(pattern, ql, re.I))
-    if diagnostic_matches > 0:
-        complexity_score += min(25, diagnostic_matches * 12)
-        complexity_factors.append("complex_diagnostic")
-    
-    # 7. Longueur de la question (+5-15 points)
-    word_count = len(q.split())
-    if word_count > 20:
-        complexity_score += 15
-        complexity_factors.append("long_question")
-    elif word_count > 12:
-        complexity_score += 8
-        complexity_factors.append("medium_question")
-    
-    # 8. Présence de chiffres/pourcentages dans contexte complexe (+10 points)
-    if re.search(r'\d+%|\d+\s*pour\s*cent', ql) and any(kw in ql for kw in ["baisse", "augmentation", "problème", "objectif"]):
-        complexity_score += 10
-        complexity_factors.append("quantified_problem")
-    
-    # Classification du niveau de complexité
-    if complexity_score >= 50:
-        complexity_level = "high"
-        needs_cot = True
-    elif complexity_score >= 25:
-        complexity_level = "medium"
-        needs_cot = True
+    # Species normalization
+    species = entities.get("species", "").lower().strip()
+    if species in ["broiler", "chair", "poulet", "chicken"]:
+        cleaned["species"] = "broiler"
+    elif species in ["layer", "pondeuse", "laying hen"]:
+        cleaned["species"] = "layer"
+    elif species:
+        cleaned["species"] = species
     else:
-        complexity_level = "simple"
-        needs_cot = False
+        cleaned["species"] = None
     
-    return {
-        "score": complexity_score,
-        "level": complexity_level,
-        "needs_cot": needs_cot,
-        "factors": complexity_factors,
-        "word_count": word_count
+    # Line normalization
+    line = entities.get("line", "").lower().strip().replace(" ", "").replace("-", "")
+    if line:
+        # Common normalizations
+        line_map = {
+            "ross308": "ross308", "ross 308": "ross308",
+            "cobb500": "cobb500", "cobb 500": "cobb500",
+            "isabrown": "isabrown", "isa brown": "isabrown"
+        }
+        cleaned["line"] = line_map.get(line, line)
+    else:
+        cleaned["line"] = None
+    
+    # Sex normalization
+    sex = entities.get("sex", "").lower().strip()
+    sex_map = {
+        "male": "male", "m": "male", "mâle": "male",
+        "female": "female", "f": "female", "femelle": "female", 
+        "mixed": "mixed", "mixte": "mixed", "as_hatched": "mixed"
     }
-
-def _classify_intent_enhanced(q: str) -> Tuple[Intention, Dict[str, Any]]:
-    """
-    Classification enrichie avec détection d'intentions complexes
-    🔧 FIXED: Multilingual keyword support
-    """
-    ql = q.lower()
-    complexity_info = _detect_complexity_score(q)
+    cleaned["sex"] = sex_map.get(sex, sex if sex else None)
     
-    # 🆕 NOUVELLES INTENTIONS COMPLEXES (priorité haute si complexité détectée)
-    if complexity_info["needs_cot"]:
-        # Diagnostic complexe
-        if (_has_any(ql, DIAGNOSTIC_KEYWORDS) and 
-            (complexity_info["score"] >= 40 or "complex_diagnostic" in complexity_info["factors"])):
-            return Intention.HealthDiagnosis, complexity_info
-        
-        # Optimisation/stratégie
-        if (_has_any(ql, ["optimiser", "améliorer", "stratégie", "rentabilité", "efficacité"]) and
-            complexity_info["score"] >= 35):
-            return Intention.OptimizationStrategy, complexity_info
-        
-        # Troubleshooting multiple
-        if ("multi_symptoms" in complexity_info["factors"] or 
-            _has_any(ql, ["plusieurs problèmes", "multiples", "divers problèmes"])):
-            return Intention.TroubleshootingMultiple, complexity_info
-        
-        # Analyse de production complexe
-        if (_has_any(ql, ["analyse", "évaluation", "performance", "comparaison"]) and
-            complexity_info["score"] >= 30):
-            return Intention.ProductionAnalysis, complexity_info
-        
-        # Multi-facteurs générique
-        if complexity_info["score"] >= 50:
-            return Intention.MultiFactor, complexity_info
+    # Age handling
+    age_days = entities.get("age_days")
+    age_weeks = entities.get("age_weeks")
     
-    # 🔧 INTENTIONS CLASSIQUES (FIXED avec support multilingue)
-    if _has_any(ql, TREATMENT_KEYWORDS):
-        return Intention.Treatments, complexity_info
-    if _has_any(ql, DIAGNOSTIC_KEYWORDS):
-        return Intention.Diagnostics, complexity_info
-    # 🔧 CRITICAL FIX: Now includes English "weight" keywords
-    if _has_any(ql, PERF_TARGETS_KEYWORDS):
-        return Intention.PerfTargets, complexity_info
-    if _has_any(ql, NUTRITION_KEYWORDS):
-        return Intention.NutritionSpecs, complexity_info
-    if _has_any(ql, WATER_FEED_KEYWORDS):
-        return Intention.WaterFeedIntake, complexity_info
-    if _has_any(ql, ENV_KEYWORDS):
-        return Intention.EnvSetpoints, complexity_info
-    if _has_any(ql, VENTILATION_KEYWORDS):
-        return Intention.VentilationSizing, complexity_info
-    if _has_any(ql, EQUIPMENT_KEYWORDS):
-        return Intention.EquipmentSizing, complexity_info
-    if _detect_program_type(ql):
-        return Intention.Programs, complexity_info
-    if _has_any(ql, ECONOMICS_KEYWORDS):
-        return Intention.Economics, complexity_info
-    if _has_any(ql, ["label rouge", "plein air", "catégorie a+", "enrichissements obligatoires", "densité maximale"]):
-        return Intention.Compliance, complexity_info
-    if _has_any(ql, ["maintenance", "extracteurs", "condensation", "ammoniaque"]) or _has_any(ql, ["ventilation insuffisante"]):
-        return Intention.Operations, complexity_info
+    try:
+        if age_days is not None:
+            cleaned["age_days"] = int(age_days)
+        else:
+            cleaned["age_days"] = None
+            
+        if age_weeks is not None:
+            cleaned["age_weeks"] = int(age_weeks)
+        else:
+            cleaned["age_weeks"] = None
+            
+        # Convert between days/weeks if only one is provided
+        if cleaned["age_days"] is not None and cleaned["age_weeks"] is None:
+            cleaned["age_weeks"] = round(cleaned["age_days"] / 7, 1)
+        elif cleaned["age_weeks"] is not None and cleaned["age_days"] is None:
+            cleaned["age_days"] = int(cleaned["age_weeks"] * 7)
+            
+    except (ValueError, TypeError):
+        cleaned["age_days"] = None
+        cleaned["age_weeks"] = None
     
-    return Intention.AmbiguousGeneral, complexity_info
+    # Other entities
+    cleaned["phase"] = entities.get("phase") or None
+    cleaned["housing"] = entities.get("housing") or None
+    cleaned["program_type"] = entities.get("program_type") or None
+    
+    # Flock size
+    try:
+        flock_size = entities.get("flock_size")
+        cleaned["flock_size"] = int(flock_size) if flock_size else None
+    except (ValueError, TypeError):
+        cleaned["flock_size"] = None
+    
+    return cleaned
 
-def classify(question: str) -> Dict[str, Any]:
+def _minimal_fallback(question: str) -> Dict[str, Any]:
     """
-    Classification principale avec enrichissements CoT
-    🔧 IMPROVED: Better multilingual support
+    Fallback minimal si OpenAI échoue - utilise regex basique
     """
-    intent, complexity_info = _classify_intent_enhanced(question)
-    line = _normalize_line(question) or None
-    species = _infer_species(question)
-    sex = _detect_sex(question)
-    age = _extract_age(question)  # Now handles "18-day-old" correctly
-    phase = _detect_phase(question)
-    housing = _detect_housing(question)
-    program_type = _detect_program_type(question)
-
+    # Basic regex patterns for critical entities
+    age_days_match = re.search(r'\b(\d{1,2})\s*(?:j|jours?|day|days?|giorni?)\b', question, re.I)
+    age_weeks_match = re.search(r'\b(\d{1,2})\s*(?:sem|semaines?|wk|weeks?|settimane?)\b', question, re.I)
+    
+    # Basic species detection
+    ql = question.lower()
+    species = None
+    if any(word in ql for word in ["broiler", "chair", "poulet", "pollo", "chicken"]):
+        species = "broiler"
+    elif any(word in ql for word in ["layer", "pondeuse", "laying", "gallina"]):
+        species = "layer"
+    
+    # Basic line detection
+    line = None
+    if "cobb" in ql and "500" in ql:
+        line = "cobb500"
+    elif "ross" in ql and "308" in ql:
+        line = "ross308"
+    
+    # Simple intent detection
+    intent = Intention.AmbiguousGeneral
+    if any(word in ql for word in ["peso", "poids", "weight", "target", "cible", "objectif"]):
+        intent = Intention.PerfTargets
+    
     entities = {
         "species": species,
         "line": line,
-        "sex": sex,
-        "age_days": age["age_days"],
-        "age_weeks": age["age_weeks"],
-        "phase": phase,
-        "housing": housing,
-        "program_type": program_type
+        "sex": None,
+        "age_days": int(age_days_match.group(1)) if age_days_match else None,
+        "age_weeks": int(age_weeks_match.group(1)) if age_weeks_match else None,
+        "phase": None,
+        "housing": None,
+        "program_type": None,
+        "flock_size": None
     }
-
+    
+    complexity = {
+        "score": 0,
+        "level": "simple",
+        "needs_cot": False,
+        "factors": []
+    }
+    
     return {
         "intent": intent,
         "entities": entities,
-        # 🆕 NOUVELLES MÉTADONNÉES DE COMPLEXITÉ
-        "complexity": complexity_info
+        "complexity": complexity,
+        "confidence": 0.3,
+        "method": "regex_fallback"
     }
 
-# 🆕 NOUVELLES FONCTIONS UTILITAIRES
+def classify(question: str) -> Dict[str, Any]:
+    """
+    Fonction principale - interface compatible avec l'original
+    """
+    if not question or not question.strip():
+        return _minimal_fallback(question)
+    
+    result = _classify_with_openai(question)
+    
+    # Format de retour compatible avec l'original
+    return {
+        "intent": result["intent"],
+        "entities": result["entities"], 
+        "complexity": result["complexity"]
+    }
 
+# Fonctions utilitaires pour compatibilité
 def should_use_cot(classification_result: Dict[str, Any]) -> bool:
-    """
-    Détermine si Chain-of-Thought doit être utilisé pour cette classification
-    """
+    """Détermine si Chain-of-Thought doit être utilisé"""
     complexity = classification_result.get("complexity", {})
     return complexity.get("needs_cot", False)
 
 def get_complexity_level(classification_result: Dict[str, Any]) -> str:
-    """
-    Retourne le niveau de complexité: 'simple', 'medium', 'high'
-    """
+    """Retourne le niveau de complexité"""
     complexity = classification_result.get("complexity", {})
     return complexity.get("level", "simple")
 
 def get_complexity_factors(classification_result: Dict[str, Any]) -> List[str]:
-    """
-    Retourne la liste des facteurs de complexité détectés
-    """
+    """Retourne les facteurs de complexité détectés"""
     complexity = classification_result.get("complexity", {})
     return complexity.get("factors", [])
+
+def get_classification_status() -> Dict[str, Any]:
+    """Statut du système de classification"""
+    return {
+        "openai_available": OPENAI_AVAILABLE,
+        "multilingual_support": OPENAI_AVAILABLE,
+        "hardcoded_keywords": False,  # 🎯 Plus de mots-clés hardcodés !
+        "supported_languages": ["any"] if OPENAI_AVAILABLE else ["limited"],
+        "classification_method": "openai_unified" if OPENAI_AVAILABLE else "regex_fallback",
+        "total_intents": len(Intention),
+        "version": "openai_pure_v1.0"
+    }
+
+def test_multilingual_classification() -> Dict[str, Any]:
+    """Test du système multilingue"""
+    test_questions = [
+        ("Quel est le poids cible d'un poulet Cobb 500 de 21 jours?", Intention.PerfTargets),
+        ("Quanto pesa un pollo Cobb 500 di 12 giorni?", Intention.PerfTargets), 
+        ("What should a 21-day Ross 308 male weigh?", Intention.PerfTargets),
+        ("¿Cuál es el peso objetivo de un pollo de 3 semanas?", Intention.PerfTargets),
+        ("Wie viel sollte ein 3 Wochen altes Huhn wiegen?", Intention.PerfTargets),
+        ("Qual a composição da ração inicial?", Intention.NutritionSpecs),
+        ("Hoeveel water drinkt een kip per dag?", Intention.WaterFeedIntake),
+    ]
+    
+    results = {}
+    for question, expected_intent in test_questions:
+        try:
+            result = classify(question)
+            results[question] = {
+                "detected_intent": result["intent"].value,
+                "expected_intent": expected_intent.value,
+                "entities": result["entities"],
+                "complexity": result["complexity"],
+                "success": result["intent"] == expected_intent
+            }
+        except Exception as e:
+            results[question] = {"error": str(e)}
+    
+    return {
+        "total_tests": len(test_questions),
+        "results": results,
+        "openai_available": OPENAI_AVAILABLE
+    }
