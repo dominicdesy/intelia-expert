@@ -34,7 +34,6 @@ interface ModalState {
   isLoading: boolean
   errors: string[]
   results: InvitationResponse | null
-  validationResults: any | null
 }
 
 type ModalAction =
@@ -43,7 +42,6 @@ type ModalAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERRORS'; payload: string[] }
   | { type: 'SET_RESULTS'; payload: InvitationResponse }
-  | { type: 'SET_VALIDATION'; payload: any }
   | { type: 'CLEAR_RESULTS' }
   | { type: 'RESET' }
 
@@ -52,8 +50,7 @@ const initialState: ModalState = {
   personalMessage: '',
   isLoading: false,
   errors: [],
-  results: null,
-  validationResults: null
+  results: null
 }
 
 function modalReducer(state: ModalState, action: ModalAction): ModalState {
@@ -68,10 +65,8 @@ function modalReducer(state: ModalState, action: ModalAction): ModalState {
       return { ...state, errors: action.payload }
     case 'SET_RESULTS':
       return { ...state, results: action.payload, isLoading: false }
-    case 'SET_VALIDATION':
-      return { ...state, validationResults: action.payload }
     case 'CLEAR_RESULTS':
-      return { ...state, results: null, validationResults: null }
+      return { ...state, results: null }
     case 'RESET':
       return { ...initialState }
     default:
@@ -104,16 +99,6 @@ function useInvitations() {
     return { valid, invalid }
   }
 
-  const validateEmailsOnServer = async (emails: string[]) => {
-    try {
-      const response = await apiClient.postSecure('/invitations/validate', { emails })
-      return response.success ? response.data : null
-    } catch (error) {
-      console.error('Erreur validation serveur:', error)
-      return null
-    }
-  }
-
   const sendInvitations = async (emails: string[], personalMessage: string): Promise<InvitationResponse> => {
     if (!user?.email || !user?.name) {
       throw new Error('Utilisateur non connecté')
@@ -141,21 +126,9 @@ function useInvitations() {
     return response.data
   }
 
-  const getInvitationStats = async () => {
-    try {
-      const response = await apiClient.getSecure('/invitations/stats/summary')
-      return response.success ? response.data : null
-    } catch (error) {
-      console.error('Erreur récupération stats:', error)
-      return null
-    }
-  }
-
   return {
     validateEmails,
-    validateEmailsOnServer,
-    sendInvitations,
-    getInvitationStats
+    sendInvitations
   }
 }
 
@@ -163,13 +136,45 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
   const { t } = useTranslation()
   const { user, isAuthenticated, hasHydrated } = useUser()
   const [state, dispatch] = useReducer(modalReducer, initialState)
-  const { validateEmails, validateEmailsOnServer, sendInvitations } = useInvitations()
+  const { validateEmails, sendInvitations } = useInvitations()
+
+  // Gestion de la fermeture avec Escape
+  React.useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [onClose])
 
   // Vérification d'authentification
   if (!hasHydrated) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+      <div 
+        className="fixed inset-0 z-50"
+        style={{
+          width: '100vw',
+          height: '100vh',
+          top: '0',
+          left: '0',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '16px'
+        }}
+      >
+        <div 
+          className="bg-white rounded-lg p-6 max-w-md w-full mx-4"
+          style={{
+            width: '95vw',
+            maxWidth: '400px',
+            minWidth: '320px'
+          }}
+        >
           <div className="text-center">
             <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-gray-600">Vérification de la session...</p>
@@ -181,8 +186,30 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
 
   if (!isAuthenticated || !user?.email) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+      <div 
+        className="fixed inset-0 z-50"
+        onClick={onClose}
+        style={{
+          width: '100vw',
+          height: '100vh',
+          top: '0',
+          left: '0',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '16px'
+        }}
+      >
+        <div 
+          className="bg-white rounded-lg p-6 max-w-md w-full mx-4"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: '95vw',
+            maxWidth: '400px',
+            minWidth: '320px'
+          }}
+        >
           <div className="text-center">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -295,8 +322,32 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div 
+      className="fixed inset-0 z-50"
+      onClick={onClose}
+      style={{
+        width: '100vw',
+        height: '100vh',
+        top: '0',
+        left: '0',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backdropFilter: 'blur(2px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px'
+      }}
+    >
+      <div 
+        className="bg-white rounded-lg shadow-xl overflow-y-auto" 
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '95vw',
+          maxWidth: '700px',
+          maxHeight: '85vh',
+          minWidth: '320px'
+        }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">Inviter des amis</h2>
