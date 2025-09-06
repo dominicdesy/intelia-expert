@@ -395,13 +395,20 @@ def finalize_response_with_language(response: Dict[str, Any], question: str, eff
         original_text = answer["text"]
         source_type = answer.get("source", "unknown")
         
-        # 🔧 CORRECTION: Vérifier si c'est vraiment un fallback OpenAI avec la bonne langue
+        # 🔧 CORRECTION: Vérifier la langue réelle de la réponse, pas seulement les métadonnées
         skip_adaptation = False
         if source_type in ["openai_fallback", "cot_analysis"]:
+            # Détecter la langue réelle de la réponse générée
+            actual_response_lang = detect_question_language(original_text) if len(original_text) > 20 else "unknown"
             target_lang_in_meta = answer.get("meta", {}).get("target_language", "")
-            if target_lang_in_meta == effective_language:
-                logger.info(f"✅ Fallback OpenAI/CoT déjà dans la langue cible: {effective_language}")
+            
+            # Seulement skiper si les métadonnées ET la langue réelle correspondent
+            if target_lang_in_meta == effective_language and actual_response_lang == effective_language:
+                logger.info(f"✅ Fallback OpenAI/CoT vraiment dans la langue cible: {effective_language}")
                 skip_adaptation = True
+            else:
+                logger.warning(f"⚠️ Fallback OpenAI incohérent: meta={target_lang_in_meta}, réel={actual_response_lang}, attendu={effective_language}")
+                skip_adaptation = False
         
         if not skip_adaptation:
             logger.info(f"🌐 Adaptation linguistique forcée: {source_type} → {effective_language}")
