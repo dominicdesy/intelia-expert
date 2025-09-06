@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '@/lib/stores/auth' 
-import { apiClient } from '@/lib/api/client'
+import { getSupabaseClient } from '@/lib/supabase/singleton'
 import { StatisticsDashboard } from './StatisticsDashboard'
 import { QuestionsTab } from './QuestionsTab'
 import { InvitationStatsComponent } from './InvitationStats'
 
-// Types pour le système de cache ultra-rapide
+// 🚀 Types pour le système de cache ultra-rapide
 interface CacheStatus {
   is_available: boolean
   last_update: string | null
@@ -161,7 +161,7 @@ export const StatisticsPage: React.FC = () => {
   const [invitationLoading, setInvitationLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
-  // États pour le cache ultra-rapide - SÉPARÉS par onglet
+  // 🚀 États pour le cache ultra-rapide - SÉPARÉS par onglet
   const [dashboardCacheStatus, setDashboardCacheStatus] = useState<CacheStatus | null>(null)
   const [questionsCacheStatus, setQuestionsCacheStatus] = useState<CacheStatus | null>(null)  
   const [invitationCacheStatus, setInvitationCacheStatus] = useState<CacheStatus | null>(null)
@@ -190,7 +190,7 @@ export const StatisticsPage: React.FC = () => {
   const [questionsPerPage] = useState(20)
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionLog | null>(null)
   
-  // Références pour éviter les chargements multiples
+  // 🔧 CORRECTION: Références pour éviter les chargements multiples
   const authCheckRef = useRef<boolean>(false)
   const stabilityCounterRef = useRef<number>(0)
   const dashboardLoadedRef = useRef<boolean>(false)
@@ -268,7 +268,7 @@ export const StatisticsPage: React.FC = () => {
     }
   }, [user, authStatus])
 
-  // Chargement des statistiques - UNE SEULE FOIS
+  // 🔧 CORRECTION: Chargement des statistiques - UNE SEULE FOIS
   useEffect(() => {
     if (authStatus === 'ready' && !statsLoading && !dashboardLoadedRef.current) {
       console.log('[StatisticsPage] Lancement chargement des statistiques')
@@ -277,7 +277,7 @@ export const StatisticsPage: React.FC = () => {
     }
   }, [authStatus])
 
-  // Chargement des questions - SEULEMENT SI NÉCESSAIRE
+  // 🔧 CORRECTION: Chargement des questions - SEULEMENT SI NÉCESSAIRE
   useEffect(() => {
     if (authStatus === 'ready' && activeTab === 'questions' && !questionsLoading) {
       const pageKey = `${currentPage}-${questionsPerPage}`
@@ -289,7 +289,7 @@ export const StatisticsPage: React.FC = () => {
     }
   }, [authStatus, activeTab, currentPage])
 
-  // Chargement des invitations - UNE SEULE FOIS PAR VISITE
+  // 🔧 CORRECTION: Chargement des invitations - UNE SEULE FOIS PAR VISITE
   useEffect(() => {
     if (authStatus === 'ready' && activeTab === 'invitations' && !invitationLoading && !invitationsLoadedRef.current) {
       console.log('[StatisticsPage] Lancement chargement des invitations')
@@ -298,7 +298,7 @@ export const StatisticsPage: React.FC = () => {
     }
   }, [authStatus, activeTab])
 
-  // Reset des références quand on change d'onglet
+  // 🔧 CORRECTION: Reset des références quand on change d'onglet
   const handleTabChange = (newTab: 'dashboard' | 'questions' | 'invitations') => {
     if (newTab !== activeTab) {
       console.log('[StatisticsPage] Changement onglet:', activeTab, '->', newTab)
@@ -312,35 +312,58 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  // NOUVELLE MÉTHODE: Utilisation d'apiClient au lieu de fetch direct
+  // FONCTION SIMPLIFIÉE POUR RÉCUPÉRER LES HEADERS D'AUTHENTIFICATION
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    try {
+      console.log('🔍 getAuthHeaders: Utilisation localStorage direct');
+      
+      const authData = localStorage.getItem('intelia-expert-auth');
+      if (authData) {
+        const parsed = JSON.parse(authData);
+        if (parsed.access_token) {
+          console.log('✅ Token récupéré depuis localStorage');
+          return {
+            'Authorization': `Bearer ${parsed.access_token}`,
+            'Content-Type': 'application/json'
+          };
+        }
+      }
+      
+      console.log('❌ Pas de token trouvé');
+      return {};
+      
+    } catch (error) {
+      console.error('❌ Erreur getAuthHeaders:', error);
+      return {};
+    }
+  };
+
+  // Charger toutes les statistiques - AVEC PROTECTION CONTRE LES DOUBLONS
   const loadAllStatistics = async () => {
     if (statsLoading) {
-      console.log('[StatisticsPage] Chargement déjà en cours, annulation...')
+      console.log('📊 [StatisticsPage] Chargement déjà en cours, annulation...')
       return
     }
     
-    console.log('[StatisticsPage] DÉBUT chargement statistiques avec apiClient')
+    console.log('🚀 [StatisticsPage] DÉBUT chargement statistiques')
     setStatsLoading(true)
     setError(null)
 
     const startTime = performance.now()
 
     try {
-      console.log('⚡ Tentative endpoint cache via apiClient: /api/v1/stats-fast/dashboard')
+      const headers = await getAuthHeaders()
+
+      console.log('⚡ Tentative endpoint cache: /api/v1/stats-fast/dashboard')
       
-      // CORRECTION: Utilise apiClient.get() au lieu de fetch direct
-      const response = await apiClient.get<FastDashboardStats>('/api/v1/stats-fast/dashboard')
+      const fastResponse = await fetch('/api/v1/stats-fast/dashboard', { headers })
       
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Erreur lors du chargement des statistiques')
+      if (!fastResponse.ok) {
+        throw new Error(`Erreur cache endpoint: ${fastResponse.status} - ${fastResponse.statusText}`)
       }
 
-      if (!response.data) {
-        throw new Error('Réponse vide du serveur')
-      }
-
-      const fastData = response.data
-      console.log('🎉 SUCCÈS endpoint avec apiClient!', fastData)
+      const fastData: FastDashboardStats = await fastResponse.json()
+      console.log('🎉 SUCCÈS endpoint!', fastData)
       
       const loadTime = performance.now() - startTime
       console.log(`⚡ Performance: ${loadTime.toFixed(0)}ms`)
@@ -429,42 +452,39 @@ export const StatisticsPage: React.FC = () => {
       setStatsLoading(false)
     }
   }
+
 	  
-  // NOUVELLE MÉTHODE: Charger les questions avec apiClient
+  // Charger les questions - CORRECTION: Utilise le vrai cache info
   const loadQuestionLogs = async () => {
     if (questionsLoading) {
-      console.log('[Questions] Chargement déjà en cours, annulation...')
+      console.log('📝 [Questions] Chargement déjà en cours, annulation...')
       return
     }
   
-    console.log('⚡ [Questions] Chargement avec apiClient')
+    console.log('⚡ [Questions] Chargement')
     setQuestionsLoading(true)
     const startTime = performance.now()
   
     try {
-      const params = {
+      const headers = await getAuthHeaders()
+      const params = new URLSearchParams({
         page: currentPage.toString(),
         limit: questionsPerPage.toString()
-      }
+      })
 
-      // CORRECTION: Utilise apiClient.get() avec params
-      const response = await apiClient.get<FastQuestionsResponse>('/api/v1/stats-fast/questions', params)
+      const fastResponse = await fetch(`/api/v1/stats-fast/questions?${params}`, { headers })
     
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Erreur lors du chargement des questions')
+      if (!fastResponse.ok) {
+        throw new Error(`Erreur questions: ${fastResponse.status} - ${fastResponse.statusText}`)
       }
 
-      if (!response.data) {
-        throw new Error('Réponse vide du serveur')
-      }
-
-      const fastData = response.data
-      console.log('🎉 Questions chargées avec apiClient!', fastData)
+      const fastData: FastQuestionsResponse = await fastResponse.json()
+      console.log('🎉 Questions chargées!', fastData)
     
       const loadTime = performance.now() - startTime
       console.log(`⚡ Questions Performance: ${loadTime.toFixed(0)}ms`)
     
-      // Utilise le cache_info depuis l'API
+      // CORRECTION: Utilise le cache_info depuis l'API
       const realCacheInfo = fastData.cache_info || {
         is_available: false,
         last_update: null,
@@ -483,6 +503,7 @@ export const StatisticsPage: React.FC = () => {
     
       setQuestionsCacheStatus(enrichedCacheInfo)
 
+	  
       const adaptedQuestions: QuestionLog[] = fastData.questions.map(q => ({
         id: q.id,
         timestamp: q.timestamp,
@@ -514,34 +535,35 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  // NOUVELLE MÉTHODE: Charger les invitations avec apiClient
+  // Charger les invitations - AVEC PROTECTION CONTRE LES DOUBLONS
   const loadInvitationStats = async () => {
     if (invitationLoading) {
-      console.log('[Invitations] Chargement déjà en cours, annulation...')
+      console.log('📨 [Invitations] Chargement déjà en cours, annulation...')
       return
     }
     
-    console.log('⚡ [Invitations] Chargement avec apiClient')
+    console.log('⚡ [Invitations] Chargement')
     setInvitationLoading(true)
     setError(null)
     const startTime = performance.now()
 
     try {
+      const headers = await getAuthHeaders()
+      
+      if (!headers || !('Authorization' in headers) || !headers.Authorization) {
+        throw new Error('Pas de token d\'authentification disponible')
+      }
+
       console.log('⚡ Tentative endpoint cache: /api/v1/stats-fast/invitations')
       
-      // CORRECTION: Utilise apiClient.get() au lieu de fetch direct
-      const response = await apiClient.get<FastInvitationStats>('/api/v1/stats-fast/invitations')
+      const fastResponse = await fetch('/api/v1/stats-fast/invitations', { headers })
       
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Erreur lors du chargement des invitations')
+      if (!fastResponse.ok) {
+        throw new Error(`Erreur cache invitations: ${fastResponse.status} - ${fastResponse.statusText}`)
       }
 
-      if (!response.data) {
-        throw new Error('Réponse vide du serveur')
-      }
-
-      const fastData = response.data
-      console.log('🎉 Invitations chargées avec apiClient!', fastData)
+      const fastData: FastInvitationStats = await fastResponse.json()
+      console.log('🎉 Invitations chargées!', fastData)
       
       const loadTime = performance.now() - startTime
       console.log(`⚡ Invitations Performance: ${loadTime.toFixed(0)}ms`)
@@ -851,7 +873,7 @@ export const StatisticsPage: React.FC = () => {
           </>
         ) : null}
 
-        {/* Modal de détail de question */}
+        {/* Modal de détail de question - IDENTIQUE */}
         {selectedQuestion && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
