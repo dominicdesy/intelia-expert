@@ -27,7 +27,7 @@ export default function PrivacyPage() {
               href="/" 
               className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
             >
-              Retour à l'accueil
+              Back to Home
             </Link>
           </div>
         </div>
@@ -37,226 +37,176 @@ export default function PrivacyPage() {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-lg shadow-sm border p-8">
           <div className="prose prose-gray max-w-none">
-            <h1 className="text-3xl font-bold text-gray-900 mb-8">POLITIQUE DE CONFIDENTIALITÉ - INTELIA TECHNOLOGIES</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-8">PRIVACY POLICY - INTELIA TECHNOLOGIES</h1>
             
             <p className="text-sm text-gray-500 mb-8">
-              <strong>Dernière mise à jour :</strong> 14 août 2025
+              <strong>Last Updated:</strong> August 14, 2025
             </p>
 
             <div className="space-y-8">
               <section>
                 <p className="text-gray-700 leading-relaxed">
-                  Intelia Technologies Inc. (« Intelia », « nous », « notre ») s'engage à 
-                  protéger votre vie privée et à traiter vos informations personnelles de 
-                  manière responsable. Cette Politique de confidentialité explique comment 
-                  nous collectons, utilisons, divulguons et protégeons vos informations 
-                  personnelles lorsque vous utilisez nos services d'intelligence artificielle, 
-                  site Web et applications connexes (collectivement, les « Services »).
+                  Intelia Technologies Inc. ("Intelia," "we," "us," or "our") is committed to protecting your privacy and handling your personal information responsibly. This Privacy Policy explains how we collect, use, disclose, and protect your personal information when you use our artificial intelligence services, website, and related applications (collectively, the "Services").
                 </p>
               </section>
 
               <section>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">PORTÉE ET APPLICATION</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">SCOPE AND APPLICATION</h2>
                 <p className="text-gray-700 leading-relaxed mb-4">
-                  Cette Politique de confidentialité s'applique aux informations personnelles 
-                  que nous collectons lorsque vous utilisez nos Services en tant qu'utilisateur 
-                  individuel, visitez notre site Web ou interagissez autrement avec nous.
+                  This Privacy Policy applies to the personal information we collect when you use our Services as an individual user, visit our website, or interact with us in any other way.
                 </p>
                 
                 <div className="bg-blue-50 border-l-4 border-blue-400 p-4 my-6">
-                  <p className="text-blue-800 font-semibold mb-2">Note importante pour les utilisateurs professionnels :</p>
+                  <p className="text-blue-800 font-semibold mb-2">Important Note for Business Users:</p>
                   <p className="text-blue-700 text-sm">
-                    Cette Politique de confidentialité ne s'applique pas aux informations 
-                    personnelles que nous traitons au nom de clients professionnels qui 
-                    utilisent nos services d'entreprise, services API ou autres offres 
-                    commerciales. Dans ces cas, nous agissons comme un responsable du 
-                    traitement des données, et le client professionnel agit comme le 
-                    contrôleur des données. Notre utilisation de ces données est régie par 
-                    nos accords clients, y compris notre Addendum de Traitement des Données (DPA), 
-                    qui couvre l'accès et l'utilisation de ces offres commerciales.
+                    This Privacy Policy does not apply to personal information that we process on behalf of business customers who use our enterprise services, API services, or other business offerings. In those cases, we act as a data processor, and the business customer acts as the data controller. Our use of such data is governed by our customer agreements, including our Data Processing Addendum (DPA), which covers access to and use of those business offerings.
                   </p>
                 </div>
 
                 <p className="text-gray-700 leading-relaxed mb-4">
-                  Si vous utilisez nos Services par l'intermédiaire de votre employeur ou 
-                  organisation (comme via un compte professionnel), votre utilisation peut 
-                  être soumise à des conditions de traitement des données différentes 
-                  établies par votre organisation. Veuillez vous référer aux politiques 
-                  de confidentialité de votre organisation et à nos accords clients 
-                  professionnels pour des informations supplémentaires.
+                  If you use our Services through your employer or organization (such as via a business account), your use may be subject to different data handling terms established by your organization. Please refer to your organization's privacy policies and our business customer agreements for additional information.
                 </p>
 
                 <p className="text-gray-700 leading-relaxed">
-                  En utilisant nos Services en tant qu'utilisateur individuel, vous acceptez 
-                  la collecte, l'utilisation et la divulgation de vos informations personnelles 
-                  comme décrit dans cette Politique de confidentialité.
+                  By using our Services as an individual user, you agree to the collection, use, and disclosure of your personal information as described in this Privacy Policy.
                 </p>
               </section>
 
               <section>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">1. INFORMATIONS QUE NOUS COLLECTONS</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">1. INFORMATION WE COLLECT</h2>
                 
-                <p className="text-gray-700 mb-4">Nous collectons les informations personnelles de la manière suivante :</p>
+                <p className="text-gray-700 mb-4">We collect personal information in the following ways:</p>
                 
-                <h3 className="text-xl font-semibold text-gray-900 mb-3">1.1 Informations que vous nous fournissez</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-3">1.1 Information You Provide to Us</h3>
                 
                 <div className="space-y-4">
                   <div>
-                    <h4 className="text-lg font-medium text-gray-900 mb-2">Informations de compte :</h4>
+                    <h4 className="text-lg font-medium text-gray-900 mb-2">Account Information:</h4>
                     <p className="text-gray-700">
-                      Lorsque vous créez un compte, nous collectons des informations telles que 
-                      votre nom, adresse e-mail et mot de passe.
+                      When you create an account, we collect information such as your name, email address, and password.
                     </p>
                   </div>
 
                   <div>
-                    <h4 className="text-lg font-medium text-gray-900 mb-2">Contenu d'entrée :</h4>
+                    <h4 className="text-lg font-medium text-gray-900 mb-2">Input Content:</h4>
                     <p className="text-gray-700">
-                      Nous collectons le texte, les invites, les questions et autres contenus 
-                      que vous soumettez à nos Services d'IA (« Entrées »). Cela inclut les 
-                      données communiquées lors de l'utilisation du service.
+                      We collect the text, prompts, questions, and other content you submit to our AI Services ("Inputs"). This includes data communicated while using the service.
                     </p>
                   </div>
 
                   <div>
-                    <h4 className="text-lg font-medium text-gray-900 mb-2">Informations de communication :</h4>
+                    <h4 className="text-lg font-medium text-gray-900 mb-2">Communication Information:</h4>
                     <p className="text-gray-700">
-                      Lorsque vous nous contactez pour obtenir de l'aide ou à d'autres fins, 
-                      nous collectons vos informations de contact et le contenu de vos communications.
+                      When you contact us for support or other purposes, we collect your contact information and the content of your communications.
                     </p>
                   </div>
 
                   <div>
-                    <h4 className="text-lg font-medium text-gray-900 mb-2">Informations de paiement :</h4>
+                    <h4 className="text-lg font-medium text-gray-900 mb-2">Payment Information:</h4>
                     <p className="text-gray-700">
-                      Si vous achetez nos services payants, nous collectons des informations 
-                      de facturation limitées, y compris votre nom et adresse de facturation. 
-                      Les transactions de paiement sont traitées de manière sécurisée par des 
-                      processeurs de paiement tiers de confiance. Intelia ne collecte ni ne 
-                      stocke les détails complets de votre carte de paiement. Les processeurs 
-                      tiers gèrent la transmission, le traitement et le stockage sécurisés 
-                      des données de paiement en conformité avec les normes industrielles 
-                      applicables (comme PCI DSS).
+                      If you purchase our paid services, we collect limited billing information, including your name and billing address. Payment transactions are processed securely by trusted third-party payment processors. Intelia does not collect or store your complete payment card details. Third-party processors handle the secure transmission, processing, and storage of payment data in compliance with applicable industry standards (such as PCI DSS).
                     </p>
                   </div>
                 </div>
 
-                <h3 className="text-xl font-semibold text-gray-900 mb-3 mt-8">1.2 Informations que nous collectons automatiquement</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-3 mt-8">1.2 Information We Collect Automatically</h3>
                 
                 <div className="space-y-4">
                   <div>
-                    <h4 className="text-lg font-medium text-gray-900 mb-2">Données d'utilisation :</h4>
+                    <h4 className="text-lg font-medium text-gray-900 mb-2">Usage Data:</h4>
                     <p className="text-gray-700">
-                      Nous collectons des informations sur la façon dont vous utilisez nos 
-                      Services, y compris les dates et heures d'accès, les fonctionnalités 
-                      utilisées, les interactions avec nos modèles d'IA, le temps passé sur 
-                      chaque page, le chemin pris dans l'application et d'autres paramètres 
-                      liés à vos habitudes d'utilisation.
+                      We collect information about how you use our Services, including the dates and times of access, features used, interactions with our AI models, the time spent on each page, the path taken within the application, and other parameters related to your usage patterns.
                     </p>
                   </div>
 
                   <div>
-                    <h4 className="text-lg font-medium text-gray-900 mb-2">Informations sur l'appareil :</h4>
+                    <h4 className="text-lg font-medium text-gray-900 mb-2">Device Information:</h4>
                     <p className="text-gray-700">
-                      Nous collectons des informations sur votre appareil, y compris le type 
-                      d'appareil, le système d'exploitation, le type et les fonctionnalités 
-                      du navigateur, les adresses IP ou noms de domaine, les identifiants 
-                      uniques d'appareil et les informations de localisation générale dérivées 
-                      de votre adresse IP.
+                      We collect information about your device, including device type, operating system, browser type and features, IP addresses or domain names, unique device identifiers, and general location information derived from your IP address.
                     </p>
                   </div>
 
                   <div>
-                    <h4 className="text-lg font-medium text-gray-900 mb-2">Informations de journal :</h4>
+                    <h4 className="text-lg font-medium text-gray-900 mb-2">Log Information:</h4>
                     <p className="text-gray-700">
-                      Nous maintenons des journaux système qui enregistrent l'interaction avec 
-                      nos Services, y compris les rapports d'erreur, les données de performance, 
-                      les codes de réponse du serveur et d'autres informations techniques pour 
-                      le fonctionnement et la maintenance.
+                      We maintain system logs that record interaction with our Services, including error reports, performance data, server response codes, and other technical information for operation and maintenance purposes.
                     </p>
                   </div>
 
                   <div>
-                    <h4 className="text-lg font-medium text-gray-900 mb-2">Trackers et technologies similaires :</h4>
+                    <h4 className="text-lg font-medium text-gray-900 mb-2">Trackers and Similar Technologies:</h4>
                     <p className="text-gray-700">
-                      Nous utilisons des cookies, identifiants uniques, balises Web, scripts 
-                      intégrés et autres technologies de suivi (collectivement appelées 
-                      « Trackers ») pour améliorer nos Services et votre expérience utilisateur. 
-                      Vous pouvez contrôler les cookies via les paramètres de votre navigateur.
+                      We use cookies, unique identifiers, web beacons, embedded scripts, and other tracking technologies (collectively referred to as "Trackers") to enhance our Services and improve your user experience. You can control cookies through your browser settings.
                     </p>
                   </div>
                 </div>
 
-                <h3 className="text-xl font-semibold text-gray-900 mb-3 mt-8">1.3 Contenu généré par l'IA</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-3 mt-8">1.3 AI-Generated Content</h3>
                 
                 <div>
-                  <h4 className="text-lg font-medium text-gray-900 mb-2">Sorties :</h4>
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">Outputs:</h4>
                   <p className="text-gray-700">
-                    Nos Services d'IA génèrent des réponses basées sur vos Entrées (« Sorties »). 
-                    Bien que vous conserviez la propriété de vos Sorties, nous pouvons traiter 
-                    ces informations comme décrit dans cette politique.
+                    Our AI Services generate responses based on your Inputs ("Outputs"). While you retain ownership of your Outputs, we may process this information as described in this policy.
                   </p>
                 </div>
               </section>
 
               <section>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">2. COMMENT NOUS UTILISONS VOS INFORMATIONS</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">2. HOW WE USE YOUR INFORMATION</h2>
                 
-                <p className="text-gray-700 mb-4">Nous utilisons vos informations personnelles aux fins suivantes :</p>
+                <p className="text-gray-700 mb-4">We use your personal information for the following purposes:</p>
                 
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-3">2.1 Fourniture de services</h3>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">2.1 Service Provision</h3>
                     <ul className="list-disc pl-6 text-gray-700 space-y-1">
-                      <li>Fournir, maintenir et améliorer nos Services d'IA</li>
-                      <li>Traiter vos demandes et générer des réponses d'IA</li>
-                      <li>Gérer votre compte et fournir un support client</li>
-                      <li>Traiter les paiements et gérer la facturation</li>
+                      <li>To provide, maintain, and improve our AI Services</li>
+                      <li>To process your requests and generate AI responses</li>
+                      <li>To manage your account and provide customer support</li>
+                      <li>To process payments and manage billing</li>
                     </ul>
                   </div>
 
                   <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-3">2.2 Amélioration des services</h3>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">2.2 Service Improvement</h3>
                     <ul className="list-disc pl-6 text-gray-700 space-y-1">
-                      <li>Analyser les habitudes d'utilisation et améliorer nos Services</li>
-                      <li>Développer de nouvelles fonctionnalités et capacités</li>
-                      <li>Améliorer les performances et la précision de nos modèles d'IA</li>
-                      <li>Assurer la sécurité et la sûreté de nos Services</li>
+                      <li>To analyze usage patterns and improve our Services</li>
+                      <li>To develop new features and capabilities</li>
+                      <li>To enhance the performance and accuracy of our AI models</li>
+                      <li>To ensure the safety and security of our Services</li>
                     </ul>
                   </div>
 
                   <div>
                     <h3 className="text-xl font-semibold text-gray-900 mb-3">2.3 Communication</h3>
                     <ul className="list-disc pl-6 text-gray-700 space-y-1">
-                      <li>Répondre à vos demandes et fournir un support</li>
-                      <li>Vous envoyer d'importantes annonces et mises à jour de service</li>
-                      <li>Vous notifier des changements à nos Services ou politiques</li>
+                      <li>To respond to your inquiries and provide support</li>
+                      <li>To send you important service announcements and updates</li>
+                      <li>To notify you about changes to our Services or policies</li>
                     </ul>
                   </div>
 
                   <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-3">2.4 Légal et sécurité</h3>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">2.4 Legal and Safety</h3>
                     <ul className="list-disc pl-6 text-gray-700 space-y-1">
-                      <li>Se conformer aux lois et réglementations applicables</li>
-                      <li>Protéger contre la fraude, l'abus et les menaces de sécurité</li>
-                      <li>Faire respecter nos Conditions d'utilisation et autres accords</li>
-                      <li>Protéger les droits, la propriété et la sécurité d'Intelia, de nos utilisateurs et d'autres</li>
+                      <li>To comply with applicable laws and regulations</li>
+                      <li>To protect against fraud, abuse, and security threats</li>
+                      <li>To enforce our Terms of Service and other agreements</li>
+                      <li>To protect the rights, property, and safety of Intelia, our users, and others</li>
                     </ul>
                   </div>
 
                   <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-3">2.5 Formation et amélioration des modèles</h3>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">2.5 Model Training and Improvement</h3>
                     <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
-                      <p className="text-yellow-800 font-semibold mb-2">Important :</p>
+                      <p className="text-yellow-800 font-semibold mb-2">Important:</p>
                       <p className="text-yellow-700 text-sm mb-2">
-                        Nous n'utilisons pas vos Entrées ou Sorties pour entraîner nos modèles 
-                        d'IA sans votre consentement explicite, sauf dans les circonstances 
-                        limitées suivantes :
+                        We do not use your Inputs or Outputs to train our AI models without your explicit consent, except in the following limited circumstances:
                       </p>
                       <ul className="list-disc pl-6 text-yellow-700 text-sm space-y-1">
-                        <li>Lorsque le contenu est signalé pour examen de sécurité</li>
-                        <li>Lorsque vous fournissez explicitement des commentaires ou signalez des problèmes</li>
-                        <li>Lorsque vous optez explicitement pour aider à améliorer nos Services</li>
+                        <li>When content is flagged for safety review</li>
+                        <li>When you explicitly provide feedback or report issues</li>
+                        <li>When you explicitly opt-in to help improve our Services</li>
                       </ul>
                     </div>
                   </div>
@@ -264,310 +214,257 @@ export default function PrivacyPage() {
               </section>
 
               <section>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">3. COMMENT NOUS PARTAGEONS VOS INFORMATIONS</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">3. HOW WE SHARE YOUR INFORMATION</h2>
                 
-                <p className="text-gray-700 mb-4">Nous pouvons partager vos informations personnelles dans les circonstances suivantes :</p>
+                <p className="text-gray-700 mb-4">We may share your personal information in the following circumstances:</p>
                 
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-3">3.1 Fournisseurs de services</h3>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">3.1 Service Providers</h3>
                     <p className="text-gray-700 mb-2">
-                      Nous pouvons partager vos informations avec des fournisseurs de services 
-                      tiers de confiance qui nous aident à exploiter nos Services, tels que :
+                      We may share your information with trusted third-party service providers who assist us in operating our Services, such as:
                     </p>
                     <ul className="list-disc pl-6 text-gray-700 space-y-1">
-                      <li>Fournisseurs d'hébergement cloud et de stockage de données</li>
-                      <li>Processeurs de paiement</li>
-                      <li>Plateformes de support client</li>
-                      <li>Services d'analyse et de surveillance</li>
-                      <li>Services de plateforme et d'hébergement</li>
-                      <li>Services de gestion des balises</li>
+                      <li>Cloud hosting and data storage providers</li>
+                      <li>Payment processors</li>
+                      <li>Customer support platforms</li>
+                      <li>Analytics and monitoring services</li>
+                      <li>Platform services and hosting providers</li>
+                      <li>Tag management services</li>
                     </ul>
                     <p className="text-gray-700 mt-2">
-                      Ces fournisseurs de services sont contractuellement obligés de protéger 
-                      vos informations et de les utiliser uniquement aux fins spécifiées par nous.
+                      These service providers are contractually obligated to protect your information and use it only for the purposes specified by us.
                     </p>
                   </div>
 
                   <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-3">3.2 Exigences légales</h3>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">3.2 Legal Requirements</h3>
                     <p className="text-gray-700 mb-2">
-                      Nous pouvons divulguer vos informations lorsque requis par la loi ou en réponse à :
+                      We may disclose your information when required by law or in response to:
                     </p>
                     <ul className="list-disc pl-6 text-gray-700 space-y-1">
-                      <li>Procédure légale valide, comme une ordonnance de tribunal ou une assignation</li>
-                      <li>Demandes gouvernementales selon la loi applicable</li>
-                      <li>Situations impliquant des menaces potentielles à la sécurité publique</li>
-                      <li>Protection de nos droits légaux et de notre propriété</li>
+                      <li>Valid legal process, such as a court order or subpoena</li>
+                      <li>Government requests by applicable law</li>
+                      <li>Situations involving potential threats to public safety</li>
+                      <li>Protection of our legal rights and property</li>
                     </ul>
                   </div>
 
                   <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-3">3.3 Transferts d'entreprise</h3>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">3.3 Business Transfers</h3>
                     <p className="text-gray-700">
-                      En cas de fusion, acquisition ou vente de notre entreprise, vos informations 
-                      peuvent être transférées à la nouvelle entité, sous réserve du même niveau 
-                      de protection pour votre vie privée.
+                      In the event of a merger, acquisition, or sale of our business, your information may be transferred to the new entity, subject to the same level of protection for your privacy.
                     </p>
                   </div>
 
                   <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-3">3.4 Responsabilité des données tierces</h3>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">3.4 Third-Party Data Responsibility</h3>
                     <p className="text-gray-700">
-                      Vous êtes responsable de toutes données personnelles tierces obtenues, 
-                      publiées ou partagées via nos Services, et vous confirmez avoir reçu 
-                      le consentement de la tierce partie pour fournir ces données.
+                      You are responsible for any third-party personal data obtained, published, or shared through our Services, and you confirm that you have received the third party's consent to provide such data to us.
                     </p>
                   </div>
 
                   <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-3">3.5 Consentement</h3>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">3.5 Consent</h3>
                     <p className="text-gray-700">
-                      Nous pouvons partager vos informations avec votre consentement explicite 
-                      ou selon vos directives.
+                      We may share your information with your explicit consent or as directed by you.
                     </p>
                   </div>
                 </div>
               </section>
 
               <section>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">4. CONSERVATION DES DONNÉES</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">4. DATA RETENTION</h2>
                 
                 <p className="text-gray-700 mb-4">
-                  Nous conservons vos informations personnelles aussi longtemps que nécessaire 
-                  pour fournir nos Services et réaliser les objectifs décrits dans cette 
-                  Politique de confidentialité.
+                  We retain your personal information for as long as necessary to provide our Services and fulfill the purposes described in this Privacy Policy.
                 </p>
 
                 <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                  <p className="font-semibold text-gray-900 mb-2">Principe général :</p>
+                  <p className="font-semibold text-gray-900 mb-2">General Principle:</p>
                   <p className="text-gray-700 text-sm">
-                    Les données personnelles sont traitées et stockées aussi longtemps que 
-                    requis par l'objectif pour lequel elles ont été collectées.
+                    Personal data shall be processed and stored for as long as required by the purpose for which they have been collected.
                   </p>
                 </div>
 
-                <p className="text-gray-700 mb-4">Les périodes de conservation spécifiques incluent :</p>
+                <p className="text-gray-700 mb-4">Specific retention periods include:</p>
                 
                 <ul className="list-disc pl-6 text-gray-700 space-y-2 mb-6">
-                  <li><strong>Données personnelles pour l'exécution du contrat :</strong> Conservées jusqu'à ce que le contrat entre nous et vous ait été entièrement exécuté</li>
-                  <li><strong>Données personnelles pour intérêts légitimes :</strong> Conservées aussi longtemps que nécessaire pour réaliser ces objectifs</li>
-                  <li><strong>Informations de compte :</strong> Conservées tant que votre compte est actif et pour une période raisonnable par la suite</li>
-                  <li><strong>Entrées et Sorties :</strong> Stockées selon les paramètres de votre compte et nos politiques de conservation des données</li>
-                  <li><strong>Données d'utilisation et de journal :</strong> Généralement conservées jusqu'à 24 mois pour la sécurité et l'amélioration des services</li>
-                  <li><strong>Enregistrements de communication :</strong> Conservés pour le service client et la conformité légale</li>
+                  <li><strong>Personal Data for Contract Performance:</strong> Retained until the contract between us and you has been fully performed</li>
+                  <li><strong>Personal Data for Legitimate Interests:</strong> Retained as long as needed to fulfill such purposes</li>
+                  <li><strong>Account Information:</strong> Retained while your account is active and for a reasonable period thereafter</li>
+                  <li><strong>Inputs and Outputs:</strong> Stored according to your account settings and our data retention policies</li>
+                  <li><strong>Usage and Log Data:</strong> Typically retained for up to 24 months for security and service improvement purposes</li>
+                  <li><strong>Communication Records:</strong> Retained for customer service and legal compliance purposes</li>
                 </ul>
 
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Conservation prolongée :</h3>
-                    <p className="text-gray-700 mb-2">Nous pouvons conserver les données personnelles pour une période plus longue lorsque :</p>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Extended Retention:</h3>
+                    <p className="text-gray-700 mb-2">We may retain personal data for a longer period when:</p>
                     <ul className="list-disc pl-6 text-gray-700 space-y-1">
-                      <li>Vous avez donné votre consentement à ce traitement, tant que ce consentement n'est pas retiré</li>
-                      <li>Requis pour s'acquitter d'une obligation légale ou sur ordre d'une autorité</li>
-                      <li>Nécessaire pour protéger nos droits et intérêts ou ceux de nos utilisateurs ou tiers</li>
+                      <li>You have given consent to such processing, as long as such consent is not withdrawn</li>
+                      <li>Required to do so for the performance of a legal obligation or upon order of an authority</li>
+                      <li>Necessary to protect our rights and interests or those of our users or third parties</li>
                     </ul>
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Suppression des données :</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Data Deletion:</h3>
                     <p className="text-gray-700 mb-2">
-                      Une fois la période de conservation expirée, les données personnelles sont supprimées. 
-                      Par conséquent, les droits d'accès, d'effacement, de rectification et de portabilité 
-                      des données ne peuvent être exercés après l'expiration de la période de conservation.
+                      Once the retention period expires, personal data shall be deleted. Therefore, the rights of access, erasure, rectification, and data portability cannot be enforced after the expiration of the retention period.
                     </p>
                     <p className="text-gray-700">
-                      Vous pouvez supprimer des conversations individuelles et gérer vos données via 
-                      les paramètres de votre compte. Lorsque vous supprimez votre compte, nous 
-                      supprimerons ou anonymiserons vos informations personnelles, sauf si requis 
-                      pour la conformité légale ou des fins commerciales légitimes.
+                      You can delete individual conversations and manage your data through your account settings. When you delete your account, we will delete or anonymize your personal information, except as required for legal compliance or legitimate business purposes.
                     </p>
                   </div>
                 </div>
               </section>
 
               <section>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">5. VOS DROITS À LA VIE PRIVÉE</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">5. YOUR PRIVACY RIGHTS</h2>
                 
                 <p className="text-gray-700 mb-4">
-                  Selon votre emplacement, vous pouvez avoir certains droits concernant vos 
-                  informations personnelles :
+                  Depending on your location, you may have certain rights regarding your personal information:
                 </p>
                 
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">5.1 Accès et portabilité</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">5.1 Access and Portability</h3>
                     <p className="text-gray-700">
-                      Vous pouvez accéder et télécharger vos informations personnelles via les 
-                      paramètres de votre compte.
+                      You can access and download your personal information through your account settings.
                     </p>
                   </div>
 
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">5.2 Correction</h3>
                     <p className="text-gray-700">
-                      Vous pouvez mettre à jour ou corriger vos informations personnelles via 
-                      les paramètres de votre compte ou en nous contactant.
+                      You can update or correct your personal information through your account settings or by contacting us.
                     </p>
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">5.3 Suppression</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">5.3 Deletion</h3>
                     <p className="text-gray-700">
-                      Vous pouvez supprimer vos conversations, compte et données associées, 
-                      sous réserve de certaines exceptions pour la conformité légale.
+                      You can delete your conversations, account, and associated data, subject to certain exceptions for legal compliance.
                     </p>
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">5.4 Objection au traitement</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">5.5 Object to Processing</h3>
                     <p className="text-gray-700">
-                      Vous avez le droit de vous opposer au traitement de vos données, 
-                      particulièrement lorsque le traitement est basé sur des intérêts légitimes. 
-                      Vous pouvez vous opposer au traitement à tout moment sans avoir besoin de 
-                      justifier pourquoi vos données sont traitées à des fins de marketing direct.
+                      You have the right to object to the processing of your data, particularly when processing is based on legitimate interests. You can object to processing at any time without needing to justify why your data is being processed for direct marketing purposes.
                     </p>
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">5.5 Déposer une plainte</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">5.6 Lodge a Complaint</h3>
                     <p className="text-gray-700">
-                      Vous avez le droit de porter plainte devant votre autorité compétente 
-                      de protection des données.
+                      You have the right to bring a claim before your competent data protection authority.
                     </p>
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">5.6 Exercer vos droits</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">5.7 Exercise Your Rights</h3>
                     <p className="text-gray-700">
-                      Pour exercer ces droits, veuillez nous contacter à{' '}
+                      To exercise these rights, please contact us at{' '}
                       <a href="mailto:confidentialite@intelia.com" className="text-blue-600 hover:text-blue-700 underline">
                         confidentialite@intelia.com
                       </a>{' '}
-                      ou{' '}
+                      or{' '}
                       <a href="https://intelia.com/contact-2/" className="text-blue-600 hover:text-blue-700 underline">
                         https://intelia.com/contact-2/
                       </a>. 
-                      Toute demande d'exercice de vos droits peut être faite gratuitement et 
-                      sera traitée dans les plus brefs délais et toujours dans un délai d'un mois. 
-                      Nous répondrons à votre demande dans un délai raisonnable, comme requis 
-                      par la loi applicable.
+                      Any requests to exercise your rights can be made free of charge and will be addressed by us as early as possible and always within one month. We will respond to your request within a reasonable timeframe, as required by applicable law.
                     </p>
                   </div>
                 </div>
               </section>
 
               <section>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">6. SÉCURITÉ DES DONNÉES</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">6. DATA SECURITY</h2>
                 
                 <p className="text-gray-700 mb-4">
-                  Nous mettons en œuvre des mesures de sécurité techniques, administratives 
-                  et physiques appropriées pour protéger vos informations personnelles contre 
-                  l'accès non autorisé, la divulgation, l'altération et la destruction. 
-                  Ces mesures incluent :
+                  We implement appropriate technical, administrative, and physical security measures to protect your personal information against unauthorized access, disclosure, alteration, and destruction. These measures include:
                 </p>
                 
                 <ul className="list-disc pl-6 text-gray-700 space-y-2 mb-4">
-                  <li>Chiffrement des données en transit et au repos</li>
-                  <li>Contrôles d'accès et systèmes d'authentification</li>
-                  <li>Évaluations et surveillance régulières de la sécurité</li>
-                  <li>Formation des employés sur les pratiques de protection des données</li>
+                  <li>Encryption of data in transit and at rest</li>
+                  <li>Access controls and authentication systems</li>
+                  <li>Regular security assessments and monitoring</li>
+                  <li>Employee training on data protection practices</li>
                 </ul>
 
                 <p className="text-gray-700 mb-4">
-                  De plus, les processeurs de paiement tiers engagés pour gérer les transactions 
-                  de facturation et de paiement mettent en œuvre leurs propres programmes de 
-                  sécurité et de conformité, y compris la certification sous la norme de 
-                  sécurité des données de l'industrie des cartes de paiement (PCI DSS), 
-                  pour protéger les informations de paiement sensibles.
+                  Additionally, third-party payment processors engaged to handle billing and payment transactions implement their own security and compliance programs, including certification under the Payment Card Industry Data Security Standard (PCI DSS), to protect sensitive payment information.
                 </p>
 
                 <p className="text-gray-700">
-                  Cependant, aucune méthode de transmission ou de stockage n'est complètement 
-                  sécurisée, et nous ne pouvons garantir une sécurité absolue.
+                  However, no method of transmission or storage is completely secure, and we cannot guarantee absolute security.
                 </p>
               </section>
 
               <section>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">7. TRANSFERTS INTERNATIONAUX DE DONNÉES</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">7. INTERNATIONAL DATA TRANSFERS</h2>
                 
                 <p className="text-gray-700 mb-4">
-                  Nos Services sont fournis depuis le Canada, et vos informations personnelles 
-                  peuvent être traitées et stockées au Canada ou dans d'autres pays où nous 
-                  ou nos fournisseurs de services opérons. Cela inclut les situations où des 
-                  processeurs de paiement tiers gèrent les transactions de facturation et de 
-                  paiement, ce qui peut impliquer le traitement et le stockage d'informations 
-                  de paiement dans des juridictions en dehors de votre pays de résidence.
+                  Our Services are provided from Canada, and your personal information may be processed and stored in Canada or other countries where we or our service providers operate. This includes situations where third-party payment processors manage billing and payment transactions, which may involve processing and storing payment information in jurisdictions outside your country of residence.
                 </p>
 
                 <p className="text-gray-700 mb-4">
-                  Pour les utilisateurs dans l'Espace économique européen (EEE), la Suisse 
-                  ou le Royaume-Uni, nous nous assurons que tout transfert international 
-                  d'informations personnelles est effectué avec des garanties appropriées, telles que :
+                  For users in the European Economic Area (EEA), Switzerland, or the United Kingdom, we ensure that any international transfers of personal information are conducted with appropriate safeguards, such as:
                 </p>
 
                 <ul className="list-disc pl-6 text-gray-700 space-y-2">
-                  <li>Décisions d'adéquation par la Commission européenne</li>
-                  <li>Clauses contractuelles types approuvées par la Commission européenne</li>
-                  <li>Autres mécanismes de transfert légalement reconnus</li>
+                  <li>Adequacy decisions by the European Commission</li>
+                  <li>Standard contractual clauses approved by the European Commission</li>
+                  <li>Other legally recognized transfer mechanisms</li>
                 </ul>
               </section>
 
               <section>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">8. MODIFICATIONS À CETTE POLITIQUE DE CONFIDENTIALITÉ</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">8. CHANGES TO THIS PRIVACY POLICY</h2>
                 
                 <p className="text-gray-700">
-                  Nous pouvons mettre à jour cette Politique de confidentialité de temps à autre 
-                  pour refléter les changements dans nos pratiques, Services ou loi applicable. 
-                  Nous vous notifierons des changements importants en publiant la politique 
-                  mise à jour sur notre site Web et en mettant à jour la date « Dernière mise à jour ». 
-                  Nous vous encourageons à consulter périodiquement cette Politique de confidentialité.
+                  We may update this Privacy Policy from time to time to reflect changes in our practices, Services, or applicable law. We will notify you of material changes by posting the updated policy on our website and updating the "Last Updated" date. We encourage you to review this Privacy Policy periodically.
                 </p>
               </section>
 
               <section>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">9. CONFORMITÉ AUX LOIS CANADIENNES SUR LA VIE PRIVÉE</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">9. CANADIAN PRIVACY LAW COMPLIANCE</h2>
                 
                 <p className="text-gray-700 mb-4">
-                  Pour les utilisateurs au Canada, nous nous conformons aux lois canadiennes 
-                  applicables sur la vie privée, y compris :
+                  For users in Canada, we comply with applicable Canadian privacy laws, including:
                 </p>
                 
                 <ul className="list-disc pl-6 text-gray-700 space-y-2 mb-6">
-                  <li>La Loi sur la protection des renseignements personnels et les documents électroniques (LPRPDE)</li>
-                  <li>La Loi sur la protection des renseignements personnels dans le secteur privé du Québec</li>
-                  <li>Autres législations provinciales applicables sur la vie privée</li>
+                  <li>The Personal Information Protection and Electronic Documents Act (PIPEDA)</li>
+                  <li>Quebec's Act respecting the protection of personal information in the private sector</li>
+                  <li>Other applicable provincial privacy legislation</li>
                 </ul>
 
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">9.1 Consentement</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">9.1 Consent</h3>
                     <p className="text-gray-700">
-                      Nous obtenons votre consentement pour la collecte, l'utilisation et la 
-                      divulgation de vos informations personnelles comme requis par la loi. 
-                      Vous pouvez retirer votre consentement à tout moment, sous réserve de 
-                      toute restriction légale ou contractuelle applicable.
+                      We obtain your consent for the collection, use, and disclosure of your personal information as required by law. You may withdraw your consent at any time, subject to any applicable legal or contractual restrictions.
                     </p>
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">9.2 Responsable de la protection de la vie privée</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">9.2 Privacy Officer</h3>
                     <p className="text-gray-700">
-                      Nous avons nommé un Responsable de la protection de la vie privée qui 
-                      est responsable d'assurer la conformité avec les lois sur la vie privée 
-                      et de traiter les demandes liées à la vie privée.
+                      We have appointed a Privacy Officer who is responsible for ensuring compliance with privacy laws and handling privacy-related inquiries.
                     </p>
                   </div>
                 </div>
               </section>
 
               <section>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">10. NOUS CONTACTER</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">10. CONTACT US</h2>
                 
                 <p className="text-gray-700 mb-4">
-                  Si vous avez des questions, préoccupations ou plaintes concernant cette 
-                  Politique de confidentialité ou nos pratiques de confidentialité, 
-                  veuillez nous contacter :
+                  If you have questions, concerns, or complaints about this Privacy Policy or our privacy practices, please get in touch with us:
                 </p>
                 
                 <div className="bg-gray-50 p-6 rounded-lg">
@@ -578,13 +475,13 @@ export default function PrivacyPage() {
                   
                   <div className="space-y-1">
                     <p className="text-gray-700">
-                      <span className="font-medium">Email du propriétaire :</span>{' '}
+                      <span className="font-medium">Owner contact email:</span>{' '}
                       <a href="mailto:confidentialite@intelia.com" className="text-blue-600 hover:text-blue-700 underline">
                         confidentialite@intelia.com
                       </a>
                     </p>
                     <p className="text-gray-700">
-                      <span className="font-medium">Contact :</span>{' '}
+                      <span className="font-medium">Contact:</span>{' '}
                       <a href="https://intelia.com/contact-2/" className="text-blue-600 hover:text-blue-700 underline">
                         https://intelia.com/contact-2/
                       </a>
@@ -594,26 +491,16 @@ export default function PrivacyPage() {
                 
                 <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mt-6">
                   <p className="text-blue-800 text-sm">
-                    <span className="font-semibold">Pour les utilisateurs au Canada :</span> Si vous 
-                    n'êtes pas satisfait de notre réponse à votre préoccupation concernant la vie 
-                    privée, vous pouvez déposer une plainte auprès du Commissariat à la protection 
-                    de la vie privée du Canada ou de votre commissaire provincial à la protection 
-                    de la vie privée applicable.
+                    <span className="font-semibold">For users in Canada:</span> If you are not satisfied with our response to your privacy concern, you may file a complaint with the Office of the Privacy Commissioner of Canada or your applicable provincial privacy commissioner.
                   </p>
                 </div>
                 
                 <p className="text-sm text-gray-500 mt-6">
-                  <span className="font-semibold">Information légale :</span> Cette déclaration 
-                  de confidentialité a été préparée selon les dispositions de multiples 
-                  législations, y compris l'article 13/14 du Règlement (UE) 2016/679 (Règlement 
-                  général sur la protection des données) et les lois canadiennes applicables 
-                  sur la vie privée.
+                  <span className="font-semibold">Legal Information:</span> This privacy statement has been prepared in accordance with the provisions of multiple legislations, including Article 13/14 of Regulation (EU) 2016/679 (General Data Protection Regulation) and applicable Canadian privacy laws.
                 </p>
                 
                 <p className="text-sm text-gray-500 mt-4 italic">
-                  Cette Politique de confidentialité est effective à partir du 14 août 2025 
-                  et remplace tous les accords et ententes antérieurs, qu'ils soient écrits ou oraux, 
-                  entre les parties.
+                  This Privacy Policy is effective as of August 14, 2025, and supersedes all prior agreements and understandings, whether written or oral, between the parties.
                 </p>
               </section>
             </div>

@@ -645,45 +645,8 @@ export function SignupModal({
           </form>
         </div>
 
-		
-		{/* Footer de la modale avec boutons */}
+        {/* Footer de la modale avec boutons */}
         <div className="flex-shrink-0 bg-gray-50 border-t border-gray-200 px-6 py-4 rounded-b-lg">
-          
-          {/* Séparateur avec texte légal */}
-          <div className="relative mb-4">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-gray-50 text-gray-500"></span>
-            </div>
-          </div>
-
-          {/* Texte légal */}
-          <div className="mb-4 text-center">
-            <p className="text-xs text-gray-500 leading-relaxed">
-              En cliquant sur « Créer un compte », vous acceptez nos{' '}
-              <a 
-                href="/terms" 
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800 underline transition-colors"
-              >
-                {safeT('legal.terms')}
-              </a>
-              {' '}et notre{' '}
-              <a 
-                href="/privacy" 
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800 underline transition-colors"
-              >
-                {safeT('legal.privacy')}
-              </a>
-              .
-            </p>
-          </div>
-
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
@@ -700,7 +663,7 @@ export function SignupModal({
               {getButtonContent()}
             </button>
           </div>
-        </div>		
+        </div>
       </div>
     </div>
   )

@@ -1,3 +1,4 @@
+// app/terms/page.tsx
 'use client'
 
 import React from 'react'
@@ -37,10 +38,10 @@ export default function TermsPage() {
 
             <div className="space-y-8">
               <section>
-                <p className="text-gray-700 leading-relaxed">
+                <p className="text-gray-700 leading-relaxed mb-4">
                   These Terms of Service ("Terms") constitute an agreement between Intelia Technologies Inc., a corporation duly incorporated under the Business Corporations Act (Quebec), having its head office at 839 Papineau, Joliette, Québec J6E 2L6, Canada ("Intelia Expert," "we," "us," or "our") and you ("User" or "you") regarding your use of our artificial intelligence services, platform, and related tools (collectively, the "Services").
                 </p>
-                <p className="text-gray-700 leading-relaxed mt-4">
+                <p className="text-gray-700 leading-relaxed">
                   By using our Services, clicking "I Accept," or otherwise indicating your consent, you agree to be bound by these Terms. If you do not agree to any part of these Terms, please discontinue use of our Services immediately.
                 </p>
               </section>
@@ -96,7 +97,7 @@ export default function TermsPage() {
 
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">3.2 Prohibited Uses</h3>
                 <p className="text-gray-700 leading-relaxed mb-2">You may not use our Services to:</p>
-                <ul className="list-disc pl-6 text-gray-700 space-y-2">
+                <ul className="list-disc pl-6 text-gray-700 space-y-2 mb-4">
                   <li>Engage in illegal activities or harm others</li>
                   <li>Infringe upon intellectual property rights</li>
                   <li>Generate harmful, abusive, or discriminatory content</li>
@@ -105,7 +106,7 @@ export default function TermsPage() {
                   <li>Use the Services to compete directly with us</li>
                 </ul>
 
-                <h3 className="text-xl font-semibold text-gray-900 mb-3 mt-6">3.3 Compliance</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-3">3.3 Compliance</h3>
                 <p className="text-gray-700 leading-relaxed mb-4">
                   Each party will comply with all applicable laws regarding the provision of the Services (for Intelia Technologies) and the use of the Services (for the User), including any relevant data privacy laws and regulations.
                 </p>
@@ -147,7 +148,10 @@ export default function TermsPage() {
 
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">5.1 Privacy Policy</h3>
                 <p className="text-gray-700 leading-relaxed mb-4">
-                  Your use of our Services is governed by our <Link href="/privacy" className="text-blue-600 hover:text-blue-700 underline">Privacy Policy</Link>, which explains how we collect, use, and protect your personal information.
+                  Your use of our Services is governed by our{' '}
+                  <Link href="/privacy" className="text-blue-600 hover:text-blue-700 underline">
+                    Privacy Policy
+                  </Link>, which explains how we collect, use, and protect your personal information.
                 </p>
 
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">5.2 Data Processing</h3>
@@ -172,7 +176,7 @@ export default function TermsPage() {
 
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">6.2 Billing Terms</h3>
                 <p className="text-gray-700 leading-relaxed mb-4">
-                  Billing begins on the activation date of the user’s plan (“Activation Date”). The customer is charged immediately for the upcoming month. Each billing cycle covers a monthly period starting and ending on the anniversary date of the Activation Date.
+                  Billing begins on the activation date of the user's plan ("Activation Date"). The customer is charged immediately for the upcoming month. Each billing cycle covers a monthly period starting and ending on the anniversary date of the Activation Date.
                 </p>
                 <p className="text-gray-700 leading-relaxed mb-4">
                   For example, if the Activation Date is the 15th of a month, the billing cycle runs from the 15th to the 14th of the following month. If a month does not contain the same calendar date (e.g., activation on the 31st), the billing cycle will end on the last day of that month.
@@ -185,15 +189,15 @@ export default function TermsPage() {
 
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">6.4 Payment Methods</h3>
                 <p className="text-gray-700 leading-relaxed mb-4">
-                  Payments must be made by credit card, bank transfer, or any other method specified on our platform. The registered payment method will be automatically charged on each billing anniversary date, unless the subscription is canceled in accordance with these Terms.
+                  Payments must be made by credit card or by any other payment method accepted by the third-party payment processor managing the transaction. The registered payment method will be automatically charged on each billing anniversary date, unless the subscription is canceled in accordance with these Terms.
                 </p>
 
-                <h3 className="text-xl font-semibold text-gray-900 mb-3">6.5 Payment Processing with Stripe</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-3">6.5 Payment Processing by Third-Party Providers</h3>
                 <p className="text-gray-700 leading-relaxed mb-4">
-                  We use <a href="https://stripe.com/legal" className="text-blue-600 hover:text-blue-700 underline" target="_blank" rel="noreferrer">Stripe</a> and <a href="https://stripe.com/privacy" className="text-blue-600 hover:text-blue-700 underline" target="_blank" rel="noreferrer">Link by Stripe</a> as our third-party payment processors. By providing your payment information, you consent to Stripe processing such data in accordance with its Services Agreement and Privacy Policy.
+                  We use trusted third-party payment processors to handle payment transactions. By providing your payment information, you consent to the processing of such data by these providers in accordance with their respective services agreements and privacy policies.
                 </p>
                 <p className="text-gray-700 leading-relaxed mb-4">
-                  We do not collect or store your complete payment card details. Stripe handles the secure transmission and storage of payment information in compliance with the Payment Card Industry Data Security Standard (PCI DSS). We may receive limited billing details (e.g., name, billing address) necessary to fulfill the transaction and provide customer support.
+                  We do not collect or store your complete payment card details. Third-party payment processors manage the secure transmission, processing, and storage of payment information in compliance with applicable industry standards (such as PCI DSS). We may receive limited billing details (e.g., name, billing address) necessary to fulfill the transaction and provide customer support.
                 </p>
 
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">6.6 Refund Policy</h3>
@@ -217,19 +221,25 @@ export default function TermsPage() {
                 </p>
 
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">7.2 Disclaimers</h3>
-                <p className="text-gray-700 leading-relaxed mb-4">
-                  TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
-                </p>
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                  <p className="text-yellow-800 font-medium">
+                    TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+                  </p>
+                </div>
 
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">7.3 Limitation of Liability</h3>
-                <p className="text-gray-700 leading-relaxed mb-4">
-                  TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, OUR TOTAL LIABILITY FOR ANY DAMAGES ARISING FROM THESE TERMS OR YOUR USE OF THE SERVICES SHALL NOT EXCEED THE AMOUNT YOU PAID US IN THE TWELVE MONTHS PRECEDING THE CLAIM.
-                </p>
+                <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+                  <p className="text-red-800 font-medium">
+                    TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, OUR TOTAL LIABILITY FOR ANY DAMAGES ARISING FROM THESE TERMS OR YOUR USE OF THE SERVICES SHALL NOT EXCEED THE AMOUNT YOU PAID US IN THE TWELVE MONTHS PRECEDING THE CLAIM.
+                  </p>
+                </div>
 
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">7.4 Exclusion of Damages</h3>
-                <p className="text-gray-700 leading-relaxed mb-4">
-                  WE SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOSS OF PROFITS OR DATA.
-                </p>
+                <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+                  <p className="text-red-800 font-medium">
+                    WE SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOSS OF PROFITS OR DATA.
+                  </p>
+                </div>
               </section>
 
               {/* 8. INDEMNIFICATION */}
@@ -337,9 +347,9 @@ export default function TermsPage() {
                   If you have questions about these Terms or need to contact us regarding our Services, please reach out to us at:
                 </p>
 
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="font-semibold text-gray-900">Intelia Technologies Inc.</p>
-                  <p className="text-gray-700">Address: 839 Papineau, Joliette, Québec J6E 2L6, Canada</p>
+                <div className="bg-gray-50 p-6 rounded-lg">
+                  <p className="font-semibold text-gray-900 mb-2">Intelia Technologies Inc.</p>
+                  <p className="text-gray-700 mb-1">Address: 839 Papineau, Joliette, Québec J6E 2L6, Canada</p>
                   <p className="text-gray-700">
                     Contact:{' '}
                     <a href="https://intelia.com/contact-2/" className="text-blue-600 hover:text-blue-700 underline" target="_blank" rel="noreferrer">
