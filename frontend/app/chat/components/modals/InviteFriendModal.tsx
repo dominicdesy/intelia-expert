@@ -114,7 +114,7 @@ function useInvitations() {
     }
   }
 
-  const sendInvitations = async (emails: string[], personalMessage: string) => {
+  const sendInvitations = async (emails: string[], personalMessage: string): Promise<InvitationResponse> => {
     if (!user?.email || !user?.name) {
       throw new Error('Utilisateur non connecté')
     }
@@ -128,10 +128,14 @@ function useInvitations() {
       force_send: false
     }
 
-    const response = await apiClient.postSecure('/invitations/send', payload)
+    const response = await apiClient.postSecure<InvitationResponse>('/invitations/send', payload)
     
     if (!response.success) {
       throw new Error(response.error?.message || 'Erreur lors de l\'envoi des invitations')
+    }
+
+    if (!response.data) {
+      throw new Error('Réponse vide du serveur')
     }
 
     return response.data
