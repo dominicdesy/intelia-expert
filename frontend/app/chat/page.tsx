@@ -26,7 +26,7 @@ import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
 import { FeedbackModal } from './components/modals/FeedbackModal'
 
-// Composant ChatInput optimise avec React.memo
+// Composant ChatInput optimisé avec React.memo - CORRIGÉ
 const ChatInput = React.memo(({ 
   inputMessage, 
   setInputMessage, 
@@ -39,7 +39,7 @@ const ChatInput = React.memo(({
 }: {
   inputMessage: string
   setInputMessage: (value: string) => void
-  onSendMessage: () => void
+  onSendMessage: () => void // Plus de paramètre optionnel
   isLoadingChat: boolean
   clarificationState: any
   isMobileDevice: boolean
@@ -49,13 +49,19 @@ const ChatInput = React.memo(({
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      onSendMessage()
+      onSendMessage() // Pas de paramètre passé
     }
   }, [onSendMessage])
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setInputMessage(e.target.value)
   }, [setInputMessage])
+
+  // Nouvelle fonction pour gérer le clic du bouton
+  const handleButtonClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    onSendMessage() // Pas de paramètre passé
+  }, [onSendMessage])
 
   return (
     <div className={`flex items-center min-h-[48px] w-full ${isMobileDevice ? 'mobile-input-container' : 'space-x-3'}`}>
@@ -79,7 +85,7 @@ const ChatInput = React.memo(({
       </div>
 
       <button
-        onClick={onSendMessage}
+        onClick={handleButtonClick} // Utilise la nouvelle fonction
         disabled={isLoadingChat || !inputMessage.trim()}
         className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 ${isMobileDevice ? 'mobile-send-button' : ''}`}
         title={isLoadingChat ? t('chat.sending') : t('chat.send')}
@@ -98,7 +104,7 @@ const ChatInput = React.memo(({
 
 ChatInput.displayName = 'ChatInput'
 
-// Composant MessageList optimise avec React.memo
+// Composant MessageList optimisé avec React.memo
 const MessageList = React.memo(({ 
   processedMessages, 
   isLoadingChat, 
@@ -251,7 +257,7 @@ const MessageList = React.memo(({
 
 MessageList.displayName = 'MessageList'
 
-// Composant principal ChatInterface (renomme depuis l'export par defaut)
+// Composant principal ChatInterface (renommé depuis l'export par défaut)
 function ChatInterface() {
   const { user, isAuthenticated, isLoading, hasHydrated, initializeSession } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
@@ -266,7 +272,7 @@ function ChatInterface() {
   const createNewConversation = useChatStore(state => state.createNewConversation)
   const loadConversations = useChatStore(state => state.loadConversations)
 
-  // Etats separes pour eviter les cascades de re-renders
+  // États séparés pour éviter les cascades de re-renders
   const [inputMessage, setInputMessage] = useState('')
   const [isLoadingChat, setIsLoadingChat] = useState(false)
   const [isMobileDevice, setIsMobileDevice] = useState(false)
@@ -278,7 +284,7 @@ function ChatInterface() {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
   const [viewportHeight, setViewportHeight] = useState(0)
 
-  // Etats pour gestion OAuth
+  // États pour gestion OAuth
   const [isProcessingOAuth, setIsProcessingOAuth] = useState(false)
   const [oauthError, setOAuthError] = useState<string | null>(null)
 
@@ -306,7 +312,7 @@ function ChatInterface() {
   const inputRef = useRef<HTMLInputElement>(null)
   const hasLoadedConversationsRef = useRef(false)
 
-  // Memorisation stable des donnees
+  // Mémorisation stable des données
   const messages: Message[] = useMemo(() => {
     return currentConversation?.messages || []
   }, [currentConversation?.messages])
@@ -315,11 +321,11 @@ function ChatInterface() {
     return messages.length > 0
   }, [messages.length])
 
-  // Gestion amelioree des erreurs d'authentification
+  // Gestion améliorée des erreurs d'authentification
   const handleAuthError = useCallback((error: any) => {
-    console.error('[Chat] Auth error detectee:', error)
+    console.error('[Chat] Auth error détectée:', error)
     
-    // Verifier si c'est une erreur de session expiree
+    // Vérifier si c'est une erreur de session expirée
     const isSessionExpired = (
       error?.status === 401 || 
       error?.status === 403 ||
@@ -328,14 +334,14 @@ function ChatInterface() {
       error?.message?.includes('Unauthorized') ||
       error?.message?.includes('Forbidden') ||
       error?.message?.includes('authentication_failed') ||
-      error?.message?.includes('Session expiree') ||
+      error?.message?.includes('Session expirée') ||
       error?.detail === 'Token expired'
     )
     
     if (isSessionExpired) {
-      console.log('[Chat] Session expiree detectee - deconnexion automatique')
+      console.log('[Chat] Session expirée détectée - déconnexion automatique')
       
-      // Nettoyer l'etat local immediatement pour eviter les erreurs en cascade
+      // Nettoyer l'état local immédiatement pour éviter les erreurs en cascade
       if (isMountedRef.current) {
         setCurrentConversation(null)
         setClarificationState(null)
@@ -343,12 +349,12 @@ function ChatInterface() {
         setIsLoadingChat(false)
       }
       
-      // Utiliser le service de logout pour une deconnexion propre
+      // Utiliser le service de logout pour une déconnexion propre
       import('@/lib/services/logoutService').then(({ logoutService }) => {
         logoutService.performLogout(user)
       }).catch(err => {
         console.warn('[Chat] Fallback - redirection directe:', err)
-        // Fallback : redirection directe si le service echoue
+        // Fallback : redirection directe si le service échoue
         setTimeout(() => {
           window.location.href = '/'
         }, 100)
@@ -359,9 +365,9 @@ function ChatInterface() {
     
     // Pour les autres erreurs, juste logger sans redirection
     console.warn('[Chat] Erreur non-auth (pas de redirection):', error)
-  }, [user, setCurrentConversation, setClarificationState, setInputMessage, setIsLoadingChat])
+  }, [user, setCurrentConversation])
 
-  // Fonctions utilitaires (conservees integralement)
+  // Fonctions utilitaires (conservées intégralement)
   const getUserInitials = useCallback((user: any): string => {
     if (!user) return 'U'
 
@@ -437,7 +443,7 @@ function ChatInterface() {
     }))
   }, [messages, preprocessMarkdown])
 
-  // Effet de nettoyage au demontage
+  // Effet de nettoyage au démontage
   useEffect(() => {
     isMountedRef.current = true
     
@@ -462,18 +468,18 @@ function ChatInterface() {
           setIsProcessingOAuth(true)
           const supabase = getSupabaseClient()
           
-          // Recuperer la session actuelle apres l'OAuth
+          // Récupérer la session actuelle après l'OAuth
           const { data: { session }, error } = await supabase.auth.getSession()
           
           if (error) {
-            console.error('[OAuth Chat] Erreur recuperation session:', error)
+            console.error('[OAuth Chat] Erreur récupération session:', error)
             setOAuthError(error.message)
             router.replace('/?auth=error&message=' + encodeURIComponent(error.message))
             return
           }
 
           if (session?.user) {
-            // Utiliser initializeSession qui met automatiquement a jour le store
+            // Utiliser initializeSession qui met automatiquement à jour le store
             await initializeSession()
             
             // Nettoyer l'URL
@@ -481,10 +487,10 @@ function ChatInterface() {
             url.searchParams.delete('auth')
             window.history.replaceState({}, '', url.pathname)
             
-            console.log('[OAuth Chat] OAuth complete avec succes pour:', session.user.email)
+            console.log('[OAuth Chat] OAuth complété avec succès pour:', session.user.email)
           } else {
-            console.error('[OAuth Chat] Session OAuth incomplete')
-            setOAuthError('Session incomplete')
+            console.error('[OAuth Chat] Session OAuth incomplète')
+            setOAuthError('Session incomplète')
             router.replace('/?auth=error&message=incomplete_session')
           }
         } catch (error: any) {
@@ -496,7 +502,7 @@ function ChatInterface() {
         }
       } else if (authStatus === 'error') {
         const message = searchParams?.get('message') || 'Erreur d\'authentification'
-        console.error('[OAuth Chat] Erreur OAuth recue:', message)
+        console.error('[OAuth Chat] Erreur OAuth reçue:', message)
         setOAuthError(message)
         router.replace('/?auth=error&message=' + encodeURIComponent(message))
       }
@@ -507,7 +513,7 @@ function ChatInterface() {
     }
   }, [searchParams, router, initializeSession])
 
-  // Detection de device mobile (conservee)
+  // Détection de device mobile (conservée)
   useEffect(() => {
     if (!isMountedRef.current) return
 
@@ -534,7 +540,7 @@ function ChatInterface() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Gestion clavier mobile (conservee)
+  // Gestion clavier mobile (conservée)
   useEffect(() => {
     if (!isMobileDevice || !isMountedRef.current) return
 
@@ -575,7 +581,7 @@ function ChatInterface() {
     }
   }, [isMobileDevice])
 
-  // Auto-scroll (conservee)
+  // Auto-scroll (conservée)
   useEffect(() => {
     if (!isMountedRef.current) return
 
@@ -595,7 +601,7 @@ function ChatInterface() {
     lastMessageCountRef.current = messages.length
   }, [messages.length, shouldAutoScroll, isUserScrolling])
 
-  // Gestion du scroll (conservee)
+  // Gestion du scroll (conservée)
   useEffect(() => {
     const chatContainer = chatContainerRef.current
     if (!chatContainer || !isMountedRef.current) return
@@ -642,7 +648,7 @@ function ChatInterface() {
     }
   }, [messages.length])
 
-  // Message de bienvenue (conserve)
+  // Message de bienvenue (conservé)
   useEffect(() => {
     if (isAuthenticated && !currentConversation && !hasMessages && isMountedRef.current && !isProcessingOAuth) {
       const welcomeMessage: Message = {
@@ -669,7 +675,7 @@ function ChatInterface() {
     }
   }, [isAuthenticated, currentConversation, hasMessages, t, currentLanguage, setCurrentConversation, isProcessingOAuth])
 
-  // useEffect pour les changements de langue (unifie et corrige)
+  // useEffect pour les changements de langue (unifié et corrigé)
   useEffect(() => {
     if (currentConversation?.id === 'welcome' &&
         currentConversation.messages.length === 1 &&
@@ -702,7 +708,7 @@ function ChatInterface() {
       console.log('[Chat] Chargement initial UNIQUE pour:', user.email)
       hasLoadedConversationsRef.current = true
 
-      // CAPTURE STABLE des valeurs au moment de l'execution
+      // CAPTURE STABLE des valeurs au moment de l'exécution
       const userEmail = user.email
 
       // FONCTION LOCALE qui utilise le store directement
@@ -711,30 +717,30 @@ function ChatInterface() {
           // Appeler le store directement sans capturer la fonction
           const { loadConversations: loadFn } = useChatStore.getState()
           await loadFn(userEmail)
-          console.log('[Chat] Chargement initial termine avec succes')
+          console.log('[Chat] Chargement initial terminé avec succès')
         } catch (error) {
           console.error('[Chat] Erreur chargement initial:', error)
           
-          // GESTION D'ERREUR LOCALE sans redependance
+          // GESTION D'ERREUR LOCALE sans redépendance
           if (error?.status === 401 || error?.status === 403) {
-            console.log('[Chat] Session expiree detectee - redirection')
-            hasLoadedConversationsRef.current = false // Permettre de reessayer
+            console.log('[Chat] Session expirée détectée - redirection')
+            hasLoadedConversationsRef.current = false // Permettre de réessayer
             setTimeout(() => {
               window.location.href = '/'
             }, 1000)
           } else {
-            // En cas d'autre erreur, permettre de reessayer
+            // En cas d'autre erreur, permettre de réessayer
             hasLoadedConversationsRef.current = false
           }
         }
       }
 
-      // EXECUTION UNIQUE avec delai pour eviter les race conditions
+      // EXÉCUTION UNIQUE avec délai pour éviter les race conditions
       setTimeout(performInitialLoad, 100)
     }
   }, [isAuthenticated, user?.email, isProcessingOAuth])
 
-  // Fonctions de gestion des messages (toutes conservees)
+  // Fonctions de gestion des messages - MODIFIÉE
   const extractAnswerAndSources = useCallback((result: any): [string, any[]] => {
     let answerText = ""
     let sources: any[] = []
@@ -786,8 +792,9 @@ function ChatInterface() {
     return [answerText, []]
   }, [t])
 
-  const handleSendMessage = useCallback(async (text?: string) => {
-    const safeText = text || inputMessage
+  // FONCTION CORRIGÉE - Plus de paramètre text
+  const handleSendMessage = useCallback(async () => {
+    const safeText = inputMessage // Utilise directement inputMessage
     
     if (!safeText.trim() || !isMountedRef.current) return
 
@@ -841,10 +848,10 @@ function ChatInterface() {
 
       if (!isMountedRef.current) return
 
-      // Verifier si la reponse indique une session expiree
+      // Vérifier si la réponse indique une session expirée
       if (response?.error === 'authentication_failed' || 
           response?.detail === 'Token expired' ||
-          response?.message?.includes('Session expiree')) {
+          response?.message?.includes('Session expirée')) {
         handleAuthError({ 
           status: 401, 
           message: 'Token expired from API response',
@@ -889,7 +896,7 @@ function ChatInterface() {
 
     } catch (error) {
       console.error(t('chat.sendError'), error)
-      handleAuthError(error) // Utilise la nouvelle gestion d'erreur amelioree
+      handleAuthError(error) // Utilise la nouvelle gestion d'erreur améliorée
 
       if (isMountedRef.current) {
         const errorMessage: Message = {
@@ -907,7 +914,7 @@ function ChatInterface() {
     }
   }, [inputMessage, currentConversation, addMessage, clarificationState, user, currentLanguage, cleanResponseText, handleAuthError, t, extractAnswerAndSources])
 
-  // Fonctions de feedback (conservees)
+  // Fonctions de feedback (conservées)
   const handleFeedbackClick = useCallback((messageId: string, feedback: 'positive' | 'negative') => {
     if (!isMountedRef.current) return
 
@@ -1030,7 +1037,7 @@ function ChatInterface() {
     })
   }, [currentLanguage])
 
-  // Calcul des styles dynamiques pour mobile (conserve)
+  // Calcul des styles dynamiques pour mobile (conservé)
   const containerStyle = useMemo(() => {
     return isMobileDevice ? {
       height: '100vh',
@@ -1054,7 +1061,7 @@ function ChatInterface() {
     }
   }, [isMobileDevice, isKeyboardVisible, keyboardHeight])
 
-  // Etats de chargement simplifies
+  // États de chargement simplifiés
   if (!hasHydrated) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
@@ -1102,7 +1109,7 @@ function ChatInterface() {
     )
   }
 
-  // Condition de rendu amelioree pour OAuth
+  // Condition de rendu améliorée pour OAuth
   if (!isAuthenticated || !user) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
@@ -1273,7 +1280,7 @@ function ChatLoading() {
   )
 }
 
-// Export par defaut avec Suspense
+// Export par défaut avec Suspense
 export default function ChatPage() {
   return (
     <Suspense fallback={<ChatLoading />}>
