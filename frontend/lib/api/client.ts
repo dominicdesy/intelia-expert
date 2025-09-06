@@ -20,16 +20,94 @@ class ApiClient {
     console.log('🔧 API Client initialisé avec baseURL nettoyé:', this.baseURL)
   }
 
-  // Méthode de récupération du token Supabase
+  // Méthode de récupération du token - LOGIQUE DU BACKUP QUI FONCTIONNE
   private async getSupabaseToken(): Promise<string | null> {
     try {
+      console.log('[apiClient] 🔍 Récupération token avec logique backup...')
+      
+      // Méthode 1: Récupérer depuis intelia-expert-auth (PRIORITÉ)
+      console.log('[apiClient] 🔍 Tentative récupération depuis intelia-expert-auth...')
+      const authData = localStorage.getItem('intelia-expert-auth')
+      if (authData) {
+        const parsed = JSON.parse(authData)
+        if (parsed.access_token) {
+          console.log('[apiClient] ✅ Token récupéré depuis intelia-expert-auth')
+          console.log('[apiClient] 📋 Token preview:', parsed.access_token.substring(0, 30) + '...')
+          
+          // Vérifier que le token n'est pas expiré
+          try {
+            const tokenParts = parsed.access_token.split('.')
+            if (tokenParts.length === 3) {
+              const payload = JSON.parse(atob(tokenParts[1]))
+              const now = Math.floor(Date.now() / 1000)
+              const isExpired = payload.exp < now
+              
+              if (isExpired) {
+                console.warn('[apiClient] ⚠️ Token expiré dans intelia-expert-auth')
+              } else {
+                console.log('[apiClient] ✅ Token valide, expire dans:', Math.floor((payload.exp - now) / 60), 'minutes')
+                return parsed.access_token
+              }
+            }
+          } catch (decodeError) {
+            console.log('[apiClient] 📋 Token JWT non décodable, utilisation directe')
+            return parsed.access_token
+          }
+        }
+      }
+      
+      // Méthode 2: Fallback vers Supabase store (si intelia-expert-auth échoue)
+      console.log('[apiClient] 🔍 Tentative fallback vers supabase-auth-store...')
+      const supabaseStore = localStorage.getItem('supabase-auth-store')
+      if (supabaseStore) {
+        const parsed = JSON.parse(supabaseStore)
+        const possibleTokens = [
+          parsed.state?.session?.access_token,
+          parsed.state?.user?.access_token,
+          parsed.access_token
+        ]
+        
+        for (const token of possibleTokens) {
+          if (token && typeof token === 'string' && token.length > 20) {
+            console.log('[apiClient] ✅ Token fallback trouvé dans supabase-auth-store')
+            return token
+          }
+        }
+      }
+      
+      // Méthode 3: Session Supabase directe
+      console.log('[apiClient] 🔍 Tentative session Supabase directe...')
       const supabase = getSupabaseClient()
       const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token || null
-      console.log('🔑 Token Supabase (singleton):', token ? 'présent' : 'absent')
-      return token
+      if (session?.access_token) {
+        console.log('[apiClient] ✅ Token trouvé via session Supabase')
+        return session.access_token
+      }
+      
+      // Méthode 4: Dernière chance avec les cookies
+      console.log('[apiClient] 🔍 Tentative dernière chance avec cookies...')
+      const cookies = document.cookie.split(';')
+      for (const cookie of cookies) {
+        if (cookie.includes('sb-') && cookie.includes('auth-token')) {
+          try {
+            const cookieValue = cookie.split('=')[1]
+            const decoded = decodeURIComponent(cookieValue)
+            const parsed = JSON.parse(decoded)
+            if (Array.isArray(parsed) && parsed[0] && typeof parsed[0] === 'string') {
+              console.log('[apiClient] ✅ Token trouvé dans cookies')
+              return parsed[0]
+            }
+          } catch (e) {
+            continue
+          }
+        }
+      }
+      
+      console.error('[apiClient] ❌ Aucun token trouvé dans aucune source')
+      return null
+      
     } catch (error) {
-      console.error('❌ Erreur récupération token Supabase (singleton):', error)
+      console.error('[apiClient] ❌ Erreur récupération token:', error)
       return null
     }
   }
