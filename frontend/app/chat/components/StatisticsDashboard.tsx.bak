@@ -6,7 +6,6 @@ interface SystemStats {
     uptime_hours: number
     total_requests: number
     error_rate: number
-    memory_percent_container?: number  // 🐳 NOUVEAU
     rag_status: {
       global: boolean
       broiler: boolean
@@ -22,7 +21,6 @@ interface SystemStats {
     billing: boolean
     authentication: boolean
     openai_fallback: boolean
-    container_memory_calculation?: boolean  // 🐳 NOUVEAU
   }
 }
 
@@ -108,7 +106,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
   return (
     <>
       {/* KPIs Row - Avec indicateurs discrets de cache */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {/* Utilisateurs Actifs */}
         <div className="bg-white border border-gray-200 p-4 relative">
           <div>
@@ -130,27 +128,6 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
             {cacheStatus?.is_available && (
               <div className="absolute top-2 right-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 🐳 NOUVEAU: Mémoire Conteneur */}
-        <div className="bg-white border border-gray-200 p-4 relative">
-          <div>
-            <p className="text-sm text-gray-600 mb-1">Mémoire Conteneur</p>
-            <p className={`text-2xl font-semibold ${
-              (systemStats?.system_health?.memory_percent_container || 0) < 70 
-                ? 'text-green-600' 
-                : (systemStats?.system_health?.memory_percent_container || 0) < 85
-                ? 'text-orange-600'
-                : 'text-red-600'
-            }`}>
-              {systemStats?.system_health?.memory_percent_container?.toFixed(1) || '0.0'}%
-            </p>
-            {systemStats?.features_enabled?.container_memory_calculation && (
-              <div className="absolute top-2 right-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full" title="Calcul mémoire conteneur activé"></div>
               </div>
             )}
           </div>
@@ -223,7 +200,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
           </div>
         </div>
 
-        {/* Santé du Système - ÉTENDUE avec mémoire */}
+        {/* Santé du Système */}
         <div className="bg-white border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200">
             <h3 className="text-base font-medium text-gray-900">Santé du Système</h3>
@@ -243,54 +220,6 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
                   {systemStats?.system_health?.error_rate?.toFixed(1) || '0.0'}%
                 </span>
               </div>
-
-              {/* 🐳 NOUVEAU: Métriques mémoire détaillées */}
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Mémoire conteneur</span>
-                <div className="flex items-center space-x-2">
-                  <span className={`text-sm font-medium ${
-                    (systemStats?.system_health?.memory_percent_container || 0) < 70 
-                      ? 'text-green-600' 
-                      : (systemStats?.system_health?.memory_percent_container || 0) < 85
-                      ? 'text-orange-600'
-                      : 'text-red-600'
-                  }`}>
-                    {systemStats?.system_health?.memory_percent_container?.toFixed(1) || '0.0'}%
-                  </span>
-                  {systemStats?.features_enabled?.container_memory_calculation && (
-                    <span className="text-xs bg-blue-100 text-blue-800 px-1 py-0.5 rounded" title="Calcul mémoire conteneur activé">
-                      Docker
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Barre de progression mémoire */}
-              {systemStats?.system_health?.memory_percent_container !== undefined && (
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs text-gray-500">
-                    <span>Utilisation mémoire</span>
-                    <span>
-                      {systemStats.system_health.memory_percent_container < 50 ? 'Optimale' :
-                       systemStats.system_health.memory_percent_container < 70 ? 'Normale' :
-                       systemStats.system_health.memory_percent_container < 85 ? 'Élevée' : 'Critique'}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-2 rounded-full transition-all duration-500 ${
-                        systemStats.system_health.memory_percent_container < 50 ? 'bg-green-500' :
-                        systemStats.system_health.memory_percent_container < 70 ? 'bg-blue-500' :
-                        systemStats.system_health.memory_percent_container < 85 ? 'bg-orange-500' :
-                        'bg-red-500'
-                      }`}
-                      style={{ 
-                        width: `${Math.min(100, systemStats.system_health.memory_percent_container)}%` 
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              )}
               
               <div className="pt-3 border-t border-gray-200">
                 <p className="text-sm font-medium text-gray-900 mb-2">Services RAG</p>
@@ -383,13 +312,13 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
         </div>
       </div>
 
-      {/* Costs and Performance Section - ÉTENDUE */}
+      {/* Costs Section */}
       <div className="bg-white border border-gray-200">
         <div className="px-4 py-3 border-b border-gray-200">
           <h3 className="text-base font-medium text-gray-900">Coûts et Performance</h3>
         </div>
         <div className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Coûts OpenAI */}
             <div className="text-center p-3 bg-white border border-gray-200">
               <p className="text-lg font-semibold text-gray-900">${performanceStats?.openai_costs?.toFixed(2) || '0.00'}</p>
@@ -406,20 +335,6 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
             <div className="text-center p-3 bg-white border border-gray-200">
               <p className="text-lg font-semibold text-gray-900">{systemStats?.system_health?.total_requests || 0}</p>
               <p className="text-xs text-gray-600">Requêtes Totales</p>
-            </div>
-
-            {/* 🐳 NOUVEAU: Santé Mémoire */}
-            <div className="text-center p-3 bg-white border border-gray-200">
-              <p className={`text-lg font-semibold ${
-                (systemStats?.system_health?.memory_percent_container || 0) < 70 
-                  ? 'text-green-600' 
-                  : (systemStats?.system_health?.memory_percent_container || 0) < 85
-                  ? 'text-orange-600'
-                  : 'text-red-600'
-              }`}>
-                {systemStats?.features_enabled?.container_memory_calculation ? 'Optimisé' : 'Standard'}
-              </p>
-              <p className="text-xs text-gray-600">Calcul Mémoire</p>
             </div>
           </div>
 
