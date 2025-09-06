@@ -1,6 +1,6 @@
-// lib/api/client.ts - VERSION CORRIGÉE AVEC SINGLETON SUPABASE
+// lib/api/client.ts - VERSION CORRIGÉE SANS DOUBLE /api
+
 import { ApiResponse } from '@/types'
-// ✅ CHANGEMENT CRITIQUE: Utiliser le singleton au lieu d'importer directement
 import { getSupabaseClient } from '@/lib/supabase/singleton'
 
 class ApiClient {
@@ -8,21 +8,21 @@ class ApiClient {
   private defaultHeaders: HeadersInit
 
   constructor() {
-    // 🔧 CORRECTION CRITIQUE: 
-    // 1. Utiliser NEXT_PUBLIC_API_BASE_URL (avec _BASE)
-    // 2. Fallback SANS /api pour éviter le double /api/api/
-    this.baseURL = process.env.NEXT_PUBLIC_API_BASE_URL
+    // CORRECTION: Nettoyer le baseURL pour éviter le double /api
+    const rawBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert.intelia.com'
+    // Enlever /api à la fin s'il est présent
+    this.baseURL = rawBaseURL.replace(/\/api\/?$/, '')
+    
     this.defaultHeaders = {
       'Content-Type': 'application/json',
-      'Origin': 'https://expert.intelia.com', // 🔧 AJOUT: Header CORS obligatoire
+      'Origin': 'https://expert.intelia.com',
     }
-    console.log('🔧 API Client initialisé avec baseURL:', this.baseURL)
+    console.log('🔧 API Client initialisé avec baseURL nettoyé:', this.baseURL)
   }
 
-  // ✅ MÉTHODE MISE À JOUR: Utilise le singleton Supabase
+  // Méthode de récupération du token Supabase
   private async getSupabaseToken(): Promise<string | null> {
     try {
-      // 🎯 CHANGEMENT: Utiliser getSupabaseClient() au lieu de supabase direct
       const supabase = getSupabaseClient()
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token || null
@@ -34,12 +34,13 @@ class ApiClient {
     }
   }
 
-  // 🔧 NOUVELLE MÉTHODE: Construction URL correcte avec /api/v1
+  // CORRECTION: Construction URL sans duplication
   private buildFullUrl(endpoint: string): string {
     const version = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
     // Nettoyer l'endpoint (enlever / en début si présent)
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint
-    // Construire l'URL complète
+    
+    // CORRECTION: Construire l'URL sans duplication d'api
     const fullUrl = `${this.baseURL}/api/${version}/${cleanEndpoint}`
     
     console.log('🔗 [ApiClient] URL construite:', {
@@ -56,10 +57,9 @@ class ApiClient {
     endpoint: string, 
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    // 🔧 CORRECTION: Utiliser la nouvelle méthode de construction URL
     const fullUrl = this.buildFullUrl(endpoint)
     
-    // 🔧 CORRECTION: Récupérer automatiquement le token Supabase si pas fourni
+    // Récupérer automatiquement le token Supabase si pas fourni
     let headers = { ...this.defaultHeaders, ...options.headers }
     
     // Si pas d'Authorization header fourni, essayer de récupérer le token Supabase
@@ -193,7 +193,7 @@ class ApiClient {
   }
 
   async patch<T>(endpoint: string, data?: any, authToken?: string): Promise<ApiResponse<T>> {
-    console.log('🔄 PATCH Request:', endpoint, 'avec data:', data)
+    console.log('📄 PATCH Request:', endpoint, 'avec data:', data)
     const headers: HeadersInit = {}
     if (authToken) {
       headers['Authorization'] = `Bearer ${authToken}`
@@ -205,14 +205,14 @@ class ApiClient {
     })
   }
 
-  // 🆕 NOUVELLES MÉTHODES: Versions avec auth automatique Supabase (singleton)
+  // Versions avec auth automatique Supabase (singleton)
   async getSecure<T>(endpoint: string): Promise<ApiResponse<T>> {
-    console.log('🔒 GET Secure Request (Supabase singleton):', endpoint)
+    console.log('🔐 GET Secure Request (Supabase singleton):', endpoint)
     return this.request<T>(endpoint, { method: 'GET' })
   }
 
   async postSecure<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
-    console.log('🔒 POST Secure Request (Supabase singleton):', endpoint, 'avec data:', data)
+    console.log('🔐 POST Secure Request (Supabase singleton):', endpoint, 'avec data:', data)
     return this.request<T>(endpoint, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
@@ -220,7 +220,7 @@ class ApiClient {
   }
 
   async putSecure<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
-    console.log('🔒 PUT Secure Request (Supabase singleton):', endpoint, 'avec data:', data)
+    console.log('🔐 PUT Secure Request (Supabase singleton):', endpoint, 'avec data:', data)
     return this.request<T>(endpoint, {
       method: 'PUT',
       body: data ? JSON.stringify(data) : undefined,
@@ -228,7 +228,7 @@ class ApiClient {
   }
 
   async patchSecure<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
-    console.log('🔒 PATCH Secure Request (Supabase singleton):', endpoint, 'avec data:', data)
+    console.log('🔐 PATCH Secure Request (Supabase singleton):', endpoint, 'avec data:', data)
     return this.request<T>(endpoint, {
       method: 'PATCH',
       body: data ? JSON.stringify(data) : undefined,
@@ -236,11 +236,11 @@ class ApiClient {
   }
 
   async deleteSecure<T>(endpoint: string): Promise<ApiResponse<T>> {
-    console.log('🔒 DELETE Secure Request (Supabase singleton):', endpoint)
+    console.log('🔐 DELETE Secure Request (Supabase singleton):', endpoint)
     return this.request<T>(endpoint, { method: 'DELETE' })
   }
 
-  // 🔧 MÉTHODES UTILITAIRES
+  // Méthodes utilitaires
   getBaseURL(): string {
     return this.baseURL
   }
@@ -307,7 +307,6 @@ class ApiClient {
     }
   }
 
-  // 🔧 MÉTHODE POUR TÉLÉCHARGER DES FICHIERS
   async downloadFile(endpoint: string): Promise<Blob | null> {
     console.log('📥 Download File Request:', endpoint)
     
@@ -338,8 +337,8 @@ class ApiClient {
   }
 }
 
-// ✅ EXPORT DE L'INSTANCE SINGLETON
+// Export de l'instance singleton
 export const apiClient = new ApiClient()
 
-// ✅ EXPORT PAR DÉFAUT POUR COMPATIBILITÉ
+// Export par défaut pour compatibilité
 export default apiClient
