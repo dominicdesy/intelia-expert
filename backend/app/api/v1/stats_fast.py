@@ -15,6 +15,8 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
+logger.info("🔄 STATS_FAST.PY VERSION CORRIGÉE v2.1 - 2025-09-06 13:50 - AUTH + AIOHTTP FIXES")
+
 
 # Import conditionnel pour éviter les erreurs si les modules n'existent pas
 try:

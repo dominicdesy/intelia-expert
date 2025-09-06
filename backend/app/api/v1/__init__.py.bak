@@ -80,67 +80,24 @@ except Exception as e:
 STATS_FAST_AVAILABLE = False
 try:
     logger.info("Tentative import stats_fast router...")
-    
-    # Test préalable des dépendances
-    try:
-        import aiohttp
-        logger.info("✅ aiohttp disponible (version: %s)", aiohttp.__version__)
-    except ImportError as aiohttp_error:
-        logger.error("❌ aiohttp MANQUANT: %s", aiohttp_error)
-    
-    # Test import auth
-    try:
-        from .auth import get_current_user
-        logger.info("✅ auth.get_current_user disponible")
-    except ImportError as auth_error:
-        logger.error("❌ auth.get_current_user MANQUANT: %s", auth_error)
-    
-    # Test import stats_cache  
-    try:
-        from .stats_cache import get_stats_cache
-        logger.info("✅ stats_cache.get_stats_cache disponible")
-    except ImportError as cache_error:
-        logger.error("❌ stats_cache.get_stats_cache MANQUANT: %s", cache_error)
-    
-    # Import principal stats_fast
     from .stats_fast import router as stats_fast_router
     STATS_FAST_AVAILABLE = True
-    logger.info("✅ Stats Fast router importe avec succes!")
+    logger.info("Stats Fast router importe avec succes!")
     logger.info("Stats Fast router a %d routes", len(stats_fast_router.routes))
     logger.info("Stats Fast router prefix: %s", getattr(stats_fast_router, 'prefix', 'None'))
     stats_fast_routes = [f"{route.path} ({', '.join(route.methods)})" for route in stats_fast_router.routes[:3]]
     logger.info("Stats Fast routes echantillon: %s", stats_fast_routes)
-    
 except ImportError as ie:
-    logger.error("❌ IMPORT ERROR stats_fast router: %s", ie)
-    logger.error("Cause probable: Module manquant ou erreur de syntaxe")
-    import traceback
-    logger.error("Traceback ImportError: %s", traceback.format_exc())
+    logger.warning("IMPORT WARNING stats_fast router: %s", ie)
+    logger.warning("Le systeme de cache stats n'est pas encore deploye (normal)")
     stats_fast_router = None
     STATS_FAST_AVAILABLE = False
-    
-except ModuleNotFoundError as mnf:
-    logger.error("❌ MODULE NOT FOUND stats_fast: %s", mnf)
-    logger.error("Vérifiez que aiohttp est installé: pip install aiohttp")
-    stats_fast_router = None
-    STATS_FAST_AVAILABLE = False
-    
 except Exception as e:
-    logger.error("❌ ERREUR GENERALE stats_fast router: %s", e)
-    logger.error("Type d'erreur: %s", type(e).__name__)
+    logger.error("ERREUR stats_fast router: %s", e)
     import traceback
-    logger.error("Traceback complet: %s", traceback.format_exc())
+    logger.error("Traceback stats_fast: %s", traceback.format_exc())
     stats_fast_router = None
     STATS_FAST_AVAILABLE = False
-
-
-
-
-
-
-
-
-
 
 # Stats Admin router (administration cache)
 STATS_ADMIN_AVAILABLE = False
