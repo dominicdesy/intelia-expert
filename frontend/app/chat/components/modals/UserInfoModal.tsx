@@ -3,6 +3,7 @@ import { useTranslation } from '@/lib/languages/i18n'
 import { UserInfoModalProps } from '@/types'
 import { PhoneInput, usePhoneValidation } from '../PhoneInput'
 import { CountrySelect } from '../CountrySelect'
+import { apiClient } from '@/lib/api/client'
 
 // Debug utility - TEMPORAIREMENT DÉSACTIVÉ
 const debugLog = (category: string, message: string, data?: any) => {
@@ -516,72 +517,6 @@ const ErrorDisplay: React.FC<{ errors: string[]; title: string }> = ({ errors, t
   )
 }
 
-// FONCTION getAuthToken CORRIGÉE - Utilise la même logique que InviteFriendModal
-const getAuthToken = (): string | null => {
-  try {
-    console.log('[UserInfoModal] === DÉBUT RÉCUPÉRATION TOKEN (méthode InviteFriendModal) ===')
-    
-    // COPIE EXACTE de la logique InviteFriendModal qui fonctionne
-    const authKeys = ['supabase.auth.token', 'intelia-expert-auth']  // ⚠️ CLÉS CORRECTES
-    
-    for (const key of authKeys) {
-      console.log(`[UserInfoModal] Tentative clé: ${key}`)
-      const stored = localStorage.getItem(key) || sessionStorage.getItem(key)
-      if (stored) {
-        console.log(`[UserInfoModal] Données trouvées pour ${key}, parsing...`)
-        try {
-          const authData = JSON.parse(stored)
-          console.log(`[UserInfoModal] ${key} keys:`, Object.keys(authData))
-          
-          let userEmail, userName, userId, userLanguage, accessToken
-          
-          // Format Supabase
-          if (authData.user?.email) {
-            userEmail = authData.user.email
-            userName = authData.user.user_metadata?.name || authData.user.name || userEmail.split('@')[0]
-            userId = authData.user.id
-            userLanguage = authData.user.user_metadata?.language || 'fr'
-            // Récupérer le token selon la structure Supabase
-            accessToken = authData.session?.access_token || authData.access_token
-          }
-          // Format Intelia
-          else if (authData.access_token && authData.user) {
-            userEmail = authData.user.email
-            userName = authData.user.name || userEmail.split('@')[0]
-            userId = authData.user.id
-            userLanguage = authData.user.language || 'fr'
-            accessToken = authData.access_token
-          }
-          // Format direct avec juste access_token
-          else if (authData.access_token) {
-            accessToken = authData.access_token
-            console.log('[UserInfoModal] Token direct trouvé')
-          }
-          
-          if (accessToken && typeof accessToken === 'string' && accessToken.length > 20) {
-            console.log(`[UserInfoModal] ✅ Token récupéré depuis ${key}`)
-            console.log(`[UserInfoModal] Token (30 premiers chars): ${accessToken.substring(0, 30)}...`)
-            return accessToken
-          }
-        } catch (parseError) {
-          console.warn(`[UserInfoModal] Erreur parsing ${key}:`, parseError)
-          continue
-        }
-      } else {
-        console.log(`[UserInfoModal] Aucune donnée pour ${key}`)
-      }
-    }
-    
-    console.error('[UserInfoModal] ❌ Aucun token trouvé dans toutes les sources')
-    console.error('[UserInfoModal] Sources testées:', authKeys)
-    return null
-    
-  } catch (error) {
-    console.error('[UserInfoModal] Erreur récupération token:', error)
-    return null
-  }
-}
-
 // Main component
 export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) => {
   debugLog('LIFECYCLE', 'Component mounting', { 
@@ -829,7 +764,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     }))
   }, [])
 
-  // FONCTION handleProfileSave CORRIGÉE - UTILISE L'API BACKEND
+  // FONCTION handleProfileSave CORRIGÉE - UTILISE apiClient COMME InviteFriendModal
   const handleProfileSave = useCallback(async () => {
     if (!isMountedRef.current || isLoading) return
     setIsLoading(true)
@@ -890,14 +825,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         return
       }
 
-      // NOUVEAU: Récupérer le token d'authentification
-      const authToken = getAuthToken()
-      if (!authToken) {
-        if (isMountedRef.current) setFormErrors([t('error.userNotConnected')])
-        return
-      }
-
-      // NOUVEAU: Validation des données avant envoi selon l'API backend
+      // Préparer les données pour l'API backend
       const apiData: UserProfileUpdate = {}
 
       if (formData.firstName !== undefined) {
@@ -924,40 +852,21 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
       if (formData.companyWebsite !== undefined) apiData.company_website = formData.companyWebsite
       if (formData.linkedinCorporate !== undefined) apiData.linkedin_corporate = formData.linkedinCorporate
 
-      console.log('[UserInfoModal] Envoi vers API backend:', '/api/v1/users/profile')
+      console.log('[UserInfoModal] Envoi vers API backend via apiClient:', '/users/profile')
       console.log('[UserInfoModal] Données à envoyer:', Object.keys(apiData))
 
-      // NOUVEAU: Appel à l'API backend au lieu de Supabase direct
-      const response = await fetch('/api/v1/users/profile', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-          'Origin': 'https://expert.intelia.com'
-        },
-        body: JSON.stringify(apiData)
-      })
-
-      console.log('[UserInfoModal] Réponse API status:', response.status)
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        let errorMessage = t('error.updateProfile')
-        
-        try {
-          const errorData = JSON.parse(errorText)
-          errorMessage = errorData.detail || errorData.message || errorMessage
-        } catch {
-          errorMessage = errorText || errorMessage
-        }
-        
-        console.error('[UserInfoModal] Erreur API:', errorMessage)
-        if (isMountedRef.current) setFormErrors([errorMessage])
-        return
+      // 🚀 UTILISER apiClient.putSecure() comme InviteFriendModal
+      const response = await apiClient.putSecure<{success: boolean, message: string, user: any}>('/users/profile', apiData)
+      
+      if (!response.success) {
+        throw new Error(response.error?.message || 'Erreur lors de la mise à jour du profil')
       }
 
-      const result = await response.json()
-      console.log('[UserInfoModal] Profil mis à jour avec succès:', result.success)
+      if (!response.data) {
+        throw new Error('Réponse vide du serveur')
+      }
+
+      console.log('[UserInfoModal] Profil mis à jour avec succès:', response.data.success)
 
       if (!isMountedRef.current) return
 
