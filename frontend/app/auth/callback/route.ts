@@ -8,10 +8,6 @@ export async function GET(request: NextRequest) {
   const code = url.searchParams.get('code')
   const errorParam = url.searchParams.get('error')
 
-  // IMPORTANT: utilises toujours l'origin réel de la requête
-  const origin = url.origin
-
-  // Petits logs côté serveur (apparaissent dans les logs Next/App Platform)
   console.log('[OAuth/Callback] hit', {
     hasCode: !!code,
     errorParam,
@@ -20,7 +16,9 @@ export async function GET(request: NextRequest) {
 
   if (!code) {
     console.error('[OAuth/Callback] missing "code" param')
-    return NextResponse.redirect(new URL('/?auth=error&message=missing_oauth_code', origin))
+    return NextResponse.redirect(
+      'https://expert.intelia.com/?auth=error&message=missing_oauth_code'
+    )
   }
 
   try {
@@ -31,7 +29,9 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('[OAuth/Callback] exchangeCodeForSession error:', error)
       return NextResponse.redirect(
-        new URL(`/?auth=error&message=${encodeURIComponent(`callback_error: ${error.message}`)}`, origin)
+        `https://expert.intelia.com/?auth=error&message=${encodeURIComponent(
+          `callback_error: ${error.message}`
+        )}`
       )
     }
 
@@ -39,12 +39,14 @@ export async function GET(request: NextRequest) {
       userId: data?.user?.id,
     })
 
-    // Redirection explicite vers /chat
-    return NextResponse.redirect(new URL('/chat', origin))
+    // 👉 Hardcode redirection vers /chat
+    return NextResponse.redirect('https://expert.intelia.com/chat')
   } catch (e: any) {
     console.error('[OAuth/Callback] unexpected exception:', e)
     return NextResponse.redirect(
-      new URL(`/?auth=error&message=${encodeURIComponent(`callback_error: ${e?.message || e}`)}`, origin)
+      `https://expert.intelia.com/?auth=error&message=${encodeURIComponent(
+        `callback_error: ${e?.message || e}`
+      )}`
     )
   }
 }
