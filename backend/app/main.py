@@ -207,7 +207,7 @@ async def periodic_stats_update():
             logger.warning(f"⚠️ Première mise à jour cache échouée: {result.get('error', 'Unknown')}")
     except Exception as e:
         cache_error_counter += 1
-        logger.error(f"❌ Erreur première mise à jour cache: {e}")
+        logger.error(f"⌚ Erreur première mise à jour cache: {e}")
     
     # Boucle principale - mise à jour toutes les heures
     while True:
@@ -239,7 +239,7 @@ async def periodic_stats_update():
             elif result.get("status") == "failed":
                 cache_error_counter += 1
                 error_msg = result.get("error", "Erreur inconnue")
-                logger.error(f"❌ Mise à jour cache échouée: {error_msg}")
+                logger.error(f"⌚ Mise à jour cache échouée: {error_msg}")
                 
             else:
                 cache_error_counter += 1
@@ -247,7 +247,7 @@ async def periodic_stats_update():
             
         except Exception as e:
             cache_error_counter += 1
-            logger.error(f"❌ Erreur durant mise à jour périodique cache: {e}")
+            logger.error(f"⌚ Erreur durant mise à jour périodique cache: {e}")
             # Attendre 10 minutes avant de retry en cas d'erreur
             await asyncio.sleep(600)
 
@@ -452,7 +452,7 @@ async def lifespan(app: FastAPI):
         elif total_rags >= 1:
             logger.warning(f"⚠️ Seulement {total_rags}/3 RAG chargés - fonctionnement partiel")
         else:
-            logger.error("❌ CRITIQUE: Aucun RAG chargé - l'application ne peut pas fonctionner correctement")
+            logger.error("⌚ CRITIQUE: Aucun RAG chargé - l'application ne peut pas fonctionner correctement")
 
     except Exception as e:
         logger.error("⌛ Erreur critique initialisation RAG: %s", e)
@@ -472,7 +472,7 @@ async def lifespan(app: FastAPI):
             stats_scheduler_task = asyncio.create_task(periodic_stats_update())
             logger.info("🔄 Scheduler cache statistiques démarré (mise à jour toutes les heures)")
         except Exception as e:
-            logger.error(f"❌ Erreur démarrage scheduler cache: {e}")
+            logger.error(f"⌚ Erreur démarrage scheduler cache: {e}")
     else:
         logger.info("ℹ️ Scheduler cache statistiques désactivé (module non disponible)")
 
@@ -503,7 +503,7 @@ async def lifespan(app: FastAPI):
             await asyncio.gather(stats_scheduler_task, return_exceptions=True)
             logger.info("🔄 Scheduler cache statistiques arrêté")
         except Exception as e:
-            logger.error(f"❌ Erreur arrêt scheduler cache: {e}")
+            logger.error(f"⌚ Erreur arrêt scheduler cache: {e}")
     
     # Statistiques finales
     uptime_hours = (time.time() - start_time) / 3600
@@ -728,7 +728,6 @@ async def rag_debug():
     except Exception as e:
         return {"error": str(e)}
 
-
 @app.get("/debug/memory-comparison", tags=["Debug"])
 async def debug_memory_comparison():
     """Compare les différentes méthodes de calcul mémoire"""
@@ -784,16 +783,7 @@ async def debug_memory_comparison():
 # === ENDPOINTS PRINCIPAUX (RESTAURÉS) ===
 @app.get("/health/complete", tags=["Health"])
 async def complete_health_check():
-
-
-
-
-
-
-# === ENDPOINTS PRINCIPAUX (RESTAURÉS) ===
-@app.get("/health/complete", tags=["Health"])
-async def complete_health_check():
-    """🥼 Check de santé complet du système"""
+    """🩼 Check de santé complet du système"""
     try:
         health_status = {
             "timestamp": datetime.utcnow().isoformat(),
@@ -1087,7 +1077,7 @@ async def admin_force_cache_update():
         }
     except Exception as e:
         cache_error_counter += 1
-        logger.error(f"❌ Erreur force update admin: {e}")
+        logger.error(f"⌚ Erreur force update admin: {e}")
         return {
             "status": "error",
             "message": f"Erreur mise à jour: {e}",
