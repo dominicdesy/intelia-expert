@@ -6,35 +6,45 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 export async function GET(request: NextRequest) {
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://expert.intelia.com'
+  const errorParam = url.searchParams.get('error')
 
-  // Pas de code → retour login avec message clair
+  // IMPORTANT: utilises toujours l'origin réel de la requête
+  const origin = url.origin
+
+  // Petits logs côté serveur (apparaissent dans les logs Next/App Platform)
+  console.log('[OAuth/Callback] hit', {
+    hasCode: !!code,
+    errorParam,
+    href: url.toString(),
+  })
+
   if (!code) {
-    return NextResponse.redirect(new URL('/?auth=error&message=missing_oauth_code', baseUrl))
+    console.error('[OAuth/Callback] missing "code" param')
+    return NextResponse.redirect(new URL('/?auth=error&message=missing_oauth_code', origin))
   }
 
   try {
-    // IMPORTANT: client lié au contexte de la requête (cookies)
-    const supabase = createRouteHandlerClient({ cookies })
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
-    // Échange le code OAuth contre une session (dépose les cookies sur expert.intelia.com)
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-
     if (error) {
-      const msg = encodeURIComponent(`callback_error: ${error.message || 'unknown'}`)
-      return NextResponse.redirect(new URL(`/?auth=error&message=${msg}`, baseUrl))
+      console.error('[OAuth/Callback] exchangeCodeForSession error:', error)
+      return NextResponse.redirect(
+        new URL(`/?auth=error&message=${encodeURIComponent(`callback_error: ${error.message}`)}`, origin)
+      )
     }
 
-    // Succès → amenez l’utilisateur là où vous voulez (chat, dashboard, etc.)
-    return NextResponse.redirect(new URL('/chat', baseUrl))
-  } catch (e: unknown) {
-    // Sécurité: sérialisation d'erreur robuste (évite "… is not a function")
-    const msg =
-      e instanceof Error ? e.message
-      : typeof e === 'string' ? e
-      : 'unknown_callback_error'
+    console.log('[OAuth/Callback] session created ✅', {
+      userId: data?.user?.id,
+    })
+
+    // Redirection explicite vers /chat
+    return NextResponse.redirect(new URL('/chat', origin))
+  } catch (e: any) {
+    console.error('[OAuth/Callback] unexpected exception:', e)
     return NextResponse.redirect(
-      new URL(`/?auth=error&message=${encodeURIComponent(`callback_error: ${msg}`)}`, baseUrl)
+      new URL(`/?auth=error&message=${encodeURIComponent(`callback_error: ${e?.message || e}`)}`, origin)
     )
   }
 }
