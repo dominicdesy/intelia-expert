@@ -3,22 +3,44 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 
+// ⚠️ Hardcode provisoire (on enlèvera ça quand tu voudras repasser aux env vars)
+const BASE_URL = 'https://expert.intelia.com' as const
+
+// Autoriser uniquement des chemins internes (ex. /chat, /dashboard)
+// pour éviter les redirections ouvertes vers des domaines externes.
+function pickSafeInternalPath(nextParam: string | null): string {
+  if (!nextParam) return '/chat'
+  // autorise seulement un chemin absolu interne: commence par "/" et pas par "//"
+  if (nextParam.startsWith('/') && !nextParam.startsWith('//')) {
+    return nextParam
+  }
+  return '/chat'
+}
+
 export async function GET(request: NextRequest) {
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
-  const errorParam = url.searchParams.get('error')
+  const providerError = url.searchParams.get('error') // p.ex. access_denied
+  const providerErrorDesc = url.searchParams.get('error_description')
+  const nextParam = url.searchParams.get('next') // optionnel: /chemin interne
 
+  // Logs minimalistes pour diag (sans PII)
   console.log('[OAuth/Callback] hit', {
     hasCode: !!code,
-    errorParam,
-    href: url.toString(),
+    providerError,
+    hasNext: !!nextParam,
   })
 
+  // Cas: le provider renvoie une erreur (ex. user a annulé sur LinkedIn)
+  if (providerError) {
+    const msg = `provider_error: ${providerError}${providerErrorDesc ? ` - ${providerErrorDesc}` : ''}`
+    const to = new URL(`/?auth=error&message=${encodeURIComponent(msg)}`, BASE_URL)
+    return NextResponse.redirect(to, { status: 303 })
+  }
+
   if (!code) {
-    console.error('[OAuth/Callback] missing "code" param')
-    return NextResponse.redirect(
-      'https://expert.intelia.com/?auth=error&message=missing_oauth_code'
-    )
+    const to = new URL('/?auth=error&message=missing_oauth_code', BASE_URL)
+    return NextResponse.redirect(to, { status: 303 })
   }
 
   try {
@@ -28,25 +50,25 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     if (error) {
       console.error('[OAuth/Callback] exchangeCodeForSession error:', error)
-      return NextResponse.redirect(
-        `https://expert.intelia.com/?auth=error&message=${encodeURIComponent(
-          `callback_error: ${error.message}`
-        )}`
+      const to = new URL(
+        `/?auth=error&message=${encodeURIComponent(`callback_error: ${error.message}`)}`,
+        BASE_URL
       )
+      return NextResponse.redirect(to, { status: 303 })
     }
 
-    console.log('[OAuth/Callback] session created ✅', {
-      userId: data?.user?.id,
-    })
+    console.log('[OAuth/Callback] session created ✅', { userId: data?.user?.id })
 
-    // 👉 Hardcode redirection vers /chat
-    return NextResponse.redirect('https://expert.intelia.com/chat')
+    // Redirection finale (par défaut /chat, ou bien ?next=/chemin-interne)
+    const safePath = pickSafeInternalPath(nextParam)
+    const to = new URL(safePath, BASE_URL)
+    return NextResponse.redirect(to, { status: 303 })
   } catch (e: any) {
     console.error('[OAuth/Callback] unexpected exception:', e)
-    return NextResponse.redirect(
-      `https://expert.intelia.com/?auth=error&message=${encodeURIComponent(
-        `callback_error: ${e?.message || e}`
-      )}`
+    const to = new URL(
+      `/?auth=error&message=${encodeURIComponent(`callback_error: ${e?.message || e}`)}`,
+      BASE_URL
     )
+    return NextResponse.redirect(to, { status: 303 })
   }
 }
