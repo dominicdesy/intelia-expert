@@ -90,9 +90,14 @@ const invitationService = {
 
       console.log('✅ [InvitationService] Session validée via Supabase')
       
-      // URL d'API relative pour éviter les problèmes de base URL
-      const apiUrl = '/api/v1/invitations/send'
-      console.log('🌍 [InvitationService] URL d\'envoi:', apiUrl)
+      // 🔧 CORRECTION: Construction d'URL qui fonctionnait dans le backup
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert.intelia.com/api'
+      const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, '')
+      const inviteUrl = `${cleanBaseUrl}/api/v1/invitations/send`
+      
+      console.log('🌍 [InvitationService] URL d\'envoi:', inviteUrl)
+      console.log('🔧 [InvitationService] Base URL utilisée:', baseUrl)
+      console.log('🔧 [InvitationService] Clean Base URL:', cleanBaseUrl)
       
       const headers = {
         'Content-Type': 'application/json',
@@ -114,7 +119,7 @@ const invitationService = {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 30000)
       
-      const response = await fetch(apiUrl, {
+      const response = await fetch(inviteUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody),
