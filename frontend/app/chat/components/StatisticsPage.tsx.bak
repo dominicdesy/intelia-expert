@@ -453,18 +453,17 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-	  
-  // Charger les questions - CORRECTION: Utilise le vrai cache info
+  // Charger les questions - AVEC PROTECTION CONTRE LES DOUBLONS
   const loadQuestionLogs = async () => {
     if (questionsLoading) {
       console.log('📝 [Questions] Chargement déjà en cours, annulation...')
       return
     }
-  
+    
     console.log('⚡ [Questions] Chargement')
     setQuestionsLoading(true)
     const startTime = performance.now()
-  
+    
     try {
       const headers = await getAuthHeaders()
       const params = new URLSearchParams({
@@ -473,37 +472,26 @@ export const StatisticsPage: React.FC = () => {
       })
 
       const fastResponse = await fetch(`/api/v1/stats-fast/questions?${params}`, { headers })
-    
+      
       if (!fastResponse.ok) {
         throw new Error(`Erreur questions: ${fastResponse.status} - ${fastResponse.statusText}`)
       }
 
       const fastData: FastQuestionsResponse = await fastResponse.json()
       console.log('🎉 Questions chargées!', fastData)
-    
+      
       const loadTime = performance.now() - startTime
       console.log(`⚡ Questions Performance: ${loadTime.toFixed(0)}ms`)
-    
-      // CORRECTION: Utilise le cache_info depuis l'API
-      const realCacheInfo = fastData.cache_info || {
+      
+      const cacheInfo = {
         is_available: false,
         last_update: null,
         cache_age_minutes: 0,
         performance_gain: `${loadTime.toFixed(0)}ms`,
         next_update: null
       }
-    
-      // Enrichir avec le temps de chargement réel
-      const enrichedCacheInfo = {
-        ...realCacheInfo,
-        performance_gain: realCacheInfo.is_available 
-          ? realCacheInfo.performance_gain 
-          : `${loadTime.toFixed(0)}ms (direct)`
-      }
-    
-      setQuestionsCacheStatus(enrichedCacheInfo)
-
-	  
+      setQuestionsCacheStatus(cacheInfo)
+      
       const adaptedQuestions: QuestionLog[] = fastData.questions.map(q => ({
         id: q.id,
         timestamp: q.timestamp,

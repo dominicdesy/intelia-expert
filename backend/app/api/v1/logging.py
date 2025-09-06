@@ -1,6 +1,7 @@
 # app/api/v1/logging.py
 """
-🚀 SYSTÈME DE LOGGING - POINT D'ENTRÉE PRINCIPAL
+SYSTÈME DE LOGGING - POINT D'ENTRÉE PRINCIPAL
+Version corrigée sans création de tables
 """
 import os
 import logging
@@ -15,26 +16,23 @@ import traceback
 
 logger = logging.getLogger(__name__)
 
-# ============================================================================
-# 📦 IMPORTS DEPUIS LES MODULES SPÉCIALISÉS
-# ============================================================================
-
+# IMPORTS DEPUIS LES MODULES SPÉCIALISÉS
 try:
     from .logging_models import (
         LogLevel, ResponseSource, UserRole, Permission, ROLE_PERMISSIONS
     )
-    logger.info("✅ Logging models importés")
+    logger.info("Logging models importés")
 except ImportError as e:
-    logger.error(f"❌ ERREUR CRITIQUE: logging_models.py manquant: {e}")
+    logger.error(f"ERREUR CRITIQUE: logging_models.py manquant: {e}")
     raise
 
 try:
     from .logging_permissions import (
         has_permission, require_permission, is_admin_user
     )
-    logger.info("✅ Logging permissions importées")
+    logger.info("Logging permissions importées")
 except ImportError as e:
-    logger.error(f"❌ ERREUR CRITIQUE: logging_permissions.py manquant: {e}")
+    logger.error(f"ERREUR CRITIQUE: logging_permissions.py manquant: {e}")
     raise
 
 try:
@@ -42,14 +40,10 @@ try:
         get_cached_or_compute, clear_analytics_cache, get_cache_stats,
         cleanup_expired_cache, get_cache_memory_usage
     )
-    logger.info("✅ Logging cache importé")
+    logger.info("Logging cache importé")
 except ImportError as e:
-    logger.error(f"❌ ERREUR CRITIQUE: logging_cache.py manquant: {e}")
+    logger.error(f"ERREUR CRITIQUE: logging_cache.py manquant: {e}")
     raise
-
-# ============================================================================
-# 🗃️ CLASSE PRINCIPALE LOGGINGMANAGER
-# ============================================================================
 
 class LoggingManager:
     """
@@ -58,9 +52,8 @@ class LoggingManager:
     
     def __init__(self, db_config: dict = None):
         self.db_config = db_config or {}
-        # Stocker DATABASE_URL pour la méthode get_connection corrigée
         self.dsn = os.getenv("DATABASE_URL")
-        logger.info("🚀 LoggingManager initialisé avec correction PostgreSQL")
+        logger.info("LoggingManager initialisé avec correction PostgreSQL")
 
     def get_connection(self):
         """
@@ -75,104 +68,6 @@ class LoggingManager:
         else:
             raise ValueError("Aucune configuration de base de données disponible (DATABASE_URL ou db_config)")
 
-    def _ensure_analytics_tables(self):
-        """Crée toutes les tables d'analytics nécessaires"""
-        try:
-            with self.get_connection() as conn:
-                with conn.cursor() as cur:
-                    # Table principale des questions/réponses
-                    cur.execute("""
-                        CREATE TABLE IF NOT EXISTS user_questions_complete (
-                            id SERIAL PRIMARY KEY,
-                            user_email VARCHAR(255),
-                            session_id VARCHAR(255),
-                            question_id VARCHAR(255),
-                            question TEXT NOT NULL,
-                            response_text TEXT,
-                            response_source VARCHAR(50),
-                            status VARCHAR(20) DEFAULT 'success',
-                            processing_time_ms INTEGER,
-                            response_confidence DECIMAL(5,2),
-                            completeness_score DECIMAL(5,2),
-                            language VARCHAR(10) DEFAULT 'fr',
-                            intent VARCHAR(50),
-                            entities JSONB DEFAULT '{}',
-                            error_type VARCHAR(100),
-                            error_message TEXT,
-                            error_traceback TEXT,
-                            feedback INTEGER CHECK (feedback IN (-1, 1)),        -- 🔧 AJOUTÉ
-                            feedback_comment TEXT,                               -- 🔧 AJOUTÉ
-                            data_size_kb INTEGER,                                -- 🔧 AJOUTÉ pour compatibilité
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                        );
-                        
-                        CREATE INDEX IF NOT EXISTS idx_user_questions_user_email ON user_questions_complete(user_email);
-                        CREATE INDEX IF NOT EXISTS idx_user_questions_created_at ON user_questions_complete(created_at);
-                        CREATE INDEX IF NOT EXISTS idx_user_questions_status ON user_questions_complete(status);
-			CREATE INDEX IF NOT EXISTS idx_user_questions_feedback ON user_questions_complete(feedback) WHERE feedback IS NOT NULL;
-                    """)
-                    
-                    # Table des erreurs système
-                    cur.execute("""
-                        CREATE TABLE IF NOT EXISTS system_errors (
-                            id SERIAL PRIMARY KEY,
-                            error_type VARCHAR(100) NOT NULL,
-                            category VARCHAR(50) NOT NULL,
-                            severity VARCHAR(20) DEFAULT 'error',
-                            component VARCHAR(100),
-                            user_email VARCHAR(255),
-                            session_id VARCHAR(255),
-                            question_id VARCHAR(255),
-                            details JSONB DEFAULT '{}',
-                            traceback TEXT,
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                        );
-                        
-                        CREATE INDEX IF NOT EXISTS idx_system_errors_category ON system_errors(category);
-                        CREATE INDEX IF NOT EXISTS idx_system_errors_severity ON system_errors(severity);
-                    """)
-                    
-                    # Table utilisation OpenAI
-                    cur.execute("""
-                        CREATE TABLE IF NOT EXISTS openai_usage (
-                            id SERIAL PRIMARY KEY,
-                            user_email VARCHAR(255),
-                            session_id VARCHAR(255),
-                            question_id VARCHAR(255),
-                            model VARCHAR(50) DEFAULT 'gpt-4',
-                            tokens INTEGER DEFAULT 0,
-                            cost_usd DECIMAL(10,6) DEFAULT 0.0,
-                            cost_eur DECIMAL(10,6) DEFAULT 0.0,
-                            purpose VARCHAR(50) DEFAULT 'chat',
-                            success BOOLEAN DEFAULT true,
-                            response_time_ms INTEGER,
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                        );
-                    """)
-                    
-                    # Table résumé quotidien OpenAI
-                    cur.execute("""
-                        CREATE TABLE IF NOT EXISTS daily_openai_summary (
-                            id SERIAL PRIMARY KEY,
-                            user_email VARCHAR(255),
-                            date DATE NOT NULL,
-                            total_requests INTEGER DEFAULT 0,
-                            successful_requests INTEGER DEFAULT 0,
-                            total_tokens INTEGER DEFAULT 0,
-                            total_cost_usd DECIMAL(10,4) DEFAULT 0.0,
-                            total_cost_eur DECIMAL(10,4) DEFAULT 0.0,
-                            avg_response_time_ms DECIMAL(8,2),
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            UNIQUE(user_email, date)
-                        );
-                    """)
-                    
-        except Exception as e:
-            logger.error(f"❌ Erreur création tables analytics: {e}")
-
-
     def update_feedback(
         self,
         conversation_id: str,
@@ -180,7 +75,7 @@ class LoggingManager:
         feedback_comment: str = None
     ):
         """
-        🔧 NOUVELLE MÉTHODE: Met à jour le feedback d'une conversation existante
+        Met à jour le feedback d'une conversation existante
         """
         try:
             with self.get_connection() as conn:
@@ -196,14 +91,14 @@ class LoggingManager:
                     
                     result = cur.fetchone()
                     if result:
-                        logger.info(f"✅ Feedback mis à jour pour conversation {conversation_id}")
+                        logger.info(f"Feedback mis à jour pour conversation {conversation_id}")
                         return {"success": True, "conversation_id": conversation_id}
                     else:
-                        logger.warning(f"⚠️ Aucune conversation trouvée pour ID: {conversation_id}")
+                        logger.warning(f"Aucune conversation trouvée pour ID: {conversation_id}")
                         return {"success": False, "error": "Conversation non trouvée"}
                     
         except Exception as e:
-            logger.error(f"❌ Erreur mise à jour feedback: {e}")
+            logger.error(f"Erreur mise à jour feedback: {e}")
             return {"success": False, "error": str(e)}
 
     def update_feedback_comment(
@@ -212,7 +107,7 @@ class LoggingManager:
         comment: str
     ):
         """
-        🔧 NOUVELLE MÉTHODE: Met à jour le commentaire feedback d'une conversation
+        Met à jour le commentaire feedback d'une conversation
         """
         try:
             with self.get_connection() as conn:
@@ -230,7 +125,7 @@ class LoggingManager:
                     return {"success": bool(result), "conversation_id": conversation_id}
                     
         except Exception as e:
-            logger.error(f"❌ Erreur mise à jour commentaire: {e}")
+            logger.error(f"Erreur mise à jour commentaire: {e}")
             return {"success": False, "error": str(e)}
 
     def log_system_error(
@@ -262,7 +157,7 @@ class LoggingManager:
                     ))
                     
         except Exception as e:
-            logger.error(f"❌ Erreur log système: {e}")
+            logger.error(f"Erreur log système: {e}")
 
     def log_openai_usage(
         self,
@@ -292,7 +187,7 @@ class LoggingManager:
                     ))
                     
         except Exception as e:
-            logger.error(f"⛔ Erreur log OpenAI: {e}")
+            logger.error(f"Erreur log OpenAI: {e}")
 
     def log_question_response(
         self,
@@ -312,14 +207,19 @@ class LoggingManager:
         error_info: Optional[Dict[str, Any]] = None
     ) -> None:
         """
-        🆕 MÉTHODE MANQUANTE - Log une question et sa réponse dans PostgreSQL
-        Compatible avec l'appel depuis logging_helpers.py
+        CORRECTION: Log une question et sa réponse dans PostgreSQL
+        Inclut maintenant data_size_kb pour éviter l'erreur de colonne manquante
         """
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cur:
                     # Préparation des données
                     entities_json = Json(entities) if entities else Json({})
+                    
+                    # Calcul de la taille des données en KB
+                    data_size_kb = 0
+                    if response_text:
+                        data_size_kb = len(response_text.encode('utf-8')) // 1024
                     
                     # Gestion des erreurs
                     error_type = None
@@ -331,28 +231,26 @@ class LoggingManager:
                         error_message = error_info.get("message")
                         error_traceback = error_info.get("traceback")
                     
-                    # Insertion dans user_questions_complete
+                    # CORRECTION: Insertion avec data_size_kb inclus
                     cur.execute("""
                         INSERT INTO user_questions_complete (
                             user_email, session_id, question_id, question, response_text,
                             response_source, status, processing_time_ms, response_confidence,
                             completeness_score, language, intent, entities,
-                            error_type, error_message, error_traceback, created_at
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            error_type, error_message, error_traceback, data_size_kb, created_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         user_email, session_id, question_id, question, response_text,
                         response_source, status, processing_time_ms, confidence,
                         completeness_score, language, intent, entities_json,
-                        error_type, error_message, error_traceback, datetime.now()
+                        error_type, error_message, error_traceback, data_size_kb, datetime.now()
                     ))
                     
-                    logger.debug(f"✅ Question loggée en base: {user_email}, session: {session_id}")
+                    logger.debug(f"Question loggée en base: {user_email}, session: {session_id}")
                     
         except Exception as e:
-            logger.error(f"⛔ Erreur log_question_response: {e}")
-            logger.error(f"⛔ Détails: user={user_email}, session={session_id}, question_id={question_id}")
-
-
+            logger.error(f"Erreur log_question_response: {e}")
+            logger.error(f"Détails: user={user_email}, session={session_id}, question_id={question_id}")
 
     def log_server_performance(self, **kwargs):
         """Log des métriques de performance serveur"""
@@ -413,7 +311,8 @@ class LoggingManager:
                         SELECT user_email, session_id, question_id, question, response_text,
                                response_source, status, processing_time_ms, response_confidence,
                                completeness_score, language, intent, entities,
-                               error_type, error_message, error_traceback, created_at
+                               error_type, error_message, error_traceback, feedback,
+                               feedback_comment, data_size_kb, created_at
                         FROM user_questions_complete
                         {where_clause}
                         ORDER BY created_at DESC
@@ -446,7 +345,7 @@ class LoggingManager:
                     }
                     
         except Exception as e:
-            logger.error(f"❌ Erreur récupération questions: {e}")
+            logger.error(f"Erreur récupération questions: {e}")
             return {
                 "success": False,
                 "error": str(e),
@@ -469,7 +368,8 @@ class LoggingManager:
                             SELECT COUNT(*) as total_questions,
                                    COUNT(CASE WHEN status = 'success' THEN 1 END) as successful_questions,
                                    AVG(response_confidence) as avg_confidence,
-                                   AVG(processing_time_ms) as avg_processing_time
+                                   AVG(processing_time_ms) as avg_processing_time,
+                                   SUM(data_size_kb) as total_data_kb
                             FROM user_questions_complete
                             WHERE user_email = %s AND created_at >= %s
                         """, (user_email, start_date))
@@ -515,7 +415,8 @@ class LoggingManager:
                                 COUNT(CASE WHEN status = 'success' THEN 1 END) as successful_requests,
                                 AVG(processing_time_ms) as avg_response_time,
                                 MAX(processing_time_ms) as max_response_time,
-                                MIN(processing_time_ms) as min_response_time
+                                MIN(processing_time_ms) as min_response_time,
+                                SUM(data_size_kb) as total_data_kb
                             FROM user_questions_complete
                             WHERE created_at >= %s
                         """, (start_time,))
@@ -532,9 +433,7 @@ class LoggingManager:
         
         return get_cached_or_compute(cache_key, compute_performance, ttl_seconds=900)
 
-# ============================================================================
-# 🔗 FONCTIONS DE COMPATIBILITÉ ET SINGLETON
-# ============================================================================
+# FONCTIONS DE COMPATIBILITÉ ET SINGLETON
 
 def get_server_analytics(hours: int = 24) -> Dict[str, Any]:
     """Récupère les analytics serveur pour compatibilité avec stats_updater.py"""
@@ -575,7 +474,7 @@ def get_analytics_manager(force_init=None) -> LoggingManager:
     if _analytics_manager is None:
         with _initialization_lock:
             if _analytics_manager is None:
-                logger.info("🔧 Création du gestionnaire analytics...")
+                logger.info("Création du gestionnaire analytics...")
                 
                 # Configuration avec DATABASE_URL
                 database_url = os.getenv("DATABASE_URL")
@@ -583,9 +482,9 @@ def get_analytics_manager(force_init=None) -> LoggingManager:
                 if database_url:
                     try:
                         db_config = psycopg2.extensions.parse_dsn(database_url)
-                        logger.info("✅ Configuration PostgreSQL depuis DATABASE_URL")
+                        logger.info("Configuration PostgreSQL depuis DATABASE_URL")
                     except Exception as e:
-                        logger.error(f"❌ Erreur parsing DATABASE_URL: {e}")
+                        logger.error(f"Erreur parsing DATABASE_URL: {e}")
                         db_config = {
                             "host": os.getenv("POSTGRES_HOST", "localhost"),
                             "port": int(os.getenv("POSTGRES_PORT", 5432)),
@@ -603,8 +502,8 @@ def get_analytics_manager(force_init=None) -> LoggingManager:
                     }
                 
                 _analytics_manager = LoggingManager(db_config)
-                _analytics_manager._ensure_analytics_tables()
-                logger.info("✅ Gestionnaire analytics créé avec correction PostgreSQL")
+                # SUPPRIMÉ: _analytics_manager._ensure_analytics_tables()
+                logger.info("Gestionnaire analytics créé sans création de tables")
     
     return _analytics_manager
 
@@ -615,23 +514,17 @@ def get_logging_manager(db_config: dict = None) -> LoggingManager:
 # Alias pour compatibilité totale
 AnalyticsManager = LoggingManager
 
-# ============================================================================
-# 📊 ROUTER ET EXPORTS
-# ============================================================================
-
+# ROUTER ET EXPORTS
 try:
     from .logging_endpoints import router
-    logger.info("✅ Logging endpoints importés")
+    logger.info("Logging endpoints importés")
 except ImportError as e:
-    logger.error(f"❌ ERREUR: logging_endpoints.py manquant: {e}")
+    logger.error(f"ERREUR: logging_endpoints.py manquant: {e}")
     # Créer un router de base pour compatibilité
     from fastapi import APIRouter
     router = APIRouter(prefix="/logging", tags=["logging"])
 
-# ============================================================================
-# 📋 EXPORTS PUBLICS
-# ============================================================================
-
+# EXPORTS PUBLICS
 __all__ = [
     # Classe principale
     'LoggingManager',
@@ -641,7 +534,7 @@ __all__ = [
     'get_analytics_manager',
     'get_logging_manager',
     'get_analytics',
-    'get_server_analytics',  # Ajouté pour stats_updater.py
+    'get_server_analytics',
     
     # Imports depuis modules spécialisés
     'LogLevel',

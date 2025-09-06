@@ -1,9 +1,6 @@
 # app/api/v1/logging.py
-# -*- coding: utf-8 -*-
 """
 🚀 SYSTÈME DE LOGGING - POINT D'ENTRÉE PRINCIPAL
-📊 Architecture modulaire avec classe LoggingManager principale
-🔧 CORRECTION: Bug PostgreSQL 'can't adapt type dict' résolu
 """
 import os
 import logging
@@ -17,10 +14,6 @@ from typing import Optional, Dict, Any, List
 import traceback
 
 logger = logging.getLogger(__name__)
-
-# 🚀 LOG DE CONFIRMATION VERSION DÉPLOYÉE
-logger.error("🚀 LOGGING SYSTEM - VERSION RESTRUCTURÉE ACTIVE - 2025-09-02-21:30")
-logger.error("🔧 CORRECTION: Bug PostgreSQL résolu avec architecture modulaire")
 
 # ============================================================================
 # 📦 IMPORTS DEPUIS LES MODULES SPÉCIALISÉS
@@ -61,7 +54,6 @@ except ImportError as e:
 class LoggingManager:
     """
     Gestionnaire principal des analytics et logging
-    CORRECTION CRITIQUE: Bug PostgreSQL 'can't adapt type dict' résolu
     """
     
     def __init__(self, db_config: dict = None):
@@ -300,7 +292,67 @@ class LoggingManager:
                     ))
                     
         except Exception as e:
-            logger.error(f"❌ Erreur log OpenAI: {e}")
+            logger.error(f"⛔ Erreur log OpenAI: {e}")
+
+    def log_question_response(
+        self,
+        user_email: str,
+        session_id: str,
+        question_id: str,
+        question: str,
+        response_text: str,
+        response_source: str,
+        status: str,
+        processing_time_ms: int,
+        confidence: Optional[float] = None,
+        completeness_score: Optional[float] = None,
+        language: str = "fr",
+        intent: Optional[str] = None,
+        entities: Dict[str, Any] = None,
+        error_info: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """
+        🆕 MÉTHODE MANQUANTE - Log une question et sa réponse dans PostgreSQL
+        Compatible avec l'appel depuis logging_helpers.py
+        """
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cur:
+                    # Préparation des données
+                    entities_json = Json(entities) if entities else Json({})
+                    
+                    # Gestion des erreurs
+                    error_type = None
+                    error_message = None
+                    error_traceback = None
+                    
+                    if error_info:
+                        error_type = error_info.get("type")
+                        error_message = error_info.get("message")
+                        error_traceback = error_info.get("traceback")
+                    
+                    # Insertion dans user_questions_complete
+                    cur.execute("""
+                        INSERT INTO user_questions_complete (
+                            user_email, session_id, question_id, question, response_text,
+                            response_source, status, processing_time_ms, response_confidence,
+                            completeness_score, language, intent, entities,
+                            error_type, error_message, error_traceback, created_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        user_email, session_id, question_id, question, response_text,
+                        response_source, status, processing_time_ms, confidence,
+                        completeness_score, language, intent, entities_json,
+                        error_type, error_message, error_traceback, datetime.now()
+                    ))
+                    
+                    logger.debug(f"✅ Question loggée en base: {user_email}, session: {session_id}")
+                    
+        except Exception as e:
+            logger.error(f"⛔ Erreur log_question_response: {e}")
+            logger.error(f"⛔ Détails: user={user_email}, session={session_id}, question_id={question_id}")
+
+
 
     def log_server_performance(self, **kwargs):
         """Log des métriques de performance serveur"""
@@ -607,6 +659,3 @@ __all__ = [
     # Router API
     'router'
 ]
-
-logger.info("✅ Système logging restructuré initialisé - Bug PostgreSQL corrigé")
-logger.info("📊 Architecture modulaire maintenue avec 6 fichiers spécialisés")
