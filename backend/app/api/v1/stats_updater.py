@@ -1,14 +1,16 @@
 # app/api/v1/stats_updater.py
 """
-VERSION CORRIGÉE - UTILISE DATABASE_URL DIRECTEMENT
+VERSION COMPLETE CORRIGEE - COMPATIBLE AVEC MAIN.PY
 Corrige le format de retour pour éviter les warnings "statut inattendu"
 AJOUT DES FONCTIONS MANQUANTES: run_update_cycle, update_all_statistics
+CORRECTION: Utilise "completed"/"failed" au lieu de "success"/"error"
 """
 
 import os
 import logging
 import psycopg2
 import asyncio
+import time
 from datetime import datetime, timedelta
 from typing import Dict, Any
 from psycopg2.extras import RealDictCursor
@@ -17,12 +19,13 @@ logger = logging.getLogger(__name__)
 
 class StatisticsUpdater:
     def __init__(self):
-        # LOG DE DÉPLOIEMENT - VERSION CORRIGÉE V1.2
+        # LOG DE DEPLOIEMENT - VERSION CORRIGEE V2.0
         print("=" * 80)
-        print("STATS_UPDATER.PY - VERSION CORRIGÉE V1.2 - DÉPLOYÉE")
+        print("STATS_UPDATER.PY - VERSION COMPLETE CORRIGEE V2.0 - DEPLOYE")
         print("Date: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        print("CORRECTION: Format de retour uniforme pour éviter warnings")
+        print("CORRECTION: Format de retour compatible main.py (completed/failed)")
         print("CORRECTION: Encodage propre sans caractères corrompus")
+        print("CORRECTION: Ajout champs requis (successful_updates, duration_ms)")
         print("AJOUT: Meilleure gestion du cache et compatibilité main.py")
         print("=" * 80)
         
@@ -31,9 +34,9 @@ class StatisticsUpdater:
         if not self.dsn:
             raise ValueError("DATABASE_URL manquant")
         
-        logger.info("StatisticsUpdater VERSION CORRIGÉE V1.2 initialisé")
+        logger.info("StatisticsUpdater VERSION COMPLETE CORRIGEE V2.0 initialisé")
         logger.info(f"DSN configuré depuis DATABASE_URL (longueur: {len(self.dsn)} chars)")
-        logger.info("Cette version corrige le format de retour pour main.py")
+        logger.info("Cette version corrige COMPLETEMENT le format de retour pour main.py")
         
         self.last_update = None
         self.update_in_progress = False
@@ -123,7 +126,8 @@ class StatisticsUpdater:
                             "meta": {
                                 "collected_at": datetime.now().isoformat(),
                                 "data_source": "user_questions_complete_direct",
-                                "dsn_source": "DATABASE_URL"
+                                "dsn_source": "DATABASE_URL",
+                                "version": "v2.0_corrected"
                             }
                         }
                     else:
@@ -188,35 +192,52 @@ class StatisticsUpdater:
             "meta": {
                 "collected_at": datetime.now().isoformat(),
                 "data_source": "fallback_empty",
-                "dsn_source": "DATABASE_URL"
+                "dsn_source": "DATABASE_URL",
+                "version": "v2.0_corrected"
             }
         }
 
     async def update_all_statistics(self) -> Dict[str, Any]:
         """
-        CORRECTION: Format de retour simplifié pour compatibilité avec main.py
-        Évite le warning "statut inattendu"
+        CORRECTION COMPLETE: Format de retour exactement compatible avec main.py
+        Retourne "completed" ou "failed" avec tous les champs requis
         """
         if self.update_in_progress:
             return {
-                "status": "skipped", 
+                "status": "failed",  # CORRIGE: compatible main.py
+                "error": "Update already in progress",
                 "reason": "already_in_progress",
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "successful_updates": 0,  # AJOUTE: requis par main.py
+                "total_updates": 1,       # AJOUTE: requis par main.py
+                "duration_ms": 0,         # AJOUTE: requis par main.py
+                "errors": ["Update already in progress"]  # AJOUTE: requis par main.py
             }
         
         self.update_in_progress = True
+        start_time = time.time()  # Utiliser time.time() pour precision
+        
         try:
             logger.info("Début mise à jour complète des statistiques")
             stats = self.get_stats()
             self.last_update = datetime.now()
             
+            duration_ms = (time.time() - start_time) * 1000  # Calcul précis en ms
+            
             logger.info(f"Mise à jour terminée: {stats['usageStats']['total_questions']} questions")
             
-            # CORRECTION: Retour simplifié pour éviter les warnings dans main.py
+            # CORRECTION COMPLETE: Retour avec statut "completed" et tous les champs requis
             return {
-                "status": "success",
+                "status": "completed",     # CORRIGE: était "success"
                 "timestamp": self.last_update.isoformat(),
-                "stats": stats,
+                "duration_ms": duration_ms,        # CORRIGE: format et calcul
+                "successful_updates": 1,           # AJOUTE: requis par main.py
+                "total_updates": 1,               # AJOUTE: requis par main.py
+                "errors": [],                     # AJOUTE: requis par main.py
+                "stats": stats,                   # CONSERVE: données statistiques
+                "details": [                      # AJOUTE: détails pour debugging
+                    ("statistics", {"success": True, "duration_ms": duration_ms})
+                ],
                 "summary": {
                     "total_questions": stats['usageStats']['total_questions'],
                     "unique_users": stats['usageStats']['unique_users'],
@@ -225,11 +246,16 @@ class StatisticsUpdater:
             }
             
         except Exception as e:
+            duration_ms = (time.time() - start_time) * 1000
             logger.error(f"Erreur update_all_statistics: {e}")
             return {
-                "status": "error", 
+                "status": "failed",        # CORRIGE: était "error"
                 "error": str(e),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "duration_ms": duration_ms,        # AJOUTE: requis par main.py
+                "successful_updates": 0,           # AJOUTE: requis par main.py
+                "total_updates": 1,               # AJOUTE: requis par main.py
+                "errors": [str(e)]                # CORRIGE: format liste requis
             }
         finally:
             self.update_in_progress = False
@@ -241,9 +267,11 @@ class StatisticsUpdater:
             "last_update": self.last_update.isoformat() if self.last_update else None,
             "update_in_progress": self.update_in_progress,
             "dsn_configured": bool(self.dsn),
-            "version": "corrected_v1.2",
+            "version": "complete_corrected_v2.0",
             "cache_enabled": os.getenv("ENABLE_STATS_CACHE", "false").lower() == "true",
-            "database_connected": self._test_database_connection()
+            "database_connected": self._test_database_connection(),
+            "format_compatibility": "main_py_compatible",
+            "return_format": "completed_failed_only"
         }
 
     def _test_database_connection(self) -> bool:
@@ -258,7 +286,7 @@ class StatisticsUpdater:
             return False
 
     def get_cache_info(self) -> Dict[str, Any]:
-        """NOUVEAU: Informations sur le cache pour le frontend"""
+        """Informations sur le cache pour le frontend"""
         cache_enabled = os.getenv("ENABLE_STATS_CACHE", "false").lower() == "true"
         
         return {
@@ -266,7 +294,9 @@ class StatisticsUpdater:
             "last_update": self.last_update.isoformat() if self.last_update else None,
             "cache_age_minutes": self._get_cache_age_minutes(),
             "performance_gain": "85% faster" if cache_enabled else "No cache",
-            "next_update": self._get_next_update_time()
+            "next_update": self._get_next_update_time(),
+            "version": "v2.0_corrected",
+            "format_compatibility": "main_py_compatible"
         }
 
     def _get_cache_age_minutes(self) -> int:
@@ -281,9 +311,20 @@ class StatisticsUpdater:
         if not self.last_update:
             return datetime.now().isoformat()
         
-        # Mise à jour toutes les 5 minutes par défaut
-        next_update = self.last_update + timedelta(minutes=5)
+        # Mise à jour toutes les heures par défaut (correspondant à main.py)
+        next_update = self.last_update + timedelta(hours=1)
         return next_update.isoformat()
+
+    def get_update_status(self) -> Dict[str, Any]:
+        """AJOUTE: Méthode attendue par main.py pour compatibilité"""
+        return {
+            "last_update": self.last_update.isoformat() if self.last_update else None,
+            "update_in_progress": self.update_in_progress,
+            "cache_available": True,
+            "invitation_manager_available": True,  # Simulation
+            "version": "v2.0_corrected",
+            "format": "main_py_compatible"
+        }
 
 # Singleton global
 _stats_updater_instance = None
@@ -295,21 +336,56 @@ def get_stats_updater():
         _stats_updater_instance = StatisticsUpdater()
     return _stats_updater_instance
 
-async def run_update_cycle():
+async def run_update_cycle() -> Dict[str, Any]:
     """
-    Fonction helper pour le scheduler - Format de retour cohérent
+    CORRECTION COMPLETE: Fonction helper pour le scheduler avec format exact main.py
+    Retourne EXACTEMENT le format attendu par main.py
     """
-    logger.info("Lancement cycle de mise à jour depuis scheduler")
-    updater = get_stats_updater()
-    result = await updater.update_all_statistics()
-    logger.info(f"Cycle terminé: {result.get('status')}")
-    return result
+    try:
+        logger.info("Lancement cycle de mise à jour depuis scheduler")
+        updater = get_stats_updater()
+        result = await updater.update_all_statistics()
+        
+        # VERIFICATION: S'assurer que le format est correct
+        required_fields = ["status", "duration_ms", "successful_updates", "total_updates"]
+        for field in required_fields:
+            if field not in result:
+                logger.error(f"Champ manquant dans résultat: {field}")
+                return {
+                    "status": "failed",
+                    "error": f"Missing field: {field}",
+                    "duration_ms": 0,
+                    "successful_updates": 0,
+                    "total_updates": 0,
+                    "errors": [f"Invalid result format: missing {field}"]
+                }
+        
+        # VERIFICATION: Status est bien "completed" ou "failed"
+        if result["status"] not in ["completed", "failed"]:
+            logger.error(f"Status invalide: {result['status']}")
+            result["status"] = "failed"
+            if "errors" not in result:
+                result["errors"] = []
+            result["errors"].append(f"Invalid status corrected: {result['status']}")
+        
+        logger.info(f"Cycle terminé: {result.get('status')} - {result.get('successful_updates', 0)}/{result.get('total_updates', 0)} succès")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Erreur run_update_cycle: {e}")
+        return {
+            "status": "failed",
+            "error": str(e),
+            "duration_ms": 0,
+            "successful_updates": 0,
+            "total_updates": 0,
+            "errors": [str(e)]
+        }
 
-async def force_update_all():
-    """Force une mise à jour immédiate"""
+async def force_update_all() -> Dict[str, Any]:
+    """Force une mise à jour immédiate avec format compatible main.py"""
     logger.info("Force update demandée")
-    updater = get_stats_updater()
-    return await updater.update_all_statistics()
+    return await run_update_cycle()
 
 def get_updater_status():
     """Retourne le statut du collecteur"""
@@ -317,10 +393,10 @@ def get_updater_status():
         updater = get_stats_updater()
         return updater.get_status()
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        return {"status": "error", "error": str(e), "version": "v2.0_corrected"}
 
 def get_cache_status():
-    """NOUVEAU: Retourne les informations de cache pour le frontend"""
+    """Retourne les informations de cache pour le frontend"""
     try:
         updater = get_stats_updater()
         return updater.get_cache_info()
@@ -331,5 +407,6 @@ def get_cache_status():
             "cache_age_minutes": 0,
             "performance_gain": "Error",
             "next_update": None,
-            "error": str(e)
+            "error": str(e),
+            "version": "v2.0_corrected"
         }
