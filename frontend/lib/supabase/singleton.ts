@@ -1,16 +1,13 @@
 'use client'
 
-import { createClientComponentClient, type SupabaseClient } from '@supabase/auth-helpers-nextjs'
-// (Optionnel) si tu as des types générés par supabase:
-// import type { Database } from '@/types/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
-// Si tu n'as pas de types, remplace SupabaseClient<any> par SupabaseClient
-let _client: SupabaseClient/*<Database>*/ | null = null
+// Let TS infer the exact client type from the helper
+let _client: ReturnType<typeof createClientComponentClient> | null = null
 
-export function getSupabaseClient(): SupabaseClient/*<Database>*/ {
+export function getSupabaseClient() {
   if (_client) return _client
-  // ✅ Indispensable: client "component" côté navigateur -> gère PKCE (code_verifier en cookie)
-  _client = createClientComponentClient/*<Database>*/()
+  _client = createClientComponentClient()
   return _client
 }
 

@@ -1,6 +1,32 @@
 {
   "version": 3,
-  "middleware": {},
+  "middleware": {
+    "/": {
+      "files": [
+        "server/edge-runtime-webpack.js",
+        "server/middleware.js"
+      ],
+      "name": "middleware",
+      "page": "/",
+      "matchers": [
+        {
+          "regexp": "^(?:\\/(_next\\/data\\/[^/]{1,}))?(?:\\/((?!_next\\/static|_next\\/image|favicon.ico|images|icons|.*\\.png$|.*\\.jpg$|.*\\.svg$|.*\\.ico$).*))(.json)?[\\/#\\?]?$",
+          "originalSource": "/((?!_next/static|_next/image|favicon.ico|images|icons|.*\\.png$|.*\\.jpg$|.*\\.svg$|.*\\.ico$).*)"
+        }
+      ],
+      "wasm": [],
+      "assets": [],
+      "env": {
+        "__NEXT_BUILD_ID": "intelia-expert-1757118864013",
+        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "qI3SPjlvxkHN945EpGIwomxOo6mi4K77EiYeLIhOqYA=",
+        "__NEXT_PREVIEW_MODE_ID": "4e812a2b8d2128ad0168c1e66c21be62",
+        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "04c81a5a6601f993552ecddeab94eea8a5709befdd5b0f1a5c5bb7064f554aed",
+        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "a8541e42419bd254401e72222910da91730533d55675b2007fd54006d84907ae"
+      }
+    }
+  },
   "functions": {},
-  "sortedMiddleware": []
+  "sortedMiddleware": [
+    "/"
+  ]
 }
