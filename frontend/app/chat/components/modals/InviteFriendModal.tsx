@@ -118,8 +118,8 @@ const invitationService = {
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody),
-        signal: controller.signal,
-        credentials: 'include' // Important pour les cookies de session
+        signal: controller.signal
+        // Pas de credentials: 'include' car c'est une requête cross-origin
       })
 
       clearTimeout(timeoutId)

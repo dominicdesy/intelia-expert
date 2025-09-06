@@ -23,10 +23,6 @@ class StatisticsUpdater:
         print("=" * 80)
         print("STATS_UPDATER.PY - VERSION COMPLETE CORRIGEE V2.0 - DEPLOYE")
         print("Date: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        print("CORRECTION: Format de retour compatible main.py (completed/failed)")
-        print("CORRECTION: Encodage propre sans caractères corrompus")
-        print("CORRECTION: Ajout champs requis (successful_updates, duration_ms)")
-        print("AJOUT: Meilleure gestion du cache et compatibilité main.py")
         print("=" * 80)
         
         # CORRECTION CRITIQUE: Utilise DATABASE_URL directement
