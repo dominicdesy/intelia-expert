@@ -77,22 +77,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
           const parsed = JSON.parse(authData)
           const token = parsed.access_token
           
-          if (token && navigator.sendBeacon) {
-            // Utiliser l'endpoint heartbeat existant pour signaler la fermeture
+          if (token) {
+            // Utiliser fetch avec keepalive et en-têtes Authorization
             const url = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'}/v1/auth/heartbeat`
             
-            // Inclure le token dans l'URL pour sendBeacon
-            const urlWithToken = `${url}?token=${encodeURIComponent(token)}`
-            const data = JSON.stringify({ 
-              logout_type: 'browser_close',
-              timestamp: new Date().toISOString()
+            fetch(url, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ 
+                logout_type: 'browser_close',
+                timestamp: new Date().toISOString()
+              }),
+              keepalive: true
+            }).catch(() => {
+              // Ignorer les erreurs silencieusement lors de la fermeture
             })
             
-            navigator.sendBeacon(urlWithToken, new Blob([data], {
-              type: 'application/json'
-            }))
-            
-            console.log('[AuthProvider] Signal de fermeture envoyé via beacon')
+            console.log('[AuthProvider] Signal de fermeture envoyé via fetch keepalive')
           }
         } catch (error) {
           console.warn('[AuthProvider] Erreur envoi beacon:', error)
