@@ -312,7 +312,7 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  // NOUVELLE MÉTHODE: Utilisation d'apiClient au lieu de fetch direct
+  // MÉTHODE CORRIGÉE: Utilisation d'apiClient.getSecure au lieu de get
   const loadAllStatistics = async () => {
     if (statsLoading) {
       console.log('[StatisticsPage] Chargement déjà en cours, annulation...')
@@ -326,10 +326,11 @@ export const StatisticsPage: React.FC = () => {
     const startTime = performance.now()
 
     try {
-      console.log('⚡ Tentative endpoint cache via apiClient: /api/v1/stats-fast/dashboard')
+      console.log('[StatisticsPage] DEBUG: baseURL from apiClient:', apiClient.getBaseURL())
+      console.log('⚡ Tentative endpoint cache via apiClient: stats-fast/dashboard')
       
-      // CORRECTION: Utilise apiClient.get() au lieu de fetch direct
-      const response = await apiClient.get<FastDashboardStats>('/api/v1/stats-fast/dashboard')
+      // CORRECTION: Utilise apiClient.getSecure() au lieu de apiClient.get()
+      const response = await apiClient.getSecure<FastDashboardStats>('stats-fast/dashboard')
       
       if (!response.success) {
         throw new Error(response.error?.message || 'Erreur lors du chargement des statistiques')
@@ -430,7 +431,7 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 	  
-  // NOUVELLE MÉTHODE: Charger les questions avec apiClient
+  // MÉTHODE CORRIGÉE: Charger les questions avec apiClient.getSecure
   const loadQuestionLogs = async () => {
     if (questionsLoading) {
       console.log('[Questions] Chargement déjà en cours, annulation...')
@@ -447,8 +448,8 @@ export const StatisticsPage: React.FC = () => {
         limit: questionsPerPage.toString()
       })
 
-      // CORRECTION: Utilise apiClient.get() avec URL complète
-      const response = await apiClient.get<FastQuestionsResponse>(`/api/v1/stats-fast/questions?${params}`)
+      // CORRECTION: Utilise apiClient.getSecure() avec URL relative
+      const response = await apiClient.getSecure<FastQuestionsResponse>(`stats-fast/questions?${params}`)
     
       if (!response.success) {
         throw new Error(response.error?.message || 'Erreur lors du chargement des questions')
@@ -514,7 +515,7 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  // NOUVELLE MÉTHODE: Charger les invitations avec apiClient
+  // MÉTHODE CORRIGÉE: Charger les invitations avec apiClient.getSecure
   const loadInvitationStats = async () => {
     if (invitationLoading) {
       console.log('[Invitations] Chargement déjà en cours, annulation...')
@@ -527,10 +528,10 @@ export const StatisticsPage: React.FC = () => {
     const startTime = performance.now()
 
     try {
-      console.log('⚡ Tentative endpoint cache: /api/v1/stats-fast/invitations')
+      console.log('⚡ Tentative endpoint cache: stats-fast/invitations')
       
-      // CORRECTION: Utilise apiClient.get() au lieu de fetch direct (sans préfixe /api/v1/)
-      const response = await apiClient.get<FastInvitationStats>('/stats-fast/invitations')
+      // CORRECTION: URL relative et méthode getSecure
+      const response = await apiClient.getSecure<FastInvitationStats>('stats-fast/invitations')
       
       if (!response.success) {
         throw new Error(response.error?.message || 'Erreur lors du chargement des invitations')
