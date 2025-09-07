@@ -366,58 +366,35 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  // SOLUTION DÉFINITIVE: Bypass complet de Supabase pour éviter les blocages
+  // ✅ MÉTHODE CORRIGÉE: Utiliser apiClient.getSecure() comme InviteFriendModal
   const loadAllStatistics = async () => {
     if (statsLoading) {
       console.log('[StatisticsPage] Chargement déjà en cours, annulation...')
       return
     }
     
-    console.log('[StatisticsPage] DÉBUT chargement statistiques avec utilisateur:', currentUser?.email)
+    console.log('[StatisticsPage] DÉBUT chargement statistiques avec apiClient.getSecure()')
     setStatsLoading(true)
     setError(null)
 
     const startTime = performance.now()
 
     try {
-      console.log('[StatisticsPage] DEBUG: baseURL from apiClient:', apiClient.getBaseURL())
-      console.log('Tentative endpoint cache via apiClient: stats-fast/dashboard')
+      // ✅ SOLUTION: Utiliser apiClient.getSecure() comme InviteFriendModal
+      console.log('[StatisticsPage] Appel apiClient.getSecure() pour stats-fast/dashboard')
       
-      // BYPASS COMPLET: Utilisation directe de fetch avec token intelia
-      const authToken = localStorage.getItem('intelia-expert-auth')
-      console.log('[StatisticsPage] Token disponible dans localStorage:', !!authToken)
+      const response = await apiClient.getSecure<FastDashboardStats>('stats-fast/dashboard')
       
-      if (!authToken && currentUser) {
-        console.log('[StatisticsPage] Création token temporaire')
-        const tempAuth = {
-          access_token: 'temp_' + Date.now(),
-          user: currentUser,
-          expires_at: Date.now() + (60 * 60 * 1000)
-        }
-        localStorage.setItem('intelia-expert-auth', JSON.stringify(tempAuth))
+      if (!response.success) {
+        throw new Error(response.error?.message || 'Erreur lors du chargement des statistiques')
       }
-      
-      // BYPASS: Appel direct sans apiClient pour éviter Supabase
-      const token = authToken ? JSON.parse(authToken).access_token : 'temp_' + Date.now()
-      const url = `${apiClient.getBaseURL()}/api/v1/stats-fast/dashboard`
-      
-      console.log('[StatisticsPage] BYPASS: Appel direct à', url)
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      })
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+
+      if (!response.data) {
+        throw new Error('Réponse vide du serveur')
       }
-      
-      const fastData = await response.json()
-      console.log('SUCCÈS bypass Supabase!', fastData)
+
+      const fastData = response.data
+      console.log('✅ Statistiques chargées avec apiClient.getSecure()!', fastData)
       
       const loadTime = performance.now() - startTime
       console.log(`Performance: ${loadTime.toFixed(0)}ms`)
@@ -496,7 +473,7 @@ export const StatisticsPage: React.FC = () => {
       setBillingStats(safeBillingStats)
       setPerformanceStats(safePerformanceStats)
       
-      console.log('Toutes les statistiques chargées depuis le cache!')
+      console.log('Toutes les statistiques chargées via apiClient.getSecure()!')
 
     } catch (err) {
       console.error('[StatisticsPage] Erreur chargement statistiques:', err)
