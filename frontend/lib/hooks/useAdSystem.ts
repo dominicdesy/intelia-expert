@@ -34,14 +34,57 @@ export const useAdSystem = () => {
 
       if (response.ok) {
         const data = await response.json();
+        
+        // Correction: Utiliser la structure correcte des données
+        const totalSessions = data.summary?.total_sessions || 0;
+        
+        // Correction: Calculer la durée moyenne depuis les sessions individuelles
+        let averageSessionDuration = 0;
+        if (data.recent_sessions && data.recent_sessions.length > 0) {
+          // Estimer la durée basée sur l'écart entre les logins (approximation)
+          const sessions = data.recent_sessions;
+          let totalEstimatedDuration = 0;
+          let validSessions = 0;
+          
+          for (let i = 0; i < sessions.length; i++) {
+            const loginTime = new Date(sessions[i].login_time);
+            
+            if (i > 0) {
+              // Utiliser l'écart avec la session précédente comme estimation
+              const prevLoginTime = new Date(sessions[i - 1].login_time);
+              const estimatedDuration = Math.abs(prevLoginTime.getTime() - loginTime.getTime()) / 1000;
+              
+              // Limiter à des valeurs réalistes (entre 1 minute et 2 heures)
+              if (estimatedDuration >= 60 && estimatedDuration <= 7200) {
+                totalEstimatedDuration += estimatedDuration;
+                validSessions++;
+              }
+            } else {
+              // Pour la première session, estimer 3 minutes par défaut
+              totalEstimatedDuration += 180;
+              validSessions++;
+            }
+          }
+          
+          if (validSessions > 0) {
+            averageSessionDuration = totalEstimatedDuration / validSessions;
+          }
+        }
+
+        console.log('🔍 Debug Ad System:', {
+          totalSessions,
+          averageSessionDuration,
+          data: data.summary
+        });
+
         const stats: UserSessionStats = {
-          totalSessions: data.total_sessions || 0,
-          averageSessionDuration: data.average_duration || 0,
+          totalSessions,
+          averageSessionDuration,
           lastAdShown: localStorage.getItem('lastAdShown'),
           qualifiesForAd: false
         };
 
-        // Vérifier les critères en utilisant les noms corrects
+        // Vérifier les critères
         const meetsSessionCriteria = stats.totalSessions >= AD_CRITERIA.MIN_SESSIONS;
         const meetsDurationCriteria = stats.averageSessionDuration >= AD_CRITERIA.MIN_DURATION_PER_SESSION;
         
@@ -53,15 +96,29 @@ export const useAdSystem = () => {
 
         stats.qualifiesForAd = meetsSessionCriteria && meetsDurationCriteria && cooldownExpired;
         
+        console.log('🎯 Critères publicitaires:', {
+          sessions: `${stats.totalSessions} >= ${AD_CRITERIA.MIN_SESSIONS} = ${meetsSessionCriteria}`,
+          duration: `${Math.round(stats.averageSessionDuration)}s >= ${AD_CRITERIA.MIN_DURATION_PER_SESSION}s = ${meetsDurationCriteria}`,
+          cooldown: `Expiré = ${cooldownExpired}`,
+          eligible: stats.qualifiesForAd
+        });
+        
         setSessionStats(stats);
+
+        // TEST FORCÉ EN DÉVELOPPEMENT
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🚀 Mode développement: forçage publicité');
+          stats.qualifiesForAd = true;
+        }
 
         // Déclencher la publicité si éligible
         if (stats.qualifiesForAd) {
+          console.log('✅ Déclenchement publicité...');
           await triggerAd();
         }
       }
     } catch (error) {
-      console.error('Erreur lors de la vérification de l\'éligibilité publicitaire:', error);
+      console.error('❌ Erreur lors de la vérification de l\'éligibilité publicitaire:', error);
     }
   }, [isAuthenticated, user, AD_CRITERIA]);
 
@@ -108,30 +165,29 @@ export const useAdSystem = () => {
   // Déclencher l'affichage de la publicité
   const triggerAd = useCallback(async () => {
     try {
+      console.log('🎬 Chargement publicité...');
       const adData = await getPersonalizedAd();
       setCurrentAd(adData);
       setShowAd(true);
+      console.log('📺 Publicité affichée:', adData.title);
     } catch (error) {
-      console.error('Erreur lors du chargement de la publicité:', error);
+      console.error('❌ Erreur lors du chargement de la publicité:', error);
     }
   }, [getPersonalizedAd]);
 
   // Gérer la fermeture de la publicité
   const handleAdClose = useCallback(() => {
+    console.log('❌ Fermeture publicité');
     setShowAd(false);
     setCurrentAd(null);
     
     // Enregistrer le timestamp pour le cooldown
     localStorage.setItem('lastAdShown', new Date().toISOString());
-    
-    // Log local optionnel (pour debug)
-    console.log('Ad closed:', { timestamp: new Date().toISOString() });
   }, []);
 
   // Gérer le clic sur la publicité
   const handleAdClick = useCallback((adId: string) => {
-    // Log local optionnel (pour debug)
-    console.log('Ad clicked:', { adId, timestamp: new Date().toISOString() });
+    console.log('👆 Clic publicité:', adId);
     
     // Enregistrer le timestamp pour le cooldown
     localStorage.setItem('lastAdShown', new Date().toISOString());
@@ -146,13 +202,19 @@ export const useAdSystem = () => {
   // Vérifier l'éligibilité au démarrage et périodiquement
   useEffect(() => {
     if (isAuthenticated) {
+      console.log('🏁 Initialisation Ad System...');
+      
       // Délai initial pour laisser le temps aux sessions de se charger
       const initialDelay = setTimeout(() => {
+        console.log('🔍 Vérification éligibilité publicité...');
         checkAdEligibility();
       }, AD_CRITERIA.INITIAL_CHECK_DELAY || 3000);
 
       // Puis vérifier selon l'intervalle configuré
-      const interval = setInterval(checkAdEligibility, AD_CRITERIA.CHECK_INTERVAL || 5 * 60 * 1000);
+      const interval = setInterval(() => {
+        console.log('🔄 Vérification périodique publicité...');
+        checkAdEligibility();
+      }, AD_CRITERIA.CHECK_INTERVAL || 5 * 60 * 1000);
       
       return () => {
         clearTimeout(initialDelay);
@@ -160,6 +222,20 @@ export const useAdSystem = () => {
       };
     }
   }, [isAuthenticated, checkAdEligibility, AD_CRITERIA]);
+
+  // Test manual trigger
+  useEffect(() => {
+    const handleManualTrigger = () => {
+      console.log('🧪 Déclenchement manuel publicité');
+      triggerAd();
+    };
+
+    window.addEventListener('triggerAd', handleManualTrigger);
+    
+    return () => {
+      window.removeEventListener('triggerAd', handleManualTrigger);
+    };
+  }, [triggerAd]);
 
   return {
     sessionStats,
