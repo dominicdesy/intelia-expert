@@ -109,6 +109,30 @@ interface FastInvitationStats {
   invitation_stats: InvitationStats
 }
 
+// Interface pour les données d'invitation depuis l'endpoint global-enhanced
+interface GlobalInvitationStats {
+  total_invitations: number
+  total_accepted: number
+  total_pending: number
+  global_acceptance_rate: number
+  active_inviters: number
+  unique_inviters: number
+  top_inviters_by_sent: Array<{
+    inviter_email: string
+    inviter_name: string
+    invitations_sent: number
+    invitations_accepted: number
+    acceptance_rate: number
+  }>
+  top_inviters_by_accepted: Array<{
+    inviter_email: string
+    inviter_name: string
+    invitations_sent: number
+    invitations_accepted: number
+    acceptance_rate: number
+  }>
+}
+
 // Types pour les données de statistiques
 interface SystemStats {
   system_health: {
@@ -579,23 +603,23 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  // MÉTHODE CORRIGÉE: Charger les invitations avec apiClient.getSecure
+  // MÉTHODE CORRIGÉE: Charger les invitations avec l'endpoint fonctionnel
   const loadInvitationStats = async () => {
     if (invitationLoading) {
       console.log('[Invitations] Chargement déjà en cours, annulation...')
       return
     }
     
-    console.log('⚡ [Invitations] Chargement avec apiClient')
+    console.log('⚡ [Invitations] Chargement avec apiClient - ENDPOINT CORRIGÉ')
     setInvitationLoading(true)
     setError(null)
     const startTime = performance.now()
 
     try {
-      console.log('⚡ Tentative endpoint cache: stats-fast/invitations')
+      console.log('⚡ Utilisation endpoint fonctionnel: invitations/stats/global-enhanced')
       
-      // CORRECTION: URL relative et méthode getSecure
-      const response = await apiClient.getSecure<FastInvitationStats>('stats-fast/invitations')
+      // CORRECTION: Utilise l'endpoint qui fonctionne réellement
+      const response = await apiClient.getSecure<GlobalInvitationStats>('invitations/stats/global-enhanced')
       
       if (!response.success) {
         throw new Error(response.error?.message || 'Erreur lors du chargement des invitations')
@@ -605,14 +629,34 @@ export const StatisticsPage: React.FC = () => {
         throw new Error('Réponse vide du serveur')
       }
 
-      const fastData = response.data
-      console.log('🎉 Invitations chargées avec apiClient!', fastData)
+      const globalData = response.data
+      console.log('🎉 Invitations chargées avec endpoint fonctionnel!', globalData)
       
       const loadTime = performance.now() - startTime
       console.log(`⚡ Invitations Performance: ${loadTime.toFixed(0)}ms`)
       
-      setInvitationCacheStatus(fastData.cache_info)
-      setInvitationStats(fastData.invitation_stats)
+      // Adapter les données au format attendu par le composant React
+      const adaptedCacheStatus: CacheStatus = {
+        is_available: false, // Pas de cache pour cet endpoint
+        last_update: new Date().toISOString(),
+        cache_age_minutes: 0,
+        performance_gain: `${loadTime.toFixed(0)}ms (direct)`,
+        next_update: null
+      }
+      
+      const adaptedInvitationStats: InvitationStats = {
+        total_invitations_sent: globalData.total_invitations,
+        total_invitations_accepted: globalData.total_accepted,
+        acceptance_rate: globalData.global_acceptance_rate,
+        unique_inviters: globalData.unique_inviters,
+        top_inviters: globalData.top_inviters_by_sent || [],
+        top_accepted: globalData.top_inviters_by_accepted || []
+      }
+      
+      setInvitationCacheStatus(adaptedCacheStatus)
+      setInvitationStats(adaptedInvitationStats)
+
+      console.log('✅ Données d\'invitations adaptées:', adaptedInvitationStats)
 
     } catch (err) {
       console.error('[StatisticsPage] Erreur chargement stats invitations:', err)

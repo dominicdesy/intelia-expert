@@ -281,85 +281,49 @@ export const StatisticsPage: React.FC = () => {
   const questionsLoadedRef = useRef<Map<string, boolean>>(new Map())
   const invitationsLoadedRef = useRef<boolean>(false)
 
-  // LOGIQUE D'AUTHENTIFICATION AMÉLIORÉE
+  // 🔧 FIX: Reset forcé des références à chaque mount
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout
+    console.log('[StatisticsPage] 🔧 RESET forcé des références au mount')
+    dashboardLoadedRef.current = false
+    authCheckRef.current = false
+    stabilityCounterRef.current = 0
+    questionsLoadedRef.current.clear()
+    invitationsLoadedRef.current = false
+  }, [])
 
-    const performAuthCheck = () => {
-      if (authStatus === 'ready' && authCheckRef.current) {
-        return
-      }
-
-      console.log('[StatisticsPage] Auth check avec fallback:', { 
-        hasUser: !!currentUser,
-        email: currentUser?.email,
-        userType: currentUser?.user_type,
-        stabilityCounter: stabilityCounterRef.current,
-        currentAuthStatus: authStatus
-      })
-
-      if (currentUser === undefined) {
-        console.log('[StatisticsPage] Phase 1: Attente initialisation auth...')
-        setAuthStatus('initializing')
-        stabilityCounterRef.current = 0
-        return
-      }
-
-      if (currentUser !== null && (!currentUser.email || !currentUser.user_type)) {
-        console.log('[StatisticsPage] Phase 2: Données utilisateur incomplètes, attente...')
-        setAuthStatus('checking')
-        stabilityCounterRef.current = 0
-        return
-      }
-
-      if (authStatus !== 'ready') {
-        stabilityCounterRef.current++
-      }
-
-      if (stabilityCounterRef.current < 2 && authStatus !== 'ready') {
-        console.log(`[StatisticsPage] Stabilisation... (${stabilityCounterRef.current}/2)`)
-        setAuthStatus('checking')
-        timeoutId = setTimeout(performAuthCheck, 150)
-        return
-      }
-
-      if (currentUser === null) {
-        console.log('[StatisticsPage] Utilisateur non connecté')
-        setAuthStatus('unauthorized')
-        setError("Vous devez être connecté pour accéder à cette page")
-        return
-      }
-
-      if (currentUser.user_type !== 'super_admin') {
-        console.log('[StatisticsPage] Permissions insuffisantes:', currentUser.user_type)
-        setAuthStatus('forbidden')
-        setError("Accès refusé - Permissions super_admin requises")
-        return
-      }
-
-      if (!authCheckRef.current) {
-        console.log('[StatisticsPage] Authentification réussie:', currentUser.email)
-        setAuthStatus('ready')
-        setError(null)
-        authCheckRef.current = true
-      }
-    }
-
-    timeoutId = setTimeout(performAuthCheck, 50)
-
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId)
-    }
-  }, [currentUser, authStatus])
-
-  // Chargement des statistiques - UNE SEULE FOIS
+  // 🔧 FIX: Logique d'authentification simplifiée
   useEffect(() => {
-    if (authStatus === 'ready' && !statsLoading && !dashboardLoadedRef.current) {
-      console.log('[StatisticsPage] Lancement chargement des statistiques')
-      dashboardLoadedRef.current = true
+    console.log('[StatisticsPage] 🔧 Auth check simplifié:', { 
+      hasUser: !!currentUser,
+      email: currentUser?.email,
+      userType: currentUser?.user_type
+    })
+
+    if (currentUser === undefined) {
+      console.log('[StatisticsPage] Initialisation auth...')
+      setAuthStatus('initializing')
+    } else if (currentUser === null) {
+      console.log('[StatisticsPage] Utilisateur non connecté')
+      setAuthStatus('unauthorized')
+      setError("Vous devez être connecté pour accéder à cette page")
+    } else if (currentUser.user_type !== 'super_admin') {
+      console.log('[StatisticsPage] Permissions insuffisantes:', currentUser.user_type)
+      setAuthStatus('forbidden')
+      setError("Accès refusé - Permissions super_admin requises")
+    } else {
+      console.log('[StatisticsPage] Authentification réussie:', currentUser.email)
+      setAuthStatus('ready')
+      setError(null)
+    }
+  }, [currentUser])
+
+  // 🔧 FIX: Chargement des statistiques avec condition simplifiée
+  useEffect(() => {
+    if (authStatus === 'ready' && !statsLoading && !systemStats) {
+      console.log('[StatisticsPage] 🔧 Lancement chargement des statistiques (condition simplifiée)')
       loadAllStatistics()
     }
-  }, [authStatus])
+  }, [authStatus, statsLoading, systemStats])
 
   // Chargement des questions - SEULEMENT SI NÉCESSAIRE
   useEffect(() => {
@@ -513,7 +477,7 @@ export const StatisticsPage: React.FC = () => {
     } catch (err) {
       console.error('❌ [StatisticsPage] Erreur chargement statistiques:', err)
       setError(`Erreur lors du chargement des statistiques: ${err}`)
-      dashboardLoadedRef.current = false // Permettre un retry
+      // 🔧 FIX: Ne plus reset dashboardLoadedRef.current, laisser la condition !systemStats gérer
     } finally {
       setStatsLoading(false)
     }
@@ -788,7 +752,9 @@ export const StatisticsPage: React.FC = () => {
           <p className="text-gray-600 mb-6">{error}</p>
           <button
             onClick={() => {
-              dashboardLoadedRef.current = false
+              // 🔧 FIX: Reset seulement les données, pas les refs
+              setSystemStats(null)
+              setError(null)
               loadAllStatistics()
             }}
             className="w-full bg-blue-600 text-white px-6 py-2 hover:bg-blue-700 transition-colors"
@@ -853,7 +819,9 @@ export const StatisticsPage: React.FC = () => {
               {activeTab === 'dashboard' && (
                 <button
                   onClick={() => {
-                    dashboardLoadedRef.current = false
+                    // 🔧 FIX: Reset seulement les données, pas les refs
+                    setSystemStats(null)
+                    setError(null)
                     loadAllStatistics()
                   }}
                   disabled={statsLoading}
