@@ -78,10 +78,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
           const token = parsed.access_token
           
           if (token && navigator.sendBeacon) {
-            // Utiliser sendBeacon avec FormData pour inclure le token
-            const url = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'}/v1/auth/logout`
+            // Utiliser l'endpoint heartbeat existant pour signaler la fermeture
+            const url = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'}/v1/auth/heartbeat`
             
-            // Option 1: Inclure le token dans l'URL comme paramètre de requête
+            // Inclure le token dans l'URL pour sendBeacon
             const urlWithToken = `${url}?token=${encodeURIComponent(token)}`
             const data = JSON.stringify({ 
               logout_type: 'browser_close',
