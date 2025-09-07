@@ -1,71 +1,27 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { useAuthStore } from '@/lib/stores/auth' 
+import { useAuthStore } from '@/lib/stores/auth' // ✅ Store unifié uniquement
 import { apiClient } from '@/lib/api/client'
 import { StatisticsDashboard } from './StatisticsDashboard'
 import { QuestionsTab } from './QuestionsTab'
 import { InvitationStatsComponent } from './InvitationStats'
 
-// Hook personnalisé pour l'authentification robuste (inspiré d'InviteFriendModal)
+// ✅ HOOK SIMPLIFIÉ - Plus de fallback localStorage/Supabase
 const useRobustAuth = () => {
   const { user } = useAuthStore()
   
   return useMemo(() => {
-    // Priorité 1: Store Zustand
+    // UNIQUEMENT le store unifié - plus de fallback
     if (user?.email && user?.user_type) {
-      console.log('[useRobustAuth] Utilisateur trouvé dans le store:', user.email, user.user_type)
+      console.log('[useRobustAuth] Utilisateur trouvé dans le store unifié:', user.email, user.user_type)
       return user
     }
     
-    // Priorité 2: Fallback localStorage/sessionStorage (comme InviteFriendModal)
-    try {
-      const authKeys = ['intelia-expert-auth', 'supabase.auth.token']
-      
-      for (const key of authKeys) {
-        const stored = localStorage.getItem(key) || sessionStorage.getItem(key)
-        if (stored) {
-          const authData = JSON.parse(stored)
-          
-          let userEmail, userName, userId, userType
-          
-          // Format Intelia
-          if (authData.access_token && authData.user) {
-            userEmail = authData.user.email
-            userName = authData.user.name || userEmail.split('@')[0]
-            userId = authData.user.id
-            userType = authData.user.user_type
-            
-            console.log('[useRobustAuth] Utilisateur trouvé dans localStorage (Intelia):', userEmail, userType)
-          }
-          // Format Supabase
-          else if (authData.user?.email) {
-            userEmail = authData.user.email
-            userName = authData.user.user_metadata?.name || authData.user.name || userEmail.split('@')[0]
-            userId = authData.user.id
-            userType = authData.user.user_metadata?.user_type || authData.user.user_type
-            
-            console.log('[useRobustAuth] Utilisateur trouvé dans localStorage (Supabase):', userEmail, userType)
-          }
-          
-          if (userEmail && userType) {
-            return {
-              email: userEmail,
-              name: userName,
-              id: userId,
-              user_type: userType
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('[useRobustAuth] Erreur récupération auth fallback:', e)
-    }
-    
-    console.log('[useRobustAuth] Aucun utilisateur trouvé')
+    console.log('[useRobustAuth] Aucun utilisateur dans le store unifié')
     return null
   }, [user])
 }
 
-// Types pour le système de cache ultra-rapide
+// Types pour le système de cache ultra-rapide (conservés)
 interface CacheStatus {
   is_available: boolean
   last_update: string | null
@@ -109,7 +65,6 @@ interface FastInvitationStats {
   invitation_stats: InvitationStats
 }
 
-// Interface pour les données d'invitation depuis l'endpoint global-enhanced
 interface GlobalInvitationStats {
   total_invitations: number
   total_accepted: number
@@ -133,7 +88,7 @@ interface GlobalInvitationStats {
   }>
 }
 
-// Types pour les données de statistiques
+// Types pour les données de statistiques (conservés)
 interface SystemStats {
   system_health: {
     uptime_hours: number
@@ -237,7 +192,8 @@ interface QuestionLog {
 }
 
 export const StatisticsPage: React.FC = () => {
-  const currentUser = useRobustAuth() // Utilise le nouveau hook robuste
+  const currentUser = useRobustAuth() // ✅ Hook simplifié
+  const { isAuthenticated, hasHydrated } = useAuthStore() // ✅ Store unifié
   
   const [authStatus, setAuthStatus] = useState<'initializing' | 'checking' | 'ready' | 'unauthorized' | 'forbidden'>('initializing')
   const [statsLoading, setStatsLoading] = useState(false)
@@ -291,18 +247,20 @@ export const StatisticsPage: React.FC = () => {
     invitationsLoadedRef.current = false
   }, [])
 
-  // Logique d'authentification simplifiée
+  // ✅ LOGIQUE D'AUTHENTIFICATION SIMPLIFIÉE - Store unifié uniquement
   useEffect(() => {
-    console.log('[StatisticsPage] Auth check simplifié:', { 
+    console.log('[StatisticsPage] Auth check unifié:', { 
+      hasHydrated,
+      isAuthenticated,
       hasUser: !!currentUser,
       email: currentUser?.email,
       userType: currentUser?.user_type
     })
 
-    if (currentUser === undefined) {
-      console.log('[StatisticsPage] Initialisation auth...')
+    if (!hasHydrated) {
+      console.log('[StatisticsPage] Store pas encore hydraté...')
       setAuthStatus('initializing')
-    } else if (currentUser === null) {
+    } else if (!isAuthenticated || !currentUser) {
       console.log('[StatisticsPage] Utilisateur non connecté')
       setAuthStatus('unauthorized')
       setError("Vous devez être connecté pour accéder à cette page")
@@ -315,17 +273,16 @@ export const StatisticsPage: React.FC = () => {
       setAuthStatus('ready')
       setError(null)
     }
-  }, [currentUser])
+  }, [hasHydrated, isAuthenticated, currentUser])
 
-  // Chargement des statistiques avec délai pour éviter les problèmes d'hydratation Supabase
+  // ✅ CHARGEMENT STATS - Avec délai pour stabilité
   useEffect(() => {
     if (authStatus === 'ready' && !statsLoading && !systemStats) {
-      console.log('[StatisticsPage] Lancement chargement des statistiques avec délai de sécurité')
+      console.log('[StatisticsPage] Lancement chargement des statistiques')
       
-      // Délai de 300ms pour laisser Supabase finir son hydratation
       const timeoutId = setTimeout(() => {
         loadAllStatistics()
-      }, 300)
+      }, 100) // Délai réduit car plus besoin d'attendre Supabase
       
       return () => clearTimeout(timeoutId)
     }
@@ -357,7 +314,6 @@ export const StatisticsPage: React.FC = () => {
     if (newTab !== activeTab) {
       console.log('[StatisticsPage] Changement onglet:', activeTab, '->', newTab)
       
-      // Reset seulement si nécessaire
       if (newTab === 'questions') {
         questionsLoadedRef.current.clear()
       }
@@ -366,21 +322,21 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  // ✅ MÉTHODE CORRIGÉE: Utiliser apiClient.getSecure() comme InviteFriendModal
+  // ✅ MÉTHODE UNIFIÉE : Utiliser apiClient.getSecure() uniquement
   const loadAllStatistics = async () => {
     if (statsLoading) {
       console.log('[StatisticsPage] Chargement déjà en cours, annulation...')
       return
     }
     
-    console.log('[StatisticsPage] DÉBUT chargement statistiques avec apiClient.getSecure()')
+    console.log('[StatisticsPage] DÉBUT chargement statistiques avec store unifié')
     setStatsLoading(true)
     setError(null)
 
     const startTime = performance.now()
 
     try {
-      // ✅ SOLUTION: Utiliser apiClient.getSecure() comme InviteFriendModal
+      // ✅ UTILISE APILIENT.GETSECURE() - plus d'appels directs
       console.log('[StatisticsPage] Appel apiClient.getSecure() pour stats-fast/dashboard')
       
       const response = await apiClient.getSecure<FastDashboardStats>('stats-fast/dashboard')
@@ -394,7 +350,7 @@ export const StatisticsPage: React.FC = () => {
       }
 
       const fastData = response.data
-      console.log('✅ Statistiques chargées avec apiClient.getSecure()!', fastData)
+      console.log('✅ Statistiques chargées avec store unifié!', fastData)
       
       const loadTime = performance.now() - startTime
       console.log(`Performance: ${loadTime.toFixed(0)}ms`)
@@ -473,7 +429,7 @@ export const StatisticsPage: React.FC = () => {
       setBillingStats(safeBillingStats)
       setPerformanceStats(safePerformanceStats)
       
-      console.log('Toutes les statistiques chargées via apiClient.getSecure()!')
+      console.log('Toutes les statistiques chargées via store unifié!')
 
     } catch (err) {
       console.error('[StatisticsPage] Erreur chargement statistiques:', err)
@@ -483,14 +439,14 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 	  
-  // MÉTHODE CORRIGÉE: Charger les questions avec apiClient.getSecure
+  // ✅ MÉTHODE UNIFIÉE : Charger les questions avec apiClient.getSecure
   const loadQuestionLogs = async () => {
     if (questionsLoading) {
       console.log('[Questions] Chargement déjà en cours, annulation...')
       return
     }
   
-    console.log('[Questions] Chargement avec apiClient')
+    console.log('[Questions] Chargement avec store unifié')
     setQuestionsLoading(true)
     const startTime = performance.now()
   
@@ -500,7 +456,7 @@ export const StatisticsPage: React.FC = () => {
         limit: questionsPerPage.toString()
       })
 
-      // CORRECTION: Utilise apiClient.getSecure() avec URL relative
+      // ✅ UTILISE APILIENT.GETSECURE() avec URL relative
       const response = await apiClient.getSecure<FastQuestionsResponse>(`stats-fast/questions?${params}`)
     
       if (!response.success) {
@@ -512,12 +468,11 @@ export const StatisticsPage: React.FC = () => {
       }
 
       const fastData = response.data
-      console.log('Questions chargées avec apiClient!', fastData)
+      console.log('Questions chargées avec store unifié!', fastData)
     
       const loadTime = performance.now() - startTime
       console.log(`Questions Performance: ${loadTime.toFixed(0)}ms`)
     
-      // Utilise le cache_info depuis l'API
       const realCacheInfo = fastData.cache_info || {
         is_available: false,
         last_update: null,
@@ -526,7 +481,6 @@ export const StatisticsPage: React.FC = () => {
         next_update: null
       }
     
-      // Enrichir avec le temps de chargement réel
       const enrichedCacheInfo = {
         ...realCacheInfo,
         performance_gain: realCacheInfo.is_available 
@@ -559,7 +513,6 @@ export const StatisticsPage: React.FC = () => {
       console.error('Erreur chargement questions:', err)
       setError(`Erreur chargement questions: ${err}`)
       setQuestionLogs([])
-      // Reset la référence pour permettre un retry
       const pageKey = `${currentPage}-${questionsPerPage}`
       questionsLoadedRef.current.delete(pageKey)
     } finally {
@@ -567,14 +520,14 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  // MÉTHODE CORRIGÉE: Charger les invitations avec l'endpoint fonctionnel
+  // ✅ MÉTHODE UNIFIÉE : Charger les invitations avec l'endpoint fonctionnel
   const loadInvitationStats = async () => {
     if (invitationLoading) {
       console.log('[Invitations] Chargement déjà en cours, annulation...')
       return
     }
     
-    console.log('[Invitations] Chargement avec apiClient - ENDPOINT CORRIGÉ')
+    console.log('[Invitations] Chargement avec store unifié')
     setInvitationLoading(true)
     setError(null)
     const startTime = performance.now()
@@ -582,7 +535,7 @@ export const StatisticsPage: React.FC = () => {
     try {
       console.log('Utilisation endpoint fonctionnel: invitations/stats/global-enhanced')
       
-      // CORRECTION: Utilise l'endpoint qui fonctionne réellement
+      // ✅ UTILISE APILIENT.GETSECURE() - plus d'appels directs
       const response = await apiClient.getSecure<GlobalInvitationStats>('invitations/stats/global-enhanced')
       
       if (!response.success) {
@@ -594,14 +547,13 @@ export const StatisticsPage: React.FC = () => {
       }
 
       const globalData = response.data
-      console.log('Invitations chargées avec endpoint fonctionnel!', globalData)
+      console.log('Invitations chargées avec store unifié!', globalData)
       
       const loadTime = performance.now() - startTime
       console.log(`Invitations Performance: ${loadTime.toFixed(0)}ms`)
       
-      // Adapter les données au format attendu par le composant React
       const adaptedCacheStatus: CacheStatus = {
-        is_available: false, // Pas de cache pour cet endpoint
+        is_available: false,
         last_update: new Date().toISOString(),
         cache_age_minutes: 0,
         performance_gain: `${loadTime.toFixed(0)}ms (direct)`,
@@ -626,7 +578,6 @@ export const StatisticsPage: React.FC = () => {
       console.error('[StatisticsPage] Erreur chargement stats invitations:', err)
       setError(`Erreur lors du chargement des statistiques d'invitations: ${err}`)
       
-      // Reset la référence pour permettre un retry
       invitationsLoadedRef.current = false
       
       setInvitationStats({
@@ -660,14 +611,14 @@ export const StatisticsPage: React.FC = () => {
     return '❓'
   }
 
-  // RENDU CONDITIONNEL - IDENTIQUE
+  // ✅ RENDU CONDITIONNEL SIMPLIFIÉ - Plus de vérifications Supabase
   
   if (authStatus === 'initializing') {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Initialisation...</p>
+          <p className="text-gray-600">Initialisation du store unifié...</p>
         </div>
       </div>
     )
@@ -679,7 +630,6 @@ export const StatisticsPage: React.FC = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Vérification des permissions...</p>
-          <p className="text-xs text-gray-400 mt-2">Stabilisation des données d'authentification</p>
         </div>
       </div>
     )
@@ -694,7 +644,7 @@ export const StatisticsPage: React.FC = () => {
           <p className="text-gray-600 mb-6">Vous devez être connecté pour accéder à cette page.</p>
           <div className="flex space-x-3">
             <button
-              onClick={() => window.location.href = '/login'}
+              onClick={() => window.location.href = '/'}
               className="flex-1 bg-blue-600 text-white px-6 py-2 hover:bg-blue-700 transition-colors"
             >
               Se connecter
@@ -736,7 +686,7 @@ export const StatisticsPage: React.FC = () => {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement des statistiques...</p>
+          <p className="text-gray-600">Chargement des statistiques avec store unifié...</p>
         </div>
       </div>
     )

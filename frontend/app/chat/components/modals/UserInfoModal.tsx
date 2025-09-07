@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, startTransition } from 'react'
 import { useTranslation } from '@/lib/languages/i18n'
+import { useAuthStore } from '@/lib/stores/auth' // ✅ Store unifié uniquement
 import { UserInfoModalProps } from '@/types'
 import { PhoneInput, usePhoneValidation } from '../PhoneInput'
 import { CountrySelect } from '../CountrySelect'
@@ -35,7 +36,7 @@ const getLanguageCode = (currentLanguage: string): string => {
   return mapping[currentLanguage] || 'eng'
 }
 
-// Fallback countries avec traductions multilingues
+// Fallback countries avec traductions multilingues (conservé)
 const getFallbackCountries = (currentLanguage: string): Country[] => {
   const translations: Record<string, Record<string, string>> = {
     en: {
@@ -111,7 +112,7 @@ const getFallbackCountries = (currentLanguage: string): Country[] => {
   })
 }
 
-// Interface TypeScript pour les données utilisateur API
+// Interface TypeScript pour les données utilisateur API (conservée)
 interface UserProfileUpdate {
   first_name?: string
   last_name?: string
@@ -281,7 +282,7 @@ const useCountries = () => {
   return { countries, loading, usingFallback }
 }
 
-// Nouvelle fonction de validation de mot de passe moderne
+// Nouvelle fonction de validation de mot de passe moderne (conservée)
 const validatePassword = (password: string): string[] => {
   const errors: string[] = []
   
@@ -342,7 +343,7 @@ const validatePassword = (password: string): string[] => {
   return errors
 }
 
-// Composant d'indicateur de force du mot de passe moderne
+// Composant d'indicateur de force du mot de passe moderne (conservé)
 const PasswordStrengthIndicator: React.FC<{ password: string }> = ({ password }) => {
   const validation = { errors: validatePassword(password) }
   
@@ -437,7 +438,7 @@ const PasswordStrengthIndicator: React.FC<{ password: string }> = ({ password })
   )
 }
 
-// Password input component
+// Password input component (conservé)
 const PasswordInput: React.FC<{
   id: string
   label: string
@@ -497,7 +498,7 @@ const PasswordInput: React.FC<{
   )
 }
 
-// Error display component
+// Error display component (conservé)
 const ErrorDisplay: React.FC<{ errors: string[]; title: string }> = ({ errors, title }) => {
   if (errors.length === 0) return null
 
@@ -529,6 +530,9 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     debugLog('LIFECYCLE', 'No user provided - returning null')
     return null
   }
+
+  // ✅ UTILISE LE STORE UNIFIÉ au lieu de updateProfile
+  const { updateProfile } = useAuthStore()
 
   // Protection unmount-safe
   const isMountedRef = useRef(true)
@@ -764,7 +768,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     }))
   }, [])
 
-  // FONCTION handleProfileSave CORRIGÉE - UTILISE apiClient COMME InviteFriendModal
+  // ✅ FONCTION handleProfileSave SIMPLIFIÉE - Utilise le store unifié
   const handleProfileSave = useCallback(async () => {
     if (!isMountedRef.current || isLoading) return
     setIsLoading(true)
@@ -825,64 +829,29 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
         return
       }
 
-      // Préparer les données pour l'API backend
-      const apiData: UserProfileUpdate = {}
-
-      if (formData.firstName !== undefined) {
-        apiData.first_name = String(formData.firstName).trim()
-      }
-
-      if (formData.lastName !== undefined) {
-        apiData.last_name = String(formData.lastName).trim()
-      }
-
-      // Construire full_name à partir des composants
-      if (formData.firstName !== undefined || formData.lastName !== undefined) {
-        const fullName = `${formData.firstName || ''} ${formData.lastName || ''}`.trim()
-        apiData.full_name = fullName
-      }
-
-      // Ajouter les autres champs
-      if (formData.country_code !== undefined) apiData.country_code = formData.country_code
-      if (formData.area_code !== undefined) apiData.area_code = formData.area_code
-      if (formData.phone_number !== undefined) apiData.phone_number = formData.phone_number
-      if (formData.country !== undefined) apiData.country = formData.country
-      if (formData.linkedinProfile !== undefined) apiData.linkedin_profile = formData.linkedinProfile
-      if (formData.companyName !== undefined) apiData.company_name = formData.companyName
-      if (formData.companyWebsite !== undefined) apiData.company_website = formData.companyWebsite
-      if (formData.linkedinCorporate !== undefined) apiData.linkedin_corporate = formData.linkedinCorporate
-
-      console.log('[UserInfoModal] Envoi vers API backend via apiClient:', '/users/profile')
-      console.log('[UserInfoModal] Données à envoyer:', Object.keys(apiData))
-
-      // 🚀 UTILISER apiClient.putSecure() comme InviteFriendModal
-      const response = await apiClient.putSecure<{success: boolean, message: string, user: any}>('/users/profile', apiData)
+      // ✅ UTILISER LE STORE UNIFIÉ au lieu d'apiClient direct
+      console.log('[UserInfoModal] Mise à jour via store unifié')
       
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Erreur lors de la mise à jour du profil')
+      const updateData = {
+        firstName: formData.firstName?.trim(),
+        lastName: formData.lastName?.trim(),
+        name: `${formData.firstName?.trim()} ${formData.lastName?.trim()}`.trim(),
+        email: formData.email?.trim(),
+        country_code: formData.country_code,
+        area_code: formData.area_code,
+        phone_number: formData.phone_number,
+        country: formData.country,
+        linkedinProfile: formData.linkedinProfile,
+        companyName: formData.companyName,
+        companyWebsite: formData.companyWebsite,
+        linkedinCorporate: formData.linkedinCorporate
       }
 
-      if (!response.data) {
-        throw new Error('Réponse vide du serveur')
-      }
+      await updateProfile(updateData)
 
-      console.log('[UserInfoModal] Profil mis à jour avec succès:', response.data.success)
+      console.log('[UserInfoModal] Profil mis à jour avec succès via store unifié')
 
       if (!isMountedRef.current) return
-
-      // Recharger les données utilisateur dans le store
-      setTimeout(async () => {
-        try {
-          const { useAuthStore } = await import('@/lib/stores/auth')
-          const authStore = useAuthStore.getState()
-          if (authStore.checkAuth) {
-            await authStore.checkAuth()
-            console.log('[UserInfoModal] Auth synchronisé après mise à jour')
-          }
-        } catch (err) {
-          console.warn('Erreur rechargement profil:', err)
-        }
-      }, 100)
 
       // Fermer immédiatement la modale
       startTransition(() => {
@@ -920,10 +889,12 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     validateUrl,
     validateLinkedInUrl,
     validatePhoneFields,
+    updateProfile,
     handleClose,
     t
   ])
 
+  // ✅ FONCTION handlePasswordChange SIMPLIFIÉE - Utilise apiClient comme les autres composants
   const handlePasswordChange = useCallback(async () => {
     debugLog('API', 'Password change started')
     
@@ -958,51 +929,18 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     setIsLoading(true)
     
     try {
-      debugLog('API', 'Verifying current password')
-      const loginResponse = await fetch('/api/v1/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: user?.email,
-          password: passwordData.currentPassword
-        })
+      debugLog('API', 'Changing password via apiClient')
+      
+      // ✅ UTILISE APILIENT au lieu d'appels fetch directs
+      const response = await apiClient.postSecure('/auth/change-password', {
+        current_password: passwordData.currentPassword,
+        new_password: passwordData.newPassword
       })
 
-      debugLog('API', 'Login response', { ok: loginResponse.ok, status: loginResponse.status })
-
-      if (!loginResponse.ok) {
-        setPasswordErrors([t('error.currentPasswordIncorrect')])
-        return
+      if (!response.success) {
+        throw new Error(response.error?.message || t('error.changePassword'))
       }
 
-      const loginData = await loginResponse.json()
-      const backendToken = loginData.access_token
-
-      debugLog('API', 'Changing password')
-      const response = await fetch('/api/v1/auth/change-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${backendToken}`
-        },
-        body: JSON.stringify({
-          current_password: passwordData.currentPassword,
-          new_password: passwordData.newPassword
-        })
-      })
-
-      debugLog('API', 'Change password response', { ok: response.ok, status: response.status })
-
-      let result: any = null
-      try {
-        result = await response.json()
-      } catch {}
-      
-      if (!response.ok) {
-        setPasswordErrors([result?.detail || result?.message || t('error.changePassword')])
-        return
-      }
-      
       debugLog('API', 'Password changed successfully')
       
       setPasswordData({
@@ -1023,16 +961,22 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({ user, onClose }) =
     } catch (error: any) {
       debugLog('API', 'Password change error', { error: error?.message })
       console.error('Erreur technique:', error)
-      setPasswordErrors([t('error.passwordServerError')])
+      
+      let errorMessage = t('error.passwordServerError')
+      if (error.message?.includes('Incorrect current password')) {
+        errorMessage = t('error.currentPasswordIncorrect')
+      }
+      
+      setPasswordErrors([errorMessage])
     } finally {
       debugLog('API', 'Password change finished')
       setIsLoading(false)
     }
-  }, [passwordData, validatePasswordField, user?.email, handleClose, isLoading, t])
+  }, [passwordData, validatePasswordField, handleClose, isLoading, t])
 
   const tabs = useMemo(() => [
     { id: 'profile', label: t('nav.profile'), icon: '👤' },
-    { id: 'password', label: t('profile.password'), icon: '🔒' }
+    { id: 'password', label: t('profile.password'), icon: '🔑' }
   ], [t])
 
   // Keyboard handling

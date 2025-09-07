@@ -4,13 +4,9 @@ import React, { useState, Suspense, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslation } from '@/lib/languages/i18n'
-import { useAuthStore } from '@/lib/stores/auth'
+import { useAuthStore } from '@/lib/stores/auth' // Store unifié
 import { availableLanguages } from '../lib/languages/config'
-// import { getSupabaseClient } from '@/lib/supabase/singleton'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { rememberMeUtils } from './page_hooks'
-
-// Import de la vraie SignupModal depuis le même répertoire
 import { SignupModal } from './page_signup_modal'
 
 // Logo Intelia dans un carré avec bordure bleue
@@ -24,7 +20,7 @@ const InteliaLogo = ({ className = "w-20 h-20" }: { className?: string }) => (
   </div>
 )
 
-// Sélecteur de langue moderne - VERSION CORRIGÉE
+// Sélecteur de langue moderne
 const LanguageSelector = () => {
   const { changeLanguage, currentLanguage } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
@@ -136,18 +132,17 @@ function AuthCallbackHandler() {
   return null
 }
 
-// PAGE LOGIN COMPLÈTE avec OAuth intégré
+// PAGE LOGIN COMPLÈTE - VERSION UNIFIÉE
 function LoginPageContent() {
   const router = useRouter()
-  const { t, currentLanguage } = useTranslation()
-  const { login } = useAuthStore()
+  const { t } = useTranslation()
+  const { login, register } = useAuthStore() // ✅ Store unifié
 
   // États simples
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [isOAuthLoading, setIsOAuthLoading] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [showSignup, setShowSignup] = useState(false)
@@ -202,57 +197,16 @@ function LoginPageContent() {
     setSignupData(prev => ({ ...prev, [field]: value }))
   }
 
-  // Fonction de connexion OAuth AVEC DÉBOGAGE
-  const handleOAuthLogin = async (provider: 'linkedin_oidc' | 'facebook') => {
-    console.log(`🚀 [OAuth] Début de connexion ${provider}`)
-    
-    setError('')
-    setIsOAuthLoading(provider)
-
-    try {
-      console.log(`📡 [OAuth] Initialisation client Supabase pour ${provider}`)
-
-	  const supabase = createClientComponentClient()
-
-	  console.log(`🔗 [OAuth] Appel signInWithOAuth pour ${provider}`)
-
-	  const { data, error } = await supabase.auth.signInWithOAuth({
-	    provider,
-	    options: {
-		  scopes: 'openid email profile',
-		  redirectTo: `${window.location.origin}/auth/callback`,
-	    },
-	  })
-
-      console.log(`📊 [OAuth] Réponse Supabase:`, { data, error })
-
-      if (error) {
-        console.error(`❌ [OAuth] Erreur Supabase:`, error)
-        throw error
-      }
-
-      console.log(`✅ [OAuth] Redirection vers ${provider} initiée`)
-      // La redirection se fera automatiquement vers le provider OAuth
-      
-    } catch (error: any) {
-      console.error(`💥 [OAuth] Erreur connexion ${provider}:`, error)
-      
-      if (error.message?.includes('OAuth')) {
-        setError(t('auth.oauthError'))
-      } else {
-        setError(error.message || t('auth.error'))
-      }
-      setIsOAuthLoading(null)
-    }
-  }
-
-  // FONCTION SIGNUP COMPLÈTE
+  // ✅ FONCTION SIGNUP UNIFIÉE - utilise le store au lieu de fetch direct
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('Signup attempt:', signupData)
+    console.log('[Signup] Utilisation du store unifié:', signupData)
+
+    setIsLoading(true)
+    setError('')
 
     try {
-      // Validation côté client avec traductions
+      // Validation côté client
       if (!signupData.email || !signupData.password || !signupData.firstName || !signupData.lastName) {
         throw new Error(t('validation.correctErrors'))
       }
@@ -267,77 +221,34 @@ function LoginPageContent() {
         throw new Error(passwordValidation.errors[0])
       }
 
-      // Préparer les données pour l'API backend (format UserRegister)
-      const registrationData = {
-        email: signupData.email,
-        password: signupData.password,
-        first_name: signupData.firstName,
-        last_name: signupData.lastName,
-        full_name: `${signupData.firstName} ${signupData.lastName}`,
-        company: signupData.companyName || undefined,
+      // ✅ UTILISATION DU STORE UNIFIÉ au lieu de fetch direct
+      const userData = {
+        name: `${signupData.firstName} ${signupData.lastName}`,
+        firstName: signupData.firstName,
+        lastName: signupData.lastName,
+        companyName: signupData.companyName,
         phone: (signupData.countryCode && signupData.areaCode && signupData.phoneNumber) 
           ? `${signupData.countryCode}${signupData.areaCode}${signupData.phoneNumber}`
           : undefined
       }
 
-      console.log('📤 Envoi vers backend API:', registrationData)
+      await register(signupData.email, signupData.password, userData)
 
-      // Construction intelligente de l'URL API
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
+      setSuccess(t('verification.pending.emailSent') || 'Compte créé avec succès!')
       
-      let apiUrl = API_BASE_URL
-      if (apiUrl.endsWith('/api')) {
-        apiUrl = `${apiUrl}/v1/auth/register`
-      } else {
-        apiUrl = `${apiUrl}/api/v1/auth/register`
-      }
-      
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(registrationData),
-        credentials: 'omit'
-      })
+      // Fermer la modal après succès
+      setTimeout(() => {
+        setShowSignup(false)
+        setSuccess('')
+      }, 2000)
 
-      console.log('📥 Réponse backend:', response.status, response.statusText)
-
-      const responseText = await response.text()
-      console.log('📄 Corps de réponse:', responseText)
-
-      if (!response.ok) {
-        let errorMessage = t('error.serverError') || `Erreur serveur (${response.status})`
-        
-        try {
-          const errorData = JSON.parse(responseText)
-          errorMessage = errorData.detail || errorData.message || errorMessage
-        } catch {
-          errorMessage = responseText || errorMessage
-        }
-        
-        throw new Error(errorMessage)
-      }
-
-      const result = JSON.parse(responseText)
-      console.log('✅ Inscription réussie:', result)
-
-      if (result.success && result.token) {
-        return {
-          success: true,
-          message: t('verification.pending.emailSent') || 'Un email de confirmation vous a été envoyé. Vérifiez votre email pour confirmer votre compte.'
-        }
-      } else if (result.success) {
-        return {
-          success: true,
-          message: t('verification.pending.emailSent') || 'Un email de confirmation vous a été envoyé. Vérifiez votre email pour confirmer votre compte.'
-        }
-      } else {
-        throw new Error(t('error.unexpectedResponse') || 'Réponse inattendue du serveur')
+      return {
+        success: true,
+        message: t('verification.pending.emailSent') || 'Compte créé avec succès!'
       }
 
     } catch (error: any) {
-      console.error('❌ Erreur inscription:', error)
+      console.error('[Signup] Erreur store unifié:', error)
       
       let errorMessage = error.message || t('error.generic')
       
@@ -349,13 +260,12 @@ function LoginPageContent() {
         errorMessage = t('auth.passwordRequirementsNotMet') || 'Le mot de passe ne respecte pas les critères requis'      
       } else if (errorMessage.includes('Invalid email') || errorMessage.includes('email')) {
         errorMessage = t('error.emailInvalid')
-      } else if (errorMessage.includes('NetworkError') || errorMessage.includes('fetch')) {
-        errorMessage = t('error.connection') + '. ' + t('error.checkConnection')
-      } else if (errorMessage.includes('502') || errorMessage.includes('503')) {
-        errorMessage = t('error.serviceUnavailable') || 'Service temporairement indisponible. Réessayez dans quelques minutes.'
       }
       
+      setError(errorMessage)
       throw new Error(errorMessage)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -373,7 +283,7 @@ function LoginPageContent() {
     validatePhone
   }
 
-  // Fonction de connexion
+  // ✅ FONCTION DE CONNEXION - déjà correcte avec le store
   const handleLogin = async () => {
     setError('')
     setSuccess('')
@@ -391,6 +301,7 @@ function LoginPageContent() {
     setIsLoading(true)
 
     try {
+      // ✅ Utilise le store unifié
       await login(email.trim(), password)
       
       // Sauvegarde du rememberMe après succès
@@ -417,23 +328,16 @@ function LoginPageContent() {
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-white">
-    {/* Background avec lignes de démarcation bleues */}
-    <div className="absolute inset-0 pointer-events-none">
-      {/* Lignes diagonales */}
-      <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
-        {/* ... contenu SVG ... */}
-      </svg>
-  
-      {/* Formes géométriques bleues subtiles */}
-      <div className="absolute top-20 left-20 w-32 h-32 bg-blue-100/30 rounded-full blur-xl"></div>
-      {/* ... autres éléments décoratifs ... */}
-    </div>
+      {/* Background avec lignes de démarcation bleues */}
+      <div className="absolute inset-0 pointer-events-none">
+        {/* Formes géométriques bleues subtiles */}
+        <div className="absolute top-20 left-20 w-32 h-32 bg-blue-100/30 rounded-full blur-xl"></div>
+      </div>
 
-    {/* Sélecteur de langue */}
-    <div className="absolute top-6 right-6 z-[1000]">
-      <LanguageSelector />
-    </div>
-
+      {/* Sélecteur de langue */}
+      <div className="absolute top-6 right-6 z-[1000]">
+        <LanguageSelector />
+      </div>
 
       {/* Contenu principal */}
       <div className="relative z-10 flex flex-col justify-center items-center min-h-screen px-4 sm:px-6 lg:px-8">
@@ -560,7 +464,7 @@ function LoginPageContent() {
               {/* Bouton de connexion */}
               <button
                 onClick={handleLogin}
-                disabled={isLoading || isOAuthLoading !== null}
+                disabled={isLoading}
                 className="w-full relative py-4 px-6 bg-blue-100 hover:bg-blue-200 border-2 border-blue-100 hover:border-blue-200 text-blue-700 font-semibold rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 {isLoading ? (
@@ -578,62 +482,7 @@ function LoginPageContent() {
                 )}
               </button>
 
-              {/* Séparateur pour les boutons sociaux */}
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-blue-200"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-white text-gray-500">{t('common.or')}</span>
-                </div>
-              </div>
-
-              {/* Boutons de connexion sociale */}
-              <div className="space-y-3">
-                {/* LinkedIn */}
-                <button
-                  onClick={() => handleOAuthLogin('linkedin_oidc')}
-                  disabled={isOAuthLoading !== null}
-                  className="w-full py-4 px-6 bg-[#0A66C2] hover:bg-[#004182] text-white font-medium rounded-2xl transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                >
-                  {isOAuthLoading === 'linkedin_oidc' ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      <span>{t('auth.connecting')}</span>
-                    </div>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                      </svg>
-                      <span>{t('auth.continueWith')} LinkedIn</span>
-                    </>
-                  )}
-                </button>
-
-                {/* Facebook */}
-                <button
-                  onClick={() => handleOAuthLogin('facebook')}
-                  disabled={isOAuthLoading !== null}
-                  className="w-full py-4 px-6 bg-[#1877F2] hover:bg-[#166FE5] text-white font-medium rounded-2xl transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                >
-                  {isOAuthLoading === 'facebook' ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      <span>{t('auth.connecting')}</span>
-                    </div>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                      </svg>
-                      <span>{t('auth.continueWith')} Facebook</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Nouveau séparateur */}
+              {/* Séparateur */}
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-blue-200"></div>
@@ -646,7 +495,7 @@ function LoginPageContent() {
               {/* Bouton d'inscription */}
               <button
                 onClick={() => setShowSignup(true)}
-                disabled={isOAuthLoading !== null}
+                disabled={isLoading}
                 className="w-full py-4 px-6 bg-gray-50 hover:bg-blue-50 border-2 border-blue-100 hover:border-blue-200 text-blue-700 font-medium rounded-2xl transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 <span className="flex items-center justify-center space-x-2">
@@ -705,13 +554,6 @@ function LoginPageContent() {
           localSuccess=""
           toggleMode={() => setShowSignup(false)}
         />
-      )}
-
-      {/* Debug */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed bottom-4 left-4 p-2 bg-white/90 border border-blue-200 rounded text-xs text-gray-700">
-          <strong>Debug:</strong> {currentLanguage}
-        </div>
       )}
     </div>
   )

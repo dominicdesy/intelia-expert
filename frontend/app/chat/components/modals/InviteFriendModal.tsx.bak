@@ -1,13 +1,13 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useTranslation } from '@/lib/languages/i18n'
-import { useAuthStore } from '@/lib/stores/auth' // ✅ Store unifié uniquement
+import { useUser } from '@/lib/hooks/useAuthStore'
 import { apiClient } from '@/lib/api/client'
 
 interface InviteFriendModalProps {
   onClose: () => void
 }
 
-// Types pour les réponses API (conservés)
+// Types pour les réponses API
 interface InvitationResult {
   email: string;
   success: boolean;
@@ -35,7 +35,7 @@ interface InvitationResponse {
 
 export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose }) => {
   const { t } = useTranslation()
-  const { user } = useAuthStore() // ✅ Store unifié uniquement
+  const { user } = useUser()
   const [emails, setEmails] = useState('')
   const [personalMessage, setPersonalMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -43,7 +43,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
   const [results, setResults] = useState<InvitationResponse | null>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
 
-  // Forcer les styles au montage (conservé)
+  // Forcer les styles au montage - COPIE EXACTE DU BACKUP
   useEffect(() => {
     const overlay = overlayRef.current
     
@@ -69,24 +69,57 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     }
   }, [])
 
-  // ✅ CALCUL CURRENTUSER SIMPLIFIÉ - Store unifié uniquement
+  // Calcul de currentUser - COPIE EXACTE DU BACKUP
   const currentUser = useMemo(() => {
-    // UNIQUEMENT le store unifié - plus de fallback
+    // Priorité 1: Store Zustand
     if (user?.email) {
-      console.log('[InviteFriendModal] Utilisateur trouvé dans le store unifié:', user.email)
-      return {
-        email: user.email,
-        name: user.name || user.firstName || user.email.split('@')[0],
-        id: user.id || user.user_id,
-        language: user.language || 'fr'
-      }
+      return user
     }
     
-    console.log('[InviteFriendModal] Aucun utilisateur dans le store unifié')
+    // Priorité 2: Session storage direct
+    try {
+      const authKeys = ['supabase.auth.token', 'intelia-expert-auth']
+      
+      for (const key of authKeys) {
+        const stored = localStorage.getItem(key) || sessionStorage.getItem(key)
+        if (stored) {
+          const authData = JSON.parse(stored)
+          
+          let userEmail, userName, userId, userLanguage
+          
+          // Format Supabase
+          if (authData.user?.email) {
+            userEmail = authData.user.email
+            userName = authData.user.user_metadata?.name || authData.user.name || userEmail.split('@')[0]
+            userId = authData.user.id
+            userLanguage = authData.user.user_metadata?.language || 'fr'
+          }
+          // Format Intelia
+          else if (authData.access_token && authData.user) {
+            userEmail = authData.user.email
+            userName = authData.user.name || userEmail.split('@')[0]
+            userId = authData.user.id
+            userLanguage = authData.user.language || 'fr'
+          }
+          
+          if (userEmail) {
+            return {
+              email: userEmail,
+              name: userName,
+              id: userId,
+              language: userLanguage
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[InviteFriendModal] Erreur récupération auth:', e)
+    }
+    
     return null
   }, [user])
 
-  // Validation side effect (conservé)
+  // Validation side effect
   useEffect(() => {
     if (!currentUser?.email) {
       setErrors(['Vous devez être connecté pour envoyer des invitations'])
@@ -95,7 +128,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     }
   }, [currentUser, t])
 
-  // Validation des emails (conservée)
+  // Validation des emails
   const validateEmails = (emailString: string): { valid: string[], invalid: string[] } => {
     const emailList = emailString
       .split(',')
@@ -117,9 +150,8 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     return { valid, invalid }
   }
 
-  // ✅ FONCTION D'ENVOI SIMPLIFIÉE - Plus de vérifications complexes
   const handleSendInvitations = async () => {
-    console.log('🖱️ [InviteFriendModal] Bouton "Envoyer" cliqué (version store unifié)')
+    console.log('🖱️ [InviteFriendModal] Bouton "Envoyer" cliqué (version corrigée avec API)')
     
     setErrors([])
     setResults(null)
@@ -166,9 +198,8 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
         force_send: false
       }
       
-      console.log('🚀 [InviteFriendModal] Appel API avec store unifié:', payload)
+      console.log('🚀 [InviteFriendModal] Appel API avec payload:', payload)
       
-      // ✅ UTILISE APILIENT.POSTSECURE() - plus d'appels directs
       const response = await apiClient.postSecure<InvitationResponse>('/invitations/send', payload)
       
       if (!response.success) {
@@ -179,7 +210,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
         throw new Error('Réponse vide du serveur')
       }
       
-      console.log('✅ [InviteFriendModal] Résultat reçu avec store unifié:', response.data)
+      console.log('✅ [InviteFriendModal] Résultat reçu:', response.data)
       setResults(response.data)
       
     } catch (error) {
@@ -191,12 +222,9 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
         errorMessage = error.message
       }
       
-      // ✅ GESTION D'ERREUR SIMPLIFIÉE - Plus de vérifications spécifiques Supabase
-      if (errorMessage.includes('Session expirée') || 
-          errorMessage.includes('Token expired') ||
-          errorMessage.includes('Unauthorized')) {
+      if (errorMessage.includes('Session expirée')) {
         setErrors([
-          'Session expirée',
+          errorMessage,
           'Veuillez vous reconnecter et réessayer'
         ])
       } else {
@@ -257,7 +285,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     return result.message
   }
 
-  // ✅ AFFICHAGE SIMPLIFIÉ - Plus d'utilisateur connecté via store unifié
+  // Affichage si pas d'utilisateur - COPIE EXACTE DU BACKUP
   if (!currentUser?.email) {
     return (
       <>
@@ -301,7 +329,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
                   </svg>
                 </div>
                 <h2 className="text-xl font-semibold text-gray-900 mb-2">Connexion requise</h2>
-                <p className="text-sm text-gray-600 mb-4">Vous devez être connecté avec le système unifié pour envoyer des invitations</p>
+                <p className="text-sm text-gray-600 mb-4">Vous devez être connecté pour envoyer des invitations</p>
                 <button 
                   onClick={onClose} 
                   className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
@@ -392,7 +420,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
                         <div className="flex items-start space-x-3">
                           <span className="text-2xl mt-1">
                             {result.success && (result.status === 'sent' || result.status === 'resent') ? '✅' : 
-                             result.status === 'skipped' ? '👤' : '❌'}
+                             result.status === 'skipped' ? '💤' : '❌'}
                           </span>
                           <div className="flex-1">
                             <p className="text-sm text-gray-800 font-medium">
@@ -534,7 +562,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
 
               {/* Footer */}
               <div className="text-xs text-gray-500 text-center pt-2 border-t border-gray-100">
-                Les invitations sont gérées de manière sécurisée via le système unifié. Vos contacts ne recevront qu'un seul email d'invitation.
+                Les invitations sont gérées de manière sécurisée. Vos contacts ne recevront qu'un seul email d'invitation.
               </div>
             </div>
           </div>

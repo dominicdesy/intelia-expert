@@ -5,13 +5,12 @@ import { useRouter } from 'next/navigation'
 import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Message } from '../../types'
-import { useAuthStore } from '@/lib/stores/auth' // ✅ Store unifié
+import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '@/lib/languages/i18n'
 import { useChatStore } from './hooks/useChatStore'
 import { generateAIResponse } from './services/apiService'
 import { conversationService } from './services/conversationService'
-// ❌ SUPPRIMÉ - Plus de Supabase direct
-// import { getSupabaseClient } from '@/lib/supabase/singleton'
+import { getSupabaseClient } from '@/lib/supabase/singleton'
 
 import {
   PaperAirplaneIcon,
@@ -40,7 +39,7 @@ const ChatInput = React.memo(({
 }: {
   inputMessage: string
   setInputMessage: (value: string) => void
-  onSendMessage: () => void
+  onSendMessage: () => void // Plus de paramètre optionnel
   isLoadingChat: boolean
   clarificationState: any
   isMobileDevice: boolean
@@ -50,7 +49,7 @@ const ChatInput = React.memo(({
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      onSendMessage()
+      onSendMessage() // Pas de paramètre passé
     }
   }, [onSendMessage])
 
@@ -58,9 +57,10 @@ const ChatInput = React.memo(({
     setInputMessage(e.target.value)
   }, [setInputMessage])
 
+  // Nouvelle fonction pour gérer le clic du bouton
   const handleButtonClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
-    onSendMessage()
+    onSendMessage() // Pas de paramètre passé
   }, [onSendMessage])
 
   return (
@@ -85,7 +85,7 @@ const ChatInput = React.memo(({
       </div>
 
       <button
-        onClick={handleButtonClick}
+        onClick={handleButtonClick} // Utilise la nouvelle fonction
         disabled={isLoadingChat || !inputMessage.trim()}
         className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 ${isMobileDevice ? 'mobile-send-button' : ''}`}
         title={isLoadingChat ? t('chat.sending') : t('chat.send')}
@@ -257,10 +257,9 @@ const MessageList = React.memo(({
 
 MessageList.displayName = 'MessageList'
 
-// Composant principal ChatInterface
+// Composant principal ChatInterface (renommé depuis l'export par défaut)
 function ChatInterface() {
-  // ✅ STORE UNIFIÉ - Plus d'initializeSession Supabase
-  const { user, isAuthenticated, isLoading, hasHydrated, checkAuth } = useAuthStore()
+  const { user, isAuthenticated, isLoading, hasHydrated, initializeSession } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -285,9 +284,9 @@ function ChatInterface() {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
   const [viewportHeight, setViewportHeight] = useState(0)
 
-  // ✅ SUPPRIMÉ - États OAuth Supabase
-  // const [isProcessingOAuth, setIsProcessingOAuth] = useState(false)
-  // const [oauthError, setOAuthError] = useState<string | null>(null)
+  // États pour gestion OAuth
+  const [isProcessingOAuth, setIsProcessingOAuth] = useState(false)
+  const [oauthError, setOAuthError] = useState<string | null>(null)
 
   const [clarificationState, setClarificationState] = useState<{
     messageId: string
@@ -322,10 +321,11 @@ function ChatInterface() {
     return messages.length > 0
   }, [messages.length])
 
-  // ✅ GESTION D'ERREUR UNIFIÉE - Plus de redirection OAuth
+  // Gestion améliorée des erreurs d'authentification
   const handleAuthError = useCallback((error: any) => {
     console.error('[Chat] Auth error détectée:', error)
     
+    // Vérifier si c'est une erreur de session expirée
     const isSessionExpired = (
       error?.status === 401 || 
       error?.status === 403 ||
@@ -341,6 +341,7 @@ function ChatInterface() {
     if (isSessionExpired) {
       console.log('[Chat] Session expirée détectée - déconnexion automatique')
       
+      // Nettoyer l'état local immédiatement pour éviter les erreurs en cascade
       if (isMountedRef.current) {
         setCurrentConversation(null)
         setClarificationState(null)
@@ -348,11 +349,12 @@ function ChatInterface() {
         setIsLoadingChat(false)
       }
       
-      // ✅ UTILISE LE STORE UNIFIÉ pour logout
+      // Utiliser le service de logout pour une déconnexion propre
       import('@/lib/services/logoutService').then(({ logoutService }) => {
         logoutService.performLogout(user)
       }).catch(err => {
         console.warn('[Chat] Fallback - redirection directe:', err)
+        // Fallback : redirection directe si le service échoue
         setTimeout(() => {
           window.location.href = '/'
         }, 100)
@@ -361,6 +363,7 @@ function ChatInterface() {
       return
     }
     
+    // Pour les autres erreurs, juste logger sans redirection
     console.warn('[Chat] Erreur non-auth (pas de redirection):', error)
   }, [user, setCurrentConversation])
 
@@ -415,6 +418,7 @@ function ChatInterface() {
     if (text.length < 100) return text.trim()
 
     let cleaned = text
+    // Nettoyage des artefacts de source
     cleaned = cleaned.replace(/\*\*Source:\s*[^*]+\*\*/g, '')
     cleaned = cleaned.replace(/Source:\s*[^\n]+/g, '')
     cleaned = cleaned.replace(/protection, regardless of the species involved[^.]+\./g, '')
@@ -450,33 +454,64 @@ function ChatInterface() {
     }
   }, [])
 
-  // ✅ SUPPRIMÉ - Gestionnaire OAuth Supabase complet
-  // useEffect(() => {
-  //   const handleOAuthCallback = async () => { ... }
-  //   if (searchParams?.has('auth')) {
-  //     handleOAuthCallback()
-  //   }
-  // }, [searchParams, router])
-
-  // ✅ GESTIONNAIRE AUTH CALLBACK SIMPLIFIÉ - Backend uniquement
+  // Gestionnaire OAuth dans la page chat
   useEffect(() => {
-    const authStatus = searchParams?.get('auth')
-    
-    if (authStatus === 'success') {
-      console.log('[Chat] Authentification réussie via backend')
-      // Nettoyer l'URL
-      const url = new URL(window.location.href)
-      url.searchParams.delete('auth')
-      window.history.replaceState({}, '', url.pathname)
+    const handleOAuthCallback = async () => {
+      const authStatus = searchParams?.get('auth')
       
-      // Vérifier l'auth via le backend
-      checkAuth()
-    } else if (authStatus === 'error') {
-      const message = searchParams?.get('message') || 'Erreur d\'authentification'
-      console.error('[Chat] Erreur auth reçue:', message)
-      router.replace('/?auth=error&message=' + encodeURIComponent(message))
+      if (authStatus === 'success') {
+        console.log('[OAuth Chat] Finalisation authentification OAuth...')
+        setIsProcessingOAuth(true)
+        setOAuthError(null)
+        
+        try {
+          setIsProcessingOAuth(true)
+          const supabase = getSupabaseClient()
+          
+          // Récupérer la session actuelle après l'OAuth
+          const { data: { session }, error } = await supabase.auth.getSession()
+          
+          if (error) {
+            console.error('[OAuth Chat] Erreur récupération session:', error)
+            setOAuthError(error.message)
+            router.replace('/?auth=error&message=' + encodeURIComponent(error.message))
+            return
+          }
+
+          if (session?.user) {
+            // Utiliser initializeSession qui met automatiquement à jour le store
+            await initializeSession()
+            
+            // Nettoyer l'URL
+            const url = new URL(window.location.href)
+            url.searchParams.delete('auth')
+            window.history.replaceState({}, '', url.pathname)
+            
+            console.log('[OAuth Chat] OAuth complété avec succès pour:', session.user.email)
+          } else {
+            console.error('[OAuth Chat] Session OAuth incomplète')
+            setOAuthError('Session incomplète')
+            router.replace('/?auth=error&message=incomplete_session')
+          }
+        } catch (error: any) {
+          console.error('[OAuth Chat] Erreur traitement OAuth:', error)
+          setOAuthError(error.message)
+          router.replace('/?auth=error&message=' + encodeURIComponent(error.message))
+        } finally {
+          setIsProcessingOAuth(false)
+        }
+      } else if (authStatus === 'error') {
+        const message = searchParams?.get('message') || 'Erreur d\'authentification'
+        console.error('[OAuth Chat] Erreur OAuth reçue:', message)
+        setOAuthError(message)
+        router.replace('/?auth=error&message=' + encodeURIComponent(message))
+      }
     }
-  }, [searchParams, router, checkAuth])
+
+    if (searchParams?.has('auth')) {
+      handleOAuthCallback()
+    }
+  }, [searchParams, router, initializeSession])
 
   // Détection de device mobile (conservée)
   useEffect(() => {
@@ -615,7 +650,7 @@ function ChatInterface() {
 
   // Message de bienvenue (conservé)
   useEffect(() => {
-    if (isAuthenticated && !currentConversation && !hasMessages && isMountedRef.current) {
+    if (isAuthenticated && !currentConversation && !hasMessages && isMountedRef.current && !isProcessingOAuth) {
       const welcomeMessage: Message = {
         id: 'welcome',
         content: t('chat.welcome'),
@@ -638,7 +673,7 @@ function ChatInterface() {
       setCurrentConversation(welcomeConversation)
       lastMessageCountRef.current = 1
     }
-  }, [isAuthenticated, currentConversation, hasMessages, t, currentLanguage, setCurrentConversation])
+  }, [isAuthenticated, currentConversation, hasMessages, t, currentLanguage, setCurrentConversation, isProcessingOAuth])
 
   // useEffect pour les changements de langue (unifié et corrigé)
   useEffect(() => {
@@ -663,41 +698,49 @@ function ChatInterface() {
 
   // Chargement initial VRAIMENT unique
   useEffect(() => {
+    // Protection absolue : ne charger QU'UNE SEULE FOIS
     if (isAuthenticated && 
         user?.email && 
         !hasLoadedConversationsRef.current && 
-        isMountedRef.current) {
+        isMountedRef.current &&
+        !isProcessingOAuth) {
       
       console.log('[Chat] Chargement initial UNIQUE pour:', user.email)
       hasLoadedConversationsRef.current = true
 
+      // CAPTURE STABLE des valeurs au moment de l'exécution
       const userEmail = user.email
 
+      // FONCTION LOCALE qui utilise le store directement
       const performInitialLoad = async () => {
         try {
+          // Appeler le store directement sans capturer la fonction
           const { loadConversations: loadFn } = useChatStore.getState()
           await loadFn(userEmail)
           console.log('[Chat] Chargement initial terminé avec succès')
         } catch (error) {
           console.error('[Chat] Erreur chargement initial:', error)
           
+          // GESTION D'ERREUR LOCALE sans redépendance
           if (error?.status === 401 || error?.status === 403) {
             console.log('[Chat] Session expirée détectée - redirection')
-            hasLoadedConversationsRef.current = false
+            hasLoadedConversationsRef.current = false // Permettre de réessayer
             setTimeout(() => {
               window.location.href = '/'
             }, 1000)
           } else {
+            // En cas d'autre erreur, permettre de réessayer
             hasLoadedConversationsRef.current = false
           }
         }
       }
 
+      // EXÉCUTION UNIQUE avec délai pour éviter les race conditions
       setTimeout(performInitialLoad, 100)
     }
-  }, [isAuthenticated, user?.email])
+  }, [isAuthenticated, user?.email, isProcessingOAuth])
 
-  // Fonctions de gestion des messages - CONSERVÉES
+  // Fonctions de gestion des messages - MODIFIÉE
   const extractAnswerAndSources = useCallback((result: any): [string, any[]] => {
     let answerText = ""
     let sources: any[] = []
@@ -749,8 +792,9 @@ function ChatInterface() {
     return [answerText, []]
   }, [t])
 
+  // FONCTION CORRIGÉE - Plus de paramètre text
   const handleSendMessage = useCallback(async () => {
-    const safeText = inputMessage
+    const safeText = inputMessage // Utilise directement inputMessage
     
     if (!safeText.trim() || !isMountedRef.current) return
 
@@ -804,6 +848,7 @@ function ChatInterface() {
 
       if (!isMountedRef.current) return
 
+      // Vérifier si la réponse indique une session expirée
       if (response?.error === 'authentication_failed' || 
           response?.detail === 'Token expired' ||
           response?.message?.includes('Session expirée')) {
@@ -851,7 +896,7 @@ function ChatInterface() {
 
     } catch (error) {
       console.error(t('chat.sendError'), error)
-      handleAuthError(error)
+      handleAuthError(error) // Utilise la nouvelle gestion d'erreur améliorée
 
       if (isMountedRef.current) {
         const errorMessage: Message = {
@@ -1028,21 +1073,43 @@ function ChatInterface() {
     )
   }
 
-  if (isLoading) {
+  if (isLoading || isProcessingOAuth) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">{t('chat.loading')}</p>
+          <p className="text-gray-600">
+            {isProcessingOAuth ? 'Finalisation OAuth LinkedIn...' : t('chat.loading')}
+          </p>
         </div>
       </div>
     )
   }
 
-  // ✅ SUPPRIMÉ - Affichage erreur OAuth
-  // if (oauthError) { ... }
+  // Affichage erreur OAuth
+  if (oauthError) {
+    return (
+      <div className="h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="text-red-600 mb-4">
+            <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Erreur d'authentification</h2>
+          <p className="text-gray-600 mb-4">{oauthError}</p>
+          <button
+            onClick={() => router.push('/')}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Retour à l'accueil
+          </button>
+        </div>
+      </div>
+    )
+  }
 
-  // ✅ CONDITION DE RENDU SIMPLIFIÉE
+  // Condition de rendu améliorée pour OAuth
   if (!isAuthenticated || !user) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">

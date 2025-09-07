@@ -281,85 +281,55 @@ export const StatisticsPage: React.FC = () => {
   const questionsLoadedRef = useRef<Map<string, boolean>>(new Map())
   const invitationsLoadedRef = useRef<boolean>(false)
 
-  // LOGIQUE D'AUTHENTIFICATION AMÉLIORÉE
+  // Reset forcé des références à chaque mount
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout
+    console.log('[StatisticsPage] Reset forcé des références au mount')
+    dashboardLoadedRef.current = false
+    authCheckRef.current = false
+    stabilityCounterRef.current = 0
+    questionsLoadedRef.current.clear()
+    invitationsLoadedRef.current = false
+  }, [])
 
-    const performAuthCheck = () => {
-      if (authStatus === 'ready' && authCheckRef.current) {
-        return
-      }
-
-      console.log('[StatisticsPage] Auth check avec fallback:', { 
-        hasUser: !!currentUser,
-        email: currentUser?.email,
-        userType: currentUser?.user_type,
-        stabilityCounter: stabilityCounterRef.current,
-        currentAuthStatus: authStatus
-      })
-
-      if (currentUser === undefined) {
-        console.log('[StatisticsPage] Phase 1: Attente initialisation auth...')
-        setAuthStatus('initializing')
-        stabilityCounterRef.current = 0
-        return
-      }
-
-      if (currentUser !== null && (!currentUser.email || !currentUser.user_type)) {
-        console.log('[StatisticsPage] Phase 2: Données utilisateur incomplètes, attente...')
-        setAuthStatus('checking')
-        stabilityCounterRef.current = 0
-        return
-      }
-
-      if (authStatus !== 'ready') {
-        stabilityCounterRef.current++
-      }
-
-      if (stabilityCounterRef.current < 2 && authStatus !== 'ready') {
-        console.log(`[StatisticsPage] Stabilisation... (${stabilityCounterRef.current}/2)`)
-        setAuthStatus('checking')
-        timeoutId = setTimeout(performAuthCheck, 150)
-        return
-      }
-
-      if (currentUser === null) {
-        console.log('[StatisticsPage] Utilisateur non connecté')
-        setAuthStatus('unauthorized')
-        setError("Vous devez être connecté pour accéder à cette page")
-        return
-      }
-
-      if (currentUser.user_type !== 'super_admin') {
-        console.log('[StatisticsPage] Permissions insuffisantes:', currentUser.user_type)
-        setAuthStatus('forbidden')
-        setError("Accès refusé - Permissions super_admin requises")
-        return
-      }
-
-      if (!authCheckRef.current) {
-        console.log('[StatisticsPage] Authentification réussie:', currentUser.email)
-        setAuthStatus('ready')
-        setError(null)
-        authCheckRef.current = true
-      }
-    }
-
-    timeoutId = setTimeout(performAuthCheck, 50)
-
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId)
-    }
-  }, [currentUser, authStatus])
-
-  // Chargement des statistiques - UNE SEULE FOIS
+  // Logique d'authentification simplifiée
   useEffect(() => {
-    if (authStatus === 'ready' && !statsLoading && !dashboardLoadedRef.current) {
-      console.log('[StatisticsPage] Lancement chargement des statistiques')
-      dashboardLoadedRef.current = true
-      loadAllStatistics()
+    console.log('[StatisticsPage] Auth check simplifié:', { 
+      hasUser: !!currentUser,
+      email: currentUser?.email,
+      userType: currentUser?.user_type
+    })
+
+    if (currentUser === undefined) {
+      console.log('[StatisticsPage] Initialisation auth...')
+      setAuthStatus('initializing')
+    } else if (currentUser === null) {
+      console.log('[StatisticsPage] Utilisateur non connecté')
+      setAuthStatus('unauthorized')
+      setError("Vous devez être connecté pour accéder à cette page")
+    } else if (currentUser.user_type !== 'super_admin') {
+      console.log('[StatisticsPage] Permissions insuffisantes:', currentUser.user_type)
+      setAuthStatus('forbidden')
+      setError("Accès refusé - Permissions super_admin requises")
+    } else {
+      console.log('[StatisticsPage] Authentification réussie:', currentUser.email)
+      setAuthStatus('ready')
+      setError(null)
     }
-  }, [authStatus])
+  }, [currentUser])
+
+  // Chargement des statistiques avec délai pour éviter les problèmes d'hydratation Supabase
+  useEffect(() => {
+    if (authStatus === 'ready' && !statsLoading && !systemStats) {
+      console.log('[StatisticsPage] Lancement chargement des statistiques avec délai de sécurité')
+      
+      // Délai de 300ms pour laisser Supabase finir son hydratation
+      const timeoutId = setTimeout(() => {
+        loadAllStatistics()
+      }, 300)
+      
+      return () => clearTimeout(timeoutId)
+    }
+  }, [authStatus, statsLoading, systemStats])
 
   // Chargement des questions - SEULEMENT SI NÉCESSAIRE
   useEffect(() => {
@@ -396,28 +366,23 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  // MÉTHODE CORRIGÉE: Utilisation d'apiClient.getSecure avec debug amélioré
+  // ✅ MÉTHODE CORRIGÉE: Utiliser apiClient.getSecure() comme InviteFriendModal
   const loadAllStatistics = async () => {
     if (statsLoading) {
       console.log('[StatisticsPage] Chargement déjà en cours, annulation...')
       return
     }
     
-    console.log('[StatisticsPage] DÉBUT chargement statistiques avec utilisateur:', currentUser?.email)
+    console.log('[StatisticsPage] DÉBUT chargement statistiques avec apiClient.getSecure()')
     setStatsLoading(true)
     setError(null)
 
     const startTime = performance.now()
 
     try {
-      // Vérification manuelle du token avant l'appel API
-      const authToken = localStorage.getItem('intelia-expert-auth')
-      console.log('[StatisticsPage] Token disponible dans localStorage:', !!authToken)
+      // ✅ SOLUTION: Utiliser apiClient.getSecure() comme InviteFriendModal
+      console.log('[StatisticsPage] Appel apiClient.getSecure() pour stats-fast/dashboard')
       
-      console.log('[StatisticsPage] DEBUG: baseURL from apiClient:', apiClient.getBaseURL())
-      console.log('⚡ Tentative endpoint cache via apiClient: stats-fast/dashboard')
-      
-      // CORRECTION: Utilise apiClient.getSecure() au lieu de apiClient.get()
       const response = await apiClient.getSecure<FastDashboardStats>('stats-fast/dashboard')
       
       if (!response.success) {
@@ -429,10 +394,10 @@ export const StatisticsPage: React.FC = () => {
       }
 
       const fastData = response.data
-      console.log('🎉 SUCCÈS endpoint avec apiClient!', fastData)
+      console.log('✅ Statistiques chargées avec apiClient.getSecure()!', fastData)
       
       const loadTime = performance.now() - startTime
-      console.log(`⚡ Performance: ${loadTime.toFixed(0)}ms`)
+      console.log(`Performance: ${loadTime.toFixed(0)}ms`)
       
       const performanceGainValue = fastData.performanceStats?.performance_gain || 
                                    fastData.performance_stats?.performance_gain || 
@@ -508,12 +473,11 @@ export const StatisticsPage: React.FC = () => {
       setBillingStats(safeBillingStats)
       setPerformanceStats(safePerformanceStats)
       
-      console.log('✅ Toutes les statistiques chargées depuis le cache!')
+      console.log('Toutes les statistiques chargées via apiClient.getSecure()!')
 
     } catch (err) {
-      console.error('❌ [StatisticsPage] Erreur chargement statistiques:', err)
+      console.error('[StatisticsPage] Erreur chargement statistiques:', err)
       setError(`Erreur lors du chargement des statistiques: ${err}`)
-      dashboardLoadedRef.current = false // Permettre un retry
     } finally {
       setStatsLoading(false)
     }
@@ -526,7 +490,7 @@ export const StatisticsPage: React.FC = () => {
       return
     }
   
-    console.log('⚡ [Questions] Chargement avec apiClient')
+    console.log('[Questions] Chargement avec apiClient')
     setQuestionsLoading(true)
     const startTime = performance.now()
   
@@ -548,10 +512,10 @@ export const StatisticsPage: React.FC = () => {
       }
 
       const fastData = response.data
-      console.log('🎉 Questions chargées avec apiClient!', fastData)
+      console.log('Questions chargées avec apiClient!', fastData)
     
       const loadTime = performance.now() - startTime
-      console.log(`⚡ Questions Performance: ${loadTime.toFixed(0)}ms`)
+      console.log(`Questions Performance: ${loadTime.toFixed(0)}ms`)
     
       // Utilise le cache_info depuis l'API
       const realCacheInfo = fastData.cache_info || {
@@ -592,7 +556,7 @@ export const StatisticsPage: React.FC = () => {
       setTotalQuestions(fastData.pagination.total)
       
     } catch (err) {
-      console.error('❌ Erreur chargement questions:', err)
+      console.error('Erreur chargement questions:', err)
       setError(`Erreur chargement questions: ${err}`)
       setQuestionLogs([])
       // Reset la référence pour permettre un retry
@@ -610,13 +574,13 @@ export const StatisticsPage: React.FC = () => {
       return
     }
     
-    console.log('⚡ [Invitations] Chargement avec apiClient - ENDPOINT CORRIGÉ')
+    console.log('[Invitations] Chargement avec apiClient - ENDPOINT CORRIGÉ')
     setInvitationLoading(true)
     setError(null)
     const startTime = performance.now()
 
     try {
-      console.log('⚡ Utilisation endpoint fonctionnel: invitations/stats/global-enhanced')
+      console.log('Utilisation endpoint fonctionnel: invitations/stats/global-enhanced')
       
       // CORRECTION: Utilise l'endpoint qui fonctionne réellement
       const response = await apiClient.getSecure<GlobalInvitationStats>('invitations/stats/global-enhanced')
@@ -630,10 +594,10 @@ export const StatisticsPage: React.FC = () => {
       }
 
       const globalData = response.data
-      console.log('🎉 Invitations chargées avec endpoint fonctionnel!', globalData)
+      console.log('Invitations chargées avec endpoint fonctionnel!', globalData)
       
       const loadTime = performance.now() - startTime
-      console.log(`⚡ Invitations Performance: ${loadTime.toFixed(0)}ms`)
+      console.log(`Invitations Performance: ${loadTime.toFixed(0)}ms`)
       
       // Adapter les données au format attendu par le composant React
       const adaptedCacheStatus: CacheStatus = {
@@ -656,7 +620,7 @@ export const StatisticsPage: React.FC = () => {
       setInvitationCacheStatus(adaptedCacheStatus)
       setInvitationStats(adaptedInvitationStats)
 
-      console.log('✅ Données d\'invitations adaptées:', adaptedInvitationStats)
+      console.log('Données d\'invitations adaptées:', adaptedInvitationStats)
 
     } catch (err) {
       console.error('[StatisticsPage] Erreur chargement stats invitations:', err)
@@ -788,7 +752,8 @@ export const StatisticsPage: React.FC = () => {
           <p className="text-gray-600 mb-6">{error}</p>
           <button
             onClick={() => {
-              dashboardLoadedRef.current = false
+              setSystemStats(null)
+              setError(null)
               loadAllStatistics()
             }}
             className="w-full bg-blue-600 text-white px-6 py-2 hover:bg-blue-700 transition-colors"
@@ -853,7 +818,8 @@ export const StatisticsPage: React.FC = () => {
               {activeTab === 'dashboard' && (
                 <button
                   onClick={() => {
-                    dashboardLoadedRef.current = false
+                    setSystemStats(null)
+                    setError(null)
                     loadAllStatistics()
                   }}
                   disabled={statsLoading}

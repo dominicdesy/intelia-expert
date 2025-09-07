@@ -211,15 +211,18 @@ function LoginPageContent() {
 
     try {
       console.log(`📡 [OAuth] Initialisation client Supabase pour ${provider}`)
-      const supabase = getSupabaseClient()
-      
-      console.log(`🔗 [OAuth] Appel signInWithOAuth pour ${provider}`)
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`
-        }
-      })
+
+	  const supabase = createClientComponentClient()
+
+	  console.log(`🔗 [OAuth] Appel signInWithOAuth pour ${provider}`)
+
+	  const { data, error } = await supabase.auth.signInWithOAuth({
+	    provider,
+	    options: {
+		  scopes: 'openid email profile',
+		  redirectTo: `${window.location.origin}/auth/callback`,
+	    },
+	  })
 
       console.log(`📊 [OAuth] Réponse Supabase:`, { data, error })
 
