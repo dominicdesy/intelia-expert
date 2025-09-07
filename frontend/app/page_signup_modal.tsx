@@ -38,6 +38,7 @@ const CountrySelect: React.FC<CountrySelectProps> = ({
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const selectRef = useRef<HTMLDivElement>(null)
+  const { t } = useTranslation()
 
   const filteredCountries = countries.filter(country =>
     country.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -90,7 +91,7 @@ const CountrySelect: React.FC<CountrySelectProps> = ({
           <div className="p-2 border-b border-gray-200">
             <input
               type="text"
-              placeholder="Rechercher un pays..."
+              placeholder={t('countries.searchPlaceholder' as any) || "Rechercher un pays..."}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -116,7 +117,7 @@ const CountrySelect: React.FC<CountrySelectProps> = ({
                 </button>
               ))
             ) : (
-              <div className="px-3 py-2 text-gray-500 text-sm">Aucun pays trouvé</div>
+              <div className="px-3 py-2 text-gray-500 text-sm">{t('countries.noResults' as any) || "Aucun pays trouvé"}</div>
             )}
           </div>
         </div>
@@ -126,33 +127,33 @@ const CountrySelect: React.FC<CountrySelectProps> = ({
 }
 
 // Nouvelle fonction de validation de mot de passe
-const validatePassword = (password: string) => {
+const validatePassword = (password: string, t: (key: string) => string) => {
   const errors = []
   
   // Vérifier que le mot de passe n'est pas vide ou seulement des espaces
   if (!password || password.trim().length === 0) {
-    errors.push('Le mot de passe est requis')
+    errors.push(t('validation.required.password') || 'Le mot de passe est requis')
     return { isValid: false, errors }
   }
   
   // Minimum 8 caractères
   if (password.length < 8) {
-    errors.push('Au moins 8 caractères requis')
+    errors.push(t('validation.password.minLength') || 'Au moins 8 caractères requis')
   }
   
   // Maximum 128 caractères (sécurité contre les attaques DoS)
   if (password.length > 128) {
-    errors.push('Maximum 128 caractères autorisés')
+    errors.push(t('resetPassword.validation.maxLength') || 'Maximum 128 caractères autorisés')
   }
   
   // Au moins une lettre (majuscule ou minuscule)
   if (!/[a-zA-Z]/.test(password)) {
-    errors.push('Au moins une lettre requise')
+    errors.push(t('resetPassword.validation.letterRequired') || 'Au moins une lettre requise')
   }
   
   // Au moins un chiffre
   if (!/\d/.test(password)) {
-    errors.push('Au moins un chiffre requis')
+    errors.push(t('validation.password.number') || 'Au moins un chiffre requis')
   }
   
   // Vérifier les mots de passe faibles courants
@@ -164,12 +165,12 @@ const validatePassword = (password: string) => {
   if (commonPasswords.some(common => 
     password.toLowerCase().includes(common.toLowerCase())
   )) {
-    errors.push('Mot de passe trop commun')
+    errors.push(t('resetPassword.validation.tooCommon') || 'Mot de passe trop commun')
   }
   
   // Vérifier la répétition excessive (plus de 3 caractères identiques consécutifs)
   if (/(.)\1{3,}/.test(password)) {
-    errors.push('Trop de caractères identiques consécutifs')
+    errors.push(t('resetPassword.validation.tooRepetitive') || 'Trop de caractères identiques consécutifs')
   }
   
   // Bonus: Vérifier que ce n'est pas que des caractères séquentiels
@@ -180,7 +181,7 @@ const validatePassword = (password: string) => {
   if (sequentialPatterns.some(pattern => 
     password.toLowerCase().includes(pattern)
   )) {
-    errors.push('Évitez les séquences de caractères')
+    errors.push(t('resetPassword.validation.avoidSequences') || 'Évitez les séquences de caractères')
   }
   
   return { isValid: errors.length === 0, errors }
@@ -188,14 +189,15 @@ const validatePassword = (password: string) => {
 
 // Composant d'indicateur de force du mot de passe
 const PasswordStrengthIndicator: React.FC<{ password: string }> = ({ password }) => {
-  const validation = validatePassword(password)
+  const { t } = useTranslation()
+  const validation = validatePassword(password, t as any)
   
   const requirements = [
-    { test: password.length >= 8, label: 'Au moins 8 caractères' },
-    { test: /[a-zA-Z]/.test(password), label: 'Au moins une lettre' },
-    { test: /\d/.test(password), label: 'Au moins un chiffre' },
-    { test: !/(.)\\1{3,}/.test(password), label: 'Pas de répétitions excessives' },
-    { test: password.length <= 128, label: 'Longueur raisonnable' }
+    { test: password.length >= 8, label: t('resetPassword.requirements.minLength' as any) || 'Au moins 8 caractères' },
+    { test: /[a-zA-Z]/.test(password), label: t('resetPassword.requirements.hasLetter' as any) || 'Au moins une lettre' },
+    { test: /\d/.test(password), label: t('validation.password.number' as any) || 'Au moins un chiffre' },
+    { test: !/(.)\\1{3,}/.test(password), label: t('resetPassword.requirements.noRepetition' as any) || 'Pas de répétitions excessives' },
+    { test: password.length <= 128, label: t('resetPassword.requirements.reasonableLength' as any) || 'Longueur raisonnable' }
   ]
 
   // Calculer le score de force
@@ -210,17 +212,17 @@ const PasswordStrengthIndicator: React.FC<{ password: string }> = ({ password })
   }
   
   const getStrengthLabel = () => {
-    if (strength < 0.4) return 'Faible'
-    if (strength < 0.7) return 'Moyen'
-    if (strength < 0.9) return 'Bon'
-    return 'Excellent'
+    if (strength < 0.4) return t('resetPassword.strength.weak' as any) || 'Faible'
+    if (strength < 0.7) return t('resetPassword.strength.medium' as any) || 'Moyen'
+    if (strength < 0.9) return t('resetPassword.strength.good' as any) || 'Bon'
+    return t('resetPassword.strength.excellent' as any) || 'Excellent'
   }
 
   return (
     <div className="mt-3 p-3 bg-gray-50 rounded-lg">
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs font-medium text-gray-700">
-          Force du mot de passe
+          {t('resetPassword.passwordStrength' as any) || 'Force du mot de passe'}
         </p>
         <span className={`text-xs font-medium ${
           strength < 0.4 ? 'text-red-600' :
@@ -263,16 +265,16 @@ const PasswordStrengthIndicator: React.FC<{ password: string }> = ({ password })
       {/* Conseils pour améliorer le mot de passe */}
       {strength < 1 && (
         <div className="mt-3 pt-2 border-t border-gray-200">
-          <p className="text-xs text-gray-600 font-medium mb-1">Conseils :</p>
+          <p className="text-xs text-gray-600 font-medium mb-1">{t('resetPassword.tips' as any) || 'Conseils'} :</p>
           <ul className="text-xs text-gray-600 space-y-1">
             {password.length < 12 && (
-              <li>• Utilisez 12+ caractères pour plus de sécurité</li>
+              <li>• {t('resetPassword.tip.longerPassword' as any) || 'Utilisez 12+ caractères pour plus de sécurité'}</li>
             )}
             {!/[A-Z]/.test(password) && !/[a-z]/.test(password) && (
-              <li>• Mélangez majuscules et minuscules</li>
+              <li>• {t('resetPassword.tip.mixCase' as any) || 'Mélangez majuscules et minuscules'}</li>
             )}
             {!/[!@#$%^&*()_+=\[\]{};':"|,.<>?-]/.test(password) && (
-              <li>• Les caractères spéciaux renforcent la sécurité (optionnel)</li>
+              <li>• {t('resetPassword.tip.specialChars' as any) || 'Les caractères spéciaux renforcent la sécurité (optionnel)'}</li>
             )}
           </ul>
         </div>
@@ -309,7 +311,11 @@ export function SignupModal({
         'common.loading': 'Chargement...',
         'placeholder.countrySelect': 'Sélectionner un pays',
         'error.generic': 'Erreur',
-        'auth.success': 'Succès'
+        'auth.success': 'Succès',
+        'gdpr.notice': 'En vous connectant, vous acceptez nos conditions d\'utilisation et notre politique de confidentialité.',
+        'countries.noResults': 'Aucun pays trouvé',
+        'countries.searchPlaceholder': 'Rechercher un pays...',
+        'countries.limitedList': 'Liste de pays limitée (service externe temporairement indisponible)'
       }
       return fallbacks[key] || key
     }
@@ -481,7 +487,7 @@ export function SignupModal({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
                 </svg>
                 <span className="text-sm text-yellow-800">
-                  Liste de pays limitée (service externe temporairement indisponible)
+                  {safeT('countries.limitedList')}
                 </span>
               </div>
             </div>
@@ -628,14 +634,14 @@ export function SignupModal({
                         <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                         </svg>
-                        Mots de passe identiques
+                        {t('validation.password.match' as any) || 'Mots de passe identiques'}
                       </div>
                     ) : (
                       <div className="flex items-center text-xs text-red-600">
                         <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                         </svg>
-                        Les mots de passe ne correspondent pas
+                        {t('validation.password.mismatch' as any) || 'Les mots de passe ne correspondent pas'}
                       </div>
                     )}
                   </div>
@@ -659,25 +665,7 @@ export function SignupModal({
           {/* Texte légal */}
           <div className="mb-10 mt-0 text-center">
             <p className="text-xs text-gray-500 leading-relaxed">
-              En cliquant sur « Créer un compte », vous acceptez nos{' '}
-              <a 
-                href="/terms" 
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800 underline transition-colors"
-              >
-                {safeT('legal.terms')}
-              </a>
-              {' '}et notre{' '}
-              <a 
-                href="/privacy" 
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800 underline transition-colors"
-              >
-                {safeT('legal.privacy')}
-              </a>
-              .
+              {safeT('gdpr.notice')}
             </p>
           </div>
 
