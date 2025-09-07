@@ -260,7 +260,7 @@ MessageList.displayName = 'MessageList'
 // Composant principal ChatInterface
 function ChatInterface() {
   // ✅ STORE UNIFIÉ - Plus d'initializeSession Supabase
-  const { user, isAuthenticated, isLoading, hasHydrated, checkAuth } = useAuthStore()
+  const { user, isAuthenticated, isLoading, hasHydrated, checkAuth, handleOAuthTokenFromURL } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -450,54 +450,23 @@ function ChatInterface() {
     }
   }, [])
 
-  // ✅ NOUVEAU - Gestion récupération token OAuth depuis URL
+
+  // ✅ OAUTH via store unifié
   useEffect(() => {
-    const oauthToken = searchParams?.get('oauth_token')
-    const authStatus = searchParams?.get('auth')
-    
-    if (oauthToken) {
-      console.log('[Chat] Token OAuth reçu depuis URL, stockage en cours...')
-      
-      // Stocker le token dans localStorage avec le format attendu
-      const authData = {
-        access_token: oauthToken,
-        token_type: 'bearer',
-        synced_at: Date.now(),
-        oauth_provider: searchParams?.get('oauth_provider') || 'unknown'
+    const processOAuth = async () => {
+      try {
+        const handled = await handleOAuthTokenFromURL()
+        if (handled) {
+          console.log('[Chat] Token OAuth traité par le store unifié')
+        }
+      } catch (error) {
+        console.error('[Chat] Erreur traitement OAuth:', error)
       }
-      
-      localStorage.setItem('intelia-expert-auth', JSON.stringify(authData))
-      
-      // Nettoyer l'URL
-      const cleanUrl = new URL(window.location.href)
-      cleanUrl.searchParams.delete('oauth_token')
-      cleanUrl.searchParams.delete('oauth_success')
-      cleanUrl.searchParams.delete('oauth_email')
-      cleanUrl.searchParams.delete('oauth_provider')
-      cleanUrl.searchParams.delete('auth')
-      cleanUrl.searchParams.delete('message')
-      window.history.replaceState({}, '', cleanUrl.pathname)
-      
-      // Recharger l'auth pour valider le token
-      checkAuth()
-      
-      console.log('[Chat] Token OAuth stocké et auth rechargée')
-    } else if (authStatus === 'success') {
-      console.log('[Chat] Authentification réussie via backend')
-      // Nettoyer l'URL si pas de token mais success
-      const url = new URL(window.location.href)
-      url.searchParams.delete('auth')
-      url.searchParams.delete('message')
-      window.history.replaceState({}, '', url.pathname)
-      
-      // Vérifier l'auth via le backend
-      checkAuth()
-    } else if (authStatus === 'error') {
-      const message = searchParams?.get('message') || 'Erreur d\'authentification'
-      console.error('[Chat] Erreur auth reçue:', message)
-      router.replace('/?auth=error&message=' + encodeURIComponent(message))
     }
-  }, [searchParams, router, checkAuth])
+  
+    processOAuth()
+  }, [handleOAuthTokenFromURL])
+
 
   // Détection de device mobile (conservée)
   useEffect(() => {
