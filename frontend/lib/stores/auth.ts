@@ -32,6 +32,26 @@ interface BackendUserData {
   is_admin?: boolean
 }
 
+// 🆕 NOUVEAUX TYPES POUR OAUTH
+interface OAuthProvider {
+  name: 'linkedin' | 'facebook'
+  displayName: string
+}
+
+interface OAuthInitiateResponse {
+  success: boolean
+  auth_url: string
+  state: string
+  message: string
+}
+
+interface OAuthCallbackResponse {
+  success: boolean
+  message: string
+  token?: string
+  user?: any
+}
+
 // Types d'état du store
 interface AuthState {
   user: AppUser | null
@@ -40,8 +60,9 @@ interface AuthState {
   hasHydrated: boolean
   lastAuthCheck: number
   authErrors: string[]
+  isOAuthLoading: string | null  // 🆕 Provider en cours de connexion OAuth
 
-  // Actions
+  // Actions existantes
   setHasHydrated: (v: boolean) => void
   handleAuthError: (error: any, ctx?: string) => void
   clearAuthErrors: () => void
@@ -52,9 +73,13 @@ interface AuthState {
   logout: () => Promise<void>
   updateProfile: (data: Partial<AppUser>) => Promise<void>
   getAuthToken: () => Promise<string | null>
-  updateConsent: (consentGiven: boolean) => Promise<void>  // ✅ AJOUT
-  exportUserData: () => Promise<any>     // ✅ AJOUT - Méthode RGPD
-  deleteUserData: () => Promise<void>    // ✅ AJOUT - Suppression compte RGPD
+  updateConsent: (consentGiven: boolean) => Promise<void>
+  exportUserData: () => Promise<any>
+  deleteUserData: () => Promise<void>
+  
+  // 🆕 NOUVELLES ACTIONS OAUTH
+  loginWithOAuth: (provider: 'linkedin' | 'facebook') => Promise<void>
+  handleOAuthCallback: (provider: string, code: string, state: string) => Promise<void>
 }
 
 // Store unifié utilisant UNIQUEMENT le backend
@@ -67,6 +92,7 @@ export const useAuthStore = create<AuthState>()(
       hasHydrated: false,
       lastAuthCheck: 0,
       authErrors: [],
+      isOAuthLoading: null,  // 🆕
 
       setHasHydrated: (v: boolean) => {
         set({ hasHydrated: v })
@@ -232,6 +258,123 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
+      // 🆕 LOGIN WITH OAUTH : Nouvelle méthode utilisant le backend
+      loginWithOAuth: async (provider: 'linkedin' | 'facebook') => {
+        set({ isOAuthLoading: provider, authErrors: [] })
+        console.log(`[AuthStore] OAuth login initié pour ${provider}`)
+        
+        try {
+          // 1. Appeler le backend pour initier OAuth
+          const response = await apiClient.post<OAuthInitiateResponse>('/auth/oauth/initiate', {
+            provider,
+            redirect_url: `${window.location.origin}/auth/oauth/callback`
+          })
+
+          if (!response.success || !response.data.auth_url) {
+            throw new Error(response.error?.message || 'Erreur d\'initiation OAuth')
+          }
+
+          const { auth_url, state } = response.data
+          
+          // 2. Stocker le state pour la vérification du callback
+          sessionStorage.setItem('oauth_state', state)
+          sessionStorage.setItem('oauth_provider', provider)
+          
+          console.log(`[AuthStore] Redirection vers ${provider}:`, auth_url)
+          
+          // 3. Rediriger vers le provider OAuth
+          window.location.href = auth_url
+          
+        } catch (e: any) {
+          console.error(`[AuthStore] Erreur OAuth ${provider}:`, e)
+          get().handleAuthError(e, `loginWithOAuth-${provider}`)
+          
+          let userMessage = e?.message || `Erreur de connexion avec ${provider}`
+          if (userMessage.includes('Service OAuth non disponible')) {
+            userMessage = `Connexion ${provider} temporairement indisponible`
+          }
+          
+          set({ isOAuthLoading: null })
+          throw new Error(userMessage)
+        }
+      },
+
+      // 🆕 HANDLE OAUTH CALLBACK : Traite le retour OAuth
+      handleOAuthCallback: async (provider: string, code: string, state: string) => {
+        set({ isOAuthLoading: provider, authErrors: [] })
+        console.log(`[AuthStore] Traitement callback OAuth ${provider}`)
+        
+        try {
+          // 1. Vérifier le state (sécurité)
+          const storedState = sessionStorage.getItem('oauth_state')
+          const storedProvider = sessionStorage.getItem('oauth_provider')
+          
+          if (!storedState || storedState !== state) {
+            throw new Error('État OAuth invalide - possible attaque CSRF')
+          }
+          
+          if (!storedProvider || storedProvider !== provider) {
+            throw new Error('Provider OAuth incohérent')
+          }
+
+          // 2. Appeler le backend pour échanger le code contre un token
+          const response = await apiClient.post<OAuthCallbackResponse>('/auth/oauth/callback', {
+            provider,
+            code,
+            state
+          })
+
+          if (!response.success || !response.data.token) {
+            throw new Error(response.error?.message || 'Erreur lors de l\'échange du code OAuth')
+          }
+
+          const { token, user } = response.data
+
+          // 3. Sauvegarder le token comme pour un login normal
+          const authData = {
+            access_token: token,
+            token_type: 'bearer',
+            synced_at: Date.now(),
+            oauth_provider: provider
+          }
+          localStorage.setItem('intelia-expert-auth', JSON.stringify(authData))
+
+          // 4. Nettoyer le sessionStorage
+          sessionStorage.removeItem('oauth_state')
+          sessionStorage.removeItem('oauth_provider')
+
+          // 5. Vérifier l'auth pour récupérer les données utilisateur complètes
+          await get().checkAuth()
+          
+          set({ isOAuthLoading: null })
+          
+          // 6. Déclencher l'événement de redirection
+          setTimeout(() => {
+            window.dispatchEvent(new Event('auth-state-changed'))
+          }, 100)
+          
+          console.log(`[AuthStore] OAuth ${provider} réussi:`, user?.email)
+          
+        } catch (e: any) {
+          console.error(`[AuthStore] Erreur callback OAuth ${provider}:`, e)
+          get().handleAuthError(e, `handleOAuthCallback-${provider}`)
+          
+          // Nettoyer le sessionStorage même en cas d'erreur
+          sessionStorage.removeItem('oauth_state')
+          sessionStorage.removeItem('oauth_provider')
+          
+          let userMessage = e?.message || `Erreur de connexion avec ${provider}`
+          if (userMessage.includes('État OAuth invalide')) {
+            userMessage = 'Erreur de sécurité OAuth. Veuillez réessayer.'
+          } else if (userMessage.includes('Données utilisateur OAuth incomplètes')) {
+            userMessage = `${provider} n'a pas fourni toutes les informations nécessaires`
+          }
+          
+          set({ isOAuthLoading: null })
+          throw new Error(userMessage)
+        }
+      },
+
       // REGISTER : Utilise /auth/register
       register: async (email: string, password: string, userData: Partial<AppUser>) => {
         set({ isLoading: true, authErrors: [] })
@@ -316,11 +459,16 @@ export const useAuthStore = create<AuthState>()(
             localStorage.removeItem(key)
           })
           
+          // Nettoyer aussi sessionStorage OAuth
+          sessionStorage.removeItem('oauth_state')
+          sessionStorage.removeItem('oauth_provider')
+          
           // Reset du store
           set({
             user: null,
             isAuthenticated: false,
             isLoading: false,
+            isOAuthLoading: null,  // 🆕
             authErrors: [],
             lastAuthCheck: Date.now()
           })
