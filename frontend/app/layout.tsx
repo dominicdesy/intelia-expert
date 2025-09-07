@@ -1,9 +1,10 @@
-// app/layout.tsx - VERSION AVEC ANTI-FLASH INTÉGRÉ ET EVENT LISTENERS CORRIGÉS
+// app/layout.tsx - VERSION AVEC ANTI-FLASH INTÉGRÉ ET EVENT LISTENERS CORRIGÉS + AD SYSTEM
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import { LanguageProvider } from '@/components/providers/LanguageProvider'
+import { AdProvider } from '@/components/AdSystem/AdProvider'
 import { Toaster } from 'react-hot-toast'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -431,15 +432,17 @@ export default function RootLayout({
       <body className={`${inter.className} h-full antialiased mobile-safe-container`}>
         <AuthProvider>
           <LanguageProvider>
-            {children}
-            <Toaster 
-              position="top-center"
-              toastOptions={{
-                style: {
-                  zIndex: 9999,
-                },
-              }}
-            />
+            <AdProvider>
+              {children}
+              <Toaster 
+                position="top-center"
+                toastOptions={{
+                  style: {
+                    zIndex: 9999,
+                  },
+                }}
+              />
+            </AdProvider>
           </LanguageProvider>
         </AuthProvider>
       </body>

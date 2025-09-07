@@ -1,4 +1,4 @@
-// types/index.ts - VERSION UNIFIÉE COMPLÈTE (37K+ caractères)
+// types/index.ts - VERSION UNIFIÉE COMPLÈTE + SESSION TRACKING
 
 // ==================== INTERFACE MESSAGE ÉTENDUE AVEC CONCISION ET RESPONSE_VERSIONS ====================
 
@@ -9,9 +9,9 @@ export interface Message {
   timestamp: Date
   feedback?: 'positive' | 'negative' | null
   conversation_id?: string
-  feedbackComment?: string  // ✅ CONSERVÉ: Commentaire associé au feedback
+  feedbackComment?: string  // Commentaire associé au feedback
   
-  // ✅ CONSERVÉS: CHAMPS POUR CLARIFICATION
+  // CHAMPS POUR CLARIFICATION
   is_clarification_request?: boolean       // Pour les messages du bot qui demandent des clarifications
   is_clarification_response?: boolean      // Pour les messages utilisateur qui répondent aux clarifications
   clarification_questions?: string[]       // Questions de clarification du bot
@@ -19,7 +19,7 @@ export interface Message {
   original_question?: string               // Question originale avant clarification
   clarification_entities?: Record<string, any>    // Entités extraites des réponses de clarification
   
-  // 🚀 NOUVEAU: Champs pour le système de concision backend
+  // NOUVEAU: Champs pour le système de concision backend
   response_versions?: {
     ultra_concise: string
     concise: string
@@ -27,15 +27,164 @@ export interface Message {
     detailed: string
   }
   
-  // ✅ CONSERVÉS: Champs pour compatibilité (peuvent être supprimés plus tard)
+  // Champs pour compatibilité (peuvent être supprimés plus tard)
   originalResponse?: string  // Réponse originale avant concision
   processedResponse?: string // Réponse après traitement de concision
   concisionLevel?: ConcisionLevel // Niveau de concision appliqué
   
-  // ✅ COMPATIBILITY: Champs du petit fichier
+  // COMPATIBILITY: Champs du petit fichier
   role?: 'user' | 'assistant'
   sources?: DocumentSource[]
   metadata?: MessageMetadata
+}
+
+// ==================== NOUVEAUX TYPES POUR SESSION TRACKING ====================
+
+export interface UserSession {
+  id?: number
+  user_email: string
+  session_id: string
+  login_time: string
+  logout_time?: string
+  last_activity: string
+  session_duration_seconds?: number
+  ip_address?: string
+  user_agent?: string
+  logout_type?: 'manual' | 'browser_close' | 'timeout' | 'forced'
+  created_at?: string
+  updated_at?: string
+}
+
+export interface SessionAnalytics {
+  user_email: string
+  period_days: number
+  total_sessions: number
+  total_connection_time_seconds: number
+  average_session_duration_seconds: number
+  longest_session_seconds: number
+  shortest_session_seconds: number
+  most_active_day: string
+  most_active_hour: number
+  sessions_per_day: number
+  active_days: number
+  logout_type_breakdown: {
+    manual: number
+    browser_close: number
+    timeout: number
+    forced: number
+  }
+  daily_patterns: Array<{
+    date: string
+    sessions: number
+    total_time_seconds: number
+    average_duration: number
+  }>
+  hourly_patterns: Array<{
+    hour: number
+    sessions: number
+    average_duration: number
+  }>
+}
+
+export interface HeartbeatResponse {
+  status: 'ok' | 'error'
+  timestamp: string
+  session_active?: boolean
+  message?: string
+}
+
+export interface LogoutRequest {
+  logout_type?: 'manual' | 'browser_close' | 'timeout'
+  session_duration?: number
+}
+
+export interface LogoutResponse {
+  status: 'success' | 'error'
+  message: string
+  session_duration_seconds?: number
+  session_id?: string
+  timestamp: string
+}
+
+export interface SessionState {
+  sessionId: string | null
+  isActive: boolean
+  loginTime: Date | null
+  lastActivity: Date | null
+  duration: number // en secondes
+}
+
+export interface SessionStore {
+  session: SessionState | null
+  isTracking: boolean
+  startSession: (sessionId: string) => void
+  endSession: (logoutType?: 'manual' | 'browser_close' | 'timeout') => Promise<void>
+  updateActivity: () => Promise<void>
+  getSessionDuration: () => number
+  resetSession: () => void
+}
+
+// ==================== NOUVEAUX TYPES POUR AD SYSTEM ====================
+
+export interface AdData {
+  id: string
+  title: string
+  description: string
+  imageUrl: string
+  ctaText: string
+  ctaUrl: string
+  company: string
+  rating?: number
+  users?: string
+  duration?: string
+  features: string[]
+}
+
+export interface UserSessionStats {
+  totalSessions: number
+  averageSessionDuration: number
+  lastAdShown?: string
+  qualifiesForAd: boolean
+}
+
+export interface AdTriggerCriteria {
+  MIN_SESSIONS: number
+  MIN_DURATION_PER_SESSION: number // en secondes
+  COOLDOWN_PERIOD: number // en heures
+  CHECK_INTERVAL?: number // optionnel
+  INITIAL_CHECK_DELAY?: number // optionnel
+}
+
+export interface AdModalProps {
+  isOpen: boolean
+  onClose: () => void
+  adData: AdData
+  onAdClick: (adId: string) => void
+}
+
+export interface AdProviderProps {
+  children: React.ReactNode
+}
+
+export interface AdSystemHookReturn {
+  sessionStats: UserSessionStats | null
+  showAd: boolean
+  currentAd: AdData | null
+  handleAdClose: () => void
+  handleAdClick: (adId: string) => void
+  checkAdEligibility: () => Promise<void>
+  triggerAd: () => Promise<void>
+}
+
+export interface AdEventData {
+  event: 'ad_shown' | 'ad_clicked' | 'ad_closed' | 'ad_error'
+  ad_id?: string
+  timestamp: string
+  user_agent?: string
+  session_data?: {
+    totalSessions: number
+    averageSessionDuration: number
+  }
 }
 
 // ==================== TYPES POUR CONCISION BACKEND ====================
@@ -48,29 +197,29 @@ export enum ConcisionLevel {
 }
 
 export interface ConcisionConfig {
-  level: ConcisionLevel;
-  autoDetect: boolean;  // Détection automatique selon le type de question
-  userPreference: boolean; // Sauvegarder préférence utilisateur
+  level: ConcisionLevel
+  autoDetect: boolean  // Détection automatique selon le type de question
+  userPreference: boolean // Sauvegarder préférence utilisateur
 }
 
 export interface ConcisionControlProps {
-  className?: string;
-  compact?: boolean;
+  className?: string
+  compact?: boolean
 }
 
-// 🚀 NOUVEAU: Interface pour sélection de versions backend
+// NOUVEAU: Interface pour sélection de versions backend
 export interface ResponseVersionSelection {
-  selectedVersion: string;
-  availableVersions: Record<string, string>;
-  selectedLevel: ConcisionLevel;
+  selectedVersion: string
+  availableVersions: Record<string, string>
+  selectedLevel: ConcisionLevel
 }
 
-// ✅ CONSERVÉ: Interface pour traitement legacy (compatibilité)
+// Interface pour traitement legacy (compatibilité)
 export interface ResponseProcessingResult {
-  processedContent: string;
-  originalContent: string;
-  levelUsed: ConcisionLevel;
-  wasProcessed: boolean;
+  processedContent: string
+  originalContent: string
+  levelUsed: ConcisionLevel
+  wasProcessed: boolean
 }
 
 // ==================== TYPES EXISTANTS CONSERVÉS ====================
@@ -78,7 +227,7 @@ export interface ResponseProcessingResult {
 export interface ExpertApiResponse {
   question: string
   response: string
-  full_text?: string  // ✅ plein texte non tronqué (si fourni par l'API)
+  full_text?: string  // plein texte non tronqué (si fourni par l'API)
   conversation_id: string
   rag_used: boolean
   rag_score?: number
@@ -90,10 +239,10 @@ export interface ExpertApiResponse {
   logged: boolean
   validation_passed?: boolean
   validation_confidence?: number
-  // ✅ CONSERVÉS: CHAMPS POUR CLARIFICATION
+  // CHAMPS POUR CLARIFICATION
   is_clarification_request?: boolean
   clarification_questions?: string[]
-  // 🚀 NOUVEAU: Champs pour versions backend
+  // NOUVEAU: Champs pour versions backend
   response_versions?: {
     ultra_concise: string
     concise: string
@@ -102,19 +251,19 @@ export interface ExpertApiResponse {
   }
 }
 
-// ✅ CONSERVÉ: INTERFACE ConversationData ÉTENDUE AVEC FEEDBACK
+// INTERFACE ConversationData ÉTENDUE AVEC FEEDBACK
 export interface ConversationData {
   user_id: string
   question: string
   response: string
-  full_text?: string  // ✅ plein texte non tronqué (si fourni par l'API)
+  full_text?: string  // plein texte non tronqué (si fourni par l'API)
   conversation_id: string
   confidence_score?: number
   response_time_ms?: number
   language?: string
   rag_used?: boolean
-  feedback?: 1 | -1 | null          // ✅ CONSERVÉ: Feedback numérique pour le backend
-  feedback_comment?: string          // ✅ CONSERVÉ: Commentaire feedback
+  feedback?: 1 | -1 | null          // Feedback numérique pour le backend
+  feedback_comment?: string          // Commentaire feedback
 }
 
 export interface ConversationItem {
@@ -128,12 +277,12 @@ export interface ConversationItem {
   updated_at: string
   created_at: string
   feedback?: number | null
-  feedback_comment?: string  // ✅ CONSERVÉ: Commentaire dans l'historique
+  feedback_comment?: string  // Commentaire dans l'historique
 }
 
-// ==================== CONSERVÉS: TYPES POUR CONVERSATIONS STYLE CLAUDE.AI ====================
+// ==================== TYPES POUR CONVERSATIONS STYLE CLAUDE.AI ====================
 
-// ✅ CONSERVÉ: Structure complète d'une conversation
+// Structure complète d'une conversation
 export interface Conversation {
   id: string
   title: string
@@ -145,23 +294,23 @@ export interface Conversation {
   language?: string
   last_message_preview?: string
   status?: 'active' | 'archived'
-  // ✅ COMPATIBILITY: Champs du petit fichier
+  // COMPATIBILITY: Champs du petit fichier
   user_id?: string
   messages?: Message[]
 }
 
-// ✅ CONSERVÉ: Conversation complète avec tous ses messages
+// Conversation complète avec tous ses messages
 export interface ConversationWithMessages extends Conversation {
   messages: Message[]
 }
 
-// ✅ CONSERVÉ: Structure pour l'historique groupé
+// Structure pour l'historique groupé
 export interface ConversationGroup {
   title: string  // "Aujourd'hui", "Hier", "Cette semaine", etc.
   conversations: Conversation[]
 }
 
-// ✅ CONSERVÉ: Réponse API pour l'historique
+// Réponse API pour l'historique
 export interface ConversationHistoryResponse {
   success: boolean
   conversations: Conversation[]
@@ -171,14 +320,14 @@ export interface ConversationHistoryResponse {
   timestamp: string
 }
 
-// ✅ CONSERVÉ: Réponse API pour une conversation complète
+// Réponse API pour une conversation complète
 export interface ConversationDetailResponse {
   success: boolean
   conversation: ConversationWithMessages
   timestamp: string
 }
 
-// ✅ CONSERVÉ: Options pour le groupement des conversations
+// Options pour le groupement des conversations
 export interface ConversationGroupingOptions {
   groupBy: 'date' | 'topic' | 'none'
   sortBy: 'updated_at' | 'created_at' | 'message_count'
@@ -187,7 +336,7 @@ export interface ConversationGroupingOptions {
   offset?: number
 }
 
-// ✅ CONSERVÉ: Statistiques de conversation
+// Statistiques de conversation
 export interface ConversationStats {
   total_conversations: number
   total_messages: number
@@ -197,9 +346,9 @@ export interface ConversationStats {
   satisfaction_rate: number
 }
 
-// ==================== CONSERVÉS: TYPES POUR CLARIFICATIONS INLINE ====================
+// ==================== TYPES POUR CLARIFICATIONS INLINE ====================
 
-// ✅ CONSERVÉ: Interface simplifiée pour clarifications inline
+// Interface simplifiée pour clarifications inline
 export interface ClarificationInlineProps {
   questions: string[]
   originalQuestion: string
@@ -210,7 +359,7 @@ export interface ClarificationInlineProps {
   conversationId?: string
 }
 
-// ✅ CONSERVÉ: Interface pour les réponses de clarification
+// Interface pour les réponses de clarification
 export interface ClarificationResponse {
   needs_clarification: boolean
   questions?: string[]
@@ -219,7 +368,7 @@ export interface ClarificationResponse {
   model_used?: string
 }
 
-// ✅ CONSERVÉ: Interface pour l'état des clarifications
+// Interface pour l'état des clarifications
 export interface ClarificationState {
   pendingClarification: ExpertApiResponse | null
   isProcessingClarification: boolean
@@ -232,7 +381,7 @@ export interface ClarificationState {
   }>
 }
 
-// ==================== CONSERVÉS: TYPES UTILISATEUR AVEC CHAMPS TÉLÉPHONE ====================
+// ==================== TYPES UTILISATEUR AVEC CHAMPS TÉLÉPHONE ====================
 
 export interface User {
   id: string
@@ -240,7 +389,7 @@ export interface User {
   name: string
   firstName: string
   lastName: string
-  phone: string  // ⚠️ CONSERVÉ: Champ existant - gardé pour compatibilité
+  phone: string  // Champ existant - gardé pour compatibilité
   country: string
   linkedinProfile: string
   companyName: string
@@ -251,12 +400,12 @@ export interface User {
   created_at: string
   plan: string
   
-  // ✅ CONSERVÉS: NOUVEAUX CHAMPS TÉLÉPHONE SÉPARÉS POUR SUPABASE
+  // NOUVEAUX CHAMPS TÉLÉPHONE SÉPARÉS POUR SUPABASE
   country_code?: string    // Code pays (ex: +1, +33, +32)
   area_code?: string       // Code régional (ex: 514, 04, 2)
   phone_number?: string    // Numéro principal (ex: 1234567, 12345678)
   
-  // ✅ COMPATIBILITY: Champs du petit fichier
+  // COMPATIBILITY: Champs du petit fichier
   full_name?: string
   avatar_url?: string
   consent_given?: boolean
@@ -272,7 +421,7 @@ export interface ProfileUpdateData {
   firstName: string
   lastName: string
   email: string
-  phone?: string  // ✅ CONSERVÉ: Maintenant optionnel pour éviter les conflits
+  phone?: string  // Maintenant optionnel pour éviter les conflits
   country: string
   linkedinProfile: string
   companyName: string
@@ -280,13 +429,13 @@ export interface ProfileUpdateData {
   linkedinCorporate: string
   language?: string
   
-  // ✅ CONSERVÉS: NOUVEAUX CHAMPS TÉLÉPHONE SÉPARÉS
+  // NOUVEAUX CHAMPS TÉLÉPHONE SÉPARÉS
   country_code?: string
   area_code?: string
   phone_number?: string
 }
 
-// ==================== CONSERVÉS: TYPES SPÉCIFIQUES AU COMPOSANT PHONE ====================
+// ==================== TYPES SPÉCIFIQUES AU COMPOSANT PHONE ====================
 
 export interface PhoneData {
   country_code: string
@@ -302,22 +451,22 @@ export interface PhoneValidationResult {
   isValidNumber: boolean
 }
 
-// ==================== CONSERVÉS: NOUVEAUX TYPES FEEDBACK ET COMMENTAIRES ====================
+// ==================== NOUVEAUX TYPES FEEDBACK ET COMMENTAIRES ====================
 
-// ✅ CONSERVÉ: Interface pour les données feedback enrichies
+// Interface pour les données feedback enrichies
 export interface FeedbackData {
   conversation_id: string
   feedback: 'positive' | 'negative'
   comment?: string
   timestamp: string
   user_id?: string
-  // ✅ COMPATIBILITY: Champs du petit fichier
+  // COMPATIBILITY: Champs du petit fichier
   message_id?: string
   rating?: 'positive' | 'negative'
   category?: 'accuracy' | 'relevance' | 'completeness' | 'other'
 }
 
-// ✅ CONSERVÉ: Props pour la modal feedback
+// Props pour la modal feedback
 export interface FeedbackModalProps {
   isOpen: boolean
   onClose: () => void
@@ -326,7 +475,7 @@ export interface FeedbackModalProps {
   isSubmitting?: boolean
 }
 
-// ✅ CONSERVÉ: Interface pour les analytics feedback
+// Interface pour les analytics feedback
 export interface FeedbackAnalytics {
   period_days: number
   total_conversations: number
@@ -348,7 +497,7 @@ export interface FeedbackAnalytics {
   }>
 }
 
-// ✅ CONSERVÉ: Interface pour le rapport admin feedback
+// Interface pour le rapport admin feedback
 export interface AdminFeedbackReport {
   period_days: number
   generated_at: string
@@ -394,7 +543,7 @@ export interface AdminFeedbackReport {
   }>
 }
 
-// ✅ CONSERVÉ: Interface pour les statistiques utilisateur
+// Interface pour les statistiques utilisateur
 export interface UserFeedbackStats {
   user_id: string
   total_conversations: number
@@ -407,24 +556,29 @@ export interface UserFeedbackStats {
   last_feedback_date?: string
 }
 
-// ==================== CONSERVÉS: TYPES HOOKS AVEC CONVERSATIONS ====================
+// ==================== TYPES HOOKS AVEC CONVERSATIONS ====================
 
-// ✅ CONSERVÉ: INTERFACE AuthStore COMPLÈTE AVEC TOUTES LES PROPRIÉTÉS
+// INTERFACE AuthStore COMPLÈTE AVEC TOUTES LES PROPRIÉTÉS
 export interface AuthStore {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
-  hasHydrated: boolean  // ✅ CONSERVÉ: Pour éviter l'erreur TypeScript
+  hasHydrated: boolean  // Pour éviter l'erreur TypeScript
   logout: () => Promise<void>
-  login: (email: string, password: string) => Promise<void>  // ✅ CONSERVÉ
-  register: (email: string, password: string, userData?: Partial<User>) => Promise<void>  // ✅ CONSERVÉ
+  login: (email: string, password: string) => Promise<void>
+  register: (email: string, password: string, userData?: Partial<User>) => Promise<void>
   updateProfile: (data: ProfileUpdateData) => Promise<{ success: boolean; error?: string }>
-  initializeSession: () => Promise<boolean>  // ✅ CONSERVÉ
+  initializeSession: () => Promise<boolean>
+  
+  // NOUVEAU: Méthodes pour session tracking
+  startSessionTracking: (sessionId: string) => void
+  endSessionTracking: (logoutType?: 'manual' | 'browser_close' | 'timeout') => Promise<void>
+  updateSessionActivity: () => Promise<void>
 }
 
-// ✅ CONSERVÉ: ChatStore pour gérer les conversations
+// ChatStore pour gérer les conversations
 export interface ChatStore {
-  // ✅ CONSERVÉES: PROPRIÉTÉS EXISTANTES 
+  // PROPRIÉTÉS EXISTANTES 
   conversations: ConversationItem[]
   isLoading: boolean
   loadConversations: (userId: string) => Promise<void>
@@ -433,7 +587,7 @@ export interface ChatStore {
   refreshConversations: (userId: string) => Promise<void>
   addConversation: (conversationId: string, question: string, response: string) => void
 
-  // ✅ CONSERVÉES: PROPRIÉTÉS POUR CONVERSATIONS STYLE CLAUDE.AI
+  // PROPRIÉTÉS POUR CONVERSATIONS STYLE CLAUDE.AI
   conversationGroups: ConversationGroup[]
   currentConversation: ConversationWithMessages | null
   isLoadingHistory: boolean
@@ -451,7 +605,7 @@ export interface Translation {
   currentLanguage: string
 }
 
-// ==================== CONSERVÉS: TYPES COMPOSANTS ====================
+// ==================== TYPES COMPOSANTS ====================
 
 export interface ModalProps {
   isOpen: boolean
@@ -587,7 +741,7 @@ export interface AppError {
   context?: string
 }
 
-// ==================== CONSERVÉS: TYPES API ====================
+// ==================== TYPES API ====================
 
 export interface ApiError extends Error {
   status?: number
@@ -692,14 +846,14 @@ export const mapBackendUserToUser = (backendUser: BackendUserData): User => {
   }
 }
 
-// ==================== CONSERVÉES: CONSTANTES API SÉCURISÉES ====================
-// 🔧 CONFIGURATION API CORRIGÉE - Configuration API dynamique depuis environnement
+// ==================== CONSTANTES API SÉCURISÉES ====================
+// Configuration API dynamique depuis environnement
 const getApiConfig = () => {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
   const version = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
   
   if (!baseUrl) {
-    console.error('❌ NEXT_PUBLIC_API_BASE_URL environment variable missing')
+    console.error('NEXT_PUBLIC_API_BASE_URL environment variable missing')
     return {
       BASE_URL: 'http://localhost:8000', // Fallback développement
       TIMEOUT: 30000,
@@ -707,19 +861,19 @@ const getApiConfig = () => {
     }
   }
   
-  // 🔧 CORRECTION: Enlever /api s'il est déjà présent pour éviter /api/api/
+  // CORRECTION: Enlever /api s'il est déjà présent pour éviter /api/api/
   const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, '')
   
   return {
-    BASE_URL: cleanBaseUrl, // 🔧 URL de base nettoyée
+    BASE_URL: cleanBaseUrl, // URL de base nettoyée
     TIMEOUT: 30000,
-    LOGGING_BASE_URL: `${cleanBaseUrl}/api/${version}` // 🔧 Construction correcte
+    LOGGING_BASE_URL: `${cleanBaseUrl}/api/${version}` // Construction correcte
   }
 }
 
 export const API_CONFIG = getApiConfig()
 
-// ✅ CONSERVÉS: ENDPOINTS FEEDBACK
+// ENDPOINTS FEEDBACK
 export const FEEDBACK_ENDPOINTS = {
   SAVE_CONVERSATION: '/logging/conversation',
   UPDATE_FEEDBACK: '/logging/conversation/{id}/feedback',
@@ -733,6 +887,15 @@ export const FEEDBACK_ENDPOINTS = {
   GET_ADMIN_FEEDBACK_REPORT: '/logging/admin/feedback-report',
   EXPORT_FEEDBACK_DATA: '/logging/admin/export-feedback',
   TEST_COMMENT_SUPPORT: '/logging/test-comments'
+} as const
+
+// NOUVEAU: ENDPOINTS SESSION TRACKING
+export const SESSION_ENDPOINTS = {
+  HEARTBEAT: '/auth/heartbeat',
+  LOGOUT: '/auth/logout', 
+  MY_SESSION_ANALYTICS: '/logging/analytics/my-sessions',
+  SESSION_STATS: '/logging/analytics/session-stats',
+  DAILY_PATTERNS: '/logging/analytics/daily-patterns'
 } as const
 
 export const PLAN_CONFIGS = {
@@ -763,7 +926,7 @@ export const PLAN_CONFIGS = {
   }
 } as const
 
-// ✅ CONSERVÉE: CONFIGURATION FEEDBACK
+// CONFIGURATION FEEDBACK
 export const FEEDBACK_CONFIG = {
   TYPES: {
     POSITIVE: {
@@ -796,7 +959,7 @@ export const FEEDBACK_CONFIG = {
   PRIVACY_POLICY_URL: 'https://intelia.com/privacy-policy/'
 } as const
 
-// ✅ CONSERVÉE: CONFIGURATION DES CLARIFICATIONS
+// CONFIGURATION DES CLARIFICATIONS
 export const CLARIFICATION_TEXTS = {
   fr: {
     title: "Informations supplémentaires requises",
@@ -842,7 +1005,7 @@ export const CLARIFICATION_CONFIG = {
   VALIDATION_DEBOUNCE: 500
 } as const
 
-// 🚀 NOUVELLE: CONFIGURATION POUR CONCISION BACKEND
+// NOUVELLE: CONFIGURATION POUR CONCISION BACKEND
 export const CONCISION_CONFIG = {
   LEVELS: {
     ULTRA_CONCISE: {
@@ -880,7 +1043,85 @@ export const CONCISION_CONFIG = {
   STORAGE_KEY: 'intelia_concision_level'
 } as const
 
-// ✅ CONSERVÉS: UTILITAIRES ANALYTICS
+// NOUVELLE: CONFIGURATION POUR AD SYSTEM
+export const AD_CONFIG = {
+  // Critères de déclenchement
+  TRIGGERS: {
+    MIN_SESSIONS: 2,
+    MIN_DURATION_PER_SESSION: 60, // 1 minute en secondes
+    COOLDOWN_PERIOD: 24, // 24 heures
+    CHECK_INTERVAL: 5 * 60 * 1000, // 5 minutes en ms
+    INITIAL_CHECK_DELAY: 3000 // 3 secondes après connexion
+  },
+  
+  // Configuration de l'affichage
+  DISPLAY: {
+    MIN_SHOW_TIME: 15, // 15 secondes minimum
+    FADE_DURATION: 200, // Animation en ms
+    Z_INDEX: 50 // z-index de la modal
+  },
+  
+  // Types de publicités disponibles
+  AD_TYPES: {
+    FARMING_TOOLS: {
+      id: 'farming-tools',
+      weight: 40,
+      targetAudience: 'agricultural',
+      category: 'productivity'
+    },
+    BUSINESS_SOFTWARE: {
+      id: 'business-software',
+      weight: 30,
+      targetAudience: 'professional',
+      category: 'software'
+    },
+    EDUCATIONAL: {
+      id: 'educational',
+      weight: 20,
+      targetAudience: 'learning',
+      category: 'education'
+    },
+    PREMIUM_FEATURES: {
+      id: 'premium-features',
+      weight: 10,
+      targetAudience: 'power-user',
+      category: 'upgrade'
+    }
+  },
+  
+  // Configuration de stockage
+  STORAGE: {
+    LAST_AD_SHOWN_KEY: 'lastAdShown',
+    USER_PREFERENCES_KEY: 'adPreferences',
+    SESSION_TRACKING_KEY: 'sessionTracking'
+  },
+  
+  // URLs et endpoints
+  ENDPOINTS: {
+    SESSION_ANALYTICS: '/analytics/my-sessions',
+    AD_EVENTS: '/logging/ad-events' // Optionnel
+  }
+} as const
+
+// NOUVELLE: CONFIGURATION POUR SESSION TRACKING
+export const SESSION_CONFIG = {
+  HEARTBEAT_INTERVAL: 2 * 60 * 1000, // 2 minutes en ms
+  SESSION_TIMEOUT: 30 * 60, // 30 minutes en secondes
+  TRACK_IP_ADDRESS: true,
+  TRACK_USER_AGENT: true,
+  AUTO_CLEANUP_OLD_SESSIONS: true,
+  CLEANUP_AFTER_DAYS: 90,
+  STORAGE_KEY: 'intelia_session_data',
+  
+  LOGOUT_TYPES: {
+    MANUAL: 'manual' as const,
+    BROWSER_CLOSE: 'browser_close' as const,
+    TIMEOUT: 'timeout' as const,
+    FORCED: 'forced' as const
+  }
+} as const
+
+// UTILITAIRES ANALYTICS
 export const ANALYTICS_UTILS = {
   calculateSatisfactionRate: (positive: number, negative: number): number => {
     const total = positive + negative
@@ -915,10 +1156,32 @@ export const ANALYTICS_UTILS = {
     } catch {
       return timestamp
     }
+  },
+
+  // NOUVEAU: Utilitaires pour sessions
+  formatSessionDuration: (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const remainingSeconds = seconds % 60
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`
+    } else if (minutes > 0) {
+      return `${minutes}m ${remainingSeconds}s`
+    } else {
+      return `${remainingSeconds}s`
+    }
+  },
+
+  calculateAverageSessionDuration: (sessions: UserSession[]): number => {
+    if (sessions.length === 0) return 0
+    const totalDuration = sessions.reduce((sum, session) => 
+      sum + (session.session_duration_seconds || 0), 0)
+    return Math.round(totalDuration / sessions.length)
   }
 } as const
 
-// ✅ CONSERVÉS: UTILITAIRES POUR CLARIFICATIONS
+// UTILITAIRES POUR CLARIFICATIONS
 export const ClarificationUtils = {
   isClarificationResponse: (response: ExpertApiResponse): boolean => {
     return (
@@ -991,7 +1254,7 @@ export const ClarificationUtils = {
   }
 } as const
 
-// 🚀 NOUVEAUX: UTILITAIRES POUR CONCISION BACKEND
+// NOUVEAUX: UTILITAIRES POUR CONCISION BACKEND
 export const ConcisionUtils = {
   selectVersionFromResponse: (
     responseVersions: Record<string, string>,
@@ -1122,7 +1385,228 @@ export const ConcisionUtils = {
   }
 } as const
 
-// ✅ CONSERVÉES: CONSTANTES DE VALIDATION
+// NOUVEAUX: UTILITAIRES POUR AD SYSTEM
+export const AdSystemUtils = {
+  // Vérifier l'éligibilité pour les publicités
+  checkAdEligibility: (
+    sessionStats: UserSessionStats,
+    criteria: AdTriggerCriteria
+  ): boolean => {
+    // Vérifier les critères de sessions
+    const meetsSessionCriteria = sessionStats.totalSessions >= criteria.MIN_SESSIONS
+    const meetsDurationCriteria = sessionStats.averageSessionDuration >= criteria.MIN_DURATION_PER_SESSION
+    
+    // Vérifier le cooldown
+    const lastAdTime = sessionStats.lastAdShown ? new Date(sessionStats.lastAdShown) : null
+    const now = new Date()
+    const cooldownExpired = !lastAdTime || 
+      (now.getTime() - lastAdTime.getTime()) > (criteria.COOLDOWN_PERIOD * 60 * 60 * 1000)
+    
+    return meetsSessionCriteria && meetsDurationCriteria && cooldownExpired
+  },
+
+  // Générer une publicité personnalisée selon le profil utilisateur
+  generatePersonalizedAd: (userProfile?: User): AdData => {
+    // Logic basique de personnalisation - en production, serait plus sophistiquée
+    const baseAd: AdData = {
+      id: 'farming-pro-2024',
+      title: 'FarmPro Analytics',
+      description: 'Optimisez vos performances agricoles avec notre plateforme IA spécialisée en élevage avicole. Analyses prédictives, suivi en temps réel et conseils personnalisés pour maximiser vos rendements.',
+      imageUrl: '/images/logo.png',
+      ctaText: 'Essai gratuit 30 jours',
+      ctaUrl: 'https://farmpro-analytics.com/trial?ref=intelia',
+      company: 'FarmPro Solutions',
+      rating: 4.8,
+      users: '10K+',
+      duration: 'Essai gratuit',
+      features: [
+        'Analyses prédictives IA',
+        'Suivi temps réel',
+        'Rapports automatisés',
+        'Support expert 24/7',
+        'Intégration IoT',
+        'Mobile & desktop'
+      ]
+    }
+
+    // Personnalisation selon le type d'utilisateur
+    if (userProfile?.user_type === 'veterinary') {
+      baseAd.title = 'VetPro Clinical'
+      baseAd.description = 'Plateforme de diagnostic vétérinaire avicole avec IA. Aide au diagnostic, base de données médicamenteuse et suivi clinique intégré.'
+      baseAd.features = [
+        'Aide au diagnostic IA',
+        'Base médicamenteuse',
+        'Dossiers patients',
+        'Analyses laboratoire',
+        'Protocoles standards',
+        'Téléconsultation'
+      ]
+    }
+
+    return baseAd
+  },
+
+  // Valider les données de session
+  validateSessionStats: (data: any): data is UserSessionStats => {
+    return (
+      typeof data === 'object' &&
+      data !== null &&
+      typeof data.totalSessions === 'number' &&
+      typeof data.averageSessionDuration === 'number' &&
+      typeof data.qualifiesForAd === 'boolean'
+    )
+  },
+
+  // Logger les événements publicitaires (version locale)
+  logAdEvent: (event: string, adId?: string, sessionData?: UserSessionStats): void => {
+    const eventData: AdEventData = {
+      event: event as AdEventData['event'],
+      ad_id: adId,
+      timestamp: new Date().toISOString(),
+      user_agent: navigator.userAgent,
+      session_data: sessionData ? {
+        totalSessions: sessionData.totalSessions,
+        averageSessionDuration: sessionData.averageSessionDuration
+      } : undefined
+    }
+
+    // Log local pour debug
+    console.log('📊 [AdSystem] Event:', eventData)
+
+    // En production, pourrait envoyer à un service d'analytics
+    try {
+      const existingLogs = localStorage.getItem('adEventLogs')
+      const logs = existingLogs ? JSON.parse(existingLogs) : []
+      logs.push(eventData)
+      
+      // Garder seulement les 100 derniers événements
+      if (logs.length > 100) {
+        logs.splice(0, logs.length - 100)
+      }
+      
+      localStorage.setItem('adEventLogs', JSON.stringify(logs))
+    } catch (error) {
+      console.warn('Erreur lors du stockage des logs publicitaires:', error)
+    }
+  },
+
+  // Calculer le temps restant avant la prochaine publicité
+  getTimeUntilNextAd: (lastAdShown?: string, cooldownHours: number = 24): number => {
+    if (!lastAdShown) return 0
+    
+    const lastAdTime = new Date(lastAdShown)
+    const now = new Date()
+    const cooldownMs = cooldownHours * 60 * 60 * 1000
+    const elapsed = now.getTime() - lastAdTime.getTime()
+    
+    return Math.max(0, cooldownMs - elapsed)
+  },
+
+  // Formater le temps restant en format lisible
+  formatTimeRemaining: (milliseconds: number): string => {
+    const hours = Math.floor(milliseconds / (1000 * 60 * 60))
+    const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60))
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`
+    } else if (minutes > 0) {
+      return `${minutes}m`
+    } else {
+      return 'Bientôt disponible'
+    }
+  }
+} as const
+
+// NOUVEAUX: UTILITAIRES POUR SESSION TRACKING
+export const SessionUtils = {
+  // Générer un ID de session unique
+  generateSessionId: (): string => {
+    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  },
+
+  // Calculer la durée d'une session
+  calculateSessionDuration: (loginTime: string, logoutTime?: string): number => {
+    const start = new Date(loginTime)
+    const end = logoutTime ? new Date(logoutTime) : new Date()
+    return Math.floor((end.getTime() - start.getTime()) / 1000)
+  },
+
+  // Détecter le type de déconnexion selon le contexte
+  detectLogoutType: (userAgent: string, sessionDuration: number): 'manual' | 'browser_close' | 'timeout' => {
+    // Session très courte = probablement fermeture navigateur
+    if (sessionDuration < 30) {
+      return 'browser_close'
+    }
+    
+    // Session très longue = probablement timeout
+    if (sessionDuration > SESSION_CONFIG.SESSION_TIMEOUT) {
+      return 'timeout'
+    }
+    
+    // Par défaut: déconnexion manuelle
+    return 'manual'
+  },
+
+  // Nettoyer les sessions expirées
+  cleanupExpiredSessions: (sessions: UserSession[]): UserSession[] => {
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - SESSION_CONFIG.CLEANUP_AFTER_DAYS)
+    
+    return sessions.filter(session => {
+      const sessionDate = new Date(session.login_time)
+      return sessionDate > cutoffDate
+    })
+  },
+
+  // Valider les données de session
+  validateSessionData: (session: any): session is UserSession => {
+    return (
+      typeof session === 'object' &&
+      session !== null &&
+      typeof session.user_email === 'string' &&
+      typeof session.session_id === 'string' &&
+      typeof session.login_time === 'string' &&
+      typeof session.last_activity === 'string'
+    )
+  },
+
+  // Grouper les sessions par période
+  groupSessionsByPeriod: (sessions: UserSession[]): Record<string, UserSession[]> => {
+    const groups: Record<string, UserSession[]> = {
+      today: [],
+      yesterday: [],
+      thisWeek: [],
+      thisMonth: [],
+      older: []
+    }
+
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000)
+    const thisWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const thisMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+    sessions.forEach(session => {
+      const sessionDate = new Date(session.login_time)
+      
+      if (sessionDate >= today) {
+        groups.today.push(session)
+      } else if (sessionDate >= yesterday) {
+        groups.yesterday.push(session)
+      } else if (sessionDate >= thisWeek) {
+        groups.thisWeek.push(session)
+      } else if (sessionDate >= thisMonth) {
+        groups.thisMonth.push(session)
+      } else {
+        groups.older.push(session)
+      }
+    })
+
+    return groups
+  }
+} as const
+
+// CONSTANTES DE VALIDATION
 export const VALIDATION_RULES = {
   FEEDBACK: {
     COMMENT_MIN_LENGTH: 0,
@@ -1135,7 +1619,7 @@ export const VALIDATION_RULES = {
     AREA_CODE_PATTERN: /^\d{1,4}$/,
     PHONE_NUMBER_PATTERN: /^\d{4,12}$/
   },
-  // ✅ CONSERVÉES: RÈGLES POUR CONVERSATIONS
+  // RÈGLES POUR CONVERSATIONS
   CONVERSATION: {
     TITLE_MAX_LENGTH: 60,
     PREVIEW_MAX_LENGTH: 150,
@@ -1143,14 +1627,14 @@ export const VALIDATION_RULES = {
     MAX_CONVERSATIONS_PER_USER: 1000,
     AUTO_DELETE_DAYS: 30
   },
-  // ✅ CONSERVÉES: RÈGLES POUR CLARIFICATIONS
+  // RÈGLES POUR CLARIFICATIONS
   CLARIFICATION: {
     MIN_ANSWER_LENGTH: 0,
     MAX_ANSWER_LENGTH: 200,
     MAX_QUESTIONS: 4,
     REQUIRED_ANSWER_PERCENTAGE: 0.5
   },
-  // 🚀 NOUVELLES: RÈGLES POUR CONCISION
+  // NOUVELLES: RÈGLES POUR CONCISION
   CONCISION: {
     MIN_RESPONSE_LENGTH: 10,
     MAX_ULTRA_CONCISE_LENGTH: 50,
@@ -1158,10 +1642,28 @@ export const VALIDATION_RULES = {
     MAX_STANDARD_LENGTH: 500,
     // Pas de limite pour DETAILED
     AUTO_DETECT_ENABLED: true
+  },
+  // NOUVELLES: RÈGLES POUR AD SYSTEM
+  AD_SYSTEM: {
+    MIN_SESSIONS_FOR_AD: 2,
+    MIN_SESSION_DURATION: 60, // secondes
+    COOLDOWN_HOURS: 24,
+    MIN_DISPLAY_TIME: 15, // secondes
+    MAX_TITLE_LENGTH: 60,
+    MAX_DESCRIPTION_LENGTH: 200,
+    MAX_FEATURES_COUNT: 8
+  },
+  // NOUVELLES: RÈGLES POUR SESSION TRACKING
+  SESSION_TRACKING: {
+    MIN_SESSION_DURATION: 5, // secondes
+    MAX_SESSION_DURATION: 8 * 60 * 60, // 8 heures
+    HEARTBEAT_TOLERANCE: 5 * 60, // 5 minutes de tolérance
+    MAX_SESSIONS_PER_DAY: 20,
+    SESSION_ID_LENGTH: 32
   }
 } as const
 
-// ✅ CONSERVÉS: MESSAGES D'ERREUR LOCALISÉS
+// MESSAGES D'ERREUR LOCALISÉS
 export const ERROR_MESSAGES = {
   FEEDBACK: {
     SUBMISSION_FAILED: 'Erreur lors de l\'envoi du feedback. Veuillez réessayer.',
@@ -1171,7 +1673,7 @@ export const ERROR_MESSAGES = {
     SERVER_ERROR: 'Erreur serveur. Veuillez réessayer plus tard.',
     TIMEOUT_ERROR: 'Timeout - le serveur met trop de temps à répondre'
   },
-  // ✅ CONSERVÉS: MESSAGES POUR CONVERSATIONS
+  // MESSAGES POUR CONVERSATIONS
   CONVERSATION: {
     LOAD_FAILED: 'Erreur lors du chargement de la conversation',
     DELETE_FAILED: 'Erreur lors de la suppression de la conversation',
@@ -1180,19 +1682,35 @@ export const ERROR_MESSAGES = {
     MESSAGE_TOO_LONG: `Le message ne peut pas dépasser ${VALIDATION_RULES.CONVERSATION.MESSAGE_MAX_LENGTH} caractères`,
     CREATION_FAILED: 'Erreur lors de la création de la conversation'
   },
-  // ✅ CONSERVÉS: MESSAGES POUR CLARIFICATIONS
+  // MESSAGES POUR CLARIFICATIONS
   CLARIFICATION: {
     PROCESSING_FAILED: 'Erreur lors du traitement des clarifications',
     INVALID_ANSWERS: 'Réponses invalides. Veuillez vérifier vos réponses.',
     SUBMISSION_FAILED: 'Erreur lors de l\'envoi des clarifications',
     TIMEOUT: 'Timeout lors du traitement des clarifications'
   },
-  // 🚀 NOUVEAUX: MESSAGES POUR CONCISION
+  // NOUVEAUX: MESSAGES POUR CONCISION
   CONCISION: {
     VERSION_NOT_FOUND: 'Version de réponse non trouvée',
     INVALID_LEVEL: 'Niveau de concision invalide',
     BACKEND_ERROR: 'Erreur lors de la génération des versions de réponse',
     FALLBACK_USED: 'Version de secours utilisée'
+  },
+  // NOUVEAUX: MESSAGES POUR AD SYSTEM
+  AD_SYSTEM: {
+    LOAD_FAILED: 'Erreur lors du chargement de la publicité',
+    SESSION_CHECK_FAILED: 'Erreur lors de la vérification de l\'éligibilité',
+    INVALID_AD_DATA: 'Données publicitaires invalides',
+    TRACKING_FAILED: 'Erreur lors du suivi publicitaire',
+    COOLDOWN_ACTIVE: 'Publicité en période d\'attente'
+  },
+  // NOUVEAUX: MESSAGES POUR SESSION TRACKING
+  SESSION_TRACKING: {
+    START_FAILED: 'Erreur lors du démarrage du tracking de session',
+    HEARTBEAT_FAILED: 'Erreur lors de la mise à jour de l\'activité',
+    END_FAILED: 'Erreur lors de la fermeture de session',
+    INVALID_SESSION: 'Session invalide ou expirée',
+    ANALYTICS_FAILED: 'Erreur lors du chargement des analytics de session'
   },
   GENERAL: {
     UNAUTHORIZED: 'Session expirée - reconnexion nécessaire',
@@ -1202,7 +1720,7 @@ export const ERROR_MESSAGES = {
   }
 } as const
 
-// ✅ CONSERVÉS: TYPES POUR LES RÉPONSES D'API FEEDBACK
+// TYPES POUR LES RÉPONSES D'API FEEDBACK
 export interface FeedbackApiResponse {
   status: 'success' | 'error'
   message: string
@@ -1226,23 +1744,108 @@ export interface AnalyticsApiResponse {
   message: string
 }
 
-// ✅ CONSERVÉS: TYPE GUARDS POUR LA VALIDATION
+// NOUVEAUX: TYPES POUR LES RÉPONSES D'API AD SYSTEM
+export interface AdEligibilityResponse {
+  status: 'success' | 'error'
+  qualifiesForAd: boolean
+  sessionStats: UserSessionStats
+  timeUntilNextAd?: number
+  message?: string
+}
+
+export interface AdEventResponse {
+  status: 'success' | 'error'
+  message: string
+  event_id?: string
+  timestamp: string
+}
+
+// NOUVEAUX: TYPES POUR LES RÉPONSES D'API SESSION TRACKING
+export interface SessionAnalyticsApiResponse {
+  status: 'success' | 'error'
+  data?: SessionAnalytics
+  error?: string
+  timestamp: string
+}
+
+export interface SessionStatsApiResponse {
+  status: 'success' | 'error'
+  data?: {
+    user_email: string
+    sessions: UserSession[]
+    analytics: SessionAnalytics
+  }
+  error?: string
+  timestamp: string
+}
+
+// TYPE GUARDS POUR LA VALIDATION
 export const TypeGuards = {
   isFeedbackType: (value: any): value is 'positive' | 'negative' => {
     return typeof value === 'string' && ['positive', 'negative'].includes(value)
   },
 
-  // 🚀 NOUVEAU: Type guard pour ConcisionLevel
+  // NOUVEAU: Type guard pour ConcisionLevel
   isConcisionLevel: (value: any): value is ConcisionLevel => {
     return typeof value === 'string' && Object.values(ConcisionLevel).includes(value as ConcisionLevel)
   },
 
-  // 🚀 NOUVEAU: Type guard pour response_versions
+  // NOUVEAU: Type guard pour response_versions
   isValidResponseVersions: (value: any): value is Record<string, string> => {
     if (!value || typeof value !== 'object') return false
     return Object.values(ConcisionLevel).some(level => 
       value[level] && typeof value[level] === 'string'
     )
+  },
+
+  // NOUVEAUX: Type guards pour Ad System
+  isValidAdData: (value: any): value is AdData => {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      typeof value.id === 'string' &&
+      typeof value.title === 'string' &&
+      typeof value.description === 'string' &&
+      typeof value.ctaText === 'string' &&
+      typeof value.ctaUrl === 'string' &&
+      typeof value.company === 'string' &&
+      Array.isArray(value.features)
+    )
+  },
+
+  isValidUserSessionStats: (value: any): value is UserSessionStats => {
+    return AdSystemUtils.validateSessionStats(value)
+  },
+
+  isValidAdEventData: (value: any): value is AdEventData => {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      typeof value.event === 'string' &&
+      typeof value.timestamp === 'string' &&
+      ['ad_shown', 'ad_clicked', 'ad_closed', 'ad_error'].includes(value.event)
+    )
+  },
+
+  // NOUVEAUX: Type guards pour Session Tracking
+  isValidUserSession: (value: any): value is UserSession => {
+    return SessionUtils.validateSessionData(value)
+  },
+
+  isValidSessionAnalytics: (value: any): value is SessionAnalytics => {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      typeof value.user_email === 'string' &&
+      typeof value.period_days === 'number' &&
+      typeof value.total_sessions === 'number' &&
+      typeof value.total_connection_time_seconds === 'number' &&
+      typeof value.average_session_duration_seconds === 'number'
+    )
+  },
+
+  isValidLogoutType: (value: any): value is 'manual' | 'browser_close' | 'timeout' | 'forced' => {
+    return typeof value === 'string' && ['manual', 'browser_close', 'timeout', 'forced'].includes(value)
   },
   
   isValidMessage: (value: any): value is Message => {
@@ -1265,7 +1868,7 @@ export const TypeGuards = {
     )
   },
 
-  // ✅ CONSERVÉ: TYPE GUARD POUR CONVERSATION DE BASE
+  // TYPE GUARD POUR CONVERSATION DE BASE
   isValidConversation: (value: any): value is Conversation => {
     return (
       typeof value === 'object' &&
@@ -1277,7 +1880,7 @@ export const TypeGuards = {
     )
   },
 
-  // ✅ CONSERVÉ: Type guard pour ConversationWithMessages
+  // Type guard pour ConversationWithMessages
   isValidConversationWithMessages: (value: any): value is ConversationWithMessages => {
     return (
       typeof value === 'object' &&
@@ -1301,7 +1904,7 @@ export const TypeGuards = {
     )
   },
 
-  // ✅ CONSERVÉ: Type guard pour clarifications
+  // Type guard pour clarifications
   isValidClarificationResponse: (value: any): value is ClarificationResponse => {
     return (
       typeof value === 'object' &&
@@ -1311,7 +1914,7 @@ export const TypeGuards = {
   }
 } as const
 
-// ✅ CONSERVÉE: CONFIGURATION DES CONVERSATIONS
+// CONFIGURATION DES CONVERSATIONS
 export const CONVERSATION_CONFIG = {
   GROUPING: {
     DEFAULT_OPTIONS: {
@@ -1342,7 +1945,7 @@ export const CONVERSATION_CONFIG = {
   }
 } as const
 
-// ✅ CONSERVÉS: UTILITAIRES POUR CONVERSATIONS
+// UTILITAIRES POUR CONVERSATIONS
 export const CONVERSATION_UTILS = {
   generateTitle: (firstMessage: string): string => {
     const maxLength = CONVERSATION_CONFIG.UI.MAX_TITLE_LENGTH
@@ -1370,7 +1973,6 @@ export const CONVERSATION_UTILS = {
     if (diffMinutes < 60) return `Il y a ${diffMinutes}m`
     if (diffHours < 24) return `Il y a ${diffHours}h`
     if (diffDays < 7) return `Il y a ${diffDays}j`
-    
     return ANALYTICS_UTILS.formatTimestamp(timestamp)
   },
 
@@ -1386,5 +1988,148 @@ export const CONVERSATION_UTILS = {
           return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
       }
     })
+  },
+
+  groupConversationsByDate: (conversations: Conversation[]): ConversationGroup[] => {
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000)
+    const thisWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const thisMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+    const groups: ConversationGroup[] = [
+      { title: CONVERSATION_CONFIG.GROUPING.TIME_PERIODS.TODAY, conversations: [] },
+      { title: CONVERSATION_CONFIG.GROUPING.TIME_PERIODS.YESTERDAY, conversations: [] },
+      { title: CONVERSATION_CONFIG.GROUPING.TIME_PERIODS.THIS_WEEK, conversations: [] },
+      { title: CONVERSATION_CONFIG.GROUPING.TIME_PERIODS.THIS_MONTH, conversations: [] },
+      { title: CONVERSATION_CONFIG.GROUPING.TIME_PERIODS.OLDER, conversations: [] }
+    ]
+
+    conversations.forEach(conversation => {
+      const convDate = new Date(conversation.updated_at)
+      
+      if (convDate >= today) {
+        groups[0].conversations.push(conversation)
+      } else if (convDate >= yesterday) {
+        groups[1].conversations.push(conversation)
+      } else if (convDate >= thisWeek) {
+        groups[2].conversations.push(conversation)
+      } else if (convDate >= thisMonth) {
+        groups[3].conversations.push(conversation)
+      } else {
+        groups[4].conversations.push(conversation)
+      }
+    })
+
+    // Retourner seulement les groupes non vides
+    return groups.filter(group => group.conversations.length > 0)
   }
 } as const
+
+// CONSTANTES D'INTERFACE
+export const UI_CONSTANTS = {
+  COLORS: {
+    PRIMARY: 'blue',
+    SUCCESS: 'green', 
+    WARNING: 'yellow',
+    ERROR: 'red',
+    INFO: 'gray'
+  },
+  ANIMATIONS: {
+    FADE_DURATION: 200,
+    SLIDE_DURATION: 300,
+    BOUNCE_DURATION: 150
+  },
+  BREAKPOINTS: {
+    SM: '640px',
+    MD: '768px', 
+    LG: '1024px',
+    XL: '1280px'
+  },
+  Z_INDEX: {
+    DROPDOWN: 10,
+    STICKY: 20,
+    MODAL_BACKDROP: 40,
+    MODAL: 50,
+    TOAST: 60,
+    TOOLTIP: 70
+  }
+} as const
+
+// CONSTANTES DE CONFIGURATION GLOBALE
+export const APP_CONFIG = {
+  NAME: 'Intelia Expert',
+  VERSION: '2.0.0',
+  DESCRIPTION: 'Plateforme IA spécialisée en élevage avicole',
+  COMPANY: 'Intelia',
+  SUPPORT_EMAIL: 'support@intelia.com',
+  PRIVACY_URL: 'https://intelia.com/privacy',
+  TERMS_URL: 'https://intelia.com/terms',
+  
+  FEATURES: {
+    ENABLE_FEEDBACK: true,
+    ENABLE_CLARIFICATIONS: true,
+    ENABLE_CONCISION: true,
+    ENABLE_AD_SYSTEM: true,
+    ENABLE_SESSION_TRACKING: true,
+    ENABLE_CONVERSATIONS: true,
+    ENABLE_ANALYTICS: true
+  },
+  
+  LIMITS: {
+    MAX_MESSAGE_LENGTH: 5000,
+    MAX_CONVERSATIONS: 1000,
+    MAX_FEEDBACK_COMMENT_LENGTH: 500,
+    SESSION_TIMEOUT_MINUTES: 30,
+    HEARTBEAT_INTERVAL_MINUTES: 2
+  }
+} as const
+
+// TYPES POUR LES PRÉFÉRENCES UTILISATEUR
+export interface UserPreferences {
+  language: Language
+  concision_level: ConcisionLevel
+  enable_notifications: boolean
+  enable_analytics_tracking: boolean
+  enable_ad_personalization: boolean
+  theme: 'light' | 'dark' | 'auto'
+  timezone: string
+  date_format: 'dd/mm/yyyy' | 'mm/dd/yyyy' | 'yyyy-mm-dd'
+  time_format: '12h' | '24h'
+}
+
+export interface UserPreferencesUpdate {
+  language?: Language
+  concision_level?: ConcisionLevel
+  enable_notifications?: boolean
+  enable_analytics_tracking?: boolean
+  enable_ad_personalization?: boolean
+  theme?: 'light' | 'dark' | 'auto'
+  timezone?: string
+  date_format?: 'dd/mm/yyyy' | 'mm/dd/yyyy' | 'yyyy-mm-dd'
+  time_format?: '12h' | '24h'
+}
+
+// TYPES POUR LES NOTIFICATIONS
+export interface NotificationData {
+  id: string
+  type: 'info' | 'success' | 'warning' | 'error'
+  title: string
+  message: string
+  timestamp: string
+  read: boolean
+  action_url?: string
+  action_text?: string
+}
+
+export interface NotificationSettings {
+  email_notifications: boolean
+  push_notifications: boolean
+  feedback_responses: boolean
+  system_updates: boolean
+  feature_announcements: boolean
+  maintenance_alerts: boolean
+}
+
+// Note: Les utilitaires sont déjà exportés via 'export const' dans leurs déclarations respectives
+// Pas besoin d'export supplémentaire ici
