@@ -329,19 +329,19 @@ export const StatisticsPage: React.FC = () => {
     }
   }, [currentUser])
 
-  // 🧪 TEST: Chargement forcé pour diagnostic
+  // ✅ FIX FINAL: Condition correcte avec protection contre les boucles
   useEffect(() => {
-    console.log('🧪 TEST: Conditions de chargement:', {
+    console.log('🔧 FINAL: Conditions de chargement:', {
       authReady: authStatus === 'ready',
       notLoading: !statsLoading,
       noSystemStats: !systemStats
     })
     
-    if (authStatus === 'ready' && !statsLoading) {
-      console.log('🧪 FORCE: Chargement des statistiques (test - condition simplifiée)')
+    if (authStatus === 'ready' && !statsLoading && !systemStats) {
+      console.log('✅ CHARGEMENT: Lancement des statistiques')
       loadAllStatistics()
     }
-  }, [authStatus, statsLoading])
+  }, [authStatus, statsLoading, systemStats])
 
   // Chargement des questions - SEULEMENT SI NÉCESSAIRE
   useEffect(() => {
