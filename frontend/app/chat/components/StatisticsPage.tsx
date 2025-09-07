@@ -291,6 +291,18 @@ export const StatisticsPage: React.FC = () => {
     invitationsLoadedRef.current = false
   }, [])
 
+  // 🧪 DEBUG: États détaillés
+  useEffect(() => {
+    console.log('🔍 DEBUG ÉTATS:', {
+      systemStatsExists: !!systemStats,
+      statsLoading: statsLoading,
+      authStatus: authStatus,
+      hasCurrentUser: !!currentUser,
+      userEmail: currentUser?.email,
+      userType: currentUser?.user_type
+    })
+  }, [systemStats, statsLoading, authStatus, currentUser])
+
   // 🔧 FIX: Logique d'authentification simplifiée
   useEffect(() => {
     console.log('[StatisticsPage] 🔧 Auth check simplifié:', { 
@@ -317,13 +329,19 @@ export const StatisticsPage: React.FC = () => {
     }
   }, [currentUser])
 
-  // 🔧 FIX: Chargement des statistiques avec condition simplifiée
+  // 🧪 TEST: Chargement forcé pour diagnostic
   useEffect(() => {
-    if (authStatus === 'ready' && !statsLoading && !systemStats) {
-      console.log('[StatisticsPage] 🔧 Lancement chargement des statistiques (condition simplifiée)')
+    console.log('🧪 TEST: Conditions de chargement:', {
+      authReady: authStatus === 'ready',
+      notLoading: !statsLoading,
+      noSystemStats: !systemStats
+    })
+    
+    if (authStatus === 'ready' && !statsLoading) {
+      console.log('🧪 FORCE: Chargement des statistiques (test - condition simplifiée)')
       loadAllStatistics()
     }
-  }, [authStatus, statsLoading, systemStats])
+  }, [authStatus, statsLoading])
 
   // Chargement des questions - SEULEMENT SI NÉCESSAIRE
   useEffect(() => {
@@ -366,6 +384,15 @@ export const StatisticsPage: React.FC = () => {
       console.log('[StatisticsPage] Chargement déjà en cours, annulation...')
       return
     }
+    
+    // 🧪 DEBUG COMPLET avant chargement
+    console.log('🔍 DEBUG COMPLET avant chargement:', {
+      currentUser: currentUser?.email,
+      authStatus: authStatus,
+      systemStatsExists: !!systemStats,
+      statsLoading: statsLoading,
+      timestamp: new Date().toISOString()
+    })
     
     console.log('[StatisticsPage] DÉBUT chargement statistiques avec utilisateur:', currentUser?.email)
     setStatsLoading(true)
