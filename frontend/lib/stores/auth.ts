@@ -59,7 +59,7 @@ interface AuthState {
   
   // 🆕 ACTIONS OAUTH BACKEND-CENTRALISÉES
   loginWithOAuth: (provider: 'linkedin' | 'facebook') => Promise<void>
-  handleOAuthTokenFromURL: () => Promise<void>
+  handleOAuthTokenFromURL: () => Promise<boolean>
 }
 
 // Store unifié utilisant UNIQUEMENT le backend
@@ -188,7 +188,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // LOGIN : Utilise /auth/login
+      // LOGIN : Utilise /auth/login avec gestion d'erreurs améliorée
       login: async (email: string, password: string) => {
         set({ isLoading: true, authErrors: [] })
         console.log('[AuthStore] Login via /auth/login:', email)
@@ -227,14 +227,88 @@ export const useAuthStore = create<AuthState>()(
           console.log('[AuthStore] Login réussi')
           
         } catch (e: any) {
+          console.error('[AuthStore] Erreur login complète:', e)
           get().handleAuthError(e, 'login')
           
-          let userMessage = e?.message || 'Erreur de connexion'
-          if (userMessage.includes('Invalid login credentials')) {
-            userMessage = 'Email ou mot de passe incorrect'
-          } else if (userMessage.includes('Email not confirmed')) {
-            userMessage = 'Veuillez confirmer votre email avant de vous connecter'
+          // 🆕 GESTION D'ERREURS AMÉLIORÉE
+          let userMessage = 'Erreur de connexion'
+          
+          // Analyser le code de statut HTTP
+          if (e?.status || e?.response?.status) {
+            const statusCode = e.status || e.response?.status
+            console.log('[AuthStore] Code de statut HTTP:', statusCode)
+            
+            switch (statusCode) {
+              case 400:
+                userMessage = 'Données de connexion invalides'
+                break
+              case 401:
+                userMessage = 'Email ou mot de passe incorrect'
+                break
+              case 403:
+                userMessage = 'Accès refusé'
+                break
+              case 404:
+                userMessage = 'Service de connexion non trouvé'
+                break
+              case 429:
+                userMessage = 'Trop de tentatives de connexion. Veuillez réessayer dans quelques minutes.'
+                break
+              case 500:
+                userMessage = 'Erreur technique du serveur. Veuillez réessayer.'
+                break
+              case 502:
+              case 503:
+              case 504:
+                userMessage = 'Service temporairement indisponible. Veuillez réessayer.'
+                break
+              default:
+                userMessage = `Erreur de connexion (Code: ${statusCode})`
+            }
           }
+          // Analyser le message d'erreur
+          else if (e?.message) {
+            const errorMsg = e.message.toLowerCase()
+            console.log('[AuthStore] Message d\'erreur:', errorMsg)
+            
+            if (errorMsg.includes('invalid login credentials') || 
+                errorMsg.includes('email ou mot de passe incorrect') ||
+                errorMsg.includes('credentials') ||
+                errorMsg.includes('password')) {
+              userMessage = 'Email ou mot de passe incorrect'
+            } else if (errorMsg.includes('email not confirmed') || 
+                       errorMsg.includes('email non confirmé') ||
+                       errorMsg.includes('verify') ||
+                       errorMsg.includes('confirmer')) {
+              userMessage = 'Veuillez confirmer votre email avant de vous connecter'
+            } else if (errorMsg.includes('request failed') || 
+                       errorMsg.includes('network') ||
+                       errorMsg.includes('fetch')) {
+              userMessage = 'Problème de connexion réseau. Vérifiez votre connexion internet.'
+            } else if (errorMsg.includes('rate limit') || 
+                       errorMsg.includes('too many') ||
+                       errorMsg.includes('trop de tentatives')) {
+              userMessage = 'Trop de tentatives de connexion. Veuillez réessayer dans quelques minutes.'
+            } else if (errorMsg.includes('timeout')) {
+              userMessage = 'Délai de connexion dépassé. Veuillez réessayer.'
+            } else if (errorMsg.includes('server') || 
+                       errorMsg.includes('internal') ||
+                       errorMsg.includes('500')) {
+              userMessage = 'Erreur technique du serveur. Veuillez réessayer ou contactez le support.'
+            } else {
+              userMessage = e.message
+            }
+          }
+          // Erreur de format/parsing
+          else if (e?.name === 'SyntaxError') {
+            userMessage = 'Erreur de communication avec le serveur'
+          }
+          // Erreur réseau général
+          else if (!navigator.onLine) {
+            userMessage = 'Pas de connexion internet'
+          }
+          
+          console.log('[AuthStore] Message d\'erreur final:', userMessage)
           
           set({ isLoading: false })
           throw new Error(userMessage)

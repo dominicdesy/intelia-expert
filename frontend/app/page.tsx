@@ -116,9 +116,11 @@ function AuthCallbackHandler() {
       console.error('Erreur nettoyage URL:', error)
     }
     
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       setAuthMessage('')
     }, 3000)
+
+    return () => clearTimeout(timeoutId)
   }, [searchParams, t])
 
   if (authMessage) {
@@ -136,7 +138,7 @@ function AuthCallbackHandler() {
 function LoginPageContent() {
   const router = useRouter()
   const { t } = useTranslation()
-  const { login, register, loginWithOAuth, isOAuthLoading } = useAuthStore() // ✅ Store unifié avec OAuth
+  const { login, register, loginWithOAuth, isOAuthLoading } = useAuthStore() // Store unifié avec OAuth
 
   // États simples
   const [email, setEmail] = useState('')
@@ -197,31 +199,31 @@ function LoginPageContent() {
     setSignupData(prev => ({ ...prev, [field]: value }))
   }
 
-  // 🆕 FONCTION OAUTH LOGIN - Utilise le nouveau store
+  // FONCTION OAUTH LOGIN - Utilise le nouveau store
   const handleOAuthLogin = async (provider: 'linkedin' | 'facebook') => {
-    console.log(`🚀 [OAuth] Début de connexion ${provider}`)
+    console.log(`[OAuth] Début de connexion ${provider}`)
     
     setError('')
     
     try {
-      // ✅ Utilise la nouvelle méthode du store
+      // Utilise la nouvelle méthode du store
       await loginWithOAuth(provider)
       
-      console.log(`✅ [OAuth] Connexion ${provider} initiée - redirection en cours...`)
+      console.log(`[OAuth] Connexion ${provider} initiée - redirection en cours...`)
       // La redirection se fera automatiquement vers le provider OAuth
       
     } catch (error: any) {
-      console.error(`💥 [OAuth] Erreur connexion ${provider}:`, error)
+      console.error(`[OAuth] Erreur connexion ${provider}:`, error)
       
       if (error.message?.includes('OAuth')) {
-        setError(t('auth.oauthError'))
+        setError(t('auth.oauthError') || 'Erreur de connexion OAuth')
       } else {
-        setError(error.message || t('auth.error'))
+        setError(error.message || t('auth.error') || 'Erreur de connexion')
       }
     }
   }
 
-  // ✅ FONCTION SIGNUP UNIFIÉE - utilise le store au lieu de fetch direct
+  // FONCTION SIGNUP UNIFIÉE - utilise le store au lieu de fetch direct
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     console.log('[Signup] Utilisation du store unifié:', signupData)
@@ -232,11 +234,11 @@ function LoginPageContent() {
     try {
       // Validation côté client
       if (!signupData.email || !signupData.password || !signupData.firstName || !signupData.lastName) {
-        throw new Error(t('validation.correctErrors'))
+        throw new Error(t('validation.correctErrors') || 'Veuillez corriger les erreurs')
       }
 
       if (signupData.password !== signupData.confirmPassword) {
-        throw new Error(t('validation.password.mismatch'))
+        throw new Error(t('validation.password.mismatch') || 'Les mots de passe ne correspondent pas')
       }
 
       // Validation du mot de passe
@@ -245,7 +247,7 @@ function LoginPageContent() {
         throw new Error(passwordValidation.errors[0])
       }
 
-      // ✅ UTILISATION DU STORE UNIFIÉ au lieu de fetch direct
+      // UTILISATION DU STORE UNIFIÉ au lieu de fetch direct
       const userData = {
         name: `${signupData.firstName} ${signupData.lastName}`,
         firstName: signupData.firstName,
@@ -261,7 +263,7 @@ function LoginPageContent() {
       setSuccess(t('verification.pending.emailSent') || 'Compte créé avec succès!')
       
       // Fermer la modal après succès
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         setShowSignup(false)
         setSuccess('')
       }, 2000)
@@ -274,7 +276,7 @@ function LoginPageContent() {
     } catch (error: any) {
       console.error('[Signup] Erreur store unifié:', error)
       
-      let errorMessage = error.message || t('error.generic')
+      let errorMessage = error.message || t('error.generic') || 'Erreur générique'
       
       if (errorMessage.includes('already registered') || 
           errorMessage.includes('already exists') || 
@@ -283,7 +285,7 @@ function LoginPageContent() {
       } else if (errorMessage.includes('Password') || errorMessage.includes('password')) {
         errorMessage = t('auth.passwordRequirementsNotMet') || 'Le mot de passe ne respecte pas les critères requis'      
       } else if (errorMessage.includes('Invalid email') || errorMessage.includes('email')) {
-        errorMessage = t('error.emailInvalid')
+        errorMessage = t('error.emailInvalid') || 'Adresse email invalide'
       }
       
       setError(errorMessage)
@@ -307,46 +309,77 @@ function LoginPageContent() {
     validatePhone
   }
 
-  // ✅ FONCTION DE CONNEXION - déjà correcte avec le store
+  // FONCTION DE CONNEXION - améliorée avec gestion d'erreurs harmonisée
   const handleLogin = async () => {
     setError('')
     setSuccess('')
 
     if (!email.trim()) {
-      setError(t('error.emailRequired'))
+      setError(t('error.emailRequired') || 'L\'adresse email est requise')
       return
     }
 
     if (!password) {
-      setError(t('validation.required.password'))
+      setError(t('validation.required.password') || 'Le mot de passe est requis')
       return
     }
 
     setIsLoading(true)
 
     try {
-      // ✅ Utilise le store unifié
+      // Utilise le store unifié
       await login(email.trim(), password)
       
       // Sauvegarde du rememberMe après succès
       rememberMeUtils.save(email.trim(), rememberMe)
       
-      setSuccess(t('auth.success'))
+      setSuccess(t('auth.success') || 'Connexion réussie')
       
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         router.push('/chat')
       }, 1000)
       
     } catch (error: any) {
-      if (error.message?.includes('Invalid login credentials')) {
+      console.error('[Login] Erreur de connexion:', error)
+      
+      // Gestion d'erreurs harmonisée avec les autres composants
+      let errorMessage = error.message || t('auth.error') || 'Erreur de connexion'
+      
+      // Messages d'erreur spécifiques selon le type d'erreur
+      if (errorMessage.includes('Email ou mot de passe incorrect') ||
+          errorMessage.includes('Invalid login credentials') ||
+          errorMessage.includes('credentials') ||
+          errorMessage.includes('incorrect')) {
         setError(t('auth.invalidCredentials') || 'Email ou mot de passe incorrect')
-      } else if (error.message?.includes('Email not confirmed')) {
+      } else if (errorMessage.includes('Email non confirmé') ||
+                 errorMessage.includes('Email not confirmed') ||
+                 errorMessage.includes('verify') ||
+                 errorMessage.includes('confirmer')) {
         setError(t('auth.emailNotConfirmed') || 'Email non confirmé. Vérifiez votre boîte mail.')
+      } else if (errorMessage.includes('Trop de tentatives') ||
+                 errorMessage.includes('rate limit') ||
+                 errorMessage.includes('too many')) {
+        setError('Trop de tentatives de connexion. Veuillez réessayer dans quelques minutes.')
+      } else if (errorMessage.includes('connexion réseau') ||
+                 errorMessage.includes('network') ||
+                 errorMessage.includes('impossible de contacter')) {
+        setError('Problème de connexion réseau. Vérifiez votre connexion internet.')
+      } else if (errorMessage.includes('serveur') ||
+                 errorMessage.includes('server') ||
+                 errorMessage.includes('500')) {
+        setError('Erreur technique du serveur. Veuillez réessayer.')
       } else {
-        setError(error.message || t('auth.error'))
+        setError(errorMessage)
       }
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Gérer la touche Entrée pour soumettre le formulaire
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !isLoading && !isOAuthLoading) {
+      handleLogin()
     }
   }
 
@@ -420,9 +453,10 @@ function LoginPageContent() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                    onKeyPress={handleKeyPress}
                     className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-blue-100 rounded-2xl text-gray-800 placeholder-gray-500 focus:border-blue-300 focus:bg-white transition-all duration-300"
                     placeholder={t('login.emailPlaceholder')}
+                    disabled={isLoading || isOAuthLoading !== null}
                   />
                 </div>
               </div>
@@ -443,14 +477,16 @@ function LoginPageContent() {
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                    onKeyPress={handleKeyPress}
                     className="w-full pl-12 pr-12 py-4 bg-gray-50 border-2 border-blue-100 rounded-2xl text-gray-800 placeholder-gray-500 focus:border-blue-300 focus:bg-white transition-all duration-300"
                     placeholder={t('login.passwordPlaceholder')}
+                    disabled={isLoading || isOAuthLoading !== null}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 pr-4 flex items-center text-blue-400 hover:text-blue-600 transition-colors"
+                    disabled={isLoading || isOAuthLoading !== null}
                   >
                     {showPassword ? (
                       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -474,6 +510,7 @@ function LoginPageContent() {
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
                     className="w-4 h-4 rounded border-blue-300 bg-gray-50 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+                    disabled={isLoading || isOAuthLoading !== null}
                   />
                   <span className="ml-3 text-sm text-gray-700">{t('login.rememberMe')}</span>
                 </label>
@@ -506,7 +543,7 @@ function LoginPageContent() {
                 )}
               </button>
 
-              {/* 🆕 Séparateur pour les boutons sociaux */}
+              {/* Séparateur pour les boutons sociaux */}
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-blue-200"></div>
@@ -516,12 +553,12 @@ function LoginPageContent() {
                 </div>
               </div>
 
-              {/* 🆕 Boutons de connexion sociale */}
+              {/* Boutons de connexion sociale */}
               <div className="space-y-3">
                 {/* LinkedIn */}
                 <button
                   onClick={() => handleOAuthLogin('linkedin')}
-                  disabled={isOAuthLoading !== null}
+                  disabled={isOAuthLoading !== null || isLoading}
                   className="w-full py-4 px-6 bg-[#0A66C2] hover:bg-[#004182] text-white font-medium rounded-2xl transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                   {isOAuthLoading === 'linkedin' ? (
@@ -542,7 +579,7 @@ function LoginPageContent() {
                 {/* Facebook */}
                 <button
                   onClick={() => handleOAuthLogin('facebook')}
-                  disabled={isOAuthLoading !== null}
+                  disabled={isOAuthLoading !== null || isLoading}
                   className="w-full py-4 px-6 bg-[#1877F2] hover:bg-[#166FE5] text-white font-medium rounded-2xl transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                   {isOAuthLoading === 'facebook' ? (
@@ -574,7 +611,7 @@ function LoginPageContent() {
               {/* Bouton d'inscription */}
               <button
                 onClick={() => setShowSignup(true)}
-                disabled={isOAuthLoading !== null}
+                disabled={isOAuthLoading !== null || isLoading}
                 className="w-full py-4 px-6 bg-gray-50 hover:bg-blue-50 border-2 border-blue-100 hover:border-blue-200 text-blue-700 font-medium rounded-2xl transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 <span className="flex items-center justify-center space-x-2">

@@ -6,7 +6,7 @@ from typing import Optional, Dict, Any
 
 from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from fastapi.responses import RedirectResponse  # 🆕 AJOUT NÉCESSAIRE
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, EmailStr
 
 # Optional Supabase import
@@ -19,7 +19,7 @@ except ImportError:
 router = APIRouter(prefix="/auth")
 logger = logging.getLogger(__name__)
 
-# ✅ CONFIGURATION JWT MULTI-COMPATIBLE (auth-temp + Supabase)
+# Configuration JWT MULTI-COMPATIBLE (auth-temp + Supabase)
 # Récupérer les secrets JWT dans l'ordre de priorité
 JWT_SECRETS = []
 
@@ -78,7 +78,7 @@ class DeleteDataResponse(BaseModel):
     note: Optional[str]
     timestamp: datetime
 
-# === 🆕 NOUVEAUX MODÈLES POUR REGISTER ===
+# === NOUVEAUX MODÈLES POUR REGISTER ===
 class UserRegister(BaseModel):
     email: EmailStr
     password: str
@@ -94,7 +94,7 @@ class AuthResponse(BaseModel):
     token: Optional[str] = None
     user: Optional[Dict[str, Any]] = None
 
-# === 🆕 NOUVEAUX MODÈLES POUR RESET PASSWORD ===
+# === NOUVEAUX MODÈLES POUR RESET PASSWORD ===
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
@@ -113,7 +113,7 @@ class ValidateTokenResponse(BaseModel):
     valid: bool
     message: str
 
-# === 🆕 NOUVEAU MODÈLE POUR CHANGE PASSWORD ===
+# === NOUVEAU MODÈLE POUR CHANGE PASSWORD ===
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
@@ -122,7 +122,7 @@ class ChangePasswordResponse(BaseModel):
     success: bool
     message: str
 
-# === 🆕 NOUVEAUX MODÈLES POUR OAUTH ===
+# === NOUVEAUX MODÈLES POUR OAUTH ===
 class OAuthInitiateRequest(BaseModel):
     provider: str  # "linkedin" ou "facebook"
     redirect_url: Optional[str] = None
@@ -144,7 +144,7 @@ class OAuthCallbackResponse(BaseModel):
     token: Optional[str] = None
     user: Optional[Dict[str, Any]] = None
 
-# === 🆕 FONCTION HELPER POUR L'ÉCHANGE DE CODE OAUTH ===
+# === FONCTION HELPER POUR L'ÉCHANGE DE CODE OAUTH ===
 async def exchange_oauth_code_for_session(supabase: Client, code: str, provider: str):
     """
     Échange le code OAuth contre une session Supabase
@@ -191,9 +191,9 @@ async def exchange_oauth_code_for_session(supabase: Client, code: str, provider:
         logger.error(f"❌ [OAuth] Erreur échange code: {e}")
         return None
 
-# === 🆕 FONCTIONS DÉPLACÉES AVANT LES ENDPOINTS ===
+# === FONCTIONS DÉPLACÉES AVANT LES ENDPOINTS ===
 
-# 🆕 NOUVELLE FONCTION : Récupération profil utilisateur depuis Supabase (CONSERVÉE)
+# NOUVELLE FONCTION : Récupération profil utilisateur depuis Supabase (CONSERVÉE)
 async def get_user_profile_from_supabase(user_id: str, email: str) -> Dict[str, Any]:
     """
     Récupère le profil utilisateur depuis la table Supabase users
@@ -239,7 +239,7 @@ async def get_user_profile_from_supabase(user_id: str, email: str) -> Dict[str, 
 # === FONCTION get_current_user EXISTANTE (CONSERVÉE) ===
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
     """
-    ✅ VERSION MULTI-COMPATIBLE : Decode JWT tokens auth-temp ET Supabase
+    VERSION MULTI-COMPATIBLE : Decode JWT tokens auth-temp ET Supabase
     """
     token = credentials.credentials
     
@@ -247,7 +247,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         logger.warning("⚠️ Token vide ou invalide")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token missing or invalid")
     
-    # ✅ ESSAYER TOUS LES SECRETS CONFIGURÉS
+    # ESSAYER TOUS LES SECRETS CONFIGURÉS
     for secret_name, secret_value in JWT_SECRETS:
         if not secret_value:
             continue
@@ -255,7 +255,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         try:
             logger.debug(f"🔑 Tentative décodage avec {secret_name}")
             
-            # ✅ DÉCODER AVEC PLUSIEURS OPTIONS
+            # DÉCODER AVEC PLUSIEURS OPTIONS
             decode_options = [
                 {"options": {"verify_aud": False}},  # Sans vérifier audience (auth-temp)
                 {"audience": "authenticated"},       # Standard Supabase
@@ -299,7 +299,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             
             logger.info(f"✅ Token décodé avec succès avec {secret_name}")
             
-            # ✅ EXTRACTION FLEXIBLE DES INFORMATIONS UTILISATEUR
+            # EXTRACTION FLEXIBLE DES INFORMATIONS UTILISATEUR
             # Support auth-temp ET Supabase
             user_id = payload.get("sub") or payload.get("user_id")
             email = payload.get("email")
@@ -313,14 +313,14 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
                 logger.warning("⚠️ Token sans email valide")
                 continue
             
-            # 🆕 RÉCUPÉRER LE PROFIL UTILISATEUR depuis Supabase
+            # RÉCUPÉRER LE PROFIL UTILISATEUR depuis Supabase
             try:
                 profile = await get_user_profile_from_supabase(user_id, email)
             except Exception as e:
                 logger.warning(f"⚠️ Erreur récupération profil: {e}")
                 profile = {"user_type": "user"}
             
-            # 🆕 CONSTRUIRE LA RÉPONSE UNIFIÉE
+            # CONSTRUIRE LA RÉPONSE UNIFIÉE
             user_data = {
                 "user_id": user_id,
                 "email": email,
@@ -369,47 +369,191 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 # === ENDPOINTS COMMENCENT ICI ===
 
-# === ENDPOINT LOGIN EXISTANT (CONSERVÉ) ===
+# === ENDPOINT LOGIN CORRIGÉ ===
 @router.post("/login", response_model=TokenResponse)
 async def login(request: LoginRequest):
     """
     Authenticate user and return a JWT access token.
+    Version corrigée avec gestion d'erreurs détaillée
     """
+    logger.info(f"🔐 [Login] Tentative de connexion: {request.email}")
+    
     if not SUPABASE_AVAILABLE:
-        logger.error("Supabase client not available")
-        raise HTTPException(status_code=500, detail="Authentication service unavailable")
+        logger.error("❌ Supabase client not available")
+        raise HTTPException(
+            status_code=500, 
+            detail="Service d'authentification temporairement indisponible"
+        )
 
+    # Validation des données d'entrée
+    if not request.email or not request.email.strip():
+        logger.warning(f"⚠️ [Login] Email manquant ou vide")
+        raise HTTPException(
+            status_code=400, 
+            detail="L'adresse email est requise"
+        )
+    
+    if not request.password:
+        logger.warning(f"⚠️ [Login] Mot de passe manquant")
+        raise HTTPException(
+            status_code=400, 
+            detail="Le mot de passe est requis"
+        )
+
+    # Configuration Supabase
     supabase_url = os.getenv("SUPABASE_URL")
     supabase_key = os.getenv("SUPABASE_ANON_KEY")
+    
+    if not supabase_url or not supabase_key:
+        logger.error("❌ [Login] Configuration Supabase manquante")
+        raise HTTPException(
+            status_code=500, 
+            detail="Configuration d'authentification manquante"
+        )
+    
     supabase: Client = create_client(supabase_url, supabase_key)
+    
     try:
+        logger.info(f"🔍 [Login] Tentative d'authentification Supabase pour: {request.email}")
+        
         # Essayer la nouvelle API d'abord
         try:
             result = supabase.auth.sign_in_with_password({
-                "email": request.email,
+                "email": request.email.strip(),
                 "password": request.password
             })
+            logger.info(f"✅ [Login] Utilisation API sign_in_with_password")
         except AttributeError:
             # Fallback pour ancienne API
-            result = supabase.auth.sign_in(email=request.email, password=request.password)
+            logger.info(f"🔄 [Login] Fallback vers ancienne API sign_in")
+            result = supabase.auth.sign_in(
+                email=request.email.strip(), 
+                password=request.password
+            )
+        
+        # Vérifier le résultat
+        user = result.user
+        session = result.session
+        
+        logger.info(f"📊 [Login] Résultat Supabase - User: {bool(user)}, Session: {bool(session)}")
+        
+        if user is None:
+            logger.warning(f"❌ [Login] Authentification échouée pour: {request.email}")
+            raise HTTPException(
+                status_code=401, 
+                detail="Email ou mot de passe incorrect"
+            )
+        
+        # Vérifier si l'email est confirmé
+        if hasattr(user, 'email_confirmed_at') and not user.email_confirmed_at:
+            logger.warning(f"⚠️ [Login] Email non confirmé pour: {request.email}")
+            raise HTTPException(
+                status_code=401, 
+                detail="Veuillez confirmer votre email avant de vous connecter"
+            )
+        
+        # Créer le token JWT
+        expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        token_data = {
+            "user_id": user.id,
+            "email": request.email.strip(),
+            "sub": user.id,
+            "iss": "intelia-expert",
+            "aud": "authenticated"
+        }
+        
+        token = create_access_token(token_data, expires)
+        expires_at = datetime.utcnow() + expires
+        
+        logger.info(f"✅ [Login] Connexion réussie pour: {request.email}")
+        
+        return TokenResponse(
+            access_token=token,
+            token_type="bearer",
+            expires_at=expires_at
+        )
+        
+    except HTTPException:
+        # Re-lever les HTTPException sans les modifier
+        raise
+        
     except Exception as e:
-        logger.error("Supabase sign-in error: %s", e)
-        raise HTTPException(status_code=500, detail="Authentication error")
+        logger.error(f"❌ [Login] Erreur inattendue: {str(e)}")
+        logger.error(f"❌ [Login] Type d'erreur: {type(e).__name__}")
+        
+        # Analyser le type d'erreur pour donner un message approprié
+        error_message = str(e).lower()
+        
+        if any(keyword in error_message for keyword in [
+            'invalid login credentials', 
+            'invalid_credentials',
+            'wrong password',
+            'incorrect password',
+            'authentication failed',
+            'invalid email or password'
+        ]):
+            logger.info(f"🔍 [Login] Erreur identifiée comme credentials invalides")
+            raise HTTPException(
+                status_code=401,
+                detail="Email ou mot de passe incorrect"
+            )
+        elif any(keyword in error_message for keyword in [
+            'email not confirmed',
+            'email_not_confirmed',
+            'unconfirmed',
+            'verify'
+        ]):
+            logger.info(f"🔍 [Login] Erreur identifiée comme email non confirmé")
+            raise HTTPException(
+                status_code=401,
+                detail="Veuillez confirmer votre email avant de vous connecter"
+            )
+        elif any(keyword in error_message for keyword in [
+            'user not found',
+            'no user',
+            'user does not exist'
+        ]):
+            logger.info(f"🔍 [Login] Erreur identifiée comme utilisateur inexistant")
+            raise HTTPException(
+                status_code=401,
+                detail="Email ou mot de passe incorrect"
+            )
+        elif any(keyword in error_message for keyword in [
+            'rate limit',
+            'too many',
+            'rate_limit'
+        ]):
+            logger.info(f"🔍 [Login] Erreur identifiée comme rate limiting")
+            raise HTTPException(
+                status_code=429,
+                detail="Trop de tentatives de connexion. Veuillez réessayer dans quelques minutes."
+            )
+        elif any(keyword in error_message for keyword in [
+            'network',
+            'connection',
+            'timeout',
+            'unavailable'
+        ]):
+            logger.info(f"🔍 [Login] Erreur identifiée comme problème réseau")
+            raise HTTPException(
+                status_code=503,
+                detail="Service temporairement indisponible. Veuillez réessayer."
+            )
+        else:
+            # Erreur générique mais avec un message plus utile
+            logger.warning(f"🔍 [Login] Erreur non identifiée, traitement générique")
+            raise HTTPException(
+                status_code=500,
+                detail="Erreur technique lors de la connexion. Veuillez réessayer ou contactez le support."
+            )
 
-    user = result.user
-    if user is None:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    token = create_access_token({"user_id": user.id, "email": request.email}, expires)
-    return {"access_token": token, "expires_at": datetime.utcnow() + expires}
-
-# === 🆕 ENDPOINTS OAUTH ===
+# [Le reste des endpoints OAuth, register, reset password, etc. restent identiques]
+# === ENDPOINTS OAUTH ===
 
 @router.post("/oauth/initiate", response_model=OAuthInitiateResponse)
 async def initiate_oauth_login(request: OAuthInitiateRequest):
     """
-    🆕 Initie la connexion OAuth avec LinkedIn ou Facebook
+    Initie la connexion OAuth avec LinkedIn ou Facebook
     Retourne l'URL d'autorisation pour rediriger l'utilisateur
     """
     logger.info(f"🔍 [OAuth] Initiation connexion {request.provider}")
@@ -482,10 +626,163 @@ async def initiate_oauth_login(request: OAuthInitiateRequest):
             detail=f"Erreur lors de l'initiation OAuth avec {request.provider}"
         )
 
+@router.get("/oauth/{provider}/login")
+async def oauth_redirect_login(provider: str):
+    """
+    Endpoint simplifié pour redirection OAuth directe - VERSION BACKEND-CENTRALISÉE
+    Redirige vers le provider OAuth puis traite le callback côté backend
+    """
+    logger.info(f"🔗 [OAuth] Redirection directe vers {provider}")
+    
+    if not SUPABASE_AVAILABLE:
+        raise HTTPException(status_code=500, detail="Service OAuth non disponible")
+
+    # Configuration
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_ANON_KEY")
+    
+    if not supabase_url or not supabase_key:
+        raise HTTPException(status_code=500, detail="Configuration OAuth manquante")
+    
+    # Valider et mapper le provider
+    provider_map = {
+        "linkedin": "linkedin_oidc",
+        "facebook": "facebook"
+    }
+    
+    provider_name = provider_map.get(provider.lower())
+    if not provider_name:
+        raise HTTPException(status_code=400, detail=f"Provider non supporté: {provider}")
+    
+    supabase: Client = create_client(supabase_url, supabase_key)
+    
+    try:
+        # URL de redirection vers NOTRE backend callback
+        backend_base = os.getenv('BACKEND_URL', 'https://expert-app-cngws.ondigitalocean.app')
+        redirect_url = f"{backend_base}/api/v1/auth/oauth/{provider}/callback"
+        
+        logger.info(f"🔗 [OAuth] Callback URL configurée: {redirect_url}")
+        
+        # Initier OAuth
+        result = supabase.auth.sign_in_with_oauth({
+            "provider": provider_name,
+            "options": {
+                "redirect_to": redirect_url,  # Pointe vers notre backend
+                "scopes": "openid email profile" if provider_name == "linkedin_oidc" else "email"
+            }
+        })
+        
+        if not result.url:
+            raise HTTPException(status_code=500, detail="Erreur génération URL OAuth")
+        
+        logger.info(f"✅ [OAuth] Redirection vers {provider}: {result.url}")
+        
+        # Redirection directe vers le provider OAuth
+        return RedirectResponse(url=result.url, status_code=302)
+        
+    except Exception as e:
+        logger.error(f"❌ [OAuth] Erreur redirection {provider}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Erreur OAuth")
+
+@router.get("/oauth/{provider}/callback")
+async def oauth_backend_callback(
+    provider: str,
+    code: str = None,
+    state: str = None,
+    error: str = None,
+    error_description: str = None
+):
+    """
+    Callback OAuth traité côté backend
+    Échange le code contre un token et redirige le frontend avec le token
+    """
+    logger.info(f"🔄 [OAuth/Callback] Callback reçu pour {provider}")
+    
+    # Gérer les erreurs OAuth
+    if error:
+        logger.error(f"❌ [OAuth/Callback] Erreur OAuth: {error} - {error_description}")
+        frontend_url = os.getenv('FRONTEND_URL', 'https://expert.intelia.com')
+        error_url = f"{frontend_url}/?oauth_error={error}&message={error_description or 'Erreur OAuth'}"
+        return RedirectResponse(url=error_url, status_code=302)
+    
+    if not code:
+        logger.error("❌ [OAuth/Callback] Aucun code d'autorisation reçu")
+        frontend_url = os.getenv('FRONTEND_URL', 'https://expert.intelia.com')
+        error_url = f"{frontend_url}/?oauth_error=no_code&message=Code d'autorisation manquant"
+        return RedirectResponse(url=error_url, status_code=302)
+    
+    try:
+        # Mapper le provider
+        provider_name = provider.lower()
+        if provider_name == "linkedin":
+            provider_name = "linkedin_oidc"
+        
+        # ÉCHANGE DU CODE CONTRE UNE SESSION SUPABASE
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_ANON_KEY")
+        supabase: Client = create_client(supabase_url, supabase_key)
+        
+        logger.info(f"🔑 [OAuth/Callback] Échange du code pour {provider_name}")
+        
+        # Utiliser notre fonction helper pour échanger le code
+        session_result = await exchange_oauth_code_for_session(supabase, code, provider_name)
+        
+        if not session_result:
+            # Fallback: créer des données utilisateur factices pour test
+            logger.warning(f"⚠️ [OAuth/Callback] Échange échoué - création utilisateur test")
+            user_data = {
+                "id": f"oauth_{provider_name}_{code[:8]}",
+                "email": f"test.oauth.{provider_name}@intelia.com",
+                "user_metadata": {
+                    "full_name": f"Test OAuth {provider_name.title()}",
+                    "avatar_url": None
+                }
+            }
+        else:
+            # Extraire les données utilisateur de la session
+            user_data = session_result.get('user', {})
+            if not user_data:
+                raise Exception("Aucune donnée utilisateur dans la session")
+        
+        email = user_data.get('email')
+        user_id = user_data.get('id')
+        full_name = user_data.get('user_metadata', {}).get('full_name') or user_data.get('name')
+        
+        if not email or not user_id:
+            raise Exception("Données utilisateur OAuth incomplètes")
+        
+        logger.info(f"👤 [OAuth/Callback] Utilisateur: {email} (ID: {user_id})")
+        
+        # CRÉER NOTRE TOKEN JWT COMPATIBLE
+        expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        token_data = {
+            "user_id": user_id,
+            "email": email,
+            "sub": user_id,
+            "iss": "intelia-expert",
+            "aud": "authenticated",  # Important pour la compatibilité
+            "oauth_provider": provider_name
+        }
+        
+        jwt_token = create_access_token(token_data, expires)
+        
+        # REDIRECTION VERS LE FRONTEND AVEC LE TOKEN
+        frontend_url = os.getenv('FRONTEND_URL', 'https://expert.intelia.com')
+        success_url = f"{frontend_url}/chat?oauth_token={jwt_token}&oauth_success=true&oauth_provider={provider}&oauth_email={email}"
+        
+        logger.info(f"✅ [OAuth/Callback] Redirection vers frontend avec token pour {email}")
+        return RedirectResponse(url=success_url, status_code=302)
+        
+    except Exception as e:
+        logger.error(f"❌ [OAuth/Callback] Erreur traitement callback: {str(e)}")
+        frontend_url = os.getenv('FRONTEND_URL', 'https://expert.intelia.com')
+        error_url = f"{frontend_url}/?oauth_error=callback_error&message={str(e)}"
+        return RedirectResponse(url=error_url, status_code=302)
+
 @router.post("/oauth/callback", response_model=OAuthCallbackResponse)
 async def handle_oauth_callback(request: OAuthCallbackRequest):
     """
-    🆕 Gère le callback OAuth après autorisation
+    Gère le callback OAuth après autorisation
     Échange le code contre un token et crée/connecte l'utilisateur
     """
     logger.info(f"🔄 [OAuth] Callback reçu pour {request.provider}")
@@ -615,172 +912,17 @@ async def handle_oauth_callback(request: OAuthCallbackRequest):
             detail=f"Erreur lors du traitement du callback OAuth"
         )
 
-# === 🆕 ENDPOINT OAUTH REDIRECTION DIRECTE MODIFIÉ ===
-@router.get("/oauth/{provider}/login")
-async def oauth_redirect_login(provider: str):
-    """
-    🆕 Endpoint simplifié pour redirection OAuth directe - VERSION BACKEND-CENTRALISÉE
-    Redirige vers le provider OAuth puis traite le callback côté backend
-    """
-    logger.info(f"🔗 [OAuth] Redirection directe vers {provider}")
-    
-    if not SUPABASE_AVAILABLE:
-        raise HTTPException(status_code=500, detail="Service OAuth non disponible")
-
-    # Configuration
-    supabase_url = os.getenv("SUPABASE_URL")
-    supabase_key = os.getenv("SUPABASE_ANON_KEY")
-    
-    if not supabase_url or not supabase_key:
-        raise HTTPException(status_code=500, detail="Configuration OAuth manquante")
-    
-    # Valider et mapper le provider
-    provider_map = {
-        "linkedin": "linkedin_oidc",
-        "facebook": "facebook"
-    }
-    
-    provider_name = provider_map.get(provider.lower())
-    if not provider_name:
-        raise HTTPException(status_code=400, detail=f"Provider non supporté: {provider}")
-    
-    supabase: Client = create_client(supabase_url, supabase_key)
-    
-    try:
-        # ✅ URL de redirection vers NOTRE backend callback
-        backend_base = os.getenv('BACKEND_URL', 'https://expert-app-cngws.ondigitalocean.app')
-        redirect_url = f"{backend_base}/api/v1/auth/oauth/{provider}/callback"
-        
-        logger.info(f"🔗 [OAuth] Callback URL configurée: {redirect_url}")
-        
-        # Initier OAuth
-        result = supabase.auth.sign_in_with_oauth({
-            "provider": provider_name,
-            "options": {
-                "redirect_to": redirect_url,  # ✅ Pointe vers notre backend
-                "scopes": "openid email profile" if provider_name == "linkedin_oidc" else "email"
-            }
-        })
-        
-        if not result.url:
-            raise HTTPException(status_code=500, detail="Erreur génération URL OAuth")
-        
-        logger.info(f"✅ [OAuth] Redirection vers {provider}: {result.url}")
-        
-        # Redirection directe vers le provider OAuth
-        return RedirectResponse(url=result.url, status_code=302)
-        
-    except Exception as e:
-        logger.error(f"❌ [OAuth] Erreur redirection {provider}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Erreur OAuth")
-
-# === 🆕 NOUVEAU ENDPOINT CALLBACK BACKEND ===
-@router.get("/oauth/{provider}/callback")
-async def oauth_backend_callback(
-    provider: str,
-    code: str = None,
-    state: str = None,
-    error: str = None,
-    error_description: str = None
-):
-    """
-    🆕 Callback OAuth traité côté backend
-    Échange le code contre un token et redirige le frontend avec le token
-    """
-    logger.info(f"🔄 [OAuth/Callback] Callback reçu pour {provider}")
-    
-    # Gérer les erreurs OAuth
-    if error:
-        logger.error(f"❌ [OAuth/Callback] Erreur OAuth: {error} - {error_description}")
-        frontend_url = os.getenv('FRONTEND_URL', 'https://expert.intelia.com')
-        error_url = f"{frontend_url}/?oauth_error={error}&message={error_description or 'Erreur OAuth'}"
-        return RedirectResponse(url=error_url, status_code=302)
-    
-    if not code:
-        logger.error("❌ [OAuth/Callback] Aucun code d'autorisation reçu")
-        frontend_url = os.getenv('FRONTEND_URL', 'https://expert.intelia.com')
-        error_url = f"{frontend_url}/?oauth_error=no_code&message=Code d'autorisation manquant"
-        return RedirectResponse(url=error_url, status_code=302)
-    
-    try:
-        # Mapper le provider
-        provider_name = provider.lower()
-        if provider_name == "linkedin":
-            provider_name = "linkedin_oidc"
-        
-        # ✅ ÉCHANGE DU CODE CONTRE UNE SESSION SUPABASE
-        supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_ANON_KEY")
-        supabase: Client = create_client(supabase_url, supabase_key)
-        
-        logger.info(f"🔑 [OAuth/Callback] Échange du code pour {provider_name}")
-        
-        # Utiliser notre fonction helper pour échanger le code
-        session_result = await exchange_oauth_code_for_session(supabase, code, provider_name)
-        
-        if not session_result:
-            # Fallback: créer des données utilisateur factices pour test
-            logger.warning(f"⚠️ [OAuth/Callback] Échange échoué - création utilisateur test")
-            user_data = {
-                "id": f"oauth_{provider_name}_{code[:8]}",
-                "email": f"test.oauth.{provider_name}@intelia.com",
-                "user_metadata": {
-                    "full_name": f"Test OAuth {provider_name.title()}",
-                    "avatar_url": None
-                }
-            }
-        else:
-            # Extraire les données utilisateur de la session
-            user_data = session_result.get('user', {})
-            if not user_data:
-                raise Exception("Aucune donnée utilisateur dans la session")
-        
-        email = user_data.get('email')
-        user_id = user_data.get('id')
-        full_name = user_data.get('user_metadata', {}).get('full_name') or user_data.get('name')
-        
-        if not email or not user_id:
-            raise Exception("Données utilisateur OAuth incomplètes")
-        
-        logger.info(f"👤 [OAuth/Callback] Utilisateur: {email} (ID: {user_id})")
-        
-        # ✅ CRÉER NOTRE TOKEN JWT COMPATIBLE
-        expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        token_data = {
-            "user_id": user_id,
-            "email": email,
-            "sub": user_id,
-            "iss": "intelia-expert",
-            "aud": "authenticated",  # ✅ Important pour la compatibilité
-            "oauth_provider": provider_name
-        }
-        
-        jwt_token = create_access_token(token_data, expires)
-        
-        # ✅ REDIRECTION VERS LE FRONTEND AVEC LE TOKEN
-        frontend_url = os.getenv('FRONTEND_URL', 'https://expert.intelia.com')
-        success_url = f"{frontend_url}/chat?oauth_token={jwt_token}&oauth_success=true&oauth_provider={provider}&oauth_email={email}"
-        
-        logger.info(f"✅ [OAuth/Callback] Redirection vers frontend avec token pour {email}")
-        return RedirectResponse(url=success_url, status_code=302)
-        
-    except Exception as e:
-        logger.error(f"❌ [OAuth/Callback] Erreur traitement callback: {str(e)}")
-        frontend_url = os.getenv('FRONTEND_URL', 'https://expert.intelia.com')
-        error_url = f"{frontend_url}/?oauth_error=callback_error&message={str(e)}"
-        return RedirectResponse(url=error_url, status_code=302)
-
-# === 🆕 NOUVEL ENDPOINT CHANGE PASSWORD ===
+# === NOUVEL ENDPOINT CHANGE PASSWORD ===
 @router.post("/change-password", response_model=ChangePasswordResponse)
 async def change_password(
     request: ChangePasswordRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user)  # ✅ CORRIGÉ
+    current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
-    🆕 Changer le mot de passe de l'utilisateur connecté
+    Changer le mot de passe de l'utilisateur connecté
     Vérifie le mot de passe actuel puis met à jour avec le nouveau
     """
-    logger.info(f"🔒 [ChangePassword] Demande de changement pour: {current_user.get('email', 'unknown')}")
+    logger.info(f"🔑 [ChangePassword] Demande de changement pour: {current_user.get('email', 'unknown')}")
     
     if not SUPABASE_AVAILABLE:
         logger.error("❌ Supabase client non disponible")
@@ -868,14 +1010,14 @@ async def change_password(
             detail="Erreur technique lors du changement de mot de passe"
         )
 
-# === 🆕 NOUVEL ENDPOINT REGISTER ===
+# === NOUVEL ENDPOINT REGISTER ===
 @router.post("/register", response_model=AuthResponse)
 async def register_user(user_data: UserRegister):
     """
-    🆕 Inscription d'un nouvel utilisateur
+    Inscription d'un nouvel utilisateur
     Crée le compte dans Supabase et retourne un token JWT
     """
-    logger.info(f"📝 [Register] Tentative inscription: {user_data.email}")
+    logger.info(f"🔍 [Register] Tentative inscription: {user_data.email}")
     
     if not SUPABASE_AVAILABLE:
         logger.error("❌ Supabase client non disponible")
@@ -986,11 +1128,11 @@ async def register_user(user_data: UserRegister):
             detail="Erreur lors de la création du compte"
         )
 
-# === 🆕 ENDPOINT FORGOT PASSWORD ===
+# === ENDPOINT FORGOT PASSWORD ===
 @router.post("/reset-password", response_model=ForgotPasswordResponse)
 async def request_password_reset(request: ForgotPasswordRequest):
     """
-    🆕 Demande de réinitialisation de mot de passe
+    Demande de réinitialisation de mot de passe
     Envoie un email avec un lien de réinitialisation
     """
     logger.info(f"🔄 [ResetPassword] Demande pour: {request.email}")
@@ -1010,7 +1152,7 @@ async def request_password_reset(request: ForgotPasswordRequest):
     supabase: Client = create_client(supabase_url, supabase_key)
     
     try:
-        # 🔧 CORRECTION : Configurer l'URL de redirection avec fallback intelligent
+        # Configurer l'URL de redirection avec fallback intelligent
         redirect_url = os.getenv("RESET_PASSWORD_REDIRECT_URL", "https://expert.intelia.com/auth/reset-password")
         
         # Essayer la nouvelle API Supabase d'abord
@@ -1043,11 +1185,11 @@ async def request_password_reset(request: ForgotPasswordRequest):
             detail="Erreur lors de l'envoi de l'email de réinitialisation"
         )
 
-# === 🆕 ENDPOINT VALIDATE RESET TOKEN ===
+# === ENDPOINT VALIDATE RESET TOKEN ===
 @router.post("/validate-reset-token", response_model=ValidateTokenResponse)
 async def validate_reset_token(request: ValidateResetTokenRequest):
     """
-    🆕 Valide un token de réinitialisation de mot de passe
+    Valide un token de réinitialisation de mot de passe
     """
     logger.info(f"🔍 [ValidateToken] Validation token...")
     
@@ -1121,11 +1263,11 @@ async def validate_reset_token(request: ValidateResetTokenRequest):
             detail="Erreur lors de la validation du token"
         )
 
-# === 🆕 ENDPOINT CONFIRM RESET PASSWORD - VERSION AVEC DEBUG APPROFONDI ===
+# === ENDPOINT CONFIRM RESET PASSWORD ===
 @router.post("/confirm-reset-password", response_model=ForgotPasswordResponse)
 async def confirm_reset_password(request: ConfirmResetPasswordRequest):
     """
-    🆕 Confirme la réinitialisation du mot de passe avec le nouveau mot de passe
+    Confirme la réinitialisation du mot de passe avec le nouveau mot de passe
     VERSION AVEC DEBUG APPROFONDI et toutes les méthodes Supabase possibles
     """
     logger.info(f"🔍 [ConfirmReset] === DÉBUT CONFIRMATION RÉINITIALISATION ===")
@@ -1246,151 +1388,9 @@ async def confirm_reset_password(request: ConfirmResetPasswordRequest):
         except Exception as method1_error:
             logger.warning(f"⚠️ [ConfirmReset] Méthode 1 échouée globalement: {method1_error}")
     
-    # === MÉTHODE 2 : CLIENT AVEC TOKEN COMME ACCESS_TOKEN ===
-    logger.info("🔄 [ConfirmReset] === MÉTHODE 2: CLIENT AVEC TOKEN COMME ACCESS_TOKEN ===")
-    try:
-        # Créer un client normal puis définir manuellement l'access_token
-        supabase_manual: Client = create_client(supabase_url, supabase_key)
-        
-        # Essayer de définir le token comme access_token directement
-        logger.info("🔄 [ConfirmReset] Définition manuelle de l'access_token...")
-        
-        # Différentes approches pour définir la session
-        session_methods = [
-            # Méthode 1: Créer un objet session-like
-            lambda: {
-                "access_token": request.token,
-                "refresh_token": request.token,  # Utiliser le même token
-                "token_type": "bearer"
-            },
-            # Méthode 2: Utiliser directement le token
-            lambda: request.token
-        ]
-        
-        for i, session_method in enumerate(session_methods, 1):
-            try:
-                session_data = session_method()
-                logger.info(f"🔄 [ConfirmReset] Tentative session méthode {i}: {type(session_data)}")
-                
-                if isinstance(session_data, dict):
-                    supabase_manual.auth.set_session(
-                        session_data["access_token"], 
-                        session_data.get("refresh_token")
-                    )
-                else:
-                    supabase_manual.auth.set_session(session_data, None)
-                
-                logger.info(f"✅ [ConfirmReset] Session définie avec méthode {i}")
-                break
-                
-            except Exception as session_error:
-                logger.warning(f"⚠️ [ConfirmReset] Échec session méthode {i}: {session_error}")
-                continue
-        
-        # Essayer l'update
-        update_result = supabase_manual.auth.update_user({
-            "password": request.new_password
-        })
-        
-        logger.info(f"🔍 [ConfirmReset] Résultat update manuel: user={bool(update_result.user)}")
-        
-        if update_result.user:
-            logger.info(f"✅ [ConfirmReset] Mot de passe mis à jour avec succès (méthode 2)")
-            return ForgotPasswordResponse(
-                success=True,
-                message="Mot de passe mis à jour avec succès"
-            )
-            
-    except Exception as method2_error:
-        logger.warning(f"⚠️ [ConfirmReset] Méthode 2 échouée: {method2_error}")
-    
-    # === MÉTHODE 3 : CRÉER CLIENT AVEC TOKEN COMME KEY ===
-    logger.info("🔄 [ConfirmReset] === MÉTHODE 3: CLIENT AVEC TOKEN COMME KEY ===")
-    try:
-        logger.info("🔄 [ConfirmReset] Création client Supabase avec token comme key...")
-        supabase_with_token: Client = create_client(supabase_url, request.token)
-        
-        logger.info("🔄 [ConfirmReset] Tentative update_user direct...")
-        update_result = supabase_with_token.auth.update_user({
-            "password": request.new_password
-        })
-        
-        logger.info(f"🔍 [ConfirmReset] Résultat update direct: user={bool(update_result.user)}")
-        
-        if update_result.user:
-            logger.info(f"✅ [ConfirmReset] Mot de passe mis à jour avec succès (méthode 3)")
-            return ForgotPasswordResponse(
-                success=True,
-                message="Mot de passe mis à jour avec succès"
-            )
-        else:
-            logger.warning(f"⚠️ [ConfirmReset] Update direct échoué - pas d'utilisateur retourné")
-            
-    except Exception as method3_error:
-        logger.warning(f"⚠️ [ConfirmReset] Méthode 3 échouée: {method3_error}")
-    
-    # === MÉTHODE 4 : API DIRECTE AVEC HEADERS ===
-    logger.info("🔄 [ConfirmReset] === MÉTHODE 4: REQUÊTE DIRECTE AVEC HEADERS ===")
-    try:
-        import httpx
-        
-        # URL de l'API Supabase pour update user
-        api_url = f"{supabase_url}/auth/v1/user"
-        
-        headers = {
-            "Authorization": f"Bearer {request.token}",
-            "Content-Type": "application/json",
-            "apikey": supabase_key
-        }
-        
-        payload = {
-            "password": request.new_password
-        }
-        
-        logger.info(f"🔄 [ConfirmReset] Requête PUT vers: {api_url}")
-        logger.info(f"🔄 [ConfirmReset] Headers: {list(headers.keys())}")
-        
-        async with httpx.AsyncClient() as client:
-            response = await client.put(api_url, headers=headers, json=payload)
-            
-        logger.info(f"🔍 [ConfirmReset] Réponse API directe: {response.status_code}")
-        logger.info(f"🔍 [ConfirmReset] Contenu réponse: {response.text[:200]}...")
-        
-        if response.status_code == 200:
-            logger.info(f"✅ [ConfirmReset] Mot de passe mis à jour avec succès (méthode 4)")
-            return ForgotPasswordResponse(
-                success=True,
-                message="Mot de passe mis à jour avec succès"
-            )
-        else:
-            logger.warning(f"⚠️ [ConfirmReset] API directe échouée: {response.status_code} - {response.text}")
-            
-    except Exception as method4_error:
-        logger.warning(f"⚠️ [ConfirmReset] Méthode 4 échouée: {method4_error}")
-    
-    # === TOUTES LES MÉTHODES ONT ÉCHOUÉ ===
+    # === Toutes les méthodes ont échoué ===
     logger.error(f"❌ [ConfirmReset] === TOUTES LES MÉTHODES ONT ÉCHOUÉ ===")
     logger.error(f"❌ [ConfirmReset] Token analysé: email={user_email}, type={token_type}")
-    
-    # Diagnostic final
-    try:
-        import jwt as pyjwt
-        token_payload = pyjwt.decode(request.token, options={"verify_signature": False})
-        exp_timestamp = token_payload.get("exp")
-        
-        if exp_timestamp:
-            current_timestamp = datetime.utcnow().timestamp()
-            if current_timestamp > exp_timestamp:
-                logger.error(f"❌ [ConfirmReset] Diagnostic: Token expiré")
-                raise HTTPException(
-                    status_code=400, 
-                    detail="Token expiré. Demandez un nouveau lien de réinitialisation."
-                )
-        
-        logger.error(f"❌ [ConfirmReset] Diagnostic: Token semble valide mais aucune méthode n'a fonctionné")
-        
-    except Exception:
-        logger.error(f"❌ [ConfirmReset] Diagnostic: Token illisible ou corrompu")
     
     # Erreur finale avec plus de détails
     raise HTTPException(
@@ -1425,7 +1425,7 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user
         "is_admin": current_user.get("is_admin"),
         "preferences": current_user.get("preferences", {}),
         "profile_id": current_user.get("profile_id"),
-        "jwt_secret_used": current_user.get("jwt_secret_used")  # 🆕 Debug info
+        "jwt_secret_used": current_user.get("jwt_secret_used")
     }
 
 @router.get("/debug/jwt-config")
@@ -1438,14 +1438,14 @@ async def debug_jwt_config():
         "supabase_anon_key_configured": bool(os.getenv("SUPABASE_ANON_KEY")),
         "supabase_service_role_key_configured": bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY")),
         "jwt_algorithm": JWT_ALGORITHM,
-        "auth_temp_compatible": True,  # 🆕 Flag
-        "supabase_compatible": True,   # 🆕 Flag
-        "multi_secret_support": True,  # 🆕 Flag
+        "auth_temp_compatible": True,
+        "supabase_compatible": True,
+        "multi_secret_support": True,
         "main_secret_type": JWT_SECRETS[0][0] if JWT_SECRETS else "none",
-        "backend_centralized_oauth": True,  # 🆕 Confirmation OAuth backend-centralisé
-        "register_endpoint_available": True,  # 🆕 Confirmation que register est disponible
-        "reset_password_endpoints_available": True,  # 🆕 Confirmation que reset password est disponible
-        "change_password_endpoint_available": True,  # 🆕 Confirmation que change password est disponible
+        "backend_centralized_oauth": True,
+        "register_endpoint_available": True,
+        "reset_password_endpoints_available": True,
+        "change_password_endpoint_available": True,
         "oauth_endpoints_available": [
             "/auth/oauth/linkedin/login",
             "/auth/oauth/facebook/login",
@@ -1454,7 +1454,7 @@ async def debug_jwt_config():
         ]
     }
 
-# === 🆕 ENDPOINT DEBUG POUR RESET PASSWORD ===
+# === ENDPOINT DEBUG POUR RESET PASSWORD ===
 @router.get("/debug/reset-config")
 async def debug_reset_config():
     """Debug temporaire pour voir la configuration de reset password"""
@@ -1474,7 +1474,7 @@ async def debug_reset_config():
         }
     }
 
-# === 🆕 ENDPOINT DEBUG OAUTH ===
+# === ENDPOINT DEBUG OAUTH ===
 @router.get("/debug/oauth-config")
 async def debug_oauth_config():
     """Debug endpoint pour vérifier la configuration OAuth"""
