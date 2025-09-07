@@ -79,7 +79,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           
           if (token && navigator.sendBeacon) {
             // Utiliser sendBeacon avec FormData pour inclure le token
-            const url = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'}/api/v1/auth/logout`
+            const url = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'}/v1/auth/logout`
             
             // Option 1: Inclure le token dans l'URL comme paramètre de requête
             const urlWithToken = `${url}?token=${encodeURIComponent(token)}`
