@@ -1,5 +1,5 @@
-// lib/stores/auth.ts - SYSTÈME D'AUTH UNIFIÉ - BACKEND ONLY
-// Version backend-centralisée pour OAuth
+// lib/stores/auth.ts - SYSTÈME D'AUTH UNIFIÉ - SUPABASE DIRECT
+// Version avec OAuth direct via auth.intelia.com
 
 'use client'
 
@@ -57,12 +57,12 @@ interface AuthState {
   exportUserData: () => Promise<any>
   deleteUserData: () => Promise<void>
   
-  // 🆕 ACTIONS OAUTH BACKEND-CENTRALISÉES
+  // ACTIONS OAUTH SUPABASE DIRECT
   loginWithOAuth: (provider: 'linkedin' | 'facebook') => Promise<void>
   handleOAuthTokenFromURL: () => Promise<boolean>
 }
 
-// Store unifié utilisant UNIQUEMENT le backend
+// Store unifié utilisant Supabase direct
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -88,12 +88,12 @@ export const useAuthStore = create<AuthState>()(
         set({ authErrors: [] })
       },
 
-      // ✅ INITIALIZE SESSION - Méthode ajoutée
+      // INITIALIZE SESSION - Méthode ajoutée
       initializeSession: async () => {
         console.log('[AuthStore] Initialisation de session...')
         
         try {
-          // 🆕 NOUVEAU: Vérifier d'abord s'il y a un token OAuth dans l'URL
+          // NOUVEAU: Vérifier d'abord s'il y a un token OAuth dans l'URL
           await get().handleOAuthTokenFromURL()
           
           // Vérifier si un token existe dans localStorage
@@ -230,7 +230,7 @@ export const useAuthStore = create<AuthState>()(
           console.error('[AuthStore] Erreur login complète:', e)
           get().handleAuthError(e, 'login')
           
-          // 🆕 GESTION D'ERREURS AMÉLIORÉE
+          // GESTION D'ERREURS AMÉLIORÉE
           let userMessage = 'Erreur de connexion'
           
           // Analyser le code de statut HTTP
@@ -315,19 +315,21 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 🆕 LOGIN WITH OAUTH : REDIRECTION DIRECTE VERS BACKEND
+      // LOGIN WITH OAUTH : REDIRECTION DIRECTE VERS SUPABASE
       loginWithOAuth: async (provider: 'linkedin' | 'facebook') => {
         set({ isOAuthLoading: provider, authErrors: [] })
-        console.log(`[AuthStore] OAuth login initié pour ${provider} - redirection directe vers backend`)
+        console.log(`[AuthStore] OAuth login initié pour ${provider} - redirection directe vers Supabase`)
         
         try {
-          // Construire l'URL du backend OAuth
-          const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app/api'
-          const oauthUrl = `${backendUrl}/v1/auth/oauth/${provider}/login`
-          
-          console.log(`[AuthStore] Redirection vers:`, oauthUrl)
-          
-          // Redirection directe vers le backend - pas d'API call
+          // NOUVEAU: Redirection directe vers le domaine Supabase configuré
+          const supabaseUrl = 'https://auth.intelia.com'
+          const providerName = provider === 'linkedin' ? 'linkedin_oidc' : provider
+          const redirectTo = encodeURIComponent('https://expert.intelia.com/chat')
+          const oauthUrl = `${supabaseUrl}/auth/v1/authorize?provider=${providerName}&redirect_to=${redirectTo}`
+
+          console.log(`[AuthStore] Redirection vers Supabase OAuth:`, oauthUrl)
+
+          // Redirection directe vers Supabase - pas d'appel backend intermédiaire
           window.location.href = oauthUrl
           
         } catch (e: any) {
@@ -341,34 +343,56 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 🆕 HANDLE OAUTH TOKEN FROM URL : Récupère le token depuis l'URL après redirection backend
+      // HANDLE OAUTH TOKEN FROM URL : Récupère le token depuis l'URL après redirection Supabase
       handleOAuthTokenFromURL: async () => {
         try {
           // Vérifier s'il y a des paramètres OAuth dans l'URL
           const urlParams = new URLSearchParams(window.location.search)
+          
+          // Gérer les tokens Supabase dans l'URL (format fragment #access_token=...)
+          const hashParams = new URLSearchParams(window.location.hash.slice(1))
+          const accessToken = hashParams.get('access_token') || urlParams.get('access_token')
+          const tokenType = hashParams.get('token_type') || urlParams.get('token_type')
+          const refreshToken = hashParams.get('refresh_token') || urlParams.get('refresh_token')
+          const expiresIn = hashParams.get('expires_in') || urlParams.get('expires_in')
+          
+          // Aussi vérifier les anciens paramètres pour compatibilité
           const oauthToken = urlParams.get('oauth_token')
           const oauthSuccess = urlParams.get('oauth_success')
           const oauthProvider = urlParams.get('oauth_provider')
           const oauthEmail = urlParams.get('oauth_email')
           
-          if (oauthSuccess === 'true' && oauthToken) {
+          if ((accessToken && tokenType === 'bearer') || (oauthSuccess === 'true' && oauthToken)) {
+            const finalToken = accessToken || oauthToken
             console.log('[AuthStore] Token OAuth détecté dans l\'URL')
+            
+            // Calculer l'expiration
+            const expiresAt = expiresIn ? 
+              new Date(Date.now() + parseInt(expiresIn) * 1000).toISOString() :
+              undefined
             
             // Stocker le token dans localStorage
             const authData = {
-              access_token: oauthToken,
+              access_token: finalToken,
               token_type: 'bearer',
+              refresh_token: refreshToken,
+              expires_at: expiresAt,
               synced_at: Date.now(),
-              oauth_provider: oauthProvider
+              oauth_provider: oauthProvider || 'supabase'
             }
             localStorage.setItem('intelia-expert-auth', JSON.stringify(authData))
             
-            // Nettoyer l'URL
+            // Nettoyer l'URL des paramètres OAuth
             const cleanUrl = new URL(window.location.href)
             cleanUrl.searchParams.delete('oauth_token')
             cleanUrl.searchParams.delete('oauth_success')
             cleanUrl.searchParams.delete('oauth_email')
             cleanUrl.searchParams.delete('oauth_provider')
+            cleanUrl.searchParams.delete('access_token')
+            cleanUrl.searchParams.delete('token_type')
+            cleanUrl.searchParams.delete('refresh_token')
+            cleanUrl.searchParams.delete('expires_in')
+            cleanUrl.hash = '' // Nettoyer aussi le hash
             window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search)
             
             // Vérifier l'auth pour récupérer les données utilisateur complètes
@@ -382,23 +406,29 @@ export const useAuthStore = create<AuthState>()(
               window.dispatchEvent(new Event('auth-state-changed'))
             }, 100)
             
-            console.log(`[AuthStore] OAuth ${oauthProvider} réussi:`, oauthEmail)
+            console.log(`[AuthStore] OAuth Supabase réussi:`, oauthEmail || 'utilisateur')
             return true
           }
           
           // Vérifier les erreurs OAuth
-          const oauthError = urlParams.get('oauth_error')
+          const oauthError = urlParams.get('oauth_error') || urlParams.get('error')
+          const errorDescription = urlParams.get('error_description')
+          
           if (oauthError) {
-            console.error('[AuthStore] Erreur OAuth dans l\'URL:', oauthError)
+            console.error('[AuthStore] Erreur OAuth dans l\'URL:', oauthError, errorDescription)
             
             // Nettoyer l'URL
             const cleanUrl = new URL(window.location.href)
             cleanUrl.searchParams.delete('oauth_error')
+            cleanUrl.searchParams.delete('error')
+            cleanUrl.searchParams.delete('error_description')
+            cleanUrl.hash = ''
             window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search)
             
             // Reset du loading et ajouter l'erreur
             set({ isOAuthLoading: null })
-            get().handleAuthError({ message: decodeURIComponent(oauthError) }, 'oauth-url-error')
+            const errorMsg = errorDescription ? `${oauthError}: ${errorDescription}` : oauthError
+            get().handleAuthError({ message: decodeURIComponent(errorMsg) }, 'oauth-url-error')
             
             return false
           }
@@ -595,7 +625,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // ✅ UPDATE CONSENT - Gestion du consentement RGPD
+      // UPDATE CONSENT - Gestion du consentement RGPD
       updateConsent: async (consentGiven: boolean) => {
         console.log('[AuthStore] Mise à jour du consentement:', consentGiven)
         
@@ -625,7 +655,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // ✅ EXPORT USER DATA - Conformité RGPD
+      // EXPORT USER DATA - Conformité RGPD
       exportUserData: async () => {
         console.log('[AuthStore] Export des données utilisateur (RGPD)')
         
@@ -650,7 +680,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // ✅ DELETE USER DATA - Suppression compte RGPD
+      // DELETE USER DATA - Suppression compte RGPD
       deleteUserData: async () => {
         console.log('[AuthStore] Suppression des données utilisateur (RGPD)')
         
