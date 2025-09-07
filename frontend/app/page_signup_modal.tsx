@@ -657,7 +657,7 @@ export function SignupModal({
           </div>
 
           {/* Texte légal */}
-          <div className="mb-4 mt-6 text-center">
+          <div className="mb-4 mt-4 text-center">
             <p className="text-xs text-gray-500 leading-relaxed">
               En cliquant sur « Créer un compte », vous acceptez nos{' '}
               <a 

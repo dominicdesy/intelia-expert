@@ -1,9 +1,69 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useAuthStore } from '@/lib/stores/auth' 
 import { apiClient } from '@/lib/api/client'
 import { StatisticsDashboard } from './StatisticsDashboard'
 import { QuestionsTab } from './QuestionsTab'
 import { InvitationStatsComponent } from './InvitationStats'
+
+// Hook personnalisé pour l'authentification robuste (inspiré d'InviteFriendModal)
+const useRobustAuth = () => {
+  const { user } = useAuthStore()
+  
+  return useMemo(() => {
+    // Priorité 1: Store Zustand
+    if (user?.email && user?.user_type) {
+      console.log('[useRobustAuth] Utilisateur trouvé dans le store:', user.email, user.user_type)
+      return user
+    }
+    
+    // Priorité 2: Fallback localStorage/sessionStorage (comme InviteFriendModal)
+    try {
+      const authKeys = ['intelia-expert-auth', 'supabase.auth.token']
+      
+      for (const key of authKeys) {
+        const stored = localStorage.getItem(key) || sessionStorage.getItem(key)
+        if (stored) {
+          const authData = JSON.parse(stored)
+          
+          let userEmail, userName, userId, userType
+          
+          // Format Intelia
+          if (authData.access_token && authData.user) {
+            userEmail = authData.user.email
+            userName = authData.user.name || userEmail.split('@')[0]
+            userId = authData.user.id
+            userType = authData.user.user_type
+            
+            console.log('[useRobustAuth] Utilisateur trouvé dans localStorage (Intelia):', userEmail, userType)
+          }
+          // Format Supabase
+          else if (authData.user?.email) {
+            userEmail = authData.user.email
+            userName = authData.user.user_metadata?.name || authData.user.name || userEmail.split('@')[0]
+            userId = authData.user.id
+            userType = authData.user.user_metadata?.user_type || authData.user.user_type
+            
+            console.log('[useRobustAuth] Utilisateur trouvé dans localStorage (Supabase):', userEmail, userType)
+          }
+          
+          if (userEmail && userType) {
+            return {
+              email: userEmail,
+              name: userName,
+              id: userId,
+              user_type: userType
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[useRobustAuth] Erreur récupération auth fallback:', e)
+    }
+    
+    console.log('[useRobustAuth] Aucun utilisateur trouvé')
+    return null
+  }, [user])
+}
 
 // Types pour le système de cache ultra-rapide
 interface CacheStatus {
@@ -153,7 +213,7 @@ interface QuestionLog {
 }
 
 export const StatisticsPage: React.FC = () => {
-  const { user } = useAuthStore() 
+  const currentUser = useRobustAuth() // Utilise le nouveau hook robuste
   
   const [authStatus, setAuthStatus] = useState<'initializing' | 'checking' | 'ready' | 'unauthorized' | 'forbidden'>('initializing')
   const [statsLoading, setStatsLoading] = useState(false)
@@ -197,7 +257,7 @@ export const StatisticsPage: React.FC = () => {
   const questionsLoadedRef = useRef<Map<string, boolean>>(new Map())
   const invitationsLoadedRef = useRef<boolean>(false)
 
-  // LOGIQUE D'AUTHENTIFICATION - IDENTIQUE
+  // LOGIQUE D'AUTHENTIFICATION AMÉLIORÉE
   useEffect(() => {
     let timeoutId: NodeJS.Timeout
 
@@ -206,22 +266,22 @@ export const StatisticsPage: React.FC = () => {
         return
       }
 
-      console.log('[StatisticsPage] Auth check:', { 
-        user: user === undefined ? 'undefined' : user === null ? 'null' : 'defined',
-        email: user?.email,
-        user_type: user?.user_type,
+      console.log('[StatisticsPage] Auth check avec fallback:', { 
+        hasUser: !!currentUser,
+        email: currentUser?.email,
+        userType: currentUser?.user_type,
         stabilityCounter: stabilityCounterRef.current,
         currentAuthStatus: authStatus
       })
 
-      if (user === undefined) {
+      if (currentUser === undefined) {
         console.log('[StatisticsPage] Phase 1: Attente initialisation auth...')
         setAuthStatus('initializing')
         stabilityCounterRef.current = 0
         return
       }
 
-      if (user !== null && (!user.email || !user.user_type)) {
+      if (currentUser !== null && (!currentUser.email || !currentUser.user_type)) {
         console.log('[StatisticsPage] Phase 2: Données utilisateur incomplètes, attente...')
         setAuthStatus('checking')
         stabilityCounterRef.current = 0
@@ -239,22 +299,22 @@ export const StatisticsPage: React.FC = () => {
         return
       }
 
-      if (user === null) {
+      if (currentUser === null) {
         console.log('[StatisticsPage] Utilisateur non connecté')
         setAuthStatus('unauthorized')
         setError("Vous devez être connecté pour accéder à cette page")
         return
       }
 
-      if (user.user_type !== 'super_admin') {
-        console.log('[StatisticsPage] Permissions insuffisantes:', user.user_type)
+      if (currentUser.user_type !== 'super_admin') {
+        console.log('[StatisticsPage] Permissions insuffisantes:', currentUser.user_type)
         setAuthStatus('forbidden')
         setError("Accès refusé - Permissions super_admin requises")
         return
       }
 
       if (!authCheckRef.current) {
-        console.log('[StatisticsPage] Authentification réussie:', user.email)
+        console.log('[StatisticsPage] Authentification réussie:', currentUser.email)
         setAuthStatus('ready')
         setError(null)
         authCheckRef.current = true
@@ -266,7 +326,7 @@ export const StatisticsPage: React.FC = () => {
     return () => {
       if (timeoutId) clearTimeout(timeoutId)
     }
-  }, [user, authStatus])
+  }, [currentUser, authStatus])
 
   // Chargement des statistiques - UNE SEULE FOIS
   useEffect(() => {
@@ -312,20 +372,24 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  // MÉTHODE CORRIGÉE: Utilisation d'apiClient.getSecure au lieu de get
+  // MÉTHODE CORRIGÉE: Utilisation d'apiClient.getSecure avec debug amélioré
   const loadAllStatistics = async () => {
     if (statsLoading) {
       console.log('[StatisticsPage] Chargement déjà en cours, annulation...')
       return
     }
     
-    console.log('[StatisticsPage] DÉBUT chargement statistiques avec apiClient')
+    console.log('[StatisticsPage] DÉBUT chargement statistiques avec utilisateur:', currentUser?.email)
     setStatsLoading(true)
     setError(null)
 
     const startTime = performance.now()
 
     try {
+      // Vérification manuelle du token avant l'appel API
+      const authToken = localStorage.getItem('intelia-expert-auth')
+      console.log('[StatisticsPage] Token disponible dans localStorage:', !!authToken)
+      
       console.log('[StatisticsPage] DEBUG: baseURL from apiClient:', apiClient.getBaseURL())
       console.log('⚡ Tentative endpoint cache via apiClient: stats-fast/dashboard')
       
@@ -646,7 +710,7 @@ export const StatisticsPage: React.FC = () => {
           <div className="text-red-600 text-6xl mb-4">🚫</div>
           <h2 className="text-2xl font-semibold text-gray-900 mb-4">Accès refusé</h2>
           <p className="text-gray-600 mb-2">Cette page est réservée aux super administrateurs.</p>
-          <p className="text-sm text-gray-500 mb-6">Votre rôle actuel : <span className="font-medium">{user?.user_type || 'non défini'}</span></p>
+          <p className="text-sm text-gray-500 mb-6">Votre rôle actuel : <span className="font-medium">{currentUser?.user_type || 'non défini'}</span></p>
           <button
             onClick={() => window.history.back()}
             className="w-full bg-blue-600 text-white px-6 py-2 hover:bg-blue-700 transition-colors"
