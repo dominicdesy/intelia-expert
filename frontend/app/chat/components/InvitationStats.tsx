@@ -1,6 +1,6 @@
 import React from 'react'
 
-// Interface pour les statistiques d'invitations - COMPLÈTE
+// Interface pour les statistiques d'invitations - COMPLÃˆTE
 interface InvitationStats {
   total_invitations_sent: number
   total_invitations_accepted: number
@@ -55,7 +55,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
     return (
       <div className="bg-white border border-gray-200 p-4">
         <div className="text-center text-gray-500">
-          <div className="text-gray-400 text-2xl mb-2">📨</div>
+          <div className="text-gray-400 text-2xl mb-2">ðŸ"¨</div>
           <p>Statistiques d'invitations non disponibles</p>
         </div>
       </div>
@@ -64,15 +64,15 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Header épuré - sans informations de debug */}
+      {/* Header Ã©purÃ© - sans informations de debug */}
 
 
 
-      {/* KPIs Invitations - Version complète */}
+      {/* KPIs Invitations - Version complÃ¨te */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white border border-gray-200 p-4">
           <div>
-            <p className="text-sm text-gray-600 mb-1">Invitations Envoyées</p>
+            <p className="text-sm text-gray-600 mb-1">Invitations EnvoyÃ©es</p>
             <p className="text-2xl font-semibold text-gray-900">{invitationStats.total_invitations_sent}</p>
             {cacheStatus && (
               <p className="text-xs text-gray-400 mt-1">
@@ -84,10 +84,10 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
 
         <div className="bg-white border border-gray-200 p-4">
           <div>
-            <p className="text-sm text-gray-600 mb-1">Invitations Acceptées</p>
+            <p className="text-sm text-gray-600 mb-1">Invitations AcceptÃ©es</p>
             <p className="text-2xl font-semibold text-green-600">{invitationStats.total_invitations_accepted}</p>
             {cacheStatus && cacheStatus.is_available && (
-              <p className="text-xs text-green-500 mt-1">Données mises en cache</p>
+              <p className="text-xs text-green-500 mt-1">DonnÃ©es mises en cache</p>
             )}
           </div>
         </div>
@@ -107,19 +107,19 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
             <p className="text-sm text-gray-600 mb-1">Taux d'Acceptation</p>
             <p className="text-2xl font-semibold text-blue-600">{invitationStats.acceptance_rate.toFixed(1)}%</p>
             {cacheStatus?.is_available && (
-              <p className="text-xs text-blue-500 mt-1">Optimisé</p>
+              <p className="text-xs text-blue-500 mt-1">OptimisÃ©</p>
             )}
           </div>
         </div>
       </div>
 
-      {/* Tables des Top Inviters - Version complète avec toutes les données */}
+      {/* Tables des Top Inviters - Version complÃ¨te avec toutes les donnÃ©es */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Top 5 Inviteurs par Nombre d'Invitations */}
         <div className="bg-white border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200">
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-medium text-gray-900">Top 5 - Invitations Envoyées</h3>
+              <h3 className="text-base font-medium text-gray-900">Top 5 - Invitations EnvoyÃ©es</h3>
               {cacheStatus && (
                 <span className={`text-xs px-2 py-1 rounded ${
                   cacheStatus.is_available 
@@ -137,8 +137,8 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
                 <tr>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rang</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Inviteur</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Envoyées</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Acceptées</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">EnvoyÃ©es</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">AcceptÃ©es</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Taux</th>
                 </tr>
               </thead>
@@ -177,11 +177,11 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
                 {invitationStats.top_inviters.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                      <div className="text-gray-400 text-2xl mb-2">📨</div>
-                      <p>Aucun inviteur trouvé</p>
+                      <div className="text-gray-400 text-2xl mb-2">ðŸ"¨</div>
+                      <p>Aucun inviteur trouvÃ©</p>
                       {cacheStatus && (
                         <p className="text-xs text-gray-400 mt-1">
-                          Mode {cacheStatus.is_available ? 'cache' : 'direct'} - Aucune donnée
+                          Mode {cacheStatus.is_available ? 'cache' : 'direct'} - Aucune donnÃ©e
                         </p>
                       )}
                     </td>
@@ -196,7 +196,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
         <div className="bg-white border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200">
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-medium text-gray-900">Top 5 - Invitations Acceptées</h3>
+              <h3 className="text-base font-medium text-gray-900">Top 5 - Invitations AcceptÃ©es</h3>
               {cacheStatus && cacheStatus.is_available && (
                 <span className="text-xs text-green-600">{cacheStatus.cache_age_minutes}min</span>
               )}
@@ -208,9 +208,9 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
                 <tr>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rang</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Inviteur</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Acceptées</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">AcceptÃ©es</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Efficacité</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">EfficacitÃ©</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -244,7 +244,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
                           {inviter.acceptance_rate.toFixed(0)}%
                         </span>
                         {inviter.acceptance_rate >= 80 && (
-                          <span className="text-green-600 text-sm">🏆</span>
+                          <span className="text-green-600 text-sm">ðŸ†</span>
                         )}
                       </div>
                     </td>
@@ -253,11 +253,11 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
                 {invitationStats.top_accepted.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                      <div className="text-gray-400 text-2xl mb-2">✅</div>
-                      <p>Aucune invitation acceptée</p>
+                      <div className="text-gray-400 text-2xl mb-2">âœ…</div>
+                      <p>Aucune invitation acceptÃ©e</p>
                       {cacheStatus && (
                         <p className="text-xs text-gray-400 mt-1">
-                          Données {cacheStatus.is_available ? 'en cache' : 'directes'} - Aucun résultat
+                          DonnÃ©es {cacheStatus.is_available ? 'en cache' : 'directes'} - Aucun rÃ©sultat
                         </p>
                       )}
                     </td>
@@ -269,14 +269,14 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
         </div>
       </div>
 
-      {/* Section de Performance Invitations détaillée */}
+      {/* Section de Performance Invitations dÃ©taillÃ©e */}
       <div className="bg-white border border-gray-200">
         <div className="px-4 py-3 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-medium text-gray-900">Performance des Invitations</h3>
             {cacheStatus && cacheStatus.last_update && (
               <div className="text-xs text-gray-500">
-                Dernière MAJ: {new Date(cacheStatus.last_update).toLocaleString('fr-FR')}
+                DerniÃ¨re MAJ: {new Date(cacheStatus.last_update).toLocaleString('fr-FR')}
               </div>
             )}
           </div>
@@ -285,7 +285,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg relative">
               <p className="text-2xl font-bold text-blue-900">{invitationStats.total_invitations_sent}</p>
-              <p className="text-sm text-blue-700">Total Envoyées</p>
+              <p className="text-sm text-blue-700">Total EnvoyÃ©es</p>
               {cacheStatus?.is_available && (
                 <div className="absolute top-2 right-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -294,7 +294,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
             </div>
             <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-lg relative">
               <p className="text-2xl font-bold text-green-900">{invitationStats.total_invitations_accepted}</p>
-              <p className="text-sm text-green-700">Total Acceptées</p>
+              <p className="text-sm text-green-700">Total AcceptÃ©es</p>
               {cacheStatus?.is_available && (
                 <div className="absolute top-2 right-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -320,58 +320,17 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
               )}
             </div>
           </div>
-
-          {/* Métriques avancées - VERSION CORRIGÉE */}
-          <div className="border-t border-gray-200 pt-4">
-            <h4 className="text-sm font-medium text-gray-900 mb-3">Analyse Avancée</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
-              
-              <div className="bg-white border border-gray-200 p-3 rounded">
-                <div className="text-center">
-                  <p className="text-lg font-semibold text-indigo-600">{invitationStats.unique_inviters}</p>
-                  <p className="text-xs text-indigo-700">Inviteurs Actifs</p>
-                </div>
-              </div>
-
-              <div className="bg-white border border-gray-200 p-3 rounded">
-                <div className="text-center">
-                  <p className="text-lg font-semibold text-teal-600">
-                    {invitationStats.unique_inviters > 0 ? 
-                      (invitationStats.total_invitations_sent / invitationStats.unique_inviters).toFixed(1) : 
-                      '0.0'
-                    }
-                  </p>
-                  <p className="text-xs text-teal-700">Moy. par Inviteur</p>
-                </div>
-              </div>
-
-              <div className="bg-white border border-gray-200 p-3 rounded">
-                <div className="text-center">
-                  <p className="text-lg font-semibold text-orange-600">
-                    {invitationStats.total_invitations_accepted > 0 ? 
-                      (invitationStats.total_invitations_accepted / invitationStats.unique_inviters).toFixed(1) : 
-                      '0.0'
-                    }
-                  </p>
-                  <p className="text-xs text-orange-700">Succès par Inviteur</p>
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-
         </div>
       </div>
 
-      {/* Section d'export complète avec informations cache */}
+      {/* Section d'export complÃ¨te avec informations cache */}
       <div className="bg-white border border-gray-200">
         <div className="px-4 py-3 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-medium text-gray-900">Export des Statistiques d'Invitations</h3>
             {cacheStatus?.is_available && (
               <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                Données optimisées
+                DonnÃ©es optimisÃ©es
               </span>
             )}
           </div>
@@ -385,25 +344,25 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
                 <h4 className="text-base font-medium text-gray-900 mb-1">Export CSV Complet</h4>
                 <p className="text-sm text-gray-600 mb-3">Toutes les statistiques au format CSV</p>
                 <div className="text-xs text-gray-500 mb-4">
-                  <p>• Top inviteurs et statistiques détaillées</p>
-                  <p>• Données {cacheStatus?.is_available ? 'optimisées par cache' : 'en temps réel'}</p>
+                  <p>â€¢ Top inviteurs et statistiques dÃ©taillÃ©es</p>
+                  <p>â€¢ DonnÃ©es {cacheStatus?.is_available ? 'optimisÃ©es par cache' : 'en temps rÃ©el'}</p>
                   {cacheStatus?.is_available && (
-                    <p>• Exporté avec performance optimisée</p>
+                    <p>â€¢ ExportÃ© avec performance optimisÃ©e</p>
                   )}
                 </div>
               </div>
               <button
                 onClick={() => {
                   const csvData = [
-                    ['Métrique', 'Valeur', 'Source', 'Timestamp'],
-                    ['Total Invitations Envoyées', invitationStats.total_invitations_sent, cacheStatus?.is_available ? 'Cache' : 'Direct', new Date().toISOString()],
-                    ['Total Invitations Acceptées', invitationStats.total_invitations_accepted, cacheStatus?.is_available ? 'Cache' : 'Direct', new Date().toISOString()],
+                    ['MÃ©trique', 'Valeur', 'Source', 'Timestamp'],
+                    ['Total Invitations EnvoyÃ©es', invitationStats.total_invitations_sent, cacheStatus?.is_available ? 'Cache' : 'Direct', new Date().toISOString()],
+                    ['Total Invitations AcceptÃ©es', invitationStats.total_invitations_accepted, cacheStatus?.is_available ? 'Cache' : 'Direct', new Date().toISOString()],
                     ['Taux d\'Acceptation Global', `${invitationStats.acceptance_rate.toFixed(1)}%`, cacheStatus?.is_available ? 'Cache' : 'Direct', new Date().toISOString()],
                     ['Nombre d\'Inviteurs Uniques', invitationStats.unique_inviters, cacheStatus?.is_available ? 'Cache' : 'Direct', new Date().toISOString()],
                     ['Moyenne Invitations par Inviteur', invitationStats.unique_inviters > 0 ? (invitationStats.total_invitations_sent / invitationStats.unique_inviters).toFixed(1) : '0', cacheStatus?.is_available ? 'Cache' : 'Direct', new Date().toISOString()],
                     ['', '', '', ''],
-                    ['Top Inviteurs (Envoyées)', '', '', ''],
-                    ['Rang', 'Nom', 'Email', 'Envoyées', 'Acceptées', 'Taux'],
+                    ['Top Inviteurs (EnvoyÃ©es)', '', '', ''],
+                    ['Rang', 'Nom', 'Email', 'EnvoyÃ©es', 'AcceptÃ©es', 'Taux'],
                     ...invitationStats.top_inviters.map((inviter, index) => [
                       index + 1,
                       inviter.inviter_name || 'N/A',
@@ -413,8 +372,8 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
                       `${inviter.acceptance_rate.toFixed(1)}%`
                     ]),
                     ['', '', '', ''],
-                    ['Top Inviteurs (Acceptées)', '', '', ''],
-                    ['Rang', 'Nom', 'Email', 'Acceptées', 'Total', 'Efficacité'],
+                    ['Top Inviteurs (AcceptÃ©es)', '', '', ''],
+                    ['Rang', 'Nom', 'Email', 'AcceptÃ©es', 'Total', 'EfficacitÃ©'],
                     ...invitationStats.top_accepted.map((inviter, index) => [
                       index + 1,
                       inviter.inviter_name || 'N/A',
@@ -441,9 +400,10 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
                   document.body.removeChild(link)
                   window.URL.revokeObjectURL(url)
                 }}
-                className="w-full bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors"
+                className="bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors inline-flex items-center space-x-2 w-fit"
               >
-                📊 Exporter CSV
+                <span>ðŸ"Š</span>
+                <span>Exporter CSV</span>
               </button>
             </div>
 
