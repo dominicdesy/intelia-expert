@@ -529,8 +529,8 @@ export const StatisticsPage: React.FC = () => {
     try {
       console.log('⚡ Tentative endpoint cache: /api/v1/stats-fast/invitations')
       
-      // CORRECTION: Utilise apiClient.get() au lieu de fetch direct
-      const response = await apiClient.get<FastInvitationStats>('/api/v1/stats-fast/invitations')
+      // CORRECTION: Utilise apiClient.get() au lieu de fetch direct (sans préfixe /api/v1/)
+      const response = await apiClient.get<FastInvitationStats>('/stats-fast/invitations')
       
       if (!response.success) {
         throw new Error(response.error?.message || 'Erreur lors du chargement des invitations')
