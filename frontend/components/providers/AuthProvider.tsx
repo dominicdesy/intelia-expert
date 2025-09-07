@@ -1,4 +1,4 @@
-// AuthProvider.tsx - Version avec session tracking automatique
+// AuthProvider.tsx - Version corrigée avec session tracking automatique
 'use client'
 
 import React, { useEffect } from 'react'
@@ -70,7 +70,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!isAuthenticated) return
 
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      // Envoyer un signal de fin de session via beacon API (non-bloquant)
+      // Envoyer un signal de fin de session via l'endpoint logout
       const authData = localStorage.getItem('intelia-expert-auth')
       if (authData) {
         try {
@@ -78,28 +78,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
           const token = parsed.access_token
           
           if (token) {
-            // Utiliser fetch avec keepalive et en-têtes Authorization
-            const url = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'}/v1/auth/heartbeat`
+            // CORRECTION: Utiliser l'endpoint logout au lieu de heartbeat
+            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
+            const logoutUrl = `${baseUrl}/api/v1/auth/logout`
             
-            fetch(url, {
+            fetch(logoutUrl, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify({ 
-                logout_type: 'browser_close',
-                timestamp: new Date().toISOString()
+                reason: 'browser_close'  // Correction: utiliser 'reason' comme dans l'endpoint
               }),
               keepalive: true
             }).catch(() => {
               // Ignorer les erreurs silencieusement lors de la fermeture
             })
             
-            console.log('[AuthProvider] Signal de fermeture envoyé via fetch keepalive')
+            console.log('[AuthProvider] Signal de fermeture envoyé via logout endpoint')
           }
         } catch (error) {
-          console.warn('[AuthProvider] Erreur envoi beacon:', error)
+          console.warn('[AuthProvider] Erreur envoi logout:', error)
         }
       }
     }

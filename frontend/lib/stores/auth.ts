@@ -114,6 +114,7 @@ export const useAuthStore = create<AuthState>()(
         console.log('[AuthStore] Session tracking démarré:', now.toISOString())
       },
 
+      // CORRECTION: Utiliser apiClient au lieu de construire l'URL manuellement
       endSessionTracking: async () => {
         const { sessionStart } = get()
         if (sessionStart) {
@@ -127,20 +128,24 @@ export const useAuthStore = create<AuthState>()(
           console.log(`[AuthStore] Session terminée - durée: ${Math.round(duration)}s`)
           
           try {
-            // Appeler l'endpoint logout backend pour enregistrer la fin de session
-            await apiClient.postSecure('/auth/logout', { duration })
-            console.log('[AuthStore] Logout tracking envoyé au backend')
+            // CORRECTION: Utiliser apiClient qui gère déjà la bonne base URL
+            const response = await apiClient.postSecure('/auth/logout', { reason: 'manual' })
+            if (response.success) {
+              console.log('[AuthStore] Logout tracking envoyé au backend')
+            }
           } catch (error) {
             console.warn('[AuthStore] Erreur logout tracking:', error)
           }
         }
       },
 
+      // CORRECTION: Utiliser apiClient au lieu de construire l'URL manuellement
       sendHeartbeat: async () => {
         const { isAuthenticated, sessionStart } = get()
         if (!isAuthenticated || !sessionStart) return
 
         try {
+          // CORRECTION: Utiliser apiClient qui gère déjà la bonne base URL
           const response = await apiClient.postSecure('/auth/heartbeat')
           if (response.success) {
             set({ lastHeartbeat: Date.now() })
