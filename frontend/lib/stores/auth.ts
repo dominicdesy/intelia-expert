@@ -8,6 +8,30 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { apiClient } from '@/lib/api/client'
 import type { User as AppUser } from '@/types'
 
+// Interface pour les données utilisateur du backend
+interface BackendUserData {
+  user_id: string
+  email: string
+  full_name?: string
+  phone?: string
+  country?: string
+  linkedin_profile?: string
+  company_name?: string
+  company_website?: string
+  linkedin_corporate?: string
+  user_type?: string
+  language?: string
+  created_at?: string
+  plan?: string
+  avatar_url?: string
+  consent_given?: boolean
+  consent_date?: string
+  updated_at?: string
+  profile_id?: string
+  preferences?: any
+  is_admin?: boolean
+}
+
 // Types d'état du store
 interface AuthState {
   user: AppUser | null
@@ -96,7 +120,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           console.log('[AuthStore] Vérification auth via /auth/me')
           
-          const response = await apiClient.getSecure('/auth/me')
+          const response = await apiClient.getSecure<BackendUserData>('/auth/me')
           
           if (response.success && response.data) {
             const userData = response.data
@@ -161,7 +185,7 @@ export const useAuthStore = create<AuthState>()(
         console.log('[AuthStore] Login via /auth/login:', email)
         
         try {
-          const response = await apiClient.post('/auth/login', {
+          const response = await apiClient.post<{access_token: string, expires_at?: string}>('/auth/login', {
             email,
             password
           })
@@ -219,7 +243,7 @@ export const useAuthStore = create<AuthState>()(
             throw new Error('Le nom doit contenir au moins 2 caractères')
           }
 
-          const response = await apiClient.post('/auth/register', {
+          const response = await apiClient.post<{token?: string, user?: any}>('/auth/register', {
             email,
             password,
             full_name: fullName,
@@ -451,7 +475,7 @@ export const useAuthStore = create<AuthState>()(
             throw new Error('Utilisateur non connecté')
           }
 
-          const response = await apiClient.deleteSecure('/users/delete-account')
+          const response = await apiClient.deleteSecure<any>('/users/delete-account')
           
           if (!response.success) {
             throw new Error(response.error?.message || 'Erreur lors de la suppression du compte')

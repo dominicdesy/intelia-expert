@@ -185,5 +185,5 @@ export class APIClient {
 // 🔧 EXPORT CORRIGÉ: Instance unique exportée
 export const apiClient = new APIClient()
 
-// Export de la classe pour les cas spéciaux
-export { APIClient }
+// Export par défaut de la classe pour les cas spéciaux si nécessaire
+export default APIClient
