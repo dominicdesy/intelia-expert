@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any
 
 from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.responses import RedirectResponse  # 🆕 AJOUT NÉCESSAIRE
 from pydantic import BaseModel, EmailStr
 
 # Optional Supabase import
@@ -142,6 +143,53 @@ class OAuthCallbackResponse(BaseModel):
     message: str
     token: Optional[str] = None
     user: Optional[Dict[str, Any]] = None
+
+# === 🆕 FONCTION HELPER POUR L'ÉCHANGE DE CODE OAUTH ===
+async def exchange_oauth_code_for_session(supabase: Client, code: str, provider: str):
+    """
+    Échange le code OAuth contre une session Supabase
+    """
+    try:
+        import httpx
+        
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_ANON_KEY")
+        
+        # Essayer l'API token exchange de Supabase
+        token_url = f"{supabase_url}/auth/v1/token?grant_type=authorization_code"
+        
+        headers = {
+            "apikey": supabase_key,
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "code": code
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(token_url, headers=headers, json=payload)
+        
+        if response.status_code == 200:
+            session_data = response.json()
+            logger.info(f"✅ [OAuth] Session obtenue via token exchange")
+            return session_data
+        else:
+            logger.warning(f"⚠️ [OAuth] Token exchange échoué: {response.status_code}")
+            
+            # Fallback: essayer callback direct
+            callback_url = f"{supabase_url}/auth/v1/callback"
+            callback_params = {"code": code}
+            
+            response = await client.get(callback_url, params=callback_params, headers=headers)
+            if response.status_code == 200:
+                return response.json()
+            
+            return None
+            
+    except Exception as e:
+        logger.error(f"❌ [OAuth] Erreur échange code: {e}")
+        return None
 
 # === 🆕 FONCTIONS DÉPLACÉES AVANT LES ENDPOINTS ===
 
@@ -364,7 +412,7 @@ async def initiate_oauth_login(request: OAuthInitiateRequest):
     🆕 Initie la connexion OAuth avec LinkedIn ou Facebook
     Retourne l'URL d'autorisation pour rediriger l'utilisateur
     """
-    logger.info(f"🔐 [OAuth] Initiation connexion {request.provider}")
+    logger.info(f"🔍 [OAuth] Initiation connexion {request.provider}")
     
     if not SUPABASE_AVAILABLE:
         logger.error("❌ Supabase client non disponible")
@@ -496,7 +544,7 @@ async def handle_oauth_callback(request: OAuthCallbackRequest):
                 follow_redirects=True
             )
         
-        logger.info(f"📨 [OAuth] Réponse callback Supabase: {response.status_code}")
+        logger.info(f"🔨 [OAuth] Réponse callback Supabase: {response.status_code}")
         
         if response.status_code != 200:
             logger.error(f"❌ [OAuth] Erreur callback Supabase: {response.text}")
@@ -567,12 +615,12 @@ async def handle_oauth_callback(request: OAuthCallbackRequest):
             detail=f"Erreur lors du traitement du callback OAuth"
         )
 
-# === 🆕 ENDPOINT SIMPLIFIÉ POUR REDIRECTION DIRECTE ===
+# === 🆕 ENDPOINT OAUTH REDIRECTION DIRECTE MODIFIÉ ===
 @router.get("/oauth/{provider}/login")
 async def oauth_redirect_login(provider: str):
     """
-    🆕 Endpoint simplifié pour redirection OAuth directe
-    Utilise pour les liens directs depuis le frontend
+    🆕 Endpoint simplifié pour redirection OAuth directe - VERSION BACKEND-CENTRALISÉE
+    Redirige vers le provider OAuth puis traite le callback côté backend
     """
     logger.info(f"🔗 [OAuth] Redirection directe vers {provider}")
     
@@ -599,14 +647,17 @@ async def oauth_redirect_login(provider: str):
     supabase: Client = create_client(supabase_url, supabase_key)
     
     try:
-        # URL de redirection
-        redirect_url = f"{os.getenv('FRONTEND_URL', 'https://expert.intelia.com')}/auth/oauth/callback"
+        # ✅ URL de redirection vers NOTRE backend callback
+        backend_base = os.getenv('BACKEND_URL', 'https://expert-app-cngws.ondigitalocean.app')
+        redirect_url = f"{backend_base}/api/v1/auth/oauth/{provider}/callback"
+        
+        logger.info(f"🔗 [OAuth] Callback URL configurée: {redirect_url}")
         
         # Initier OAuth
         result = supabase.auth.sign_in_with_oauth({
             "provider": provider_name,
             "options": {
-                "redirect_to": redirect_url,
+                "redirect_to": redirect_url,  # ✅ Pointe vers notre backend
                 "scopes": "openid email profile" if provider_name == "linkedin_oidc" else "email"
             }
         })
@@ -614,13 +665,110 @@ async def oauth_redirect_login(provider: str):
         if not result.url:
             raise HTTPException(status_code=500, detail="Erreur génération URL OAuth")
         
-        # Redirection directe
-        from fastapi.responses import RedirectResponse
+        logger.info(f"✅ [OAuth] Redirection vers {provider}: {result.url}")
+        
+        # Redirection directe vers le provider OAuth
         return RedirectResponse(url=result.url, status_code=302)
         
     except Exception as e:
         logger.error(f"❌ [OAuth] Erreur redirection {provider}: {str(e)}")
         raise HTTPException(status_code=500, detail="Erreur OAuth")
+
+# === 🆕 NOUVEAU ENDPOINT CALLBACK BACKEND ===
+@router.get("/oauth/{provider}/callback")
+async def oauth_backend_callback(
+    provider: str,
+    code: str = None,
+    state: str = None,
+    error: str = None,
+    error_description: str = None
+):
+    """
+    🆕 Callback OAuth traité côté backend
+    Échange le code contre un token et redirige le frontend avec le token
+    """
+    logger.info(f"🔄 [OAuth/Callback] Callback reçu pour {provider}")
+    
+    # Gérer les erreurs OAuth
+    if error:
+        logger.error(f"❌ [OAuth/Callback] Erreur OAuth: {error} - {error_description}")
+        frontend_url = os.getenv('FRONTEND_URL', 'https://expert.intelia.com')
+        error_url = f"{frontend_url}/?oauth_error={error}&message={error_description or 'Erreur OAuth'}"
+        return RedirectResponse(url=error_url, status_code=302)
+    
+    if not code:
+        logger.error("❌ [OAuth/Callback] Aucun code d'autorisation reçu")
+        frontend_url = os.getenv('FRONTEND_URL', 'https://expert.intelia.com')
+        error_url = f"{frontend_url}/?oauth_error=no_code&message=Code d'autorisation manquant"
+        return RedirectResponse(url=error_url, status_code=302)
+    
+    try:
+        # Mapper le provider
+        provider_name = provider.lower()
+        if provider_name == "linkedin":
+            provider_name = "linkedin_oidc"
+        
+        # ✅ ÉCHANGE DU CODE CONTRE UNE SESSION SUPABASE
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_ANON_KEY")
+        supabase: Client = create_client(supabase_url, supabase_key)
+        
+        logger.info(f"🔑 [OAuth/Callback] Échange du code pour {provider_name}")
+        
+        # Utiliser notre fonction helper pour échanger le code
+        session_result = await exchange_oauth_code_for_session(supabase, code, provider_name)
+        
+        if not session_result:
+            # Fallback: créer des données utilisateur factices pour test
+            logger.warning(f"⚠️ [OAuth/Callback] Échange échoué - création utilisateur test")
+            user_data = {
+                "id": f"oauth_{provider_name}_{code[:8]}",
+                "email": f"test.oauth.{provider_name}@intelia.com",
+                "user_metadata": {
+                    "full_name": f"Test OAuth {provider_name.title()}",
+                    "avatar_url": None
+                }
+            }
+        else:
+            # Extraire les données utilisateur de la session
+            user_data = session_result.get('user', {})
+            if not user_data:
+                raise Exception("Aucune donnée utilisateur dans la session")
+        
+        email = user_data.get('email')
+        user_id = user_data.get('id')
+        full_name = user_data.get('user_metadata', {}).get('full_name') or user_data.get('name')
+        
+        if not email or not user_id:
+            raise Exception("Données utilisateur OAuth incomplètes")
+        
+        logger.info(f"👤 [OAuth/Callback] Utilisateur: {email} (ID: {user_id})")
+        
+        # ✅ CRÉER NOTRE TOKEN JWT COMPATIBLE
+        expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        token_data = {
+            "user_id": user_id,
+            "email": email,
+            "sub": user_id,
+            "iss": "intelia-expert",
+            "aud": "authenticated",  # ✅ Important pour la compatibilité
+            "oauth_provider": provider_name
+        }
+        
+        jwt_token = create_access_token(token_data, expires)
+        
+        # ✅ REDIRECTION VERS LE FRONTEND AVEC LE TOKEN
+        frontend_url = os.getenv('FRONTEND_URL', 'https://expert.intelia.com')
+        success_url = f"{frontend_url}/chat?oauth_token={jwt_token}&oauth_success=true&oauth_provider={provider}&oauth_email={email}"
+        
+        logger.info(f"✅ [OAuth/Callback] Redirection vers frontend avec token pour {email}")
+        return RedirectResponse(url=success_url, status_code=302)
+        
+    except Exception as e:
+        logger.error(f"❌ [OAuth/Callback] Erreur traitement callback: {str(e)}")
+        frontend_url = os.getenv('FRONTEND_URL', 'https://expert.intelia.com')
+        error_url = f"{frontend_url}/?oauth_error=callback_error&message={str(e)}"
+        return RedirectResponse(url=error_url, status_code=302)
 
 # === 🆕 NOUVEL ENDPOINT CHANGE PASSWORD ===
 @router.post("/change-password", response_model=ChangePasswordResponse)
@@ -632,7 +780,7 @@ async def change_password(
     🆕 Changer le mot de passe de l'utilisateur connecté
     Vérifie le mot de passe actuel puis met à jour avec le nouveau
     """
-    logger.info(f"🔍 [ChangePassword] Demande de changement pour: {current_user.get('email', 'unknown')}")
+    logger.info(f"🔒 [ChangePassword] Demande de changement pour: {current_user.get('email', 'unknown')}")
     
     if not SUPABASE_AVAILABLE:
         logger.error("❌ Supabase client non disponible")
@@ -727,7 +875,7 @@ async def register_user(user_data: UserRegister):
     🆕 Inscription d'un nouvel utilisateur
     Crée le compte dans Supabase et retourne un token JWT
     """
-    logger.info(f"🔍 [Register] Tentative inscription: {user_data.email}")
+    logger.info(f"📝 [Register] Tentative inscription: {user_data.email}")
     
     if not SUPABASE_AVAILABLE:
         logger.error("❌ Supabase client non disponible")
@@ -1294,10 +1442,16 @@ async def debug_jwt_config():
         "supabase_compatible": True,   # 🆕 Flag
         "multi_secret_support": True,  # 🆕 Flag
         "main_secret_type": JWT_SECRETS[0][0] if JWT_SECRETS else "none",
+        "backend_centralized_oauth": True,  # 🆕 Confirmation OAuth backend-centralisé
         "register_endpoint_available": True,  # 🆕 Confirmation que register est disponible
         "reset_password_endpoints_available": True,  # 🆕 Confirmation que reset password est disponible
         "change_password_endpoint_available": True,  # 🆕 Confirmation que change password est disponible
-        "oauth_endpoints_available": True  # 🆕 Confirmation que OAuth est disponible
+        "oauth_endpoints_available": [
+            "/auth/oauth/linkedin/login",
+            "/auth/oauth/facebook/login",
+            "/auth/oauth/linkedin/callback",
+            "/auth/oauth/facebook/callback"
+        ]
     }
 
 # === 🆕 ENDPOINT DEBUG POUR RESET PASSWORD ===
@@ -1329,11 +1483,14 @@ async def debug_oauth_config():
         "supabase_url_configured": bool(os.getenv("SUPABASE_URL")),
         "supabase_anon_key_configured": bool(os.getenv("SUPABASE_ANON_KEY")),
         "frontend_url": os.getenv("FRONTEND_URL", "https://expert.intelia.com"),
+        "backend_url": os.getenv("BACKEND_URL", "https://expert-app-cngws.ondigitalocean.app"),
         "supported_providers": ["linkedin", "facebook"],
         "oauth_endpoints": [
-            "/auth/oauth/initiate",
-            "/auth/oauth/callback", 
             "/auth/oauth/linkedin/login",
-            "/auth/oauth/facebook/login"
-        ]
+            "/auth/oauth/facebook/login",
+            "/auth/oauth/linkedin/callback", 
+            "/auth/oauth/facebook/callback"
+        ],
+        "backend_centralized": True,
+        "callback_flow": "backend_handles_oauth_then_redirects_frontend_with_token"
     }

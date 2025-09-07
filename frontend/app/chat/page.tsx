@@ -10,7 +10,7 @@ import { useTranslation } from '@/lib/languages/i18n'
 import { useChatStore } from './hooks/useChatStore'
 import { generateAIResponse } from './services/apiService'
 import { conversationService } from './services/conversationService'
-// ❌ SUPPRIMÉ - Plus de Supabase direct
+// ⌐ SUPPRIMÉ - Plus de Supabase direct
 // import { getSupabaseClient } from '@/lib/supabase/singleton'
 
 import {
@@ -450,23 +450,44 @@ function ChatInterface() {
     }
   }, [])
 
-  // ✅ SUPPRIMÉ - Gestionnaire OAuth Supabase complet
-  // useEffect(() => {
-  //   const handleOAuthCallback = async () => { ... }
-  //   if (searchParams?.has('auth')) {
-  //     handleOAuthCallback()
-  //   }
-  // }, [searchParams, router])
-
-  // ✅ GESTIONNAIRE AUTH CALLBACK SIMPLIFIÉ - Backend uniquement
+  // ✅ NOUVEAU - Gestion récupération token OAuth depuis URL
   useEffect(() => {
+    const oauthToken = searchParams?.get('oauth_token')
     const authStatus = searchParams?.get('auth')
     
-    if (authStatus === 'success') {
-      console.log('[Chat] Authentification réussie via backend')
+    if (oauthToken) {
+      console.log('[Chat] Token OAuth reçu depuis URL, stockage en cours...')
+      
+      // Stocker le token dans localStorage avec le format attendu
+      const authData = {
+        access_token: oauthToken,
+        token_type: 'bearer',
+        synced_at: Date.now(),
+        oauth_provider: searchParams?.get('oauth_provider') || 'unknown'
+      }
+      
+      localStorage.setItem('intelia-expert-auth', JSON.stringify(authData))
+      
       // Nettoyer l'URL
+      const cleanUrl = new URL(window.location.href)
+      cleanUrl.searchParams.delete('oauth_token')
+      cleanUrl.searchParams.delete('oauth_success')
+      cleanUrl.searchParams.delete('oauth_email')
+      cleanUrl.searchParams.delete('oauth_provider')
+      cleanUrl.searchParams.delete('auth')
+      cleanUrl.searchParams.delete('message')
+      window.history.replaceState({}, '', cleanUrl.pathname)
+      
+      // Recharger l'auth pour valider le token
+      checkAuth()
+      
+      console.log('[Chat] Token OAuth stocké et auth rechargée')
+    } else if (authStatus === 'success') {
+      console.log('[Chat] Authentification réussie via backend')
+      // Nettoyer l'URL si pas de token mais success
       const url = new URL(window.location.href)
       url.searchParams.delete('auth')
+      url.searchParams.delete('message')
       window.history.replaceState({}, '', url.pathname)
       
       // Vérifier l'auth via le backend
@@ -1038,9 +1059,6 @@ function ChatInterface() {
       </div>
     )
   }
-
-  // ✅ SUPPRIMÉ - Affichage erreur OAuth
-  // if (oauthError) { ... }
 
   // ✅ CONDITION DE RENDU SIMPLIFIÉE
   if (!isAuthenticated || !user) {

@@ -1,5 +1,5 @@
 // lib/stores/auth.ts - SYSTÈME D'AUTH UNIFIÉ - BACKEND ONLY
-// Version simplifiée qui utilise UNIQUEMENT le backend
+// Version backend-centralisée pour OAuth
 
 'use client'
 
@@ -32,26 +32,6 @@ interface BackendUserData {
   is_admin?: boolean
 }
 
-// 🆕 NOUVEAUX TYPES POUR OAUTH
-interface OAuthProvider {
-  name: 'linkedin' | 'facebook'
-  displayName: string
-}
-
-interface OAuthInitiateResponse {
-  success: boolean
-  auth_url: string
-  state: string
-  message: string
-}
-
-interface OAuthCallbackResponse {
-  success: boolean
-  message: string
-  token?: string
-  user?: any
-}
-
 // Types d'état du store
 interface AuthState {
   user: AppUser | null
@@ -60,7 +40,7 @@ interface AuthState {
   hasHydrated: boolean
   lastAuthCheck: number
   authErrors: string[]
-  isOAuthLoading: string | null  // 🆕 Provider en cours de connexion OAuth
+  isOAuthLoading: string | null  // Provider en cours de connexion OAuth
 
   // Actions existantes
   setHasHydrated: (v: boolean) => void
@@ -77,9 +57,9 @@ interface AuthState {
   exportUserData: () => Promise<any>
   deleteUserData: () => Promise<void>
   
-  // 🆕 NOUVELLES ACTIONS OAUTH
+  // 🆕 ACTIONS OAUTH BACKEND-CENTRALISÉES
   loginWithOAuth: (provider: 'linkedin' | 'facebook') => Promise<void>
-  handleOAuthCallback: (provider: string, code: string, state: string) => Promise<void>
+  handleOAuthTokenFromURL: () => Promise<void>
 }
 
 // Store unifié utilisant UNIQUEMENT le backend
@@ -92,7 +72,7 @@ export const useAuthStore = create<AuthState>()(
       hasHydrated: false,
       lastAuthCheck: 0,
       authErrors: [],
-      isOAuthLoading: null,  // 🆕
+      isOAuthLoading: null,
 
       setHasHydrated: (v: boolean) => {
         set({ hasHydrated: v })
@@ -113,6 +93,9 @@ export const useAuthStore = create<AuthState>()(
         console.log('[AuthStore] Initialisation de session...')
         
         try {
+          // 🆕 NOUVEAU: Vérifier d'abord s'il y a un token OAuth dans l'URL
+          await get().handleOAuthTokenFromURL()
+          
           // Vérifier si un token existe dans localStorage
           const authData = localStorage.getItem('intelia-expert-auth')
           
@@ -258,120 +241,100 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 🆕 LOGIN WITH OAUTH : Nouvelle méthode utilisant le backend
+      // 🆕 LOGIN WITH OAUTH : REDIRECTION DIRECTE VERS BACKEND
       loginWithOAuth: async (provider: 'linkedin' | 'facebook') => {
         set({ isOAuthLoading: provider, authErrors: [] })
-        console.log(`[AuthStore] OAuth login initié pour ${provider}`)
+        console.log(`[AuthStore] OAuth login initié pour ${provider} - redirection directe vers backend`)
         
         try {
-          // 1. Appeler le backend pour initier OAuth
-          const response = await apiClient.post<OAuthInitiateResponse>('/auth/oauth/initiate', {
-            provider,
-            redirect_url: `${window.location.origin}/auth/oauth/callback`
-          })
-
-          if (!response.success || !response.data.auth_url) {
-            throw new Error(response.error?.message || 'Erreur d\'initiation OAuth')
-          }
-
-          const { auth_url, state } = response.data
+          // Construire l'URL du backend OAuth
+          const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app/api'
+          const oauthUrl = `${backendUrl}/v1/auth/oauth/${provider}/login`
           
-          // 2. Stocker le state pour la vérification du callback
-          sessionStorage.setItem('oauth_state', state)
-          sessionStorage.setItem('oauth_provider', provider)
+          console.log(`[AuthStore] Redirection vers:`, oauthUrl)
           
-          console.log(`[AuthStore] Redirection vers ${provider}:`, auth_url)
-          
-          // 3. Rediriger vers le provider OAuth
-          window.location.href = auth_url
+          // Redirection directe vers le backend - pas d'API call
+          window.location.href = oauthUrl
           
         } catch (e: any) {
           console.error(`[AuthStore] Erreur OAuth ${provider}:`, e)
           get().handleAuthError(e, `loginWithOAuth-${provider}`)
           
           let userMessage = e?.message || `Erreur de connexion avec ${provider}`
-          if (userMessage.includes('Service OAuth non disponible')) {
-            userMessage = `Connexion ${provider} temporairement indisponible`
-          }
           
           set({ isOAuthLoading: null })
           throw new Error(userMessage)
         }
       },
 
-      // 🆕 HANDLE OAUTH CALLBACK : Traite le retour OAuth
-      handleOAuthCallback: async (provider: string, code: string, state: string) => {
-        set({ isOAuthLoading: provider, authErrors: [] })
-        console.log(`[AuthStore] Traitement callback OAuth ${provider}`)
-        
+      // 🆕 HANDLE OAUTH TOKEN FROM URL : Récupère le token depuis l'URL après redirection backend
+      handleOAuthTokenFromURL: async () => {
         try {
-          // 1. Vérifier le state (sécurité)
-          const storedState = sessionStorage.getItem('oauth_state')
-          const storedProvider = sessionStorage.getItem('oauth_provider')
+          // Vérifier s'il y a des paramètres OAuth dans l'URL
+          const urlParams = new URLSearchParams(window.location.search)
+          const oauthToken = urlParams.get('oauth_token')
+          const oauthSuccess = urlParams.get('oauth_success')
+          const oauthProvider = urlParams.get('oauth_provider')
+          const oauthEmail = urlParams.get('oauth_email')
           
-          if (!storedState || storedState !== state) {
-            throw new Error('État OAuth invalide - possible attaque CSRF')
+          if (oauthSuccess === 'true' && oauthToken) {
+            console.log('[AuthStore] Token OAuth détecté dans l\'URL')
+            
+            // Stocker le token dans localStorage
+            const authData = {
+              access_token: oauthToken,
+              token_type: 'bearer',
+              synced_at: Date.now(),
+              oauth_provider: oauthProvider
+            }
+            localStorage.setItem('intelia-expert-auth', JSON.stringify(authData))
+            
+            // Nettoyer l'URL
+            const cleanUrl = new URL(window.location.href)
+            cleanUrl.searchParams.delete('oauth_token')
+            cleanUrl.searchParams.delete('oauth_success')
+            cleanUrl.searchParams.delete('oauth_email')
+            cleanUrl.searchParams.delete('oauth_provider')
+            window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search)
+            
+            // Vérifier l'auth pour récupérer les données utilisateur complètes
+            await get().checkAuth()
+            
+            // Reset du loading OAuth
+            set({ isOAuthLoading: null })
+            
+            // Déclencher l'événement de redirection
+            setTimeout(() => {
+              window.dispatchEvent(new Event('auth-state-changed'))
+            }, 100)
+            
+            console.log(`[AuthStore] OAuth ${oauthProvider} réussi:`, oauthEmail)
+            return true
           }
           
-          if (!storedProvider || storedProvider !== provider) {
-            throw new Error('Provider OAuth incohérent')
+          // Vérifier les erreurs OAuth
+          const oauthError = urlParams.get('oauth_error')
+          if (oauthError) {
+            console.error('[AuthStore] Erreur OAuth dans l\'URL:', oauthError)
+            
+            // Nettoyer l'URL
+            const cleanUrl = new URL(window.location.href)
+            cleanUrl.searchParams.delete('oauth_error')
+            window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search)
+            
+            // Reset du loading et ajouter l'erreur
+            set({ isOAuthLoading: null })
+            get().handleAuthError({ message: decodeURIComponent(oauthError) }, 'oauth-url-error')
+            
+            return false
           }
-
-          // 2. Appeler le backend pour échanger le code contre un token
-          const response = await apiClient.post<OAuthCallbackResponse>('/auth/oauth/callback', {
-            provider,
-            code,
-            state
-          })
-
-          if (!response.success || !response.data.token) {
-            throw new Error(response.error?.message || 'Erreur lors de l\'échange du code OAuth')
-          }
-
-          const { token, user } = response.data
-
-          // 3. Sauvegarder le token comme pour un login normal
-          const authData = {
-            access_token: token,
-            token_type: 'bearer',
-            synced_at: Date.now(),
-            oauth_provider: provider
-          }
-          localStorage.setItem('intelia-expert-auth', JSON.stringify(authData))
-
-          // 4. Nettoyer le sessionStorage
-          sessionStorage.removeItem('oauth_state')
-          sessionStorage.removeItem('oauth_provider')
-
-          // 5. Vérifier l'auth pour récupérer les données utilisateur complètes
-          await get().checkAuth()
           
+          return false
+          
+        } catch (error) {
+          console.error('[AuthStore] Erreur traitement token OAuth URL:', error)
           set({ isOAuthLoading: null })
-          
-          // 6. Déclencher l'événement de redirection
-          setTimeout(() => {
-            window.dispatchEvent(new Event('auth-state-changed'))
-          }, 100)
-          
-          console.log(`[AuthStore] OAuth ${provider} réussi:`, user?.email)
-          
-        } catch (e: any) {
-          console.error(`[AuthStore] Erreur callback OAuth ${provider}:`, e)
-          get().handleAuthError(e, `handleOAuthCallback-${provider}`)
-          
-          // Nettoyer le sessionStorage même en cas d'erreur
-          sessionStorage.removeItem('oauth_state')
-          sessionStorage.removeItem('oauth_provider')
-          
-          let userMessage = e?.message || `Erreur de connexion avec ${provider}`
-          if (userMessage.includes('État OAuth invalide')) {
-            userMessage = 'Erreur de sécurité OAuth. Veuillez réessayer.'
-          } else if (userMessage.includes('Données utilisateur OAuth incomplètes')) {
-            userMessage = `${provider} n'a pas fourni toutes les informations nécessaires`
-          }
-          
-          set({ isOAuthLoading: null })
-          throw new Error(userMessage)
+          return false
         }
       },
 
@@ -468,7 +431,7 @@ export const useAuthStore = create<AuthState>()(
             user: null,
             isAuthenticated: false,
             isLoading: false,
-            isOAuthLoading: null,  // 🆕
+            isOAuthLoading: null,
             authErrors: [],
             lastAuthCheck: Date.now()
           })
@@ -641,7 +604,7 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: 'intelia-auth-store', // Nouveau nom pour éviter les conflits
+      name: 'intelia-auth-store',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         user: state.user,
