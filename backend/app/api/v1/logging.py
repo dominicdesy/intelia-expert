@@ -1,7 +1,7 @@
 # app/api/v1/logging.py
 """
 SYSTÈME DE LOGGING - POINT D'ENTRÉE PRINCIPAL
-Version corrigée sans création de tables
+Version corrigée sans création de tables + TRACKING SESSIONS UTILISATEUR
 """
 import os
 import logging
@@ -47,13 +47,13 @@ except ImportError as e:
 
 class LoggingManager:
     """
-    Gestionnaire principal des analytics et logging
+    Gestionnaire principal des analytics et logging + TRACKING SESSIONS
     """
     
     def __init__(self, db_config: dict = None):
         self.db_config = db_config or {}
         self.dsn = os.getenv("DATABASE_URL")
-        logger.info("LoggingManager initialisé avec correction PostgreSQL")
+        logger.info("LoggingManager initialisé avec correction PostgreSQL + sessions")
 
     def get_connection(self):
         """
@@ -67,6 +67,203 @@ class LoggingManager:
             return psycopg2.connect(**self.db_config)
         else:
             raise ValueError("Aucune configuration de base de données disponible (DATABASE_URL ou db_config)")
+
+    # ============================================================================
+    # NOUVELLES MÉTHODES POUR TRACKING DES SESSIONS
+    # ============================================================================
+
+    def start_session(self, user_email: str, session_id: str, ip_address: str = None, user_agent: str = None):
+        """Démarre une nouvelle session utilisateur"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO user_sessions (user_email, session_id, login_time, last_activity, ip_address, user_agent)
+                        VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, %s, %s)
+                        ON CONFLICT (session_id) DO UPDATE SET
+                            last_activity = CURRENT_TIMESTAMP,
+                            updated_at = CURRENT_TIMESTAMP
+                    """, (user_email, session_id, ip_address, user_agent))
+                    
+            logger.info(f"Session démarrée: {user_email} ({session_id})")
+            return {"success": True, "session_id": session_id}
+        except Exception as e:
+            logger.error(f"Erreur démarrage session: {e}")
+            return {"success": False, "error": str(e)}
+
+    def update_session_heartbeat(self, session_id: str):
+        """Met à jour l'activité de session (heartbeat)"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE user_sessions 
+                        SET last_activity = CURRENT_TIMESTAMP, 
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE session_id = %s AND logout_time IS NULL
+                        RETURNING user_email
+                    """, (session_id,))
+                    
+                    result = cur.fetchone()
+                    if result:
+                        return {"success": True, "user_email": result[0]}
+                    else:
+                        return {"success": False, "error": "Session not found or already ended"}
+                        
+        except Exception as e:
+            logger.error(f"Erreur heartbeat session: {e}")
+            return {"success": False, "error": str(e)}
+
+    def end_session(self, session_id: str, logout_type: str = "manual"):
+        """Termine une session et calcule la durée"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE user_sessions 
+                        SET logout_time = CURRENT_TIMESTAMP,
+                            session_duration_seconds = EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - login_time)),
+                            logout_type = %s,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE session_id = %s AND logout_time IS NULL
+                        RETURNING user_email, session_duration_seconds
+                    """, (logout_type, session_id))
+                    
+                    result = cur.fetchone()
+                    if result:
+                        user_email, duration = result
+                        logger.info(f"Session terminée: {user_email} - durée: {duration}s")
+                        return {"success": True, "duration": duration, "user_email": user_email}
+                    else:
+                        return {"success": False, "error": "Session not found or already ended"}
+                        
+        except Exception as e:
+            logger.error(f"Erreur fin session: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_user_session_analytics(self, user_email: str, days: int = 30):
+        """Analytics des sessions d'un utilisateur avec cache"""
+        cache_key = f"user_sessions_{user_email}_{days}"
+        
+        def compute_session_analytics():
+            try:
+                with self.get_connection() as conn:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        start_date = datetime.now() - timedelta(days=days)
+                        
+                        # Statistiques globales
+                        cur.execute("""
+                            SELECT 
+                                COUNT(*) as total_sessions,
+                                COUNT(CASE WHEN logout_time IS NOT NULL THEN 1 END) as completed_sessions,
+                                COUNT(CASE WHEN logout_time IS NULL THEN 1 END) as active_sessions,
+                                AVG(session_duration_seconds) as avg_session_duration,
+                                MAX(session_duration_seconds) as max_session_duration,
+                                MIN(session_duration_seconds) as min_session_duration,
+                                SUM(session_duration_seconds) as total_time_seconds
+                            FROM user_sessions
+                            WHERE user_email = %s AND login_time >= %s
+                        """, (user_email, start_date))
+                        
+                        stats = dict(cur.fetchone() or {})
+                        
+                        # Sessions récentes
+                        cur.execute("""
+                            SELECT 
+                                session_id,
+                                login_time,
+                                logout_time,
+                                session_duration_seconds,
+                                logout_type,
+                                CASE 
+                                    WHEN logout_time IS NULL THEN 'active'
+                                    ELSE 'completed'
+                                END as status
+                            FROM user_sessions
+                            WHERE user_email = %s AND login_time >= %s
+                            ORDER BY login_time DESC
+                            LIMIT 10
+                        """, (user_email, start_date))
+                        
+                        recent_sessions = []
+                        for row in cur.fetchall():
+                            session = dict(row)
+                            if session['login_time']:
+                                session['login_time'] = session['login_time'].isoformat()
+                            if session['logout_time']:
+                                session['logout_time'] = session['logout_time'].isoformat()
+                            recent_sessions.append(session)
+                        
+                        # Sessions par jour
+                        cur.execute("""
+                            SELECT 
+                                DATE(login_time) as session_date,
+                                COUNT(*) as daily_sessions,
+                                AVG(session_duration_seconds) as avg_daily_duration,
+                                SUM(session_duration_seconds) as total_daily_time
+                            FROM user_sessions
+                            WHERE user_email = %s 
+                            AND login_time >= %s 
+                            AND session_duration_seconds IS NOT NULL
+                            GROUP BY DATE(login_time)
+                            ORDER BY session_date DESC
+                        """, (user_email, start_date))
+                        
+                        daily_breakdown = []
+                        for row in cur.fetchall():
+                            day = dict(row)
+                            if day['session_date']:
+                                day['session_date'] = day['session_date'].isoformat()
+                            daily_breakdown.append(day)
+                        
+                        return {
+                            "success": True,
+                            "user_email": user_email,
+                            "period_days": days,
+                            "summary": stats,
+                            "recent_sessions": recent_sessions,
+                            "daily_breakdown": daily_breakdown
+                        }
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+        
+        return get_cached_or_compute(cache_key, compute_session_analytics, ttl_seconds=600)
+
+    def get_all_active_sessions(self):
+        """Récupère toutes les sessions actives (admin)"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute("""
+                        SELECT 
+                            user_email, 
+                            session_id, 
+                            login_time, 
+                            last_activity,
+                            EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - login_time)) as current_duration_seconds,
+                            EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - last_activity)) as idle_time_seconds
+                        FROM user_sessions
+                        WHERE logout_time IS NULL
+                        ORDER BY login_time DESC
+                    """)
+                    
+                    sessions = []
+                    for row in cur.fetchall():
+                        session = dict(row)
+                        if session['login_time']:
+                            session['login_time'] = session['login_time'].isoformat()
+                        if session['last_activity']:
+                            session['last_activity'] = session['last_activity'].isoformat()
+                        sessions.append(session)
+                    
+                    return {"success": True, "active_sessions": sessions, "count": len(sessions)}
+        except Exception as e:
+            logger.error(f"Erreur récupération sessions actives: {e}")
+            return {"success": False, "error": str(e)}
+
+    # ============================================================================
+    # MÉTHODES EXISTANTES (INCHANGÉES)
+    # ============================================================================
 
     def update_feedback(
         self,

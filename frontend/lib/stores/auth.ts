@@ -1,8 +1,9 @@
-// lib/stores/auth.ts - SYSTÈME D'AUTH UNIFIÉ - SUPABASE DIRECT
-// Version avec OAuth direct via auth.intelia.com
+// lib/stores/auth.ts - SYSTÈME D'AUTH UNIFIÉ - SUPABASE DIRECT + SESSION TRACKING
+// Version avec OAuth direct via auth.intelia.com + tracking temps de connexion
 
 'use client'
 
+import React, { useEffect } from 'react'
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { apiClient } from '@/lib/api/client'
@@ -41,6 +42,11 @@ interface AuthState {
   lastAuthCheck: number
   authErrors: string[]
   isOAuthLoading: string | null  // Provider en cours de connexion OAuth
+  
+  // NOUVEAUX ÉTATS POUR SESSION TRACKING
+  sessionStart: Date | null
+  sessionDuration: number
+  lastHeartbeat: number
 
   // Actions existantes
   setHasHydrated: (v: boolean) => void
@@ -60,9 +66,14 @@ interface AuthState {
   // ACTIONS OAUTH SUPABASE DIRECT
   loginWithOAuth: (provider: 'linkedin' | 'facebook') => Promise<void>
   handleOAuthTokenFromURL: () => Promise<boolean>
+  
+  // NOUVELLES ACTIONS POUR SESSION TRACKING
+  startSessionTracking: () => void
+  endSessionTracking: () => Promise<void>
+  sendHeartbeat: () => Promise<void>
 }
 
-// Store unifié utilisant Supabase direct
+// Store unifié utilisant Supabase direct + session tracking
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -73,6 +84,11 @@ export const useAuthStore = create<AuthState>()(
       lastAuthCheck: 0,
       authErrors: [],
       isOAuthLoading: null,
+      
+      // NOUVEAUX ÉTATS POUR SESSION TRACKING
+      sessionStart: null,
+      sessionDuration: 0,
+      lastHeartbeat: 0,
 
       setHasHydrated: (v: boolean) => {
         set({ hasHydrated: v })
@@ -88,7 +104,54 @@ export const useAuthStore = create<AuthState>()(
         set({ authErrors: [] })
       },
 
-      // INITIALIZE SESSION - Méthode ajoutée
+      // NOUVELLES MÉTHODES POUR SESSION TRACKING
+      startSessionTracking: () => {
+        const now = new Date()
+        set({ 
+          sessionStart: now,
+          lastHeartbeat: Date.now()
+        })
+        console.log('[AuthStore] Session tracking démarré:', now.toISOString())
+      },
+
+      endSessionTracking: async () => {
+        const { sessionStart } = get()
+        if (sessionStart) {
+          const duration = (Date.now() - sessionStart.getTime()) / 1000
+          set({ 
+            sessionDuration: duration, 
+            sessionStart: null,
+            lastHeartbeat: 0
+          })
+          
+          console.log(`[AuthStore] Session terminée - durée: ${Math.round(duration)}s`)
+          
+          try {
+            // Appeler l'endpoint logout backend pour enregistrer la fin de session
+            await apiClient.postSecure('/auth/logout', { duration })
+            console.log('[AuthStore] Logout tracking envoyé au backend')
+          } catch (error) {
+            console.warn('[AuthStore] Erreur logout tracking:', error)
+          }
+        }
+      },
+
+      sendHeartbeat: async () => {
+        const { isAuthenticated, sessionStart } = get()
+        if (!isAuthenticated || !sessionStart) return
+
+        try {
+          const response = await apiClient.postSecure('/auth/heartbeat')
+          if (response.success) {
+            set({ lastHeartbeat: Date.now() })
+            console.log('[AuthStore] Heartbeat envoyé')
+          }
+        } catch (error) {
+          console.warn('[AuthStore] Erreur heartbeat:', error)
+        }
+      },
+
+      // INITIALIZE SESSION - Méthode modifiée
       initializeSession: async () => {
         console.log('[AuthStore] Initialisation de session...')
         
@@ -102,6 +165,11 @@ export const useAuthStore = create<AuthState>()(
           if (authData) {
             // Si token existe, vérifier l'authentification
             await get().checkAuth()
+            
+            // NOUVEAU: Démarrer le tracking de session si authentifié
+            if (get().isAuthenticated) {
+              get().startSessionTracking()
+            }
           } else {
             // Aucun token, utilisateur non authentifié
             set({ 
@@ -188,7 +256,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // LOGIN : Utilise /auth/login avec gestion d'erreurs améliorée
+      // LOGIN : Utilise /auth/login avec gestion d'erreurs améliorée + session tracking
       login: async (email: string, password: string) => {
         set({ isLoading: true, authErrors: [] })
         console.log('[AuthStore] Login via /auth/login:', email)
@@ -216,6 +284,11 @@ export const useAuthStore = create<AuthState>()(
 
           // Vérifier l'auth pour récupérer les données utilisateur
           await get().checkAuth()
+          
+          // NOUVEAU: Démarrer le tracking de session après login réussi
+          if (get().isAuthenticated) {
+            get().startSessionTracking()
+          }
           
           set({ isLoading: false })
           
@@ -398,6 +471,11 @@ export const useAuthStore = create<AuthState>()(
             // Vérifier l'auth pour récupérer les données utilisateur complètes
             await get().checkAuth()
             
+            // NOUVEAU: Démarrer le tracking de session après OAuth réussi
+            if (get().isAuthenticated) {
+              get().startSessionTracking()
+            }
+            
             // Reset du loading OAuth
             set({ isOAuthLoading: null })
             
@@ -480,6 +558,11 @@ export const useAuthStore = create<AuthState>()(
 
             // Récupérer les données utilisateur
             await get().checkAuth()
+            
+            // NOUVEAU: Démarrer le tracking de session après register réussi
+            if (get().isAuthenticated) {
+              get().startSessionTracking()
+            }
           }
           
           set({ isLoading: false })
@@ -501,11 +584,14 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // LOGOUT : Nettoyage simple
+      // LOGOUT : Nettoyage simple + fin de session tracking
       logout: async () => {
         console.log('[AuthStore] Logout - nettoyage localStorage')
         
         try {
+          // NOUVEAU: Terminer le tracking de session avant le logout
+          await get().endSessionTracking()
+          
           // Nettoyage localStorage sélectif
           const keysToRemove = []
           
@@ -537,7 +623,11 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             isOAuthLoading: null,
             authErrors: [],
-            lastAuthCheck: Date.now()
+            lastAuthCheck: Date.now(),
+            // Reset session tracking
+            sessionStart: null,
+            sessionDuration: 0,
+            lastHeartbeat: 0
           })
 
           sessionStorage.setItem('recent-logout', Date.now().toString())
@@ -741,6 +831,30 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 )
+
+// NOUVEAU: Hook pour gérer les heartbeats automatiques
+export const useSessionHeartbeat = () => {
+  const { isAuthenticated, sendHeartbeat } = useAuthStore()
+  
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    // Envoyer un heartbeat toutes les 2 minutes
+    const heartbeatInterval = setInterval(() => {
+      sendHeartbeat()
+    }, 120000) // 2 minutes
+
+    // Heartbeat initial après 30 secondes
+    const initialHeartbeat = setTimeout(() => {
+      sendHeartbeat()
+    }, 30000)
+
+    return () => {
+      clearInterval(heartbeatInterval)
+      clearTimeout(initialHeartbeat)
+    }
+  }, [isAuthenticated, sendHeartbeat])
+}
 
 // Fonction utilitaire exportée
 export const getAuthToken = async (): Promise<string | null> => {

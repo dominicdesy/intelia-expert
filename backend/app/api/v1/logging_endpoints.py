@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 🌐 ENDPOINTS API POUR LE SYSTÈME DE LOGGING
-📊 Tous les endpoints FastAPI pour analytics, debugging et administration
+📊 Tous les endpoints FastAPI pour analytics, debugging et administration + SESSIONS TRACKING
 """
 import os
 import logging
@@ -131,6 +131,123 @@ async def server_performance_analytics(
         return {"error": str(e)}
 
 
+# ============================================================================
+# 🆕 NOUVEAUX ENDPOINTS POUR SESSIONS TRACKING
+# ============================================================================
+
+@router.get("/analytics/my-sessions")
+async def my_session_analytics(
+    days: int = Query(30, ge=1, le=365),
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Analytics des sessions de l'utilisateur connecté"""
+    user_email = current_user.get("email")
+    
+    try:
+        analytics = get_analytics_manager()
+        result = analytics.get_user_session_analytics(user_email, days)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@router.get("/analytics/active-sessions")
+async def get_active_sessions(
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Liste des sessions actives (admin only)"""
+    if not has_permission(current_user, Permission.VIEW_ALL_ANALYTICS):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        analytics = get_analytics_manager()
+        result = analytics.get_all_active_sessions()
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@router.get("/analytics/session-stats")
+async def session_statistics(
+    user_email: str = Query(None),
+    days: int = Query(30, ge=1, le=365),
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Statistiques de sessions (admin peut voir tous les utilisateurs)"""
+    
+    # Si admin, peut voir n'importe quel utilisateur
+    if not has_permission(current_user, Permission.VIEW_ALL_ANALYTICS):
+        user_email = current_user.get("email")  # Forcer son propre email
+    
+    if not user_email:
+        user_email = current_user.get("email")
+    
+    try:
+        analytics = get_analytics_manager()
+        result = analytics.get_user_session_analytics(user_email, days)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@router.get("/analytics/session-summary")
+async def get_session_summary(
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Résumé rapide des sessions pour le dashboard"""
+    if not has_permission(current_user, Permission.VIEW_OWN_ANALYTICS):
+        raise HTTPException(status_code=403, detail="View analytics permission required")
+    
+    user_email = current_user.get("email")
+    
+    try:
+        analytics = get_analytics_manager()
+        
+        with analytics.get_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Dernière session
+                cur.execute("""
+                    SELECT login_time, logout_time, session_duration_seconds
+                    FROM user_sessions
+                    WHERE user_email = %s
+                    ORDER BY login_time DESC
+                    LIMIT 1
+                """, (user_email,))
+                
+                last_session = cur.fetchone()
+                if last_session:
+                    last_session = dict(last_session)
+                    if last_session['login_time']:
+                        last_session['login_time'] = last_session['login_time'].isoformat()
+                    if last_session['logout_time']:
+                        last_session['logout_time'] = last_session['logout_time'].isoformat()
+                
+                # Stats rapides des 7 derniers jours
+                cur.execute("""
+                    SELECT 
+                        COUNT(*) as sessions_7d,
+                        AVG(session_duration_seconds) as avg_duration_7d,
+                        SUM(session_duration_seconds) as total_time_7d
+                    FROM user_sessions
+                    WHERE user_email = %s 
+                    AND login_time >= CURRENT_DATE - INTERVAL '7 days'
+                    AND session_duration_seconds IS NOT NULL
+                """, (user_email,))
+                
+                stats_7d = dict(cur.fetchone() or {})
+                
+                return {
+                    "success": True,
+                    "last_session": last_session,
+                    "stats_7_days": stats_7d,
+                    "user_email": user_email
+                }
+                
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ============================================================================
+# 📊 ENDPOINTS EXISTANTS (INCHANGÉS)
+# ============================================================================
+
 @router.get("/my-permissions")
 async def get_my_permissions(
     current_user: dict = Depends(get_current_user)
@@ -153,7 +270,9 @@ async def get_my_permissions(
             "analytics_dashboard": has_permission(current_user, Permission.ADMIN_DASHBOARD),
             "my_usage": has_permission(current_user, Permission.VIEW_OWN_ANALYTICS),
             "openai_costs": has_permission(current_user, Permission.VIEW_OPENAI_COSTS),
-            "server_performance": has_permission(current_user, Permission.VIEW_SERVER_PERFORMANCE)
+            "server_performance": has_permission(current_user, Permission.VIEW_SERVER_PERFORMANCE),
+            "my_sessions": has_permission(current_user, Permission.VIEW_OWN_ANALYTICS),
+            "active_sessions": has_permission(current_user, Permission.VIEW_ALL_ANALYTICS)
         }
     }
 
@@ -165,11 +284,27 @@ def analytics_health_check() -> Dict[str, Any]:
         analytics = get_analytics_manager()
         cache_stats = get_cache_stats()
         
+        # Vérifier que la table user_sessions existe
+        sessions_table_exists = False
+        try:
+            with analytics.get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT EXISTS (
+                            SELECT FROM information_schema.tables 
+                            WHERE table_name = 'user_sessions'
+                        );
+                    """)
+                    sessions_table_exists = cur.fetchone()[0]
+        except:
+            pass
+        
         return {
             "status": "healthy",
             "analytics_available": True,
             "database_connected": bool(analytics.dsn),
             "tables_ready": os.getenv("ANALYTICS_TABLES_READY", "false").lower() == "true",
+            "sessions_table_exists": sessions_table_exists,
             "cache_enabled": True,
             "cache_stats": cache_stats,
             "timestamp": datetime.now().isoformat()
@@ -306,7 +441,8 @@ async def get_system_info(
                         "system_errors", 
                         "openai_api_calls",
                         "daily_openai_summary",
-                        "server_performance_metrics"
+                        "server_performance_metrics",
+                        "user_sessions"  # NOUVELLE TABLE
                     ]
                     
                     for table in tables:
@@ -576,7 +712,7 @@ async def billing_admin_stats(
                 }
                 
     except Exception as e:
-        logger.error(f"❌ Erreur billing admin stats: {e}")
+        logger.error(f"⚠️ Erreur billing admin stats: {e}")
         return {"error": str(e)}
 
 
@@ -642,7 +778,8 @@ async def simple_test():
         "message": "Endpoint works", 
         "timestamp": datetime.now().isoformat(),
         "cache_enabled": True,
-        "cache_stats": get_cache_stats()
+        "cache_stats": get_cache_stats(),
+        "sessions_feature": "available"
     }
 
 
@@ -663,9 +800,14 @@ async def test_db_direct():
                 cur.execute("SELECT id, user_email, question FROM user_questions_complete ORDER BY created_at DESC LIMIT 3")
                 samples = [dict(row) for row in cur.fetchall()]
                 
+                # Test sessions table
+                cur.execute("SELECT COUNT(*) as session_count FROM user_sessions")
+                session_result = cur.fetchone()
+                
                 return {
                     "count": result["count"],
                     "samples": samples,
+                    "session_count": session_result["session_count"],
                     "success": True,
                     "dsn_available": bool(dsn)
                 }
@@ -682,7 +824,8 @@ async def test_analytics_manager():
             "analytics_available": analytics is not None,
             "dsn": bool(analytics.dsn) if analytics else False,
             "type": type(analytics).__name__ if analytics else None,
-            "tables_ready": os.getenv("ANALYTICS_TABLES_READY", "false").lower() == "true"
+            "tables_ready": os.getenv("ANALYTICS_TABLES_READY", "false").lower() == "true",
+            "sessions_methods_available": hasattr(analytics, 'start_session') if analytics else False
         }
     except Exception as e:
         return {"error": str(e), "type": type(e).__name__}
@@ -713,6 +856,45 @@ async def test_permissions(current_user: dict = Depends(get_current_user)):
             "permissions": perms,
             "raw_user": current_user
         }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}
+
+
+@router.get("/test-sessions")
+async def test_sessions_functionality(current_user: dict = Depends(get_current_user)):
+    """Test 5: Test des fonctionnalités de sessions"""
+    try:
+        analytics = get_analytics_manager()
+        
+        # Test si les méthodes existent
+        methods_available = {
+            "start_session": hasattr(analytics, 'start_session'),
+            "update_session_heartbeat": hasattr(analytics, 'update_session_heartbeat'),
+            "end_session": hasattr(analytics, 'end_session'),
+            "get_user_session_analytics": hasattr(analytics, 'get_user_session_analytics'),
+            "get_all_active_sessions": hasattr(analytics, 'get_all_active_sessions')
+        }
+        
+        # Test connexion à la table user_sessions
+        table_accessible = False
+        session_count = 0
+        try:
+            with analytics.get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT COUNT(*) FROM user_sessions")
+                    session_count = cur.fetchone()[0]
+                    table_accessible = True
+        except Exception as table_error:
+            table_accessible = str(table_error)
+        
+        return {
+            "methods_available": methods_available,
+            "table_accessible": table_accessible,
+            "session_count": session_count,
+            "user_email": current_user.get("email"),
+            "analytics_manager_type": type(analytics).__name__
+        }
+        
     except Exception as e:
         return {"error": str(e), "type": type(e).__name__}
 
