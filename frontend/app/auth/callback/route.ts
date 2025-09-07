@@ -1,16 +1,13 @@
 // app/auth/callback/route.ts
+// Version mise à jour pour l'architecture Backend OAuth
 import { NextResponse, type NextRequest } from 'next/server'
-import { cookies } from 'next/headers'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 
-// ⚠️ Hardcode provisoire (on enlèvera ça quand tu voudras repasser aux env vars)
 const BASE_URL = 'https://expert.intelia.com' as const
+const API_BASE_URL = 'https://expert.intelia.com/api' as const
 
-// Autoriser uniquement des chemins internes (ex. /chat, /dashboard)
-// pour éviter les redirections ouvertes vers des domaines externes.
+// Autoriser uniquement des chemins internes sécurisés
 function pickSafeInternalPath(nextParam: string | null): string {
   if (!nextParam) return '/chat'
-  // autorise seulement un chemin absolu interne: commence par "/" et pas par "//"
   if (nextParam.startsWith('/') && !nextParam.startsWith('//')) {
     return nextParam
   }
@@ -20,51 +17,110 @@ function pickSafeInternalPath(nextParam: string | null): string {
 export async function GET(request: NextRequest) {
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
-  const providerError = url.searchParams.get('error') // p.ex. access_denied
+  const state = url.searchParams.get('state')
+  const providerError = url.searchParams.get('error')
   const providerErrorDesc = url.searchParams.get('error_description')
-  const nextParam = url.searchParams.get('next') // optionnel: /chemin interne
+  const nextParam = url.searchParams.get('next')
 
-  // Logs minimalistes pour diag (sans PII)
-  console.log('[OAuth/Callback] hit', {
+  console.log('[OAuth/Callback] Backend OAuth callback:', {
     hasCode: !!code,
+    hasState: !!state,
     providerError,
     hasNext: !!nextParam,
   })
 
   // Cas: le provider renvoie une erreur (ex. user a annulé sur LinkedIn)
   if (providerError) {
-    const msg = `provider_error: ${providerError}${providerErrorDesc ? ` - ${providerErrorDesc}` : ''}`
+    const msg = `${providerError}${providerErrorDesc ? `: ${providerErrorDesc}` : ''}`
+    console.error('[OAuth/Callback] Provider error:', msg)
     const to = new URL(`/?auth=error&message=${encodeURIComponent(msg)}`, BASE_URL)
     return NextResponse.redirect(to, { status: 303 })
   }
 
   if (!code) {
+    console.error('[OAuth/Callback] Missing authorization code')
     const to = new URL('/?auth=error&message=missing_oauth_code', BASE_URL)
     return NextResponse.redirect(to, { status: 303 })
   }
 
-  try {
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+  if (!state) {
+    console.error('[OAuth/Callback] Missing OAuth state')
+    const to = new URL('/?auth=error&message=missing_oauth_state', BASE_URL)
+    return NextResponse.redirect(to, { status: 303 })
+  }
 
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-    if (error) {
-      console.error('[OAuth/Callback] exchangeCodeForSession error:', error)
+  try {
+    // Déterminer le provider depuis l'état ou l'URL
+    // En général, le provider est stocké côté client, mais on peut l'inférer
+    let provider = 'linkedin' // Default, mais on devrait l'obtenir autrement
+    
+    // Essayer de détecter le provider depuis le referrer ou d'autres indices
+    const referer = request.headers.get('referer') || ''
+    if (referer.includes('linkedin')) {
+      provider = 'linkedin'
+    } else if (referer.includes('facebook')) {
+      provider = 'facebook'
+    }
+
+    console.log('[OAuth/Callback] Detected provider:', provider)
+
+    // Appeler notre backend pour traiter le callback OAuth
+    const callbackResponse = await fetch(`${API_BASE_URL}/v1/auth/oauth/callback`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        provider,
+        code,
+        state
+      })
+    })
+
+    const callbackData = await callbackResponse.json()
+
+    if (!callbackResponse.ok || !callbackData.success) {
+      console.error('[OAuth/Callback] Backend callback failed:', callbackData)
+      const errorMsg = callbackData.message || `HTTP ${callbackResponse.status}`
       const to = new URL(
-        `/?auth=error&message=${encodeURIComponent(`callback_error: ${error.message}`)}`,
+        `/?auth=error&message=${encodeURIComponent(`callback_error: ${errorMsg}`)}`,
         BASE_URL
       )
       return NextResponse.redirect(to, { status: 303 })
     }
 
-    console.log('[OAuth/Callback] session created ✅', { userId: data?.user?.id })
+    console.log('[OAuth/Callback] Backend callback successful')
 
-    // Redirection finale (par défaut /chat, ou bien ?next=/chemin-interne)
+    // Le backend a retourné un token JWT
+    const { token, user } = callbackData
+    
+    if (!token) {
+      console.error('[OAuth/Callback] No token returned from backend')
+      const to = new URL('/?auth=error&message=no_token_returned', BASE_URL)
+      return NextResponse.redirect(to, { status: 303 })
+    }
+
+    // Créer la réponse de redirection avec le token
     const safePath = pickSafeInternalPath(nextParam)
-    const to = new URL(safePath, BASE_URL)
-    return NextResponse.redirect(to, { status: 303 })
+    const redirectUrl = new URL(safePath, BASE_URL)
+    
+    // Ajouter le token et les infos utilisateur comme paramètres de query temporaires
+    // Le frontend les récupérera et les stockera dans localStorage
+    redirectUrl.searchParams.set('oauth_token', token)
+    redirectUrl.searchParams.set('oauth_success', 'true')
+    if (user?.email) {
+      redirectUrl.searchParams.set('oauth_email', user.email)
+    }
+    if (provider) {
+      redirectUrl.searchParams.set('oauth_provider', provider)
+    }
+
+    console.log('[OAuth/Callback] Redirecting to:', safePath)
+    
+    return NextResponse.redirect(redirectUrl, { status: 303 })
+
   } catch (e: any) {
-    console.error('[OAuth/Callback] unexpected exception:', e)
+    console.error('[OAuth/Callback] Unexpected exception:', e)
     const to = new URL(
       `/?auth=error&message=${encodeURIComponent(`callback_error: ${e?.message || e}`)}`,
       BASE_URL
