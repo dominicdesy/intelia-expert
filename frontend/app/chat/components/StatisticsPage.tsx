@@ -419,17 +419,6 @@ export const StatisticsPage: React.FC = () => {
       const fastData = await response.json()
       console.log('SUCCÈS bypass Supabase!', fastData)
       
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Erreur lors du chargement des statistiques')
-      }
-
-      if (!response.data) {
-        throw new Error('Réponse vide du serveur')
-      }
-
-      const fastData = response.data
-      console.log('SUCCÈS endpoint avec apiClient!', fastData)
-      
       const loadTime = performance.now() - startTime
       console.log(`Performance: ${loadTime.toFixed(0)}ms`)
       
