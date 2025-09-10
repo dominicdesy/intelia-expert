@@ -29,6 +29,45 @@ logger = logging.getLogger(__name__)
 DetectorFactory.seed = 0  # déterminisme
 load_dotenv()
 
+# ===== INTENTIONS MÉTIER (agri/aviculture) =====
+INTENT_DEFS = {
+    "broiler_weight": {
+        "required_slots": ["age_days", "line", "sex"],
+        "followup_themes": ["water_consumption", "feed_intake", "housing_conditions"],
+        "description": "Questions sur le poids et croissance des poulets de chair"
+    },
+    "water_intake": {
+        "required_slots": ["age_days", "line"],
+        "followup_themes": ["water_temperature", "drinking_equipment", "water_quality"],
+        "description": "Questions sur la consommation d'eau des volailles"
+    },
+    "feed_consumption": {
+        "required_slots": ["age_days", "line"],
+        "followup_themes": ["nutritional_composition", "feeding_schedules", "feed_conversion"],
+        "description": "Questions sur l'alimentation et consommation d'aliment"
+    },
+    "temperature_management": {
+        "required_slots": ["age_days", "season"],
+        "followup_themes": ["ventilation", "humidity_control", "heating_systems"],
+        "description": "Questions sur la gestion thermique des bâtiments"
+    },
+    "disease_prevention": {
+        "required_slots": ["pathogen_type", "prevention_method"],
+        "followup_themes": ["vaccination_programs", "biosecurity", "treatment_protocols"],
+        "description": "Questions sur la prévention et traitement des maladies"
+    },
+    "ventilation_optimization": {
+        "required_slots": ["building_type", "bird_count"],
+        "followup_themes": ["air_quality_sensors", "automation", "energy_efficiency"],
+        "description": "Questions sur la ventilation et qualité de l'air"
+    },
+    "economic_analysis": {
+        "required_slots": ["analysis_type", "period"],
+        "followup_themes": ["comparative_analysis", "cost_optimization", "profitability"],
+        "description": "Questions sur l'analyse économique et rentabilité"
+    }
+}
+
 # -------- Config via variables d'environnement --------
 BASE_PATH = os.environ.get("BASE_PATH", "/llm").rstrip("/")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
@@ -179,7 +218,7 @@ LINE_ALIASES = {
     # Ross
     "ross 308": ["ross308", "r308", "ross-308", "罗斯308", "羅斯308", "ross 308 ap", "ross 308ap", "ross"],
     # Cobb
-    "cobb 500": ["cobb500", "c500", "cobb-500", "科宝500", "科博500", "cobb"],
+    "cobb 500": ["cobb500", "c500", "cobb-500", "科宝500", "科寶500", "cobb"],
 }
 
 SEX_ALIASES = {
@@ -206,7 +245,231 @@ def fuzzy_map(value: str, choices: Dict[str, List[str]], cutoff: float = 0.75) -
             return key
     return None
 
-# -------- Intent & Slots (multilingue, tolérant) --------
+# -------- Génération de messages via GPT (remplace hardcodage) --------
+async def generate_clarification_question(client: OpenAI, intent_id: str, missing_slots: List[str], user_text: str) -> Tuple[str, Dict[str, Any]]:
+    """Génère une question de clarification contextualisée via GPT"""
+    
+    intent_desc = INTENT_DEFS.get(intent_id, {}).get("description", "question avicole")
+    required_slots = INTENT_DEFS.get(intent_id, {}).get("required_slots", [])
+    
+    system_prompt = f"""Tu es un assistant avicole expert. L'utilisateur pose une question sur : {intent_desc}
+
+Pour répondre précisément, tu as besoin de ces informations : {', '.join(required_slots)}
+Informations manquantes détectées : {', '.join(missing_slots)}
+
+Génère UNE question courte et naturelle pour demander UNIQUEMENT les informations manquantes.
+
+Règles :
+- Réponds dans la MÊME langue que la question de l'utilisateur
+- Sois concis et professionnel
+- Adapte le ton à la culture locale
+- Ne demande que ce qui est nécessaire
+
+Question de l'utilisateur : "{user_text}"
+
+Réponds uniquement avec la question de clarification, sans autre texte."""
+
+    try:
+        resp = await asyncio.to_thread(
+            client.chat.completions.create,
+            model=FALLBACK_MODEL,
+            messages=[{"role": "system", "content": system_prompt}],
+            temperature=0.1,
+            max_tokens=150
+        )
+        
+        question = (resp.choices[0].message.content or "").strip()
+        
+        # Suggestions basées sur l'intention
+        suggestions = {}
+        if "line" in missing_slots:
+            suggestions["lines"] = ["Ross 308", "Cobb 500"]
+        if "sex" in missing_slots:
+            suggestions["sex"] = ["male", "female"]
+        if "season" in missing_slots:
+            suggestions["season"] = ["summer", "winter", "spring", "autumn"]
+        
+        return question, suggestions
+        
+    except Exception as e:
+        logger.error(f"Erreur génération question clarification: {e}")
+        # Fallback générique
+        fallback = "Pour répondre précisément, merci de préciser les informations manquantes."
+        return fallback, {}
+
+async def generate_followup_suggestion(client: OpenAI, intent_id: str, user_text: str, response_context: str = "") -> Optional[str]:
+    """Génère une suggestion de suivi contextualisée via GPT"""
+    
+    intent_desc = INTENT_DEFS.get(intent_id, {}).get("description", "question avicole")
+    followup_themes = INTENT_DEFS.get(intent_id, {}).get("followup_themes", [])
+    
+    system_prompt = f"""Tu es un assistant avicole expert. L'utilisateur vient de poser une question sur : {intent_desc}
+
+Thèmes de suivi possibles : {', '.join(followup_themes)}
+
+Génère UNE question de suivi pertinente et utile pour approfondir le sujet.
+
+Règles :
+- Réponds dans la MÊME langue que la question initiale
+- Propose quelque chose de complémentaire et pratique
+- Sois naturel et engageant
+- Maximum 1 phrase
+- Commence par un mot interrogatif approprié
+
+Question initiale : "{user_text}"
+Contexte de réponse : "{response_context[:200]}"
+
+Réponds uniquement avec la question de suivi, sans autre texte."""
+
+    try:
+        resp = await asyncio.to_thread(
+            client.chat.completions.create,
+            model=FALLBACK_MODEL,
+            messages=[{"role": "system", "content": system_prompt}],
+            temperature=0.3,
+            max_tokens=100
+        )
+        
+        followup = (resp.choices[0].message.content or "").strip()
+        return followup if followup else None
+        
+    except Exception as e:
+        logger.error(f"Erreur génération followup: {e}")
+        return None
+
+async def generate_domain_restriction_message(client: OpenAI, user_text: str) -> str:
+    """Génère un message de restriction de domaine adapté à la langue"""
+    
+    system_prompt = f"""Tu es un assistant spécialisé en agriculture et aviculture. L'utilisateur pose une question hors de ton domaine d'expertise.
+
+Génère un message poli et professionnel pour expliquer que tu ne peux répondre qu'aux questions agricoles.
+
+Règles :
+- Réponds dans la MÊME langue que la question de l'utilisateur
+- Sois poli et professionnel
+- Mentionne ton domaine : agriculture, élevage, aviculture
+- Encourage à poser une question dans ton domaine
+- Maximum 2 phrases
+
+Question hors domaine : "{user_text}"
+
+Réponds uniquement avec le message de restriction, sans autre texte."""
+
+    try:
+        resp = await asyncio.to_thread(
+            client.chat.completions.create,
+            model=FALLBACK_MODEL,
+            messages=[{"role": "system", "content": system_prompt}],
+            temperature=0.1,
+            max_tokens=100
+        )
+        
+        message = (resp.choices[0].message.content or "").strip()
+        return message if message else f"Domaine restreint : {ALLOWED_DOMAIN_DESC}."
+        
+    except Exception as e:
+        logger.error(f"Erreur génération message restriction: {e}")
+        return f"Domaine restreint : {ALLOWED_DOMAIN_DESC}."
+
+# -------- Nouvelle fonction de routage GPT --------
+def gpt_route_and_extract(client: OpenAI, text: str, lang: str) -> dict:
+    """Classification intelligente des questions + extraction slots"""
+    system_prompt = f"""Tu es un système de classification pour questions avicoles. Analyse le texte et retourne un JSON strict avec :
+
+{{
+  "intent_id": "broiler_weight|water_intake|feed_consumption|temperature_management|disease_prevention|ventilation_optimization|economic_analysis|null",
+  "confidence": 0.0-1.0,
+  "slots": {{}},
+  "need_clarification": true/false
+}}
+
+Intentions disponibles :
+- broiler_weight : poids, courbe de croissance, objectifs pondéraux
+- water_intake : consommation d'eau, abreuvement  
+- feed_consumption : consommation aliment, nutrition
+- temperature_management : température, chauffage, refroidissement
+- disease_prevention : maladies, prévention, vaccination
+- ventilation_optimization : ventilation, qualité d'air
+- economic_analysis : rentabilité, coûts, analyses économiques
+
+Slots possibles :
+- age_days (int) : âge en jours
+- line (string) : "ross 308" ou "cobb 500" uniquement
+- sex (string) : "male" ou "female" uniquement  
+- season, pathogen_type, prevention_method, building_type, bird_count, analysis_type, period
+
+Règles :
+- Si line="ross" ou "cobb" sans numéro → slot=null (besoin précision)
+- need_clarification=true si slots requis manquants
+- confidence faible si intention peu claire
+- Réponds uniquement en JSON valide"""
+
+    try:
+        resp = client.chat.completions.create(
+            model=FALLBACK_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text}
+            ],
+            temperature=0.1,
+            max_tokens=400
+        )
+        
+        raw = resp.choices[0].message.content.strip()
+        
+        # Extraction du JSON (parfois entouré de ```json```)
+        if "```json" in raw:
+            json_start = raw.find("```json") + 7
+            json_end = raw.find("```", json_start)
+            raw = raw[json_start:json_end].strip()
+        elif "```" in raw:
+            json_start = raw.find("```") + 3
+            json_end = raw.find("```", json_start)
+            raw = raw[json_start:json_end].strip()
+        
+        data = json.loads(raw)
+        
+        # Validation et nettoyage
+        intent_id = data.get("intent_id")
+        if intent_id == "null":
+            intent_id = None
+        
+        confidence = float(data.get("confidence", 0.0))
+        confidence = max(0.0, min(1.0, confidence))
+        
+        slots = data.get("slots", {})
+        
+        # Nettoyage des slots
+        if "line" in slots and slots["line"] in ["ross", "cobb"]:
+            slots["line"] = None  # Force clarification
+        
+        if "age_days" in slots:
+            try:
+                age = int(slots["age_days"])
+                if age < 0 or age > 70:
+                    slots["age_days"] = None
+                else:
+                    slots["age_days"] = age
+            except (ValueError, TypeError):
+                slots["age_days"] = None
+        
+        return {
+            "intent_id": intent_id,
+            "confidence": confidence,
+            "slots": slots,
+            "need_clarification": bool(data.get("need_clarification", False))
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur routage GPT: {e}")
+        return {
+            "intent_id": None,
+            "confidence": 0.0,
+            "slots": {},
+            "need_clarification": False
+        }
+
+# -------- Intent & Slots (multilingue, tolérant) - LEGACY --------
 BROILER_WEIGHT_INTENT_PAT = re.compile(
     r"(?:(poids|weight|peso|体重|體重|標準體重|标准体重|目標體重|目标体重|objectif|target|增重|增重曲線|增重曲线))"
     r".*?(poulet|broiler|ross|cobb|鸡|雞|小鸡|雏雞)?|"
@@ -330,55 +593,6 @@ def gpt_extract_slots(client: OpenAI, text: str, lang: str) -> BroilerWeightSlot
         logger.error(f"Erreur GPT extraction slots: {e}")
         return BroilerWeightSlots(age_days=None, line=None, sex=None)
 
-async def ask_for_missing_slots_with_gpt(client: OpenAI, lang: str, slots: BroilerWeightSlots) -> Tuple[str, Dict[str, Any]]:
-    """Génère une question de clarification pour les slots manquants"""
-    missing = []
-    if slots.line is None:
-        missing.append("lignée (ex. Ross 308, Cobb 500)")
-    if slots.sex is None:
-        missing.append("sexe (mâle ou femelle)")
-    if slots.age_days is None:
-        missing.append("âge (en jours)")
-        
-    # default minimal prompts
-    default_map = {
-        "fr": "Pour répondre précisément, précise la lignée (ex. Ross 308, Cobb 500) et le sexe (mâle ou femelle), ainsi que l'âge en jours si absent.",
-        "en": "To answer precisely, please specify the line (e.g., Ross 308, Cobb 500), the sex (male or female), and age in days if missing.",
-        "zh": "为准确回答，请补充：品系（如 Ross 308、Cobb 500）、性别（公或母），以及（若缺少）日龄。",
-        "es": "Para responder con precisión, indica la línea (p. ej., Ross 308, Cobb 500), el sexo (macho o hembra) y la edad en días si falta."
-    }
-    default = default_map.get(lang, default_map["en"])
-
-    # Chips de suggestion (UI côté client)
-    suggestions = {
-        "lines": ["Ross 308", "Cobb 500"],
-        "sex": ["male", "female"]
-    }
-
-    if not missing:
-        return default, suggestions
-
-    system = (
-        "You write one short clarifying question for a poultry production context. "
-        "Ask ONLY for the missing entities to lookup broiler target weight tables: "
-        "line (Ross 308/Cobb 500), sex (male/female), and/or age in days. "
-        "Be concise, one sentence, no extra commentary."
-    )
-    user = f"Missing entities: {', '.join(missing)}. Write the question in language code: {lang}."
-    
-    try:
-        resp = client.chat.completions.create(
-            model=FALLBACK_MODEL,
-            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-            temperature=0.1,
-            max_tokens=80
-        )
-        q = (resp.choices[0].message.content or "").strip() or default
-        return q, suggestions
-    except Exception as e:
-        logger.error(f"Erreur génération question clarification: {e}")
-        return default, suggestions
-
 # --- Assistant data-only (Assistant v2) ---
 def run_data_only_assistant(client: OpenAI, assistant_id: str, user_text: str, lang: str) -> str:
     """Exécute l'assistant avec les données du Vector Store uniquement"""
@@ -386,7 +600,7 @@ def run_data_only_assistant(client: OpenAI, assistant_id: str, user_text: str, l
         "RÉPONDS EXCLUSIVEMENT à partir des documents du Vector Store. "
         "Si l'information est absente, réponds exactement: "
         "\"Hors base: information absente de la connaissance Intelia.\" "
-        f"Réponds en {lang}. Ne traduis pas dans une autre langue sauf si on te le demande."
+        f"Réponds dans la même langue que la question de l'utilisateur. Ne traduis pas dans une autre langue sauf si on te le demande."
     )
     
     try:
@@ -430,16 +644,23 @@ def run_data_only_assistant(client: OpenAI, assistant_id: str, user_text: str, l
         return "Hors base: information absente de la connaissance Intelia."
 
 # --- Fallback général (GPT) ---
-async def stream_fallback_general(client: OpenAI, text: str, lang: str):
+async def stream_fallback_general(client: OpenAI, text: str, user_text: str):
     """Fallback streaming avec GPT pour les questions hors base"""
-    system = (
-        "You are an agricultural domain assistant. Answer ONLY within agriculture "
-        "(including livestock, poultry, broilers/layers, animal nutrition, farm environment, "
-        "biosecurity, ventilation, poultry diseases, agricultural economics directly related to farms, "
-        "and adjacent topics that clearly relate to agriculture). If the user asks anything clearly "
-        "outside this scope, politely refuse.\n"
-        f"Reply in {lang}."
-    )
+    system = f"""Tu es un assistant spécialisé en agriculture et aviculture. Tu réponds UNIQUEMENT aux questions dans ce domaine :
+- Élevage (volailles, bovins, porcins, etc.)
+- Aviculture (poulets de chair, pondeuses, etc.)
+- Nutrition animale
+- Environnement d'élevage
+- Biosécurité
+- Ventilation
+- Maladies animales
+- Économie agricole directement liée aux exploitations
+
+Si la question sort clairement de ce cadre, refuse poliment.
+
+Question de l'utilisateur : "{user_text}"
+
+Réponds dans la MÊME langue que la question de l'utilisateur. Sois naturel et adapte ton ton à la culture locale."""
     
     try:
         stream = client.chat.completions.create(
@@ -507,7 +728,8 @@ async def chat_stream(request: Request):
         try:
             # 1) Garde-fou permissif
             if not is_agri_question(message):
-                answer = f"Domaine restreint : {ALLOWED_DOMAIN_DESC}."
+                _client = OpenAI(api_key=OPENAI_API_KEY)
+                answer = await generate_domain_restriction_message(_client, message)
                 answer = clean_text(answer)
                 yield sse_event({"type": "final", "answer": answer})
                 return
@@ -520,8 +742,6 @@ async def chat_stream(request: Request):
             confidence = float(route.get("confidence") or 0.0)
             slots = route.get("slots") or {}
             need_clar = bool(route.get("need_clarification"))
-            clarify_q = clean_text(route.get("clarify_question") or "")
-            suggestions = route.get("suggestions") or None
 
             # Si l'intention est reconnue et nécessite des précisions → on clarifie avant de répondre
             if intent_id in INTENT_DEFS and (need_clar or confidence < 0.55):
@@ -529,13 +749,9 @@ async def chat_stream(request: Request):
                 req = set(INTENT_DEFS[intent_id]["required_slots"])
                 missing = [k for k in req if (slots.get(k) in (None, "", []))]
                 if missing:
-                    ask = clarify_q if clarify_q else {
-                        "fr": "Pour répondre précisément, merci de préciser les informations manquantes.",
-                        "en": "To answer precisely, please provide the missing details.",
-                        "zh": "为精准回答，请补充缺失信息。",
-                        "es": "Para responder con precisión, proporcione los datos faltantes."
-                    }.get(lang, "Please provide the missing details.")
-                    payload = {"type": "clarify", "answer": ask}
+                    clarify_q, suggestions = await generate_clarification_question(_client, intent_id, missing, message)
+                    clarify_q = clean_text(clarify_q)
+                    payload = {"type": "clarify", "answer": clarify_q}
                     if suggestions: 
                         payload["suggestions"] = suggestions
                     yield sse_event(payload)
@@ -561,7 +777,15 @@ async def chat_stream(request: Request):
 
                 # Si slots manquants → question ciblée + suggestions
                 if (slots_legacy.line is None) or (slots_legacy.sex is None) or (slots_legacy.age_days is None):
-                    clarify, suggestions_legacy = await asyncio.to_thread(ask_for_missing_slots_with_gpt, _client, lang, slots_legacy)
+                    missing_legacy = []
+                    if slots_legacy.line is None:
+                        missing_legacy.append("line")
+                    if slots_legacy.sex is None:
+                        missing_legacy.append("sex")
+                    if slots_legacy.age_days is None:
+                        missing_legacy.append("age_days")
+                    
+                    clarify, suggestions_legacy = await generate_clarification_question(_client, "broiler_weight", missing_legacy, message)
                     clarify = clean_text(clarify)
                     yield sse_event({"type": "clarify", "answer": clarify, "suggestions": suggestions_legacy})
                     return
@@ -573,11 +797,11 @@ async def chat_stream(request: Request):
             # 4) Fallback GPT si hors base
             if text.lower().startswith("hors base"):
                 if HYBRID_MODE and allow_fallback:
-                    async for sse in stream_fallback_general(_client, message, lang):
+                    async for sse in stream_fallback_general(_client, message, message):
                         yield sse
                     # Après le fallback, proposer un Smart Follow-up si une intention a été détectée
                     if intent_id in INTENT_DEFS and confidence >= 0.55:
-                        fup = get_followup_for_intent(intent_id, lang)
+                        fup = await generate_followup_suggestion(_client, intent_id, message, "")
                         if fup:
                             yield sse_event({"type": "followup", "answer": fup})
                     return
@@ -595,7 +819,7 @@ async def chat_stream(request: Request):
             
             # Après le message final, proposer un Smart Follow-up si une intention a été détectée
             if intent_id in INTENT_DEFS and confidence >= 0.55:
-                fup = get_followup_for_intent(intent_id, lang)
+                fup = await generate_followup_suggestion(_client, intent_id, message, text[:200])
                 if fup:
                     yield sse_event({"type": "followup", "answer": fup})
 
