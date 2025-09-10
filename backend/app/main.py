@@ -656,6 +656,14 @@ except ImportError as e:
     except ImportError as e:
         logger.error(f"⌛ Expert router non disponible: {e}")
     
+    # Conversations router
+    try:
+        from app.api.v1.conversations import router as conversations_router
+        temp_v1_router.include_router(conversations_router, prefix="/conversations", tags=["conversations"])
+        logger.info("✅ Conversations router ajoute")
+    except ImportError as e:
+        logger.warning(f"⚠️ Conversations router non disponible: {e}")
+    
     # Auth router
     try:
         from app.api.v1.auth import router as auth_router
