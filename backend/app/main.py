@@ -1,4 +1,24 @@
-# -*- coding: utf-8 -*-
+# === ENDPOINTS CHAT DIRECTS (HORS V1) ===
+@app.post("/chat/stream", tags=["Chat"])
+async def chat_stream_direct(request: Request):
+    """Endpoint chat direct - sans préfixe v1 pour compatibilité frontend"""
+    try:
+        # Lire le corps de la requête
+        body = await request.body()
+        
+        # Headers à transférer
+        headers = {
+            "Content-Type": "application/json",
+            "X-Frontend-Origin": "intelia"
+        }
+        
+        # Ajouter l'auth si présente
+        auth_header = request.headers.get("Authorization")
+        if auth_header:
+            headers["Authorization"] = auth_header
+        
+        # URL du service LLM
+        llm_service_url = os.getenv("LLM_BACKEND_URL", "https://expert.intelia.com/# -*- coding: utf-8 -*-
 #
 # app/main.py - VERSION 4.1 NETTOYEE - ENDPOINTS SELECTIONNES UNIQUEMENT
 # 🎯 GARDE: Admin, Auth, Billing, Health, Invitations, Logging, Stats, System, User
@@ -633,7 +653,80 @@ except ImportError as e:
 except Exception as e:
     logger.error(f"⌛ Erreur lors de l'activation du middleware d'auth: {e}")
 
-# === MONTAGE DES ROUTERS - ENDPOINTS SELECTIONNES UNIQUEMENT ===
+# === ENDPOINTS CHAT DIRECTS (HORS V1) ===
+@app.post("/chat/stream", tags=["Chat"])
+async def chat_stream_direct(request: Request):
+    """Endpoint chat direct - proxy vers service LLM externe"""
+    try:
+        import httpx
+        
+        # Lire le corps de la requête
+        body = await request.body()
+        
+        # Headers à transférer
+        headers = {
+            "Content-Type": "application/json",
+            "X-Frontend-Origin": "intelia"
+        }
+        
+        # Ajouter l'auth si présente
+        auth_header = request.headers.get("Authorization")
+        if auth_header:
+            headers["Authorization"] = auth_header
+        
+        # URL du service LLM externe
+        target_url = "https://expert.intelia.com/llm/chat/stream"
+        
+        # Proxy vers le service LLM externe
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                target_url,
+                content=body,
+                headers=headers,
+                timeout=60.0
+            )
+            
+            if response.status_code == 200:
+                # Streamer la réponse
+                from fastapi.responses import StreamingResponse
+                return StreamingResponse(
+                    response.aiter_text(),
+                    media_type="text/event-stream",
+                    headers={
+                        "Cache-Control": "no-cache",
+                        "Connection": "keep-alive",
+                        "Access-Control-Allow-Origin": request.headers.get("Origin", "*"),
+                        "Access-Control-Allow-Credentials": "true"
+                    }
+                )
+            else:
+                return JSONResponse(
+                    status_code=response.status_code,
+                    content={"detail": f"LLM service error: {response.status_code}"}
+                )
+                
+    except Exception as e:
+        logger.error(f"Erreur proxy chat direct: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Proxy error: {str(e)}"}
+        )
+
+@app.get("/chat/health", tags=["Chat"])
+async def chat_health_direct():
+    """Health check du service LLM externe"""
+    try:
+        import httpx
+        target_url = "https://expert.intelia.com/llm/health"
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(target_url, timeout=10.0)
+            return response.json()
+            
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 try:
     from app.api.v1 import router as api_v1_router
     app.include_router(api_v1_router)
