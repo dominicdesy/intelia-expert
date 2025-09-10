@@ -542,31 +542,70 @@ async def chat_stream_direct(request: Request):
     try:
         import httpx
         
-        # Lire le corps de la requete
-        body = await request.body()
+        # Lire et parser le corps de la requete
+        body_bytes = await request.body()
         
-        # Headers a transferer
+        # Parser le JSON pour transformation si nécessaire
+        try:
+            body_json = json.loads(body_bytes.decode('utf-8'))
+            
+            # Transformation des données pour le service LLM
+            # Le frontend envoie "message_preview", le LLM attend "message"
+            if "message_preview" in body_json and "message" not in body_json:
+                body_json["message"] = body_json.pop("message_preview")
+                logger.info("Transformation: message_preview -> message")
+            
+            # Si on a une question (depuis session_id/user_id), l'utiliser comme message
+            if "question" in body_json and "message" not in body_json:
+                body_json["message"] = body_json.pop("question")
+                logger.info("Transformation: question -> message")
+            
+            # Reconvertir en bytes
+            body_bytes = json.dumps(body_json).encode('utf-8')
+            logger.info(f"Body transformé: {body_json}")
+            
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            logger.warning("Impossible de parser/transformer le body JSON, envoi tel quel")
+        
+        # Headers a transferer - plus complets
         headers = {
             "Content-Type": "application/json",
-            "X-Frontend-Origin": "intelia"
+            "X-Frontend-Origin": "intelia",
+            "User-Agent": "Intelia-Expert-Proxy/1.0",
+            "Accept": "*/*",
+            "Accept-Encoding": "gzip, deflate",
+            "Connection": "keep-alive"
         }
         
-        # Ajouter l'auth si presente
-        auth_header = request.headers.get("Authorization")
-        if auth_header:
-            headers["Authorization"] = auth_header
+        # Transferer tous les headers importants du frontend
+        for header_name in ["Authorization", "Cookie", "X-Session-ID", "X-User-ID", "X-Tenant-ID"]:
+            header_value = request.headers.get(header_name)
+            if header_value:
+                headers[header_name] = header_value
+        
+        # Transferer l'origine si presente
+        origin = request.headers.get("Origin")
+        if origin:
+            headers["Origin"] = origin
+            headers["Referer"] = origin
         
         # URL du service LLM externe
         target_url = "https://expert.intelia.com/llm/chat/stream"
         
+        # Log pour debug
+        logger.info(f"Proxy chat vers {target_url}")
+        logger.debug(f"Headers proxy: {headers}")
+        
         # Proxy vers le service LLM externe
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
             response = await client.post(
                 target_url,
-                content=body,
+                content=body_bytes,
                 headers=headers,
                 timeout=60.0
             )
+            
+            logger.info(f"Reponse LLM service: {response.status_code}")
             
             if response.status_code == 200:
                 # Streamer la réponse
@@ -582,9 +621,19 @@ async def chat_stream_direct(request: Request):
                     }
                 )
             else:
+                # Log l'erreur complète
+                try:
+                    error_content = response.text
+                    logger.error(f"LLM service error {response.status_code}: {error_content}")
+                except:
+                    logger.error(f"LLM service error {response.status_code}: (impossible de lire le contenu)")
+                
                 return JSONResponse(
                     status_code=response.status_code,
-                    content={"detail": f"LLM service error: {response.status_code}"}
+                    content={
+                        "detail": f"LLM service error: {response.status_code}",
+                        "upstream_error": response.text if response.text else "No details"
+                    }
                 )
                 
     except Exception as e:
