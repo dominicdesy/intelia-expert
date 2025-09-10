@@ -6,14 +6,14 @@
 
 import os, re, json, asyncio
 import time
-from typing import Any, Dict, Generator, AsyncGenerator, Optional
+from typing import Any, Dict, AsyncGenerator
 
 from fastapi import FastAPI, APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from openai import OpenAI, BadRequestError
-from langdetect import detect, DetectorFactory  # NEW
+from openai import OpenAI
+from langdetect import detect, DetectorFactory
 DetectorFactory.seed = 0  # déterminisme
 
 # Charge .env si présent (utile en local)
@@ -45,7 +45,7 @@ app.add_middleware(
 
 router = APIRouter()
 
-
+# -------- Utilitaires --------
 def sse_event(obj: Dict[str, Any]) -> bytes:
     """Encode un event SSE (Server-Sent Events)."""
     return f"data: {json.dumps(obj, ensure_ascii=False)}\n\n".encode("utf-8")
@@ -75,16 +75,87 @@ def guess_lang_from_text(text: str) -> str | None:
         return None
 
 
-# -------- Garde-fou domaine agricole --------
-AGRI_PAT = re.compile(
-    r"\b(agri|agricultur|élevage|aviculture|volaille|poulet|poulailler|broiler|layer|ross|aviagen|hy-?line|"
-    r"nutri|aliment|feed|AMEn|acides aminés|biosécur|ventilation|température|CO2|ascite|humidité|densité)\b",
+# -------- Nettoyage des marqueurs de source --------
+# Supprime toute séquence entre crochets pleins `【 ... 】`
+# Exemple : "", "【turn7file4†L10-L20】", etc.
+CITATION_PATTERN = re.compile(r"【[^】]*】")
+
+def clean_text(txt: str) -> str:
+    if not txt:
+        return txt
+    cleaned = CITATION_PATTERN.sub("", txt)
+    # Normalise les espaces après suppression
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r"\s+\n", "\n", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
+# -------- Garde-fou permissif (liste NON-AGRI) --------
+# Principe: on ACCEPTE par défaut tout ce qui peut toucher directement/indirectement à l'agriculture.
+# On REJETTE seulement si on détecte explicitement un domaine manifestement hors-sujet.
+NON_AGRI_TERMS = [
+    # Divertissement & culture pop
+    "cinéma","film","films","séries","serie","séries tv","netflix","hollywood","bollywood","disney",
+    "pixar","musique","concert","rap","pop","rock","jazz","opéra","orchestre","télévision","télé",
+    "emission","émission","talk-show","talk show","documentaire","jeux vidéo","gaming","playstation",
+    "xbox","nintendo","e-sport","esport","fortnite","minecraft","twitch",
+    # Sport & loisirs
+    "football","soccer","nba","nfl","nhl","hockey","baseball","mlb","tennis","golf","cyclisme",
+    "tour de france","formule 1","f1","motogp","boxe","ufc","olympiques","olympics","fitness",
+    "musculation","yoga","randonnée","plongée","ski","surf","basketball","rugby","cricket",
+    # Politique & société
+    "élections","elections","président","president","premier ministre","parlement","sénat","senat",
+    "congrès","congres","diplomatie","guerre","armée","armee","conflit","otan","onu","droit humain",
+    "droits humains","immigration","lois","justice","criminel","tribunal","révolution","révolte",
+    # Finance & économie grand public
+    "bourse","actions","nasdaq","wall street","s&p500","dow jones","crypto","bitcoin","ethereum",
+    "blockchain","nft","banque","banques","crédit","credits","prêt","pret","hypothèque","hypotheque",
+    "assurance","impôt","impots","fiscalité","fiscalite","immobilier","courtage","trading",
+    "hedge fund","capital risque","capital-risque","private equity","forex",
+    # Tech grand public
+    "iphone","android","samsung","apple","google","microsoft","windows","linux","amazon","tesla",
+    "réseaux sociaux","reseaux sociaux","facebook","instagram","tiktok","youtube","twitter","x ",
+    "snapchat","applications mobiles","app mobile","messagerie","whatsapp","telegram","signal",
+    "streaming","spotify","itunes",
+    # Santé humaine (hors zoonoses / comparaisons animales)
+    "cancer","diabète","diabete","hypertension","grippe saisonnière","grippe saisonniere","covid",
+    "hôpital","hopital","clinique","pharmacie","chirurgie esthétique","dentiste","dentisterie",
+    "nutrition humaine","régime","regime","keto","végan","vegan","végétarien","vegetarien",
+    # Mode, lifestyle & tourisme
+    "vêtements","vetements","chaussures","bijoux","luxe","gucci","louis vuitton","zara","nike",
+    "coiffure","maquillage","cosmétiques","cosmetiques","parfums","voyage","vacances","tourisme",
+    "hôtel","hotel","airbnb","croisière","croisiere","disneyland","gastronomie","recette",
+    # Sciences & éducation non agricoles
+    "astronomie","physique quantique","astrophysique","fusées","fusees","nasa","spacex","mathématiques",
+    "mathematiques","philosophie","histoire","archéologie","archeologie","psychologie","psychanalyse",
+    "sociologie",
+    # Religion & ésotérisme
+    "église","eglise","prière","priere","islam","christianisme","judaïsme","judaisme","bouddhisme",
+    "astrologie","horoscope","tarot","voyance","magie","sorcellerie",
+    # Autres clairement hors-sujet agri
+    "météo urbaine","meteo urbaine","météo de paris","meteo de paris","trafic routier","bouchons",
+    "automobile","course automobile","tuning","uber","lyft","relations amoureuses","sexualité",
+    "sexualite","mariage","divorce","fashion week","influenceur","influenceuse"
+]
+
+# Construit un regex robuste : \b(?:terme1|terme2|...)\b
+# (Les espaces à l'intérieur des termes multi-mots sont respectés)
+NON_AGRI_PAT = re.compile(
+    r"\b(?:"
+    + "|".join(re.escape(t) for t in NON_AGRI_TERMS)
+    + r")\b",
     re.IGNORECASE,
 )
 
 def is_agri_question(text: str) -> bool:
-    """Vérifie si une question concerne le domaine agricole/aviculture."""
-    return bool(AGRI_PAT.search(text))
+    """
+    Filtre permissif : accepte par défaut.
+    Rejette seulement si un terme non-agricole explicite est détecté.
+    """
+    if not text:
+        return True
+    return not bool(NON_AGRI_PAT.search(text))
 
 
 # --- Data-only (Assistant v2) : exécution non streamée, on bufferise le texte ---
@@ -109,12 +180,11 @@ def run_data_only_assistant(client: OpenAI, assistant_id: str, user_text: str, l
     )
     # 2) run + poll
     run = client.beta.threads.runs.create(thread_id=thread.id, assistant_id=assistant_id)
-    import time
     while True:
         r = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
         if r.status in ("completed", "failed", "cancelled", "expired"):
             break
-        time.sleep(0.5)
+        time.sleep(POLL_INTERVAL_SEC)
     if r.status != "completed":
         return "Hors base: information absente de la connaissance Intelia."
     # 3) récupérer le dernier message assistant
@@ -124,6 +194,7 @@ def run_data_only_assistant(client: OpenAI, assistant_id: str, user_text: str, l
             for c in m.content:
                 if getattr(c, "type", "") == "text":
                     txt = (c.text.value or "").strip()
+                    txt = clean_text(txt)  # suppression des marqueurs 【...】
                     return txt if txt else "Hors base: information absente de la connaissance Intelia."
     return "Hors base: information absente de la connaissance Intelia."
 
@@ -136,9 +207,10 @@ async def stream_fallback_general(client: OpenAI, text: str, lang: str):
     """
     system = (
         "You are an agricultural domain assistant. Answer ONLY within agriculture "
-        "(livestock, poultry, broilers/layers, animal nutrition, farm environment, "
-        "biosecurity, ventilation, poultry diseases). If the user asks anything outside "
-        "this scope, politely refuse.\n"
+        "(including livestock, poultry, broilers/layers, animal nutrition, farm environment, "
+        "biosecurity, ventilation, poultry diseases, agricultural economics directly related to farms, "
+        "and adjacent topics that clearly relate to agriculture). If the user asks anything clearly "
+        "outside this scope, politely refuse.\n"
         f"Reply in {lang}."
     )
     model = os.getenv("FALLBACK_MODEL", "gpt-5")
@@ -162,9 +234,11 @@ async def stream_fallback_general(client: OpenAI, text: str, lang: str):
             delta = event.choices[0].delta
             if delta and getattr(delta, "content", None):
                 chunk = delta.content
-                final_buf.append(chunk)
-                yield f'data: {json.dumps({"type":"delta","text": chunk}, ensure_ascii=False)}\n\n'
-    final_text = "".join(final_buf).strip()
+                # Nettoie à la volée les éventuels marqueurs dans le flux
+                cleaned_chunk = clean_text(chunk)
+                final_buf.append(cleaned_chunk)
+                yield f'data: {json.dumps({"type":"delta","text": cleaned_chunk}, ensure_ascii=False)}\n\n'
+    final_text = clean_text("".join(final_buf).strip())
     yield f'data: {json.dumps({"type":"final","answer": final_text}, ensure_ascii=False)}\n\n'
 
 
@@ -185,7 +259,7 @@ async def chat_stream(request: Request):
       - Sinon → réponse data-only streamée
 
     Logique:
-      1. Garde-fou domaine agricole
+      1. Garde-fou permissif (rejette seulement les domaines non-agri explicites)
       2. Assistant data-only (non streamé, bufferisé)
       3. Fallback GPT-5 conditionnel (streamé)
     """
@@ -209,33 +283,34 @@ async def chat_stream(request: Request):
     lang = (lang or "fr")[:5].split("-")[0].lower()
 
     async def event_source() -> AsyncGenerator[str, None]:
-        # 0) garde-fou domaine
+        # 0) garde-fou permissif
         if not is_agri_question(message):
-            answer = f"Domaine restreint : {os.getenv('ALLOWED_DOMAIN_DESC') or 'agriculture uniquement'}."
+            answer = f"Domaine restreint : {os.getenv('ALLOWED_DOMAIN_DESC') or 'agriculture et sujets adjacents uniquement'}."
+            answer = clean_text(answer)
             yield f'data: {json.dumps({"type":"final","answer": answer})}\n\n'
             return
 
-        client = OpenAI(api_key=OPENAI_API_KEY)
+        _client = OpenAI(api_key=OPENAI_API_KEY)
         
         # 1) essayer data-only (Assistant v2)
         text = await asyncio.to_thread(
-            run_data_only_assistant, client, ASSISTANT_ID, message, lang
+            run_data_only_assistant, _client, ASSISTANT_ID, message, lang
         )
+        text = clean_text(text)
 
         # 2) si "Hors base" → fallback (si autorisé)
         if text.lower().startswith("hors base"):
             if os.getenv("HYBRID_MODE") and allow_fallback:
-                async for sse in stream_fallback_general(client, message, lang):
+                async for sse in stream_fallback_general(_client, message, lang):
                     yield sse
                 return
             else:
                 yield f'data: {json.dumps({"type":"final","answer": text})}\n\n'
                 return
 
-        # 3) Sinon (réponse data-only) — on envoie delta + final
-        # Simulation du streaming pour UX cohérente
+        # 3) Sinon (réponse data-only) — on envoie delta + final (avec nettoyage)
         for i in range(0, len(text), STREAM_CHUNK_LEN):
-            chunk = text[i:i + STREAM_CHUNK_LEN]
+            chunk = clean_text(text[i:i + STREAM_CHUNK_LEN])
             yield f'data: {json.dumps({"type":"delta","text": chunk})}\n\n'
             await asyncio.sleep(0.02)
         
