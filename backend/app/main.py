@@ -648,6 +648,14 @@ except ImportError as e:
     
     # === ENDPOINTS SELECTIONNES UNIQUEMENT ===
     
+    # Expert router (pour les endpoints de chat)
+    try:
+        from app.api.v1.expert import router as expert_router
+        temp_v1_router.include_router(expert_router, tags=["expert"])
+        logger.info("✅ Expert router ajoute (pour endpoints chat)")
+    except ImportError as e:
+        logger.error(f"⌛ Expert router non disponible: {e}")
+    
     # Auth router
     try:
         from app.api.v1.auth import router as auth_router
