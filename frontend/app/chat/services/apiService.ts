@@ -1,16 +1,14 @@
-// app/chat/services/apiService.ts - VERSION SUPABASE NATIVE COMPLETE AVEC DEBUG
+// app/chat/services/apiService.ts - VERSION HYBRIDE: Streaming LLM + Backend métier
 
 import { conversationService } from './conversationService'
-// ✅ CHANGEMENT CRITIQUE: Utiliser le singleton au lieu d'importer directement
 import { getSupabaseClient } from '@/lib/supabase/singleton'
 
-// Configuration API propre
+// Configuration API pour le backend métier (stats, billing, etc.)
 const getApiConfig = () => {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
   const version = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
   
-  // Enlever /api s'il est deja present pour eviter /api/api/
-  const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, '')
+  const cleanBaseUrl = baseUrl?.replace(/\/api\/?$/, '') || ''
   const finalUrl = `${cleanBaseUrl}/api/${version}`
   
   return finalUrl
@@ -18,19 +16,17 @@ const getApiConfig = () => {
 
 const API_BASE_URL = getApiConfig()
 
-// 🔧 FONCTION getAuthToken() CORRIGÉE - SEULE MODIFICATION DANS TOUT LE FICHIER
+// Fonction d'authentification pour le backend métier (conservée)
 const getAuthToken = async (): Promise<string | null> => {
-  console.log('[apiService] 🔍 getAuthToken() appelée...');
+  console.log('[apiService] Récupération token auth...');
   
   try {
-    // MÉTHODE 1: Récupérer depuis intelia-expert-auth (PRIORITÉ)
-    console.log('[apiService] 🔍 Tentative récupération depuis intelia-expert-auth...');
+    // Méthode 1: Récupérer depuis intelia-expert-auth (PRIORITÉ)
     const authData = localStorage.getItem('intelia-expert-auth');
     if (authData) {
       const parsed = JSON.parse(authData);
       if (parsed.access_token) {
-        console.log('[apiService] ✅ Token récupéré depuis intelia-expert-auth');
-        console.log('[apiService] 📋 Token preview:', parsed.access_token.substring(0, 30) + '...');
+        console.log('[apiService] Token récupéré depuis intelia-expert-auth');
         
         // Vérifier que le token n'est pas expiré
         try {
@@ -40,22 +36,17 @@ const getAuthToken = async (): Promise<string | null> => {
             const now = Math.floor(Date.now() / 1000);
             const isExpired = payload.exp < now;
             
-            if (isExpired) {
-              console.warn('[apiService] ⚠️ Token expiré dans intelia-expert-auth');
-            } else {
-              console.log('[apiService] ✅ Token valide, expire dans:', Math.floor((payload.exp - now) / 60), 'minutes');
+            if (!isExpired) {
               return parsed.access_token;
             }
           }
         } catch (decodeError) {
-          console.log('[apiService] 📋 Token JWT non décodable, utilisation directe');
           return parsed.access_token;
         }
       }
     }
     
-    // MÉTHODE 2: Fallback vers Supabase store (si intelia-expert-auth échoue)
-    console.log('[apiService] 🔍 Tentative fallback vers supabase-auth-store...');
+    // Méthode 2: Fallback vers Supabase store
     const supabaseStore = localStorage.getItem('supabase-auth-store');
     if (supabaseStore) {
       const parsed = JSON.parse(supabaseStore);
@@ -67,65 +58,36 @@ const getAuthToken = async (): Promise<string | null> => {
       
       for (const token of possibleTokens) {
         if (token && typeof token === 'string' && token.length > 20) {
-          console.log('[apiService] ✅ Token fallback trouvé dans supabase-auth-store');
           return token;
         }
       }
     }
     
-    // MÉTHODE 3: Dernière chance avec les cookies
-    console.log('[apiService] 🔍 Tentative dernière chance avec cookies...');
-    const cookies = document.cookie.split(';');
-    for (const cookie of cookies) {
-      if (cookie.includes('sb-') && cookie.includes('auth-token')) {
-        try {
-          const cookieValue = cookie.split('=')[1];
-          const decoded = decodeURIComponent(cookieValue);
-          const parsed = JSON.parse(decoded);
-          if (Array.isArray(parsed) && parsed[0] && typeof parsed[0] === 'string') {
-            console.log('[apiService] ✅ Token trouvé dans cookies');
-            return parsed[0];
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-    }
-    
-    console.error('[apiService] ❌ Aucun token trouvé dans aucune source');
+    console.error('[apiService] Aucun token trouvé');
     return null;
     
   } catch (error) {
-    console.error('[apiService] ❌ Erreur récupération token:', error);
+    console.error('[apiService] Erreur récupération token:', error);
     return null;
   }
 }
 
-// 🔧 getAuthHeaders avec logs de debug détaillés - CODE ORIGINAL CONSERVÉ
+// Headers pour les appels au backend métier
 const getAuthHeaders = async (): Promise<Record<string, string>> => {
-  console.log('[apiService] 🔍 getAuthHeaders() appelée...')
-  
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Origin': 'https://expert.intelia.com',
   }
 
-  console.log('[apiService] 🔍 Appel getAuthToken()...')
   const authToken = await getAuthToken()
-  console.log('[apiService] 📋 getAuthToken() résultat:', !!authToken)
-
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`
-    console.log('[apiService] ✅ Headers avec Authorization configurés')
-  } else {
-    console.warn('[apiService] ⚠️ Headers sans authentification - pas de token Supabase (singleton)')
   }
 
-  console.log('[apiService] 📋 Headers finaux:', Object.keys(headers))
   return headers
 }
 
-// UUID Generation - CODE ORIGINAL CONSERVÉ
+// Génération UUID (conservée)
 const generateUUID = (): string => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID()
@@ -138,7 +100,7 @@ const generateUUID = (): string => {
   })
 }
 
-// Formatage heure locale - CODE ORIGINAL CONSERVÉ
+// Formatage heure locale (conservé)
 export const formatToLocalTime = (utcTimestamp: string): string => {
   try {
     const date = new Date(utcTimestamp);
@@ -175,77 +137,151 @@ export const simpleLocalTime = (utcTimestamp: string): string => {
   }
 }
 
-// Interface pour les reponses IA - CODE ORIGINAL CONSERVÉ
+// Interface pour les réponses (adaptée au streaming)
 interface EnhancedAIResponse {
-  response?: string
+  response: string
   conversation_id: string
   language: string
-  ai_enhancements_used?: string[]
-  rag_used?: boolean
-  sources?: any[]
-  confidence_score?: number
-  response_time?: number
-  mode?: string
-  note?: string
-  timestamp?: string
-  processing_time?: number
+  timestamp: string
+  mode: 'streaming'
+  source: 'llm_backend'
+  final_response: string
   
+  // Propriétés compatibles avec l'ancien format
+  type?: 'answer' | 'clarification' | 'partial_answer' | 'validation_rejected'
+  requires_clarification?: boolean
+  clarification_questions?: string[]
+  clarification_result?: any
   response_versions?: {
     ultra_concise?: string
     concise?: string
     standard?: string
     detailed?: string
   }
-  
-  clarification_result?: {
-    clarification_requested: boolean
-    clarification_type: string
-    missing_information: string[]
-    age_detected?: string
-    confidence: number
-  }
-  requires_clarification?: boolean
-  clarification_questions?: string[]
-  clarification_type?: string
-  vague_entities?: string[]
-  
-  type?: 'answer' | 'clarification' | 'partial_answer' | 'validation_rejected'
-  questions?: string[]
-  source?: string
-  documents_used?: number
-  warning?: string
-  
-  general_answer?: {
-    text: string
-    source?: string
-  }
-  follow_up_questions?: Array<{
-    field: string
-    question: string
-    options?: string[]
-  }>
-  
-  message?: string
-  validation?: {
-    is_valid: boolean
-    confidence: number
-    suggested_topics?: string[]
-    detected_keywords?: string[]
-    rejected_keywords?: string[]
-  }
-  
   full_text?: string
-}
-
-interface APIError {
-  detail: string
-  timestamp: string
-  path: string
-  version: string
+  rag_used?: boolean
+  sources?: any[]
+  confidence_score?: number
+  note?: string
 }
 
 /**
- * FONCTION PRINCIPALE - Expert API avec Supabase natif (singleton) + DEBUG DÉTAILLÉ - CODE ORIGINAL CONSERVÉ
+ * FONCTION STREAMING SSE INTERNE
+ * Gère l'appel vers /api/chat/stream
+ */
+async function streamAIResponseInternal(
+  tenant_id: string,
+  lang: string,
+  message: string,
+  conversation_id: string,
+  user_context?: any
+): Promise<string> {
+  
+  const payload = {
+    tenant_id,
+    lang,
+    message,
+    conversation_id,
+    user_context
+  };
+
+  console.log('[apiService] Streaming vers /api/chat/stream:', {
+    tenant_id,
+    lang,
+    message_preview: message.substring(0, 50) + '...'
+  });
+
+  const response = await fetch('/api/chat/stream', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'text/event-stream'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    let errorInfo: any = null;
+    try { 
+      const text = await response.text();
+      errorInfo = JSON.parse(text); 
+    } catch { 
+      errorInfo = { error: `http_${response.status}`, message: `Erreur HTTP ${response.status}` };
+    }
+    
+    console.error('[apiService] Erreur streaming:', errorInfo);
+    throw new Error(errorInfo?.message || `Erreur ${response.status}`);
+  }
+
+  if (!response.body) {
+    throw new Error("Pas de flux de données reçu");
+  }
+
+  // Traitement du flux SSE
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let finalAnswer = "";
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      
+      if (done) {
+        console.log('[apiService] Stream terminé, réponse finale:', finalAnswer.length, 'caractères');
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Traitement ligne par ligne (format SSE)
+      let newlineIndex: number;
+      while ((newlineIndex = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, newlineIndex).trim();
+        buffer = buffer.slice(newlineIndex + 1);
+        
+        if (!line || !line.startsWith("data:")) {
+          continue;
+        }
+        
+        const jsonStr = line.slice(5).trim();
+        if (!jsonStr || jsonStr === "[DONE]") {
+          continue;
+        }
+        
+        try {
+          const event = JSON.parse(jsonStr);
+          
+          if (event.type === "delta" && typeof event.text === "string" && event.text) {
+            finalAnswer += event.text;
+          } else if (event.type === "final" && event.answer) {
+            finalAnswer = event.answer;
+            break;
+          } else if (event.type === "error") {
+            console.error('[apiService] Erreur dans le stream:', event);
+            throw new Error(event.message || 'Erreur de streaming');
+          }
+          
+        } catch (parseError) {
+          // Ignore les lignes JSON malformées (chunks partiels)
+        }
+      }
+    }
+    
+  } finally {
+    try {
+      reader.cancel();
+    } catch {
+      // Ignore les erreurs de cancel
+    }
+  }
+
+  return finalAnswer;
+}
+
+/**
+ * NOUVELLE FONCTION generateAIResponse avec streaming intégré
+ * Interface compatible avec l'ancien système
  */
 export const generateAIResponse = async (
   question: string,
@@ -257,6 +293,7 @@ export const generateAIResponse = async (
   originalQuestion?: string,
   clarificationEntities?: Record<string, any>
 ): Promise<EnhancedAIResponse> => {
+  
   if (!question || question.trim() === '') {
     throw new Error('Question requise')
   }
@@ -267,23 +304,34 @@ export const generateAIResponse = async (
 
   const finalConversationId = conversationId || generateUUID()
 
-  console.log('[apiService] Expert API avec Supabase natif (singleton):', {
+  console.log('[apiService] NOUVEAU: Génération AI avec streaming:', {
     question: question.substring(0, 50) + '...',
     session_id: finalConversationId.substring(0, 8) + '...',
-    system: 'Supabase singleton -> Expert API'
+    user_id: user.id,
+    system: 'LLM Backend Streaming'
   })
 
   try {
-    const endpoint = `${API_BASE_URL}/expert/ask`
+    // Récupération du tenant_id depuis le profil utilisateur
+    let tenant_id = 'ten_demo'; // Fallback
     
-    // Enrichissement clarification conservé - CODE ORIGINAL CONSERVÉ
+    // TODO: Récupérer le vrai tenant_id depuis Supabase
+    // const supabase = getSupabaseClient()
+    // const { data: profile } = await supabase
+    //   .from('profiles')
+    //   .select('tenant_id, organization_id')
+    //   .eq('id', user.id)
+    //   .single()
+    // tenant_id = profile?.tenant_id || profile?.organization_id || 'ten_demo'
+
+    // Enrichissement clarification (conservé de l'ancien système)
     let finalQuestion = question.trim()
     
     if (isClarificationResponse && originalQuestion) {
       console.log('[apiService] Mode clarification - enrichissement question')
       
       const breedMatch = finalQuestion.match(/(ross\s*308|cobb\s*500|hubbard)/i)
-      const sexMatch = finalQuestion.match(/(male|male|femelle|female|mixte|mixed)/i)
+      const sexMatch = finalQuestion.match(/(male|mâle|femelle|female|mixte|mixed)/i)
       
       const breed = breedMatch ? breedMatch[0] : ''
       const sex = sexMatch ? sexMatch[0] : ''
@@ -294,209 +342,137 @@ export const generateAIResponse = async (
       }
     }
 
-    const requestBody = {
-      session_id: finalConversationId,
-      question: finalQuestion
-    }
+    // Appel au service de streaming
+    const finalResponse = await streamAIResponseInternal(
+      tenant_id,
+      language,
+      finalQuestion,
+      finalConversationId,
+      {
+        user_id: user.id,
+        concision_level: concisionLevel,
+        ...(clarificationEntities && { clarification_entities: clarificationEntities })
+      }
+    );
 
-    // 🔍 DEBUG: Appel getAuthHeaders avec logs détaillés
-    console.log('[apiService] 🔍 Récupération des headers d\'authentification...')
-    const headers = await getAuthHeaders()
-
-    console.log('[apiService] Requete Expert API (Supabase singleton):', requestBody)
-    console.log('[apiService] 🔍 Préparation de la requête fetch...')
-
-    // 🔍 DEBUG: Ajouter des logs avant et après le fetch
-    console.log('[apiService] 🚀 Envoi de la requête vers:', endpoint)
-    console.log('[apiService] 📋 Détails de la requête:', {
-      method: 'POST',
-      headers_keys: Object.keys(headers),
-      body_size: JSON.stringify(requestBody).length,
-      has_auth_header: !!headers['Authorization']
+    console.log('[apiService] Streaming terminé:', {
+      final_length: finalResponse.length,
+      conversation_id: finalConversationId
     })
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(requestBody)
-    })
-
-    console.log('[apiService] ✅ Réponse reçue du serveur')
-    console.log('[apiService] Expert API status (Supabase singleton):', response.status)
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('[apiService] ❌ Erreur Expert API (Supabase singleton):', errorText)
-      
-      if (response.status === 401) {
-        throw new Error('Session expiree. Veuillez vous reconnecter.')
-      }
-      
-      if (response.status === 403) {
-        throw new Error('Acces non autorise.')
-      }
-      
-      let errorMessage = `Erreur API: ${response.status}`
-      try {
-        const errorData: APIError = JSON.parse(errorText)
-        errorMessage = errorData.detail || errorMessage
-      } catch (e) {
-        errorMessage = errorText || errorMessage
-      }
-      
-      throw new Error(errorMessage)
+    // Enregistrement de la conversation via le backend métier
+    try {
+      await saveConversationToBackend(finalConversationId, finalQuestion, finalResponse, user.id)
+    } catch (saveError) {
+      console.warn('[apiService] Erreur sauvegarde conversation:', saveError)
+      // Ne pas faire échouer la réponse pour une erreur de sauvegarde
     }
 
-    console.log('[apiService] 🔍 Lecture du JSON de la réponse...')
-    const data = await response.json()
-    
-    console.log('[apiService] Reponse Expert API recue (Supabase singleton):', {
-      type: data.type,
-      has_answer: !!data.answer,
-      answer_text_exists: !!(data.answer?.text),
-      has_general_answer: !!data.general_answer,
-      has_questions: !!data.questions,
-      has_message: !!data.message,
-      source: data.source,
-      documents_used: data.documents_used
-    })
-
-    // Extraction du texte selon le type - CODE ORIGINAL CONSERVÉ
-    let responseText = ''
-    if (data.type === 'answer' && data.answer?.text) {
-      responseText = data.answer.text
-      console.log('[apiService] Texte extrait de data.answer.text')
-    } else if (data.type === 'partial_answer' && data.general_answer?.text) {
-      responseText = data.general_answer.text
-      console.log('[apiService] Texte extrait de data.general_answer.text')
-    } else if (data.type === 'validation_rejected') {
-      responseText = data.message || "Cette question ne concerne pas le domaine agricole."
-      console.log('[apiService] Question rejetee par validation agricole')
-    } else {
-      console.warn('[apiService] Aucun texte trouve dans la reponse!')
+    // Stockage du session ID pour l'historique
+    try {
+      conversationService.storeRecentSessionId(finalConversationId)
+    } catch (error) {
+      console.warn('[apiService] Erreur stockage session ID:', error)
     }
 
-    // Construction des donnees de reponse - CODE ORIGINAL CONSERVÉ
-    const processedData: EnhancedAIResponse = {
+    // Construction de la réponse dans le format attendu par l'interface
+    const processedResponse: EnhancedAIResponse = {
+      response: finalResponse,
       conversation_id: finalConversationId,
       language: language,
       timestamp: new Date().toISOString(),
+      mode: 'streaming',
+      source: 'llm_backend',
+      final_response: finalResponse,
       
-      // Type answer
-      ...(data.type === 'answer' ? {
-        type: 'answer',
-        response: responseText,
-        full_text: responseText,
-        requires_clarification: false,
-        rag_used: true,
-        sources: data.answer?.sources || (data.source ? [{ source: data.source }] : []),
-        mode: 'perfstore_hit',
-        note: data.warning || `Documents utilises: ${data.documents_used || 0}`,
-        confidence_score: data.answer?.confidence || 0.9
-      } : {}),
+      // Propriétés compatibles avec l'ancien format
+      type: 'answer',
+      requires_clarification: false,
+      rag_used: true,
+      sources: [],
+      confidence_score: 0.9,
+      note: 'Généré via streaming LLM',
+      full_text: finalResponse,
       
-      // Type partial_answer
-      ...(data.type === 'partial_answer' ? {
-        type: 'partial_answer',
-        general_answer: data.general_answer,
-        follow_up_questions: data.follow_up_questions,
-        response: responseText,
-        full_text: responseText,
-        rag_used: true,
-        sources: data.source ? [{ source: data.source }] : [],
-        mode: 'rag_partial_answer',
-        note: data.warning || `Documents utilises: ${data.documents_used || 0}`,
-        confidence_score: data.documents_used ? Math.min(0.9, 0.5 + (data.documents_used * 0.1)) : 0.5
-      } : {}),
-      
-      // Type clarification
-      ...(data.type === 'clarification' ? {
-        type: 'clarification',
-        requires_clarification: true,
-        clarification_questions: data.questions || [],
-        clarification_type: 'missing_info',
-        vague_entities: ['breed', 'sex'],
-        clarification_result: {
-          clarification_requested: true,
-          clarification_type: 'missing_info',
-          missing_information: ['breed', 'sex'],
-          confidence: 0.5
-        },
-        rag_used: false,
-        sources: [],
-        mode: 'clarification_dialoguemanager',
-        note: 'Clarification requise'
-      } : {}),
-
-      // Type validation_rejected
-      ...(data.type === 'validation_rejected' ? {
-        type: 'validation_rejected',
-        message: data.message,
-        validation: data.validation,
-        response: responseText,
-        full_text: responseText,
-        requires_clarification: false,
-        rag_used: false,
-        sources: [],
-        mode: 'validation_rejected',
-        note: 'Question rejetee par validation agricole',
-        confidence_score: 0.0
-      } : {})
-    }
-
-    // Generation automatique des versions de reponse - CODE ORIGINAL CONSERVÉ
-    if (processedData.response && !processedData.response_versions) {
-      console.log('[apiService] Generation automatique response_versions')
-      
-      const mainResponse = processedData.response
-      
-      processedData.response_versions = {
-        ultra_concise: mainResponse.length > 200 ? 
-          mainResponse.substring(0, 150) + '...' : mainResponse,
-        concise: mainResponse.length > 400 ? 
-          mainResponse.substring(0, 300) + '...' : mainResponse,
-        standard: mainResponse,
-        detailed: mainResponse + (processedData.sources?.length ? 
-          `\n\nSources consultees: ${processedData.sources.length} documents` : '')
+      // Génération automatique des versions de réponse
+      response_versions: {
+        ultra_concise: finalResponse.length > 200 ? 
+          finalResponse.substring(0, 150) + '...' : finalResponse,
+        concise: finalResponse.length > 400 ? 
+          finalResponse.substring(0, 300) + '...' : finalResponse,
+        standard: finalResponse,
+        detailed: finalResponse
       }
     }
 
-    // Stocker le session ID pour l'historique - CODE ORIGINAL CONSERVÉ
-    try {
-      conversationService.storeRecentSessionId(finalConversationId)
-      console.log('[apiService] Session ID stocke pour historique (singleton)')
-    } catch (error) {
-      console.warn('[apiService] Erreur stockage session ID (singleton):', error)
-    }
-
-    console.log('[apiService] Reponse traitee (Supabase singleton):', {
-      type: processedData.type,
-      requires_clarification: processedData.requires_clarification,
-      clarification_questions_count: processedData.clarification_questions?.length || 0,
-      has_response: !!processedData.response,
-      response_length: processedData.response?.length || 0,
-      has_general_answer: !!processedData.general_answer,
-      has_versions: !!processedData.response_versions,
-      validation_rejected: processedData.type === 'validation_rejected'
+    console.log('[apiService] Réponse streaming traitée:', {
+      response_length: processedResponse.response.length,
+      conversation_id: processedResponse.conversation_id
     })
 
-    console.log('[apiService] 🎉 SUCCÈS: Retour de la réponse traitée')
-    return processedData
+    return processedResponse
 
   } catch (error) {
-    console.error('[apiService] ❌ ERREUR CRITIQUE dans generateAIResponse:', error)
-    console.error('[apiService] 📋 Stack trace:', error?.stack?.substring(0, 500))
+    console.error('[apiService] Erreur génération AI streaming:', error)
     
+    // Gestion des erreurs avec messages appropriés
     if (error instanceof Error) {
       throw error
     }
     
-    throw new Error('Erreur de communication avec le serveur')
+    throw new Error('Erreur de génération avec le service LLM')
   }
 }
 
 /**
- * VERSION PUBLIQUE avec Supabase (singleton) - CODE ORIGINAL CONSERVÉ
+ * Sauvegarde de la conversation via le backend métier
+ * Utilise l'ancien endpoint pour maintenir la compatibilité des stats/billing
+ */
+async function saveConversationToBackend(
+  conversationId: string,
+  question: string,
+  response: string,
+  userId: string
+): Promise<void> {
+  
+  try {
+    const headers = await getAuthHeaders()
+    
+    const payload = {
+      conversation_id: conversationId,
+      question: question.trim(),
+      response: response,
+      user_id: userId,
+      timestamp: new Date().toISOString(),
+      source: 'llm_streaming',
+      metadata: {
+        mode: 'streaming',
+        backend: 'llm_backend'
+      }
+    }
+
+    const response_save = await fetch(`${API_BASE_URL}/conversations/save`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    })
+
+    if (!response_save.ok) {
+      const errorText = await response_save.text()
+      console.error('[apiService] Erreur sauvegarde conversation:', errorText)
+      throw new Error(`Erreur sauvegarde: ${response_save.status}`)
+    }
+
+    console.log('[apiService] Conversation sauvegardée avec succès')
+
+  } catch (error) {
+    console.error('[apiService] Erreur lors de la sauvegarde:', error)
+    throw error
+  }
+}
+
+/**
+ * VERSION PUBLIQUE avec streaming (remplace l'ancienne)
  */
 export const generateAIResponsePublic = async (
   question: string,
@@ -504,165 +480,77 @@ export const generateAIResponsePublic = async (
   conversationId?: string,
   concisionLevel: 'ultra_concise' | 'concise' | 'standard' | 'detailed' = 'concise'
 ): Promise<EnhancedAIResponse> => {
+  
   if (!question || question.trim() === '') {
     throw new Error('Question requise')
   }
 
   const finalConversationId = conversationId || generateUUID()
 
-  console.log('[apiService] Expert API public (Supabase singleton):', {
+  console.log('[apiService] Génération AI publique avec streaming:', {
     question: question.substring(0, 50) + '...',
     session_id: finalConversationId.substring(0, 8) + '...'
   })
 
   try {
-    const endpoint = `${API_BASE_URL}/expert/ask-public`
-    
-    const requestBody = {
-      session_id: finalConversationId,
-      question: question.trim()
+    const finalResponse = await streamAIResponseInternal(
+      'ten_public',
+      language,
+      question.trim(),
+      finalConversationId
+    );
+
+    // Stockage du session ID
+    try {
+      conversationService.storeRecentSessionId(finalConversationId)
+    } catch (error) {
+      console.warn('[apiService] Erreur stockage session ID public:', error)
     }
 
-    const headers = {
-      'Content-Type': 'application/json',
-      'Origin': 'https://expert.intelia.com'
-    }
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(requestBody)
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('[apiService] Erreur Expert API public (Supabase singleton):', errorText)
-      throw new Error(`Erreur API: ${response.status}`)
-    }
-
-    const data = await response.json()
-    
-    console.log('[apiService] Reponse Expert API public (Supabase singleton):', {
-      type: data.type,
-      has_answer: !!data.answer,
-      answer_text_exists: !!(data.answer?.text),
-      has_general_answer: !!data.general_answer,
-      has_questions: !!data.questions,
-      has_message: !!data.message
-    })
-
-    // Meme extraction que la version auth
-    let responseText = ''
-    if (data.type === 'answer' && data.answer?.text) {
-      responseText = data.answer.text
-    } else if (data.type === 'partial_answer' && data.general_answer?.text) {
-      responseText = data.general_answer.text
-    } else if (data.type === 'validation_rejected') {
-      responseText = data.message || "Cette question ne concerne pas le domaine agricole."
-    }
-
-    const processedData: EnhancedAIResponse = {
+    return {
+      response: finalResponse,
       conversation_id: finalConversationId,
       language: language,
       timestamp: new Date().toISOString(),
+      mode: 'streaming',
+      source: 'llm_backend',
+      final_response: finalResponse,
       
-      ...(data.type === 'answer' ? {
-        type: 'answer',
-        response: responseText,
-        full_text: responseText,
-        requires_clarification: false,
-        rag_used: true,
-        sources: data.answer?.sources || (data.source ? [{ source: data.source }] : []),
-        mode: 'perfstore_hit_public',
-        note: data.warning || `Documents utilises: ${data.documents_used || 0}`,
-        confidence_score: data.answer?.confidence || 0.9
-      } : {}),
+      type: 'answer',
+      requires_clarification: false,
+      rag_used: true,
+      sources: [],
+      confidence_score: 0.9,
+      note: 'Généré via streaming LLM (public)',
+      full_text: finalResponse,
       
-      ...(data.type === 'partial_answer' ? {
-        type: 'partial_answer',
-        general_answer: data.general_answer,
-        follow_up_questions: data.follow_up_questions,
-        response: responseText,
-        full_text: responseText,
-        rag_used: true,
-        sources: data.source ? [{ source: data.source }] : [],
-        mode: 'rag_partial_answer_public',
-        note: data.warning || `Documents utilises: ${data.documents_used || 0}`,
-        confidence_score: data.documents_used ? Math.min(0.9, 0.5 + (data.documents_used * 0.1)) : 0.5
-      } : {}),
-      
-      ...(data.type === 'clarification' ? {
-        type: 'clarification',
-        requires_clarification: true,
-        clarification_questions: data.questions || [],
-        clarification_type: 'missing_info',
-        vague_entities: ['breed', 'sex'],
-        clarification_result: {
-          clarification_requested: true,
-          clarification_type: 'missing_info',
-          missing_information: ['breed', 'sex'],
-          confidence: 0.5
-        },
-        rag_used: false,
-        sources: [],
-        mode: 'clarification_dialoguemanager_public',
-        note: 'Clarification requise'
-      } : {}),
-
-      ...(data.type === 'validation_rejected' ? {
-        type: 'validation_rejected',
-        message: data.message,
-        validation: data.validation,
-        response: responseText,
-        full_text: responseText,
-        requires_clarification: false,
-        rag_used: false,
-        sources: [],
-        mode: 'validation_rejected_public',
-        note: 'Question rejetee par validation agricole',
-        confidence_score: 0.0
-      } : {})
-    }
-
-    // Generation response_versions
-    if (processedData.response && !processedData.response_versions) {
-      const mainResponse = processedData.response
-      
-      processedData.response_versions = {
-        ultra_concise: mainResponse.length > 200 ? 
-          mainResponse.substring(0, 150) + '...' : mainResponse,
-        concise: mainResponse.length > 400 ? 
-          mainResponse.substring(0, 300) + '...' : mainResponse,
-        standard: mainResponse,
-        detailed: mainResponse
+      response_versions: {
+        ultra_concise: finalResponse.length > 200 ? 
+          finalResponse.substring(0, 150) + '...' : finalResponse,
+        concise: finalResponse.length > 400 ? 
+          finalResponse.substring(0, 300) + '...' : finalResponse,
+        standard: finalResponse,
+        detailed: finalResponse
       }
     }
 
-    // Stocker le session ID
-    try {
-      conversationService.storeRecentSessionId(finalConversationId)
-      console.log('[apiService] Session ID stocke pour historique (public singleton)')
-    } catch (error) {
-      console.warn('[apiService] Erreur stockage session ID (public singleton):', error)
-    }
-
-    return processedData
-
   } catch (error) {
-    console.error('[apiService] Erreur Expert API public (Supabase singleton):', error)
+    console.error('[apiService] Erreur génération AI publique streaming:', error)
     throw error
   }
 }
 
+// ===== FONCTIONS MÉTIER CONSERVÉES INTÉGRALEMENT (backend Digital Ocean) =====
+
 /**
- * Chargement des conversations utilisateur (singleton) - CODE ORIGINAL CONSERVÉ
+ * Chargement des conversations utilisateur (backend métier)
  */
 export const loadUserConversations = async (userId: string): Promise<any> => {
   if (!userId) {
     throw new Error('User ID requis')
   }
 
-  console.log('[apiService] Chargement conversations pour (singleton):', userId)
+  console.log('[apiService] Chargement conversations:', userId)
 
   try {
     const headers = await getAuthHeaders()
@@ -673,24 +561,20 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
       headers
     })
 
-    console.log('[apiService] Conversations statut (singleton):', response.status)
-
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('[apiService] Erreur conversations (singleton):', errorText)
+      console.error('[apiService] Erreur conversations:', errorText)
       
       if (response.status === 401) {
-        throw new Error('Session expiree. Veuillez vous reconnecter.')
+        throw new Error('Session expirée. Veuillez vous reconnecter.')
       }
       
       if (response.status === 405 || response.status === 404) {
-        // Si l'endpoint n'existe pas encore, retourner des donnees vides
-        console.warn('[apiService] Endpoint conversations non disponible - retour donnees vides (singleton)')
         return {
           count: 0,
           conversations: [],
           user_id: userId,
-          note: "Fonctionnalite en cours de developpement"
+          note: "Fonctionnalité en cours de développement"
         }
       }
       
@@ -698,7 +582,7 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
     }
 
     const data = await response.json()
-    console.log('[apiService] Conversations chargees (singleton):', {
+    console.log('[apiService] Conversations chargées:', {
       count: data.count,
       conversations: data.conversations?.length || 0
     })
@@ -706,16 +590,14 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
     return data
 
   } catch (error) {
-    console.error('[apiService] Erreur chargement conversations (singleton):', error)
+    console.error('[apiService] Erreur chargement conversations:', error)
     
-    // En cas d'erreur reseau, retourner des donnees vides plutot que de faire planter l'app
     if (error instanceof Error && error.message.includes('Failed to fetch')) {
-      console.warn('[apiService] Erreur reseau - retour donnees vides (singleton)')
       return {
         count: 0,
         conversations: [],
         user_id: userId,
-        note: "Erreur de connexion - reessayez plus tard"
+        note: "Erreur de connexion - réessayez plus tard"
       }
     }
     
@@ -724,7 +606,7 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
 }
 
 /**
- * ENVOI DE FEEDBACK (singleton) - CODE ORIGINAL CONSERVÉ
+ * ENVOI DE FEEDBACK (backend métier)
  */
 export const sendFeedback = async (
   conversationId: string,
@@ -735,7 +617,7 @@ export const sendFeedback = async (
     throw new Error('ID de conversation requis')
   }
 
-  console.log('[apiService] Envoi feedback (Supabase singleton):', feedback)
+  console.log('[apiService] Envoi feedback:', feedback)
 
   try {
     const requestBody = {
@@ -754,32 +636,32 @@ export const sendFeedback = async (
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('[apiService] Erreur feedback (Supabase singleton):', errorText)
+      console.error('[apiService] Erreur feedback:', errorText)
       
       if (response.status === 401) {
-        throw new Error('Session expiree. Veuillez vous reconnecter.')
+        throw new Error('Session expirée. Veuillez vous reconnecter.')
       }
       
       throw new Error(`Erreur envoi feedback: ${response.status}`)
     }
 
-    console.log('[apiService] Feedback envoye avec succes (Supabase singleton)')
+    console.log('[apiService] Feedback envoyé avec succès')
 
   } catch (error) {
-    console.error('[apiService] Erreur feedback (Supabase singleton):', error)
+    console.error('[apiService] Erreur feedback:', error)
     throw error
   }
 }
 
 /**
- * SUPPRESSION DE CONVERSATION (singleton) - CODE ORIGINAL CONSERVÉ
+ * SUPPRESSION DE CONVERSATION (backend métier)
  */
 export const deleteConversation = async (conversationId: string): Promise<void> => {
   if (!conversationId) {
     throw new Error('ID de conversation requis')
   }
 
-  console.log('[apiService] Suppression conversation (Supabase singleton):', conversationId)
+  console.log('[apiService] Suppression conversation:', conversationId)
 
   try {
     const headers = await getAuthHeaders()
@@ -789,42 +671,40 @@ export const deleteConversation = async (conversationId: string): Promise<void> 
       headers
     })
 
-    console.log('[apiService] Delete statut (Supabase singleton):', response.status)
-
     if (!response.ok) {
       if (response.status === 404) {
-        console.warn('[apiService] Conversation deja supprimee ou inexistante (singleton)')
+        console.warn('[apiService] Conversation déjà supprimée ou inexistante')
         return
       }
       
       const errorText = await response.text()
-      console.error('[apiService] Erreur delete conversation (Supabase singleton):', errorText)
+      console.error('[apiService] Erreur delete conversation:', errorText)
       
       if (response.status === 401) {
-        throw new Error('Session expiree. Veuillez vous reconnecter.')
+        throw new Error('Session expirée. Veuillez vous reconnecter.')
       }
       
       throw new Error(`Erreur suppression conversation: ${response.status}`)
     }
 
     const result = await response.json()
-    console.log('[apiService] Conversation supprimee (Supabase singleton):', result.message || 'Succes')
+    console.log('[apiService] Conversation supprimée:', result.message || 'Succès')
 
   } catch (error) {
-    console.error('[apiService] Erreur suppression conversation (Supabase singleton):', error)
+    console.error('[apiService] Erreur suppression conversation:', error)
     throw error
   }
 }
 
 /**
- * SUPPRESSION DE TOUTES LES CONVERSATIONS (singleton) - CODE ORIGINAL CONSERVÉ
+ * SUPPRESSION DE TOUTES LES CONVERSATIONS (backend métier)
  */
 export const clearAllUserConversations = async (userId: string): Promise<void> => {
   if (!userId) {
     throw new Error('User ID requis')
   }
 
-  console.log('[apiService] Suppression toutes conversations pour (Supabase singleton):', userId)
+  console.log('[apiService] Suppression toutes conversations:', userId)
 
   try {
     const headers = await getAuthHeaders()
@@ -834,36 +714,34 @@ export const clearAllUserConversations = async (userId: string): Promise<void> =
       headers
     })
 
-    console.log('[apiService] Clear all statut (Supabase singleton):', response.status)
-
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('[apiService] Erreur clear all conversations (Supabase singleton):', errorText)
+      console.error('[apiService] Erreur clear all conversations:', errorText)
       
       if (response.status === 401) {
-        throw new Error('Session expiree. Veuillez vous reconnecter.')
+        throw new Error('Session expirée. Veuillez vous reconnecter.')
       }
       
       throw new Error(`Erreur suppression conversations: ${response.status}`)
     }
 
     const result = await response.json()
-    console.log('[apiService] Toutes conversations supprimees (Supabase singleton):', {
+    console.log('[apiService] Toutes conversations supprimées:', {
       message: result.message,
       deleted_count: result.deleted_count || 0
     })
 
   } catch (error) {
-    console.error('[apiService] Erreur suppression toutes conversations (Supabase singleton):', error)
+    console.error('[apiService] Erreur suppression toutes conversations:', error)
     throw error
   }
 }
 
 /**
- * SUGGESTIONS DE SUJETS (singleton) - CODE ORIGINAL CONSERVÉ
+ * SUGGESTIONS DE SUJETS (backend métier)
  */
 export const getTopicSuggestions = async (language: string = 'fr'): Promise<string[]> => {
-  console.log('[apiService] Recuperation suggestions sujets (Supabase singleton):', language)
+  console.log('[apiService] Récupération suggestions sujets:', language)
 
   try {
     const headers = await getAuthHeaders()
@@ -874,39 +752,39 @@ export const getTopicSuggestions = async (language: string = 'fr'): Promise<stri
     })
 
     if (!response.ok) {
-      console.warn('[apiService] Erreur recuperation sujets (Supabase singleton):', response.status)
+      console.warn('[apiService] Erreur récupération sujets:', response.status)
       
       return [
-        "Problemes de croissance poulets",
+        "Problèmes de croissance poulets",
         "Conditions environnementales optimales",
         "Protocoles de vaccination",
-        "Diagnostic problemes de sante",
+        "Diagnostic problèmes de santé",
         "Nutrition et alimentation",
-        "Gestion de la mortalite"
+        "Gestion de la mortalité"
       ]
     }
 
     const data = await response.json()
-    console.log('[apiService] Sujets recuperes (Supabase singleton):', data.topics?.length || 0)
+    console.log('[apiService] Sujets récupérés:', data.topics?.length || 0)
 
     return Array.isArray(data.topics) ? data.topics : []
 
   } catch (error) {
-    console.error('[apiService] Erreur sujets (Supabase singleton):', error)
+    console.error('[apiService] Erreur sujets:', error)
     
     return [
-      "Problemes de croissance poulets",
+      "Problèmes de croissance poulets",
       "Conditions environnementales optimales", 
       "Protocoles de vaccination",
-      "Diagnostic problemes de sante",
+      "Diagnostic problèmes de santé",
       "Nutrition et alimentation",
-      "Gestion de la mortalite"
+      "Gestion de la mortalité"
     ]
   }
 }
 
 /**
- * HEALTH CHECK (singleton) - CODE ORIGINAL CONSERVÉ
+ * HEALTH CHECK (backend métier)
  */
 export const checkAPIHealth = async (): Promise<boolean> => {
   try {
@@ -919,19 +797,18 @@ export const checkAPIHealth = async (): Promise<boolean> => {
     })
 
     const isHealthy = response.ok
-    console.log('[apiService] API Health (Supabase singleton):', isHealthy ? 'OK' : 'KO')
+    console.log('[apiService] API Health:', isHealthy ? 'OK' : 'KO')
     
     return isHealthy
 
   } catch (error) {
-    console.error('[apiService] Erreur health check (Supabase singleton):', error)
+    console.error('[apiService] Erreur health check:', error)
     return false
   }
 }
 
-/**
- * UTILITAIRES CLARIFICATION - CODE ORIGINAL CONSERVÉ
- */
+// ===== FONCTIONS UTILITAIRES CONSERVÉES =====
+
 export const buildClarificationEntities = (
   clarificationAnswers: Record<string, string>,
   clarificationQuestions: string[]
@@ -949,11 +826,11 @@ export const buildClarificationEntities = (
             entities.breed = answer.trim()
           } else if (question.includes('sexe') || question.includes('sex') || question.includes('male') || question.includes('femelle')) {
             entities.sex = answer.trim()
-          } else if (question.includes('age') || question.includes('age') || question.includes('jour') || question.includes('semaine')) {
+          } else if (question.includes('age') || question.includes('âge') || question.includes('jour') || question.includes('semaine')) {
             entities.age = answer.trim()
           } else if (question.includes('poids') || question.includes('weight')) {
             entities.weight = answer.trim()
-          } else if (question.includes('temperature') || question.includes('temperature')) {
+          } else if (question.includes('temperature') || question.includes('température')) {
             entities.temperature = answer.trim()
           } else if (question.includes('nombre') || question.includes('quantite') || question.includes('effectif')) {
             entities.quantity = answer.trim()
@@ -967,187 +844,25 @@ export const buildClarificationEntities = (
     }
   })
   
-  console.log('[apiService] Entites construites (singleton):', entities)
+  console.log('[apiService] Entités construites:', entities)
   return entities
 }
 
 export const handleEnhancedNetworkError = (error: any): string => {
   if (error?.message?.includes('Failed to fetch')) {
-    return 'Probleme de connexion. Verifiez votre connexion internet.'
+    return 'Problème de connexion. Vérifiez votre connexion internet.'
   }
   
-  if (error?.message?.includes('Session expiree')) {
-    return 'Votre session a expire. Veuillez vous reconnecter.'
+  if (error?.message?.includes('Session expirée')) {
+    return 'Votre session a expiré. Veuillez vous reconnecter.'
   }
   
-  if (error?.message?.includes('Acces non autorise')) {
+  if (error?.message?.includes('Accès non autorisé')) {
     return 'Vous n\'avez pas l\'autorisation d\'effectuer cette action.'
   }
   
   return error?.message || 'Une erreur inattendue s\'est produite.'
 }
 
-/**
- * FONCTIONS DE DEBUG ET TEST (singleton) - CODE ORIGINAL CONSERVÉ
- */
-export const debugEnhancedAPI = () => {
-  console.group('[apiService] Configuration DialogueManager + expert.py + SUPABASE SINGLETON')
-  console.log('API_BASE_URL:', API_BASE_URL)
-  console.log('Systeme backend: DialogueManager + expert.py')
-  console.log('Systeme auth: Supabase SINGLETON')
-  console.log('Endpoint principal:', `${API_BASE_URL}/expert/ask`)
-  console.log('CORRECTIONS EFFECTUEES:')
-  console.log('  - Body avec session_id: { session_id, question }')
-  console.log('  - Headers avec CORS Origin obligatoire')
-  console.log('  - Supabase SINGLETON: Token dans Authorization header')
-  console.log('  - Extraction correcte du texte selon type')
-  console.log('  - Support type: "answer" avec data.answer.text')
-  console.log('  - Support type: "partial_answer"')
-  console.log('  - Support type: "clarification"')
-  console.log('  - Support type: "validation_rejected"')
-  console.log('  - Generation automatique response_versions')
-  console.log('  - Stockage automatique session ID pour historique')
-  console.log('  - DELETE conversation corrige (/conversations au pluriel)')
-  console.log('  - CLEAR ALL conversations ajoute')
-  console.log('  - Formatage heure locale')
-  console.log('  - SUPABASE SINGLETON: Headers avec Origin + Authorization')
-  console.log('  - ✅ SINGLETON: Une seule instance GoTrueClient')
-  console.log('  - 🔧 DEBUG DÉTAILLÉ: Logs étape par étape')
-  console.log('  - 🔧 FIX: getAuthToken() utilise localStorage directement')
-  console.log('FONCTIONNALITES PRESERVEES:')
-  console.log('  - Authentification JWT (Supabase SINGLETON)')
-  console.log('  - Feedback, conversations, topics')
-  console.log('  - Gestion erreurs')
-  console.log('  - Health check')
-  console.log('  - Utilitaires clarification')
-  console.log('  - Integration ConversationService')
-  console.groupEnd()
-}
-
-export const testEnhancedConversationContinuity = async (
-  user: any,
-  language: string = 'fr'
-): Promise<{
-  first_conversation_id: string,
-  second_conversation_id: string,
-  same_id: boolean,
-  success: boolean,
-  enhancements_used: string[]
-}> => {
-  try {
-    console.log('[apiService] Test continuite DialogueManager (Supabase singleton)...')
-    
-    const firstResponse = await generateAIResponse(
-      "Test question 1: Qu'est-ce que les poulets de chair ?",
-      user,
-      language
-    )
-    
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    const secondResponse = await generateAIResponse(
-      "Test question 2: Quel est leur poids optimal a 12 jours ?",
-      user,
-      language,
-      firstResponse.conversation_id
-    )
-    
-    const sameId = firstResponse.conversation_id === secondResponse.conversation_id
-    
-    console.log('[apiService] Test DialogueManager resultat (Supabase singleton):', {
-      first_id: firstResponse.conversation_id,
-      second_id: secondResponse.conversation_id,
-      same_id: sameId,
-      first_type: firstResponse.type,
-      second_type: secondResponse.type
-    })
-    
-    return {
-      first_conversation_id: firstResponse.conversation_id,
-      second_conversation_id: secondResponse.conversation_id,
-      same_id: sameId,
-      success: true,
-      enhancements_used: ['DialogueManager', 'expert.py', 'ConversationService', 'DeleteFix', 'HeureLocale', 'Supabase', 'SINGLETON', 'DEBUG_DETAILED', 'LOCALSTORAGE_FIX']
-    }
-    
-  } catch (error) {
-    console.error('[apiService] Erreur test DialogueManager (Supabase singleton):', error)
-    return {
-      first_conversation_id: '',
-      second_conversation_id: '',
-      same_id: false,
-      success: false,
-      enhancements_used: []
-    }
-  }
-}
-
-export const detectAPIVersion = async (): Promise<'dialoguemanager' | 'legacy' | 'error'> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/expert/ask`, {
-      method: 'OPTIONS',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Origin': 'https://expert.intelia.com'
-      }
-    })
-    
-    if (response.ok || response.status === 405) {
-      console.log('[detectAPIVersion] DialogueManager /ask disponible (Supabase singleton)')
-      return 'dialoguemanager'
-    }
-    
-    return 'error'
-    
-  } catch (error) {
-    console.error('[detectAPIVersion] Erreur detection (Supabase singleton):', error)
-    return 'error'
-  }
-}
-
-export const logEnhancedAPIInfo = () => {
-  console.group('[apiService] DialogueManager + expert.py Integration + SUPABASE SINGLETON + DEBUG')
-  console.log('Version:', 'DialogueManager v1.0 - SUPABASE SINGLETON FIXED + DEBUG DETAILED + LOCALSTORAGE FIX')
-  console.log('Base URL:', API_BASE_URL)
-  console.log('Backend: expert.py + DialogueManager + Agricultural Validator')
-  console.log('Auth System: Supabase SINGLETON')
-  console.log('Debug System: LOGS DÉTAILLÉS ÉTAPE PAR ÉTAPE')
-  console.log('CHANGEMENTS MAJEURS CORRIGES:')
-  console.log('  - Utilisation endpoint /ask simplifie')
-  console.log('  - Session ID dans le BODY (corrige !)')
-  console.log('  - Headers avec CORS Origin obligatoire')
-  console.log('  - Supabase SINGLETON: Token JWT dans Authorization header')
-  console.log('  - Extraction type: "answer" de data.answer.text (CORRIGE !)')
-  console.log('  - Support type: "validation_rejected"')
-  console.log('  - Stockage automatique session ID pour historique')
-  console.log('  - DELETE conversation corrige (/conversations au pluriel)')
-  console.log('  - CLEAR ALL conversations ajoute')
-  console.log('  - Formatage heure locale')
-  console.log('  - Body: { session_id, question }')
-  console.log('  - Support type: clarification/answer/partial_answer/validation_rejected')
-  console.log('  - PRESERVATION format partial_answer')
-  console.log('  - Conversion automatique format')
-  console.log('  - SUPABASE SINGLETON: JWT token authentique + profil utilisateur')
-  console.log('  - ✅ SINGLETON: Elimination Multiple GoTrueClient instances')
-  console.log('  - 🔧 DEBUG: Logs détaillés pour identifier les blocages')
-  console.log('  - 🔧 FIX MAJEUR: getAuthToken() utilise localStorage directement (pas de timeout)')
-  console.log('FONCTIONNALITES:')
-  console.log('  - Clarification intelligente automatique')
-  console.log('  - Gestion memoire conversation Postgres')
-  console.log('  - Pipeline RAG modulaire')
-  console.log('  - Validation agricole integree')
-  console.log('  - Toutes fonctions frontend preservees')
-  console.log('  - Support PerfStore avec type: "answer"')
-  console.log('  - Integration ConversationService pour historique')
-  console.log('  - Sauvegarde automatique via /expert/ask')
-  console.log('  - Gestion DELETE conversations')
-  console.log('  - Formatage heure locale automatique')
-  console.log('  - Supabase SINGLETON: Auth moderne + profils utilisateur')
-  console.log('  - ✅ Une seule instance GoTrueClient dans toute l\'application')
-  console.log('  - 🔧 Debugging avancé avec timeouts et logs détaillés')
-  console.log('  - 🔧 Authentification robuste via localStorage (évite les timeouts)')
-  console.groupEnd()
-}
-
-// Export par defaut
+// Export par défaut
 export default generateAIResponse
