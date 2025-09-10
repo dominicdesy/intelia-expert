@@ -1,29 +1,9 @@
-# === ENDPOINTS CHAT DIRECTS (HORS V1) ===
-@app.post("/chat/stream", tags=["Chat"])
-async def chat_stream_direct(request: Request):
-    """Endpoint chat direct - sans préfixe v1 pour compatibilité frontend"""
-    try:
-        # Lire le corps de la requête
-        body = await request.body()
-        
-        # Headers à transférer
-        headers = {
-            "Content-Type": "application/json",
-            "X-Frontend-Origin": "intelia"
-        }
-        
-        # Ajouter l'auth si présente
-        auth_header = request.headers.get("Authorization")
-        if auth_header:
-            headers["Authorization"] = auth_header
-        
-        # URL du service LLM
-	target_url = "https://expert.intelia.com/llm/chat/stream"
+# -*- coding: utf-8 -*-
 #
 # app/main.py - VERSION 4.1 NETTOYEE - ENDPOINTS SELECTIONNES UNIQUEMENT
-# 🎯 GARDE: Admin, Auth, Billing, Health, Invitations, Logging, Stats, System, User
-# 🧹 RETIRE: Expert, Conversations, Debug RAG, Metrics non-admin
-# 🔧 CONSERVE: CORS, monitoring, cache statistiques, detection RAG amelioree
+# GARDE: Admin, Auth, Billing, Health, Invitations, Logging, Stats, System, User
+# RETIRE: Expert, Conversations, Debug RAG, Metrics non-admin
+# CONSERVE: CORS, monitoring, cache statistiques, detection RAG amelioree
 #
 
 from __future__ import annotations
@@ -69,7 +49,7 @@ error_counter = 0
 start_time = time.time()
 active_requests = 0
 
-# 🚀 NOUVEAU: Variables pour le systeme de cache statistiques
+# Variables pour le systeme de cache statistiques
 stats_scheduler_task = None
 cache_update_counter = 0
 cache_error_counter = 0
@@ -126,7 +106,7 @@ def get_container_memory_percent() -> float:
 
 # === OUTILS SUPPLEMENTAIRES ===
 def get_rag_paths() -> Dict[str, str]:
-    """🎯 TOUS LES RAG : Global + Broiler + Layer"""
+    """TOUS LES RAG : Global + Broiler + Layer"""
     base_path = "/workspace/backend/rag_index"
     return {
         "global": f"{base_path}/global",
@@ -186,7 +166,7 @@ async def periodic_monitoring():
             
             # Metriques systeme avec calcul memoire conteneur precis
             cpu_percent = psutil.cpu_percent(interval=1)
-            memory_percent = get_container_memory_percent()  # 🐳 NOUVEAU: Calcul precis
+            memory_percent = get_container_memory_percent()  # Calcul precis
             
             # Determiner le status de sante
             if error_rate_percent > 10 or cpu_percent > 90 or memory_percent > 90:
@@ -204,13 +184,13 @@ async def periodic_monitoring():
                 # Calculer l'heure tronquee pour le groupement
                 current_hour = datetime.now().replace(minute=0, second=0, microsecond=0)
                 
-                # Log des metriques (cette fonction devra etre ajoutee dans logging.py)
+                # Log des metriques
                 analytics.log_server_performance(
                     timestamp_hour=current_hour,
                     total_requests=request_counter,
                     successful_requests=request_counter - error_counter,
                     failed_requests=error_counter,
-                    avg_response_time_ms=int(250),  # A calculer reellement si necessaire
+                    avg_response_time_ms=int(250),
                     health_status=health_status,
                     error_rate_percent=error_rate_percent
                 )
@@ -218,7 +198,7 @@ async def periodic_monitoring():
             except Exception as e:
                 logger.warning(f"⚠️ Erreur logging metriques en base: {e}")
                 
-            # 🚀 NOUVEAU: Ajouter les metriques du cache
+            # Ajouter les metriques du cache
             cache_info = ""
             if STATS_CACHE_AVAILABLE:
                 cache_info = f", cache: {cache_update_counter} updates, {cache_error_counter} erreurs"
@@ -233,14 +213,14 @@ async def periodic_monitoring():
             await asyncio.sleep(60)  # Retry dans 1 minute en cas d'erreur
 
 async def periodic_stats_update():
-    """🔄 Mise a jour periodique du cache statistiques toutes les heures"""
+    """Mise a jour periodique du cache statistiques toutes les heures"""
     global cache_update_counter, cache_error_counter
     
     if not STATS_CACHE_AVAILABLE:
         logger.warning("⚠️ Cache statistiques non disponible - arret scheduler")
         return
     
-    # Attendre 5 minutes avant la premiere mise a jour (laisser le systeme s'initialiser)
+    # Attendre 5 minutes avant la premiere mise a jour
     await asyncio.sleep(300)
     
     # Premiere mise a jour au demarrage
@@ -260,15 +240,12 @@ async def periodic_stats_update():
     # Boucle principale - mise a jour toutes les heures
     while True:
         try:
-            # Attendre 1 heure (3600 secondes)
-            await asyncio.sleep(3600)
+            await asyncio.sleep(3600)  # 1 heure
             
             logger.info("🔄 Debut mise a jour periodique cache statistiques")
             start_update = time.time()
             
-            # Lancer la mise a jour
             result = await run_update_cycle()
-            
             update_duration = (time.time() - start_update) * 1000  # en ms
             
             if result.get("status") == "completed":
@@ -279,7 +256,6 @@ async def periodic_stats_update():
                 
                 logger.info(f"✅ Cache mis a jour: {successful}/{total} succes en {duration:.0f}ms")
                 
-                # Log detaille si des erreurs
                 errors = result.get("errors", [])
                 if errors:
                     logger.warning(f"⚠️ Erreurs durant la mise a jour: {errors}")
@@ -296,16 +272,15 @@ async def periodic_stats_update():
         except Exception as e:
             cache_error_counter += 1
             logger.error(f"⌚ Erreur durant mise a jour periodique cache: {e}")
-            # Attendre 10 minutes avant de retry en cas d'erreur
-            await asyncio.sleep(600)
+            await asyncio.sleep(600)  # Attendre 10 minutes avant retry
 
 # === LIFESPAN COMPLET AVEC DETECTION RAG AMELIOREE ===
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ========== INITIALISATION AU DEMARRAGE ==========
-    logger.info("🚀 Demarrage de l'application Expert API avec systeme complet + detection RAG amelioree")
+    logger.info("🚀 Demarrage de l'application Expert API avec systeme complet")
 
-    # ========== INITIALISATION DES SERVICES AMELIOREE ==========
+    # ========== INITIALISATION DES SERVICES ==========
     try:
         logger.info("📊 Initialisation des services analytics et facturation...")
         database_url = os.getenv("DATABASE_URL")
@@ -328,11 +303,10 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.warning(f"⚠️ Service billing partiellement disponible: {e}")
 
-            # 🚀 Cache statistiques (optionnel)
+            # Cache statistiques (optionnel)
             if STATS_CACHE_AVAILABLE:
                 try:
                     cache = get_stats_cache()
-                    # Methodes possibles pour obtenir les stats
                     if hasattr(cache, 'get_cache_stats'):
                         cache_stats = cache.get_cache_stats()
                     elif hasattr(cache, 'get_stats'):
@@ -370,7 +344,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("ℹ️ Supabase indisponible: %s", e)
 
-    # 🚀 CHARGEMENT DES 3 RAG AVEC DETECTION AMELIOREE (OPTIONNEL)
+    # CHARGEMENT DES 3 RAG AVEC DETECTION AMELIOREE (OPTIONNEL)
     app.state.rag = None
     app.state.rag_broiler = None
     app.state.rag_layer = None
@@ -378,67 +352,11 @@ async def lifespan(app: FastAPI):
 
     try:
         from rag.embedder import FastRAGEmbedder
-
         rag_paths = get_rag_paths()
         logger.info(f"🔍 Chargement des 3 RAG: {list(rag_paths.keys())}")
 
-        # Variables d'environnement (override si definies)
-        env_override = {
-            "global": os.getenv("RAG_INDEX_GLOBAL"),
-            "broiler": os.getenv("RAG_INDEX_BROILER"),
-            "layer": os.getenv("RAG_INDEX_LAYER"),
-        }
-        for key, env_path in env_override.items():
-            if env_path and os.path.exists(env_path):
-                rag_paths[key] = env_path
-                logger.info(f"🔧 Override ENV pour {key}: {env_path}")
-
-        def _log_loaded(name: str, path: str, emb) -> None:
-            try:
-                # Essayer differentes methodes pour obtenir les stats
-                stats = {}
-                if hasattr(emb, "get_index_stats"):
-                    stats = emb.get_index_stats() or {}
-                elif hasattr(emb, "get_stats"):
-                    stats = emb.get_stats() or {}
-                
-                # Essayer d'obtenir les infos directement des attributs
-                n_docs = stats.get("n_docs")
-                if n_docs is None and hasattr(emb, "documents") and emb.documents:
-                    n_docs = len(emb.documents)
-                
-                faiss_total = stats.get("faiss_total")
-                if faiss_total is None and hasattr(emb, "index") and emb.index:
-                    faiss_total = emb.index.ntotal if hasattr(emb.index, "ntotal") else None
-                
-                chunks_loaded = stats.get("chunks_loaded", faiss_total)
-                dim = stats.get("embedding_dim", stats.get("dim"))
-                if dim is None and hasattr(emb, "embedding_dim"):
-                    dim = emb.embedding_dim
-                
-                model = stats.get("model_name", stats.get("model"))
-                if model is None and hasattr(emb, "model_name"):
-                    model = emb.model_name
-                
-                logger.info(
-                    f"✅ RAG {name.capitalize()} charge: {path} "
-                    f"(docs={n_docs if n_docs is not None else 'unknown'}, "
-                    f"chunks={chunks_loaded if chunks_loaded is not None else 'unknown'}, "
-                    f"dim={dim if dim is not None else 'unknown'}, "
-                    f"model={model if model is not None else 'unknown'})"
-                )
-                
-                # Debug : afficher les attributs disponibles si stats vides
-                if not any([n_docs, faiss_total, dim, model]):
-                    available_attrs = [attr for attr in dir(emb) if not attr.startswith('_')][:10]
-                    logger.debug(f"📊 Attributs disponibles sur {name}: {available_attrs}")
-                    
-            except Exception as e:
-                logger.info(f"✅ RAG {name.capitalize()} charge: {path}")
-                logger.debug(f"Erreur recuperation stats {name}: {e}")
-
-        def _load_rag(name: str, path: str, debug: bool = False):
-            """Fonction helper pour charger un RAG avec gestion d'erreurs amelioree."""
+        def _load_rag(name: str, path: str):
+            """Fonction helper pour charger un RAG"""
             logger.info(f"🔍 Chargement RAG {name.capitalize()}: {path}")
             
             if not os.path.exists(path):
@@ -446,62 +364,31 @@ async def lifespan(app: FastAPI):
                 return None
             
             try:
-                # Verifier le contenu du dossier
-                entries = os.listdir(path)
-                logger.debug(f"📂 {name.upper()} dir entries ({len(entries)}): {entries[:10]}")
-                
-                # Chercher les fichiers requis
-                required_files = ["index.faiss"]
-                missing_files = [f for f in required_files if f not in entries]
-                if missing_files:
-                    logger.warning(f"⚠️ RAG {name.capitalize()}: Fichiers manquants {missing_files}")
-                
-                # CORRECTION PRINCIPALE: Utiliser index_dir dans le constructeur
                 embedder = FastRAGEmbedder(
                     index_dir=path,
-                    debug=debug,
+                    debug=False,
                     cache_embeddings=True,
                     max_workers=2,
                 )
                 
-                # Tester la fonctionnalite avec notre fonction amelioree
                 if is_rag_functional(embedder):
-                    _log_loaded(name, path, embedder)
+                    logger.info(f"✅ RAG {name.capitalize()} charge: {path}")
                     return embedder
                 else:
                     logger.warning(f"⚠️ RAG {name.capitalize()}: Instance creee mais non fonctionnelle")
-                    # Log des details pour debug
-                    if hasattr(embedder, "get_index_stats"):
-                        stats = embedder.get_index_stats()
-                        logger.debug(f"📊 Stats {name}: {stats}")
                     return None
                     
             except Exception as e:
                 logger.exception(f"💥 RAG {name.capitalize()} init failed: {e}")
                 return None
 
-        # 🚀 Chargement des 3 RAG
-        app.state.rag = _load_rag("global", rag_paths["global"], debug=False)
+        # Chargement des 3 RAG
+        app.state.rag = _load_rag("global", rag_paths["global"])
         app.state.rag_broiler = _load_rag("broiler", rag_paths["broiler"])
         app.state.rag_layer = _load_rag("layer", rag_paths["layer"])
 
-        # 📊 Resume final des 3 RAG
         total_rags = sum(1 for rag in [app.state.rag, app.state.rag_broiler, app.state.rag_layer] if rag)
-
-        rag_summary = {
-            "global": "✅ Actif" if app.state.rag else "⌛ CRITIQUE",
-            "broiler": "✅ Actif" if app.state.rag_broiler else "⌛ Absent",
-            "layer": "✅ Actif" if app.state.rag_layer else "⌛ Absent",
-            "total_loaded": total_rags
-        }
-        logger.info(f"📊 Status final des RAG: {rag_summary}")
-
-        if total_rags == 3:
-            logger.info("🎉 PARFAIT: Les 3 RAG sont charges (Global + Broiler + Layer)")
-        elif total_rags >= 1:
-            logger.warning(f"⚠️ Seulement {total_rags}/3 RAG charges - fonctionnement partiel")
-        else:
-            logger.error("⌚ CRITIQUE: Aucun RAG charge - l'application ne peut pas fonctionner correctement")
+        logger.info(f"📊 Status final des RAG: {total_rags}/3 charges")
 
     except ImportError as e:
         logger.warning(f"⚠️ Module RAG non disponible: {e}")
@@ -524,11 +411,11 @@ async def lifespan(app: FastAPI):
     if STATS_CACHE_AVAILABLE:
         try:
             stats_scheduler_task = asyncio.create_task(periodic_stats_update())
-            logger.info("🔄 Scheduler cache statistiques demarre (mise a jour toutes les heures)")
+            logger.info("🔄 Scheduler cache statistiques demarre")
         except Exception as e:
             logger.error(f"⌚ Erreur demarrage scheduler cache: {e}")
     else:
-        logger.info("ℹ️ Scheduler cache statistiques desactive (module non disponible)")
+        logger.info("ℹ️ Scheduler cache statistiques desactive")
 
     # ========== L'APPLICATION DEMARRE ==========
     system_features = []
@@ -541,7 +428,6 @@ async def lifespan(app: FastAPI):
     # ========== NETTOYAGE A L'ARRET ==========
     logger.info("🛑 Arret de l'application Expert API")
     
-    # Arreter le monitoring
     if monitoring_task:
         try:
             monitoring_task.cancel()
@@ -550,7 +436,6 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"⌛ Erreur arret monitoring: {e}")
     
-    # 🚀 Arreter le scheduler cache
     if stats_scheduler_task:
         try:
             stats_scheduler_task.cancel()
@@ -561,7 +446,7 @@ async def lifespan(app: FastAPI):
     
     # Statistiques finales
     uptime_hours = (time.time() - start_time) / 3600
-    final_stats = f"{request_counter} requetes en {uptime_hours:.1f}h, {error_counter} erreurs ({(error_counter/max(request_counter,1)*100):.1f}%)"
+    final_stats = f"{request_counter} requetes en {uptime_hours:.1f}h, {error_counter} erreurs"
     
     if STATS_CACHE_AVAILABLE and cache_update_counter > 0:
         cache_success_rate = ((cache_update_counter / max(cache_update_counter + cache_error_counter, 1)) * 100)
@@ -584,7 +469,6 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://expert.intelia.com",
         "https://expert.intelia.com",
         "http://localhost:3000",
         "http://localhost:8080",
@@ -611,7 +495,7 @@ app.add_middleware(
     ]
 )
 
-# === MIDDLEWARE DE MONITORING DES REQUETES (RESTAURE) ===
+# === MIDDLEWARE DE MONITORING DES REQUETES ===
 @app.middleware("http")
 async def monitoring_middleware(request: Request, call_next):
     """Middleware pour tracker les performances en temps reel"""
@@ -624,7 +508,6 @@ async def monitoring_middleware(request: Request, call_next):
     try:
         response = await call_next(request)
         
-        # Tracker les erreurs
         if response.status_code >= 400:
             error_counter += 1
             
@@ -639,7 +522,6 @@ async def monitoring_middleware(request: Request, call_next):
         active_requests -= 1
         processing_time = (time.time() - start_time_req) * 1000
         
-        # Log des requetes lentes
         if processing_time > 5000:  # Plus de 5 secondes
             logger.warning(f"🌀 Requete lente: {request.method} {request.url.path} - {processing_time:.0f}ms")
 
@@ -660,16 +542,16 @@ async def chat_stream_direct(request: Request):
     try:
         import httpx
         
-        # Lire le corps de la requête
+        # Lire le corps de la requete
         body = await request.body()
         
-        # Headers à transférer
+        # Headers a transferer
         headers = {
             "Content-Type": "application/json",
             "X-Frontend-Origin": "intelia"
         }
         
-        # Ajouter l'auth si présente
+        # Ajouter l'auth si presente
         auth_header = request.headers.get("Authorization")
         if auth_header:
             headers["Authorization"] = auth_header
@@ -726,7 +608,7 @@ async def chat_health_direct():
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
-
+# === MONTAGE DES ROUTERS ===
 try:
     from app.api.v1 import router as api_v1_router
     app.include_router(api_v1_router)
@@ -735,19 +617,10 @@ except ImportError as e:
     logger.warning(f"⚠️ Impossible de charger le router v1 depuis __init__.py: {e}")
     logger.info("🔧 Creation d'un router v1 temporaire avec endpoints selectionnes...")
     
-    # Creer un router temporaire et inclure UNIQUEMENT les composants selectionnes
     from fastapi import APIRouter
     temp_v1_router = APIRouter(prefix="/v1", tags=["v1"])
     
     # === ENDPOINTS SELECTIONNES UNIQUEMENT ===
-    
-    # Expert router (pour les endpoints de chat)
-    try:
-        from app.api.v1.expert import router as expert_router
-        temp_v1_router.include_router(expert_router, tags=["expert"])
-        logger.info("✅ Expert router ajoute (pour endpoints chat)")
-    except ImportError as e:
-        logger.error(f"⌛ Expert router non disponible: {e}")
     
     # Conversations router
     try:
@@ -762,7 +635,7 @@ except ImportError as e:
         from app.api.v1.auth import router as auth_router
         temp_v1_router.include_router(
             auth_router, 
-            prefix="",  # Pas de prefix car auth.py definit deja router = APIRouter(prefix="/auth")
+            prefix="",
             tags=["auth"]
         )
         logger.info("✅ Auth router ajoute")
@@ -809,7 +682,7 @@ except ImportError as e:
     except ImportError as e:
         logger.warning(f"⚠️ Invitations router non disponible: {e}")
     
-    # Logging router (inclut logging, logging_cache, logging_helpers, logging_models, logging_permissions)
+    # Logging router
     try:
         from app.api.v1.logging import router as logging_router
         temp_v1_router.include_router(logging_router, tags=["logging"])
@@ -833,7 +706,7 @@ except ImportError as e:
     except ImportError as e:
         logger.warning(f"⚠️ Billing OpenAI router non disponible: {e}")
     
-    # 🚀 Stats Fast router (endpoints ultra-rapides)
+    # Stats Fast router
     try:
         from app.api.v1.stats_fast import router as stats_fast_router
         temp_v1_router.include_router(stats_fast_router, tags=["statistics-fast"])
@@ -841,7 +714,7 @@ except ImportError as e:
     except ImportError as e:
         logger.warning(f"⚠️ Stats Fast router non disponible: {e}")
 
-    # 🚀 Stats Admin router (administration cache)
+    # Stats Admin router
     if STATS_CACHE_AVAILABLE:
         try:
             from app.api.v1.stats_admin import router as stats_admin_router
@@ -854,10 +727,10 @@ except ImportError as e:
     app.include_router(temp_v1_router)
     logger.info("✅ Router v1 temporaire monte avec endpoints selectionnes")
 
-# === ENDPOINTS PRINCIPAUX (HEALTH CHECK) ===
+# === ENDPOINTS PRINCIPAUX ===
 @app.get("/health/complete", tags=["Health"])
 async def complete_health_check():
-    """🩼 Check de sante complet du systeme"""
+    """Check de sante complet du systeme"""
     try:
         health_status = {
             "timestamp": datetime.utcnow().isoformat(),
@@ -897,7 +770,7 @@ async def complete_health_check():
             }
             health_status["status"] = "degraded"
         
-        # 🚀 Check systeme de cache statistiques
+        # Check systeme de cache statistiques
         if STATS_CACHE_AVAILABLE:
             try:
                 cache = get_stats_cache()
@@ -984,7 +857,7 @@ async def complete_health_check():
             "cache_updates": cache_update_counter,
             "cache_errors": cache_error_counter,
             "scheduler_active": stats_scheduler_task is not None and not stats_scheduler_task.done() if STATS_CACHE_AVAILABLE else False,
-            "memory_percent_container": get_container_memory_percent()  # 🐳 NOUVEAU
+            "memory_percent_container": get_container_memory_percent()
         }
         
         # Determiner le statut global
@@ -1005,270 +878,6 @@ async def complete_health_check():
             "status": "error",
             "error": str(e)
         }
-
-@app.get("/admin/stats", tags=["Admin"])
-async def admin_statistics():
-    """📈 Statistiques administrateur completes avec cache"""
-    try:
-        from app.api.v1.billing import get_billing_manager
-        
-        # Stats billing
-        billing = get_billing_manager()
-        
-        # Stats analytics (approximatives)
-        uptime_hours = (time.time() - start_time) / 3600
-        
-        base_stats = {
-            "system_health": {
-                "uptime_hours": round(uptime_hours, 2),
-                "total_requests": request_counter,
-                "error_rate": round((error_counter / max(request_counter, 1)) * 100, 2),
-                "memory_percent_container": get_container_memory_percent(),  # 🐳 NOUVEAU
-                "rag_status": {
-                    "global": bool(getattr(app.state, "rag", None)),
-                    "broiler": bool(getattr(app.state, "rag_broiler", None)),
-                    "layer": bool(getattr(app.state, "rag_layer", None))
-                }
-            },
-            "billing_stats": {
-                "plans_available": len(billing.plans),
-                "plan_names": list(billing.plans.keys())
-            },
-            "features_enabled": {
-                "analytics": bool(os.getenv("DATABASE_URL")),
-                "billing": True,
-                "authentication": bool(os.getenv("JWT_SECRET") or os.getenv("SUPABASE_JWT_SECRET")),
-                "openai_fallback": bool(os.getenv("OPENAI_API_KEY")),
-                "auth_routing_fixed": True,
-                "cors_middleware_fixed": True,
-                "direct_auth_endpoints": True,
-                "cors_credentials_fixed": True,
-                "statistics_cache_system": STATS_CACHE_AVAILABLE,
-                "stats_admin_router_enabled": True,
-                "container_memory_calculation": True,  # 🐳 NOUVEAU
-            }
-        }
-        
-        # 🚀 Ajouter stats cache si disponible
-        if STATS_CACHE_AVAILABLE:
-            try:
-                cache = get_stats_cache()
-                if hasattr(cache, 'get_cache_stats'):
-                    cache_stats = cache.get_cache_stats()
-                else:
-                    cache_stats = "disponible"
-                
-                base_stats["cache_system"] = {
-                    "enabled": True,
-                    "scheduler_active": stats_scheduler_task is not None and not stats_scheduler_task.done(),
-                    "updates_total": cache_update_counter,
-                    "errors_total": cache_error_counter,
-                    "success_rate": round((cache_update_counter / max(cache_update_counter + cache_error_counter, 1)) * 100, 1),
-                    "cache_statistics": cache_stats
-                }
-            except Exception as e:
-                base_stats["cache_system"] = {
-                    "enabled": True,
-                    "status": "error",
-                    "error": str(e)
-                }
-        else:
-            base_stats["cache_system"] = {
-                "enabled": False,
-                "reason": "Module non importe"
-            }
-        
-        return base_stats
-        
-    except Exception as e:
-        return {"error": str(e)}
-
-# 🚀 Endpoints pour controle manuel du cache
-@app.post("/admin/cache/force-update", tags=["Admin"])
-async def admin_force_cache_update():
-    """🔄 Force une mise a jour manuelle du cache (admin)"""
-    if not STATS_CACHE_AVAILABLE:
-        return {
-            "status": "unavailable",
-            "message": "Systeme de cache non disponible"
-        }
-    
-    try:
-        logger.info("🔄 Force update cache demande via admin endpoint")
-        result = await force_update_all()
-        
-        global cache_update_counter, cache_error_counter
-        if result.get("status") == "completed":
-            cache_update_counter += 1
-        else:
-            cache_error_counter += 1
-        
-        return {
-            "status": "success",
-            "message": "Mise a jour cache forcee",
-            "result": result,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-    except Exception as e:
-        cache_error_counter += 1
-        logger.error(f"⌚ Erreur force update admin: {e}")
-        return {
-            "status": "error",
-            "message": f"Erreur mise a jour: {e}",
-            "timestamp": datetime.utcnow().isoformat()
-        }
-
-@app.get("/admin/cache/status", tags=["Admin"])
-async def admin_cache_status():
-    """📊 Statut detaille du systeme de cache (admin)"""
-    if not STATS_CACHE_AVAILABLE:
-        return {
-            "status": "unavailable",
-            "message": "Systeme de cache non disponible",
-            "enabled": False
-        }
-    
-    try:
-        cache = get_stats_cache()
-        updater = get_stats_updater()
-        
-        if hasattr(cache, 'get_cache_stats'):
-            cache_stats = cache.get_cache_stats()
-        else:
-            cache_stats = "disponible"
-            
-        if hasattr(updater, 'get_update_status'):
-            update_status = updater.get_update_status()
-        else:
-            update_status = "disponible"
-        
-        return {
-            "status": "available",
-            "enabled": True,
-            "scheduler": {
-                "active": stats_scheduler_task is not None and not stats_scheduler_task.done(),
-                "task_done": stats_scheduler_task.done() if stats_scheduler_task else True
-            },
-            "counters": {
-                "updates_successful": cache_update_counter,
-                "updates_failed": cache_error_counter,
-                "success_rate": round((cache_update_counter / max(cache_update_counter + cache_error_counter, 1)) * 100, 1)
-            },
-            "cache_statistics": cache_stats,
-            "last_update": update_status,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e),
-            "enabled": True
-        }
-
-# === ENDPOINTS AUTH DIRECTS (RESTAURES) ===
-@app.post("/v1/auth/login")
-async def auth_login_direct(request: Request):
-    """Endpoint login direct - contournement du probleme de router"""
-    try:
-        from app.api.v1.auth import LoginRequest, create_access_token
-        
-        body = await request.json()
-        login_data = LoginRequest(**body)
-        
-        supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_ANON_KEY")
-        
-        if not supabase_url or not supabase_key:
-            return JSONResponse(
-                status_code=500,
-                content={"detail": "Authentication service unavailable"}
-            )
-        
-        try:
-            from supabase import create_client
-            supabase = create_client(supabase_url, supabase_key)
-            
-            result = supabase.auth.sign_in_with_password({
-                "email": login_data.email,
-                "password": login_data.password
-            })
-            
-        except Exception as e:
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Invalid credentials", "error": str(e)}
-            )
-        
-        user = result.user
-        if user is None:
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Invalid credentials"}
-            )
-        
-        expires = timedelta(minutes=60)
-        token = create_access_token(
-            {"user_id": user.id, "email": login_data.email}, 
-            expires
-        )
-        
-        return {
-            "access_token": token,
-            "token_type": "bearer",
-            "expires_at": (datetime.utcnow() + expires).isoformat(),
-            "user": {
-                "id": user.id,
-                "email": user.email,
-                "user_metadata": user.user_metadata
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"⌛ Erreur login direct: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"detail": "Login failed", "error": str(e)}
-        )
-
-@app.get("/v1/auth/me")
-async def auth_me_direct(request: Request):
-    """Endpoint me direct"""
-    try:
-        from app.api.v1.auth import get_current_user
-        from fastapi.security import HTTPAuthorizationCredentials
-        
-        auth_header = request.headers.get("Authorization")
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Missing or invalid authorization header"}
-            )
-        
-        credentials = HTTPAuthorizationCredentials(
-            scheme="Bearer",
-            credentials=auth_header.replace("Bearer ", "")
-        )
-        
-        user_info = await get_current_user(credentials)
-        
-        return {
-            "user_id": user_info.get("user_id"),
-            "email": user_info.get("email"),
-            "user_type": user_info.get("user_type"),
-            "full_name": user_info.get("full_name"),
-            "is_admin": user_info.get("is_admin"),
-            "preferences": user_info.get("preferences", {}),
-            "profile_id": user_info.get("profile_id"),
-            "direct_endpoint": True,
-            "routing_corrected": True
-        }
-        
-    except Exception as e:
-        logger.error(f"⌛ Erreur me direct: {e}")
-        return JSONResponse(
-            status_code=401,
-            content={"detail": "Authentication failed", "error": str(e)}
-        )
 
 @app.get("/", tags=["Root"])
 async def root():
@@ -1313,13 +922,13 @@ async def root():
         "statistics_cache_system": cache_status,
         "stats_admin_router_enabled": True,
         "improved_rag_detection": True,
-        "container_memory_calculation": True,  # 🐳 NOUVEAU
+        "container_memory_calculation": True,
         "uptime_hours": round(uptime_hours, 2),
         "requests_processed": request_counter,
         "cache_updates": cache_update_counter if STATS_CACHE_AVAILABLE else 0,
-        "memory_percent": get_container_memory_percent(),  # 🐳 NOUVEAU
-        "last_update": "2025-08-25T02:30:00Z",
-        "deployment_version": "v4.1.0-cleaned-endpoints"
+        "memory_percent": get_container_memory_percent(),
+        "last_update": "2025-09-10T18:55:00Z",
+        "deployment_version": "v4.1.0-fixed-complete"
     }
 
 # === GESTIONNAIRES D'EXCEPTIONS AVEC CORS CORRIGE ===
@@ -1333,7 +942,6 @@ async def http_exc_handler(request: Request, exc: HTTPException):
 
     origin = request.headers.get("Origin")
     allowed_origins = [
-        "https://expert.intelia.com",
         "https://expert.intelia.com",
         "http://localhost:3000",
         "http://localhost:8080"
@@ -1363,7 +971,6 @@ async def generic_exc_handler(request: Request, exc: Exception):
 
     origin = request.headers.get("Origin")
     allowed_origins = [
-        "https://expert.intelia.com",
         "https://expert.intelia.com",
         "http://localhost:3000",
         "http://localhost:8080"
