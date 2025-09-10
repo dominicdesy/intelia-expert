@@ -18,7 +18,7 @@ async def chat_stream_direct(request: Request):
             headers["Authorization"] = auth_header
         
         # URL du service LLM
-        llm_service_url = os.getenv("LLM_BACKEND_URL", "https://expert.intelia.com/# -*- coding: utf-8 -*-
+	target_url = "https://expert.intelia.com/llm/chat/stream"
 #
 # app/main.py - VERSION 4.1 NETTOYEE - ENDPOINTS SELECTIONNES UNIQUEMENT
 # 🎯 GARDE: Admin, Auth, Billing, Health, Invitations, Logging, Stats, System, User
