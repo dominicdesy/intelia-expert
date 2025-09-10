@@ -76,10 +76,11 @@ POLL_INTERVAL_SEC = float(os.environ.get("POLL_INTERVAL_SEC", "0.6"))
 STREAM_CHUNK_LEN = int(os.environ.get("STREAM_CHUNK_LEN", "400"))
 DEBUG_GUARD = os.getenv("DEBUG_GUARD", "0") == "1"
 HYBRID_MODE = os.getenv("HYBRID_MODE", "1") == "1"
-FALLBACK_MODEL = os.getenv("FALLBACK_MODEL", "gpt-4")
+FALLBACK_MODEL = os.getenv("FALLBACK_MODEL", "gpt-5")
 FALLBACK_TEMPERATURE = float(os.getenv("FALLBACK_TEMPERATURE", "0.2"))
 FALLBACK_MAX_TOKENS = int(os.getenv("FALLBACK_MAX_TOKENS", "600"))
 ALLOWED_DOMAIN_DESC = os.getenv("ALLOWED_DOMAIN_DESC", "agriculture et sujets adjacents uniquement")
+FRONTEND_SSE_COMPAT = os.getenv("FRONTEND_SSE_COMPAT", "1") == "1"
 
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY is required")
@@ -111,6 +112,15 @@ def sse_event(obj: Dict[str, Any]) -> bytes:
     except Exception as e:
         logger.error(f"Erreur formatage SSE: {e}")
         return b"data: {\"type\":\"error\",\"message\":\"Erreur formatage\"}\n\n"
+
+# Compatibilité front: transforme clarify/followup en final si besoin
+def send_event(obj: Dict[str, Any]) -> bytes:
+    etype = obj.get("type")
+    if FRONTEND_SSE_COMPAT and etype in {"clarify", "followup"}:
+        text = (obj.get("answer") or obj.get("text") or "").strip()
+        prefix = "Question de précision : " if etype == "clarify" else "Suggestion : "
+        return sse_event({"type": "final", "answer": f"{prefix}{text}"})
+    return sse_event(obj)
 
 def parse_accept_language(header: Optional[str]) -> Optional[str]:
     """Parse l'en-tête Accept-Language pour détecter la langue préférée"""
@@ -265,15 +275,16 @@ Règles :
 - Adapte le ton à la culture locale
 - Ne demande que ce qui est nécessaire
 
-Question de l'utilisateur : "{user_text}"
-
-Réponds uniquement avec la question de clarification, sans autre texte."""
+RÉponds uniquement avec la question de clarification, sans autre texte."""
 
     try:
         resp = await asyncio.to_thread(
             client.chat.completions.create,
             model=FALLBACK_MODEL,
-            messages=[{"role": "system", "content": system_prompt}],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_text}
+            ],
             temperature=0.1,
             max_tokens=150
         )
@@ -316,16 +327,16 @@ Règles :
 - Maximum 1 phrase
 - Commence par un mot interrogatif approprié
 
-Question initiale : "{user_text}"
-Contexte de réponse : "{response_context[:200]}"
-
 Réponds uniquement avec la question de suivi, sans autre texte."""
 
     try:
         resp = await asyncio.to_thread(
             client.chat.completions.create,
             model=FALLBACK_MODEL,
-            messages=[{"role": "system", "content": system_prompt}],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": response_context[:200] if response_context else user_text}
+            ],
             temperature=0.3,
             max_tokens=100
         )
@@ -351,15 +362,16 @@ Règles :
 - Encourage à poser une question dans ton domaine
 - Maximum 2 phrases
 
-Question hors domaine : "{user_text}"
-
 Réponds uniquement avec le message de restriction, sans autre texte."""
 
     try:
         resp = await asyncio.to_thread(
             client.chat.completions.create,
             model=FALLBACK_MODEL,
-            messages=[{"role": "system", "content": system_prompt}],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_text}
+            ],
             temperature=0.1,
             max_tokens=100
         )
@@ -472,7 +484,7 @@ Règles :
 # -------- Intent & Slots (multilingue, tolérant) - LEGACY --------
 BROILER_WEIGHT_INTENT_PAT = re.compile(
     r"(?:(poids|weight|peso|体重|體重|標準體重|标准体重|目標體重|目标体重|objectif|target|增重|增重曲線|增重曲线))"
-    r".*?(poulet|broiler|ross|cobb|鸡|雞|小鸡|雏雞)?|"
+    r".*?(poulet|broiler|ross|cobb|鸡|雞|小鸡|雞雞)?|"
     r"\b(ross|cobb)\b.*?(poids|weight|体重|體重|標準體重|标准体重|objectif|target)",
     re.IGNORECASE
 )
@@ -598,9 +610,12 @@ def run_data_only_assistant(client: OpenAI, assistant_id: str, user_text: str, l
     """Exécute l'assistant avec les données du Vector Store uniquement"""
     reminder = (
         "RÉPONDS EXCLUSIVEMENT à partir des documents du Vector Store. "
-        "Si l'information est absente, réponds exactement: "
+        "SI DES INFORMATIONS ESSENTIELLES MANQUENT POUR RÉPONDRE PRÉCISÉMENT "
+        "(ex. lignée, sexe, âge en jours, période), POSE D'ABORD UNE QUESTION DE CLARIFICATION "
+        "courte listant uniquement les éléments manquants, puis attends la réponse. "
+        "Si l'information est absente de la base, réponds exactement : "
         "\"Hors base: information absente de la connaissance Intelia.\" "
-        f"Réponds dans la même langue que la question de l'utilisateur. Ne traduis pas dans une autre langue sauf si on te le demande."
+        f"Réponds dans la même langue que la question de l'utilisateur."
     )
     
     try:
@@ -658,8 +673,6 @@ async def stream_fallback_general(client: OpenAI, text: str, user_text: str):
 
 Si la question sort clairement de ce cadre, refuse poliment.
 
-Question de l'utilisateur : "{user_text}"
-
 Réponds dans la MÊME langue que la question de l'utilisateur. Sois naturel et adapte ton ton à la culture locale."""
     
     try:
@@ -679,15 +692,15 @@ Réponds dans la MÊME langue que la question de l'utilisateur. Sois naturel et 
                     chunk = delta.content
                     cleaned_chunk = clean_text(chunk)
                     final_buf.append(cleaned_chunk)
-                    yield sse_event({"type": "delta", "text": cleaned_chunk})
+                    yield send_event({"type": "delta", "text": cleaned_chunk})
                     
         final_text = clean_text("".join(final_buf).strip())
-        yield sse_event({"type": "final", "answer": final_text})
+        yield send_event({"type": "final", "answer": final_text})
         
     except Exception as e:
         logger.error(f"Erreur fallback streaming: {e}")
         error_msg = f"Erreur technique: {str(e)}"
-        yield sse_event({"type": "error", "message": error_msg})
+        yield send_event({"type": "error", "message": error_msg})
 
 @router.get("/health")
 def health():
@@ -697,7 +710,8 @@ def health():
         "assistant_id": ASSISTANT_ID,
         "guard_mode": "permissive_non_agri",
         "debug_guard": DEBUG_GUARD,
-        "hybrid_mode": HYBRID_MODE
+        "hybrid_mode": HYBRID_MODE,
+        "frontend_sse_compat": FRONTEND_SSE_COMPAT
     }
 
 @router.post("/chat/stream")
@@ -731,7 +745,7 @@ async def chat_stream(request: Request):
                 _client = OpenAI(api_key=OPENAI_API_KEY)
                 answer = await generate_domain_restriction_message(_client, message)
                 answer = clean_text(answer)
-                yield sse_event({"type": "final", "answer": answer})
+                yield send_event({"type": "final", "answer": answer})
                 return
 
             _client = OpenAI(api_key=OPENAI_API_KEY)
@@ -754,7 +768,7 @@ async def chat_stream(request: Request):
                     payload = {"type": "clarify", "answer": clarify_q}
                     if suggestions: 
                         payload["suggestions"] = suggestions
-                    yield sse_event(payload)
+                    yield send_event(payload)
                     return
 
             # 2) CONTEXTUALISATION LEGACY — Intent poids broiler (pour compatibilité)
@@ -787,7 +801,7 @@ async def chat_stream(request: Request):
                     
                     clarify, suggestions_legacy = await generate_clarification_question(_client, "broiler_weight", missing_legacy, message)
                     clarify = clean_text(clarify)
-                    yield sse_event({"type": "clarify", "answer": clarify, "suggestions": suggestions_legacy})
+                    yield send_event({"type": "clarify", "answer": clarify, "suggestions": suggestions_legacy})
                     return
 
             # 3) Essai data-only (Assistant v2)
@@ -803,31 +817,31 @@ async def chat_stream(request: Request):
                     if intent_id in INTENT_DEFS and confidence >= 0.55:
                         fup = await generate_followup_suggestion(_client, intent_id, message, "")
                         if fup:
-                            yield sse_event({"type": "followup", "answer": fup})
+                            yield send_event({"type": "followup", "answer": fup})
                     return
                 else:
-                    yield sse_event({"type": "final", "answer": text})
+                    yield send_event({"type": "final", "answer": text})
                     return
 
             # 5) Sinon, réponse data-only stream simulé
             for i in range(0, len(text), STREAM_CHUNK_LEN):
                 chunk = clean_text(text[i:i + STREAM_CHUNK_LEN])
-                yield sse_event({"type": "delta", "text": chunk})
+                yield send_event({"type": "delta", "text": chunk})
                 await asyncio.sleep(0.02)
                 
-            yield sse_event({"type": "final", "answer": text})
+            yield send_event({"type": "final", "answer": text})
             
             # Après le message final, proposer un Smart Follow-up si une intention a été détectée
             if intent_id in INTENT_DEFS and confidence >= 0.55:
                 fup = await generate_followup_suggestion(_client, intent_id, message, text[:200])
                 if fup:
-                    yield sse_event({"type": "followup", "answer": fup})
+                    yield send_event({"type": "followup", "answer": fup})
 
         except HTTPException:
             raise
         except Exception as e:
             logger.error(f"Erreur dans event_source: {e}")
-            yield sse_event({"type": "error", "message": f"Erreur interne: {str(e)}"})
+            yield send_event({"type": "error", "message": f"Erreur interne: {str(e)}"})
 
     headers = {
         "Content-Type": "text/event-stream",
