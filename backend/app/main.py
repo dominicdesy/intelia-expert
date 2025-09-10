@@ -539,36 +539,54 @@ except Exception as e:
 # === ENDPOINTS CHAT DIRECTS (HORS V1) ===
 @app.post("/chat/stream", tags=["Chat"])
 async def chat_stream_direct(request: Request):
-    """Endpoint chat direct - proxy vers service LLM externe"""
+    """Endpoint chat direct - proxy vers service LLM externe avec logging"""
+    start_time = time.time()
+    user_question = ""
+    llm_response = ""
+    user_email = ""
+    session_id = ""
+    
     try:
         import httpx
         
         # Lire et parser le corps de la requete
         body_bytes = await request.body()
         
-        # Parser le JSON pour transformation si nécessaire
+        # Parser le JSON pour transformation et extraction des donnees
         try:
             body_json = json.loads(body_bytes.decode('utf-8'))
             
+            # Extraire les donnees pour le logging
+            user_question = body_json.get("message_preview", body_json.get("question", ""))
+            session_id = body_json.get("session_id", "")
+            
+            # Extraire user_email depuis l'auth header si possible
+            auth_header = request.headers.get("Authorization")
+            if auth_header:
+                try:
+                    from app.api.v1.auth import get_current_user_from_token
+                    user_info = await get_current_user_from_token(auth_header.replace("Bearer ", ""))
+                    user_email = user_info.get("email", "")
+                except:
+                    user_email = "anonymous"
+            
             # Transformation des données pour le service LLM
-            # Le frontend envoie "message_preview", le LLM attend "message"
             if "message_preview" in body_json and "message" not in body_json:
                 body_json["message"] = body_json.pop("message_preview")
                 logger.info("Transformation: message_preview -> message")
             
-            # Si on a une question (depuis session_id/user_id), l'utiliser comme message
             if "question" in body_json and "message" not in body_json:
                 body_json["message"] = body_json.pop("question")
                 logger.info("Transformation: question -> message")
             
             # Reconvertir en bytes
             body_bytes = json.dumps(body_json).encode('utf-8')
-            logger.info(f"Body transformé: {body_json}")
+            logger.info(f"Question extraite: {user_question[:100]}...")
             
         except (json.JSONDecodeError, UnicodeDecodeError):
             logger.warning("Impossible de parser/transformer le body JSON, envoi tel quel")
         
-        # Headers a transferer - plus complets
+        # Headers a transferer
         headers = {
             "Content-Type": "application/json",
             "X-Frontend-Origin": "intelia",
@@ -595,7 +613,6 @@ async def chat_stream_direct(request: Request):
         
         # Log pour debug
         logger.info(f"Proxy chat vers {target_url}")
-        logger.debug(f"Headers proxy: {headers}")
         
         # Proxy vers le service LLM externe
         async with httpx.AsyncClient(follow_redirects=True) as client:
@@ -609,10 +626,19 @@ async def chat_stream_direct(request: Request):
             logger.info(f"Reponse LLM service: {response.status_code}")
             
             if response.status_code == 200:
-                # Streamer la réponse
+                # Collecter la réponse pour le logging
+                response_chunks = []
+                
+                async def response_collector():
+                    async for chunk in response.aiter_text():
+                        response_chunks.append(chunk)
+                        yield chunk
+                
+                # Streamer la réponse en collectant le contenu
                 from fastapi.responses import StreamingResponse
-                return StreamingResponse(
-                    response.aiter_text(),
+                
+                stream_response = StreamingResponse(
+                    response_collector(),
                     media_type="text/event-stream",
                     headers={
                         "Cache-Control": "no-cache",
@@ -621,13 +647,67 @@ async def chat_stream_direct(request: Request):
                         "Access-Control-Allow-Credentials": "true"
                     }
                 )
+                
+                # Programmer l'enregistrement en arrière-plan après le streaming
+                async def log_interaction_async():
+                    try:
+                        # Reconstituer la réponse complète
+                        full_response = "".join(response_chunks)
+                        
+                        # Extraire le texte de la réponse depuis les événements SSE
+                        extracted_response = ""
+                        for line in full_response.split('\n'):
+                            if line.startswith('data: '):
+                                try:
+                                    event_data = json.loads(line[6:])  # Enlever "data: "
+                                    if event_data.get("type") == "final":
+                                        extracted_response = event_data.get("answer", "")
+                                        break
+                                    elif event_data.get("type") == "delta":
+                                        extracted_response += event_data.get("text", "")
+                                except json.JSONDecodeError:
+                                    continue
+                        
+                        # Enregistrer dans la base de données
+                        await log_user_question_async(
+                            user_email=user_email or "anonymous",
+                            question=user_question,
+                            response_text=extracted_response,
+                            response_source="llm_service",
+                            processing_time_ms=int((time.time() - start_time) * 1000),
+                            session_id=session_id,
+                            language=body_json.get("lang", "fr") if 'body_json' in locals() else "fr"
+                        )
+                        
+                        logger.info(f"Question enregistrée: {user_email} -> {len(user_question)} chars question, {len(extracted_response)} chars response")
+                        
+                    except Exception as log_error:
+                        logger.error(f"Erreur enregistrement question: {log_error}")
+                
+                # Lancer l'enregistrement en arrière-plan
+                import asyncio
+                asyncio.create_task(log_interaction_async())
+                
+                return stream_response
+                
             else:
-                # Log l'erreur complète
+                # Enregistrer l'erreur aussi
+                processing_time = int((time.time() - start_time) * 1000)
                 try:
                     error_content = response.text
-                    logger.error(f"LLM service error {response.status_code}: {error_content}")
-                except:
-                    logger.error(f"LLM service error {response.status_code}: (impossible de lire le contenu)")
+                    await log_user_question_async(
+                        user_email=user_email or "anonymous",
+                        question=user_question,
+                        response_text=f"Erreur LLM: {response.status_code}",
+                        response_source="llm_service_error",
+                        processing_time_ms=processing_time,
+                        session_id=session_id,
+                        status="error"
+                    )
+                except Exception as log_error:
+                    logger.error(f"Erreur enregistrement erreur: {log_error}")
+                
+                logger.error(f"LLM service error {response.status_code}: {error_content}")
                 
                 return JSONResponse(
                     status_code=response.status_code,
@@ -638,11 +718,62 @@ async def chat_stream_direct(request: Request):
                 )
                 
     except Exception as e:
+        # Enregistrer l'erreur proxy aussi
+        processing_time = int((time.time() - start_time) * 1000)
+        try:
+            await log_user_question_async(
+                user_email=user_email or "anonymous",
+                question=user_question,
+                response_text=f"Erreur proxy: {str(e)}",
+                response_source="proxy_error",
+                processing_time_ms=processing_time,
+                session_id=session_id,
+                status="error"
+            )
+        except Exception as log_error:
+            logger.error(f"Erreur enregistrement erreur proxy: {log_error}")
+        
         logger.error(f"Erreur proxy chat direct: {e}")
         return JSONResponse(
             status_code=500,
             content={"detail": f"Proxy error: {str(e)}"}
         )
+
+# Fonction utilitaire pour l'enregistrement asynchrone
+async def log_user_question_async(
+    user_email: str,
+    question: str,
+    response_text: str,
+    response_source: str = "llm_service",
+    processing_time_ms: int = 0,
+    session_id: str = "",
+    language: str = "fr",
+    status: str = "completed"
+):
+    """Enregistre une question/réponse de manière asynchrone"""
+    try:
+        from app.api.v1.logging import get_analytics_manager
+        
+        analytics = get_analytics_manager()
+        
+        # Utiliser la méthode log_user_question si elle existe
+        if hasattr(analytics, 'log_user_question'):
+            analytics.log_user_question(
+                user_email=user_email,
+                question=question,
+                response_text=response_text,
+                response_source=response_source,
+                response_confidence=0.8,  # Score par défaut pour LLM
+                processing_time_ms=processing_time_ms,
+                session_id=session_id,
+                language=language,
+                status=status
+            )
+        else:
+            logger.warning("Méthode log_user_question non disponible dans analytics")
+            
+    except Exception as e:
+        logger.error(f"Erreur log_user_question_async: {e}")
 
 @app.get("/chat/health", tags=["Chat"])
 async def chat_health_direct():
