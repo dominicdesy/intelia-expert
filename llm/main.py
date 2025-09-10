@@ -12,6 +12,7 @@ import time
 import unicodedata
 import difflib
 import logging
+import uuid
 from typing import Any, Dict, AsyncGenerator, Optional, Tuple, List
 
 from fastapi import FastAPI, APIRouter, Request, HTTPException
@@ -84,12 +85,19 @@ BASE_PATH = os.environ.get("BASE_PATH", "/llm").rstrip("/")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 ASSISTANT_ID = os.environ.get("ASSISTANT_ID")
 POLL_INTERVAL_SEC = float(os.environ.get("POLL_INTERVAL_SEC", "0.6"))
+ASSISTANT_TIMEOUT = int(os.getenv("ASSISTANT_TIMEOUT_SEC", "30"))
+ASSISTANT_MAX_POLLS = int(os.getenv("ASSISTANT_MAX_POLLS", "200"))
 STREAM_CHUNK_LEN = int(os.environ.get("STREAM_CHUNK_LEN", "400"))
 DEBUG_GUARD = os.getenv("DEBUG_GUARD", "0") == "1"
 HYBRID_MODE = os.getenv("HYBRID_MODE", "1") == "1"
 FALLBACK_MODEL = os.getenv("FALLBACK_MODEL", "gpt-5")
 FALLBACK_TEMPERATURE = float(os.getenv("FALLBACK_TEMPERATURE", "0.2"))
-FALLBACK_MAX_TOKENS = int(os.getenv("FALLBACK_MAX_TOKENS", "600"))
+
+# Alias rétro-compat : accepte l’ancienne variable si la nouvelle n’est pas fournie
+FALLBACK_MAX_COMPLETION_TOKENS = int(
+    os.getenv("FALLBACK_MAX_COMPLETION_TOKENS", os.getenv("FALLBACK_MAX_TOKENS", "600"))
+)
+
 FRONTEND_SSE_COMPAT = os.getenv("FRONTEND_SSE_COMPAT", "1") == "1"
 LANGUAGE_FILE = os.getenv("LANGUAGE_FILE", "languages.json")
 
@@ -103,12 +111,11 @@ if not ASSISTANT_ID:
 # -----------------------------------------------------------------------------
 def _load_language_messages(path: str) -> Dict[str, str]:
     """
-    languages.json structure example:
+    languages.json structure:
     {
-      "default": "…",
-      "fr": "…",
-      "en": "…",
-      "es": "…",
+      "default": "...",
+      "fr": "...",
+      "en": "...",
       ...
     }
     """
@@ -117,11 +124,9 @@ def _load_language_messages(path: str) -> Dict[str, str]:
             data = json.load(f)
         if "default" not in data or not isinstance(data["default"], str):
             raise ValueError("languages.json must include a 'default' string.")
-        # normalize keys
-        return { (k.lower() if isinstance(k, str) else k): v for k, v in data.items() }
+        return {(k.lower() if isinstance(k, str) else k): v for k, v in data.items()}
     except Exception as e:
         logger.error(f"Unable to load {path}: {e}")
-        # hard fallback (English)
         return {
             "default": "Intelia Expert is a poultry-focused application. Questions outside this domain cannot be processed."
         }
@@ -129,12 +134,6 @@ def _load_language_messages(path: str) -> Dict[str, str]:
 OUT_OF_DOMAIN_MESSAGES = _load_language_messages(LANGUAGE_FILE)
 
 def get_out_of_domain_message(lang: str) -> str:
-    """
-    Returns the out-of-domain message in the question language.
-    - Exact hit on 'xx'
-    - Fallback tries first two letters (just in case)
-    - Then 'default'
-    """
     if not lang:
         return OUT_OF_DOMAIN_MESSAGES.get("default")
     code = (lang or "").lower()
@@ -178,6 +177,13 @@ def sse_event(obj: Dict[str, Any]) -> bytes:
         return b"data: {\"type\":\"error\",\"message\":\"Erreur formatage\"}\n\n"
 
 def send_event(obj: Dict[str, Any]) -> bytes:
+    # Schéma minimal de sécurité
+    if "type" not in obj:
+        obj = {"type": "final", "answer": "Désolé, une erreur de format interne est survenue."}
+    if obj.get("type") == "final" and not obj.get("answer"):
+        obj["answer"] = "Désolé, aucune réponse n’a pu être générée."
+
+    # Compat front : clarifications/suivis convertis si nécessaire
     etype = obj.get("type")
     if FRONTEND_SSE_COMPAT and etype in {"clarify", "followup"}:
         text = (obj.get("answer") or obj.get("text") or "").strip()
@@ -224,17 +230,28 @@ def clean_text(txt: str) -> str:
 # Domain guard (permissif: bloque évidents hors-agri)
 # -----------------------------------------------------------------------------
 NON_AGRI_TERMS = [
+    # médias / divertissement
     "cinéma", "film", "films", "séries", "serie", "séries tv", "netflix", "hollywood", "bollywood", "disney",
     "pixar", "musique", "concert", "rap", "pop", "rock", "jazz", "opéra", "orchestre", "télévision", "télé",
     "emission", "émission", "jeux vidéo", "gaming", "playstation", "xbox", "nintendo", "fortnite", "minecraft",
+    # sports
     "football", "soccer", "nba", "nfl", "nhl", "hockey", "mlb", "tennis", "golf", "cyclisme",
     "tour de france", "formule 1", "f1", "boxe", "ufc", "olympiques",
+    # politique / géopolitique
     "élections", "elections", "président", "premier ministre", "parlement", "guerre", "otan", "onu",
-    "bourse", "actions", "nasdaq", "wall street", "crypto",
+    # finance / crypto
+    "bourse", "actions", "nasdaq", "wall street",
+    "crypto", "cryptomonnaie", "cryptomonnaies", "cryptocurrency", "cryptocurrencies",
+    "blockchain", "bitcoin", "ethereum",
+    # tech grand public
     "iphone", "android", "samsung", "apple", "google", "microsoft",
+    # santé humaine
     "cancer", "diabète", "covid", "hôpital", "clinique",
+    # lifestyle
     "mode", "vêtements", "voyage", "vacances",
+    # sciences hors-sujet
     "astronomie", "physique quantique", "spacex",
+    # religion / ésotérisme
     "religion", "église", "astrologie", "horoscope",
 ]
 NON_AGRI_PAT = re.compile(r"\b(?:" + "|".join(re.escape(t) for t in NON_AGRI_TERMS) + r")\b", re.IGNORECASE)
@@ -310,9 +327,9 @@ Règles :
                 {"role": "user", "content": text}
             ],
             temperature=0.1,
-            max_tokens=400
+            max_completion_tokens=400
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = (resp.choices[0].message.content or "").strip()
         if "```json" in raw:
             a = raw.find("```json") + 7
             b = raw.find("```", a)
@@ -321,12 +338,16 @@ Règles :
             a = raw.find("```") + 3
             b = raw.find("```", a)
             raw = raw[a:b].strip()
-        data = json.loads(raw)
-        intent_id = data.get("intent_id")
+        try:
+            data = json.loads(raw) if raw else {}
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON invalide (route) [{FALLBACK_MODEL}]: {str(e)} | payload={raw[:200]}")
+            data = {}
+        intent_id = data.get("intent_id") if isinstance(data, dict) else None
         if intent_id == "null":
             intent_id = None
-        confidence = max(0.0, min(1.0, float(data.get("confidence", 0.0))))
-        slots = data.get("slots", {})
+        confidence = max(0.0, min(1.0, float(data.get("confidence", 0.0)))) if isinstance(data, dict) else 0.0
+        slots = data.get("slots", {}) if isinstance(data, dict) else {}
         if "line" in slots and slots["line"] in ["ross", "cobb"]:
             slots["line"] = None
         if "age_days" in slots:
@@ -335,8 +356,12 @@ Règles :
                 slots["age_days"] = age if 0 <= age <= 70 else None
             except Exception:
                 slots["age_days"] = None
-        return {"intent_id": intent_id, "confidence": confidence, "slots": slots,
-                "need_clarification": bool(data.get("need_clarification", False))}
+        return {
+            "intent_id": intent_id,
+            "confidence": confidence,
+            "slots": slots,
+            "need_clarification": bool(data.get("need_clarification", False)) if isinstance(data, dict) else False
+        }
     except Exception as e:
         logger.error(f"Erreur routage GPT: {e}")
         return {"intent_id": None, "confidence": 0.0, "slots": {}, "need_clarification": False}
@@ -372,9 +397,9 @@ Règles:
                 {"role": "user", "content": user_text}
             ],
             temperature=0.1,
-            max_tokens=300
+            max_completion_tokens=300
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = (resp.choices[0].message.content or "").strip()
         if "```json" in raw:
             a = raw.find("```json") + 7
             b = raw.find("```", a)
@@ -383,13 +408,18 @@ Règles:
             a = raw.find("```") + 3
             b = raw.find("```", a)
             raw = raw[a:b].strip()
-        data = json.loads(raw)
-        logger.info(f"[DECISION] intent={intent_id}, mode={data.get('answer_mode')}, missing={data.get('missing')}, slots={slots}")
+        try:
+            data = json.loads(raw) if raw else {}
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON invalide (decision) [{FALLBACK_MODEL}]: {str(e)} | payload={raw[:200]}")
+            data = {}
+        logger.info(f"[DECISION] intent={intent_id}, mode={(data.get('answer_mode') if isinstance(data, dict) else None)}, "
+                    f"missing={(data.get('missing') if isinstance(data, dict) else None)}, slots={slots}")
         return {
-            "answer_mode": data.get("answer_mode", "direct"),
-            "clarify_question": data.get("clarify_question", ""),
-            "missing": data.get("missing", []),
-            "followup_suggestion": data.get("followup_suggestion", "")
+            "answer_mode": (data.get("answer_mode", "direct") if isinstance(data, dict) else "direct"),
+            "clarify_question": (data.get("clarify_question", "") if isinstance(data, dict) else ""),
+            "missing": (data.get("missing", []) if isinstance(data, dict) else []),
+            "followup_suggestion": (data.get("followup_suggestion", "") if isinstance(data, dict) else "")
         }
     except Exception as e:
         logger.error(f"Erreur décision GPT: {e}")
@@ -427,7 +457,7 @@ Donne UNE question courte (langue de l'utilisateur) demandant UNIQUEMENT les inf
                 {"role": "user", "content": user_text}
             ],
             temperature=0.1,
-            max_tokens=120
+            max_completion_tokens=150
         )
         question = (resp.choices[0].message.content or "").strip()
         suggestions = {}
@@ -457,7 +487,7 @@ Donne UNE question de suivi pertinente, en une phrase, même langue que l'utilis
                 {"role": "user", "content": response_context[:200] if response_context else user_text}
             ],
             temperature=0.3,
-            max_tokens=80
+            max_completion_tokens=100
         )
         return (resp.choices[0].message.content or "").strip() or None
     except Exception as e:
@@ -501,22 +531,32 @@ def run_data_only_assistant(client: OpenAI, assistant_id: str, user_text: str, l
             thread_id=thread.id, role="user", content=f"{user_text}\n\n{reminder}"
         )
         run = client.beta.threads.runs.create(thread_id=thread.id, assistant_id=assistant_id)
-        timeout = time.time() + 30
-        while time.time() < timeout:
+        timeout = time.time() + ASSISTANT_TIMEOUT
+        polls = 0
+        while time.time() < timeout and polls < ASSISTANT_MAX_POLLS:
             r = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
             if r.status in ("completed", "failed", "cancelled", "expired"):
                 break
             time.sleep(POLL_INTERVAL_SEC)
+            polls += 1
         if r.status != "completed":
             logger.error(f"Assistant run failed with status: {r.status}")
             return "Hors base: information absente de la connaissance Intelia."
         msgs = client.beta.threads.messages.list(thread_id=thread.id)
-        latest = next((m for m in sorted(msgs.data, key=lambda x: x.created_at, reverse=True) if m.role == "assistant"), None)
+        msgs_data = msgs.data
+        if len(msgs_data) == 1:
+            latest = msgs_data[0] if msgs_data[0].role == "assistant" else None
+        else:
+            latest = next(
+                (m for m in sorted(msgs_data, key=lambda x: x.created_at, reverse=True) if m.role == "assistant"),
+                None
+            )
         if latest:
             for c in latest.content:
                 if getattr(c, "type", "") == "text":
                     txt = clean_text((c.text.value or "").strip())
-                    return txt if txt else "Hors base: information absente de la connaissance Intelia."
+                    if txt:
+                        return txt
         return "Hors base: information absente de la connaissance Intelia."
     except Exception as e:
         logger.error(f"Erreur assistant data-only: {e}")
@@ -537,7 +577,7 @@ async def stream_fallback_general(client: OpenAI, text: str):
             model=FALLBACK_MODEL,
             messages=[{"role": "system", "content": system}, {"role": "user", "content": text}],
             temperature=FALLBACK_TEMPERATURE,
-            max_tokens=FALLBACK_MAX_TOKENS,
+            max_completion_tokens=FALLBACK_MAX_COMPLETION_TOKENS,
             stream=True,
         )
         final_buf = []
@@ -549,10 +589,12 @@ async def stream_fallback_general(client: OpenAI, text: str):
                     final_buf.append(chunk)
                     yield send_event({"type": "delta", "text": chunk})
         final_text = clean_text("".join(final_buf).strip())
+        if not final_text:
+            final_text = "Désolé, aucune réponse n’a pu être générée. Pouvez-vous reformuler ou préciser votre question ?"
         yield send_event({"type": "final", "answer": final_text})
     except Exception as e:
         logger.error(f"Erreur fallback streaming: {e}")
-        yield send_event({"type": "error", "message": f"Erreur technique: {str(e)}"})
+        yield send_event({"type": "final", "answer": "Désolé, une erreur est survenue et la réponse n’a pas pu être générée."})
 
 # -----------------------------------------------------------------------------
 # Routes
@@ -587,18 +629,29 @@ async def chat_stream(request: Request):
 
     if not tenant_id or not message:
         raise HTTPException(status_code=400, detail="missing_fields")
+    if len(message) > 10000:
+        raise HTTPException(status_code=400, detail="message_too_long")
+    if len(message) < 2:
+        raise HTTPException(status_code=400, detail="message_too_short")
+    if "\x00" in message:
+        raise HTTPException(status_code=400, detail="message_invalid_chars")
 
-    # Langue = celle de la question (prioritaire). On garde Accept-Language en secours.
+    # Langue = celle de la question (prioritaire). Accept-Language en secours.
     accept_lang = request.headers.get("accept-language")
     lang = guess_lang_from_text(message) or parse_accept_language(accept_lang) or "fr"
     lang = (lang or "fr")[:5].split("-")[0].lower()
 
+    request_id = str(uuid.uuid4())
+    logger.info(f"[REQ {request_id}] tenant={tenant_id}")
+
     async def event_source() -> AsyncGenerator[str, None]:
+        sent_final = False
         try:
             # 1) Garde-fou: hors-domaine => message fixe depuis languages.json
             if not is_agri_question(message):
                 answer = clean_text(get_out_of_domain_message(lang))
                 yield send_event({"type": "final", "answer": answer})
+                sent_final = True
                 return
 
             _client = OpenAI(api_key=OPENAI_API_KEY)
@@ -608,7 +661,7 @@ async def chat_stream(request: Request):
             intent_id = route.get("intent_id")
             confidence = float(route.get("confidence") or 0.0)
             slots = route.get("slots") or {}
-            logger.info(f"[ROUTE] intent={intent_id}, confidence={confidence:.2f}, slots={slots}")
+            logger.info(f"[REQ {request_id}] ROUTE intent={intent_id}, conf={confidence:.2f}, slots={slots}")
 
             # 3) Décision clarifier / répondre
             followup_hint = None
@@ -630,10 +683,13 @@ async def chat_stream(request: Request):
                             suggestions["sex"] = ["male", "female"]
                         if "season" in missing:
                             suggestions["season"] = ["summer", "winter", "spring", "autumn"]
+                    if not clarify_q:
+                        clarify_q = "Pour répondre précisément, merci de préciser les informations manquantes."
                     payload_clarify = {"type": "clarify", "answer": clarify_q}
                     if suggestions:
                         payload_clarify["suggestions"] = suggestions
                     yield send_event(payload_clarify)
+                    # clarify = on attend une nouvelle entrée côté front, pas de 'final' ici
                     return
 
             # 4) Tentative data-only (Assistant v2)
@@ -644,21 +700,26 @@ async def chat_stream(request: Request):
             if text.lower().startswith("hors base"):
                 if HYBRID_MODE and allow_fallback:
                     async for sse in stream_fallback_general(_client, message):
-                        yield sse
+                        yield sse  # le fallback stream envoie un final non-vide
+                    # Follow-up après fallback
                     final_followup = followup_hint or await ensure_followup_suggestion(_client, intent_id, message, "", confidence)
                     if final_followup:
                         yield send_event({"type": "followup", "answer": final_followup})
                     return
                 else:
                     yield send_event({"type": "final", "answer": text})
+                    sent_final = True
                     return
 
             # 6) Réponse data-only (stream simulé)
             for i in range(0, len(text), STREAM_CHUNK_LEN):
                 chunk = clean_text(text[i:i + STREAM_CHUNK_LEN])
-                yield send_event({"type": "delta", "text": chunk})
-                await asyncio.sleep(0.02)
-            yield send_event({"type": "final", "answer": text})
+                if chunk:
+                    yield send_event({"type": "delta", "text": chunk})
+                    await asyncio.sleep(0.02)
+            final_answer = text if text else "Désolé, aucune réponse n’a pu être générée."
+            yield send_event({"type": "final", "answer": final_answer})
+            sent_final = True
 
             # 7) Follow-up systématique
             final_followup = followup_hint or await ensure_followup_suggestion(_client, intent_id, message, text[:200], confidence)
@@ -668,8 +729,14 @@ async def chat_stream(request: Request):
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Erreur dans event_source: {e}")
-            yield send_event({"type": "error", "message": f"Erreur interne: {str(e)}"})
+            logger.error(f"[REQ {request_id}] Erreur dans event_source: {e}")
+            if not sent_final:
+                yield send_event({"type": "final", "answer": "Désolé, une erreur est survenue et la réponse n’a pas pu être générée."})
+            else:
+                yield send_event({"type": "error", "message": f"Erreur interne: {str(e)}"})
+        finally:
+            if not sent_final:
+                yield send_event({"type": "final", "answer": "Désolé, aucune réponse n’a pu être générée."})
 
     headers = {
         "Content-Type": "text/event-stream",
