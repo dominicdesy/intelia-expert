@@ -350,10 +350,11 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("ℹ️ Supabase indisponible: %s", e)
 
-    # 🚀 CHARGEMENT DES 3 RAG AVEC DETECTION AMELIOREE
+    # 🚀 CHARGEMENT DES 3 RAG AVEC DETECTION AMELIOREE (OPTIONNEL)
     app.state.rag = None
     app.state.rag_broiler = None
     app.state.rag_layer = None
+    total_rags = 0  # Initialiser par defaut
 
     try:
         from rag.embedder import FastRAGEmbedder
@@ -482,8 +483,13 @@ async def lifespan(app: FastAPI):
         else:
             logger.error("⌚ CRITIQUE: Aucun RAG charge - l'application ne peut pas fonctionner correctement")
 
+    except ImportError as e:
+        logger.warning(f"⚠️ Module RAG non disponible: {e}")
+        logger.info("ℹ️ L'application fonctionnera sans le systeme RAG")
+        total_rags = 0
     except Exception as e:
         logger.error("⌛ Erreur critique initialisation RAG: %s", e)
+        total_rags = 0
 
     # ========== DEMARRAGE DU MONITORING & SCHEDULER ==========
     monitoring_task = None
