@@ -98,8 +98,10 @@ FALLBACK_MAX_COMPLETION_TOKENS = int(
     os.getenv("FALLBACK_MAX_COMPLETION_TOKENS", os.getenv("FALLBACK_MAX_TOKENS", "600"))
 )
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_SSE_COMPAT = os.getenv("FRONTEND_SSE_COMPAT", "1") == "1"
-LANGUAGE_FILE = os.getenv("LANGUAGE_FILE", "languages.json")
+LANGUAGE_FILE = os.getenv("LANGUAGE_FILE", os.path.join(BASE_DIR, "languages.json"))
+
 
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY is required")
