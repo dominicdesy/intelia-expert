@@ -1,0 +1,61 @@
+# Infectious Bronchitis Virus (IBV)
+
+## Introduction
+
+Infectious Bronchitis Virus (IBV) is an acute, highly contagious respiratory disease occurring in chickens of all ages. It affects the respiratory, renal (kidney) and reproductive systems causing severe economic loss in the broiler and in the egg layer industry. Distributed worldwide, IBV is highly transmissible and is a tremendous hazard for unvaccinated flocks. Natural outbreaks have declined over the past couple of decades due to active vaccination, however the fear of variant serotypes and their control continue to plague the industry.
+
+## Infectious Bronchitis and its Serotypes
+
+IBV is caused by a virus belonging to the genus coronavirus family known as coronaviraidae. Several serotypes of antigenic variation or strains of IBV have been identified and continue to be isolated in the province of Ontario. The most common serotype is Massachusetts and Connecticut. Arkansas strains and other variants have not been consistently isolated, however, there are hints of the variant serotypes emerging in the field of poultry production. The virus has the ability to mutate and undergo recombination producing these variant or untypable strains. The concern is that these new strains are becoming more difficult to control through vaccination efforts and the lack of bio-security measures.
+
+## Transmission
+
+The virus spreads rapidly among chickens in a flock. The route is usually by inhalation of virus droplets produced by coughing or sneezing chickens. We cannot rule out the potential spread between flocks where the farms are in close proximity or down wind from infected flocks. The incubation period, before clinical signs are apparent, can be observed from 18 to 36 hour's post insult. Birds become ill, production parameters are challenged and carrier birds become a nidus of infection for other farms or naïve birds. Vectors (e.g. rodents) do not appear to be a factor in the spread of the disease. Also IB is not transmitted vertically through the egg, therefore is not related to hatchery management.
+
+## Disease
+
+As mentioned, the incubation period of the virus is 18 to 36 hours. This depends on the dosage, route of inoculation and susceptibility Lesions include inflammation and accumulation of mucous in the trachea, nasal passages and sinuses. Air sacs may be cloudy young birds with diminishing signs in older birds.
+
+of the chicken. In chicks, there can be signs of and thickened. This is more pronounced in gasping, coughing and nasal discharge. Wet eyes and swollen sinuses are occasionally seen under severe conditions. The chicks are depressed, lethargic and usually huddle close to each other. Food consumption, water consumption and weight gain are depressed. The concern in our industry focuses not only on the production loss but the challenge of secondary bacteria such as E.coli. E.coli can cause increase condemnations due to CRD and Airsacculitis.
+
+The renal form of the disease has been diagnosed in the province of Ontario. These strains that target the renal system are referred to as nephrotropic strains. They have a high affinity (attraction) for the kidneys and the ureters. This form of the disease can contribute to high mortality rates, as high as 25% in younger flocks. The strains most frequently identified with the renal form of the disease include Gray, Holte and the Australian T strain. Lesions seen at the Animal Health Laboratory include swollen and inflamed kidneys, distension of the ureters with build up of urate deposits.
+
+In adult laying flocks, a drop in egg production usually follows the respiratory symptoms of gasping and coughing. Frequently, drops in egg production are observed without any incidence of poor eggshell quality (wrinkled eggs, slab sided eggs). Pullets in good condition and in the first few weeks of production suffer only a slight drop in production and usually regain normal production in a few weeks. Older birds may not bounce back as quickly, revealing a weakening performance for the duration of lay. IB strains that target the reproductive tract could have a permanent role in the shell and internal egg quality.
+
+Reproductive forms of IBV occur in lay, especially in naïve flocks or flocks that are not adequately protected through vaccination. These flocks can suffer large drops in egg production. The virus can cause a direct insult to the ovaries and the reproductive tract. As indicated, this is observed as eggshell abnormality such as wrinkled, rough or slab sided eggs. One must not assume that all eggshell abnormalities are related to IBV challenges. Careful examination and diagnostic procedures must be in place to pinpoint the cause.
+
+Respiratory forms of the disease are usually observed in poorly vaccinated flocks. Secondary bacteria such as E.coli, as explained, can complicate the production parameters minimizing profit returns.
+
+## Diagnosis of IBV
+
+Besides preventive measures which include biosecurity and vaccination, the service of diagnostics, utilizing qualified veterinary supervision and laboratory support, are the key elements and attributes in assisting us in making a proper diagnosis of IBV infection in a broiler, pullet or layer flock. We, the industry, need to follow set guidelines or procedures to optimize our potential in coming to a diagnostic conclusion. Tools that are available to us are listed for reference, application or follow up.
+
+## 1) Serological Profiles
+
+As with any other foreign protein, the chicken responds to IBV field infection or vaccination by producing specific antibodies. Antibodies induced by IBV may be of three different classes; IgM, IgG and IgA, with the main antibody found in serum or humoral antibody is of the IgG class. Peak titers are achieved 7 to 8 days post infection and gradually decline if no further insult or vaccination is presented to the bird. As this antibody is only present for a short period of time, it provides a useful tool in the diagnosis of a recent IBV infection. Antibody of the IgG class, measured by serological techniques (ELISA) can be detected as early as 7 days post infection with highest titers found at approximately 10 - 14 days post infection.
+
+For field evaluation, we utilize the principles of antibody response, by taking acute (time of infection) and convalescent (3 weeks post infection) samples to verify the presence of field challenge. Health professionals will ask for acute / convalescent samples to be submitted at the same time to run an ELISA portfolio for the respiratory pathogens. The laboratory can run a serological test for IBV only or call for a respiratory profile, which would include NDV, AE and possibly Mg. Interpretation of titers requires a qualified person with a complete history of vaccination status at hand.
+
+## 2) Virus Isolation
+
+IBV can be isolated directly from diseased chickens or alternatively from sentinel chickens placed in contact with commercial layers or broilers. Samples for IBV isolation must be obtained as soon as clinical signs (coughing, sneezing, tracheal rales) are Serological profiles should always be evaluated on a flock basis and not on an individual bird. It is important to ensure a sample that is representative of the whole flock, with a minimum sample size of 20 birds. It is important to always test paired sera at the same time.
+
+Again, the sampling should be at the time of vaccination or at the onset of the disease (acute) with the convalescent sample 3 weeks later. On problem farms, it is a good policy to investigate a procedure of regular flock sampling (every 10 weeks). Serum can be separated and stored by freezing, to be kept at a later date for testing, if required. Rising titers between samples may indicate exposure. Experience will indicate normal ranges of titers resulting from vaccination programs. A field challenge will usually result in a higher titer than normally resulting from vaccination.
+
+In order to isolate a pathogenic IBV field strain, free of vaccine strains, it is recommended to avoid taking samples within 3 weeks of live IBV vaccination. Tracheal swabs or other tissues such as lung, kidney, oviduct and cecal tonsils are usually collected evident. Whole bird carcasses (dead less than 24 hours, preferably refrigerated and not frozen) and live birds (5 live birds representative of the problem, not culled birds) should be submitted to the Animal Health Laboratory or to a Poultry Practitioner. If only tissue samples can be submitted, it is advised that they be shipped refrigerated (ice packs) to a veterinary laboratory within 24 hours.
+
+for virus isolation. Professional services in the field or in the laboratory are equipped to handle this diagnostic procedure. Because IBV persists in the intestinal tract, isolation of many strains from the cecal tonsils is possible for several weeks after the disappearance of clinical signs.
+
+## 3) IBV Serotyping
+
+There are many serotypes worldwide. Common serotypes in Ontario are the ones most commonly used in vaccination such as Massachusetts and Connecticut. Other strains found are usually classified as variants or mutations from vaccine strains or new serotypes emerging in our poultry industry. It is very important to remember that there is often cross protection between different IBV serotypes, hence new vaccines are not as often needed. However, it is critical that the diagnostic laboratory have the needed specimens so that IBV serotyping can occur. Many tests are available; by far the most revealing in our system today is the use of reverse transcriptase - polymerase chain reaction (RT-PCR). These tests as well as others are available at the Animal Health Laboratory.
+
+## Summary
+
+Sound field investigation to resolve an IBV challenge should make use of all tests that are available. These tests, as well as others, can be serviced at the Animal Health Laboratory. Critical to the submission is communication with professional support groups (veterinarians, pathologists) and tardiness to get the challenge resolved as soon as possible. Too often production drops are left unnoticed because of the failure to communicate and contact the proper professional groups. In order to advance our knowledge and understanding of the role the IBV, we have to have a better understanding of what we can do ourselves.
+
+Paired sera, freezing of serum in problem farms, representative whole bird submissions, sentinel bird placements and following diagnostics out to the end will help us better understand our needs. For further information on IBV surveillance and diagnostic protocols, it is advised to contact a poultry veterinarian in your area. The Animal Health Laboratory also can provide a list of poultry practitioners who can provide consultation needs for your farm challenges.
+
+## Acknowledgements:
+
+Scott Gillingham DVM, Diplomate ACPV

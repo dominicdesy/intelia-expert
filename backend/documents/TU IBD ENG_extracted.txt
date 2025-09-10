@@ -1,0 +1,100 @@
+## Technical Update
+
+!\[Image description\](Hy-Line. logo)
+
+# INFECTIOUS BURSAL DISEASE (IBD, GUMBORO)
+
+## INTRODUCTION
+
+Infectious Bursal Disease (IBD), also known as Gumboro, is one of the most important diseases to affect layer pullets around the world. It continues to present new challenges as it can genetically mutate into new serotypes and, in some cases, a more virulent virus, thereby complicating vaccination immunity.
+
+The IBD virus attacks the young bird's immune system and causes a severe immunosuppressive illness, usually around 3 to 6 weeks of age. The incubation period is short and clinical signs appear within 2-3 days after exposure. There are two distinct clinical presentations of IBD infection. The classic IBD virus causes clinical illness with symptoms of depression, ruffled feathers, trembling, diarrhea, vent picking, hemorrhages on thigh and breast muscles, and/or variable mortality. Birds may pick at their own vents as the bursa becomes inflamed. Lesions usually occur in the bursa of Fabricius, which can become swollen and edematous at 3 to 4 days post-infection then quickly regresses to a smaller size. Typically all birds become affected and mortality is variable but can become 90% with very virulent strains (vvIBDV). The newer variant IBD viruses, becoming increasingly prevalent in North America and around the world, cause a subclinical infection with little to no clinical signs or lesions other than a rapid regression in bursal size. Even though a bird may survive the initial acute infection, there can be subsequent problems. The impaired immune system is much less capable of defending against disease challenges so the bird is susceptible to secondary infections. Flocks challenged by IBD will typically be underweight, lack uniformity, and have higher mortality.
+
+## MATERNAL ANTIBODY PROTECTION
+
+The IBD virus cannot be controlled with antibiotics, and is nearly impossible to eliminate from a house by cleaning and disinfection once it is established. Fortunately, there are safe, effective vaccines that can effectively prevent most of the damaging effects of IBD, if properly utilized. Most parent stock flocks are vaccinated with both live and killed vaccine products that produce a high level of maternal antibody that will protect the chick during the first 3 to 4 weeks of life. More importantly, the maternal antibody needs to closely match the serotype of the field virus; therefore, killed vaccines used in the breeders should be produced with the same type of virus. Dr. Daral Jackwood, professor at The Ohio State University, stated: "The biggest problem I see in layers and broilers is the antigenic drift that is occurring in the IBD virus. This has been documented in all forms of the virus: Classic, Variant and very virulent (vv) IBD virus. When the virus mutates, the maternal immunity becomes less effective, leading to early infections in a flock. The best way to control and prevent this is to administer a killed vaccine to the breeders that is antigenically similar to the field challenge virus. Since there are only a limited number of antigenically diverse vaccines available, autogenous vaccines have been used successfully; therefore, it is important to determine the molecular sequence of the field challenge virus in order for the correct vaccine to be selected." Figure 1. Normal bursa. Photo: Dr. Daral Jackwood, The Ohio State University.
+
+Figure 2. Classical IBD, 3-4 days post- infection. The bursa is surrounded with a gelatinous exudate. Photo: Dr. Daral Jackwood, The Ohio State University.
+
+Figure 3. Classical IBD, 3-4 days post- infection. Inflammation and hemorrhage on plicae inside of bursa.
+
+Figure 4. Muscular hemorrhages, which can occur with classical and vvIBD.
+
+## LIVE VACCINATION TIMING
+
+Maternal antibody protects the chicks during the most susceptible first few weeks in the grow house, but it gradually declines over time. When maternal antibody protection is almost gone, the chick must be immunized with a live IBD vaccine as soon as possible. It can be difficult to determine the exact age at which to vaccinate. This is the time after maternal immunity has declined sufficiently to allow the vaccine virus to reproduce in the bird, but before infection with a damaging field virus has occurred. Considering that field viruses can infect at higher maternal antibody levels than attenuated live vaccines can, achieving vaccination protection can be nearly impossible in a heavily contaminated house. Growing houses need to be cleaned and disinfected to reduce the amount of field virus to give the vaccine any chance to be effective.
+
+Several years ago, Hy-Line conducted vaccination trials to determine the most effective IBD vaccination timing for Hy-Line strains of layers. That research demonstrated live vaccinations at 14 days of age or earlier were ineffective due to the protective level of maternal antibody typical in Hy-Line chicks. Not all chicks were capable of responding to vaccination at the same age. A few showed active response to vaccination as early as 18 days of age. A greater percent of chicks responded to later vaccinations and nearly all were capable of responding by 30 days of age.
+
+The conclusion from this research formed the basis for Hy-Line's current IBD vaccination recommendations, which is to vaccinate a pullet flock for IBD at least twice, and preferably three
+
+| | | |
+| - | - | - |
+| 10000 | | |
+| 9000 | | |
+| 8000 | | |
+| IBD TITER | | % RESPONSE |
+| 7000 | | 80 |
+| 6000 | | 70 |
+| 5000 | vaccination | 60 |
+| 4000 | | 50 |
+| 3000 | vaccination | 40 |
+| 2000 | | 30 |
+| vaccination | | |
+| 1000 | | 20 |
+| 0 | 0 | 10 |
+| | 10 | |
+| | 15 | DAYS OF AGE |
+| | 20 | 0 |
+| | 25 | |
+| | 30 | |
+| | 35 | |
+
+## VACCINATION ROUTE
+
+The vaccine virus needs to initially infect cells in the bird's intestine, and the result is dose- dependent, meaning the more virus that reaches the gut, the better the chance for overcoming any remaining maternal immunity, in order to stimulate an immune response. It is difficult to vaccinate pullets of this age through the drinking water because they are not consuming much water. Despite this fact, IBD vaccine virus does remain stable during the vaccination process for at least six hours, so there is more time for the pullets to consume the treated water. On the other hand, the spray vaccination route is not recommended for IBD. Spraying vaccine results in much of the dose being lost in the environment and never getting in the birds. The small fraction of the dose that does may be sufficient for some respiratory viral vaccines, but is not enough for IBD immunization. Eyedrop vaccination of IBD vaccine is also an acceptable route.
+
+times. The exact timing can be adjusted for convenience purposes, but in general, the first live IBD vaccination should be at 18-20 days of age, a second at 24-26 days, and the last at 30-32 days of age. All applications should be done with an "intermediate" vaccine strain of IBD and should preferably be administered in the drinking water or by eyedrop. IBD vaccine can be combined with other live vaccines such as Newcastle and bronchitis. This program has been adopted by most of Hy-Line's customers worldwide, and generally has proven very effective in preventing the potentially damaging effects of IBD.
+
+## MONITORING VACCINATION RESULTS
+
+In general, serology is of little value to determine how well a flock is protected against IBD. Every flock will predictably lose maternal antibody over its first 3-4 weeks, test negative temporarily around 4-5 weeks of age, and then turn antibody-positive again at 5-6 weeks as the birds react to IBD virus, whether from vaccine, or field virus, or both. The strength of the final titer is not indicative of vaccine protection or severity of IBD infection.
+
+Figure 5. IBD maternal antibody decline and % response to vaccination, 0–35 days.
+
+!\[Image description\](Image of a caliper measuring the diameter of a bursa.)
+*Figure 6.* Measuring the diameter of a bursa with calipers.
+
+## BURSAL MONITORING
+
+A better way to evaluate IBD protection is to directly examine the bursas in a sampling of average birds. The size of the bursa is a good indicator of damage from IBD infection and/or other immunosuppressive diseases. IBD infection results in a decreased bursa size about a week post- infection. The smaller the bursa becomes, the more severe the effects on the immune system. Early infections tend to cause the most severe and potentially permanent immunosuppression, and are more likely caused by a variant virus.
+
+Monitoring bursa sizes closely in the 3-6 week age range will also help determine the age when the birds are being infected. About 3-4 days post- infection with a classic IBD virus, the bursa will become inflamed and swell to a larger size. During 4-7 days post-infection, it will then shrink to a smaller-than-normal size. Using these timeframes, it may be possible to estimate the day of infection in individual birds. If this can be determined, it indicates the age when the greatest vaccination effort should be applied.
+
+!\[Image description\](Line chart showing normal bursa size in millimeters (unexposed to any IBD virus), 1-20 weeks.)
+*Figure 8.* Normal bursa size in millimeters (unexposed to any IBD virus), 1-20 weeks.
+
+!\[Image description\](Image showing the size difference between normal bursas (top row) and variant IBD infected bursas (bottom row).)
+*Figure 7.* Size difference between normal bursas (top row) and variant IBD infected bursas (bottom row). *Photo: Dr. Daral Jackwood, The Ohio State University.*
+
+## VERY VIRULENT IBD (vvIBD)
+
+In recent years, a new, highly virulent form of IBD has emerged in many countries around the world. This type of IBD has been capable of causing very high mortality of 50% or more. It is a more virulent virus, capable of breaking through a higher level of maternal antibody. In places where it has been isolated, it has been classified as a standard serotype 1 virus; therefore, commercial vaccines provide the right kind of immunity to protect against it, if the flock is immunized before the disease strikes, which is the main issue with IBD vaccination. If a field virus is present in the house, it will probably break through maternal antibody and begin infecting birds before traditional vaccine can initiate protection. This has led to novel approaches to vaccination in order to prevent this highly virulent form of IBD infection. One is to inject a partial dose (0.2 mL) of a killed IBD vaccine at 12-16 days, followed by several live vaccinations every 5-6 days up to 30-32 days of age. Bursa- derived killed vaccines are recommended for this purpose.
+
+The use of stronger live IBD vaccines is also recommended to help prevent this highly virulent form of IBD. Although these vaccines may cause some bursal damage themselves, they can dramatically reduce morbidity and mortality caused by the vvIBD field virus. Several products have been developed specifically for vvIBD that contain stronger, more invasive vaccine viruses. These are generally not recommended unless vvIBD is present.
+
+Additionally, day-old vaccinations in the hatchery with either standard live or killed IBD products have been attempted with limited success. The maternal antibody at that point generally prevents any reaction to the vaccine. Only chicks with essentially no maternal antibody would benefit from this early vaccination. There is some thought that day-old vaccination may at least help prime the immune system to react more readily to IBD vaccines administered later in life, but this practice is seldom used in layer chicks.
+
+## VECTOR VACCINATION
+
+The most recent additions to IBD vaccination options are two products that are genetic recombinants of HVT Marek's vaccine virus and IBD. Known as vectored vaccines (vHVT-IBD), both are based on HVT as the vector, or carrier virus, which has been modified to carry genes for the immunogenic VP2 proteins of the IBD virus. As the HVT virus replicates in the chick shortly after Marek's vaccination, these VP2 proteins are produced and stimulate an immune response against that portion of the IBD virus. Immunity against IBD is achieved without any actual infection by an IBD virus. Field results have generally been very good, as bursas in vHVT-IBD vaccinated flocks frequently look very big and healthy, as though they were never infected at all. In some locations with vvIBD challenge, the vectored vaccine alone may not be adequate. In these cases, the vectored vaccine can still be used, but combined with the application of a standard live vaccination program with several administrations in the range of 18-32 days of age. To give the vectored vaccine the best chance to work, it needs to be the only HVT vaccine the chicks receive. It should not be combined with another HVT vector or standard Marek's vaccine containing the regular HVT virus.
+
+!\[Image description\](Genetic engineering of vector vaccine)
+
+## CLEANING AND DISINFECTION
+
+Whether confronted with standard IBD, variants, or the highly virulent virus, one management technique that is always helpful is thorough cleaning and disinfection of the grow house. As previously mentioned, virulent field viruses are able to break through maternal immunity before vaccination can be effectively administered in the field. Therefore, in the presence of heavy field challenge, the vaccine is virtually ineffective. The IBD virus is very stable and resistant to many disinfectants. It may be difficult to eliminate all of the IBD virus in the environment, but providing a clean environment for new chicks will give the vaccine a chance to be effective before the chicks encounter the field virus challenge. Cleaning and disinfection pays big dividends for controlling IBD and other diseases.
+
+## SUMMARY
+
+IBD is a very challenging disease for several reasons. The virus continues to evolve and can be very difficult to vaccinate against in field conditions. Producers must do everything possible to reduce IBD challenge in the environment and vaccinate with the best products available, using proper vaccination technique and at the appropriate times during the growing period.

@@ -1,0 +1,508 @@
+!\[Image description\](The image is a cover of a nutrition supplement for broiler chickens by Ross (An Aviagen Brand). The background is black and the text is white. The word "BROILER" is in large letters and below it, the words "Nutrition Supplement" are smaller. At the bottom left, the year "2025" is written in light gray. On the right side of the image, there is a photo of a white chicken. At the very bottom right, there is a white button that says "START" with a black arrow.)
+!\[Image description\](ROSS An Avlagen Brand NUTRITION SUPPLEMENT)
+
+## Contents
+
+Use this button to visit the contents pages
+
+## Introduction 3
+
+## Supply of Nutrients 4
+
+## Energy 4
+
+## Balanced Protein 5
+
+## Macro Minerals 7
+
+## Added Trace Minerals 8
+
+## Added Vitamins and Choline 8
+
+## Feed Additives 9
+
+## Feed Program 10
+
+## Starter Feed 10
+
+## Grower Feed 10
+
+## Finisher Feed 10
+
+## Feed Ingredients 11
+
+## Feed Form 13
+
+## Whole Grain Feeding 14
+
+## Feeding Under Hot Environmental Temperatures 15
+
+## Litter Quality 16
+
+## Welfare and Environment 17
+
+Use the back arrow to return to the previous page Use the forward arrow to move to the next page
+
+# Introduction
+
+!\[Image description\](Image of a button saying 'CONTENTS')
+!\[Image description\](ROSS
+An Aviagen Brand)
+
+## Objective
+
+The purpose of this Nutrition Supplement is to provide the framework and background information of the **Ross** **Broiler Nutrition Specifications** for nutritionists who are involved in decision making for feed specifications and formulations. It should be the goal of the nutritionists to supply a range of balanced feeds that satisfy the nutrient needs of broiler chickens at all stages of their development and production, and which optimize efficiency and profitability as well as support bird welfare and sustainability.
+
+**Ross Broiler Nutrition Specifications** are available on the Aviagen® website and aim to support the achievement of optimal biological performance in varying environments and market scenarios globally.
+
+## Principles
+
+Feed is a major component of the total cost of broiler production. Broiler feeds should be formulated to supply the correct balance of energy, protein and amino acids (AA), essential fatty acids, vitamins, and minerals, to allow optimum growth and performance.
+
+It is widely accepted that the choice of dietary nutrient levels should be an economic decision made by each company or enterprise. This is especially important for dietary energy, protein and AA. Higher levels of digestible AA have been shown to increase broiler performance, especially carcass composition and processing yield. The optimum dietary composition will vary according to the end product of the business. Maximizing live bird profitability is similar to minimizing feed cost per kg (lb) live weight, but when producing birds for portioning, this relationship changes. To maximize margin from portioned birds, it is often necessary to increase the dietary digestible AA levels to above those levels that produce maximum live bird profitability. This is because of the financial benefit of additional meat yield from portioned broilers. These relationships are illustrated below in **Figure 1**.
+
+## Figure 1 Relationship between dietary levels of AA and profitability.
+
+!\[Image description\](A chart showing the relationship between dietary levels of AA and profitability. The x-axis is labeled 'Digestible AA in diet' and the y-axis is labeled 'Cost/Income'.)
+A response to improved nutrition will only be achieved in broiler flocks when nutrient supply, rather than other management factors, is limiting performance. Aviagen's recommended feed specifications will allow good performance in healthy broilers, reared under good management.
+
+!\[Image description\](A box with an icon containing a list and the text 'OTHER USEFUL INFORMATION AVAILABLE' and 'Ross Broiler Nutrition Specifications')
+Feed cost Income portioning Income live bird Maximum portioning margin Maximum live bird margin
+
+## Supply of Nutrients
+
+## Energy
+
+The formulated energy content of broiler feeds should primarily be determined by economic considerations derived by local conditions under which the broilers are grown. In practice, the choice of energy level will also be influenced by many interacting factors (e.g., supply of feed ingredients, milling constraints).
+
+The conventional method of expressing the energy content of the feed is as the Apparent Metabolizable Energy level corrected to zero nitrogen retention (AMEn). The AMEn values of ingredients are influenced by the nutrient content, such as moisture, fat, protein, fiber, carbohydrates, etc. Data on energy contents expressed in this way are available from many sources. Energy values quoted in the **Broiler Nutrition Specifications** are based on World Poultry Science Association (WPSA 1989) equations.
+
+Additionally, the age of the bird also has an impact on dietary AMEn. Dietary lipids such as saturated fats tend to be less digested in young chicks than in adult birds and, thus have a lower energy value. Formulating feeds for broilers using separate chick and adult AMEn values accounts for these differences. Expressing energy content in terms of net energy (NE) overcomes the differences in the utilization of AMEn for metabolic purposes when it is derived from varied substrates (e.g., fat, protein, or carbohydrate). Adoption of the NE system aims to improve consistency and predictability of broiler performance. However, a reliable and well accepted NE system has yet to be established, so AMEn remains the current preferred method. Importantly, nutritionists need to be consistent with the energy values used in feed formulation. Cross-checking tabled data and/or equations is useful in ensuring correct values are used.
+
+Aviagen trials have demonstrated the ability of the modern broiler to adjust its feed intake with varying levels of metabolizable energy in the feed, providing circumstances such as environment and physical feed quality allow. Trials have shown that birds can adjust their intake by as much as 10% to compensate for changes in dietary energy.
+
+## Protein and Amino Acids
+
+Feed proteins are complex AA polymers that are broken down in the gut into smaller peptides or individual AA. Dietary protein quality is based on the level, balance, and digestibility of essential AA in the final mixed feed. The actual levels of essential AA available to the bird are critical. Therefore, it is recommended that broiler feeds are formulated on the basis of digestible AA. Despite requiring further research, the importance of non-essential AA supply has also been recognized, especially when the provision of protein is limited or reduced. The digestible AA levels quoted in the **Broiler Nutrition Specifications** are based on standardized ileal digestibility (SID) assays.
+
+The recommended levels of dietary crude protein should be used as a guide. The actual protein level will vary according to the feed ingredients being used and will be driven by the first limiting essential AA not available in supplemental form. Recommended levels for the AA that may be limiting in practical feeds are listed in the **Broiler Nutrition Specifications.** More complex feed formulations may create additional limiting AA that are not traditionally considered, which should be carefully reviewed.
+
+It is preferable to use high-quality protein sources where these are available, especially for broilers under heat-related stress. Poor quality or imbalanced protein can impact broiler metabolism negatively, as there is an energy cost associated with degrading and excreting excess nitrogen. Additionally, the latter can also result in wet litter, and associated welfare problems such as foot pad dermatitis (FPD).
+
+Feed formulation aims to supply an adequate and balanced level of AA to the bird. To achieve this, it is important that the formulation matrix is routinely revised and updated based on current market conditions. Protein levels of ingredients should be monitored by a direct analysis of the raw materials being used in the formulations. If changes are seen in the protein level of an ingredient, adjustments should be made to total and digestible AA attributed to the individual feed ingredients in the formulation matrix.
+
+KEY POINTS
+Optimum dietary energy levels will depend upon both bird needs (which are affected by maintenance, growth, and environmental conditions) and economic considerations.
+
+Ideal Amino Acid Profile As an aid to achieve an appropriate balance of digestible AA, the ideal AA profile can be used. This is a system where the content of AA that may be limiting in broiler feeds is calculated as a ratio to lysine, which serves as the reference AA. This is advantageous when using different lysine levels in the diet. The use of an ideal AA profile ensures balanced AA even at different lysine contents **(Table 1)**.
+
+| Table 1 | Ratios for an ideal Amino Acid profile. | Age Fed (days) - 0-10 | Age Fed (days) - 11-24 | Age Fed (days) - 25-39 | Age Fed (days) - 40-51 | Age Fed (days) - \>52 |
+| ------- | --------------------------------------- | --------------------- | ---------------------- | ---------------------- | ---------------------- | -------------------- |
+| Lysine | % | 100 | 100 | 100 | 100 | 100 |
+| Methionine | % | 42 | 43 | 44 | 44 | 44 |
+| Methionine + Cystine | % | 76 | 78 | 80 | 80 | 80 |
+| Threonine | % | 67 | 67 | 67 | 67 | 67 |
+| Valine | % | 76 | 77 | 78 | 78 | 80 |
+| Isoleucine | % | 67 | 68 | 69 | 69 | 70 |
+| Arginine | % | 106 | 108 | 108 | 110 | 112 |
+| Tryptophan | % | 16 | 16 | 16 | 16 | 16 |
+| Leucine | % | 110 | 110 | 110 | 110 | 110 |
+
+NOTE: The information in the table is derived from Aviagen internal trials and published literature.
+
+Balanced Protein The balanced protein (BP) concept is the level of dietary lysine according to the suggested levels in the **Ross Broiler Nutrient Specifications** in conjunction with using the recommended ideal AA ratio profile **(Table 1)**. For example, if 100% BP for the broiler starter feed is 1.32% digestible lysine, then 110% BP would be 1.45% digestible lysine. The ideal AA profile described previously applies both minimum and maximum values to the individual AA to produce an exact profile. Indeed, this is a useful tool for the nutritionist to refer to during formulation; it has to be recognized that such exact profiles are theoretical in the context of commercial formulation. The concept of BP has been developed as a practical application of the ideal AA profile to supply broilers with the correct minimum levels of essential and non- essential AA.
+
+Aviagen's BP recommendations, using the digestible lysine level in conjunction with the ideal AA profile, are derived from a combination of both internal Aviagen data on BP responses and experiences in the field. Economic responses have been analyzed for different world regions across various weight categories and end objectives, including live weight, eviscerated carcass, and portioned products. By taking these into account, the full breadth of economic environments is included in these recommendations.
+
+Energy and Protein Response The modern Ross broiler will respond efficiently to dietary AMEn and BP in terms of growth and feed conversion ratio (FCR) to the recommended levels in the **Broiler Nutrition Specifications**. Moreover, higher levels of digestible AA may improve profitability by increasing broiler performance and processing yield in specific markets. Ultimately, the final appropriate determinants of nutrient density in feeds are nutrient ingredient prices and meat product values. To aid decisions on the appropriate feed nutrient density, when faced with variable market conditions, bio-economical models are available. Aviagen has collected trial data from around the world over many years to assist customers in determining AMEn and BP to optimize margin over feeding cost (MOFC) based on market conditions and the desired product mix. An example of the energy and protein response is shown in **Figure 2**.
+
+Figure 2 Live weight (g) response of 39-day-old male broilers in response to varying levels of dietary AMEn and BP. The 100% AMEn and BP values are referencing Aviagen's recommendations.
+
+OTHER USEFUL INFORMATION AVAILABLE Aviagen Brief: Optimizing Nutrition of Modern Broilers KEY POINTS Formulate on digestible AA and the Ross recommended BP to benefit bird and economic performance.
+
+Consider digestible AA levels together with factors affecting feed intake (e.g., energy levels, feed management programs, and feed form) when formulating broiler feeds.
+
+Use high-quality sources of protein, especially in circumstances when broilers are likely to experience stressors.
+
+Maintain updated ingredient AA and protein values on the formulation matrix.
+
+Dietary Fiber In the past, fiber has received negative connotations in broiler feeds and has been largely ignored in formulations. However, ongoing research has shown the importance of fiber related to the development of the gastrointestinal tract, for example, support of gizzard development and, therefore, overall broiler performance. Fiber consists of non-starch polysaccharides, oligosaccharides, and other plant components (e.g., cellulose, hemicellulose, lignin). In general, fiber compounds are classified as either soluble or insoluble. Insoluble fiber is known to support gut function, whereas soluble fiber is associated with increasing intestinal viscosity and reduced nutrient absorption. More research is warranted to understand the response of the bird to dietary fiber.
+
+## Macro Minerals
+
+Providing correct levels of all major minerals in the appropriate balance is important for growing broilers successfully. The macro minerals involved are calcium (Ca), phosphorus (P), magnesium (Mg), sodium (Na), potassium (K), and chloride (CI). Excesses of macro minerals can have an adverse effect on broiler growth performance.
+
+## Calcium
+
+Calcium in broiler feeds influences growth, feed efficiency, bone development, leg health, nerve function, and the immune system. It is vital that Ca is supplied in adequate quantities and on a consistent basis to achieve optimum performance.
+
+The total Ca levels recommended in the **Broiler Nutrition Specifications** aim to optimize broiler performance and leg health. Total Ca and available P specifications were determined with corn/wheat-soybean-based feeds with limestone and monocalcium phosphate as the only supplemental sources of Ca and P. As a reference, slow/intermediate soluble limestone (300-350 microns geometric mean diameter \[GMD\]) has been adopted in Aviagen trials, providing 55-60% of solubility at 5 minutes, according to published methods.
+
+Large variations exist in terms of sources, geology, and quality of limestones used globally. Also, there is a lack of standardization in the classification of particle size. These factors vastly affect Ca solubility and, therefore, its utilization by the bird. Mineral sources supplying Ca need to be tested periodically for concentration, solubility, and particle size, and their matrices should be adapted accordingly.
+
+Ongoing research to develop digestible Ca values is promising, but a globally accepted system is currently not available.
+
+## Phosphorus
+
+Phosphorus, like Ca, is required in the correct form and quantity to optimize skeletal structure and growth. P recommendations in the **Broiler Nutrition Specifications** are based on the classical availability system, whereby inorganic P sources are described as being 100% available, and plant sources are described as 33% available. Digestible or retainable P systems are used in some countries as a way of more accurately assessing the P contribution of materials. Once chosen, the system (available, retainable, or digestible) should be used consistently across raw materials. Whenever necessary, adaptations should be made to meet the Aviagen's specifications for available P.
+
+A variable but large proportion of P in plant material is in the form of phytate-P, which is largely unavailable for poultry. The use of phytase will increase the P utilization of vegetable feed ingredients; this should be accounted for appropriately in the phytase matrix values.
+
+## Magnesium
+
+Magnesium requirements are normally met without the need for supplementation. Limestone can be a major indirect contributor of Mg and should be monitored to prevent excessive Mg as \>0.5% may cause scouring.
+
+## Sodium, Potassium and Chloride
+
+Sodium, K and Cl are needed for a number of metabolic functions. Excessive levels of these minerals result in increased water intake and subsequent poorer litter quality. Shortages can affect feed intake, growth, and blood pH. Therefore, it is important to control Na, K, and Cl within the levels suggested in the **Broiler Nutrition Specifications**.
+
+The main sources of Na and Cl include sodium chloride (NaCl), sodium bicarbonate (NaHCO3), sodium sesquicarbonate (Na3H(CO3)2), and sodium sulfate (Na2SO4). Other dietary sources of these minerals should be carefully identified (e.g., Cl contribution from lysine hydrochloride and choline chloride).
+
+Dietary electrolyte balance (DEB) is important to broilers, especially in heat-stress conditions. The anion content of both vitamin and mineral premixes should always be included in the calculation of ionic balance in finished feeds. With practical K levels of about 0.85% and the recommended levels of Na and Cl, a DEB (Na + K - CI) of about 220-240 mEq/kg will be obtained. This is satisfactory, and as indicated, most emphasis should be placed on the control of Cl levels. In addition, the sources of ions should be considered; for example, Na2SO4 helps balance Na and Cl but reduces the provision of bicarbonate ions, crucial for hot environmental conditions.
+
+!\[Image description\](An Avlagen Brand)
+
+## CONTENTS
+
+## KEY POINTS
+
+Provide adequate Ca for the bird, following the recommendations.
+Accurately describe P in feed ingredients and bird requirements in the same units.
+Control Cl levels by using NaCl and, where necessary, NaHCO3 or Na3H(CO3)2 as feed ingredients.
+Practical vitamin supplementation should take into account losses that might occur between premix manufacture and feeding. Selection and source of vitamin products, premixing, storage times, conditions at all stages, and feed thermal processing are the most important factors in vitamin stability. To reduce oxidative losses, the exclusion of choline chloride, trace minerals, and salt from the vitamin premix is strongly recommended, and all premixes should be stored under conditions that are cool, dark, and dry.
+
+To maximize the efficacy of vitamin and mineral premixes, the incorporation of an antioxidant and careful inventory management are recommended.
+
+## Added Trace Minerals
+
+Trace minerals are needed for all metabolic functions, and recommended levels support broiler health and overall performance. Care should be taken to ensure that suitable forms of each mineral are included in the premix. The **Broiler Nutrition Specifications** quantify the supplemented amount but not the form of trace minerals. Trace minerals are commercially available in several forms, namely, inorganic (oxides and sulfates) and organic/chelated. Generally, organic trace elements have a higher biological availability. Adjustments may be necessary for local conditions, legislation, and markets.
+
+## Added Vitamins and Choline
+
+As trace minerals, vitamins are important cofactors involved in various metabolic functions, and recommended levels support broiler health and overall performance. Some circumstances (e.g., stress, disease) make birds responsive to higher vitamin levels than recommended in the **Broiler Nutrition Specifications**. Increases in the levels of vitamins supplied via feed or water must be based on local knowledge and experience. In general, the longer-term strategy should be to remove or reduce any stress factors rather than to depend on prolonged use of excessive vitamin supplementation.
+
+It should be noted that the recommendations for choline are given as a minimum specification in the complete feed. Therefore, the contribution of feed ingredients should be taken into account.
+
+It is known that various feed manufacturing processes, as well as exposure to light, oxygen, humidity, and high temperatures, affect vitamin stability. Therefore, it is important to include stable vitamin sources and conduct regular analyses in complete feed to validate appropriate vitamin addition and their recovery.
+
+## KEY POINTS
+
+Reduce or remove stressors rather than depending on excessive vitamin supplementation.
+Ensure appropriate storage times and cool, dark and dry storage conditions between manufacture of vitamin premixes and inclusion into the feed.
+Conduct regular vitamin recovery in complete feed.
+ROSS An Avlagem Brand
+
+## Feed Additives
+
+Feed may be used as a carrier for a wide range of additives, medicinal products, and other non-nutritive substances. It is not possible to give a comprehensive list and it is not the scope of Aviagen to recommend or endorse particular products. This supplement lists the different types of additives that might be considered for use in broiler feeds. It is important to note that local laws and legislation may control the use of these products. Producers, feed compounders, and nutritional consultants are advised to assure themselves with the necessity and the efficacy of the products used.
+
+## Enzymes:
+
+Exogenous enzymes are routinely used in poultry feeds to act upon specific substrates, often times anti-nutritional components, and improve the digestibility of feed ingredients. In general, feed enzymes that act on carbohydrates, proteins, and phytate-P are commercially available. In addition to an economical advantage, the use of enzymes may be attractive for nutritionists as they allow for greater flexibility and choice in raw material selection. It is common that several enzymes may be present in one formulation alongside other additives and their respective nutrient matrices. In such cases, it is prudent to verify the additivity of their matrices prior to their application in the field.
+
+The use of phytase increases the available P content of vegetable feed ingredients; this should be accounted for appropriately in the phytase matrix values. The reduction in phytate arising from the use of enzymes also increases the availability of Ca and possibly other nutrients.
+
+Carbohydrase enzymes were initially developed to counteract the anti-nutritive effects of non-starch polysaccharides or soluble fiber, present in several cereals such as wheat, rye, barley, oats, and other grains, and support nutrient utilization. The development of such enzymes has allowed greater flexibility in the inclusion of viscous cereals in poultry feeds. More recently, their benefit has been shown in corn-based feeds, especially for young birds with developing gastrointestinal tracts.
+
+The use of protease enzymes has proven beneficial when using various vegetable and animal-origin ingredients.
+
+When adding enzymes before heat processing broiler feeds, there is the potential for a loss in enzyme activity due to thermal damage to the enzyme. This may be avoided by spraying enzymes on the feed at the end of feed processing or by using enzymes with proven heat stability. Additionally, routine enzyme recovery should be conducted to ensure appropriate levels in the final feed.
+
+## Prebiotics
+
+are substrates selectively utilized by host microorganisms in the intestinal tract to confer a health benefit to the host.
+
+## Probiotics
+
+are live microorganisms that confer a health benefit to the host. This can be achieved through various mechanisms, such as pathogen reduction via competitive exclusion or inhibition of their growth, stimulation of the immune system, promotion of intestinal tissue development, and assistance with digestion.
+
+## Organic acids
+
+are a diverse group of products that can be administered in feed or water. They reduce bacterial contamination in feed, inhibit pathogens in the intestinal tract, stimulate the growth of beneficial bacteria, support the development and maintenance of intestinal tissues, and aid digestion.
+
+## Mycotoxin-counteracting products,
+
+commonly referred to as mycotoxin binders or deactivators, aim to manage the harmful effects of certain types of mycotoxins, which can negatively impact bird health and nutrient absorption.
+
+## Antioxidants
+
+provide protection against nutrient loss in feeds. Certain feed ingredients are more prone to oxidation, such as fish meal and fats/oils, which may need protection. Vitamin premixes should be protected by an antioxidant unless optimum storage times and conditions are warranted. Additional antioxidants may be added to the final feed where prolonged storage or challenging storage conditions are unavoidable. It is important to note that local laws and legislation may control the use of these products.
+
+## Anti-mold Agents
+
+may be added to feed ingredients or to finished feeds to reduce fungal growth and mycotoxin production during storage.
+
+## Pelleting Agents
+
+are used to improve pellet durability. Examples of pellet binders include lignosulfonate, bentonite, and guar gum.
+
+Other products potentially used in broiler feed production include essential oils, nucleotides, β-glucans, pigments, and specialized plant extracts.
+
+!\[Image description\](An Avlagen Brand)
+
+## Feed Program
+
+Full guidance on feed specifications for broilers is provided in the **Broiler Nutrition Specifications** for a range of popular production and market situations.
+
+The most appropriate feed specifications are designed to either minimize the cost for live bird production or maximize margin over-feed cost for portioned products required by the processing plant. Specifications may need to be modified depending on specific market conditions. Factors to be considered are:
+
+Final product – live bird, whole carcass, or carcass component yield.
+Supply and price of feed ingredients.
+Logistics and operational capacity.
+Rearing mixed-sex or sex-separate flocks.
+Age and live weight at processing.
+Yield and carcass quality.
+Market requirements for skin color, shelf-life, etc.
+
+## Starter Feed
+
+The anatomy and physiology of young chicks differ significantly from that of older broilers. From post-hatch, the transformation from embryonic absorption of the yolk sac to utilization of feed is accompanied by dramatic changes in the digestive tract. In the first few days after hatching, the pancreas and intestine increase in size almost 4.5 times quicker than the body as a whole. The digestive system of the young chick is immature; therefore, care must be taken to ensure that nutrient levels are optimal and that the raw materials used are highly digestible.
+
+The objective of the starter period is to support good appetite, optimize organ development, and achieve maximum early growth. As a general rule, the 7-day target body weight should be at least 4.5 times the initial chick weight. Broiler starter feed should be given for at least 10 days and extended if target body weights are not achieved. The starter feed represents a small proportion of the total feed cost and decisions on starter formulation should be based on overall performance and profitability rather than dietary cost, per se.
+
+The recommended digestible AA levels allow the bird to achieve optimal early growth. The use of highly digestible raw materials promotes the early development of broilers and improves subsequent overall performance. The response to BP during the starter period is well established. When justified, supplying levels of AA above those recommended can further support growth. This is particularly important in the production of small birds in challenging conditions when variable physical feed quality is used or breast meat production is at a premium.
+
+Some features of a starter feed are listed below:
+
+Use of highly digestible ingredients.
+Adequate nutrient levels, especially digestible AA, vitamin E, and zinc (Zn).
+Use of pre- and pro-biotics and acidifiers.
+Immunity stimulants: essential oils, nucleotides, β-glucans.
+Intake stimulants: feed form, increased Na.
+
+## Grower Feed
+
+There is particular importance for a good-quality grower feed considering that broilers achieve the highest rate of growth during this period. The grower feed is generally fed from 11 up to 24 days. Transitioning from a starter to grower feed will typically involve a change of feed texture from crumble to pellets and a change in nutrient density and raw material inclusion. As such, it is important that these changes are smooth to prevent any reduction in intake or growth rate.
+
+## Finisher Feed
+
+Broiler finisher feeds are usually introduced after 25 days of age. Finisher feeds account for the major feeding cost, and economic principles should be applied to the formulation of these feeds in order to optimize the financial return for the type of product mix being produced.
+
+Changes in body composition can be rapid during this period; excessive abdominal fat deposition indicates not achieving the genetic potential for meat yield and needs to be avoided by ensuring the appropriate supply of BP.
+
+To optimize profitability, broilers grown beyond 2.5 kg (5.5 lb) will require additional finisher feed(s). Ultimately, the total number of feeds fed to the broiler depends upon the desired processing weight, the length of the production period, the design of the feeding program, feed manufacturing capabilities, the feed mill finished feed bin capacity, and feed transportation logistics. Careful consideration of the total feed program design is critical to optimize profitability.
+
+Withdrawal periods for certain pharmaceutical compounds, based on local laws and legislation, may dictate the use of a withdrawal finisher feed. This feed should be adjusted for the age of the birds.
+
+The use of starter, grower, and finisher feeds, as described above, form the classic phase-feeding regime. An alternative to this classic system is the inclusion and use of a specialized pre-starter feed in the early stages, which are fed up to 5 to 7 days of age. This approach is applied in situations where historically poor early body weights have been observed.
+
+## Separate Feeding of Male and Female Broilers
+
+When male and female broilers are grown separately, as in a separate sex growing, there may be an opportunity to increase profitability by using different feeding programs. The most practical method is to use the same feeds for both sexes but shorten the grower feeding period for the females. It is recommended that the amount or duration of the starter feed be kept the same to ensure early development. To optimize sex-dependent biological response, separate specifications for male and female feeds may be profitable.
+
+Design broiler feeds to maximize profitability of the whole production chain.
+
+Formulate starter feeds to maximize performance rather than to minimize feed cost.
+
+The use of a pre-starter feed can promote early growth and development.
+
+## Feed Ingredients
+
+Successful broiler production depends on supplying birds with the highest achievable feed quality, in terms of ingredients used, processing procedures applied, and the feed form in which the feed is presented to the bird.
+
+Ingredients used to manufacture broiler feeds should be fresh and of high quality. When poorer quality ingredients are fed, non-utilizable nutrients must be catabolized and excreted by the birds, using up energy and creating metabolic stress. Furthermore, undigested nutrients are substrates for potentially pathogenic microorganisms in the hindgut, which can lead to intestinal health challenges.
+
+Cereals and vegetable feed ingredients are susceptible to fungal growth if stored in hot and humid conditions. Fungi can produce mycotoxins that, depending upon the degree of contamination, overall stress levels, and disease pressure, may impair broiler health, growth rate, and FCR. Litter condition may also be adversely affected, which increases the risk of broiler carcasses being downgraded due to breast blisters, FPD, and hock burn.
+
+The nutritional value of feed ingredients will vary with source, climate, season, and feed processing methods, and the feed formulation matrix must be maintained accordingly. Nutritional values attributed to feeds must accurately reflect the true nutritional values of the ingredients being used. This will require routine nutritional analyses of the ingredients used. This should be part of a quality control program, with an emphasis on ingredients, but also finished feed analysis. Proximate analyses, including moisture, protein, fat, fiber, ash, and starch are common properties to evaluate ingredient and finished feed qualities. In addition, visual examination and further biological testing for contamination (e.g., *Salmonellae spp.*, mycotoxins, oxidation) should be conducted.
+
+An effective feed quality-control program integrates four critical pillars: ingredient quality, process control, finished feed quality, and the management of toxic substances, including pathogenic microorganisms. Maintaining ingredient quality requires stringent supplier specifications, routine on-site audits, and systematic sampling and analysis protocols. Advanced technologies, such as near-infrared (NIR) spectroscopy, combined with laboratory assays that comply with the Association of Official Analytical Chemists (AOAC) standards, enable precise ingredient characterization and control. Process control is fortified through the implementation of standardized operating procedures and regular equipment calibration, ensuring uniform feed production. Comprehensive testing of finished feed is performed to meet both physical and nutritional standards. The management of toxic substances, including microbial contamination and mycotoxins, is handled through rigorous testing and preventive strategies.
+
+Any non-conformance in ingredient or finished feed quality prompts an in-depth evaluation of production processes, sampling methodologies, and ingredient integrity, ensuring consistent, high-quality feed production.
+
+The range of feed ingredients available for least-cost formulation must be suitable for broilers. In selecting ingredients for broiler feeds, consideration should be given to their impact on nutrient balance, gastrointestinal health, and bird physiology. Limits should be set on the inclusion of ingredients known to cause problems when consumed in excess (e.g., tapioca, low-protein soya meal, DDGS). The use of several comparable feed ingredients in feed formulation will reduce dependency on any particular ingredient. The greater the use of a single ingredient, the more important it is to have effective quality control of that ingredient.
+
+Feeds must use high-quality, fresh ingredients, especially in starter feeds.
+
+Maintain an accurate ingredient database for use in ration formulation based on results obtained from a routine analysis program.
+
+Individual raw material inclusion levels should be based on knowledge of any anti-nutritional factors within the ingredient and any concerns on quality and consistency.
+
+| Criteria Required for Feed Fats | Comments |
+| ------------------------------- | -------- |
+| Moisture and impurities | Max 1% Water promotes hydrolytic rancidity. Solid material residues from the rendering, extraction, or fat recovery process can block filters and nozzles. |
+| Monomeric fatty acids | Min 92% |
+| Non-elutable material | Max 8% |
+| Free fatty acids | Max 15%\* Higher levels could be an indication of the onset of peroxidation. |
+| Oxidized fatty acids | Max 2% Poor-quality oxidized fats have a negative effect on meat quality and general bird health. |
+| Antioxidant | Present |
+
+\*If using blended fats containing acidulated soapstock, this specification can be adjusted to allow for the higher Free Fatty Acids (FFA) found in this fat.
+
+## Vitamin and Mineral Premixes
+
+General recommendations for dietary supplementation of vitamins and trace minerals are provided in the published **Broiler Nutrition Specifications**. Occasionally, circumstances may arise which cause an increase in vitamin needs. In these situations, the strategic use of supplementing vitamins through water should be considered as a possible alternative to increase necessary vitamin intake. When supplying nutrients via the water line, careful attention should be made to prevent biofilm formation (see **Broiler Management Handbook** for more details on water line management).
+
+Aviagen does not endorse the practice of removing vitamin or trace mineral premixes during the final stages of the birds' lives because of the associated welfare implications.
+
+## Fat Sources
+
+Fat, of either animal or vegetable origin, is added to feeds as an energy source, essential fatty acid source, and support feed mill throughput. Animal fats, other than poultry fat, contain more saturated fatty acids, which are less digestible, especially for the immature digestive system of the chick. In starter and grower feeds, it is advisable to use fats containing higher percentages of unsaturated fats. In finisher feeds, the potential for high levels of unsaturated fats to have a detrimental effect on carcass greasiness and shelf life should also be considered. Only good-quality, stable fats should be used for broiler feeds. It is important that the quality of fat ingredients is carefully controlled if broiler performance and product quality are not to be affected, see **Table 2**.
+
+Supplementary levels must take into account probable losses during feed thermal processing and storage.
+
+Exclude choline chloride, trace minerals, and salt from the vitamin premix.
+
+Consider including an antioxidant in fat and vitamin premixes.
+
+Supply unsaturated fats in starter and grower feeds.
+
+Ensure a good quality control program is in place with routine nutrient analyses.
+
+Feed Form Poultry feeds are formulated to a specific nutrient concentration to support bird performance. However, growth is dependent upon feed intake, which in turn is influenced by feed form. The highest feed intake and best performance are achieved by feeding good-quality crumble/pellets. It is known that high levels of fines (particle size \<1 mm \[0.04 in\]) have a negative effect on intake, live weight, and FCR. Data shows that reducing dietary fines, with a particle size smaller than 1 mm by up to 10%, can increase live weight and improve FCR. Reductions in the energy used in feeding activity by the bird can explain many of the live performance benefits of pelleting. Benefits also accrue due to savings in feed wastage and improvements in feed transportation.
+
+Pellet durability can be improved by using raw materials with good binding ability. In descending order of pelleting quality, these materials are wheat, rye, barley, oats, maize, and peas. Additionally, the use of pellet binders might be considered.
+
+Feed manufacturing processes will also have a substantial impact on pellet quality. Grinding of raw materials and feed thermal conditioning are regarded as the most influential factors affecting pellet quality. Thermal conditioning not only releases the natural bonding agents in the feed but will also reduce microbial contamination. Depending on the degree of feed thermal processing, compensation should be made for any heat-induced nutrient degradation. Additionally, higher conditioning temperatures (above 88.0°C/190.4°F) for an extended period of time can result in an increase in pellet durability, but it can also lead to nutrient digestibility and availability changes that can negatively impact on performance.
+
+Adding a portion of supplementary fat post-pelleting, rather than in the mixer, will have a further positive effect on pellet durability. Finished feed pellet durability should be tested in the feed mill prior to dispatch, aiming for a Holmen test result of 95% pellets after a 30-second test period or 98% pellets after a 10-minute test period using the Tumbling Can method. Pellets at bird level (i.e., feed pan) should also be monitored, and a revision to the manufacturing process should be considered when the recommended particle size distribution is not met (see **Table 3** and **Aviagen Brief: Shaker Sieve**).
+
+OTHER USEFUL INFORMATION AVAILABLE
+
+Video: Feed Sieve Demo If durability results are consistently below these levels, then the feed manufacturing process should be reviewed. This review should consider the raw materials being used and the production process, in particular, grinding, mixing, thermal processing, and pelleting. An emphasis should be placed on reviewing mill maintenance.
+
+| Table 3 | Recommended particle size distribution for crumble or pelleted feeds at bird level/feeder. | Form | 0–10 days Crumble | 11–18 days Pellet | 19–days to finish Pellet |
+| ------- | ------------------------------------------------------------------------------------------ | ---- | ----------------- | ----------------- | ------------------------ |
+| \>3 mm (0.12 in) | | \<20% | \>80% | \>80% |
+| 1–3 mm (0.04–0.12 in) | | 70% | 10% | 10% |
+| \<1 mm (\<0.04 in) | | \<10% | \<10% | \<10% |
+
+| Table 4 | Feed form and recommended particle size by age in broilers. | Age (days) | Feed Form | Particle size |
+| ------- | ----------------------------------------------------------- | ---------- | --------- | ------------- |
+| 0–10 | Crumble | 2.0–3.5 mm (0.08–0.14 in) diameter |
+| 11–18 | Pellet | 3.0–5.0 mm (0.12–0.20 in) diameter 5.0–7.0 mm (0.20–0.28 in) length |
+| 19–finish | Pellet | 3.0–5.0 mm (0.12–0.20 in) diameter 6.0–10.0 mm (0.24–0.40 in) length |
+
+Feed Form by Age in Broilers Optimum broiler growth and FCR can generally be obtained if the starter feed is in a sieved crumble form. After 11 days of age, the pellet should be 3.0-5.0 mm (0.12-0.20 in) in diameter (see **Table 4**).
+
+Extended use of crumble products beyond 10 days is not recommended, as crumble will depress feed intake and growth/FCR compared to pelleted feed. However, if the flock is significantly lighter than the target body weight, feeding a good-quality crumble for a few extra days may be beneficial.
+
+!\[Image description\](An Avlagen Brand logo)
+
+## CONTENTS
+
+Where producers are not able to pellet feed, the mash feed produced should be sufficiently coarse and of a uniform particle size. The cereal grain(s) used in mash feed should be ground so that the geometric mean diameter size is 1.2-2 mm (0.05-0.08 in). Mash feeds also benefit from the inclusion of oil or fat in the formulation, as this reduces dustiness and improves palatability. Producing mash feeds that conform to these recommendations will give them a better flowability, which will make transportation and and distribution easier.
+
+| Table 5 Safe inclusion rates of whole grain in broiler rations. |
+| --------------------------------------------------------------- |
+| Form | Inclusion Rate of Whole Grain |
+| Starter | Zero |
+| Grower | Gradual increase to 15-20% |
+| Finisher | Gradual increase to 25-30% |
+
+NOTE: These inclusion rates are particularly applicable to wheat. It is possible to increase these inclusion rates provided care is taken to make suitable adjustments to the composition of the balancer feed to prevent excessive dilution of the overall diet.
+
+feeding supports a better gut microflora, enhances gut function and digestive efficiency, and can improve litter condition. There is some evidence that feeding whole grain may increase coccidiosis resistance. These advantages must be set against the loss of carcass and breast meat yield. The whole grain used should be treated with organic acids to control *Salmonellae spp.* Used together with the recommendations published in the ***Broiler Nutrition Specifications***, safe inclusion rates of whole grain are given in **Table 5**. Whole grain must be removed from the feed 2 days before processing to avoid contamination issues at evisceration at the processing plant.
+
+## KEY POINTS
+
+Use crumble for the first 10 days and pelleted feed thereafter for optimum growth and FCR. Maximize pellet durability for best results.
+
+Ensure optimum particle size and appropriate cereal source when pelleting is not possible.
+
+## Whole-Grain Feeding
+
+The practice of presenting broilers with a mixture of compound feed (pellets) and whole wheat has been most widely used in areas such as Europe, Canada, New Zealand, and Australia. However, it should be feasible to use any whole cereal grain, excluding corn, for this purpose. In some areas, a mix of whole and cracked wheat is used as an option if segregation is an issue.
+
+The whole grain inclusion level should be accounted for when formulating the accompanying compound feed in order to maintain adequate growth and efficiency. The compound feed and the whole grain together supply the nutrient needs of the bird. The broiler is responsive to the level of BP in the diet, and when the compound feed or balancer feed is not adjusted for the amount of whole grain added, birds will exhibit poorer growth and FCR and have a lower breast meat yield and a higher fat content. Therefore, both the amount of whole grain to be used and the composition of the compound (or balancer) feed must be considered carefully. The aim is to provide sufficient intakes of all nutrients from the combination of compound feed and grain. Individual birds satisfy, to some extent, their own nutrient requirements by selecting an appropriate mixture of the two feeds. Care must always be taken to ensure that intakes of micro-nutrients and any medications contained in the feed are sufficient at the dilution rates used. When feeding whole grain, this must be of good quality and free of fungal and toxin contamination.
+
+The addition of whole grain post pelleting or on the farm saves costs in feed manufacture, possibly in transport and may be used to facilitate a smoother transition of nutrient supply during the growing period. Whole grain
+
+## KEY POINTS
+
+Account for the inclusion level of whole grain when formulating the compound feed.
+
+Maintain intakes of micro-nutrients and medication at recommended and legal levels.
+
+Store grain carefully, avoiding high moisture content and mycotoxin contamination. Treat with organic acid(s) to reduce the risk of microbiological contamination.
+
+!\[Image description\](Ross An Avlagen Brand Logo)
+
+## Feeding Under Hot Environmental Temperatures
+
+Feed and nutrition have a significant influence on how broilers respond to hot environmental temperatures. One of the most successful ways to aid the health, welfare, and performance of broilers during periods of heat-related stress is to employ good nutrition and feed management practices as described in the **Broiler Management Handbook**.
+
+Good feed physical quality (crumble, pellet, or mash) will minimize the energy expended to physically eat and reduce the heat generated during feeding activity. Optimal feed form will also increase compensatory feed intake during the cooler periods of the day or night. It is usually best to encourage compensatory feed intake at night.
+
+Increasing nutrient intake during heat stress may have an adverse effect on livability; however, increasing dietary nutrient digestibility and using specific micro-ingredients have proven beneficial.
+
+For protein, consideration should be given to increasing AA digestibility rather than AA density. Excess protein should be minimized and AA should be balanced by exploiting the use of supplemental AA instead of intact proteins, as any excess protein will generate additional metabolic heat.
+
+Supplying energy in the feed using fats rather than carbohydrates can be beneficial. Lipids yield 9 kcal of energy per gram, while carbohydrates and proteins yield only 4 kcal of energy per gram. Thus, lipids contain 2.25 times as much energy as carbohydrates and is more digestible, resulting in less heat waste and a lower heat increment during feeding.
+
+Heat-related stress that is severe enough to induce a higher respiratory rate (i.e., severe panting) and increased core body temperature results in:
+
+Increased urinary and fecal excretion of minerals and trace elements.
+An abnormally high loss of blood carbon dioxide.
+A decline in blood bicarbonate and an increase in blood pH.
+Thus, heat-related stress may induce a metabolic requirement for bicarbonate. Under such conditions, the bird can benefit from being provided feeds containing NaHCO3 or Na3H(CO3)2 such that these products supply approximately 50% of dietary Na. Furthermore, feeding diets with higher Na levels increases water intake and, if cool water is provided, helps reduce body temperature. Higher Na levels result in a DEB of 240-260 mEq/kg, which can be beneficial in reducing heat-related mortality and improving growth during hot weather.
+
+Vitamins A, C, D, E, and niacin are known to have a positive effect on the response of birds to heat stress. A general approach is to increase the level of vitamins by 1.25% per degree centigrade (2°F) as the temperature rises from 21.0 to 28.0°C (69.8 to 82.4°F). If temperatures exceed 28.0°C (82.4°F), then further increases in vitamin levels should be made at the rate of 2.5% per degree centigrade (2°F). This guideline is dependent upon the vitamin levels used in the standard supplement. Supplementary vitamins should never be withdrawn from the feed and, depending on their stability, are more suitable for water supplementation (in particular, vitamin C).
+
+Other additives shown to have benefits in improving heat tolerance include, but not limited to:
+
+**Betaine** – osmoregulator that increases the efficiency of absorption of minerals and trace elements.
+**Glucose** – increases the energy required for extreme temperatures.
+**Salicylic acid** – increases birds' tolerance to heat.
+In heat-related stress situations, the choice of anti-coccidial should be considered carefully to avoid those associated with increased mortality via increased heat production or those known to alter metabolic utilization of Na or K.
+
+## KEY POINTS
+
+Maintain good feed form in hot environmental conditions.
+Optimize amino acid intake with balanced protein and highly digestible raw materials.
+Provide a higher calorie contribution from fats rather than carbohydrates.
+
+## Litter Quality
+
+Litter quality directly affects bird health, welfare, and performance. Poor-quality litter with high moisture content may result in increased ammonia levels within the broiler house. This has the potential to produce increased respiratory stress and increased levels of carcass damage. Poor-quality litter also increases the risk of FPD and hock burn. Therefore, maintaining good litter quality is not only beneficial to the bird but also to the producer.
+
+There are a number of factors involved in litter quality, including environmental management, bird husbandry, house management, enteric conditions, and nutrition. Provided suitable management, health, and environmental practices are followed, the following nutritional strategies will help to ensure litter quality is maintained:
+
+Formulate using the BP concept to meet the birds' needs and avoid excess levels of crude protein.
+Formulate on a digestible AA basis.
+Maintain the feed formulation raw material matrix with relevant and updated values for ingredient protein.
+Formulate using the BP concept to meet the birds' needs and avoid excesses.
+Control salt levels to avoid increased water intake, which can be a primary cause of wet litter. As a result, DEB levels should be lower at 200-220 mEq/kg. Accurate descriptions of the Na, Cl, and K levels of raw materials should be maintained in the formulation matrix.
+Fats of particularly poor quality and low digestibility must be avoided.
+The use of exogenous enzymes helps reduce gut viscosity, which will improve litter quality. Refer to manufacturer recommendations when using an enzyme(s) to ensure these additives are accurately added at the correct dosage and sequenced properly in the feed manufacturing process to allow good dispersion into the feed matrix and to minimize degradation due to feed thermal processing.
+Anticoccidials generally support gut health by improving gut integrity and helping to maintain litter quality. However, using a live vaccine for coccidiosis control in broilers requires additional attention to gut health to ensure optimal litter conditions.
+
+Aviagen developed a separate set of **All Plant Protein Based Broiler Nutrition Specifications** for those areas or concepts where no animal protein is allowed and/or FPD has an economic value. These recommendations have shorter feeding phases, resulting in smaller dietary transitions between feeds to promote enteric health. Additionally, BP recommendations are slightly lower to optimize enteric health and litter quality while still achieving good broiler performance.
+
+OTHER USEFUL INFORMATION AVAILABLE Ross All Plant Protein-Based Feeds Broiler Nutrition Specifications KEY POINTS Good, friable litter without excess moisture is needed for optimal footpad integrity.
+
+Adequate AA nutrition is key for maintaining good litter quality.
+
+## Welfare and Environment
+
+All feed formulations should be produced with due consideration to bird welfare and potential environmental impact. As a general rule, the practices and nutritional strategies outlined in this Nutrition Supplement will form the basis of a successful welfare and environmental strategy. Some of the more important areas where particular consideration is required are outlined below.
+
+Adequate nutrition is necessary to maintain optimal broiler growth profile and prevent nutritional deficiencies.
+
+Severe deficiency or excess of several nutrients will compromise broiler welfare.
+
+## Welfare
+
+Balanced nutrition should be supplied to the broiler to maintain a practical and sensible growth profile and to prevent nutritional deficiencies. Protein needs to be supplied as a balance of digestible AA. Macro mineral levels must be supplied at adequate and balanced levels. Special reference should be made to Ca and P to avoid skeletal disorders. Equally, Na levels are important along with DEB to avoid deficiencies and maintain good litter. Vitamins and trace minerals must be supplied at adequate levels to avoid metabolic disorders associated with deficiencies. Biotin and Zn have been identified as assisting in the prevention of FPD. Maintaining good-quality litter will also assist with limiting the incidence of FPD.
+
+## Environment
+
+Minimizing excess crude protein levels in the feed by formulating to balanced levels of digestible AA, rather than minimum crude protein levels, will minimize nitrogen excretion. The subsection on **Protein and AA** explains the concepts of ideal AA profile and BP, which can be used to reduce nitrogen excretion. It has been determined that a 1% reduction in feed protein level (e.g., from 20% to 19%) results in an average 10% reduction in both nitrogen excretion and ammonia emission. Adjustment in the whole AA profile is required in order to maintain live and processing performance; higher levels of synthetic AA will be required.
+
+Phosphorus excretion can also be reduced by feeding more closely to the birds' needs and utilizing phytase enzymes. Refer to the subsection **Macro Minerals** for further details on P nutrition.
+
+Generally speaking, any nutritional practices that minimize FCR, thereby reducing the total amount of feed consumed and manure produced, will reduce the environmental impact of animal production.
+
+!\[Image description\](Logo of Ross and text 'NUTRITION SUPPLEMENT' at the top left corner.)
+
+## Notes
+
+## Notes
+
+!\[Image description\](Black and white image of a chicken standing upright.)
+!\[Image description\](Aviagen logo)
+www.aviagen.com Every attempt has been made to ensure the accuracy and relevance of the information presented. However, Aviagen accepts no liability for the consequences of using the information for the management of chickens.
+
+Aviagen, the Aviagen logo, Ross and the Ross logo are registered trademarks of Aviagen in the US and other countries. All other trademarks or brands are registered by their respective owners. © 2025 Aviagen.
+
+Privacy Notice: Aviagen collects data to effectively communicate and provide information to you about our products and our business. This data may include your email address, name, business address and telephone number. To view the full Aviagen privacy notice visit Aviagen.com.

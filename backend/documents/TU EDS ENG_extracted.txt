@@ -1,0 +1,109 @@
+## Technical Update
+
+!\[Image description\](Hy-Line. Logo)
+
+# EGG DROP SYNDROME (EDS)
+
+## INTRODUCTION
+
+Egg Drop Syndrome (EDS), initially described in 1976, has since become an important cause of decreased egg production worldwide. It is a viral disease that is thought to have been introduced into chickens through a contaminated vaccine. This virus can be both horizontally and vertically transmitted, although horizontal transmission occurs slowly throughout the flock. EDS is characterized by egg shell abnormalities, including thin-shelled and shell-less eggs. Affected birds typically demonstrate no other signs of illness. Clinical cases have been reported in Europe, Asia, Africa, and Latin America, and more recently, sporadic cases have been described in North America.
+
+## ETIOLOGY
+
+EDS is caused by an adenovirus known as duck adenovirus 1, or egg drop syndrome virus (EDSV). This is not to be confused with the recently described flaviviral disease of ducks, which has been referred to as "duck egg drop syndrome".
+
+!\[Image description\](An early sign of EDS is loss of shell pigmentation.)
+Although the first isolates of EDSV were from chickens, it has since been discovered to have originated from ducks. EDSV is now considered a naturally occurring virus in waterfowl. All virus isolates belong to the same serotype of duck adenovirus type 1 (DAdV-1). Recent studies suggest that the virus circulating in chickens has not significantly changed since it was initially introduced.
+
+## TRANSMISSION
+
+Outbreaks of EDS have been described to fit one of three patterns. The classic form of EDS involved the introduction of the virus into primary breeder stock, followed by vertical transmission through the embryonated egg. The virus has since been eradicated from primary breeder stock and is more commonly found in commercial laying hens. This is the second outbreak pattern, or the endemic form. The endemic form likely originated from the classic form and has since become established on multiple aged commercial layer farms in some areas. Horizontal spread throughout and between these flocks occurs slowly but easily, and is usually associated with contaminated eggs or egg trays. Eggs can be contaminated with virus both externally and internally. Laying flocks may be affected at any age and affected flocks commonly share an egg-packing station. The third outbreak pattern is the sporadic form due to spread from domestic or wild waterfowl or other wild birds. This can occur through direct or indirect contact or water contaminated by infected droppings.
+
+!\[Image description\](Calcification of the egg shell membrane is impaired, resulting in the production of soft-shelled eggs. Internal egg quality is generally unaffected.)
+Virus is shed in feces and birds become infected via the oral route. The source of the virus is oviduct exudations which is mixed with feces in the vent. EDSV does not have an envelope, likely allowing prolonged survival in the environment and spread via contaminated personnel or fomites. Once infected, birds become viremic and spread can occur by use of shared needles when vaccinating or bleeding birds. Spread may also occur via biting insects, such as mosquitoes, but this has not yet been confirmed.
+
+## Technical Update – EGG DROP SYNDROME
+
+## DISINFECTION
+
+EDSV is non-enveloped, making it resistant to many commonly used disinfectants. Sodium hypochlorite (bleach), chlorine dioxide, iodophors, aldehydes and some others have demonstrated efficacy, but may require longer contact times. EDSV is tolerant of a wide pH range (pH 3-10) and is also relatively tolerant of heat. However, autoclaving does successfully inactivate the virus.
+
+## INCUBATION PERIOD
+
+Mature laying hens produced abnormal eggs between 10-24 days post-inoculation in experimental infections. EDSV has a highly variable incubation period. Birds infected at a young age, either in ovo or as chicks, may remain asymptomatic until they reach sexual maturity or around the expected time of peak production.
+
+## CLINICAL SIGNS
+
+The principal pathological effect of EDSV is on the shell gland (uterus) impairing the calcification of the shell membrane. An early clinical sign is usually a loss of shell color in pigmented eggs. This is followed by production of thin-shelled, soft-shelled, and shell-less eggs. The result is a perceived decrease in egg production due to eggs being eaten or lost in the manure, rather than a true drop in production. Decreased production is typically observed during the period of peak production, or when a flock fails to reach or maintain peak production. Outbreaks may last between 4-10 weeks with production drops ranging from 5-50%. There may be compensation later in lay, but total egg loss has been estimated to be 10-16 eggs per bird.
+
+Infected birds typically do not demonstrate any clinical signs of illness. They may appear depressed for 48 hours, with small decreases in feed and water consumption, but this is not common. Diarrhea has been reported, but this is likely due to excess oviduct excretion rather than gastrointestinal disease.
+
+## GROSS LESIONS
+
+Usually, there are no obvious gross lesions in naturally occurring infections. Inactive ovaries and/or atrophied oviducts have been observed but are not consistently present. Uterine edema has been reported in a previous outbreak.
+
+Experimental infection can induce gross lesions such as uterine edema, presence of exudate in the shell gland, mild splenomegaly, flaccid ovules, and eggs in various stages of formation in the coelomic cavity.
+
+## DIAGNOSIS
+
+EDS should be suspected when a sudden drop in egg production associated with thin-shelled, soft-shelled, or shell-less eggs occurs in an otherwise healthy flock. The drop in egg production may be small, however, and require careful examination of the house and the flock for affected eggs. The major differential diagnosis is Infectious Bronchitis (IBV), a disease which can also result in decreased egg production and egg abnormalities. Egg abnormalities seen with IBV that are not seen with EDS include misshapen or wrinkled shells as well as watery albumen. Additionally, there are usually signs of respiratory disease with IBV that would not occur with EDS.
+
+EDS can be diagnosed by virus detection/ isolation and/or serology. PCR is an increasingly popular method for virus detection because of the fast turnaround time and ease of sample collection. PCR can be performed on cloacal swabs from live birds or swabs of the shell gland from dead birds, as well as organ samples including shell gland, oviduct, spleen, cecal tonsils, or kidneys. Virus isolation using embryonated duck or goose eggs or cell cultures can also be performed using these samples.
+
+Virus recovery may be difficult, however, as shedding is transient. Obviously affected birds, i.e. those producing abnormal eggs, should be targeted for sample collection as they are most likely to be shedding the virus.
+
+!\[Image description\](Hen-day egg production drops as egg defects increase.)
+Hemagglutination inhibition (HI) and ELISA are the most commonly used tests for detection of antibodies to EDSV. HI is more sensitive, however, making it the test of choice in unvaccinated flocks. Blood samples should be collected from birds that are producing affected eggs, as they have already seroconverted. Birds that are not yet producing affected eggs may indeed be infected, but they may not be producing antibodies yet. For example, flocks that contain birds that were infected with EDSV in ovo do not develop antibodies during the growing period. A negative serological test prior to or around 20 weeks of age does not guarantee freedom from infection.
+
+## INTERVENTION STRATEGIES
+
+## Prevention and Management
+
+Obtain replacement birds from uninfected
+flocks.
+Practice good cleaning and disinfection
+protocols, particularly concerning
+materials that contact eggs and common
+egg-packing stations.
+Do not reuse egg trays or share egg trays
+with other farms.
+Change needles frequently during
+vaccination and blood collection.
+Take precautions in the hatchery when
+dealing with infected and uninfected
+flocks to prevent lateral transmission.
+Minimal precautions would be to use
+separate setters and hatchers and to
+handle clean stock prior to handling
+infected chicks.
+Follow a biosecurity program, with
+emphasis on exclusion of waterfowl and
+wild birds as well as appropriate water
+sanitation.
+Endemic EDS can be controlled by
+vaccination using a commercially
+available inactivated vaccine administered
+intramuscularly between 14-18 weeks of
+age.
+Autogenous vaccines can be used where
+the commercial vaccine is not available to
+prevent additional spread.
+
+## Treatment
+
+There is no treatment for EDS.
+
+## SUMMARY
+
+Egg drop syndrome is a viral disease that results in decreased egg production in an otherwise healthy flock. The outbreaks can last from 4-10 weeks and can result in a 5-50% drop in egg production. Egg drop syndrome virus can be transmitted both vertically and horizontally. Eggs and equipment associated with egg collection, such as egg belts and egg trays, are considered major fomites for virus spread. Diagnosis of EDS can be accomplished by virus detection/isolation or serology. Effective commercial vaccines exist for prevention of EDS. Prevention and control of the disease as described are crucial, as there is no available treatment.
+
+!\[Image description\](Image of eggs on a conveyor belt.)
+*EDSV is spread by egg contents, contaminated egg belts and other egg collection equipment. Reuse of plastic egg trays is an important risk factor.*
+
+## REFERENCES
+
+McFerran, John B. and Adair, Brian M. Chapter 8: Adenovirus Infections. Diseases of Poultry. 13th Edition. Ames: Wiley-Blackwell, 2013. Print.
+Smyth, Joan A. and McNulty, M.S. Chapter 31: *Adenoviridae*. Poultry Diseases. 6th Edition. Philadelphia: Saunders Elsevier, 2008. Print.
+Smyth, Joan A. Merck Veterinary Manual. Overview of Egg Drop Syndrome '76 in Poultry. Retrieved from https://www.merckvetmanual.com/poultry/egg-drop-syndrome-76/overview-of-egg-drop-syndrome-76-in-poultry.
+Spickler, Anna R. 2017. Egg Drop Syndrome 1976. Retrieved from http://www.cfsph.iastate.edu/DiseaseInfo/factsheets.php.
+Hy-Line.

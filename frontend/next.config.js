@@ -17,11 +17,13 @@ const nextConfig = {
   // 🚀 Optimisations pour Digital Ocean
   compress: true,
   
-  // ⚡ Configuration expérimentale minimale
+  // ⚡ Configuration expérimentale - MISE À JOUR pour SSE
   experimental: {
     serverComponentsExternalPackages: [
       '@supabase/supabase-js'
-    ]
+    ],
+    // Support amélioré pour les API routes avec streaming
+    appDir: true,
   },
   
   // 🏷️ Build ID simple et prévisible
@@ -40,23 +42,33 @@ const nextConfig = {
     unoptimized: false, // Était: process.env.NODE_ENV === 'production'
   },
 
-  // 🌍 Variables d'environnement
+  // 🌐 Variables d'environnement - AJOUTS pour streaming
   env: {
     NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
     NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
+    // Nouvelles variables pour le streaming
+    NEXT_PUBLIC_CHAT_DEBUG_MODE: process.env.NEXT_PUBLIC_CHAT_DEBUG_MODE,
+    NEXT_PUBLIC_STREAM_TIMEOUT: process.env.NEXT_PUBLIC_STREAM_TIMEOUT,
+    NEXT_PUBLIC_FALLBACK_TO_LEGACY: process.env.NEXT_PUBLIC_FALLBACK_TO_LEGACY,
   },
 
-  // 📝 Configuration TypeScript
+  // 🔍 Configuration TypeScript
   typescript: {
     ignoreBuildErrors: false,
   },
 
-  // 📝 Configuration ESLint
+  // 🔍 Configuration ESLint
   eslint: {
     ignoreDuringBuilds: false,
   },
 
-  // 🔐 Headers de sécurité
+  // Configuration pour les timeouts de streaming - NOUVEAU
+  serverRuntimeConfig: {
+    // Timeout pour les API routes (30 secondes)
+    maxDuration: 30,
+  },
+
+  // 🔒 Headers de sécurité - MISE À JOUR pour SSE
   async headers() {
     return [
       {
@@ -94,9 +106,8 @@ const nextConfig = {
               "base-uri 'self'",
               "form-action 'self'",
               "frame-ancestors 'none'",
-              // 🔧 CORRECTION: Ajout de https://expert.intelia.com
-              "connect-src 'self' https://*.supabase.co https://expert.intelia.com https://salesiq.zohopublic.com https://*.zoho.com wss://*.zoho.com wss://vts.zohopublic.com wss://salesiq.zohopublic.com https://*.zohostatic.com https://restcountries.com"
-
+              // 🔧 MISE À JOUR: Ajout LLM backend pour streaming
+              "connect-src 'self' https://*.supabase.co https://expert.intelia.com https://llm.intelia.ai https://salesiq.zohopublic.com https://*.zoho.com wss://*.zoho.com wss://vts.zohopublic.com wss://salesiq.zohopublic.com https://*.zohostatic.com https://restcountries.com"
             ].join('; ')
           }
         ]
@@ -109,11 +120,41 @@ const nextConfig = {
             value: 'no-cache, no-store, must-revalidate'
           }
         ]
-      }
+      },
+      // NOUVEAU: Headers spéciaux pour le streaming SSE
+      {
+        source: '/api/chat/stream',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
+          },
+          {
+            key: 'Connection',
+            value: 'keep-alive',
+          },
+          {
+            key: 'Content-Type',
+            value: 'text/event-stream',
+          },
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
+          },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'POST, OPTIONS',
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'Content-Type',
+          },
+        ],
+      },
     ]
   },
 
-  // ⚙️ Configuration Webpack simplifiée et robuste
+  // ⚙️ Configuration Webpack simplifiée et robuste - MISE À JOUR pour SSE
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
     
     // 🛠 Mode développement
@@ -139,7 +180,7 @@ const nextConfig = {
       }
     }
     
-    // 🌐 Fallbacks pour le navigateur
+    // 🌐 Fallbacks pour le navigateur - MISE À JOUR pour streaming
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -147,7 +188,7 @@ const nextConfig = {
         net: false,
         tls: false,
         crypto: false,
-        stream: false,
+        stream: false, // Important pour SSE
         process: false,
         path: false,
         os: false,
@@ -159,7 +200,7 @@ const nextConfig = {
         https: false,
         zlib: false,
         assert: false,
-        buffer: false,
+        buffer: false, // Important pour SSE
         constants: false,
       }
     }
@@ -199,22 +240,48 @@ const nextConfig = {
     return []
   },
 
-  // ✨ Rewrites - NOUVEAU: Redirection API vers backend
+  // ✨ Rewrites - MISE À JOUR: Distinction entre API legacy et streaming
   async rewrites() {
     return [
+      // NOUVEAU: Route spéciale pour le streaming (pas de rewrite)
+      // /api/chat/stream reste en local pour gérer le proxy SSE
+      
+      // Routes API classiques vers le backend Digital Ocean
       {
-        source: '/api/:path*',
-        destination: 'https://expert-app-cngws.ondigitalocean.app/api/:path*'
+        source: '/api/expert/:path*',
+        destination: 'https://expert-app-cngws.ondigitalocean.app/api/expert/:path*'
+      },
+      {
+        source: '/api/conversations/:path*',
+        destination: 'https://expert-app-cngws.ondigitalocean.app/api/conversations/:path*'
+      },
+      {
+        source: '/api/system/:path*',
+        destination: 'https://expert-app-cngws.ondigitalocean.app/api/system/:path*'
+      },
+      {
+        source: '/api/stats-fast/:path*',
+        destination: 'https://expert-app-cngws.ondigitalocean.app/api/stats-fast/:path*'
+      },
+      // Fallback pour les autres routes API (sauf streaming)
+      {
+        source: '/api/((?!chat/stream).*)',
+        destination: 'https://expert-app-cngws.ondigitalocean.app/api/$1'
       }
     ]
   },
 }
 
-// 📊 Validation de la configuration
+// 📊 Validation de la configuration - MISE À JOUR
 console.log('🚀 Next.js config loaded for environment:', process.env.NODE_ENV)
 console.log('🔧 SWC compilation: enabled, Terser minification: enabled')
 console.log('🖼️ Image optimization:', nextConfig.images.unoptimized ? 'disabled' : 'enabled')
-console.log('🔐 CSP updated with expert.intelia.com support')
-console.log('🔄 API rewrites configured: /api/* → expert-app-cngws.ondigitalocean.app/api/*')
+console.log('🔒 CSP updated with expert.intelia.com + llm.intelia.ai support')
+console.log('📄 API rewrites configured:')
+console.log('   • /api/expert/* → expert-app-cngws.ondigitalocean.app/api/expert/*')
+console.log('   • /api/chat/stream → LOCAL (proxy SSE)')
+console.log('   • Other /api/* → expert-app-cngws.ondigitalocean.app/api/*')
+console.log('🔄 SSE streaming support: enabled')
+console.log('⏱️ API timeout: 30 seconds')
 
 module.exports = nextConfig

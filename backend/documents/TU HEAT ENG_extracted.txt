@@ -1,0 +1,240 @@
+## **Technical Update**
+
+## UNDERSTANDING HEAT STRESS IN LAYERS: Management Tips to Improve Hot Weather Flock Performance
+
+!\[Image description\](Hy-Line. logo)
+Periods of high environmental temperatures, often accompanied by high relative humidity, are common in the summer months. Heat stress can profoundly affect the productivity of a flock. At environmental temperatures above 33°C (91°F), high mortality and large production losses are readily evident, but at less extreme temperatures, heat stress is often overlooked as a cause for poor growth or subtle losses in egg production and shell quality.
+
+## THERMOREGULATION OF THE HEN
+
+Excess body heat is removed by four different mechanisms (see Figure 1).
+
+Convection
+*Body heat lost to cooler surrounding air.* Birds will increase
+exposed surface area by drooping and spreading wings.
+Convection is aided with air movement by creating a
+*wind chill effect*.
+Vasodilation – Blood-swollen wattles
+and comb bring internal body heat
+to the surface to be lost to the cooler
+surrounding air.
+Radiation
+*Electromagnetic waves transfer heat
+through the air to a distant object.* Body
+heat is radiated to cooler objects in the
+house (i.e. walls, ceiling, equipment).
+!\[Image description\](Diagram of a chicken with arrows indicating heat loss. The text 'Reduced Body Heat Production – Birds become inactive and listless, decreases feed consumption' is written next to the chicken.)
+Evaporative Cooling
+*Rapid, shallow, open-mouth
+breathing increases heat loss
+by increasing the evaporation
+of water from the mouth and
+respiratory tract.* Evaporative
+cooling is aided by lower
+air humidity.
+Conduction
+*Body heat loss to cooler
+objects in direct contact with
+the bird* (i.e. litter, slats, cage
+wire). Birds will seek cooler
+places in the house. Birds will
+lie on floor and dig into litter to
+find a cooler place.
+Figure 1. Heat loss mechanisms of the chicken.
+
+Radiation, convection and conduction together are called sensible heat loss. The thermoneutral zone of the chicken is generally between 18–25°C (64–77°F). Within this temperature range, sensible heat loss is adequate to maintain the bird's normal body temperature of 41°C (106°F).
+
+Above the thermoneutral zone, the efficiency of sensible heat loss mechanisms diminishes. At this point, the evaporation of water from the respiratory tract becomes the major heat loss mechanism of the bird. The evaporation of one gram of water dissipates 540 calories of body heat.
+
+At temperatures above the thermoneutral zone, the bird has to expend energy to maintain normal body temperature and metabolic activities. This diverts energy away from growth and egg production, resulting in performance loss.
+
+## EFFECTS OF HEAT STRESS
+
+|
+|
+| ✔Feed intake | ↑ Mortality (especially with acute heat stress) |
+| Egg production | ↑Cannibalism |
+| Egg weight | ↑ Immunosuppression |
+| ✔Shell quality | Hatchability |
+| ✔Albumen height | ✔Fertility in roosters |
+| ↓ Growth | |
+
+Production losses occurring from heat stress depend on:
+
+Maximum temperature to which the flock
+was exposed
+Duration of high temperatures
+Rate of temperature change
+Relative humidity of air
+
+## Technical Update – UNDERSTANDING HEAT STRESS IN LAYERS
+
+At high environmental temperatures, birds begin to have rapid, shallow, open-mouth breathing, called the gular reflex, to increase the evaporation of water from the respiratory tract. When panting fails to maintain body temperature, the bird becomes listless, then comatose and may die.
+
+Flocks not previously acclimated to high temperatures typically suffer the greatest loss in production and mortality. Young birds exposed to high environmental temperatures are more thermotolerant later in life, due to the production of heat shock proteins.
+
+## RELATIONSHIP OF ENVIRONMENTAL TEMPERATURE AND RELATIVE HUMIDITY
+
+Heat stress is the combined effect of temperature and relative humidity of air on the bird. This is known as the effective temperature. Increasing air humidity at any temperature will increase bird discomfort and heat stress. Producers should carefully monitor temperature and humidity at their location. Generally, during the daytime, the temperature increases and relative humidity decreases. The best method of cooling during periods of lower humidity is evaporative cooling (fogger, mister or cool pad).
+
+During the evening when temperature decreases and humidity typically increases, the added humidity provided by foggers may increase heat stress. When the humidity is high, increased air movement using fans alone will reduce heat stress in open houses. Air movement produces a wind chill effect, which is a perceived decrease in air temperature felt by the body due to the flow of air. A heat stress index table for commercial layers has been developed (Figure 2).
+
+| °F | °C | 5 | 10 | 15 | 20 | 25 | 30 | 35 | 40 | 45 | 50 | 55 | 60 | 65 | 70 | 75 | 80 | 85 | 90 | 95 | 100 |
+| -- | -- | - | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | --- |
+| 68 | 20 | 63 | 63 | 63 | 64 | 64 | 64 | 64 | 65 | 65 | 65 | 66 | 66 | 66 | 66 | 67 | 67 | 67 | 67 | 68 | 68 |
+| 72 | 22 | 64 | 65 | 65 | 66 | 66 | 66 | 67 | 67 | 67 | 68 | 68 | 69 | 69 | 69 | 70 | 70 | 70 | 71 | 71 | 72 |
+| 75 | 24 | 66 | 67 | 67 | 68 | 68 | 69 | 69 | 70 | 70 | 70 | 71 | 71 | 72 | 72 | 73 | 73 | 74 | 74 | 75 | 75 |
+| 79 | 26 | 68 | 69 | 69 | 70 | 70 | 71 | 71 | 72 | 73 | 73 | 74 | 74 | 75 | 75 | 76 | 77 | 77 | 78 | 78 | 79 |
+| 82 | 28 | 70 | 70 | 71 | 72 | 72 | 73 | 74 | 74 | 75 | 76 | 76 | 77 | 78 | 78 | 79 | 80 | 80 | 81 | | |
+| 86 | 30 | 71 | 72 | 73 | 74 | 74 | 75 | 76 | 77 | 78 | 78 | 79 | 80 | 81 | 81 | | | | | | |
+| 90 | 32 | 73 | 74 | 75 | 76 | 77 | 77 | 78 | 79 | 80 | 81 | | | | | | | | | | |
+| 93 | 34 | 75 | 76 | 77 | 78 | 79 | 80 | 81 | | | | | | | | | | | | | |
+| 97 | 36 | 77 | 78 | 79 | 80 | 81 | | | | | | | | | | | | | | | |
+| 100 | 38 | 78 | 79 | 81 | | | | | | | | | | | | | | | | | |
+
+Bird Comfort Zone (heat index \< 70): No action needed; a good time to prepare for future hot weather.
+
+Alert (heat index 70-75): Begin taking heat stress reduction measures in the flock; increase ventilation rate; increase fan speed and use foggers (run foggers based on relative humidity). Monitor bird behavior for signs of heat stress; ensure drinker and ventilation systems are functioning properly.
+
+Danger (heat index 76-81): Heat stress conditions exist; take immediate measures to reduce heat stress in the flock. Increase ventilation rate in closed houses and use evaporative cooling based on relative humidity; in open houses run stir fans and misters. Adjust nutrient density of bird's diet to match any reduction in feed consumption. Move air over the birds at a minimum velocity of 1.8-2.0 m/second (5.9-6.5 ft/second). Periodically flush water lines with cooler water. Closely monitor flock behavior. Maximize nighttime cooling.
+
+Emergency (heat index \> 81): Extreme heat stress conditions exist; avoid handling birds for transfer or vaccination. Do not feed during the hottest part of the day. Decrease light intensity to reduce bird activity and body heat production.
+
+*Figure 2.* Adapted from Temperature and Humidity Stress Index for Laying Hens. Xin, Hongwei and Harmon, Jay D., "Livestock Industry Facilities and Environment: Heat Stress Indices for Livestock" (1998) Agriculture and Environment Extension Publications. Book 163, Iowa State University.
+
+# THE EFFECT OF HEAT STRESS ON EGG SHELL QUALITY
+
+Heat-stressed laying flocks often lay eggs with thinner, weaker eggshells because of an acid/base disturbance occurring in the blood as a result of panting (hyperventilation, gular reflex). As birds hyperventilate to lose body heat, there is excessive loss of CO₂ gas from their lungs and blood. Lower CO₂ in blood causes blood pH to elevate or become more alkaline. This condition is called respiratory alkalosis. The higher blood pH reduces the activity of the enzyme carbonic anhydrase, resulting in reduced calcium and carbonate ions transferred from blood to the shell gland (uterus). Increasing the amount of calcium in the diet will not correct this problem. Another contributing factor to thin eggshells is reduced intake of calcium as feed consumption drops, and an increased loss of phosphorus.
+
+| Lungs | Blood | Shell gland |
+| ----- | ----- | ----------- |
+| ↑CO₂ + H₂O | H₂CO₃ HCO₃⁻ + H⁺ | CO₃⁻ + H⁺ |
+| | Protein-bound Non-diffusible calcium | Ionized diffusible calcium |
+| Hyperventilation causes increased loss of CO₂ gas from the lungs | Blood pH increases as a result, producing a respiratory alkalosis; this reduces the activity of carbonic anhydrase (an enzyme critical to form eggshell) | Reduced secretion of calcium and carbonate by the shell gland results in thin, weak eggshells |
+
+Figure 3. Demonstration of acid/base balance disruption caused by heat stress.
+
+## RESTORING THE ACID/BASE BALANCE
+
+Potassium chloride, ammonium chloride or sodium bicarbonate (2–3 kg/MT / 4.9-7.3 lb/US ton of feed) can replace electrolytes lost during heat stress and encourage consumption of water. These treatments have shown beneficial in reducing mortality in acutely heat-stressed flocks.
+
+## DRINKER SYSTEM MANAGEMENT OF THE HEAT-STRESSED FLOCK
+
+During periods of high environmental temperature, the flock has a high demand for drinking water. The water-to-feed consumption ratio is normally 2:1 at 21°C (70°F), but increases to 8:1 at 38°C (100°F).
+
+Drinking water must be available to heat-stressed flocks in the amount they require.
+Ensure that drinkers have sufficient water flow (\> 70 ml/minute/nipple drinker).
+Ensure that sufficient drinker space is being provided and drinkers are functioning properly.
+For floor-reared flocks, providing additional drinkers can help accommodate the increased water
+consumption.
+Cooler water will help reduce the birds' core temperature and thus reduce the impact of heat stress.
+Cooling drinking water by flushing water lines during the afternoon has been shown to increase feed
+consumption and sustain egg production in heat-stressed layers.
+Plastic water lines rapidly equilibrate with the environmental temperature, making it difficult to cool
+water temperature below the air temperature, particularly at the end of long water lines.
+Keeping water below 25°C (77°F) will help maintain higher water intakes and therefore encourage
+higher feed intake. Water temperature above 30°C (86°F) will negatively impact water intake and have
+further negative impact on feed intake.
+Use vitamin and electrolyte supplements in the drinking water to replenish the loss of sodium, chloride, potassium and bicarbonate in the urine. Electrolyte supplements are best used in anticipation of a rapid rise in environmental temperature.
+Drinking water from overhead water tanks can become hot if exposed to direct sunlight. These water tanks should be a light color, insulated and covered to avoid direct sunlight. Water tanks are ideally placed inside the house or underground (see Figure 12).
+
+## MANAGEMENT OF THE HEAT-STRESSED FLOCK
+
+Do not disturb the birds during the hottest time of the day (afternoon and early evening). Adjust work schedules and lighting programs so that routine work is done early in the morning or at night.
+Management practices that require bird handling, such as beak trimming, transfer and vaccinations (by eyedrop, wingweb or injection), should be done in the early morning hours.
+Use foggers and misters to increase the evaporative cooling during the day. Run the foggers for 2 minutes every 10 minutes. Fogger run times can be adjusted based on house temperature and humidity.
+Fogging the inlet air in negative pressure ventilation systems has a good cooling effect.
+Using roof sprinklers during times of extremely high temperature can remove heat from the roof and cool the inside of the house.
+Do not run the feeders during the hottest time of the day.
+Adjust fan thermostats so all fans run continuously during the night and early morning hours. The goal is to maximize nighttime cooling in the house to prolong the period of moderate temperatures the next morning.
+Increase the movement of air in open houses with stir fans. Ensure a minimum velocity of 1.8–2.0 meters/ second (5.9–6.6 ft/second) in the bird areas.
+Caged birds are more susceptible to heat stress because they are unable to seek a cooler place and there is less opportunity for conductive heat loss in cages. The temperature within a cage can be much higher than the measured air temperature in the walkway. Increased air velocity within the cages increases the convective heat loss and removes trapped air between birds.
+!\[Image description\](Figure 4. Stir fans and foggers increase air velocity within the house and create a cooling effect.)
+Do not overstock cages; overcrowded cages allow less air flow between birds, reducing the effectiveness of ventilation and increasing the heat load in the house.
+!\[Image description\](15 m (49 ft) between fans (92 cm/36 in diameter) 1 m (3 ft) between foggers
+Figure 5. Placement of stir fans and foggers in open houses.)
+Transport birds early in the morning or at night. Place fewer birds per transport crate and have empty crates on the truck to allow space for ventilation around the birds during the move.
+| AMBIENT TEMP. (°C) | Air Movement (m³ / hour per 1000 birds) - 1 week - W-36 | Air Movement (m³ / hour per 1000 birds) - 1 week - HLB | Air Movement (m³ / hour per 1000 birds) - 3 weeks - W-36 | Air Movement (m³ / hour per 1000 birds) - 3 weeks - HLB | Air Movement (m³ / hour per 1000 birds) - 6 weeks - W-36 | Air Movement (m³ / hour per 1000 birds) - 6 weeks - HLB | Air Movement (m³ / hour per 1000 birds) - 12 weeks - W-36 | Air Movement (m³ / hour per 1000 birds) - 12 weeks - HLB | Air Movement (m³ / hour per 1000 birds) - 18 weeks - W-36 | Air Movement (m³ / hour per 1000 birds) - 18 weeks - HLB | Air Movement (m³ / hour per 1000 birds) - 19+ weeks - W-36 | Air Movement (m³ / hour per 1000 birds) - 19+ weeks - HLB |
+| ------------------ | ------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------- |
+| 32 | 340 | 360 | 510 | 540 | 1020 | 1250 | 2550 | 3000 | 5950 | 7140 | 4650-9350 | 9340-12000 |
+| 21 | 170 | 180 | 255 | 270 | 510 | 630 | 1275 | 1500 | 2550 | 3050 | 4250-5100 | 5100-6800 |
+| 10 | 120 | 130 | 170 | 180 | 340 | 420 | 680 | 800 | 1870 | 2240 | 2550-3400 | 3060-4250 |
+
+| AMBIENT TEMP. (°F) | Air Movement (ft³ / minute per 1000 birds) - 1 week - W-36 | Air Movement (ft³ / minute per 1000 birds) - 1 week - HLB | Air Movement (ft³ / minute per 1000 birds) - 3 weeks - W-36 | Air Movement (ft³ / minute per 1000 birds) - 3 weeks - HLB | Air Movement (ft³ / minute per 1000 birds) - 6 weeks - W-36 | Air Movement (ft³ / minute per 1000 birds) - 6 weeks - HLB | Air Movement (ft³ / minute per 1000 birds) - 12 weeks - W-36 | Air Movement (ft³ / minute per 1000 birds) - 12 weeks - HLB | Air Movement (ft³ / minute per 1000 birds) - 18 weeks - W-36 | Air Movement (ft³ / minute per 1000 birds) - 18 weeks - HLB | Air Movement (ft³ / minute per 1000 birds) - 19+ weeks - W-36 | Air Movement (ft³ / minute per 1000 birds) - 19+ weeks - HLB |
+| ------------------ | ---------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------ |
+| 90 | 200 | 210 | 300 | 320 | 600 | 740 | 1500 | 1755 | 3500 | 4200 | 4500-1500 | 5500-7000 |
+| 70 | 100 | 110 | 150 | 160 | 300 | 370 | 750 | 880 | 1500 | 1800 | 2500-3000 | 3000-4000 |
+| 50 | 70 | 75 | 100 | 110 | 200 | 245 | 400 | 470 | 1100 | 1320 | 1500-2000 | 1800-2500 |
+
+Figure 6. Recommended ventilation rates for commercial layers (W-36 and Hy-Line Brown). For more information, see *Hy-Line International Management Guides*. Acknowledgment: Dr. Hongwei Xin, Professor, Department of Agriculture and Biosystems Engineering and Department of Animal Science, lowa State University, Ames, Iowa, USA.
+
+## LIGHTING PROGRAMS FOR HEAT-STRESSED FLOCKS
+
+Adjust the lighting program to provide more morning light hours (and fewer afternoon light hours) to encourage feed consumption during the cooler period of the day.
+Use a midnight feeding of 1-2 hours to provide an additional feeding during the cool of the night to encourage feed intake during hot weather. (For more information on midnight feeding, see Hy- Line International Management Guides.)
+In extreme heat stress, lower the intensity of light during the hottest time of the day to reduce bird activity.
+Intermittent lighting programs have also been used successfully in heat stress conditions to encourage feed intake.
+
+## NUTRITIONAL MANAGEMENT OF THE HEAT-STRESSED FLOCK
+
+Closely monitor the feed consumption of the flock during hot weather. It is important to rebalance the diet for other critical nutrients, particularly amino acids, calcium, sodium and phosphorous according to the birds' productivity demand (i.e. stage of production) and the observed feed intake. Insufficient amino acid intake is the primary reason for productivity loss during hot weather.
+
+Several strategies may be employed to help to manage elevated temperatures and maintain higher levels of feed intake.
+
+Avoid feeding times during hot periods of the day and encourage as much consumption as possible in the early morning or evening.
+Normally a maximum 1 hour for feeder clean-out time is recommended, but this can be extended to 3 hours when the temperature exceeds 36°C (97°F).
+Consider adding a 1- to 2-hour midnight feeding.
+Alter feed particle size, either by increasing it or by feeding a crumble diet. With crumble diets in laying flocks, a supplementary source or presentation of large particle limestone is recommended.
+When formulating the diet for hot weather conditions, there are several things to consider:
+
+Formulate diets using highly digestible materials, particularly protein sources. Metabolism of excess protein is particularly heat-loading on the bird and exacerbates the ionic misbalance. Formulate to digestible amino acid targets and do not apply a high crude protein minimum in the formula. Synthetic amino acids can reduce crude protein in the diet without limiting amino acid levels.
+Increasing the proportion of energy contribution from highly digestible lipid, rather than starches or proteins, will reduce the body heat production resulting from digestion. This is known as heat increment and is lowest with the digestion of dietary fat.
+The phosphorous requirement increases during heat stress due to increased urinary excretion. Increases of up to 5% should be appropriate under heat stress conditions.
+The ratio of chloride to sodium in the diet should be between 1:1 and 1.1:1 in hot weather conditions, with a target dietary electrolyte balance (molar equivalence of Na+ + K+ – Cl-) of about 250 mEq/kg (550 mEq/lb). Due to elevated electrolyte loss in hot weather, higher sodium levels may be required (0.02–0.03% more than in non-heat stress conditions). Care should also be given that water is not providing a significant level of chloride to the birds.
+Due to the reduced feed intake, vitamin and trace mineral intake is also reduced. Many of these micro nutrients, particularly B vitamins and antioxidants, may be beneficial to the bird in heat stress conditions. Vitamin C at 200-300 mg/kg (440-660 mg/lb) of diet can be added to the diet to improve performance.
+Organic zinc may improve shell quality by assisting the activity of the carbonic anhydrase enzyme, as zinc is a key mineral element of this critical enzyme.
+Organic copper may also be helpful, by reducing the negative antagonism between inorganic copper and zinc sources during digestion.
+Do not use nicarbazin (anticoccidial drug) during hot weather, as it can increase heat stress-induced mortality.
+
+## VACCINATION CONSIDERATIONS DURING HEAT STRESS
+
+Adjust the amount of medications and volumes of water used for water vaccination to reflect the increased water consumption of the flock during hot weather.
+Water vaccinations during hot weather should ideally be administered within one hour.
+Use caution when spray vaccinating during hot weather. Newcastle and bronchitis vaccine reactions can occur in birds hyperventilating because of heat stress.
+Use caution when water vaccinating a flock during hot weather. Do not withhold drinking water from the flocks during hot weather. It is best to water vaccinate flocks just after the lights come on in the morning.
+Postpone vaccinations during periods of heat stress whenever possible. Heat-stressed birds have decreased immune function and may not respond as well to vaccination.
+Live vaccines are subject to accelerated deterioration when exposed to high heat. Maintain the refrigeration of live vaccines until the vaccines are administered. Bronchitis and AE vaccines are particularly heat-sensitive and titers can be lost rapidly.
+!\[Image description\](Diagram of an open roof design for reducing heat stress. The diagram shows the structure of a house with features like an open roof ridge, roof insulation, window shades, foggers, and stir fans. Arrows indicate air flow. The text labels describe the function of each feature, such as removing manure to improve ventilation and reduce heat source, orienting the house to minimize solar heating, and using a sufficient roof overhang to keep direct sunlight from hitting birds.)
+
+## Figure 7. Open house design for reducing heat stress.
+
+## HOUSING CONSIDERATIONS DURING HEAT STRESS
+
+The ventilation system should be checked to insure efficient operation prior to the arrival of the hot season.
+
+Clean and ensure function of fan louvers. Fan belts should be tightened or changed to avoid slipping or breaking during periods of high temperature. Air inlets must be adequate to supply the airflow needed to ventilate the house during warm weather. Inadequate inlet space will throttle down the fans and decrease airflow. Inlets should be kept clean and free of anything that might restrict the flow of incoming air. Use baffle boards to direct incoming air onto the birds.
+Thermostats should be checked for accuracy. An auxiliary power system must be in place in case of a power outage during hot weather.
+Check house static pressure settings in negative and positive pressure ventilation systems to ensure adequate and uniform airflow (12.5–30 Pa or 0.05–0.12 in. water).
+In houses equipped with evaporative cooling systems, the pads should be cleaned or replaced when they become clogged. Water flow over the pads should be uniform with no dry areas. Air will flow preferentially through dry areas since there is less resistance.
+Check the water filters and change if necessary. A clogged water filter restricts the flow of fresh drinking water into the house.
+!\[Image description\](Figure 8. Photograph of a roof constructed using thatching material (paddy straw, corn stalks, sugarcane tops) to reduce solar heating of the roof.)
+!\[Image description\](Figure 9. Photograph of porous window shades blocking direct sunlight from entering the house, but allowing air to pass through.)
+Clean spider webs and dust from window screens frequently to improve ventilation inside the house.
+*Figure 10.* Sunlight should not shine directly on birds. Use sufficient roof overhangs or window shades to block sunlight.
+
+*Figure 11.* Manure allowed to accumulate reduces ventilation in cages.
+
+Remove manure from the house before the hot season, if practical. Heat produced during the decomposition of manure contributes to the heat load in the house. The presence of large amounts of manure in shallow pit houses or under cage batteries restricts the movement of air.
+Environmentally controlled houses and curtain- sided houses that can convert to tunnel ventilation are ideal in areas subject to high environmental temperatures. Open houses should utilize stir fans and fogging systems.
+!\[Image description\](Clock diagram showing management schedule during times of heat stress, with markings for 'Provide Feed', 'Drinking Water Flush', and 'Midnight Lighting'.)
+*Figure 12.* Having the water tank inside the house keeps the water cooler.
+
+Insulated roofs reduce the radiation and conduction of solar heat through the roof to the interior of the house.
+Ensure the water system can accommodate the water demands for foggers and evaporative cooling systems, and increased bird water consumption. **The availability of drinking water to a heat-stressed flock should never be compromised.**
+*Figure 13.* Management schedule during times of heat stress.
+
+Remove unneeded metal objects from around houses (i.e., machinery, vehicles, nest boxes, junk) that could radiate heat into open houses.
+The key to minimizing the effects of heat stress is *anticipating* periods of high environmental temperatures, and implementing appropriate *management* and *nutritional* measures prior to the rise in temperatures.
+
+!\[Image description\](Hy-Line logo.)
+Hy-Line International | www.hyline.com
