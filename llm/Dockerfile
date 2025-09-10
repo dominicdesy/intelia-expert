@@ -1,4 +1,7 @@
+#
 # Intelia LLM backend (FastAPI) — Dockerfile
+#
+
 FROM python:3.11-slim
 
 # Sécurité/perf de base

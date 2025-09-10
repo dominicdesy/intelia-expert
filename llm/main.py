@@ -1,5 +1,8 @@
+#
 # main.py — Intelia LLM backend (FastAPI + SSE)
+#
 # Python 3.11+
+#
 
 import os
 import json
