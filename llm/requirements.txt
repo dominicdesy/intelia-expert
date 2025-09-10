@@ -2,5 +2,7 @@ fastapi==0.112.2
 uvicorn[standard]==0.30.6
 python-dotenv==1.0.1
 openai==1.107.0
+langdetect==1.0.9
+
 
 
