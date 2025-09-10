@@ -813,8 +813,10 @@ async def chat_stream(request: Request):
                 if HYBRID_MODE and allow_fallback:
                     async for sse in stream_fallback_general(_client, message, message):
                         yield sse
-                    # Après le fallback, proposer un Smart Follow-up si une intention a été détectée
-                    if intent_id in INTENT_DEFS and confidence >= 0.55:
+                    # --- Smart Follow-up contextuel ---
+                    if followup_hint:
+                        yield send_event({"type":"followup","answer": followup_hint})
+                    elif intent_id in INTENT_DEFS and confidence >= 0.55:
                         fup = await generate_followup_suggestion(_client, intent_id, message, "")
                         if fup:
                             yield send_event({"type": "followup", "answer": fup})
@@ -831,8 +833,10 @@ async def chat_stream(request: Request):
                 
             yield send_event({"type": "final", "answer": text})
             
-            # Après le message final, proposer un Smart Follow-up si une intention a été détectée
-            if intent_id in INTENT_DEFS and confidence >= 0.55:
+            # --- Smart Follow-up contextuel ---
+            if followup_hint:
+                yield send_event({"type":"followup","answer": followup_hint})
+            elif intent_id in INTENT_DEFS and confidence >= 0.55:
                 fup = await generate_followup_suggestion(_client, intent_id, message, text[:200])
                 if fup:
                     yield send_event({"type": "followup", "answer": fup})
