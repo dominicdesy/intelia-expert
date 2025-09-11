@@ -11,6 +11,7 @@ import asyncio
 import time
 import logging
 import uuid
+import urllib.parse
 from typing import Any, Dict, AsyncGenerator, Optional
 
 from fastapi import FastAPI, APIRouter, Request, HTTPException
@@ -240,7 +241,7 @@ def clean_text(txt: str) -> str:
     return cleaned.strip()
 
 # -----------------------------------------------------------------------------
-# Proactive Followup System
+# Proactive Followup System - VERSION CORRIGÉE
 # -----------------------------------------------------------------------------
 
 def extract_intent_from_question(question: str) -> dict:
@@ -248,61 +249,141 @@ def extract_intent_from_question(question: str) -> dict:
     question_lower = question.lower()
     
     detected_metric = None
-    if any(word in question_lower for word in ['poids', 'weight', 'gramme', 'kg']):
-        if any(word in question_lower for word in ['cible', 'target', 'objectif']):
-            detected_metric = "body_weight_target"
-    elif any(word in question_lower for word in ['fcr', 'conversion']):
-        detected_metric = "fcr_target"
-    elif any(word in question_lower for word in ['eau', 'water']):
-        detected_metric = "water_intake_daily"
-    elif any(word in question_lower for word in ['aliment', 'feed']):
-        detected_metric = "feed_intake_daily"
-    elif any(word in question_lower for word in ['température', 'temperature']):
-        detected_metric = "ambient_temp_target"
-    elif any(word in question_lower for word in ['coût', 'cost']):
-        detected_metric = "feed_cost_per_bird"
-    
-    # Extraction de la lignée
     detected_line = None
-    aliases = INTENTS_CONFIG.get("aliases", {}).get("line", {})
-    for canonical_line, alias_list in aliases.items():
-        if canonical_line in question_lower:
-            detected_line = canonical_line
-            break
-        for alias in alias_list:
-            if alias.lower() in question_lower:
+    has_specific_context = False
+    
+    # Détection de métriques (plus permissive)
+    if any(word in question_lower for word in ['poids', 'weight', 'gramme', 'kg', 'g']):
+        detected_metric = "body_weight_target"
+        has_specific_context = True
+    elif any(word in question_lower for word in ['fcr', 'conversion', 'indice']):
+        detected_metric = "fcr_target"
+        has_specific_context = True
+    elif any(word in question_lower for word in ['eau', 'water', 'abreuv']):
+        detected_metric = "water_intake_daily"
+        has_specific_context = True
+    elif any(word in question_lower for word in ['aliment', 'feed', 'consommation']):
+        detected_metric = "feed_intake_daily"
+        has_specific_context = True
+    elif any(word in question_lower for word in ['température', 'temperature', 'temp', 'climat']):
+        detected_metric = "ambient_temp_target"
+        has_specific_context = True
+    elif any(word in question_lower for word in ['coût', 'cost', 'prix', 'économ']):
+        detected_metric = "feed_cost_per_bird"
+        has_specific_context = True
+    
+    # Détection de lignées (élargie)
+    line_patterns = {
+        'ross': ['ross', 'ross 308', 'ross308'],
+        'cobb': ['cobb', 'cobb 500', 'cobb500'],
+        'hubbard': ['hubbard'],
+        'arbor': ['arbor'],
+        'isa': ['isa', 'isa brown'],
+        'lohmann': ['lohmann'],
+        'novogen': ['novogen']
+    }
+    
+    for canonical_line, patterns in line_patterns.items():
+        for pattern in patterns:
+            if pattern in question_lower:
                 detected_line = canonical_line
+                has_specific_context = True
                 break
         if detected_line:
             break
     
+    # Détection d'âge (nouveau)
+    age_detected = bool(re.search(r'\b\d+\s*(jour|day|semaine|week|j|sem)\b', question_lower))
+    if age_detected:
+        has_specific_context = True
+    
+    # Détection de nombres spécifiques (nouveau)
+    numbers_detected = bool(re.search(r'\b\d+\b', question_lower))
+    if numbers_detected:
+        has_specific_context = True
+    
     return {
         "metric": detected_metric,
         "line": detected_line,
-        "has_specific_context": detected_metric is not None or detected_line is not None
+        "has_age": age_detected,
+        "has_numbers": numbers_detected,
+        "has_specific_context": has_specific_context
     }
 
 def should_generate_proactive_followup(question: str, answer: str, intent_data: dict) -> bool:
-    """Détermine si une relance proactive doit être générée"""
-    if len(answer) < 50 or "désolé" in answer.lower():
+    """Détermine si une relance proactive doit être générée - VERSION PLUS PERMISSIVE"""
+    
+    # Conditions d'exclusion (plus restrictives)
+    if len(answer) < 30:  # Réponse trop courte
         return False
-    if any(word in question.lower() for word in ['pourquoi', 'comment']):
+    if any(word in answer.lower() for word in ['désolé', 'ne sais pas', 'erreur', 'impossible']):
         return False
-    return intent_data.get("has_specific_context", False)
+    if any(word in question.lower() for word in ['pourquoi', 'comment', 'expliquer']):  # Questions déjà détaillées
+        return False
+    
+    # Conditions d'inclusion (plus permissives)
+    if intent_data.get("has_specific_context", False):
+        return True
+    if intent_data.get("metric") is not None:
+        return True
+    if intent_data.get("line") is not None:
+        return True
+    if intent_data.get("has_age", False):
+        return True
+    
+    # Fallback: questions techniques probables
+    technical_indicators = ['poids', 'consommation', 'température', 'mortalité', 'production']
+    if any(indicator in question.lower() for indicator in technical_indicators):
+        return True
+    
+    return False
 
 def generate_proactive_followup(question: str, answer: str, lang: str = "fr") -> Optional[str]:
-    """Génère une relance proactive contextuelle"""
+    """Génère une relance proactive contextuelle - VERSION AMÉLIORÉE"""
     try:
         intent_data = extract_intent_from_question(question)
+        
         if not should_generate_proactive_followup(question, answer, intent_data):
             return None
+        
+        # Template par métrique détectée
         detected_metric = intent_data.get("metric")
         if detected_metric and detected_metric in METRIC_FOLLOWUP_TEMPLATES:
             return METRIC_FOLLOWUP_TEMPLATES[detected_metric]
-        return None
+        
+        # Templates génériques par contexte
+        if intent_data.get("line"):
+            return "Voulez-vous que je compare ces données avec d'autres lignées ou que j'analyse l'évolution dans le temps ?"
+        
+        if intent_data.get("has_age"):
+            return "Souhaitez-vous connaître l'évolution de cette métrique sur d'autres âges, ou les objectifs cibles pour cette période ?"
+        
+        # Template générique pour questions techniques
+        return "Avez-vous besoin d'informations complémentaires sur ce sujet, ou souhaitez-vous analyser d'autres paramètres liés ?"
+        
     except Exception as e:
         logger.error(f"Erreur génération relance proactive: {e}")
         return None
+
+# -----------------------------------------------------------------------------
+# Debug helpers pour tester la détection
+# -----------------------------------------------------------------------------
+
+def debug_intent_detection(question: str) -> dict:
+    """Helper pour débugger la détection d'intentions"""
+    intent_data = extract_intent_from_question(question)
+    
+    debug_info = {
+        "question": question,
+        "intent_data": intent_data,
+        "would_generate_followup": should_generate_proactive_followup(
+            question, 
+            "Réponse de test suffisamment longue pour passer le filtre de longueur.", 
+            intent_data
+        )
+    }
+    
+    return debug_info
 
 # -----------------------------------------------------------------------------
 # Conversation Memory
@@ -515,6 +596,71 @@ def health():
         "conversation_memory": memory_stats,
         "max_memory_items": MAX_MEMORY_ITEMS
     }
+
+@router.get("/debug/intent/{question}")
+def debug_intent_endpoint(question: str):
+    """Endpoint pour tester la détection d'intentions"""
+    try:
+        # Décoder l'URL
+        decoded_question = urllib.parse.unquote(question)
+        
+        # Analyser la question
+        intent_data = extract_intent_from_question(decoded_question)
+        
+        # Simuler une réponse
+        mock_answer = "Le poids d'un poulet Ross 308 à 19 jours est d'environ 860 grammes."
+        
+        # Tester la génération de relance
+        should_generate = should_generate_proactive_followup(decoded_question, mock_answer, intent_data)
+        followup = None
+        if should_generate:
+            followup = generate_proactive_followup(decoded_question, mock_answer, "fr")
+        
+        return {
+            "question": decoded_question,
+            "intent_data": intent_data,
+            "should_generate_followup": should_generate,
+            "proactive_followup": followup,
+            "mock_answer_length": len(mock_answer),
+            "debug_notes": {
+                "metric_templates_count": len(METRIC_FOLLOWUP_TEMPLATES),
+                "intents_config_loaded": bool(INTENTS_CONFIG)
+            }
+        }
+    except Exception as e:
+        return {"error": str(e), "question": question}
+
+@router.post("/debug/test-followup")
+async def test_followup_endpoint(request: Request):
+    """Endpoint pour tester le système de relances avec une vraie question/réponse"""
+    try:
+        payload = await request.json()
+        question = payload.get("question", "")
+        answer = payload.get("answer", "")
+        lang = payload.get("lang", "fr")
+        
+        if not question or not answer:
+            raise HTTPException(status_code=400, detail="question and answer required")
+        
+        intent_data = extract_intent_from_question(question)
+        should_generate = should_generate_proactive_followup(question, answer, intent_data)
+        followup = None
+        
+        if should_generate:
+            followup = generate_proactive_followup(question, answer, lang)
+        
+        return {
+            "question": question,
+            "answer": answer[:100] + "..." if len(answer) > 100 else answer,
+            "intent_data": intent_data,
+            "should_generate_followup": should_generate,
+            "proactive_followup": followup,
+            "answer_length": len(answer)
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur test followup: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/chat/stream")
 async def chat_stream(request: Request):
