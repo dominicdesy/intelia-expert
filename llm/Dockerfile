@@ -1,32 +1,11 @@
-#
-# Intelia LLM backend (FastAPI) — Dockerfile
-#
-
 FROM python:3.11-slim
-
-# Sécurité/perf de base
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
-
 WORKDIR /app
-
-# Dépendances système minimales (si besoin d'OCR/pdf, on les ajoutera plus tard)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl && \
-    rm -rf /var/lib/apt/lists/*
-
-# Dépendances Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Code et fichiers de configuration
-COPY . .
-
-# Ou spécifiquement les fichiers nécessaires :
-# COPY main.py languages.json ./
-
-# Port par convention (DO injectera $PORT)
+COPY . .   # ← depuis le contexte ./llm, cela place main.py + intents.json + languages.json dans /app
+ENV BASE_PATH=/llm
+# facultatif mais explicite :
+ENV LANGUAGE_FILE=/app/languages.json
+ENV INTENTS_FILE=/app/intents.json
 EXPOSE 8080
-
-# Commande de lancement (App Platform passe $PORT automatiquement)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn","main:app","--host","0.0.0.0","--port","8080"]

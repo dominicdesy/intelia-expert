@@ -1,0 +1,96 @@
+{
+  "version": "1.0",
+  "aliases": {
+    "line": {
+      "ross 308": ["ross308", "ross-308", "r308", "ross"],
+      "cobb 500": ["cobb500", "cobb-500", "c500", "cobb"],
+      "isa brown": ["isa", "isa-brown"],
+      "lohmann brown": ["lohmann", "lohmann-brown", "lb"],
+      "hy-line brown": ["hyline", "hy-line", "hyline-brown"]
+    },
+    "phase": {
+      "starter": ["demarrage", "démarrage", "start", "0-10 jours", "0-10d"],
+      "grower": ["croissance", "grow", "11-28 jours", "11-28d"],
+      "finisher": ["finition", "finish", "29-42 jours", "29-42d"]
+    }
+  },
+  "defaults_by_topic": {
+    "temperature": "broiler_farm",
+    "water": "broiler_farm",
+    "feed": "feed_mill",
+    "mortality": "broiler_farm",
+    "biosecurity": "hatchery",
+    "vaccination": "hatchery",
+    "lighting": "broiler_farm",
+    "ventilation": "broiler_farm",
+    "performance": "broiler_farm",
+    "conversion": "broiler_farm",
+    "economics": "broiler_farm"
+  },
+  "universal_slots": {
+    "site_type": { "enum": ["broiler_farm","layer_farm","rearing_farm","breeding_farm","hatchery","feed_mill"] },
+    "bird_type": { "enum": ["broiler","layer","breeder","pullet","chick"] },
+    "sex":       { "enum": ["male","female"], "optional": true },
+    "line":      { "enum": ["ross 308","cobb 500","isa brown","lohmann brown","hy-line brown"] },
+    "age_days":  { "type": "int", "min": 0, "max": 120 },
+    "age_weeks": { "type": "int", "min": 0, "max": 120 },
+    "phase":     { "enum": ["starter","grower","finisher"], "optional": true },
+    "environment": { "enum": ["tunnel","natural","mechanical"], "optional": true },
+    "season":    { "enum": ["winter","spring","summer","autumn"], "optional": true },
+    "flock_size":{ "type": "int", "min": 1, "optional": true }
+  },
+  "intents": {
+    "metric_query": {
+      "required": ["site_type","bird_type","line","metric"],
+      "at_least_one_of": [["age_days","age_weeks","phase"]],
+      "optional": ["sex","flock_size","environment","season"],
+      "metrics": {
+        "body_weight_target":    { "requires_one_of": [["age_days","age_weeks"]], "unit": "g" },
+        "daily_gain":            { "requires_one_of": [["age_days","age_weeks"]], "unit": "g/day" },
+        "fcr_target":            { "requires_one_of": [["age_days","phase"]] },
+        "water_intake_daily":    { "requires_one_of": [["age_days","age_weeks"]], "optional": ["flock_size"], "unit": "L" },
+        "feed_intake_daily":     { "requires_one_of": [["age_days","age_weeks"]], "unit": "g" },
+        "energy_density_kcalkg": { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "kcal/kg" },
+        "feeder_space_cm":       { "requires_one_of": [["age_days","age_weeks"]], "unit": "cm/bird" },
+        "ambient_temp_target":   { "requires_one_of": [["age_days","age_weeks","phase"]] },
+        "humidity_target":       { "requires_one_of": [["age_days","age_weeks"]] },
+        "lighting_hours":        { "requires_one_of": [["age_days","age_weeks","phase"]], "unit": "h/day" },
+
+        "egg_production_pct":    { "requires": ["age_weeks"], "unit": "%" },
+        "hen_daily_feed":        { "requires": ["age_weeks"], "unit": "g/hen/day" },
+        "pullet_weight_target":  { "requires": ["age_weeks"], "unit": "g" },
+        "egg_weight_target":     { "requires": ["age_weeks"], "unit": "g" },
+        "calcium_pct":           { "requires_one_of": [["phase","age_weeks"]], "unit": "%" }
+      }
+    },
+    "environment_setting": {
+      "required": ["site_type","bird_type","line","metric"],
+      "at_least_one_of": [["age_days","age_weeks","phase"]],
+      "optional": ["season","environment","flock_size"],
+      "metrics": {
+        "min_ventilation_rate": { "requires_one_of": [["age_days","age_weeks"]], "unit": "m3/h/kg" },
+        "air_speed_tunnel":     { "requires_one_of": [["age_days","age_weeks"]], "unit": "m/s" },
+        "nh3_max_ppm":          { "unit": "ppm" },
+        "co2_max_ppm":          { "unit": "ppm" },
+        "ambient_temp_target":  { "requires_one_of": [["age_days","age_weeks","phase"]], "unit": "°C" }
+      }
+    },
+    "protocol_query": {
+      "required": ["site_type","bird_type","line","protocol_type"],
+      "optional": ["pathogen","age_weeks","age_days","weight_kg","drug"],
+      "protocol_type": ["vaccination","biosecurity","treatment","lab_diagnostics"]
+    },
+    "diagnosis_triage": {
+      "required": ["site_type","bird_type","line","age_days|age_weeks","signs"],
+      "optional": ["onset","morbid_rate","mortality_rate"]
+    },
+    "economics_cost": {
+      "required": ["site_type","bird_type","line","metric","age_days|age_weeks"],
+      "optional": ["region","feed_price","energy_price"],
+      "metrics": {
+        "feed_cost_per_bird": {},
+        "heating_cost_start": {}
+      }
+    }
+  }
+}

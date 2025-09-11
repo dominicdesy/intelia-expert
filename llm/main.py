@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# main.py — Intelia LLM backend (FastAPI + SSE)
+# main.py – Intelia LLM backend (FastAPI + SSE)
 # Python 3.11+
 #
 
@@ -31,7 +31,7 @@ DetectorFactory.seed = 0
 load_dotenv()
 
 # -----------------------------------------------------------------------------
-# Intent definitions (sex optionnel pour broiler_weight)
+# Intent definitions (garde ce bloc si tu veux une sauvegarde locale)
 # -----------------------------------------------------------------------------
 INTENT_DEFS = {
     "broiler_weight": {
@@ -94,21 +94,35 @@ DEBUG_GUARD = os.getenv("DEBUG_GUARD", "0") == "1"
 HYBRID_MODE = os.getenv("HYBRID_MODE", "1") == "1"
 FALLBACK_MODEL = os.getenv("FALLBACK_MODEL", "gpt-5")
 
-# Par défaut = 1.0 (certains modèles n’acceptent QUE la valeur par défaut)
+# Par défaut = 1.0 (certains modèles n'acceptent QUE la valeur par défaut)
 FALLBACK_TEMPERATURE = float(os.getenv("FALLBACK_TEMPERATURE", "1.0"))
 
-# Alias rétro-compat : accepte l’ancienne variable si la nouvelle n’est pas fournie
+# Alias rétro-compat : accepte l'ancienne variable si la nouvelle n'est pas fournie
 FALLBACK_MAX_COMPLETION_TOKENS = int(
     os.getenv("FALLBACK_MAX_COMPLETION_TOKENS", os.getenv("FALLBACK_MAX_TOKENS", "600"))
 )
 
-FRONTEND_SSE_COMPAT = os.getenv("FRONTEND_SSE_COMPAT", "1") == "1"
+FRONTEND_SSE_COMPAT = os.getenv("FRONTEND_SSE_COMPAT", "0") == "1"
 LANGUAGE_FILE = os.getenv("LANGUAGE_FILE", os.path.join(BASE_DIR, "languages.json"))
+
+# 1) Ajouter après les constantes de fichiers (près de LANGUAGE_FILE)
+INTENTS_FILE = os.getenv("INTENTS_FILE", os.path.join(BASE_DIR, "intents.json"))
 
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY is required")
 if not ASSISTANT_ID:
     raise RuntimeError("ASSISTANT_ID is required")
+
+# -----------------------------------------------------------------------------
+# 2) Ajouter un petit loader générique (près du loader languages.json)
+# -----------------------------------------------------------------------------
+def load_json(path: str, fallback):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Unable to load {path}: {e}")
+        return fallback
 
 # -----------------------------------------------------------------------------
 # Load messages (languages.json)
@@ -136,6 +150,13 @@ def _load_language_messages(path: str) -> Dict[str, str]:
         }
 
 OUT_OF_DOMAIN_MESSAGES = _load_language_messages(LANGUAGE_FILE)
+
+# 3) Charger la config si présente
+INTENTS = load_json(INTENTS_FILE, {})
+
+# Modification 5 : Logs de démarrage (diagnostic déploiement)
+logger.info(f"LANGUAGE_FILE={LANGUAGE_FILE} exists={os.path.exists(LANGUAGE_FILE)}")
+logger.info(f"INTENTS_FILE={INTENTS_FILE} exists={os.path.exists(INTENTS_FILE)}")
 
 def get_out_of_domain_message(lang: str) -> str:
     if not lang:
@@ -185,7 +206,7 @@ def send_event(obj: Dict[str, Any]) -> bytes:
     if "type" not in obj:
         obj = {"type": "final", "answer": "Désolé, une erreur de format interne est survenue."}
     if obj.get("type") == "final" and not obj.get("answer"):
-        obj["answer"] = "Désolé, aucune réponse n’a pu être générée."
+        obj["answer"] = "Désolé, aucune réponse n'a pu être générée."
 
     # Compat front : clarifications/suivis convertis si nécessaire
     etype = obj.get("type")
@@ -358,7 +379,7 @@ def gpt_route_and_extract(client: OpenAI, text: str, lang: str) -> dict:
 }}
 Règles :
 - line = 'ross 308' ou 'cobb 500' (si 'ross' ou 'cobb' seul => null)
-- age_days entier 0..70
+- age_days entier 0..120
 - sex optionnel
 - Réponds uniquement en JSON
 """
@@ -395,10 +416,11 @@ Règles :
         slots = data.get("slots", {}) if isinstance(data, dict) else {}
         if "line" in slots and slots["line"] in ["ross", "cobb"]:
             slots["line"] = None
+        # Modification 4 : Étendue d'âge des broilers (0..120 au lieu de 0..70)
         if "age_days" in slots:
             try:
                 age = int(slots["age_days"])
-                slots["age_days"] = age if 0 <= age <= 70 else None
+                slots["age_days"] = age if 0 <= age <= 120 else None
             except Exception:
                 slots["age_days"] = None
         return {
@@ -412,10 +434,14 @@ Règles :
         return {"intent_id": None, "confidence": 0.0, "slots": {}, "need_clarification": False}
 
 async def gpt_decide_answer_or_clarify(client: OpenAI, lang: str, intent_id: str, slots: Dict, user_text: str) -> Dict[str, Any]:
-    intent_desc = INTENT_DEFS.get(intent_id, {}).get("description", "question avicole")
-    required_slots = INTENT_DEFS.get(intent_id, {}).get("required_slots", [])
-    optional_slots = INTENT_DEFS.get(intent_id, {}).get("optional_slots", [])
-    followup_themes = INTENT_DEFS.get(intent_id, {}).get("followup_themes", [])
+    intent_cfg = (INTENTS.get("intents", {}).get(intent_id) 
+                  if isinstance(INTENTS.get("intents"), dict) else {})
+    if not intent_cfg:  # fallback sur les defs locales si fichier absent
+        intent_cfg = INTENT_DEFS.get(intent_id, {})
+    intent_desc = intent_cfg.get("description", "question avicole")
+    required_slots = intent_cfg.get("required_slots", [])
+    optional_slots = intent_cfg.get("optional_slots", [])
+    followup_themes = intent_cfg.get("followup_themes", [])
     system_prompt = f"""Tu es un système de décision pour un assistant avicole.
 INTENTION: {intent_desc}
 SLOTS REQUIS: {', '.join(required_slots)}
@@ -489,8 +515,12 @@ Règles:
 
 # Clarify & follow-up text generation
 async def generate_clarification_question(client: OpenAI, intent_id: str, missing_slots: List[str], user_text: str) -> Tuple[str, Dict[str, Any]]:
-    intent_desc = INTENT_DEFS.get(intent_id, {}).get("description", "question avicole")
-    required_slots = INTENT_DEFS.get(intent_id, {}).get("required_slots", [])
+    intent_cfg = (INTENTS.get("intents", {}).get(intent_id) 
+                  if isinstance(INTENTS.get("intents"), dict) else {})
+    if not intent_cfg:  # fallback sur les defs locales si fichier absent
+        intent_cfg = INTENT_DEFS.get(intent_id, {})
+    intent_desc = intent_cfg.get("description", "question avicole")
+    required_slots = intent_cfg.get("required_slots", [])
     system_prompt = f"""Assistant avicole. Sujet: {intent_desc}
 Slots requis: {', '.join(required_slots)}
 Manquants: {', '.join(missing_slots)}
@@ -510,8 +540,9 @@ Donne UNE question courte (langue de l'utilisateur) demandant UNIQUEMENT les inf
         )
         question = (resp.choices[0].message.content or "").strip()
         suggestions = {}
+        # Modification 2 : Clarify: clé de suggestion (uniformisé sur "line" au lieu de "lines")
         if "line" in missing_slots:
-            suggestions["lines"] = ["Ross 308", "Cobb 500"]
+            suggestions["line"] = ["Ross 308", "Cobb 500"]
         if "sex" in missing_slots:
             suggestions["sex"] = ["male", "female"]
         if "season" in missing_slots:
@@ -522,8 +553,12 @@ Donne UNE question courte (langue de l'utilisateur) demandant UNIQUEMENT les inf
         return "Pour répondre précisément, merci de préciser les informations manquantes.", {}
 
 async def generate_followup_suggestion(client: OpenAI, intent_id: str, user_text: str, response_context: str = "") -> Optional[str]:
-    intent_desc = INTENT_DEFS.get(intent_id, {}).get("description", "question avicole")
-    followup_themes = INTENT_DEFS.get(intent_id, {}).get("followup_themes", [])
+    intent_cfg = (INTENTS.get("intents", {}).get(intent_id) 
+                  if isinstance(INTENTS.get("intents"), dict) else {})
+    if not intent_cfg:  # fallback sur les defs locales si fichier absent
+        intent_cfg = INTENT_DEFS.get(intent_id, {})
+    intent_desc = intent_cfg.get("description", "question avicole")
+    followup_themes = intent_cfg.get("followup_themes", [])
     system_prompt = f"""Assistant avicole. Sujet: {intent_desc}
 Thèmes: {', '.join(followup_themes)}
 Donne UNE question de suivi pertinente, en une phrase, même langue que l'utilisateur."""
@@ -558,7 +593,9 @@ def get_default_followup_by_intent(intent_id: str) -> Optional[str]:
     return defaults.get(intent_id)
 
 async def ensure_followup_suggestion(client: OpenAI, intent_id: str, user_text: str, response_context: str, confidence: float) -> Optional[str]:
-    if intent_id not in INTENT_DEFS:
+    intent_cfg = (INTENTS.get("intents", {}).get(intent_id) 
+                  if isinstance(INTENTS.get("intents"), dict) else {})
+    if not intent_cfg:
         return None
     followup = await generate_followup_suggestion(client, intent_id, user_text, response_context)
     return followup or get_default_followup_by_intent(intent_id)
@@ -642,11 +679,22 @@ async def stream_fallback_general(client: OpenAI, text: str):
                     yield send_event({"type": "delta", "text": chunk})
         final_text = clean_text("".join(final_buf).strip())
         if not final_text:
-            final_text = "Désolé, aucune réponse n’a pu être générée. Pouvez-vous reformuler ou préciser votre question ?"
+            final_text = "Désolé, aucune réponse n'a pu être générée. Pouvez-vous reformuler ou préciser votre question ?"
         yield send_event({"type": "final", "answer": final_text})
     except Exception as e:
+        # Modification 3 : Fallback non-stream si le modèle refuse le streaming
+        if "must be verified to stream" in str(e).lower() or "param': 'stream'" in str(e).lower():
+            resp = create_chat_completion_safe(
+                client, model=FALLBACK_MODEL,
+                messages=[{"role":"system","content":system},{"role":"user","content":text}],
+                max_completion_tokens=FALLBACK_MAX_COMPLETION_TOKENS, stream=False, temperature=FALLBACK_TEMPERATURE
+            )
+            final_text = clean_text(resp.choices[0].message.content or "") or "Désolé, aucune réponse n'a pu être générée."
+            yield send_event({"type":"final","answer":final_text})
+            return
+        # sinon, erreur générique
         logger.error(f"Erreur fallback streaming: {e}")
-        yield send_event({"type": "final", "answer": "Désolé, une erreur est survenue et la réponse n’a pas pu être générée."})
+        yield send_event({"type": "final", "answer": "Désolé, une erreur est survenue et la réponse n'a pas pu être générée."})
 
 # -----------------------------------------------------------------------------
 # Routes
@@ -661,7 +709,9 @@ def health():
         "hybrid_mode": HYBRID_MODE,
         "frontend_sse_compat": FRONTEND_SSE_COMPAT,
         "language_file": LANGUAGE_FILE,
-        "languages_loaded": list(OUT_OF_DOMAIN_MESSAGES.keys())[:10] + (["…"] if len(OUT_OF_DOMAIN_MESSAGES) > 10 else [])
+        "intents_file": INTENTS_FILE,
+        "languages_loaded": list(OUT_OF_DOMAIN_MESSAGES.keys())[:10] + (["…"] if len(OUT_OF_DOMAIN_MESSAGES) > 10 else []),
+        "intents_loaded": list(INTENTS.get("intents", {}).keys()) if isinstance(INTENTS.get("intents"), dict) else []
     }
 
 @router.post("/chat/stream")
@@ -696,7 +746,8 @@ async def chat_stream(request: Request):
     request_id = str(uuid.uuid4())
     logger.info(f"[REQ {request_id}] tenant={tenant_id}")
 
-    async def event_source() -> AsyncGenerator[str, None]:
+    # Modification 1 : Type du générateur SSE (AsyncGenerator[bytes, None] au lieu de str)
+    async def event_source() -> AsyncGenerator[bytes, None]:
         sent_final = False
         try:
             # 1) Garde-fou: hors-domaine => message fixe depuis languages.json
@@ -706,7 +757,8 @@ async def chat_stream(request: Request):
                 sent_final = True
                 return
 
-            _client = OpenAI(api_key=OPENAI_API_KEY)
+            # Modification 6 : Éviter un client OpenAI par requête (réutilise le client global)
+            _client = client
 
             # 2) Routage intention & slots
             route = await asyncio.to_thread(gpt_route_and_extract, _client, message, lang)
@@ -717,32 +769,38 @@ async def chat_stream(request: Request):
 
             # 3) Décision clarifier / répondre
             followup_hint = None
-            if intent_id in INTENT_DEFS:
-                decision = await gpt_decide_answer_or_clarify(_client, lang, intent_id, slots, message)
-                answer_mode = decision.get("answer_mode", "direct")
-                followup_hint = decision.get("followup_suggestion") or followup_hint
-                if answer_mode == "clarify":
-                    clarify_q = clean_text(decision.get("clarify_question") or "")
-                    if not clarify_q:
-                        missing = decision.get("missing", [])
-                        clarify_q, suggestions = await generate_clarification_question(_client, intent_id, missing, message)
-                    else:
-                        missing = decision.get("missing", [])
-                        suggestions = {}
-                        if "line" in missing:
-                            suggestions["lines"] = ["Ross 308", "Cobb 500"]
-                        if "sex" in missing:
-                            suggestions["sex"] = ["male", "female"]
-                        if "season" in missing:
-                            suggestions["season"] = ["summer", "winter", "spring", "autumn"]
-                    if not clarify_q:
-                        clarify_q = "Pour répondre précisément, merci de préciser les informations manquantes."
-                    payload_clarify = {"type": "clarify", "answer": clarify_q}
-                    if suggestions:
-                        payload_clarify["suggestions"] = suggestions
-                    yield send_event(payload_clarify)
-                    # clarify = on attend une nouvelle entrée côté front, pas de 'final' ici
-                    return
+            if intent_id:
+                intent_cfg = (INTENTS.get("intents", {}).get(intent_id) 
+                              if isinstance(INTENTS.get("intents"), dict) else {})
+                if not intent_cfg:  # fallback sur les defs locales si fichier absent
+                    intent_cfg = INTENT_DEFS.get(intent_id, {})
+                    
+                if intent_cfg:  # on a une configuration pour cette intention
+                    decision = await gpt_decide_answer_or_clarify(_client, lang, intent_id, slots, message)
+                    answer_mode = decision.get("answer_mode", "direct")
+                    followup_hint = decision.get("followup_suggestion") or followup_hint
+                    if answer_mode == "clarify":
+                        clarify_q = clean_text(decision.get("clarify_question") or "")
+                        if not clarify_q:
+                            missing = decision.get("missing", [])
+                            clarify_q, suggestions = await generate_clarification_question(_client, intent_id, missing, message)
+                        else:
+                            missing = decision.get("missing", [])
+                            suggestions = {}
+                            if "line" in missing:
+                                suggestions["line"] = ["Ross 308", "Cobb 500"]
+                            if "sex" in missing:
+                                suggestions["sex"] = ["male", "female"]
+                            if "season" in missing:
+                                suggestions["season"] = ["summer", "winter", "spring", "autumn"]
+                        if not clarify_q:
+                            clarify_q = "Pour répondre précisément, merci de préciser les informations manquantes."
+                        payload_clarify = {"type": "clarify", "answer": clarify_q}
+                        if suggestions:
+                            payload_clarify["suggestions"] = suggestions
+                        yield send_event(payload_clarify)
+                        # clarify = on attend une nouvelle entrée côté front, pas de 'final' ici
+                        return
 
             # 4) Tentative data-only (Assistant v2)
             text = await asyncio.to_thread(run_data_only_assistant, _client, ASSISTANT_ID, message, lang)
@@ -769,7 +827,7 @@ async def chat_stream(request: Request):
                 if chunk:
                     yield send_event({"type": "delta", "text": chunk})
                     await asyncio.sleep(0.02)
-            final_answer = text if text else "Désolé, aucune réponse n’a pu être générée."
+            final_answer = text if text else "Désolé, aucune réponse n'a pu être générée."
             yield send_event({"type": "final", "answer": final_answer})
             sent_final = True
 
@@ -783,12 +841,12 @@ async def chat_stream(request: Request):
         except Exception as e:
             logger.error(f"[REQ {request_id}] Erreur dans event_source: {e}")
             if not sent_final:
-                yield send_event({"type": "final", "answer": "Désolé, une erreur est survenue et la réponse n’a pas pu être générée."})
+                yield send_event({"type": "final", "answer": "Désolé, une erreur est survenue et la réponse n'a pas pu être générée."})
             else:
                 yield send_event({"type": "error", "message": f"Erreur interne: {str(e)}"})
         finally:
             if not sent_final:
-                yield send_event({"type": "final", "answer": "Désolé, aucune réponse n’a pu être générée."})
+                yield send_event({"type": "final", "answer": "Désolé, aucune réponse n'a pu être générée."})
 
     headers = {
         "Content-Type": "text/event-stream",
