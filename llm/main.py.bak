@@ -1,11 +1,17 @@
+# -*- coding: utf-8 -*-
 #
 # main.py — Intelia LLM backend (FastAPI + SSE)
 # Python 3.11+
 #
 
-import os, re, json, asyncio, time, unicodedata, difflib
-from typing import Any, Dict, AsyncGenerator, Optional, Tuple, List
-from dataclasses import dataclass
+import os
+import re
+import json
+import asyncio
+import time
+import logging
+import uuid
+from typing import Any, Dict, AsyncGenerator, Optional
 
 from fastapi import FastAPI, APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse, PlainTextResponse
@@ -14,373 +20,381 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from langdetect import detect, DetectorFactory
 
-DetectorFactory.seed = 0  # déterminisme
+# -----------------------------------------------------------------------------
+# Setup
+# -----------------------------------------------------------------------------
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+DetectorFactory.seed = 0
 load_dotenv()
 
-# -------- Config via variables d'environnement --------
+# -----------------------------------------------------------------------------
+# Env config
+# -----------------------------------------------------------------------------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 BASE_PATH = os.environ.get("BASE_PATH", "/llm").rstrip("/")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 ASSISTANT_ID = os.environ.get("ASSISTANT_ID")
 POLL_INTERVAL_SEC = float(os.environ.get("POLL_INTERVAL_SEC", "0.6"))
+ASSISTANT_TIMEOUT = int(os.getenv("ASSISTANT_TIMEOUT_SEC", "30"))
+ASSISTANT_MAX_POLLS = int(os.getenv("ASSISTANT_MAX_POLLS", "200"))
 STREAM_CHUNK_LEN = int(os.environ.get("STREAM_CHUNK_LEN", "400"))
 DEBUG_GUARD = os.getenv("DEBUG_GUARD", "0") == "1"
+HYBRID_MODE = os.getenv("HYBRID_MODE", "1") == "1"
+FALLBACK_MODEL = os.getenv("FALLBACK_MODEL", "gpt-4o")
+FALLBACK_TEMPERATURE = float(os.getenv("FALLBACK_TEMPERATURE", "0.7"))
+FALLBACK_MAX_COMPLETION_TOKENS = int(
+    os.getenv("FALLBACK_MAX_COMPLETION_TOKENS", os.getenv("FALLBACK_MAX_TOKENS", "600"))
+)
+
+LANGUAGE_FILE = os.getenv("LANGUAGE_FILE", os.path.join(BASE_DIR, "languages.json"))
+BLOCKED_TERMS_FILE = os.getenv("BLOCKED_TERMS_FILE", os.path.join(BASE_DIR, "blocked_terms.json"))
 
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY is required")
 if not ASSISTANT_ID:
     raise RuntimeError("ASSISTANT_ID is required")
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+# -----------------------------------------------------------------------------
+# Load messages (languages.json)
+# -----------------------------------------------------------------------------
+def _load_language_messages(path: str) -> Dict[str, str]:
+    """
+    languages.json structure:
+    {
+      "default": "...",
+      "fr": "...",
+      "en": "...",
+      ...
+    }
+    """
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if "default" not in data or not isinstance(data["default"], str):
+            raise ValueError("languages.json must include a 'default' string.")
+        return {(k.lower() if isinstance(k, str) else k): v for k, v in data.items()}
+    except Exception as e:
+        logger.error(f"Unable to load {path}: {e}")
+        return {
+            "default": "Intelia Expert is a poultry-focused application. Questions outside this domain cannot be processed."
+        }
 
-# -------- App & CORS --------
-app = FastAPI(title="Intelia LLM Backend")
+OUT_OF_DOMAIN_MESSAGES = _load_language_messages(LANGUAGE_FILE)
+
+# Charger les termes bloqués depuis le fichier JSON
+def _load_blocked_terms(path: str) -> list:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        # Fusionner toutes les catégories en une seule liste
+        all_terms = []
+        for category, terms in data.items():
+            if isinstance(terms, list):
+                all_terms.extend(terms)
+        return all_terms
+    except Exception as e:
+        logger.error(f"Unable to load blocked terms from {path}: {e}")
+        # Fallback minimal
+        return ["crypto", "cryptocurrency", "bitcoin", "ethereum", "blockchain"]
+
+BLOCKED_TERMS = _load_blocked_terms(BLOCKED_TERMS_FILE)
+
+logger.info(f"LANGUAGE_FILE={LANGUAGE_FILE} exists={os.path.exists(LANGUAGE_FILE)}")
+logger.info(f"BLOCKED_TERMS_FILE={BLOCKED_TERMS_FILE} exists={os.path.exists(BLOCKED_TERMS_FILE)}")
+logger.info(f"FALLBACK_MODEL={FALLBACK_MODEL}")
+logger.info(f"Loaded {len(BLOCKED_TERMS)} blocked terms")
+
+def get_out_of_domain_message(lang: str) -> str:
+    if not lang:
+        return OUT_OF_DOMAIN_MESSAGES.get("default")
+    code = (lang or "").lower()
+    msg = OUT_OF_DOMAIN_MESSAGES.get(code)
+    if msg:
+        return msg
+    short = code.split("-")[0]
+    return OUT_OF_DOMAIN_MESSAGES.get(short, OUT_OF_DOMAIN_MESSAGES["default"])
+
+# -----------------------------------------------------------------------------
+# OpenAI client
+# -----------------------------------------------------------------------------
+try:
+    client = OpenAI(api_key=OPENAI_API_KEY)
+    test_models = client.models.list()
+    logger.info(f"OpenAI client initialized successfully. Available models: {len(test_models.data)}")
+except Exception as e:
+    logger.error(f"Erreur initialisation OpenAI client: {e}")
+    raise RuntimeError(f"Impossible d'initialiser le client OpenAI: {e}")
+
+# -----------------------------------------------------------------------------
+# FastAPI
+# -----------------------------------------------------------------------------
+app = FastAPI(title="Intelia LLM Backend", debug=False)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], allow_credentials=True,
-    allow_methods=["*"], allow_headers=["*"],
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 router = APIRouter()
 
+# -----------------------------------------------------------------------------
+# SSE helpers
+# -----------------------------------------------------------------------------
 def sse_event(obj: Dict[str, Any]) -> bytes:
-    return f"data: {json.dumps(obj, ensure_ascii=False)}\n\n".encode("utf-8")
+    try:
+        data = json.dumps(obj, ensure_ascii=False)
+        return f"data: {data}\n\n".encode("utf-8")
+    except Exception as e:
+        logger.error(f"Erreur formatage SSE: {e}")
+        return b"data: {\"type\":\"error\",\"message\":\"Erreur formatage\"}\n\n"
 
+def send_event(obj: Dict[str, Any]) -> bytes:
+    if "type" not in obj:
+        obj = {"type": "final", "answer": "Désolé, une erreur de format interne est survenue."}
+    if obj.get("type") == "final" and not obj.get("answer"):
+        obj["answer"] = "Désolé, aucune réponse n'a pu être générée."
+    return sse_event(obj)
+
+# -----------------------------------------------------------------------------
+# Language detection
+# -----------------------------------------------------------------------------
 def parse_accept_language(header: Optional[str]) -> Optional[str]:
-    if not header: return None
+    if not header:
+        return None
     try:
         first = header.split(",")[0].strip()
         code = first.split(";")[0].split("-")[0].lower()
-        if 2 <= len(code) <= 3: return code
+        if 2 <= len(code) <= 3:
+            return code
     except Exception:
         pass
     return None
 
 def guess_lang_from_text(text: str) -> Optional[str]:
     try:
-        return detect(text)
+        detected = detect(text)
+        # Normaliser les codes de langue
+        if detected in ['de', 'ger']:
+            return 'de'
+        elif detected in ['fr', 'fra']:
+            return 'fr'
+        elif detected in ['en', 'eng']:
+            return 'en'
+        elif detected in ['es', 'spa']:
+            return 'es'
+        else:
+            return detected
     except Exception:
+        # Fallback basique si langdetect échoue
+        text_lower = text.lower()
+        if any(word in text_lower for word in ['was', 'ist', 'wie', 'wo', 'wann', 'warum', 'kryptowährung', 'deutschland']):
+            return 'de'
+        elif any(word in text_lower for word in ['what', 'is', 'how', 'where', 'when', 'why', 'cryptocurrency']):
+            return 'en'
+        elif any(word in text_lower for word in ['qué', 'es', 'cómo', 'dónde', 'cuándo', 'por qué']):
+            return 'es'
+        elif any(word in text_lower for word in ['qu\'est', 'comment', 'où', 'quand', 'pourquoi', 'cryptomonnaie']):
+            return 'fr'
         return None
 
-# -------- Nettoyage des marqueurs de source --------
-CITATION_PATTERN = re.compile(r"【[^】]*】")
+# -----------------------------------------------------------------------------
+# Text helpers
+# -----------------------------------------------------------------------------
+CITATION_PATTERN = re.compile(r"【[^【】]*】")
+
 def clean_text(txt: str) -> str:
-    if not txt: return txt
+    if not txt:
+        return txt
     cleaned = CITATION_PATTERN.sub("", txt)
     cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
     cleaned = re.sub(r"\s+\n", "\n", cleaned)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()
 
-# -------- Garde-fou permissif (liste NON-AGRI) --------
-NON_AGRI_TERMS = [
-    "cinéma","film","films","séries","serie","séries tv","netflix","hollywood","bollywood","disney",
-    "pixar","musique","concert","rap","pop","rock","jazz","opéra","orchestre","télévision","télé",
-    "emission","émission","talk-show","talk show","documentaire","jeux vidéo","gaming","playstation",
-    "xbox","nintendo","e-sport","esport","fortnite","minecraft","twitch",
-    "football","soccer","nba","nfl","nhl","hockey","baseball","mlb","tennis","golf","cyclisme",
-    "tour de france","formule 1","f1","motogp","boxe","ufc","olympiques","olympics","fitness",
-    "musculation","yoga","randonnée","plongée","ski","surf","basketball","rugby","cricket",
-    "élections","elections","président","president","premier ministre","parlement","sénat","senat",
-    "congrès","congres","diplomatie","guerre","armée","armee","conflit","otan","onu","droit humain",
-    "droits humains","immigration","lois","justice","criminel","tribunal","révolution","révolte",
-    "bourse","actions","nasdaq","wall street","s&p500","dow jones","crypto","bitcoin","ethereum",
-    "blockchain","nft","banque","banques","crédit","credits","prêt","pret","hypothèque","hypotheque",
-    "assurance","impôt","impots","fiscalité","fiscalite","immobilier","courtage","trading",
-    "hedge fund","capital risque","capital-risque","private equity","forex",
-    "iphone","android","samsung","apple","google","microsoft","windows","linux","amazon","tesla",
-    "réseaux sociaux","reseaux sociaux","facebook","instagram","tiktok","youtube","twitter","x ",
-    "snapchat","applications mobiles","app mobile","messagerie","whatsapp","telegram","signal",
-    "streaming","spotify","itunes",
-    "cancer","diabète","diabete","hypertension","grippe saisonnière","grippe saisonniere","covid",
-    "hôpital","hopital","clinique","pharmacie","chirurgie esthétique","dentiste","dentisterie",
-    "nutrition humaine","régime","regime","keto","végan","vegan","végétarien","vegetarien",
-    "vêtements","vetements","chaussures","bijoux","luxe","gucci","louis vuitton","zara","nike",
-    "coiffure","maquillage","cosmétiques","cosmetiques","parfums","voyage","vacances","tourisme",
-    "hôtel","hotel","airbnb","croisière","croisiere","disneyland","gastronomie","recette",
-    "astronomie","physique quantique","astrophysique","fusées","fusees","nasa","spacex","mathématiques",
-    "mathematiques","philosophie","histoire","archéologie","archeologie","psychologie","psychanalyse",
-    "sociologie",
-    "église","eglise","prière","priere","islam","christianisme","judaïsme","judaisme","bouddhisme",
-    "astrologie","horoscope","tarot","voyance","magie","sorcellerie",
-    "météo urbaine","meteo urbaine","météo de paris","meteo de paris","trafic routier","bouchons",
-    "automobile","course automobile","tuning","uber","lyft","relations amoureuses","sexualité",
-    "sexualite","mariage","divorce","fashion week","influenceur","influenceuse"
-]
-NON_AGRI_PAT = re.compile(r"\b(?:" + "|".join(re.escape(t) for t in NON_AGRI_TERMS) + r")\b", re.IGNORECASE)
+# -----------------------------------------------------------------------------
+# Domain guard (permissif: bloque évidents hors-agri)
+# -----------------------------------------------------------------------------
+def create_blocked_pattern(terms_list: list) -> re.Pattern:
+    """Crée le pattern regex à partir de la liste de termes bloqués"""
+    return re.compile(r"\b(?:" + "|".join(re.escape(t) for t in terms_list) + r")\b", re.IGNORECASE)
+
+# Pattern créé dynamiquement à partir du fichier JSON
+NON_AGRI_PAT = create_blocked_pattern(BLOCKED_TERMS)
 
 def guard_debug(reason: str, text: str):
     if DEBUG_GUARD:
-        print(f"[GUARD] {reason} :: {text[:160]!r}")
+        logger.info(f"[GUARD] {reason} :: {text[:160]!r}")
 
 def is_agri_question(text: str) -> bool:
-    if not text: return True
+    if not text:
+        return True
     blocked = NON_AGRI_PAT.search(text) is not None
-    if blocked: guard_debug("blocked_non_agri_match", text)
+    if blocked:
+        guard_debug("blocked_non_agri_match", text)
     return not blocked
 
-# -------- Normalisation & alias (pour tolérance aux fautes) --------
-def normalize(s: str) -> str:
-    if s is None: return ""
-    s = unicodedata.normalize("NFKC", s)
-    s = s.lower().strip()
-    s = "".join(ch for ch in s if ch.isalnum() or ch.isspace())
-    s = re.sub(r"\s+", " ", s)
-    return s
+# -----------------------------------------------------------------------------
+# Chat Completions helpers
+# -----------------------------------------------------------------------------
+def _chat_args(messages, max_completion_tokens, stream=False, temperature=None):
+    args = dict(messages=messages, max_completion_tokens=max_completion_tokens, stream=stream)
+    force_temp = os.getenv("FORCE_TEMPERATURE_PARAM", "0") == "1"
+    if force_temp and temperature is not None:
+        args["temperature"] = float(temperature)
+    return args
 
-LINE_ALIASES = {
-    # Ross
-    "ross 308": ["ross308","r308","ross-308","罗斯308","羅斯308","ross 308 ap","ross 308ap","ross"],
-    # Cobb
-    "cobb 500": ["cobb500","c500","cobb-500","科寶500","科博500","cobb"],
-}
-SEX_ALIASES = {
-    "male": ["mâle","masculin","male","macho","公","雄","boy","garçon","garcon"],
-    "female": ["femelle","feminin","féminin","female","hembra","母","雌","girl","fille"],
-}
-
-def fuzzy_map(value: str, choices: Dict[str, List[str]], cutoff: float = 0.75) -> Optional[str]:
-    v = normalize(value)
-    pool = []
-    for key, alias_list in choices.items():
-        pool.append(key)
-        pool.extend(alias_list)
-    best = difflib.get_close_matches(v, pool, n=1, cutoff=cutoff)
-    if not best: return None
-    hit = best[0]
-    # Map alias back to canonical key
-    for key, alias_list in choices.items():
-        if hit == key or hit in [normalize(a) for a in alias_list]:
-            return key
-    return None
-
-# -------- Intent & Slots (multilingue, tolérant) --------
-# Intent: poids/weight/体重/體重/目标体重/標準體重/目标/target/objectif/增重
-BROILER_WEIGHT_INTENT_PAT = re.compile(
-    r"(?:(poids|weight|peso|体重|體重|標準體重|标准体重|目標體重|目标体重|objectif|target|增重|增重曲線|增重曲线))"
-    r".*?(poulet|broiler|ross|cobb|鸡|雞|小鸡|雛雞)?|"
-    r"\b(ross|cobb)\b.*?(poids|weight|体重|體重|標準體重|标准体重|objectif|target)",
-    re.IGNORECASE
-)
-
-# Age (jours) : fr/en/es/zh
-AGE_DAYS_PAT = re.compile(
-    r"\b(\d{1,2})\s*(j|jour|jours|d|día|dias|días|days)\b|(\d{1,2})\s*天",
-    re.IGNORECASE
-)
-
-LINE_PAT = re.compile(r"\b(ross|cobb|aviagen|hy-?line)\b", re.IGNORECASE)
-MALE_PAT = re.compile(r"\b(mâle|male|masculin|macho|公|雄)\b", re.IGNORECASE)
-FEMALE_PAT = re.compile(r"\b(femelle|female|féminin|feminin|hembra|母|雌)\b", re.IGNORECASE)
-
-@dataclass
-class BroilerWeightSlots:
-    age_days: Optional[int]
-    line: Optional[str]      # canonical 'ross 308' / 'cobb 500'
-    sex: Optional[str]       # 'male' | 'female'
-
-def detect_broiler_weight_intent(text: str) -> bool:
-    return bool(BROILER_WEIGHT_INTENT_PAT.search(text))
-
-def extract_broiler_weight_slots(text: str) -> BroilerWeightSlots:
-    tnorm = normalize(text)
-
-    # Age
-    age = None
-    m_age = AGE_DAYS_PAT.search(text)
-    if m_age:
-        age = m_age.group(1) or m_age.group(3)
-        age = int(age) if age is not None else None
-
-    # Line (regex coarse)
-    line = None
-    m_line = LINE_PAT.search(text)
-    if m_line:
-        rough = m_line.group(1).lower()
-        # Fuzzy enrich (could be 'ross' only → leave as None to clarify)
-        line = fuzzy_map(rough, LINE_ALIASES, cutoff=0.6) or (rough if rough in ["ross","cobb"] else None)
-
-    # Sex
-    sex = None
-    if MALE_PAT.search(text):
-        sex = "male"
-    elif FEMALE_PAT.search(text):
-        sex = "female"
-    else:
-        # Fuzzy from whole text (handles typos)
-        # check presence of any alias token
-        for k, arr in SEX_ALIASES.items():
-            for a in arr:
-                if normalize(a) in tnorm:
-                    sex = k
-                    break
-            if sex: break
-
-    # Fuzzy correction if user typed model directly like "ross308"
-    if not line:
-        # grab any token ~ line
-        tokens = tnorm.split()
-        for token in tokens:
-            hit = fuzzy_map(token, LINE_ALIASES, cutoff=0.8)
-            if hit:
-                line = hit
-                break
-
-    return BroilerWeightSlots(age_days=age, line=line, sex=sex)
-
-# GPT extractor JSON (fallback si extraction regex/fuzzy est pauvre)
-def gpt_extract_slots(client: OpenAI, text: str, lang: str) -> BroilerWeightSlots:
-    system = (
-        "Extract broiler target-weight query entities as strict JSON with keys: "
-        "age_days (int|null), line (one of ['ross 308','cobb 500', null]), sex (one of ['male','female', null]). "
-        "Infer from multilingual text (fr/en/es/zh). If only 'ross' or 'cobb' given, set line=null (needs subline). "
-        "Return ONLY JSON."
-    )
-    user = text
-    resp = client.chat.completions.create(
-        model=os.getenv("FALLBACK_MODEL", "gpt-5"),
-        messages=[{"role":"system","content":system},{"role":"user","content":user}],
-        temperature=0.0, max_tokens=100
-    )
-    raw = resp.choices[0].message.content.strip()
+def create_chat_completion_safe(client, model, messages, max_completion_tokens, stream=False, temperature=None):
     try:
-        data = json.loads(raw)
-        age = data.get("age_days")
-        line = data.get("line")
-        sex  = data.get("sex")
-        # Normalize line through aliases if needed
-        if isinstance(line, str):
-            line = fuzzy_map(line, LINE_ALIASES, cutoff=0.6) or line
-        if line and line in ["ross","cobb"]:
-            line = None  # force clarification for subline specificity
-        if isinstance(sex, str):
-            sex = "male" if "male" in sex.lower() else ("female" if "female" in sex.lower() else None)
-        if isinstance(age, str) and age.isdigit():
-            age = int(age)
-        if isinstance(age, int) and (age < 0 or age > 70):
-            age = None
-        return BroilerWeightSlots(age_days=age, line=line, sex=sex)
-    except Exception:
-        return BroilerWeightSlots(age_days=None, line=None, sex=None)
+        kwargs = _chat_args(messages, max_completion_tokens, stream=stream, temperature=temperature)
+        return client.chat.completions.create(model=model, **kwargs)
+    except Exception as e:
+        emsg = str(e)
+        if ("Unsupported value: 'temperature'" in emsg) or ("does not support" in emsg and "temperature" in emsg):
+            kwargs = _chat_args(messages, max_completion_tokens, stream=stream, temperature=None)
+            return client.chat.completions.create(model=model, **kwargs)
+        raise
 
-async def ask_for_missing_slots_with_gpt(client: OpenAI, lang: str, slots: BroilerWeightSlots) -> Tuple[str, Dict[str, Any]]:
-    missing = []
-    if slots.line is None: missing.append("lignée (ex. Ross 308, Cobb 500)")
-    if slots.sex is None:  missing.append("sexe (mâle ou femelle)")
-    if slots.age_days is None: missing.append("âge (en jours)")
-    # default minimal prompts
-    default_map = {
-        "fr": "Pour répondre précisément, précise la lignée (ex. Ross 308, Cobb 500) et le sexe (mâle ou femelle), ainsi que l’âge en jours si absent.",
-        "en": "To answer precisely, please specify the line (e.g., Ross 308, Cobb 500), the sex (male or female), and age in days if missing.",
-        "zh": "为准确回答，请补充：品系（如 Ross 308、Cobb 500）、性别（公或母），以及（若缺少）日龄。",
-        "es": "Para responder con precisión, indica la línea (p. ej., Ross 308, Cobb 500), el sexo (macho o hembra) y la edad en días si falta."
-    }
-    default = default_map.get(lang, default_map["en"])
-
-    # Chips de suggestion (UI côté client)
-    suggestions = {
-        "lines": ["Ross 308", "Cobb 500"],
-        "sex": ["male", "female"]
-    }
-
-    if not missing:
-        return default, suggestions
-
-    system = (
-        "You write one short clarifying question for a poultry production context. "
-        "Ask ONLY for the missing entities to lookup broiler target weight tables: "
-        "line (Ross 308/Cobb 500), sex (male/female), and/or age in days. "
-        "Be concise, one sentence, no extra commentary."
-    )
-    user = f"Missing entities: {', '.join(missing)}. Write the question in language code: {lang}."
-    resp = client.chat.completions.create(
-        model=os.getenv("FALLBACK_MODEL", "gpt-5"),
-        messages=[{"role":"system","content":system},{"role":"user","content":user}],
-        temperature=0.1, max_tokens=80
-    )
-    q = (resp.choices[0].message.content or "").strip() or default
-    return q, suggestions
-
-# --- Assistant data-only (Assistant v2) ---
+# -----------------------------------------------------------------------------
+# Data-only (Assistant v2)
+# -----------------------------------------------------------------------------
 def run_data_only_assistant(client: OpenAI, assistant_id: str, user_text: str, lang: str) -> str:
     reminder = (
-        "RÉPONDS EXCLUSIVEMENT à partir des documents du Vector Store. "
-        "Si l'information est absente, réponds exactement: "
-        "\"Hors base: information absente de la connaissance Intelia.\" "
-        f"Réponds en {lang}. Ne traduis pas dans une autre langue sauf si on te le demande."
+        f"Tu es un expert en aviculture. Réponds aux questions en utilisant tes connaissances.\n"
+        f"Si tu ne connais pas la réponse précise, dis-le clairement.\n"
+        f"Réponds dans la langue de la question: {lang}\n\n"
+        f"Question: {user_text}"
     )
-    thread = client.beta.threads.create()
-    client.beta.threads.messages.create(
-        thread_id=thread.id, role="user", content=f"{user_text}\n\n{reminder}",
-    )
-    run = client.beta.threads.runs.create(thread_id=thread.id, assistant_id=assistant_id)
-    while True:
-        r = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
-        if r.status in ("completed", "failed", "cancelled", "expired"): break
-        time.sleep(POLL_INTERVAL_SEC)
-    if r.status != "completed":
-        return "Hors base: information absente de la connaissance Intelia."
-    msgs = client.beta.threads.messages.list(thread_id=thread.id)
-    for m in msgs.data:
-        if m.role == "assistant":
-            for c in m.content:
+    
+    try:
+        thread = client.beta.threads.create()
+        client.beta.threads.messages.create(
+            thread_id=thread.id, 
+            role="user", 
+            content=reminder
+        )
+        
+        run = client.beta.threads.runs.create(
+            thread_id=thread.id, 
+            assistant_id=assistant_id
+        )
+        
+        timeout = time.time() + ASSISTANT_TIMEOUT
+        polls = 0
+        
+        while time.time() < timeout and polls < ASSISTANT_MAX_POLLS:
+            r = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
+            if r.status in ("completed", "failed", "cancelled", "expired"):
+                break
+            time.sleep(POLL_INTERVAL_SEC)
+            polls += 1
+        
+        logger.info(f"[ASSISTANT] Status: {r.status} après {polls} polls")
+        
+        if r.status != "completed":
+            logger.error(f"Assistant run failed with status: {r.status}")
+            return "Hors base: information absente de la connaissance Intelia."
+        
+        msgs = client.beta.threads.messages.list(thread_id=thread.id)
+        msgs_data = msgs.data
+        
+        if len(msgs_data) == 1:
+            latest = msgs_data[0] if msgs_data[0].role == "assistant" else None
+        else:
+            latest = next(
+                (m for m in sorted(msgs_data, key=lambda x: x.created_at, reverse=True) if m.role == "assistant"),
+                None
+            )
+        
+        if latest:
+            for c in latest.content:
                 if getattr(c, "type", "") == "text":
-                    txt = (c.text.value or "").strip()
-                    txt = clean_text(txt)
-                    return txt if txt else "Hors base: information absente de la connaissance Intelia."
-    return "Hors base: information absente de la connaissance Intelia."
+                    txt = clean_text((c.text.value or "").strip())
+                    if txt:
+                        logger.info(f"[ASSISTANT] Réponse: {txt[:100]}...")
+                        return txt
+        
+        return "Hors base: information absente de la connaissance Intelia."
+        
+    except Exception as e:
+        logger.error(f"Erreur assistant data-only: {e}")
+        return "Hors base: information absente de la connaissance Intelia."
 
-# --- Fallback général (GPT-5) ---
-async def stream_fallback_general(client: OpenAI, text: str, lang: str):
+# -----------------------------------------------------------------------------
+# Fallback general (stream)
+# -----------------------------------------------------------------------------
+async def stream_fallback_general(client: OpenAI, text: str):
     system = (
-        "You are an agricultural domain assistant. Answer ONLY within agriculture "
-        "(including livestock, poultry, broilers/layers, animal nutrition, farm environment, "
-        "biosecurity, ventilation, poultry diseases, agricultural economics directly related to farms, "
-        "and adjacent topics that clearly relate to agriculture). If the user asks anything clearly "
-        "outside this scope, politely refuse.\n"
-        f"Reply in {lang}."
+        "Tu es un assistant spécialisé en agriculture et aviculture. "
+        "Tu remponds UNIQUEMENT aux questions dans ce domaine. "
+        "Si la question sort du cadre, refuse poliment. "
+        "Réponds dans la MÊME langue que la question de l'utilisateur. "
+        "Sois précis et technique quand approprié."
     )
-    model = os.getenv("FALLBACK_MODEL", "gpt-5")
-    temperature = float(os.getenv("FALLBACK_TEMPERATURE", "0.2"))
-    max_tokens = int(os.getenv("FALLBACK_MAX_TOKENS", "600"))
+    try:
+        stream = create_chat_completion_safe(
+            client,
+            model=FALLBACK_MODEL,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": text}],
+            max_completion_tokens=FALLBACK_MAX_COMPLETION_TOKENS,
+            stream=True,
+            temperature=FALLBACK_TEMPERATURE
+        )
+        final_buf = []
+        for event in stream:
+            if hasattr(event, "choices") and event.choices:
+                delta = event.choices[0].delta
+                if delta and getattr(delta, "content", None):
+                    chunk = clean_text(delta.content)
+                    final_buf.append(chunk)
+                    yield send_event({"type": "delta", "text": chunk})
+        final_text = clean_text("".join(final_buf).strip())
+        if not final_text:
+            final_text = "Désolé, aucune réponse n'a pu être générée. Pouvez-vous reformuler ou préciser votre question ?"
+        yield send_event({"type": "final", "answer": final_text})
+    except Exception as e:
+        if "must be verified to stream" in str(e).lower() or "param': 'stream'" in str(e).lower():
+            resp = create_chat_completion_safe(
+                client, model=FALLBACK_MODEL,
+                messages=[{"role":"system","content":system},{"role":"user","content":text}],
+                max_completion_tokens=FALLBACK_MAX_COMPLETION_TOKENS, stream=False, temperature=FALLBACK_TEMPERATURE
+            )
+            final_text = clean_text(resp.choices[0].message.content or "") or "Désolé, aucune réponse n'a pu être générée."
+            yield send_event({"type":"final","answer":final_text})
+            return
+        logger.error(f"Erreur fallback streaming: {e}")
+        yield send_event({"type": "final", "answer": "Désolé, une erreur est survenue et la réponse n'a pas pu être générée."})
 
-    stream = client.chat.completions.create(
-        model=model,
-        messages=[{"role":"system","content":system},{"role":"user","content":text}],
-        temperature=temperature, max_tokens=max_tokens, stream=True,
-    )
-
-    final_buf = []
-    for event in stream:
-        if hasattr(event, "choices") and event.choices:
-            delta = event.choices[0].delta
-            if delta and getattr(delta, "content", None):
-                chunk = delta.content
-                cleaned_chunk = clean_text(chunk)
-                final_buf.append(cleaned_chunk)
-                yield f'data: {json.dumps({"type":"delta","text": cleaned_chunk}, ensure_ascii=False)}\n\n'
-    final_text = clean_text("".join(final_buf).strip())
-    yield f'data: {json.dumps({"type":"final","answer": final_text}, ensure_ascii=False)}\n\n'
-
+# -----------------------------------------------------------------------------
+# Routes
+# -----------------------------------------------------------------------------
 @router.get("/health")
 def health():
     return {
         "ok": True,
         "assistant_id": ASSISTANT_ID,
         "guard_mode": "permissive_non_agri",
-        "debug_guard": DEBUG_GUARD
+        "debug_guard": DEBUG_GUARD,
+        "hybrid_mode": HYBRID_MODE,
+        "language_file": LANGUAGE_FILE,
+        "blocked_terms_file": BLOCKED_TERMS_FILE,
+        "fallback_model": FALLBACK_MODEL,
+        "languages_loaded": list(OUT_OF_DOMAIN_MESSAGES.keys())[:10] + (["…"] if len(OUT_OF_DOMAIN_MESSAGES) > 10 else []),
+        "blocked_terms_count": len(BLOCKED_TERMS),
+        "blocked_terms_sample": BLOCKED_TERMS[:10]
     }
 
 @router.post("/chat/stream")
 async def chat_stream(request: Request):
     """
     JSON attendu: { "tenant_id": "ten_123", "message": "...", "allow_fallback": true }
-    Flux SSE:
-      - Garde-fou permissif (rejette seulement non-agri explicite)
-      - Contextualisation poids broiler (intent+slots). Si slots manquants -> question de clarification
-      - Data-only Assistant (RAG). Si "Hors base" et fallback autorisé -> GPT-5 streaming.
     """
     try:
         payload = await request.json()
-    except Exception:
+    except Exception as e:
+        logger.error(f"Erreur parsing JSON: {e}")
         raise HTTPException(status_code=400, detail="invalid_json")
 
     tenant_id = (payload.get("tenant_id") or "").strip()
@@ -389,86 +403,102 @@ async def chat_stream(request: Request):
 
     if not tenant_id or not message:
         raise HTTPException(status_code=400, detail="missing_fields")
+    if len(message) > 10000:
+        raise HTTPException(status_code=400, detail="message_too_long")
+    if len(message) < 2:
+        raise HTTPException(status_code=400, detail="message_too_short")
+    if "\x00" in message:
+        raise HTTPException(status_code=400, detail="message_invalid_chars")
 
-    # langue
+    # Langue = celle de la question (prioritaire). Accept-Language en secours.
     accept_lang = request.headers.get("accept-language")
-    lang = parse_accept_language(accept_lang) or guess_lang_from_text(message) or "fr"
+    lang = guess_lang_from_text(message) or parse_accept_language(accept_lang) or "fr"
     lang = (lang or "fr")[:5].split("-")[0].lower()
 
-    async def event_source() -> AsyncGenerator[str, None]:
-        # 0) garde-fou permissif
-        if not is_agri_question(message):
-            answer = f"Domaine restreint : {os.getenv('ALLOWED_DOMAIN_DESC') or 'agriculture et sujets adjacents uniquement'}."
-            answer = clean_text(answer)
-            yield f'data: {json.dumps({"type":"final","answer": answer})}\n\n'
-            return
+    request_id = str(uuid.uuid4())
+    logger.info(f"[REQ {request_id}] tenant={tenant_id}, lang={lang}, message='{message[:50]}...'")
 
-        _client = OpenAI(api_key=OPENAI_API_KEY)
-
-        # 0-bis) CONTEXTUALISATION — Intent poids broiler
-        if detect_broiler_weight_intent(message):
-            slots = extract_broiler_weight_slots(message)
-
-            # Si extraction regex/fuzzy trop pauvre, tenter extraction GPT JSON
-            if slots.age_days is None or slots.line is None or slots.sex is None:
-                gslots = await asyncio.to_thread(gpt_extract_slots, _client, message, lang)
-                # Merge préférant infos “certaines”
-                slots = BroilerWeightSlots(
-                    age_days = slots.age_days or gslots.age_days,
-                    line     = slots.line or gslots.line,
-                    sex      = slots.sex or gslots.sex
-                )
-
-            # Hook (extension future) : si line vaut 'ross' ou 'cobb' (trop vague), forcer clarification
-            if slots.line in ("ross","cobb"):
-                slots = BroilerWeightSlots(age_days=slots.age_days, line=None, sex=slots.sex)
-
-            # (Option) Normaliser semaines → jours (non implémenté: prévoir conversion 1 sem ~ 7 jours)
-
-            # Si slots manquants → question ciblée + suggestions
-            if (slots.line is None) or (slots.sex is None) or (slots.age_days is None):
-                clarify, suggestions = await asyncio.to_thread(ask_for_missing_slots_with_gpt, _client, lang, slots)
-                clarify = clean_text(clarify)
-                # Envoie une réponse de clarification avec suggestions (si le front les exploite)
-                yield f'data: {json.dumps({"type":"clarify","answer": clarify, "suggestions": suggestions}, ensure_ascii=False)}\n\n'
+    async def event_source() -> AsyncGenerator[bytes, None]:
+        sent_final = False
+        try:
+            # 1) Garde-fou: hors-domaine => message fixe depuis languages.json
+            if not is_agri_question(message):
+                answer = clean_text(get_out_of_domain_message(lang))
+                yield send_event({"type": "final", "answer": answer})
+                sent_final = True
                 return
-            # Sinon → laisser continuer le flux normal (RAG data-only d’abord)
 
-        # 1) Essai data-only (Assistant v2)
-        text = await asyncio.to_thread(run_data_only_assistant, _client, ASSISTANT_ID, message, lang)
-        text = clean_text(text)
+            _client = client
 
-        # 2) Fallback GPT-5 si hors base
-        if text.lower().startswith("hors base"):
-            if os.getenv("HYBRID_MODE") and allow_fallback:
-                async for sse in stream_fallback_general(_client, message, lang):
-                    yield sse
-                return
+            # 2) Tentative data-only (Assistant v2)
+            text = await asyncio.to_thread(run_data_only_assistant, _client, ASSISTANT_ID, message, lang)
+            text = clean_text(text)
+            logger.info(f"[REQ {request_id}] Assistant response: {text[:100]}...")
+
+            # 3) Fallback GPT si hors base
+            if text.lower().startswith("hors base"):
+                if HYBRID_MODE and allow_fallback:
+                    logger.info(f"[REQ {request_id}] Basculement vers fallback GPT")
+                    async for sse in stream_fallback_general(_client, message):
+                        yield sse
+                    sent_final = True
+                    return
+                else:
+                    yield send_event({"type": "final", "answer": text})
+                    sent_final = True
+                    return
+
+            # 4) Réponse data-only (stream simulé)
+            if not text:
+                text = "Désolé, aucune réponse n'a pu être générée."
+                
+            for i in range(0, len(text), STREAM_CHUNK_LEN):
+                chunk = clean_text(text[i:i + STREAM_CHUNK_LEN])
+                if chunk:
+                    yield send_event({"type": "delta", "text": chunk})
+                    await asyncio.sleep(0.02)
+                    
+            final_answer = text
+            yield send_event({"type": "final", "answer": final_answer})
+            sent_final = True
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"[REQ {request_id}] Erreur dans event_source: {e}")
+            if not sent_final:
+                yield send_event({"type": "final", "answer": "Désolé, une erreur est survenue et la réponse n'a pas pu être générée."})
+                sent_final = True
             else:
-                yield f'data: {json.dumps({"type":"final","answer": text})}\n\n'
-                return
-
-        # 3) Sinon, réponse data-only stream simulé
-        for i in range(0, len(text), STREAM_CHUNK_LEN):
-            chunk = clean_text(text[i:i + STREAM_CHUNK_LEN])
-            yield f'data: {json.dumps({"type":"delta","text": chunk})}\n\n'
-            await asyncio.sleep(0.02)
-        yield f'data: {json.dumps({"type":"final","answer": text})}\n\n'
+                yield send_event({"type": "error", "message": f"Erreur interne: {str(e)}"})
 
     headers = {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache, no-transform",
         "Connection": "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "*",
     }
     return StreamingResponse(event_source(), headers=headers)
 
-# Monte les routes
+# -----------------------------------------------------------------------------
+# Mount router & misc
+# -----------------------------------------------------------------------------
 app.include_router(router, prefix=BASE_PATH)
 
 @app.get("/")
 def root():
-    return JSONResponse({"service": "intelia-llm", "sse": f"{BASE_PATH}/chat/stream"})
+    return JSONResponse({"service": "intelia-llm", "sse": f"{BASE_PATH}/chat/stream", "version": "simplified"})
 
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def robots():
     return "User-agent: *\nDisallow: /\n"
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Erreur non gérée: {exc}")
+    return JSONResponse(status_code=500, content={"detail": f"Erreur interne du serveur: {str(exc)}"})
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

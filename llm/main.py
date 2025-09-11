@@ -42,7 +42,7 @@ ASSISTANT_MAX_POLLS = int(os.getenv("ASSISTANT_MAX_POLLS", "200"))
 STREAM_CHUNK_LEN = int(os.environ.get("STREAM_CHUNK_LEN", "400"))
 DEBUG_GUARD = os.getenv("DEBUG_GUARD", "0") == "1"
 HYBRID_MODE = os.getenv("HYBRID_MODE", "1") == "1"
-FALLBACK_MODEL = os.getenv("FALLBACK_MODEL", "gpt-4o")
+FALLBACK_MODEL = os.getenv("FALLBACK_MODEL", "gpt-4o-2024-11-20")  # ou "o1-preview" selon disponibilité
 FALLBACK_TEMPERATURE = float(os.getenv("FALLBACK_TEMPERATURE", "0.7"))
 FALLBACK_MAX_COMPLETION_TOKENS = int(
     os.getenv("FALLBACK_MAX_COMPLETION_TOKENS", os.getenv("FALLBACK_MAX_TOKENS", "600"))
@@ -372,6 +372,13 @@ async def stream_fallback_general(client: OpenAI, text: str):
 # -----------------------------------------------------------------------------
 @router.get("/health")
 def health():
+    # Stats mémoire de conversation
+    memory_stats = {
+        "active_conversations": len(conversation_memory),
+        "total_exchanges": sum(len(history) for history in conversation_memory.values()),
+        "memory_size_kb": len(str(conversation_memory)) // 1024
+    }
+    
     return {
         "ok": True,
         "assistant_id": ASSISTANT_ID,
@@ -383,7 +390,9 @@ def health():
         "fallback_model": FALLBACK_MODEL,
         "languages_loaded": list(OUT_OF_DOMAIN_MESSAGES.keys())[:10] + (["…"] if len(OUT_OF_DOMAIN_MESSAGES) > 10 else []),
         "blocked_terms_count": len(BLOCKED_TERMS),
-        "blocked_terms_sample": BLOCKED_TERMS[:10]
+        "blocked_terms_sample": BLOCKED_TERMS[:10],
+        "conversation_memory": memory_stats,
+        "max_memory_items": MAX_MEMORY_ITEMS
     }
 
 @router.post("/chat/stream")
