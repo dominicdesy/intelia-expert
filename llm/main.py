@@ -992,7 +992,6 @@ async def chat_stream(request: Request):
                             payload_clarify["suggestions"] = suggestions
                         yield send_event(payload_clarify)
                         # CORRECTION 1: IMPORTANT : éviter que le 'finally' envoie un final d'excuse
-                        nonlocal sent_final
                         sent_final = True
                         return
 
