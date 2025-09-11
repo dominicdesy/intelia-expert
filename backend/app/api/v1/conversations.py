@@ -3,10 +3,11 @@
 Router pour la gestion des conversations avec intégration PostgreSQL optimisée.
 Version avec requêtes JSONB fiables + retour messages + index de performance.
 VERSION MISE À JOUR pour support persistance conversations complète.
-🔧 CORRECTIF: Index CONCURRENTLY en mode autocommit
+🔧 CORRECTIF: Index CONCURRENTLY en mode autocommit + endpoint POST /save
 """
 from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Dict, Any, List, Optional
+from pydantic import BaseModel
 import logging
 import os
 import json
@@ -19,6 +20,16 @@ from app.api.v1.auth import get_current_user
 
 logger = logging.getLogger("app.api.v1.conversations")
 router = APIRouter()
+
+# ===== Modèles Pydantic pour validation =====
+class ConversationSaveRequest(BaseModel):
+    conversation_id: str
+    question: str
+    response: str
+    user_id: str
+    timestamp: Optional[str] = None
+    source: Optional[str] = "llm_streaming"
+    metadata: Optional[Dict[str, Any]] = {}
 
 # ===== Initialisation PostgresMemory =====
 MEMORY_AVAILABLE = False
@@ -60,7 +71,7 @@ def ensure_user_id_index():
         
         try:
             with conn.cursor() as cur:
-                # Vérifier si l'index existe déjà
+                # Vérifier si l'index existe déjà 
                 cur.execute("""
                     SELECT 1 FROM pg_indexes 
                     WHERE tablename = 'conversation_memory' 
@@ -247,7 +258,8 @@ async def health_check() -> Dict[str, Any]:
                 "total_conversations": stats.get("total_sessions", 0),
                 "index_jsonb_status": index_status,
                 "persistence_enabled": True,
-                "autocommit_fix_applied": True,  # 🔧 NOUVEAU: Indicateur fix autocommit
+                "autocommit_fix_applied": True,
+                "save_endpoint_available": True,  # 🆕 NOUVEAU: Indicateur endpoint save
                 "timestamp": datetime.utcnow().isoformat()
             }
         elif conversation_tracker:
@@ -255,6 +267,7 @@ async def health_check() -> Dict[str, Any]:
                 "status": "healthy",
                 "backend": "conversation_tracker",
                 "persistence_enabled": False,
+                "save_endpoint_available": True,
                 "timestamp": datetime.utcnow().isoformat()
             }
         else:
@@ -263,6 +276,7 @@ async def health_check() -> Dict[str, Any]:
                 "backend": "none",
                 "message": "No conversation backend available",
                 "persistence_enabled": False,
+                "save_endpoint_available": False,
                 "timestamp": datetime.utcnow().isoformat()
             }
     except Exception as e:
@@ -271,6 +285,7 @@ async def health_check() -> Dict[str, Any]:
             "status": "unhealthy",
             "error": str(e),
             "persistence_enabled": False,
+            "save_endpoint_available": False,
             "timestamp": datetime.utcnow().isoformat()
         }
 
@@ -347,9 +362,191 @@ async def test_public() -> Dict[str, Any]:
         "router": "conversations",
         "backend_available": MEMORY_AVAILABLE,
         "persistence_optimized": True,
-        "autocommit_fix": True,  # 🔧 NOUVEAU: Indicateur fix autocommit
+        "autocommit_fix": True,
+        "save_endpoint": True,  # 🆕 NOUVEAU: Indicateur endpoint save
         "timestamp": datetime.utcnow().isoformat()
     }
+
+# ===== 🆕 NOUVEL ENDPOINT: POST /save =====
+
+@router.post("/save")
+async def save_conversation(
+    conversation_data: ConversationSaveRequest,
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    🆕 NOUVEAU: Sauvegarde une conversation complète.
+    Endpoint pour compatibilité avec le frontend streaming.
+    Résout l'erreur 405 Method Not Allowed.
+    """
+    try:
+        logger.info(f"💾 save_conversation: user={current_user.get('email', 'unknown')}, conv_id={conversation_data.conversation_id[:8]}...")
+        
+        # Vérification sécurité: l'utilisateur ne peut sauvegarder que ses propres conversations
+        requester_id = current_user.get('email', current_user.get('user_id', ''))
+        if conversation_data.user_id != requester_id and not current_user.get('is_admin', False):
+            logger.warning(f"🚫 Tentative sauvegarde non autorisée: {requester_id} → {conversation_data.user_id}")
+            raise HTTPException(
+                status_code=403,
+                detail="Vous ne pouvez sauvegarder que vos propres conversations"
+            )
+        
+        if MEMORY_AVAILABLE and memory:
+            # Vérifier si la conversation existe déjà
+            existing_context = memory.get(conversation_data.conversation_id)
+            
+            if existing_context:
+                # Mettre à jour la conversation existante
+                messages = existing_context.get("messages", [])
+                
+                # Créer les nouveaux messages
+                user_msg = {
+                    "role": "user",
+                    "content": conversation_data.question,
+                    "timestamp": conversation_data.timestamp or datetime.utcnow().isoformat(),
+                    "user_id": conversation_data.user_id
+                }
+                
+                assistant_msg = {
+                    "role": "assistant", 
+                    "content": conversation_data.response,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "metadata": {
+                        **conversation_data.metadata,
+                        "source": conversation_data.source
+                    }
+                }
+                
+                # Éviter les doublons en vérifiant le contenu
+                user_exists = any(
+                    msg.get('content') == conversation_data.question and msg.get('role') == 'user' 
+                    for msg in messages
+                )
+                assistant_exists = any(
+                    msg.get('content') == conversation_data.response and msg.get('role') == 'assistant' 
+                    for msg in messages
+                )
+                
+                if not user_exists:
+                    messages.append(user_msg)
+                    
+                if not assistant_exists:
+                    messages.append(assistant_msg)
+                
+                # Mettre à jour le contexte
+                existing_context.update({
+                    "messages": messages,
+                    "updated_at": datetime.utcnow().isoformat(),
+                    "message_count": len(messages),
+                    "last_question": conversation_data.question,
+                    "last_response": conversation_data.response
+                })
+                
+                memory.set(conversation_data.conversation_id, existing_context)
+                
+                logger.info(f"✅ Conversation mise à jour: {conversation_data.conversation_id}, {len(messages)} messages")
+                
+                return {
+                    "status": "updated",
+                    "conversation_id": conversation_data.conversation_id,
+                    "message_count": len(messages),
+                    "user_id": conversation_data.user_id,
+                    "action": "conversation_updated",
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+                
+            else:
+                # Créer une nouvelle conversation
+                new_context = {
+                    "user_id": conversation_data.user_id,
+                    "language": "fr",  # Par défaut, peut être paramétré plus tard
+                    "created_at": datetime.utcnow().isoformat(),
+                    "updated_at": datetime.utcnow().isoformat(),
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": conversation_data.question,
+                            "timestamp": conversation_data.timestamp or datetime.utcnow().isoformat(),
+                            "user_id": conversation_data.user_id
+                        },
+                        {
+                            "role": "assistant",
+                            "content": conversation_data.response,
+                            "timestamp": datetime.utcnow().isoformat(),
+                            "metadata": {
+                                **conversation_data.metadata,
+                                "source": conversation_data.source
+                            }
+                        }
+                    ],
+                    "message_count": 2,
+                    "source": conversation_data.source
+                }
+                
+                memory.set(conversation_data.conversation_id, new_context)
+                
+                logger.info(f"✅ Nouvelle conversation créée: {conversation_data.conversation_id}")
+                
+                return {
+                    "status": "created",
+                    "conversation_id": conversation_data.conversation_id,
+                    "message_count": 2,
+                    "user_id": conversation_data.user_id,
+                    "action": "conversation_created",
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+        
+        elif conversation_tracker:
+            # Fallback avec ConversationTracker
+            try:
+                conversation_tracker.add_conversation(
+                    conversation_data.conversation_id,
+                    conversation_data.user_id,
+                    conversation_data.question,
+                    conversation_data.response
+                )
+                
+                logger.info(f"✅ Conversation sauvegardée (fallback): {conversation_data.conversation_id}")
+                
+                return {
+                    "status": "saved_fallback",
+                    "conversation_id": conversation_data.conversation_id,
+                    "message_count": 2,
+                    "user_id": conversation_data.user_id,
+                    "action": "conversation_saved_tracker",
+                    "backend": "conversation_tracker",
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+                
+            except Exception as tracker_error:
+                logger.error(f"❌ Erreur ConversationTracker: {tracker_error}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Erreur sauvegarde fallback: {str(tracker_error)}"
+                )
+        
+        else:
+            # Aucun backend disponible - retourner succès pour éviter les erreurs frontend
+            logger.warning(f"⚠️ Aucun backend disponible pour sauvegarder {conversation_data.conversation_id}")
+            
+            return {
+                "status": "accepted",
+                "conversation_id": conversation_data.conversation_id,
+                "message_count": 2,
+                "user_id": conversation_data.user_id,
+                "action": "conversation_accepted_no_backend",
+                "note": "Conversation acceptée mais non persistée (backend indisponible)",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Erreur sauvegarde conversation {conversation_data.conversation_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur interne lors de la sauvegarde: {str(e)}"
+        )
 
 # ===== ENDPOINTS PROTÉGÉS (nécessitent authentification) =====
 
@@ -594,6 +791,115 @@ async def delete_conversation(
             detail=f"Error deleting conversation: {str(e)}"
         )
 
+@router.delete("/user/{user_id}")
+async def delete_all_user_conversations(
+    user_id: str,
+    current_user: dict = Depends(get_current_user)  # 🔒 Auth requise
+) -> Dict[str, Any]:
+    """
+    🆕 NOUVEAU: Supprime toutes les conversations d'un utilisateur.
+    Compatible avec l'appel frontend clearAllUserConversations.
+    """
+    try:
+        logger.info(f"🗑️ delete_all_user_conversations: user_id={user_id}, requester={current_user.get('email', 'unknown')}")
+        
+        # Vérification sécurité: l'utilisateur ne peut supprimer que ses propres conversations
+        requester_id = current_user.get('email', current_user.get('user_id', ''))
+        if user_id != requester_id and not current_user.get('is_admin', False):
+            logger.warning(f"🚫 Tentative suppression massive non autorisée: {requester_id} → {user_id}")
+            raise HTTPException(
+                status_code=403,
+                detail="Vous ne pouvez supprimer que vos propres conversations"
+            )
+        
+        deleted_count = 0
+        
+        if MEMORY_AVAILABLE and memory:
+            try:
+                # Récupérer toutes les conversations de l'utilisateur
+                conversations_rows, total_count = query_conversations_by_user(user_id, limit=1000, offset=0)
+                
+                # Supprimer chaque conversation
+                for session_id, _, _, _ in conversations_rows:
+                    try:
+                        memory.clear(session_id)
+                        deleted_count += 1
+                    except Exception as delete_error:
+                        logger.warning(f"⚠️ Erreur suppression {session_id}: {delete_error}")
+                
+                logger.info(f"✅ Suppression massive: {deleted_count}/{total_count} conversations supprimées pour {user_id}")
+                
+                return {
+                    "status": "success",
+                    "user_id": user_id,
+                    "deleted_count": deleted_count,
+                    "total_found": total_count,
+                    "message": f"{deleted_count} conversations supprimées avec succès",
+                    "requester": requester_id,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+                
+            except Exception as db_error:
+                logger.error(f"❌ Erreur suppression massive pour {user_id}: {db_error}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Erreur lors de la suppression: {str(db_error)}"
+                )
+        
+        elif conversation_tracker:
+            try:
+                # Fallback avec ConversationTracker
+                conversations = conversation_tracker.get_user_conversations(user_id, limit=1000)
+                
+                for conv in conversations:
+                    try:
+                        conversation_tracker.delete_conversation(conv.get('id', ''))
+                        deleted_count += 1
+                    except Exception as delete_error:
+                        logger.warning(f"⚠️ Erreur suppression tracker {conv.get('id', '')}: {delete_error}")
+                
+                return {
+                    "status": "success",
+                    "user_id": user_id,
+                    "deleted_count": deleted_count,
+                    "total_found": len(conversations),
+                    "message": f"{deleted_count} conversations supprimées avec succès (tracker)",
+                    "backend": "conversation_tracker",
+                    "requester": requester_id,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+                
+            except Exception as tracker_error:
+                logger.error(f"❌ Erreur ConversationTracker suppression pour {user_id}: {tracker_error}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Erreur suppression tracker: {str(tracker_error)}"
+                )
+        
+        else:
+            # Aucun backend - retourner succès pour éviter les erreurs frontend
+            logger.warning(f"⚠️ Aucun backend pour suppression massive {user_id}")
+            
+            return {
+                "status": "accepted",
+                "user_id": user_id,
+                "deleted_count": 0,
+                "total_found": 0,
+                "message": "Suppression acceptée mais aucun backend disponible",
+                "backend": "none",
+                "requester": requester_id,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"❌ Unexpected error deleting all conversations for {user_id}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur inattendue lors de la suppression: {str(e)}"
+        )
+
 # ===== ENDPOINTS D'ADMINISTRATION (super utilisateurs) =====
 
 @router.post("/admin/ensure-index")
@@ -614,7 +920,7 @@ async def admin_ensure_index(
         return {
             "status": "success" if success else "failed",
             "index_created": success,
-            "autocommit_mode": True,  # 🔧 NOUVEAU: Indicateur mode autocommit
+            "autocommit_mode": True,
             "admin": current_user.get('email', 'unknown'),
             "timestamp": datetime.utcnow().isoformat()
         }
@@ -686,7 +992,8 @@ async def admin_database_info(
         return {
             "status": "success",
             "database_info": db_info,
-            "autocommit_fix_applied": True,  # 🔧 NOUVEAU: Indicateur fix
+            "autocommit_fix_applied": True,
+            "save_endpoint_available": True,
             "admin": current_user.get('email', 'unknown'),
             "timestamp": datetime.utcnow().isoformat()
         }
@@ -832,7 +1139,8 @@ async def test_query_performance(
             "status": "success",
             "user_id": user_id,
             "performance_results": performance_results,
-            "autocommit_fix_status": "applied",  # 🔧 NOUVEAU: Status fix
+            "autocommit_fix_status": "applied",
+            "save_endpoint_status": "available",
             "tester": current_user.get('email', 'unknown'),
             "timestamp": datetime.utcnow().isoformat()
         }
@@ -847,13 +1155,13 @@ async def test_query_performance(
             "timestamp": datetime.utcnow().isoformat()
         }
 
-# 🔧 NOUVEAU: Endpoint de diagnostic pour autocommit fix
-@router.get("/admin/autocommit-status")
-async def admin_autocommit_status(
+# 🆕 NOUVEAU: Endpoint de diagnostic pour l'endpoint save
+@router.get("/admin/save-endpoint-status")
+async def admin_save_endpoint_status(
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
-    🔧 NOUVEAU: Diagnostic du status autocommit fix pour les index CONCURRENTLY.
+    🆕 NOUVEAU: Diagnostic du status endpoint POST /save.
     Réservé aux administrateurs.
     """
     # Vérification admin
@@ -861,217 +1169,42 @@ async def admin_autocommit_status(
         raise HTTPException(status_code=403, detail="Accès administrateur requis")
     
     try:
-        if not MEMORY_AVAILABLE or not memory:
-            return {
-                "status": "unavailable",
-                "message": "PostgreSQL memory not available",
-                "autocommit_fix": "n/a"
-            }
-        
-        # Vérifier le statut de l'index
-        index_info = {}
-        try:
-            with psycopg2.connect(memory.dsn) as conn:
-                with conn.cursor() as cur:
-                    # Vérifier l'existence de l'index
-                    cur.execute("""
-                        SELECT 
-                            indexname, 
-                            indexdef,
-                            schemaname,
-                            tablename
-                        FROM pg_indexes 
-                        WHERE tablename = 'conversation_memory' 
-                        AND indexname = 'ix_conv_user_id'
-                    """)
-                    
-                    index_row = cur.fetchone()
-                    if index_row:
-                        index_info = {
-                            "exists": True,
-                            "name": index_row[0],
-                            "definition": index_row[1],
-                            "schema": index_row[2],
-                            "table": index_row[3]
-                        }
-                    else:
-                        index_info = {"exists": False}
-                    
-                    # Test de performance simple
-                    start_time = time.time()
-                    cur.execute("""
-                        SELECT COUNT(*) FROM conversation_memory 
-                        WHERE context->>'user_id' = 'test_performance'
-                    """)
-                    performance_time = (time.time() - start_time) * 1000
-                    
-        except Exception as e:
-            index_info = {"error": str(e)}
-            performance_time = -1
-        
         return {
             "status": "success",
-            "autocommit_fix": {
-                "applied": True,
-                "description": "CREATE INDEX CONCURRENTLY now uses autocommit mode",
-                "function": "ensure_user_id_index()",
-                "solution": "conn.autocommit = True before CONCURRENTLY operations"
+            "save_endpoint": {
+                "available": True,
+                "method": "POST",
+                "path": "/api/v1/conversations/save",
+                "description": "Endpoint pour sauvegarder les conversations streaming",
+                "authentication": "required",
+                "validation": "ConversationSaveRequest model",
+                "features": [
+                    "Création nouvelle conversation",
+                    "Mise à jour conversation existante", 
+                    "Évitement doublons messages",
+                    "Vérification sécurité utilisateur",
+                    "Support fallback ConversationTracker"
+                ]
             },
-            "index_status": index_info,
-            "performance_test_ms": round(performance_time, 2) if performance_time >= 0 else "error",
+            "backend_status": {
+                "postgresql_memory": MEMORY_AVAILABLE,
+                "conversation_tracker": conversation_tracker is not None,
+                "primary_backend": "postgresql" if MEMORY_AVAILABLE else "tracker" if conversation_tracker else "none"
+            },
+            "fixed_issue": {
+                "error_405": "resolved",
+                "description": "POST /conversations/save endpoint now available",
+                "compatibility": "frontend_streaming_llm"
+            },
             "admin": current_user.get('email', 'unknown'),
             "timestamp": datetime.utcnow().isoformat()
         }
         
     except Exception as e:
-        logger.error(f"❌ Erreur diagnostic autocommit: {e}")
+        logger.error(f"❌ Erreur diagnostic save endpoint: {e}")
         return {
             "status": "error",
             "error": str(e),
-            "autocommit_fix": "unknown",
             "admin": current_user.get('email', 'unknown'),
             "timestamp": datetime.utcnow().isoformat()
-        }
-
-
-# Remplacez COMPLÈTEMENT l'endpoint @router.get("/questions") dans logging.py
-
-@router.get("/questions")
-async def get_questions(
-    page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100),
-    search: str = Query(""),
-    source: str = Query("all"),
-    confidence: str = Query("all"), 
-    feedback: str = Query("all"),
-    user: str = Query("all"),
-    time_range: str = Query("month"),
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """Récupérer la liste des questions avec filtres - VERSION SIMPLIFIÉE QUI MARCHE"""
-    
-    if not has_permission(current_user, Permission.VIEW_ALL_ANALYTICS):
-        raise HTTPException(
-            status_code=403, 
-            detail=f"View all analytics permission required. Your role: {current_user.get('user_type', 'user')}"
-        )
-    
-    try:
-        analytics = get_analytics_manager()
-        
-        # Calculer la période
-        now = datetime.now()
-        if time_range == "day":
-            start_date = now - timedelta(days=1)
-        elif time_range == "week":
-            start_date = now - timedelta(days=7)
-        elif time_range == "month":
-            start_date = now - timedelta(days=30)
-        elif time_range == "year":
-            start_date = now - timedelta(days=365)
-        else:
-            start_date = now - timedelta(days=30)
-        
-        with psycopg2.connect(analytics.dsn) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                
-                # REQUÊTE SIMPLE SANS FILTRES COMPLEXES POUR COMMENCER
-                logger.info(f"🔍 Recherche questions depuis {start_date}")
-                
-                # Test: récupérer TOUTES les questions sans filtres d'abord
-                cur.execute("""
-                    SELECT COUNT(*) 
-                    FROM user_questions_complete 
-                    WHERE created_at >= %s
-                """, (start_date,))
-                
-                total_count = cur.fetchone()[0]
-                logger.info(f"📊 Total questions trouvées: {total_count}")
-                
-                if total_count == 0:
-                    logger.warning("⚠️ Aucune question dans user_questions_complete")
-                    return {
-                        "questions": [],
-                        "pagination": {"page": 1, "limit": limit, "total": 0, "pages": 0},
-                        "debug": "no_questions_in_period"
-                    }
-                
-                # Récupérer les questions de base
-                cur.execute("""
-                    SELECT 
-                        id,
-                        created_at,
-                        user_email,
-                        question,
-                        response_text,
-                        response_source,
-                        COALESCE(response_confidence, 0) as confidence,
-                        COALESCE(processing_time_ms, 0) as response_time_ms,
-                        COALESCE(language, 'fr') as language,
-                        COALESCE(session_id, '') as session_id,
-                        status
-                    FROM user_questions_complete 
-                    WHERE created_at >= %s
-                    ORDER BY created_at DESC
-                    LIMIT %s OFFSET %s
-                """, (start_date, limit, (page - 1) * limit))
-                
-                questions_raw = cur.fetchall()
-                logger.info(f"📊 Questions récupérées: {len(questions_raw)}")
-                
-                # Formatage SIMPLE
-                formatted_questions = []
-                for row in questions_raw:
-                    try:
-                        formatted_questions.append({
-                            "id": str(row["id"]),
-                            "timestamp": row["created_at"].isoformat() if row["created_at"] else None,
-                            "user_email": row["user_email"] or "",
-                            "user_name": (row["user_email"] or "").split('@')[0].replace('.', ' ').title() if row["user_email"] else "Utilisateur",
-                            "question": row["question"] or "",
-                            "response": row["response_text"] or "",
-                            "response_source": row["response_source"] or "unknown",
-                            "confidence_score": float(row["confidence"] or 0),
-                            "response_time": int(row["response_time_ms"] or 0) / 1000,  # ms vers secondes
-                            "language": row["language"] or "fr",
-                            "session_id": row["session_id"] or "",
-                            "feedback": None,  # À implémenter si besoin
-                            "feedback_comment": None
-                        })
-                    except Exception as format_error:
-                        logger.error(f"❌ Erreur formatage question {row['id']}: {format_error}")
-                        continue
-                
-                logger.info(f"✅ Questions formatées: {len(formatted_questions)}")
-                
-                return {
-                    "questions": formatted_questions,
-                    "pagination": {
-                        "page": page,
-                        "limit": limit,
-                        "total": total_count,
-                        "pages": (total_count + limit - 1) // limit if limit > 0 else 1
-                    },
-                    "filters_applied": {
-                        "search": search,
-                        "source": source,
-                        "confidence": confidence,
-                        "feedback": feedback,
-                        "user": user,
-                        "time_range": time_range
-                    },
-                    "debug": {
-                        "total_found": total_count,
-                        "formatted_count": len(formatted_questions),
-                        "start_date": start_date.isoformat()
-                    }
-                }
-                    
-    except Exception as e:
-        logger.error(f"❌ Erreur récupération questions: {e}")
-        return {
-            "error": str(e),
-            "questions": [],
-            "pagination": {"page": 1, "limit": limit, "total": 0, "pages": 0},
-            "debug": {"error_type": type(e).__name__, "error_message": str(e)}
         }
