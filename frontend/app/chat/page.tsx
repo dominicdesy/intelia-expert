@@ -677,58 +677,6 @@ function ChatInterface() {
     }
   }, [isAuthenticated, user?.email])
 
-  // Fonctions de gestion des messages - CORRIGÉ POUR STREAMING
-  const extractAnswerAndSources = useCallback((result: any): [string, any[]] => {
-    let answerText = ""
-    let sources: any[] = []
-
-    if (result?.type === 'validation_rejected') {
-      let rejectionMessage = result.message || t('chat.rejectionMessage')
-
-      if (result.validation?.suggested_topics && result.validation.suggested_topics.length > 0) {
-        rejectionMessage += `\n\n**${t('chat.suggestedTopics')}**\n`
-        result.validation.suggested_topics.forEach((topic: string) => {
-          rejectionMessage += `• ${topic}\n`
-        })
-      }
-
-      return [rejectionMessage, []]
-    }
-
-    if (result?.type === 'answer' && result?.answer) {
-      answerText = result.answer.text || ""
-      return [answerText, []]
-    }
-
-    if (result?.type === 'partial_answer' && result?.general_answer) {
-      answerText = result.general_answer.text || ""
-      return [answerText, []]
-    }
-
-    const responseContent = result?.response || ""
-
-    if (typeof responseContent === 'object' && responseContent !== null) {
-      answerText = String(responseContent.answer || "").trim()
-      if (!answerText) {
-        answerText = t('chat.formatError')
-      }
-    } else {
-      answerText = String(responseContent).trim() || t('chat.formatError')
-
-      if (answerText.includes("'type': 'text'") && answerText.includes("'answer':")) {
-        const match = answerText.match(/'answer': "(.+?)"/)
-        if (match) {
-          answerText = match[1]
-            .replace(/\\"/g, '"')
-            .replace(/\\n/g, '\n')
-            .replace(/\\\\/g, '\\')
-        }
-      }
-    }
-
-    return [answerText, []]
-  }, [t])
-
   // FONCTION CORRIGÉE POUR STREAMING
   const handleSendMessage = useCallback(async () => {
     const safeText = inputMessage
@@ -757,11 +705,11 @@ function ChatInterface() {
     setShouldAutoScroll(true)
     setIsUserScrolling(false)
 
-    // Ajouter le message assistant placeholder
+    // CHANGEMENT PRINCIPAL : Créer le message assistant vide AVANT l'appel API
     const assistantId = `ai-${Date.now()}`
     addMessage({
       id: assistantId,
-      content: '',
+      content: '',  // Placeholder vide qui sera alimenté en streaming
       isUser: false,
       timestamp: new Date()
     })
@@ -778,7 +726,7 @@ function ChatInterface() {
 
       const optimalLevel = undefined
       
-      // CORRIGÉ: Appel avec callbacks de streaming
+      // APPEL AVEC CALLBACKS DE STREAMING
       const response = await generateAIResponse(
         finalQuestionOrSafeText,
         user,
@@ -790,7 +738,7 @@ function ChatInterface() {
         clarificationState ? { answer: safeText.trim() } : undefined,
         {
           onDelta: (chunk: string) => {
-            // CORRIGÉ: Obtenir le message actuel et le mettre à jour
+            // Mettre à jour le message en accumulant les chunks
             const currentMessage = useChatStore.getState().currentConversation?.messages.find(m => m.id === assistantId)
             if (currentMessage) {
               updateMessage(assistantId, {
@@ -798,22 +746,29 @@ function ChatInterface() {
               })
             }
           },
-          onFinal: (full: string) => {
+          onFinal: (fullText: string) => {
+            // Mise à jour finale avec le texte complet
             updateMessage(assistantId, { 
-              content: full 
+              content: fullText 
             })
           },
-          onFollowup: (msg: string) => {
-            // Rien à changer : la notification DOM existe déjà via apiService
+          onFollowup: (followupMessage: string) => {
+            // CHANGEMENT PRINCIPAL : Ajouter la relance comme un nouveau message assistant
+            addMessage({
+              id: `followup-${Date.now()}`,
+              content: followupMessage,
+              isUser: false,
+              timestamp: new Date()
+            })
           }
         }
       )
 
       if (!isMountedRef.current) return
 
-      // Vérification des erreurs d'authentification basée sur le contenu de la réponse
+      // Vérification des erreurs d'authentification
       if (response?.response?.includes?.('Session expirée') ||
-          response?.response?.includes?.('Token expired') ||
+          response?.response?.includes?. ('Token expired') ||
           response?.response?.includes?.('authentication_failed') ||
           response?.response?.includes?.('Unauthorized') ||
           response?.response?.includes?.('401') ||
@@ -830,7 +785,7 @@ function ChatInterface() {
       const needsClarification = response.clarification_result?.clarification_requested === true
 
       if (needsClarification) {
-        // Mise à jour finale pour clarification
+        // Mise à jour pour clarification
         const clarificationText = (response.full_text || response.response) + `\n\n${t('chat.clarificationInstruction')}`
         
         updateMessage(assistantId, {

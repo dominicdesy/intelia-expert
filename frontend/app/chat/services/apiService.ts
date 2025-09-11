@@ -172,59 +172,8 @@ interface EnhancedAIResponse {
   note?: string
 }
 
-// NOUVELLE FONCTION corrigée pour afficher les relances proactives
-function showProactiveFollowupNotification(followupText: string) {
-  console.log('[apiService] 💡 Relance proactive:', followupText);
-  
-  // Créer une notification temporaire
-  const notification = document.createElement('div');
-  notification.className = 'proactive-followup-notification proactive-notification-styles';
-  
-  // Structure HTML avec les classes CSS appropriées
-  notification.innerHTML = `
-    <div class="proactive-notification-content">
-      <span class="proactive-notification-icon">💡</span>
-      <div class="proactive-notification-text-container">
-        <p class="proactive-notification-title">Suggestion</p>
-        <p class="proactive-notification-message">${followupText}</p>
-      </div>
-      <button class="proactive-notification-close" onclick="this.closest('.proactive-followup-notification').remove()" aria-label="Fermer la notification">
-        ×
-      </button>
-    </div>
-  `;
-  
-  // Ajouter au DOM
-  document.body.appendChild(notification);
-  
-  console.log('[apiService] Notification ajoutée au DOM');
-  
-  // Supprimer automatiquement après 15 secondes
-  setTimeout(() => {
-    if (notification.parentNode) {
-      notification.classList.add('proactive-notification-exit');
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.remove();
-          console.log('[apiService] Notification supprimée automatiquement');
-        }
-      }, 300); // Attendre la fin de l'animation de sortie
-    }
-  }, 15000);
-  
-  // Accessibilité : focus sur le bouton fermer si nécessaire
-  const closeButton = notification.querySelector('.proactive-notification-close') as HTMLElement;
-  if (closeButton) {
-    closeButton.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        notification.remove();
-      }
-    });
-  }
-}
-
 /**
- * FONCTION STREAMING SSE INTERNE - VERSION MISE À JOUR AVEC CALLBACKS
+ * FONCTION STREAMING SSE INTERNE - VERSION CORRIGÉE AVEC CALLBACKS
  * Gère l'appel vers /api/chat/stream avec support des callbacks et relances proactives
  */
 async function streamAIResponseInternal(
@@ -284,7 +233,6 @@ async function streamAIResponseInternal(
   const decoder = new TextDecoder();
   let finalAnswer = "";
   let buffer = "";
-  let proactiveFollowups: string[] = [];
 
   try {
     while (true) {
@@ -317,19 +265,15 @@ async function streamAIResponseInternal(
           
           if (event.type === "delta" && typeof event.text === "string" && event.text) {
             finalAnswer += event.text;
-            callbacks?.onDelta?.(event.text);
+            callbacks?.onDelta?.(event.text);            // <<< STREAM LIVE
           } else if (event.type === "final" && event.answer) {
             finalAnswer = event.answer;
-            callbacks?.onFinal?.(finalAnswer);
+            callbacks?.onFinal?.(finalAnswer);           // <<< FIN
             // ne break PAS ici : on laisse sortir proprement (reader.done)
           } else if (event.type === "proactive_followup" && event.answer) {
-            // Gestion des relances proactives
+            // ✅ NOUVEAU: on pousse dans le chat via callback (plus de notification/bulle)
             console.log('[apiService] Relance proactive reçue:', event.answer);
-            proactiveFollowups.push(event.answer);
-            callbacks?.onFollowup?.(event.answer);
-            
-            // Afficher immédiatement la relance comme notification
-            showProactiveFollowupNotification(event.answer);
+            callbacks?.onFollowup?.(event.answer);       // <<< RELANCE DANS LE CHAT
             
           } else if (event.type === "error") {
             console.error('[apiService] Erreur dans le stream:', event);
@@ -348,11 +292,6 @@ async function streamAIResponseInternal(
     } catch {
       // Ignore les erreurs de cancel
     }
-  }
-
-  // Log des relances reçues
-  if (proactiveFollowups.length > 0) {
-    console.log('[apiService] Relances proactives reçues:', proactiveFollowups.length);
   }
 
   return finalAnswer;
@@ -434,7 +373,7 @@ export const generateAIResponse = async (
         concision_level: concisionLevel,
         ...(clarificationEntities && { clarification_entities: clarificationEntities })
       },
-      callbacks
+      callbacks  // <<< PROPAGATION DES CALLBACKS
     );
 
     console.log('[apiService] Streaming terminé:', {
@@ -583,7 +522,7 @@ export const generateAIResponsePublic = async (
       question.trim(),
       finalConversationId,
       undefined,
-      callbacks
+      callbacks  // <<< PROPAGATION DES CALLBACKS
     );
 
     // Stockage du session ID
