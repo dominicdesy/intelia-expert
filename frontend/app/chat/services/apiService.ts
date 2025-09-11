@@ -3,6 +3,13 @@
 import { conversationService } from './conversationService'
 import { getSupabaseClient } from '@/lib/supabase/singleton'
 
+// Types pour les callbacks de streaming
+type StreamCallbacks = {
+  onDelta?: (text: string) => void;
+  onFinal?: (full: string) => void;
+  onFollowup?: (msg: string) => void;
+};
+
 // Configuration API pour le backend métier (stats, billing, etc.)
 const getApiConfig = () => {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
@@ -217,15 +224,16 @@ function showProactiveFollowupNotification(followupText: string) {
 }
 
 /**
- * FONCTION STREAMING SSE INTERNE - VERSION MISE À JOUR AVEC HEADERS COMPLETS
- * Gère l'appel vers /api/chat/stream avec support des relances proactives
+ * FONCTION STREAMING SSE INTERNE - VERSION MISE À JOUR AVEC CALLBACKS
+ * Gère l'appel vers /api/chat/stream avec support des callbacks et relances proactives
  */
 async function streamAIResponseInternal(
   tenant_id: string,
   lang: string,
   message: string,
   conversation_id: string,
-  user_context?: any
+  user_context?: any,
+  callbacks?: StreamCallbacks
 ): Promise<string> {
   
   const payload = {
@@ -239,10 +247,11 @@ async function streamAIResponseInternal(
   console.log('[apiService] Streaming vers /api/chat/stream:', {
     tenant_id,
     lang,
-    message_preview: message.substring(0, 50) + '...'
+    message_preview: message.substring(0, 50) + '...',
+    has_callbacks: !!callbacks
   });
 
-  // CHANGEMENT: Headers SSE complets avec Cache-Control
+  // Headers SSE complets avec Cache-Control
   const response = await fetch('/api/chat/stream', {
     method: 'POST',
     headers: {
@@ -270,12 +279,12 @@ async function streamAIResponseInternal(
     throw new Error("Pas de flux de données reçu");
   }
 
-  // Traitement du flux SSE
+  // Traitement du flux SSE avec callbacks
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let finalAnswer = "";
   let buffer = "";
-  let proactiveFollowups: string[] = []; // NOUVEAU : Stocker les relances
+  let proactiveFollowups: string[] = [];
 
   try {
     while (true) {
@@ -308,13 +317,16 @@ async function streamAIResponseInternal(
           
           if (event.type === "delta" && typeof event.text === "string" && event.text) {
             finalAnswer += event.text;
+            callbacks?.onDelta?.(event.text);
           } else if (event.type === "final" && event.answer) {
             finalAnswer = event.answer;
-            break;
+            callbacks?.onFinal?.(finalAnswer);
+            // ne break PAS ici : on laisse sortir proprement (reader.done)
           } else if (event.type === "proactive_followup" && event.answer) {
-            // NOUVEAU : Gestion des relances proactives
+            // Gestion des relances proactives
             console.log('[apiService] Relance proactive reçue:', event.answer);
             proactiveFollowups.push(event.answer);
+            callbacks?.onFollowup?.(event.answer);
             
             // Afficher immédiatement la relance comme notification
             showProactiveFollowupNotification(event.answer);
@@ -338,7 +350,7 @@ async function streamAIResponseInternal(
     }
   }
 
-  // NOUVEAU : Log des relances reçues
+  // Log des relances reçues
   if (proactiveFollowups.length > 0) {
     console.log('[apiService] Relances proactives reçues:', proactiveFollowups.length);
   }
@@ -358,7 +370,8 @@ export const generateAIResponse = async (
   concisionLevel: 'ultra_concise' | 'concise' | 'standard' | 'detailed' = 'concise',
   isClarificationResponse = false,
   originalQuestion?: string,
-  clarificationEntities?: Record<string, any>
+  clarificationEntities?: Record<string, any>,
+  callbacks?: StreamCallbacks
 ): Promise<EnhancedAIResponse> => {
   
   if (!question || question.trim() === '') {
@@ -375,7 +388,8 @@ export const generateAIResponse = async (
     question: question.substring(0, 50) + '...',
     session_id: finalConversationId.substring(0, 8) + '...',
     user_id: user.id,
-    system: 'LLM Backend Streaming'
+    system: 'LLM Backend Streaming',
+    has_callbacks: !!callbacks
   })
 
   try {
@@ -409,7 +423,7 @@ export const generateAIResponse = async (
       }
     }
 
-    // Appel au service de streaming
+    // Appel au service de streaming avec callbacks
     const finalResponse = await streamAIResponseInternal(
       tenant_id,
       language,
@@ -419,7 +433,8 @@ export const generateAIResponse = async (
         user_id: user.id,
         concision_level: concisionLevel,
         ...(clarificationEntities && { clarification_entities: clarificationEntities })
-      }
+      },
+      callbacks
     );
 
     console.log('[apiService] Streaming terminé:', {
@@ -545,7 +560,8 @@ export const generateAIResponsePublic = async (
   question: string,
   language: string = 'fr',
   conversationId?: string,
-  concisionLevel: 'ultra_concise' | 'concise' | 'standard' | 'detailed' = 'concise'
+  concisionLevel: 'ultra_concise' | 'concise' | 'standard' | 'detailed' = 'concise',
+  callbacks?: StreamCallbacks
 ): Promise<EnhancedAIResponse> => {
   
   if (!question || question.trim() === '') {
@@ -556,7 +572,8 @@ export const generateAIResponsePublic = async (
 
   console.log('[apiService] Génération AI publique avec streaming:', {
     question: question.substring(0, 50) + '...',
-    session_id: finalConversationId.substring(0, 8) + '...'
+    session_id: finalConversationId.substring(0, 8) + '...',
+    has_callbacks: !!callbacks
   })
 
   try {
@@ -564,7 +581,9 @@ export const generateAIResponsePublic = async (
       'ten_public',
       language,
       question.trim(),
-      finalConversationId
+      finalConversationId,
+      undefined,
+      callbacks
     );
 
     // Stockage du session ID

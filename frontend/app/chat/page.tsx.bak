@@ -10,7 +10,7 @@ import { useTranslation } from '@/lib/languages/i18n'
 import { useChatStore } from './hooks/useChatStore'
 import { generateAIResponse } from './services/apiService'
 import { conversationService } from './services/conversationService'
-// ❌ SUPPRIMÉ - Plus de Supabase direct
+// ⌐ SUPPRIMÉ - Plus de Supabase direct
 // import { getSupabaseClient } from '@/lib/supabase/singleton'
 
 import {
@@ -687,7 +687,7 @@ function ChatInterface() {
     }
   }, [isAuthenticated, user?.email])
 
-  // Fonctions de gestion des messages - MODIFIÉES POUR STREAMING
+  // Fonctions de gestion des messages - CONSERVÉES
   const extractAnswerAndSources = useCallback((result: any): [string, any[]] => {
     let answerText = ""
     let sources: any[] = []
@@ -739,7 +739,6 @@ function ChatInterface() {
     return [answerText, []]
   }, [t])
 
-  // ✅ FONCTION MODIFIÉE POUR STREAMING
   const handleSendMessage = useCallback(async () => {
     const safeText = inputMessage
     
@@ -760,63 +759,38 @@ function ChatInterface() {
       conversationIdToSend = currentConversation.id
     }
 
-    // Ajouter le message utilisateur
     addMessage(userMessage)
     setInputMessage('')
     setIsLoadingChat(true)
     setShouldAutoScroll(true)
     setIsUserScrolling(false)
 
-    // ✅ AJOUT DU MESSAGE ASSISTANT PLACEHOLDER
-    const assistantId = `ai-${Date.now()}`
-    addMessage({
-      id: assistantId,
-      content: '',                 // placeholder vide
-      isUser: false,
-      timestamp: new Date()
-    })
-
     try {
-      let finalQuestionOrSafeText: string
+      let response;
+      const optimalLevel = undefined;
 
       if (clarificationState) {
-        finalQuestionOrSafeText = clarificationState.originalQuestion + " " + safeText.trim()
+        response = await generateAIResponse(
+          clarificationState.originalQuestion + " " + safeText.trim(),
+          user,
+          currentLanguage,
+          conversationIdToSend,
+          optimalLevel,
+          true,
+          clarificationState.originalQuestion,
+          { answer: safeText.trim() }
+        )
+
         setClarificationState(null)
       } else {
-        finalQuestionOrSafeText = safeText.trim()
+        response = await generateAIResponse(
+          safeText.trim(),
+          user,
+          currentLanguage,
+          conversationIdToSend,
+          optimalLevel
+        )
       }
-
-      const optimalLevel = undefined
-      
-      // ✅ APPEL AVEC CALLBACKS DE STREAMING
-      const response = await generateAIResponse(
-        finalQuestionOrSafeText,
-        user,
-        currentLanguage,
-        conversationIdToSend,
-        optimalLevel,
-        /* isClarificationResponse */ clarificationState !== null,
-        clarificationState?.originalQuestion,
-        clarificationState ? { answer: safeText.trim() } : undefined,
-        {
-          onDelta: (chunk: string) => {
-            // Concaténation incrémentale
-            updateMessage(assistantId, (prev) => ({
-              ...prev,
-              content: (prev.content || '') + chunk
-            }))
-          },
-          onFinal: (full: string) => {
-            updateMessage(assistantId, (prev) => ({ 
-              ...prev, 
-              content: full 
-            }))
-          },
-          onFollowup: (msg: string) => {
-            // Rien à changer : la notification DOM existe déjà via apiService
-          }
-        }
-      )
 
       if (!isMountedRef.current) return
 
@@ -834,28 +808,35 @@ function ChatInterface() {
       const needsClarification = response.clarification_result?.clarification_requested === true
 
       if (needsClarification) {
-        // ✅ MISE À JOUR FINALE POUR CLARIFICATION
-        const clarificationText = (response.full_text || response.response) + `\n\n${t('chat.clarificationInstruction')}`
-        
-        updateMessage(assistantId, (prev) => ({
-          ...prev,
-          content: clarificationText,
+        const clarificationMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: (response.full_text || response.response) + `\n\n${t('chat.clarificationInstruction')}`,
+          isUser: false,
+          timestamp: new Date(),
           conversation_id: response.conversation_id
-        }))
+        }
 
+        addMessage(clarificationMessage)
         setClarificationState({
-          messageId: assistantId,
+          messageId: clarificationMessage.id,
           originalQuestion: safeText.trim(),
           clarificationQuestions: response.clarification_questions || []
         })
       } else {
-        // ✅ MISE À JOUR FINALE AVEC MÉTADONNÉES
-        updateMessage(assistantId, (prev) => ({
-          ...prev,
+        const [answerText, sources] = extractAnswerAndSources(response)
+        const cleanedText = cleanResponseText(answerText)
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: cleanedText || t('chat.emptyContent'),
+          isUser: false,
+          timestamp: new Date(),
           conversation_id: response.conversation_id,
           response_versions: response.response_versions,
           originalResponse: response.response
-        }))
+        }
+
+        addMessage(aiMessage)
       }
 
     } catch (error) {
@@ -863,19 +844,20 @@ function ChatInterface() {
       handleAuthError(error)
 
       if (isMountedRef.current) {
-        // ✅ MISE À JOUR DU MESSAGE D'ERREUR
-        const errorContent = error instanceof Error ? error.message : t('chat.errorMessage')
-        updateMessage(assistantId, (prev) => ({
-          ...prev,
-          content: errorContent
-        }))
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: error instanceof Error ? error.message : t('chat.errorMessage'),
+          isUser: false,
+          timestamp: new Date()
+        }
+        addMessage(errorMessage)
       }
     } finally {
       if (isMountedRef.current) {
         setIsLoadingChat(false)
       }
     }
-  }, [inputMessage, currentConversation, addMessage, updateMessage, clarificationState, user, currentLanguage, handleAuthError, t])
+  }, [inputMessage, currentConversation, addMessage, clarificationState, user, currentLanguage, cleanResponseText, handleAuthError, t, extractAnswerAndSources])
 
   // Fonctions de feedback (conservées)
   const handleFeedbackClick = useCallback((messageId: string, feedback: 'positive' | 'negative') => {
