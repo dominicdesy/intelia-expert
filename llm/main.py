@@ -50,6 +50,7 @@ FALLBACK_MAX_COMPLETION_TOKENS = int(
 
 LANGUAGE_FILE = os.getenv("LANGUAGE_FILE", os.path.join(BASE_DIR, "languages.json"))
 BLOCKED_TERMS_FILE = os.getenv("BLOCKED_TERMS_FILE", os.path.join(BASE_DIR, "blocked_terms.json"))
+INTENTS_FILE = os.getenv("INTENTS_FILE", os.path.join(BASE_DIR, "intents.json"))
 
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY is required")
@@ -101,10 +102,34 @@ def _load_blocked_terms(path: str) -> list:
 
 BLOCKED_TERMS = _load_blocked_terms(BLOCKED_TERMS_FILE)
 
+# Charger la configuration des intentions pour les relances contextuelles
+def _load_intents_config(path: str) -> dict:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Unable to load intents config from {path}: {e}")
+        return {}
+
+INTENTS_CONFIG = _load_intents_config(INTENTS_FILE)
+
+# Templates de relances par métrique spécifique
+METRIC_FOLLOWUP_TEMPLATES = {
+    "body_weight_target": "Souhaitez-vous que je vérifie si vos résultats actuels sont dans la norme, ou analyser les causes d'un éventuel écart (nutrition, climat, densité) ?",
+    "fcr_target": "Souhaitez-vous comparer ce FCR avec vos performances actuelles ou identifier les leviers d'optimisation ?",
+    "water_intake_daily": "Voulez-vous que j'analyse la cohérence avec votre consommation d'aliment ou les facteurs climatiques ?",
+    "feed_intake_daily": "Voulez-vous comparer cette consommation avec vos objectifs de croissance ou optimiser votre formulation ?",
+    "ambient_temp_target": "Voulez-vous que je calcule la courbe de température optimale pour votre bâtiment ?",
+    "feed_cost_per_bird": "Souhaitez-vous que j'analyse les leviers de réduction de ce coût ou compare avec vos marges ?",
+}
+
 logger.info(f"LANGUAGE_FILE={LANGUAGE_FILE} exists={os.path.exists(LANGUAGE_FILE)}")
 logger.info(f"BLOCKED_TERMS_FILE={BLOCKED_TERMS_FILE} exists={os.path.exists(BLOCKED_TERMS_FILE)}")
+logger.info(f"INTENTS_FILE={INTENTS_FILE} exists={os.path.exists(INTENTS_FILE)}")
 logger.info(f"FALLBACK_MODEL={FALLBACK_MODEL}")
 logger.info(f"Loaded {len(BLOCKED_TERMS)} blocked terms")
+logger.info(f"Loaded {len(METRIC_FOLLOWUP_TEMPLATES)} metric followup templates")
+logger.info(f"Intents config loaded: {bool(INTENTS_CONFIG)}")
 
 def get_out_of_domain_message(lang: str) -> str:
     if not lang:
@@ -215,6 +240,101 @@ def clean_text(txt: str) -> str:
     return cleaned.strip()
 
 # -----------------------------------------------------------------------------
+# Proactive Followup System
+# -----------------------------------------------------------------------------
+
+def extract_intent_from_question(question: str) -> dict:
+    """Extraction basique d'intent à partir de la question pour les relances"""
+    question_lower = question.lower()
+    
+    detected_metric = None
+    if any(word in question_lower for word in ['poids', 'weight', 'gramme', 'kg']):
+        if any(word in question_lower for word in ['cible', 'target', 'objectif']):
+            detected_metric = "body_weight_target"
+    elif any(word in question_lower for word in ['fcr', 'conversion']):
+        detected_metric = "fcr_target"
+    elif any(word in question_lower for word in ['eau', 'water']):
+        detected_metric = "water_intake_daily"
+    elif any(word in question_lower for word in ['aliment', 'feed']):
+        detected_metric = "feed_intake_daily"
+    elif any(word in question_lower for word in ['température', 'temperature']):
+        detected_metric = "ambient_temp_target"
+    elif any(word in question_lower for word in ['coût', 'cost']):
+        detected_metric = "feed_cost_per_bird"
+    
+    # Extraction de la lignée
+    detected_line = None
+    aliases = INTENTS_CONFIG.get("aliases", {}).get("line", {})
+    for canonical_line, alias_list in aliases.items():
+        if canonical_line in question_lower:
+            detected_line = canonical_line
+            break
+        for alias in alias_list:
+            if alias.lower() in question_lower:
+                detected_line = canonical_line
+                break
+        if detected_line:
+            break
+    
+    return {
+        "metric": detected_metric,
+        "line": detected_line,
+        "has_specific_context": detected_metric is not None or detected_line is not None
+    }
+
+def should_generate_proactive_followup(question: str, answer: str, intent_data: dict) -> bool:
+    """Détermine si une relance proactive doit être générée"""
+    if len(answer) < 50 or "désolé" in answer.lower():
+        return False
+    if any(word in question.lower() for word in ['pourquoi', 'comment']):
+        return False
+    return intent_data.get("has_specific_context", False)
+
+def generate_proactive_followup(question: str, answer: str, lang: str = "fr") -> Optional[str]:
+    """Génère une relance proactive contextuelle"""
+    try:
+        intent_data = extract_intent_from_question(question)
+        if not should_generate_proactive_followup(question, answer, intent_data):
+            return None
+        detected_metric = intent_data.get("metric")
+        if detected_metric and detected_metric in METRIC_FOLLOWUP_TEMPLATES:
+            return METRIC_FOLLOWUP_TEMPLATES[detected_metric]
+        return None
+    except Exception as e:
+        logger.error(f"Erreur génération relance proactive: {e}")
+        return None
+
+# -----------------------------------------------------------------------------
+# Conversation Memory
+# -----------------------------------------------------------------------------
+conversation_memory = {}
+MAX_MEMORY_ITEMS = 3
+
+def needs_context(question: str) -> bool:
+    ambiguous_terms = ["cette maladie", "ce traitement", "cette méthode", "il", "elle", "ça"]
+    return any(term in question.lower() for term in ambiguous_terms)
+
+def add_to_conversation_memory(tenant_id: str, question: str, answer: str):
+    if tenant_id not in conversation_memory:
+        conversation_memory[tenant_id] = []
+    conversation_memory[tenant_id].append({"question": question, "answer": answer, "timestamp": time.time()})
+    if len(conversation_memory[tenant_id]) > MAX_MEMORY_ITEMS:
+        conversation_memory[tenant_id] = conversation_memory[tenant_id][-MAX_MEMORY_ITEMS:]
+
+def build_context_prompt(tenant_id: str, current_question: str) -> str:
+    if not needs_context(current_question):
+        return current_question
+    history = conversation_memory.get(tenant_id, [])
+    if not history:
+        return current_question
+    context_parts = ["CONTEXTE:"]
+    for item in history[-2:]:
+        context_parts.append(f"Q: {item['question']}")
+        context_parts.append(f"R: {item['answer'][:150]}...")
+    context_parts.append(f"QUESTION ACTUELLE: {current_question}")
+    return "\n".join(context_parts)
+
+# -----------------------------------------------------------------------------
 # Domain guard (permissif: bloque évidents hors-agri)
 # -----------------------------------------------------------------------------
 def create_blocked_pattern(terms_list: list) -> re.Pattern:
@@ -260,12 +380,13 @@ def create_chat_completion_safe(client, model, messages, max_completion_tokens, 
 # -----------------------------------------------------------------------------
 # Data-only (Assistant v2)
 # -----------------------------------------------------------------------------
-def run_data_only_assistant(client: OpenAI, assistant_id: str, user_text: str, lang: str) -> str:
+def run_data_only_assistant(client: OpenAI, assistant_id: str, user_text: str, lang: str, tenant_id: str = "") -> str:
+    contextual_prompt = build_context_prompt(tenant_id, user_text)
     reminder = (
         f"Tu es un expert en aviculture. Réponds aux questions en utilisant tes connaissances.\n"
         f"Si tu ne connais pas la réponse précise, dis-le clairement.\n"
         f"Réponds dans la langue de la question: {lang}\n\n"
-        f"Question: {user_text}"
+        f"Question: {contextual_prompt}"
     )
     
     try:
@@ -439,37 +560,53 @@ async def chat_stream(request: Request):
 
             _client = client
 
-            # 2) Tentative data-only (Assistant v2)
-            text = await asyncio.to_thread(run_data_only_assistant, _client, ASSISTANT_ID, message, lang)
+            # 2) Tentative data-only (Assistant v2) avec contexte
+            text = await asyncio.to_thread(run_data_only_assistant, _client, ASSISTANT_ID, message, lang, tenant_id)
             text = clean_text(text)
             logger.info(f"[REQ {request_id}] Assistant response: {text[:100]}...")
+
+            final_response = ""
 
             # 3) Fallback GPT si hors base
             if text.lower().startswith("hors base"):
                 if HYBRID_MODE and allow_fallback:
                     logger.info(f"[REQ {request_id}] Basculement vers fallback GPT")
+                    response_chunks = []
                     async for sse in stream_fallback_general(_client, message):
                         yield sse
+                        # Collecter pour la mémoire
+                        try:
+                            sse_data = json.loads(sse.decode('utf-8').replace('data: ', ''))
+                            if sse_data.get('type') == 'final':
+                                final_response = sse_data.get('answer', '')
+                        except:
+                            pass
                     sent_final = True
-                    return
                 else:
+                    final_response = text
                     yield send_event({"type": "final", "answer": text})
                     sent_final = True
-                    return
-
-            # 4) Réponse data-only (stream simulé)
-            if not text:
-                text = "Désolé, aucune réponse n'a pu être générée."
+            else:
+                # 4) Réponse data-only (stream simulé)
+                if not text:
+                    text = "Désolé, aucune réponse n'a pu être générée."
                 
-            for i in range(0, len(text), STREAM_CHUNK_LEN):
-                chunk = clean_text(text[i:i + STREAM_CHUNK_LEN])
-                if chunk:
-                    yield send_event({"type": "delta", "text": chunk})
-                    await asyncio.sleep(0.02)
-                    
-            final_answer = text
-            yield send_event({"type": "final", "answer": final_answer})
-            sent_final = True
+                for i in range(0, len(text), STREAM_CHUNK_LEN):
+                    chunk = clean_text(text[i:i + STREAM_CHUNK_LEN])
+                    if chunk:
+                        yield send_event({"type": "delta", "text": chunk})
+                        await asyncio.sleep(0.02)
+                
+                final_response = text
+                yield send_event({"type": "final", "answer": text})
+                sent_final = True
+
+            # 5) Ajouter à la mémoire et générer relance
+            if final_response:
+                add_to_conversation_memory(tenant_id, message, final_response)
+                proactive_followup = generate_proactive_followup(message, final_response, lang)
+                if proactive_followup:
+                    yield send_event({"type": "proactive_followup", "answer": proactive_followup})
 
         except HTTPException:
             raise
