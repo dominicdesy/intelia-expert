@@ -80,7 +80,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           if (token) {
             // CORRECTION: Utiliser l'endpoint logout au lieu de heartbeat
             const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
-            const logoutUrl = `${baseUrl}/api/v1/auth/logout`
+            const logoutUrl = `${baseUrl}/v1/auth/logout`
             
             fetch(logoutUrl, {
               method: 'POST',
