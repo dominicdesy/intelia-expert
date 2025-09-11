@@ -677,7 +677,7 @@ function ChatInterface() {
     }
   }, [isAuthenticated, user?.email])
 
-  // FONCTION CORRIGÉE POUR STREAMING
+  // FONCTION CORRIGÉE POUR STREAMING - Élimine le scintillement
   const handleSendMessage = useCallback(async () => {
     const safeText = inputMessage
     
@@ -701,18 +701,13 @@ function ChatInterface() {
     // Ajouter le message utilisateur
     addMessage(userMessage)
     setInputMessage('')
-    setIsLoadingChat(true)
+    setIsLoadingChat(true) // L'indicateur de typing gère l'affichage
     setShouldAutoScroll(true)
     setIsUserScrolling(false)
 
-    // CHANGEMENT PRINCIPAL : Créer le message assistant vide AVANT l'appel API
-    const assistantId = `ai-${Date.now()}`
-    addMessage({
-      id: assistantId,
-      content: '',  // Placeholder vide qui sera alimenté en streaming
-      isUser: false,
-      timestamp: new Date()
-    })
+    // Variables pour le streaming - PAS de message vide créé
+    let assistantId: string | null = null
+    let messageCreated = false
 
     try {
       let finalQuestionOrSafeText: string
@@ -726,7 +721,7 @@ function ChatInterface() {
 
       const optimalLevel = undefined
       
-      // APPEL AVEC CALLBACKS DE STREAMING
+      // APPEL AVEC CALLBACKS DE STREAMING AMÉLIORÉS
       const response = await generateAIResponse(
         finalQuestionOrSafeText,
         user,
@@ -738,22 +733,38 @@ function ChatInterface() {
         clarificationState ? { answer: safeText.trim() } : undefined,
         {
           onDelta: (chunk: string) => {
-            // Mettre à jour le message en accumulant les chunks
-            const currentMessage = useChatStore.getState().currentConversation?.messages.find(m => m.id === assistantId)
-            if (currentMessage) {
-              updateMessage(assistantId, {
-                content: (currentMessage.content || '') + chunk
+            if (!messageCreated) {
+              // Créer le message au premier chunk reçu
+              assistantId = `ai-${Date.now()}`
+              addMessage({
+                id: assistantId,
+                content: chunk,
+                isUser: false,
+                timestamp: new Date()
               })
+              messageCreated = true
+              // Arrêter l'indicateur de typing dès qu'on reçoit le premier chunk
+              setIsLoadingChat(false)
+            } else if (assistantId) {
+              // Mettre à jour le message existant
+              const currentMessage = useChatStore.getState().currentConversation?.messages.find(m => m.id === assistantId)
+              if (currentMessage) {
+                updateMessage(assistantId, {
+                  content: (currentMessage.content || '') + chunk
+                })
+              }
             }
           },
           onFinal: (fullText: string) => {
             // Mise à jour finale avec le texte complet
-            updateMessage(assistantId, { 
-              content: fullText 
-            })
+            if (assistantId) {
+              updateMessage(assistantId, { 
+                content: fullText 
+              })
+            }
           },
           onFollowup: (followupMessage: string) => {
-            // CHANGEMENT PRINCIPAL : Ajouter la relance comme un nouveau message assistant
+            // Ajouter la relance comme un nouveau message assistant
             addMessage({
               id: `followup-${Date.now()}`,
               content: followupMessage,
@@ -768,7 +779,7 @@ function ChatInterface() {
 
       // Vérification des erreurs d'authentification
       if (response?.response?.includes?.('Session expirée') ||
-          response?.response?.includes?. ('Token expired') ||
+          response?.response?.includes?.('Token expired') ||
           response?.response?.includes?.('authentication_failed') ||
           response?.response?.includes?.('Unauthorized') ||
           response?.response?.includes?.('401') ||
@@ -784,7 +795,7 @@ function ChatInterface() {
 
       const needsClarification = response.clarification_result?.clarification_requested === true
 
-      if (needsClarification) {
+      if (needsClarification && assistantId) {
         // Mise à jour pour clarification
         const clarificationText = (response.full_text || response.response) + `\n\n${t('chat.clarificationInstruction')}`
         
@@ -798,7 +809,7 @@ function ChatInterface() {
           originalQuestion: safeText.trim(),
           clarificationQuestions: response.clarification_questions || []
         })
-      } else {
+      } else if (assistantId) {
         // Mise à jour finale avec métadonnées
         const safeResponseVersions = response.response_versions ? {
           ultra_concise: response.response_versions.ultra_concise || response.response,
@@ -819,15 +830,25 @@ function ChatInterface() {
       handleAuthError(error)
 
       if (isMountedRef.current) {
-        // Mise à jour du message d'erreur
-        const errorContent = error instanceof Error ? error.message : t('chat.errorMessage')
-        updateMessage(assistantId, {
-          content: errorContent
-        })
+        if (!messageCreated && assistantId) {
+          // Si le message n'a pas encore été créé, le créer avec l'erreur
+          addMessage({
+            id: `error-${Date.now()}`,
+            content: error instanceof Error ? error.message : t('chat.errorMessage'),
+            isUser: false,
+            timestamp: new Date()
+          })
+        } else if (assistantId) {
+          // Mise à jour du message d'erreur
+          const errorContent = error instanceof Error ? error.message : t('chat.errorMessage')
+          updateMessage(assistantId, {
+            content: errorContent
+          })
+        }
       }
     } finally {
       if (isMountedRef.current) {
-        setIsLoadingChat(false)
+        setIsLoadingChat(false) // S'assurer que l'indicateur est arrêté
       }
     }
   }, [inputMessage, currentConversation, addMessage, updateMessage, clarificationState, user, currentLanguage, handleAuthError, t])
