@@ -5,13 +5,11 @@ import { useRouter } from 'next/navigation'
 import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Message } from '../../types'
-import { useAuthStore } from '@/lib/stores/auth' // ✅ Store unifié
+import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '@/lib/languages/i18n'
 import { useChatStore } from './hooks/useChatStore'
 import { generateAIResponse } from './services/apiService'
 import { conversationService } from './services/conversationService'
-// ❌ SUPPRIMÉ - Plus de Supabase direct
-// import { getSupabaseClient } from '@/lib/supabase/singleton'
 
 import {
   PaperAirplaneIcon,
@@ -27,7 +25,7 @@ import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
 import { FeedbackModal } from './components/modals/FeedbackModal'
 
-// Composant ChatInput optimisé avec React.memo - CORRIGÉ
+// Composant ChatInput optimisé avec React.memo
 const ChatInput = React.memo(({ 
   inputMessage, 
   setInputMessage, 
@@ -259,7 +257,6 @@ MessageList.displayName = 'MessageList'
 
 // Composant principal ChatInterface
 function ChatInterface() {
-  // ✅ STORE UNIFIÉ - Plus d'initializeSession Supabase
   const { user, isAuthenticated, isLoading, hasHydrated, checkAuth, handleOAuthTokenFromURL } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
   const searchParams = useSearchParams()
@@ -284,10 +281,6 @@ function ChatInterface() {
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
   const [viewportHeight, setViewportHeight] = useState(0)
-
-  // ✅ SUPPRIMÉ - États OAuth Supabase
-  // const [isProcessingOAuth, setIsProcessingOAuth] = useState(false)
-  // const [oauthError, setOAuthError] = useState<string | null>(null)
 
   const [clarificationState, setClarificationState] = useState<{
     messageId: string
@@ -322,7 +315,7 @@ function ChatInterface() {
     return messages.length > 0
   }, [messages.length])
 
-  // ✅ GESTION D'ERREUR UNIFIÉE - Plus de redirection OAuth
+  // Gestion d'erreur unifiée
   const handleAuthError = useCallback((error: any) => {
     console.error('[Chat] Auth error détectée:', error)
     
@@ -348,7 +341,6 @@ function ChatInterface() {
         setIsLoadingChat(false)
       }
       
-      // ✅ UTILISE LE STORE UNIFIÉ pour logout
       import('@/lib/services/logoutService').then(({ logoutService }) => {
         logoutService.performLogout(user)
       }).catch(err => {
@@ -364,7 +356,7 @@ function ChatInterface() {
     console.warn('[Chat] Erreur non-auth (pas de redirection):', error)
   }, [user, setCurrentConversation])
 
-  // Fonctions utilitaires (conservées intégralement)
+  // Fonctions utilitaires
   const getUserInitials = useCallback((user: any): string => {
     if (!user) return 'U'
 
@@ -450,8 +442,7 @@ function ChatInterface() {
     }
   }, [])
 
-
-  // ✅ OAUTH via store unifié
+  // OAuth via store unifié
   useEffect(() => {
     const processOAuth = async () => {
       try {
@@ -467,8 +458,7 @@ function ChatInterface() {
     processOAuth()
   }, [handleOAuthTokenFromURL])
 
-
-  // Détection de device mobile (conservée)
+  // Détection de device mobile
   useEffect(() => {
     if (!isMountedRef.current) return
 
@@ -495,7 +485,7 @@ function ChatInterface() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Gestion clavier mobile (conservée)
+  // Gestion clavier mobile
   useEffect(() => {
     if (!isMobileDevice || !isMountedRef.current) return
 
@@ -536,7 +526,7 @@ function ChatInterface() {
     }
   }, [isMobileDevice])
 
-  // Auto-scroll (conservée)
+  // Auto-scroll
   useEffect(() => {
     if (!isMountedRef.current) return
 
@@ -556,7 +546,7 @@ function ChatInterface() {
     lastMessageCountRef.current = messages.length
   }, [messages.length, shouldAutoScroll, isUserScrolling])
 
-  // Gestion du scroll (conservée)
+  // Gestion du scroll
   useEffect(() => {
     const chatContainer = chatContainerRef.current
     if (!chatContainer || !isMountedRef.current) return
@@ -603,7 +593,7 @@ function ChatInterface() {
     }
   }, [messages.length])
 
-  // Message de bienvenue (conservé)
+  // Message de bienvenue
   useEffect(() => {
     if (isAuthenticated && !currentConversation && !hasMessages && isMountedRef.current) {
       const welcomeMessage: Message = {
@@ -630,7 +620,7 @@ function ChatInterface() {
     }
   }, [isAuthenticated, currentConversation, hasMessages, t, currentLanguage, setCurrentConversation])
 
-  // useEffect pour les changements de langue (unifié et corrigé)
+  // useEffect pour les changements de langue
   useEffect(() => {
     if (currentConversation?.id === 'welcome' &&
         currentConversation.messages.length === 1 &&
@@ -651,7 +641,7 @@ function ChatInterface() {
     }
   }, [currentLanguage, t, currentConversation, setCurrentConversation])
 
-  // Chargement initial VRAIMENT unique
+  // Chargement initial unique
   useEffect(() => {
     if (isAuthenticated && 
         user?.email && 
@@ -687,7 +677,7 @@ function ChatInterface() {
     }
   }, [isAuthenticated, user?.email])
 
-  // Fonctions de gestion des messages - MODIFIÉES POUR STREAMING
+  // Fonctions de gestion des messages - CORRIGÉ POUR STREAMING
   const extractAnswerAndSources = useCallback((result: any): [string, any[]] => {
     let answerText = ""
     let sources: any[] = []
@@ -739,7 +729,7 @@ function ChatInterface() {
     return [answerText, []]
   }, [t])
 
-  // ✅ FONCTION MODIFIÉE POUR STREAMING
+  // FONCTION CORRIGÉE POUR STREAMING
   const handleSendMessage = useCallback(async () => {
     const safeText = inputMessage
     
@@ -767,11 +757,11 @@ function ChatInterface() {
     setShouldAutoScroll(true)
     setIsUserScrolling(false)
 
-    // ✅ AJOUT DU MESSAGE ASSISTANT PLACEHOLDER
+    // Ajouter le message assistant placeholder
     const assistantId = `ai-${Date.now()}`
     addMessage({
       id: assistantId,
-      content: '',                 // placeholder vide
+      content: '',
       isUser: false,
       timestamp: new Date()
     })
@@ -788,29 +778,30 @@ function ChatInterface() {
 
       const optimalLevel = undefined
       
-      // ✅ APPEL AVEC CALLBACKS DE STREAMING
+      // CORRIGÉ: Appel avec callbacks de streaming
       const response = await generateAIResponse(
         finalQuestionOrSafeText,
         user,
         currentLanguage,
         conversationIdToSend,
         optimalLevel,
-        /* isClarificationResponse */ clarificationState !== null,
+        clarificationState !== null,
         clarificationState?.originalQuestion,
         clarificationState ? { answer: safeText.trim() } : undefined,
         {
           onDelta: (chunk: string) => {
-            // Concaténation incrémentale
-            updateMessage(assistantId, (prev) => ({
-              ...prev,
-              content: (prev.content || '') + chunk
-            }))
+            // CORRIGÉ: Obtenir le message actuel et le mettre à jour
+            const currentMessage = useChatStore.getState().currentConversation?.messages.find(m => m.id === assistantId)
+            if (currentMessage) {
+              updateMessage(assistantId, {
+                content: (currentMessage.content || '') + chunk
+              })
+            }
           },
           onFinal: (full: string) => {
-            updateMessage(assistantId, (prev) => ({ 
-              ...prev, 
+            updateMessage(assistantId, { 
               content: full 
-            }))
+            })
           },
           onFollowup: (msg: string) => {
             // Rien à changer : la notification DOM existe déjà via apiService
@@ -834,14 +825,13 @@ function ChatInterface() {
       const needsClarification = response.clarification_result?.clarification_requested === true
 
       if (needsClarification) {
-        // ✅ MISE À JOUR FINALE POUR CLARIFICATION
+        // Mise à jour finale pour clarification
         const clarificationText = (response.full_text || response.response) + `\n\n${t('chat.clarificationInstruction')}`
         
-        updateMessage(assistantId, (prev) => ({
-          ...prev,
+        updateMessage(assistantId, {
           content: clarificationText,
           conversation_id: response.conversation_id
-        }))
+        })
 
         setClarificationState({
           messageId: assistantId,
@@ -849,13 +839,12 @@ function ChatInterface() {
           clarificationQuestions: response.clarification_questions || []
         })
       } else {
-        // ✅ MISE À JOUR FINALE AVEC MÉTADONNÉES
-        updateMessage(assistantId, (prev) => ({
-          ...prev,
+        // Mise à jour finale avec métadonnées
+        updateMessage(assistantId, {
           conversation_id: response.conversation_id,
           response_versions: response.response_versions,
           originalResponse: response.response
-        }))
+        })
       }
 
     } catch (error) {
@@ -863,7 +852,7 @@ function ChatInterface() {
       handleAuthError(error)
 
       if (isMountedRef.current) {
-        // ✅ MISE À JOUR DU MESSAGE D'ERREUR
+        // Mise à jour du message d'erreur
         const errorContent = error instanceof Error ? error.message : t('chat.errorMessage')
         updateMessage(assistantId, {
           content: errorContent
@@ -876,7 +865,7 @@ function ChatInterface() {
     }
   }, [inputMessage, currentConversation, addMessage, updateMessage, clarificationState, user, currentLanguage, handleAuthError, t])
 
-  // Fonctions de feedback (conservées)
+  // Fonctions de feedback
   const handleFeedbackClick = useCallback((messageId: string, feedback: 'positive' | 'negative') => {
     if (!isMountedRef.current) return
 
@@ -999,7 +988,7 @@ function ChatInterface() {
     })
   }, [currentLanguage])
 
-  // Calcul des styles dynamiques pour mobile (conservé)
+  // Calcul des styles dynamiques pour mobile
   const containerStyle = useMemo(() => {
     return isMobileDevice ? {
       height: '100vh',
@@ -1046,7 +1035,7 @@ function ChatInterface() {
     )
   }
 
-  // ✅ CONDITION DE RENDU SIMPLIFIÉE
+  // Condition de rendu simplifiée
   if (!isAuthenticated || !user) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
