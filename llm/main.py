@@ -1,20 +1,4 @@
-NON_AGRI_TERMS = [
-    # Médias / Divertissement (FR/EN/DE/ES/IT/NL/PL/PT)
-    "cinéma", "film", "films", "séries", "serie", "séries tv", "netflix", "hollywood", "bollywood", "disney",
-    "pixar", "musique", "concert", "rap", "pop", "rock", "jazz", "opéra", "orchestre", "télévision", "télé",
-    "emission", "émission", "jeux vidéo", "gaming", "playstation", "xbox", "nintendo", "fortnite", "minecraft",
-    "kino", "filme", "musik", "konzert", "fernsehen", "videospiele", "spiele",  # DE
-    "cine", "música", "televisión", "videojuegos", "juegos",  # ES
-    "cinema", "musica", "televisione", "videogiochi", "giochi",  # IT
-    "bioscoop", "muziek", "televisie", "videospellen", "spellen",  # NL
-    "kino", "muzyka", "telewizja", "gry wideo", "gry",  # PL
-    "cinema", "música", "televisão", "videojogos", "jogos",  # PT
-    
-    # Sports
-    "football", "soccer", "nba", "nfl", "nhl", "hockey", "mlb", "tennis", "golf", "cyclisme",
-    "tour de france", "formule 1", "f1", "boxe", "ufc", "olympiques",
-    "fußball", "sport", "olympia", "bundesliga",  # DE
-    "fútbol", "deporte", "olimpiadas",# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # main.py — Intelia LLM backend (FastAPI + SSE)
 # Python 3.11+
@@ -65,6 +49,7 @@ FALLBACK_MAX_COMPLETION_TOKENS = int(
 )
 
 LANGUAGE_FILE = os.getenv("LANGUAGE_FILE", os.path.join(BASE_DIR, "languages.json"))
+BLOCKED_TERMS_FILE = os.getenv("BLOCKED_TERMS_FILE", os.path.join(BASE_DIR, "blocked_terms.json"))
 
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY is required")
@@ -98,8 +83,28 @@ def _load_language_messages(path: str) -> Dict[str, str]:
 
 OUT_OF_DOMAIN_MESSAGES = _load_language_messages(LANGUAGE_FILE)
 
+# Charger les termes bloqués depuis le fichier JSON
+def _load_blocked_terms(path: str) -> list:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        # Fusionner toutes les catégories en une seule liste
+        all_terms = []
+        for category, terms in data.items():
+            if isinstance(terms, list):
+                all_terms.extend(terms)
+        return all_terms
+    except Exception as e:
+        logger.error(f"Unable to load blocked terms from {path}: {e}")
+        # Fallback minimal
+        return ["crypto", "cryptocurrency", "bitcoin", "ethereum", "blockchain"]
+
+BLOCKED_TERMS = _load_blocked_terms(BLOCKED_TERMS_FILE)
+
 logger.info(f"LANGUAGE_FILE={LANGUAGE_FILE} exists={os.path.exists(LANGUAGE_FILE)}")
+logger.info(f"BLOCKED_TERMS_FILE={BLOCKED_TERMS_FILE} exists={os.path.exists(BLOCKED_TERMS_FILE)}")
 logger.info(f"FALLBACK_MODEL={FALLBACK_MODEL}")
+logger.info(f"Loaded {len(BLOCKED_TERMS)} blocked terms")
 
 def get_out_of_domain_message(lang: str) -> str:
     if not lang:
@@ -212,23 +217,12 @@ def clean_text(txt: str) -> str:
 # -----------------------------------------------------------------------------
 # Domain guard (permissif: bloque évidents hors-agri)
 # -----------------------------------------------------------------------------
-NON_AGRI_TERMS = [
-    "cinéma", "film", "films", "séries", "serie", "séries tv", "netflix", "hollywood", "bollywood", "disney",
-    "pixar", "musique", "concert", "rap", "pop", "rock", "jazz", "opéra", "orchestre", "télévision", "télé",
-    "emission", "émission", "jeux vidéo", "gaming", "playstation", "xbox", "nintendo", "fortnite", "minecraft",
-    "football", "soccer", "nba", "nfl", "nhl", "hockey", "mlb", "tennis", "golf", "cyclisme",
-    "tour de france", "formule 1", "f1", "boxe", "ufc", "olympiques",
-    "élections", "elections", "président", "premier ministre", "parlement", "guerre", "otan", "onu",
-    "bourse", "actions", "nasdaq", "wall street",
-    "crypto", "cryptomonnaie", "cryptomonnaies", "cryptocurrency", "cryptocurrencies",
-    "blockchain", "bitcoin", "ethereum",
-    "iphone", "android", "samsung", "apple", "google", "microsoft",
-    "cancer", "diabète", "covid", "hôpital", "clinique",
-    "mode", "vêtements", "voyage", "vacances",
-    "astronomie", "physique quantique", "spacex",
-    "religion", "église", "astrologie", "horoscope",
-]
-NON_AGRI_PAT = re.compile(r"\b(?:" + "|".join(re.escape(t) for t in NON_AGRI_TERMS) + r")\b", re.IGNORECASE)
+def create_blocked_pattern(terms_list: list) -> re.Pattern:
+    """Crée le pattern regex à partir de la liste de termes bloqués"""
+    return re.compile(r"\b(?:" + "|".join(re.escape(t) for t in terms_list) + r")\b", re.IGNORECASE)
+
+# Pattern créé dynamiquement à partir du fichier JSON
+NON_AGRI_PAT = create_blocked_pattern(BLOCKED_TERMS)
 
 def guard_debug(reason: str, text: str):
     if DEBUG_GUARD:
