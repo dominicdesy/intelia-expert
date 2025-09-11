@@ -331,6 +331,19 @@ def fuzzy_map(value: str, choices: Dict[str, List[str]], cutoff: float = 0.75) -
             return key
     return None
 
+def guess_line_from_text(text: str) -> Optional[str]:
+    """CORRECTION 2: Détection automatique de lignée dans le texte"""
+    t = normalize(text or "")
+    for canon, aliases in LINE_ALIASES.items():
+        # match sur canon
+        if normalize(canon) in t:
+            return canon
+        # match sur alias
+        for a in aliases:
+            if normalize(a) in t:
+                return canon
+    return None
+
 # -----------------------------------------------------------------------------
 # Chat Completions helpers (temp compat + retry)
 # -----------------------------------------------------------------------------
@@ -427,6 +440,7 @@ Exemples:
         if not raw:
             logger.warning("[ROUTE] Réponse GPT vide, utilisation du fallback")
             return _extract_intent_fallback(text)
+        elif "```json" in raw:
             a = raw.find("```json") + 7
             b = raw.find("```", a)
             raw = raw[a:b].strip()
@@ -453,6 +467,12 @@ Exemples:
         if "line" in slots and slots["line"] in ["ross", "cobb"]:
             slots["line"] = None
             
+        # CORRECTION 2: Si la lignée n'a pas été extraite, essaye de l'inférer depuis le texte
+        if not slots.get("line"):
+            guessed = guess_line_from_text(text)
+            if guessed:
+                slots["line"] = guessed
+                
         if "age_days" in slots:
             try:
                 age = int(slots["age_days"])
@@ -516,6 +536,11 @@ def _extract_intent_fallback(text: str) -> dict:
     slots = {}
     if age_days is not None:
         slots["age_days"] = age_days
+        
+    # CORRECTION 2: Deviner la lignée si possible dans le fallback
+    gl = guess_line_from_text(text)
+    if gl:
+        slots["line"] = gl
         
     return {
         "intent_id": intent_id,
@@ -670,7 +695,7 @@ async def generate_clarification_question(client: OpenAI, intent_id: str, missin
         "season": "À quelle saison : été, hiver, printemps, automne ?"
     }
     
-    # Construire la question
+    # CORRECTION 3: Construire la question avec suggestions systématiques
     if len(missing_slots) == 1:
         question = questions_map.get(missing_slots[0], f"Précisez: {missing_slots[0]}")
     else:
@@ -966,7 +991,9 @@ async def chat_stream(request: Request):
                         if suggestions:
                             payload_clarify["suggestions"] = suggestions
                         yield send_event(payload_clarify)
-                        # clarify = on attend une nouvelle entrée côté front, pas de 'final' ici
+                        # CORRECTION 1: IMPORTANT : éviter que le 'finally' envoie un final d'excuse
+                        nonlocal sent_final
+                        sent_final = True
                         return
 
             # 4) Tentative data-only (Assistant v2) AMÉLIORÉE
