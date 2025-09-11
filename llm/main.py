@@ -743,15 +743,16 @@ async def chat_stream(request: Request):
                         yield send_event({"type": "delta", "text": chunk})
                         await asyncio.sleep(0.02)
                 
-                final_response = text
+                final_response = text  # ← CORRECTION : définir final_response pour data-only aussi
                 yield send_event({"type": "final", "answer": text})
                 sent_final = True
 
-            # 5) Ajouter à la mémoire et générer relance
+            # 5) Ajouter à la mémoire et générer relance (maintenant final_response est toujours défini)
             if final_response:
                 add_to_conversation_memory(tenant_id, message, final_response)
                 proactive_followup = generate_proactive_followup(message, final_response, lang)
                 if proactive_followup:
+                    logger.info(f"[REQ {request_id}] Sending proactive followup: {proactive_followup[:50]}...")
                     yield send_event({"type": "proactive_followup", "answer": proactive_followup})
 
         except HTTPException:
