@@ -109,7 +109,6 @@
       "followup_themes": ["water_consumption","feed_intake","housing_conditions","lighting_program","ventilation_strategy","health_monitoring"],
 
       "metrics": {
-        /* Croissance & performance */
         "body_weight_target":     { "requires_one_of": [["age_days","age_weeks"]], "unit": "g" },
         "body_weight_avg":        { "requires_one_of": [["age_days","age_weeks"]], "unit": "g" },
         "daily_gain":             { "requires_one_of": [["age_days","age_weeks"]], "unit": "g/day" },
@@ -118,13 +117,11 @@
         "production_index_epef":  { "requires_one_of": [["age_days","age_weeks"]], "unit": "" },
         "mortality_expected_pct": { "requires_one_of": [["age_days","age_weeks"]], "unit": "%" },
 
-        /* Eau & aliment */
         "water_intake_daily":     { "requires_one_of": [["age_days","age_weeks"]], "optional": ["flock_size"], "unit": "L" },
         "water_feed_ratio":       { "requires_one_of": [["age_days","age_weeks"]], "unit": "" },
         "feed_intake_daily":      { "requires_one_of": [["age_days","age_weeks"]], "unit": "g" },
         "feed_intake_cumulative": { "requires_one_of": [["age_days","age_weeks"]], "unit": "g" },
 
-        /* Densité & équipements */
         "stocking_density_kgm2":  { "requires_one_of": [["age_days","age_weeks"]], "unit": "kg/m2" },
         "stocking_density_birdsm2": { "requires_one_of": [["age_days","age_weeks"]], "unit": "birds/m2" },
         "feeder_space_cm":        { "requires_one_of": [["age_days","age_weeks"]], "unit": "cm/bird" },
@@ -133,7 +130,6 @@
         "nipple_pressure_kpa":    { "requires_one_of": [["age_days","age_weeks"]], "unit": "kPa" },
         "nipple_height_cm":       { "requires_one_of": [["age_days","age_weeks"]], "unit": "cm" },
 
-        /* Climat */
         "ambient_temp_target":    { "requires_one_of": [["age_days","age_weeks","phase"]], "unit": "°C" },
         "litter_temp_target":     { "requires_one_of": [["age_days","age_weeks"]], "unit": "°C" },
         "humidity_target":        { "requires_one_of": [["age_days","age_weeks"]], "unit": "%" },
@@ -145,12 +141,10 @@
         "static_pressure_pa":     { "unit": "Pa" },
         "min_ventilation_rate_m3hkg": { "requires_one_of": [["age_days","age_weeks"]], "unit": "m3/h/kg" },
 
-        /* Lumière */
         "lighting_hours":         { "requires_one_of": [["age_days","age_weeks","phase"]], "unit": "h/day" },
         "light_intensity_lux":    { "requires_one_of": [["age_days","age_weeks","phase"]], "unit": "lux" },
         "light_color_temp_k":     { "requires_one_of": [["age_days","age_weeks","phase"]], "unit": "K" },
 
-        /* Pondeuses spécifiques */
         "egg_production_pct":     { "requires": ["age_weeks"], "unit": "%" },
         "hen_daily_feed":         { "requires": ["age_weeks"], "unit": "g/hen/day" },
         "pullet_weight_target":   { "requires": ["age_weeks"], "unit": "g" },
@@ -158,7 +152,6 @@
         "nest_boxes_per_hen":     { "requires": ["age_weeks"], "unit": "boxes/hen" },
         "perch_length_cm_per_hen":{ "requires": ["age_weeks"], "unit": "cm/hen" },
 
-        /* Nutrition (formulation cibles) */
         "me_kcalkg":              { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "kcal/kg" },
         "cp_pct":                 { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "%" },
         "lys_digestible_pct":     { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "%" },
@@ -180,7 +173,7 @@
     },
 
     "environment_setting": {
-      "description": "Réglages d’ambiance/ventilation/climat",
+      "description": "Réglages d'ambiance/ventilation/climat",
       "required": ["site_type","bird_type","line","metric"],
       "at_least_one_of": [["age_days","age_weeks","phase"]],
       "optional": ["season","environment","flock_size"],
