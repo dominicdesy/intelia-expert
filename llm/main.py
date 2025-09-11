@@ -412,7 +412,7 @@ Exemples:
             model=FALLBACK_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Question: {text}"}
+                {"role": "user", "content": text}
             ],
             max_completion_tokens=400,
             stream=False,
@@ -420,10 +420,13 @@ Exemples:
         )
         
         raw = (resp.choices[0].message.content or "").strip()
-        logger.info(f"[ROUTE] Réponse GPT brute: {raw[:200]}")
+        logger.info(f"[ROUTE] Question: {text}")
+        logger.info(f"[ROUTE] Réponse GPT brute: '{raw}'")
         
-        # Extraction JSON plus robuste
-        if "```json" in raw:
+        # Si réponse vide, utiliser directement le fallback
+        if not raw:
+            logger.warning("[ROUTE] Réponse GPT vide, utilisation du fallback")
+            return _extract_intent_fallback(text)
             a = raw.find("```json") + 7
             b = raw.find("```", a)
             raw = raw[a:b].strip()
