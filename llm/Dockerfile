@@ -19,8 +19,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Code
-COPY main.py .
+# Code et fichiers de configuration
+COPY . .
+
+# Ou spécifiquement les fichiers nécessaires :
+# COPY main.py languages.json ./
 
 # Port par convention (DO injectera $PORT)
 EXPOSE 8080
