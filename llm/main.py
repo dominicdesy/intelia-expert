@@ -1,4 +1,20 @@
-# -*- coding: utf-8 -*-
+NON_AGRI_TERMS = [
+    # Médias / Divertissement (FR/EN/DE/ES/IT/NL/PL/PT)
+    "cinéma", "film", "films", "séries", "serie", "séries tv", "netflix", "hollywood", "bollywood", "disney",
+    "pixar", "musique", "concert", "rap", "pop", "rock", "jazz", "opéra", "orchestre", "télévision", "télé",
+    "emission", "émission", "jeux vidéo", "gaming", "playstation", "xbox", "nintendo", "fortnite", "minecraft",
+    "kino", "filme", "musik", "konzert", "fernsehen", "videospiele", "spiele",  # DE
+    "cine", "música", "televisión", "videojuegos", "juegos",  # ES
+    "cinema", "musica", "televisione", "videogiochi", "giochi",  # IT
+    "bioscoop", "muziek", "televisie", "videospellen", "spellen",  # NL
+    "kino", "muzyka", "telewizja", "gry wideo", "gry",  # PL
+    "cinema", "música", "televisão", "videojogos", "jogos",  # PT
+    
+    # Sports
+    "football", "soccer", "nba", "nfl", "nhl", "hockey", "mlb", "tennis", "golf", "cyclisme",
+    "tour de france", "formule 1", "f1", "boxe", "ufc", "olympiques",
+    "fußball", "sport", "olympia", "bundesliga",  # DE
+    "fútbol", "deporte", "olimpiadas",# -*- coding: utf-8 -*-
 #
 # main.py — Intelia LLM backend (FastAPI + SSE)
 # Python 3.11+
@@ -154,8 +170,29 @@ def parse_accept_language(header: Optional[str]) -> Optional[str]:
 
 def guess_lang_from_text(text: str) -> Optional[str]:
     try:
-        return detect(text)
+        detected = detect(text)
+        # Normaliser les codes de langue
+        if detected in ['de', 'ger']:
+            return 'de'
+        elif detected in ['fr', 'fra']:
+            return 'fr'
+        elif detected in ['en', 'eng']:
+            return 'en'
+        elif detected in ['es', 'spa']:
+            return 'es'
+        else:
+            return detected
     except Exception:
+        # Fallback basique si langdetect échoue
+        text_lower = text.lower()
+        if any(word in text_lower for word in ['was', 'ist', 'wie', 'wo', 'wann', 'warum', 'kryptowährung', 'deutschland']):
+            return 'de'
+        elif any(word in text_lower for word in ['what', 'is', 'how', 'where', 'when', 'why', 'cryptocurrency']):
+            return 'en'
+        elif any(word in text_lower for word in ['qué', 'es', 'cómo', 'dónde', 'cuándo', 'por qué']):
+            return 'es'
+        elif any(word in text_lower for word in ['qu\'est', 'comment', 'où', 'quand', 'pourquoi', 'cryptomonnaie']):
+            return 'fr'
         return None
 
 # -----------------------------------------------------------------------------
@@ -349,8 +386,11 @@ def health():
         "debug_guard": DEBUG_GUARD,
         "hybrid_mode": HYBRID_MODE,
         "language_file": LANGUAGE_FILE,
+        "blocked_terms_file": BLOCKED_TERMS_FILE,
         "fallback_model": FALLBACK_MODEL,
-        "languages_loaded": list(OUT_OF_DOMAIN_MESSAGES.keys())[:10] + (["…"] if len(OUT_OF_DOMAIN_MESSAGES) > 10 else [])
+        "languages_loaded": list(OUT_OF_DOMAIN_MESSAGES.keys())[:10] + (["…"] if len(OUT_OF_DOMAIN_MESSAGES) > 10 else []),
+        "blocked_terms_count": len(BLOCKED_TERMS),
+        "blocked_terms_sample": BLOCKED_TERMS[:10]
     }
 
 @router.post("/chat/stream")
