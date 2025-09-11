@@ -1,4 +1,4 @@
-/* app/globals.css - VERSION FINALE AVEC CORRECTIONS HEADER + ZOHO + TEXTE + MODAL + ANTI-FLASH + RELANCES PROACTIVES */
+/* app/globals.css - VERSION FINALE AVEC CORRECTIONS HEADER + ZOHO + TEXTE + MODAL + ANTI-FLASH */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -449,93 +449,6 @@ html:not(.language-ready) body::after {
     align-items: center !important;
     justify-content: center !important;
   }
-
-  /* === STYLES POUR LES RELANCES PROACTIVES === */
-  
-  /* Notification principale */
-  .proactive-followup-notification {
-    animation: slideInFromRight 0.3s ease-out;
-    z-index: 9999 !important;
-    position: fixed !important;
-    pointer-events: auto !important;
-  }
-  
-  /* Classes utilitaires pour forcer les styles si Tailwind ne charge pas */
-  .proactive-notification-styles {
-    position: fixed !important;
-    top: 80px !important;
-    right: 16px !important;
-    z-index: 9999 !important;
-    max-width: 28rem !important;
-    background-color: rgb(239 246 255) !important;
-    border: 1px solid rgb(191 219 254) !important;
-    border-radius: 0.5rem !important;
-    padding: 1rem !important;
-    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
-    font-family: system-ui, -apple-system, sans-serif !important;
-  }
-  
-  /* Styles pour le contenu de la notification */
-  .proactive-notification-content {
-    display: flex !important;
-    align-items: flex-start !important;
-    gap: 12px !important;
-  }
-  
-  .proactive-notification-icon {
-    color: rgb(37 99 235) !important;
-    font-size: 18px !important;
-    line-height: 1 !important;
-  }
-  
-  .proactive-notification-text-container {
-    flex: 1 !important;
-  }
-  
-  .proactive-notification-title {
-    color: rgb(30 64 175) !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    margin: 0 0 4px 0 !important;
-    line-height: 1.2 !important;
-  }
-  
-  .proactive-notification-message {
-    color: rgb(29 78 216) !important;
-    font-size: 14px !important;
-    margin: 0 !important;
-    line-height: 1.4 !important;
-  }
-  
-  .proactive-notification-close {
-    color: rgb(37 99 235) !important;
-    font-size: 18px !important;
-    line-height: 1 !important;
-    background: none !important;
-    border: none !important;
-    cursor: pointer !important;
-    padding: 0 !important;
-    width: 20px !important;
-    height: 20px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-  }
-  
-  .proactive-notification-close:hover {
-    color: rgb(29 78 216) !important;
-  }
-  
-  .proactive-notification-close:focus {
-    outline: 2px solid rgb(37 99 235) !important;
-    outline-offset: 2px !important;
-    border-radius: 2px !important;
-  }
-  
-  /* Animation de sortie (optionnelle) */
-  .proactive-notification-exit {
-    animation: slideOutToRight 0.3s ease-in;
-  }
 }
 
 /* Animations personnalisées */
@@ -572,30 +485,6 @@ html:not(.language-ready) body::after {
   }
 }
 
-/* Animation d'entrée depuis la droite pour les relances proactives */
-@keyframes slideInFromRight {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-/* Animation de sortie vers la droite */
-@keyframes slideOutToRight {
-  from {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-}
-
 /* Media queries spécifiques */
 @media (max-width: 640px) {
   .container {
@@ -608,19 +497,6 @@ html:not(.language-ready) body::after {
   
   .mobile-stack {
     @apply flex-col space-y-2 space-x-0;
-  }
-  
-  /* Responsive pour les notifications proactives sur mobile */
-  .proactive-notification-styles {
-    right: 8px !important;
-    left: 8px !important;
-    max-width: calc(100vw - 16px) !important;
-    top: 70px !important;
-  }
-  
-  .proactive-notification-title,
-  .proactive-notification-message {
-    font-size: 13px !important;
   }
 }
 
@@ -644,15 +520,6 @@ html:not(.language-ready) body::after {
   
   /* Désactiver le loader animé aussi */
   html:not(.language-ready) body::after {
-    animation: none !important;
-  }
-  
-  /* Désactiver les animations des relances proactives */
-  .proactive-followup-notification {
-    animation: none !important;
-  }
-  
-  .proactive-notification-exit {
     animation: none !important;
   }
 }
