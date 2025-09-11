@@ -217,7 +217,7 @@ function showProactiveFollowupNotification(followupText: string) {
 }
 
 /**
- * FONCTION STREAMING SSE INTERNE - VERSION MISE À JOUR
+ * FONCTION STREAMING SSE INTERNE - VERSION MISE À JOUR AVEC HEADERS COMPLETS
  * Gère l'appel vers /api/chat/stream avec support des relances proactives
  */
 async function streamAIResponseInternal(
@@ -242,11 +242,13 @@ async function streamAIResponseInternal(
     message_preview: message.substring(0, 50) + '...'
   });
 
+  // CHANGEMENT: Headers SSE complets avec Cache-Control
   const response = await fetch('/api/chat/stream', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'text/event-stream'
+      'Accept': 'text/event-stream',
+      'Cache-Control': 'no-cache'
     },
     body: JSON.stringify(payload)
   });

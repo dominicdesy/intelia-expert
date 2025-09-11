@@ -1,229 +1,163 @@
-// app/api/chat/stream/route.ts - VERSION CORRIGÉE
-import { NextRequest } from "next/server";
+// app/api/chat/stream/route.ts
 
-export const runtime = "nodejs";
+import type { NextRequest } from 'next/server'
 
-export async function POST(req: NextRequest) {
-  try {
-    const payload = await req.json();
-    
-    // Validation minimale des données requises
-    if (!payload?.tenant_id || !payload?.message) {
-      console.error('[chat/stream] Paramètres manquants:', { 
-        tenant_id: !!payload?.tenant_id, 
-        message: !!payload?.message 
-      });
-      return new Response(
-        JSON.stringify({ 
-          error: "invalid_payload",
-          message: "tenant_id et message sont requis" 
-        }), 
-        { 
-          status: 400,
-          headers: { "Content-Type": "application/json" }
-        }
-      );
-    }
+/**
+ * Forcer un vrai streaming côté Next.js
+ * - Node runtime (évite certains buffers de l’Edge runtime)
+ * - Pas de cache sur cette route
+ */
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
-    // Configuration backend avec fallbacks multiples
-    const backendUrl = 
-      process.env.LLM_BACKEND_URL || 
-      process.env.NEXT_PUBLIC_LLM_BACKEND_URL || 
-      'http://localhost:8007';
+/**
+ * URL du backend LLM (FastAPI) qui émet le SSE.
+ * Ajustez au besoin:
+ *   - Exemple DO App Platform: https://llm.intelia.com/llm/chat/stream
+ *   - Exemple local:           http://localhost:8000/llm/chat/stream
+ */
+const LLM_STREAM_URL =
+  process.env.LLM_STREAM_URL ?? 'http://localhost:8000/llm/chat/stream'
 
-    if (!backendUrl) {
-      console.error('[chat/stream] Aucune URL backend configurée');
-      return new Response(
-        JSON.stringify({ 
-          error: "server_configuration",
-          message: "Configuration serveur manquante" 
-        }), 
-        { 
-          status: 500,
-          headers: { "Content-Type": "application/json" }
-        }
-      );
-    }
-
-    // URL correcte pour le backend LLM
-    const targetUrl = `${backendUrl}/api/chat/stream`;
-    
-    console.log('[chat/stream] Proxying vers:', targetUrl);
-    console.log('[chat/stream] Payload:', {
-      tenant_id: payload.tenant_id,
-      lang: payload.lang,
-      message_preview: payload.message?.substring(0, 50) + '...',
-      conversation_id: payload.conversation_id?.substring(0, 8) + '...',
-      user_context: !!payload.user_context
-    });
-
-    // Appel vers l'API LLM backend avec timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
-
-    const upstream = await fetch(targetUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "text/event-stream",
-        "X-Frontend-Origin": "intelia-expert",
-        "User-Agent": "Intelia-Frontend/1.0",
-        "Cache-Control": "no-cache",
-      },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    console.log('[chat/stream] Upstream status:', upstream.status);
-    console.log('[chat/stream] Upstream headers:', Object.fromEntries(upstream.headers.entries()));
-
-    // Si erreur HTTP, forward la réponse JSON
-    if (!upstream.ok) {
-      const text = await upstream.text();
-      console.error('[chat/stream] Upstream error:', {
-        status: upstream.status,
-        statusText: upstream.statusText,
-        body: text.substring(0, 500)
-      });
-      
-      return new Response(
-        text || JSON.stringify({ 
-          error: "upstream_error",
-          status: upstream.status,
-          message: `Backend LLM error: ${upstream.statusText}`
-        }), 
-        { 
-          status: upstream.status,
-          headers: { "Content-Type": "application/json" }
-        }
-      );
-    }
-
-    if (!upstream.body) {
-      console.error('[chat/stream] Pas de body dans la réponse upstream');
-      return new Response(
-        JSON.stringify({ 
-          error: "no_stream_body",
-          message: "Pas de flux de données reçu du backend" 
-        }), 
-        { 
-          status: 502,
-          headers: { "Content-Type": "application/json" }
-        }
-      );
-    }
-
-    console.log('[chat/stream] Streaming SSE démarré - proxying vers frontend');
-
-    // Headers optimisés pour SSE
-    const headers = new Headers({
-      "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-cache, no-store, must-revalidate",
-      "Connection": "keep-alive",
-      "X-Accel-Buffering": "no", // Nginx
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Accept",
-      "Access-Control-Expose-Headers": "Content-Type",
-    });
-
-    // Créer un stream transformé pour debug et gestion d'erreurs
-    const transformedStream = new ReadableStream({
-      start(controller) {
-        console.log('[chat/stream] Transform stream started');
-      },
-      
-      async pull(controller) {
-        try {
-          const reader = upstream.body!.getReader();
-          const decoder = new TextDecoder();
-          
-          while (true) {
-            const { done, value } = await reader.read();
-            
-            if (done) {
-              console.log('[chat/stream] Upstream stream completed');
-              controller.close();
-              break;
-            }
-            
-            // Décoder et logger les chunks pour debug
-            const chunk = decoder.decode(value, { stream: true });
-            
-            // Logger les événements spéciaux (relances proactives)
-            if (chunk.includes('"type":"proactive_followup"')) {
-              console.log('[chat/stream] 🚀 RELANCE PROACTIVE détectée:', 
-                chunk.substring(0, 100) + '...'
-              );
-            }
-            
-            if (chunk.includes('"type":"delta"')) {
-              console.log('[chat/stream] 📝 Delta reçu:', chunk.length, 'bytes');
-            }
-            
-            if (chunk.includes('"type":"final"')) {
-              console.log('[chat/stream] ✅ Réponse finale reçue');
-            }
-            
-            if (chunk.includes('"type":"error"')) {
-              console.log('[chat/stream] ❌ Erreur dans le stream:', chunk);
-            }
-            
-            // Forward le chunk tel quel
-            controller.enqueue(value);
-          }
-          
-        } catch (error) {
-          console.error('[chat/stream] Erreur dans transform stream:', error);
-          
-          // Envoyer un événement d'erreur au frontend
-          const errorEvent = `data: ${JSON.stringify({
-            type: "error",
-            message: "Erreur de streaming",
-            error: error instanceof Error ? error.message : "Erreur inconnue"
-          })}\n\n`;
-          
-          controller.enqueue(new TextEncoder().encode(errorEvent));
-          controller.close();
-        }
-      },
-      
-      cancel() {
-        console.log('[chat/stream] Transform stream cancelled');
-      }
-    });
-
-    return new Response(transformedStream, { headers });
-
-  } catch (error) {
-    console.error('[chat/stream] Erreur proxy générale:', error);
-    
-    // Retourner une erreur JSON lisible
-    return new Response(
-      JSON.stringify({ 
-        error: "proxy_error",
-        message: error instanceof Error ? error.message : "Erreur interne du proxy",
-        details: "Vérifiez la configuration LLM_BACKEND_URL et la disponibilité du backend"
-      }), 
-      { 
-        status: 500,
-        headers: { "Content-Type": "application/json" }
-      }
-    );
-  }
+/**
+ * En-têtes SSE conseillés pour éviter tout buffering intermédiaire.
+ * - no-transform : empêche certains proxies/CDN de « réécrire » le flux
+ * - X-Accel-Buffering: no : clé avec Nginx/ingress
+ */
+const SSE_HEADERS: HeadersInit = {
+  'Content-Type': 'text/event-stream; charset=utf-8',
+  'Cache-Control': 'no-cache, no-transform',
+  Connection: 'keep-alive',
+  'X-Accel-Buffering': 'no',
+  // CORS basique si la route est appelée depuis un autre domaine
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Accept',
+  'Access-Control-Expose-Headers': 'Content-Type',
 }
 
-// Gestion CORS pour les requêtes OPTIONS
+/** Réponse à la préflight CORS */
 export async function OPTIONS() {
-  return new Response(null, {
-    status: 200,
+  return new Response(null, { status: 204, headers: SSE_HEADERS })
+}
+
+/**
+ * Proxy SSE → “pipe” *chaque* chunk immédiatement au navigateur.
+ * Lecture en `start()` avec boucle push() récursive.
+ */
+export async function POST(req: NextRequest) {
+  // Récupère le payload JSON tel quel (lang, message, tenant, etc.)
+  const payload = await req.json().catch(() => ({}))
+
+  // Appel du backend LLM (FastAPI) qui renvoie un flux text/event-stream
+  const controller = new AbortController()
+  const upstream = await fetch(LLM_STREAM_URL, {
+    method: 'POST',
+    signal: controller.signal,
     headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Accept, Authorization",
-      "Access-Control-Max-Age": "86400",
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      // Évite certains caches intermédiaires côté fetch()
+      'Cache-Control': 'no-cache',
     },
-  });
+    body: JSON.stringify(payload),
+  }).catch((err) => {
+    // Si le backend est injoignable, on renvoie un flux SSE avec une erreur
+    const errEvent = `data: ${JSON.stringify({
+      type: 'error',
+      message:
+        "Le service de génération est momentanément indisponible. Réessayez dans un instant.",
+      detail: String(err),
+    })}\n\n`
+    return new Response(new ReadableStream({
+      start(c) {
+        c.enqueue(new TextEncoder().encode(errEvent))
+        c.close()
+      },
+    }))
+  })
+
+  // Si pas de body, on renvoie une erreur SSE et on termine
+  if (!upstream.body) {
+    const errEvent = `data: ${JSON.stringify({
+      type: 'error',
+      message: 'Pas de flux renvoyé par le backend.',
+    })}\n\n`
+    const rs = new ReadableStream({
+      start(c) {
+        c.enqueue(new TextEncoder().encode(errEvent))
+        c.close()
+      },
+    })
+    return new Response(rs, { headers: SSE_HEADERS, status: 502 })
+  }
+
+  // Transform stream: lit en amont et “pousse” les chunks tels quels au client
+  const transformed = new ReadableStream({
+    start(controller) {
+      const reader = upstream.body!.getReader()
+      const decoder = new TextDecoder()
+      const encoder = new TextEncoder()
+
+      // Heartbeat (facultatif) pour garder certaines connexions vivantes
+      const heartbeat = setInterval(() => {
+        try {
+          controller.enqueue(encoder.encode(':ping\n\n'))
+        } catch {
+          /* noop */
+        }
+      }, 15000)
+
+      function push(): void {
+        reader
+          .read()
+          .then(({ done, value }) => {
+            if (done) {
+              clearInterval(heartbeat)
+              controller.close()
+              return
+            }
+
+            // (Optionnel) petit hook de debug si vous voulez tracer des relances
+            try {
+              const chunkText = decoder.decode(value, { stream: true })
+              if (chunkText.includes('"type":"proactive_followup"')) {
+                // eslint-disable-next-line no-console
+                console.log('[chat/stream] 🚀 RELANCE PROACTIVE détectée')
+              }
+            } catch {
+              /* ignore decode errors */
+            }
+
+            controller.enqueue(value)
+            push()
+          })
+          .catch((err) => {
+            clearInterval(heartbeat)
+            const errorEvent = `data: ${JSON.stringify({
+              type: 'error',
+              message: "Erreur de streaming vers le client.",
+              detail: String(err),
+            })}\n\n`
+            controller.enqueue(encoder.encode(errorEvent))
+            controller.close()
+          })
+      }
+
+      push()
+    },
+    cancel() {
+      // Annule l’appel amont si le client ferme la connexion
+      try {
+        controller.abort()
+      } catch {
+        /* noop */
+      }
+    },
+  })
+
+  return new Response(transformed, {
+    status: 200,
+    headers: SSE_HEADERS,
+  })
 }
