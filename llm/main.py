@@ -81,6 +81,8 @@ INTENT_DEFS = {
 # -----------------------------------------------------------------------------
 # Env config
 # -----------------------------------------------------------------------------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 BASE_PATH = os.environ.get("BASE_PATH", "/llm").rstrip("/")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 ASSISTANT_ID = os.environ.get("ASSISTANT_ID")
@@ -91,17 +93,17 @@ STREAM_CHUNK_LEN = int(os.environ.get("STREAM_CHUNK_LEN", "400"))
 DEBUG_GUARD = os.getenv("DEBUG_GUARD", "0") == "1"
 HYBRID_MODE = os.getenv("HYBRID_MODE", "1") == "1"
 FALLBACK_MODEL = os.getenv("FALLBACK_MODEL", "gpt-5")
-FALLBACK_TEMPERATURE = float(os.getenv("FALLBACK_TEMPERATURE", "0.2"))
+
+# Par défaut = 1.0 (certains modèles n’acceptent QUE la valeur par défaut)
+FALLBACK_TEMPERATURE = float(os.getenv("FALLBACK_TEMPERATURE", "1.0"))
 
 # Alias rétro-compat : accepte l’ancienne variable si la nouvelle n’est pas fournie
 FALLBACK_MAX_COMPLETION_TOKENS = int(
     os.getenv("FALLBACK_MAX_COMPLETION_TOKENS", os.getenv("FALLBACK_MAX_TOKENS", "600"))
 )
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_SSE_COMPAT = os.getenv("FRONTEND_SSE_COMPAT", "1") == "1"
 LANGUAGE_FILE = os.getenv("LANGUAGE_FILE", os.path.join(BASE_DIR, "languages.json"))
-
 
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY is required")
@@ -305,6 +307,45 @@ def fuzzy_map(value: str, choices: Dict[str, List[str]], cutoff: float = 0.75) -
     return None
 
 # -----------------------------------------------------------------------------
+# Chat Completions helpers (temp compat + retry)
+# -----------------------------------------------------------------------------
+UNSUPPORTED_TEMP_MSG = "Only the default (1) value is supported"
+
+def _chat_args(messages, max_completion_tokens, stream=False, temperature=None):
+    """
+    Construit les kwargs pour client.chat.completions.create en évitant d'envoyer
+    'temperature' si le modèle ne le supporte pas (ou si != 1).
+    - Safe par défaut: n'envoie pas 'temperature' sauf si elle vaut exactement 1.0.
+    - Permet de forcer via env FORCE_TEMPERATURE_PARAM=1 (à utiliser si ton modèle accepte la temp).
+    """
+    args = dict(messages=messages, max_completion_tokens=max_completion_tokens, stream=stream)
+    force_temp = os.getenv("FORCE_TEMPERATURE_PARAM", "0") == "1"
+    if force_temp:
+        if temperature is not None:
+            args["temperature"] = float(temperature)
+    else:
+        if temperature is not None and float(temperature) == 1.0:
+            # valeur par défaut, on peut l'omettre (certains SDK ignoreront)
+            pass
+    return args
+
+def create_chat_completion_safe(client, model, messages, max_completion_tokens, stream=False, temperature=None):
+    """
+    Fait l'appel en appliquant _chat_args. Si 400 à cause de 'temperature',
+    on retente immédiatement SANS 'temperature'.
+    """
+    try:
+        kwargs = _chat_args(messages, max_completion_tokens, stream=stream, temperature=temperature)
+        return client.chat.completions.create(model=model, **kwargs)
+    except Exception as e:
+        emsg = str(e)
+        if ("Unsupported value: 'temperature'" in emsg) or ("does not support" in emsg and "temperature" in emsg):
+            # retry sans temperature
+            kwargs = _chat_args(messages, max_completion_tokens, stream=stream, temperature=None)
+            return client.chat.completions.create(model=model, **kwargs)
+        raise
+
+# -----------------------------------------------------------------------------
 # Routing & decision (GPT)
 # -----------------------------------------------------------------------------
 def gpt_route_and_extract(client: OpenAI, text: str, lang: str) -> dict:
@@ -322,14 +363,16 @@ Règles :
 - Réponds uniquement en JSON
 """
     try:
-        resp = client.chat.completions.create(
+        resp = create_chat_completion_safe(
+            client,
             model=FALLBACK_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": text}
             ],
-            temperature=0.1,
-            max_completion_tokens=400
+            max_completion_tokens=400,
+            stream=False,
+            temperature=FALLBACK_TEMPERATURE
         )
         raw = (resp.choices[0].message.content or "").strip()
         if "```json" in raw:
@@ -392,14 +435,16 @@ Règles:
 """
     try:
         resp = await asyncio.to_thread(
-            client.chat.completions.create,
-            model=FALLBACK_MODEL,
-            messages=[
+            create_chat_completion_safe,
+            client,
+            FALLBACK_MODEL,
+            [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_text}
             ],
-            temperature=0.1,
-            max_completion_tokens=300
+            300,
+            False,
+            FALLBACK_TEMPERATURE
         )
         raw = (resp.choices[0].message.content or "").strip()
         if "```json" in raw:
@@ -452,14 +497,16 @@ Manquants: {', '.join(missing_slots)}
 Donne UNE question courte (langue de l'utilisateur) demandant UNIQUEMENT les infos manquantes."""
     try:
         resp = await asyncio.to_thread(
-            client.chat.completions.create,
-            model=FALLBACK_MODEL,
-            messages=[
+            create_chat_completion_safe,
+            client,
+            FALLBACK_MODEL,
+            [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_text}
             ],
-            temperature=0.1,
-            max_completion_tokens=150
+            150,
+            False,
+            FALLBACK_TEMPERATURE
         )
         question = (resp.choices[0].message.content or "").strip()
         suggestions = {}
@@ -482,14 +529,16 @@ Thèmes: {', '.join(followup_themes)}
 Donne UNE question de suivi pertinente, en une phrase, même langue que l'utilisateur."""
     try:
         resp = await asyncio.to_thread(
-            client.chat.completions.create,
-            model=FALLBACK_MODEL,
-            messages=[
+            create_chat_completion_safe,
+            client,
+            FALLBACK_MODEL,
+            [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": response_context[:200] if response_context else user_text}
             ],
-            temperature=0.3,
-            max_completion_tokens=100
+            100,
+            False,
+            FALLBACK_TEMPERATURE
         )
         return (resp.choices[0].message.content or "").strip() or None
     except Exception as e:
@@ -575,12 +624,13 @@ async def stream_fallback_general(client: OpenAI, text: str):
         "Réponds dans la MÊME langue que la question de l'utilisateur."
     )
     try:
-        stream = client.chat.completions.create(
+        stream = create_chat_completion_safe(
+            client,
             model=FALLBACK_MODEL,
             messages=[{"role": "system", "content": system}, {"role": "user", "content": text}],
-            temperature=FALLBACK_TEMPERATURE,
             max_completion_tokens=FALLBACK_MAX_COMPLETION_TOKENS,
             stream=True,
+            temperature=FALLBACK_TEMPERATURE
         )
         final_buf = []
         for event in stream:
