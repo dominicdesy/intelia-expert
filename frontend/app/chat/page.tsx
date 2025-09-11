@@ -811,9 +811,14 @@ function ChatInterface() {
 
       if (!isMountedRef.current) return
 
-      if (response?.error === 'authentication_failed' || 
-          response?.detail === 'Token expired' ||
-          response?.message?.includes('Session expirée')) {
+      // Vérification des erreurs d'authentification basée sur le contenu de la réponse
+      if (response?.response?.includes?.('Session expirée') ||
+          response?.response?.includes?.('Token expired') ||
+          response?.response?.includes?.('authentication_failed') ||
+          response?.response?.includes?.('Unauthorized') ||
+          response?.response?.includes?.('401') ||
+          response?.note?.includes?.('Session expirée') ||
+          response?.note?.includes?.('Token expired')) {
         handleAuthError({ 
           status: 401, 
           message: 'Token expired from API response',
@@ -840,9 +845,16 @@ function ChatInterface() {
         })
       } else {
         // Mise à jour finale avec métadonnées
+        const safeResponseVersions = response.response_versions ? {
+          ultra_concise: response.response_versions.ultra_concise || response.response,
+          concise: response.response_versions.concise || response.response,
+          standard: response.response_versions.standard || response.response,
+          detailed: response.response_versions.detailed || response.response
+        } : undefined
+
         updateMessage(assistantId, {
           conversation_id: response.conversation_id,
-          response_versions: response.response_versions,
+          ...(safeResponseVersions && { response_versions: safeResponseVersions }),
           originalResponse: response.response
         })
       }

@@ -1,14 +1,14 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/auth/forgot-password/page": "app/auth/forgot-password/page.js",
   "/admin/statistics/page": "app/admin/statistics/page.js",
-  "/auth/reset-password/page": "app/auth/reset-password/page.js",
+  "/auth/forgot-password/page": "app/auth/forgot-password/page.js",
   "/auth/invitation/page": "app/auth/invitation/page.js",
-  "/auth/signup/page": "app/auth/signup/page.js",
+  "/auth/reset-password/page": "app/auth/reset-password/page.js",
   "/auth/verify-email/page": "app/auth/verify-email/page.js",
+  "/auth/signup/page": "app/auth/signup/page.js",
   "/chat/page": "app/chat/page.js",
-  "/privacy/page": "app/privacy/page.js",
   "/page": "app/page.js",
+  "/privacy/page": "app/privacy/page.js",
   "/profile/page": "app/profile/page.js",
   "/terms/page": "app/terms/page.js",
   "/api/chat/stream/route": "app/api/chat/stream/route.js"
