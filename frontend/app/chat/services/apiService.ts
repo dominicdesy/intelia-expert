@@ -165,9 +165,53 @@ interface EnhancedAIResponse {
   note?: string
 }
 
+// NOUVEAU : Fonction pour afficher les relances proactives
+function showProactiveFollowupNotification(followupText: string) {
+  console.log('[apiService] 💡 Relance proactive:', followupText);
+  
+  // Créer une notification temporaire
+  const notification = document.createElement('div');
+  notification.className = 'proactive-followup-notification fixed top-20 right-4 z-50 max-w-md';
+  notification.innerHTML = `
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-lg">
+      <div class="flex items-start space-x-3">
+        <span class="text-blue-600 text-lg">💡</span>
+        <div class="flex-1">
+          <p class="text-sm text-blue-800 font-medium mb-1">Suggestion</p>
+          <p class="text-sm text-blue-700">${followupText}</p>
+        </div>
+        <button class="text-blue-600 hover:text-blue-800 text-lg leading-none" onclick="this.parentElement.parentElement.parentElement.remove()">
+          ×
+        </button>
+      </div>
+    </div>
+  `;
+  
+  // Ajouter au DOM
+  document.body.appendChild(notification);
+  
+  // Supprimer automatiquement après 15 secondes
+  setTimeout(() => {
+    if (notification.parentNode) {
+      notification.remove();
+    }
+  }, 15000);
+  
+  // Animation d'entrée
+  setTimeout(() => {
+    notification.style.transform = 'translateX(0)';
+    notification.style.opacity = '1';
+  }, 100);
+  
+  // Style initial pour l'animation
+  notification.style.transform = 'translateX(100%)';
+  notification.style.opacity = '0';
+  notification.style.transition = 'all 0.3s ease-out';
+}
+
 /**
- * FONCTION STREAMING SSE INTERNE
- * Gère l'appel vers /api/chat/stream
+ * FONCTION STREAMING SSE INTERNE - VERSION MISE À JOUR
+ * Gère l'appel vers /api/chat/stream avec support des relances proactives
  */
 async function streamAIResponseInternal(
   tenant_id: string,
@@ -222,6 +266,7 @@ async function streamAIResponseInternal(
   const decoder = new TextDecoder();
   let finalAnswer = "";
   let buffer = "";
+  let proactiveFollowups: string[] = []; // NOUVEAU : Stocker les relances
 
   try {
     while (true) {
@@ -257,6 +302,14 @@ async function streamAIResponseInternal(
           } else if (event.type === "final" && event.answer) {
             finalAnswer = event.answer;
             break;
+          } else if (event.type === "proactive_followup" && event.answer) {
+            // NOUVEAU : Gestion des relances proactives
+            console.log('[apiService] Relance proactive reçue:', event.answer);
+            proactiveFollowups.push(event.answer);
+            
+            // Afficher immédiatement la relance comme notification
+            showProactiveFollowupNotification(event.answer);
+            
           } else if (event.type === "error") {
             console.error('[apiService] Erreur dans le stream:', event);
             throw new Error(event.message || 'Erreur de streaming');
@@ -274,6 +327,11 @@ async function streamAIResponseInternal(
     } catch {
       // Ignore les erreurs de cancel
     }
+  }
+
+  // NOUVEAU : Log des relances reçues
+  if (proactiveFollowups.length > 0) {
+    console.log('[apiService] Relances proactives reçues:', proactiveFollowups.length);
   }
 
   return finalAnswer;
