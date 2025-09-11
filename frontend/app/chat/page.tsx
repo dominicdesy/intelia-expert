@@ -865,10 +865,9 @@ function ChatInterface() {
       if (isMountedRef.current) {
         // ✅ MISE À JOUR DU MESSAGE D'ERREUR
         const errorContent = error instanceof Error ? error.message : t('chat.errorMessage')
-        updateMessage(assistantId, (prev) => ({
-          ...prev,
+        updateMessage(assistantId, {
           content: errorContent
-        }))
+        })
       }
     } finally {
       if (isMountedRef.current) {
