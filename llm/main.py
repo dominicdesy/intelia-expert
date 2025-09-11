@@ -262,11 +262,10 @@ def create_chat_completion_safe(client, model, messages, max_completion_tokens, 
 # -----------------------------------------------------------------------------
 def run_data_only_assistant(client: OpenAI, assistant_id: str, user_text: str, lang: str) -> str:
     reminder = (
-        f"INSTRUCTIONS STRICTES:\n"
-        f"1. RÉPONDS EXCLUSIVEMENT à partir des documents du Vector Store\n"
-        f"2. Si l'information est totalement absente, réponds: \"Hors base: information absente de la connaissance Intelia.\"\n"
-        f"3. TOUJOURS répondre dans la langue de la question: {lang}\n\n"
-        f"Question utilisateur: {user_text}"
+        f"Tu es un expert en aviculture. Réponds aux questions en utilisant tes connaissances.\n"
+        f"Si tu ne connais pas la réponse précise, dis-le clairement.\n"
+        f"Réponds dans la langue de la question: {lang}\n\n"
+        f"Question: {user_text}"
     )
     
     try:
