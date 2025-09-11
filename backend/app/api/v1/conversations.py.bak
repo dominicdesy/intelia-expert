@@ -442,7 +442,7 @@ async def save_conversation(
                     "last_response": conversation_data.response
                 })
                 
-                memory.update(conversation_data.conversation_id, existing_context)
+                memory.set(conversation_data.conversation_id, existing_context)
                 
                 logger.info(f"✅ Conversation mise à jour: {conversation_data.conversation_id}, {len(messages)} messages")
                 
@@ -483,7 +483,7 @@ async def save_conversation(
                     "source": conversation_data.source
                 }
                 
-                memory.update(conversation_data.conversation_id, new_context)
+                memory.set(conversation_data.conversation_id, new_context)
                 
                 logger.info(f"✅ Nouvelle conversation créée: {conversation_data.conversation_id}")
                 
@@ -1052,7 +1052,7 @@ async def test_create_sample_conversation(
         }
         
         # Sauvegarder
-        memory.update(test_session_id, test_context)
+        memory.set(test_session_id, test_context)
         
         return {
             "status": "success",
