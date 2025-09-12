@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# main.py — Intelia LLM backend (FastAPI + SSE)
+# main.py — Intelia LLM backend (FastAPI + SSE + RAG)
 # Python 3.11+
 #
 
@@ -21,6 +21,9 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from langdetect import detect, DetectorFactory
 
+# Import du module RAG
+from rag_engine import create_rag_engine, process_question_with_rag, RAGSource, RAGResult
+
 # -----------------------------------------------------------------------------
 # Setup
 # -----------------------------------------------------------------------------
@@ -28,6 +31,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 DetectorFactory.seed = 0
 load_dotenv()
+
+# Variable globale pour l'instance RAG
+rag_engine = None
 
 # -----------------------------------------------------------------------------
 # Env config
@@ -48,6 +54,9 @@ FALLBACK_TEMPERATURE = float(os.getenv("FALLBACK_TEMPERATURE", "0.7"))
 FALLBACK_MAX_COMPLETION_TOKENS = int(
     os.getenv("FALLBACK_MAX_COMPLETION_TOKENS", os.getenv("FALLBACK_MAX_TOKENS", "600"))
 )
+
+# Configuration RAG
+RAG_CONFIDENCE_THRESHOLD = float(os.getenv("RAG_CONFIDENCE_THRESHOLD", "0.7"))
 
 LANGUAGE_FILE = os.getenv("LANGUAGE_FILE", os.path.join(BASE_DIR, "languages.json"))
 BLOCKED_TERMS_FILE = os.getenv("BLOCKED_TERMS_FILE", os.path.join(BASE_DIR, "blocked_terms.json"))
@@ -128,6 +137,7 @@ logger.info(f"LANGUAGE_FILE={LANGUAGE_FILE} exists={os.path.exists(LANGUAGE_FILE
 logger.info(f"BLOCKED_TERMS_FILE={BLOCKED_TERMS_FILE} exists={os.path.exists(BLOCKED_TERMS_FILE)}")
 logger.info(f"INTENTS_FILE={INTENTS_FILE} exists={os.path.exists(INTENTS_FILE)}")
 logger.info(f"FALLBACK_MODEL={FALLBACK_MODEL}")
+logger.info(f"RAG_CONFIDENCE_THRESHOLD={RAG_CONFIDENCE_THRESHOLD}")
 logger.info(f"Loaded {len(BLOCKED_TERMS)} blocked terms")
 logger.info(f"Loaded {len(METRIC_FOLLOWUP_TEMPLATES)} metric followup templates")
 logger.info(f"Intents config loaded: {bool(INTENTS_CONFIG)}")
@@ -154,6 +164,30 @@ except Exception as e:
     raise RuntimeError(f"Impossible d'initialiser le client OpenAI: {e}")
 
 # -----------------------------------------------------------------------------
+# Initialisation RAG
+# -----------------------------------------------------------------------------
+async def initialize_rag_engine():
+    """Initialise le moteur RAG au démarrage"""
+    global rag_engine
+    if rag_engine is not None:
+        return rag_engine
+    
+    try:
+        logger.info("Initialisation du moteur RAG...")
+        rag_engine = await create_rag_engine(client)
+        rag_status = rag_engine.get_status()
+        logger.info(f"Moteur RAG initialisé: {rag_status}")
+        return rag_engine
+    except Exception as e:
+        logger.error(f"Erreur initialisation RAG: {e}")
+        return None
+
+# Initialiser RAG au démarrage
+async def startup_event():
+    """Événement de démarrage pour initialiser les services"""
+    await initialize_rag_engine()
+
+# -----------------------------------------------------------------------------
 # FastAPI
 # -----------------------------------------------------------------------------
 app = FastAPI(title="Intelia LLM Backend", debug=False)
@@ -165,6 +199,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 router = APIRouter()
+
+# Ajouter l'événement de démarrage à FastAPI
+@app.on_event("startup")
+async def startup():
+    await startup_event()
 
 # -----------------------------------------------------------------------------
 # SSE helpers
@@ -241,7 +280,7 @@ def clean_text(txt: str) -> str:
     return cleaned.strip()
 
 # -----------------------------------------------------------------------------
-# NOUVEAU : Streaming intelligent
+# Streaming intelligent
 # -----------------------------------------------------------------------------
 def smart_chunk_text(text: str, max_chunk_size: int = 400) -> list:
     """
@@ -456,26 +495,6 @@ def generate_proactive_followup(question: str, answer: str, lang: str = "fr") ->
         return None
 
 # -----------------------------------------------------------------------------
-# Debug helpers pour tester la détection
-# -----------------------------------------------------------------------------
-
-def debug_intent_detection(question: str) -> dict:
-    """Helper pour débugger la détection d'intentions"""
-    intent_data = extract_intent_from_question(question)
-    
-    debug_info = {
-        "question": question,
-        "intent_data": intent_data,
-        "would_generate_followup": should_generate_proactive_followup(
-            question, 
-            "Réponse de test suffisamment longue pour passer le filtre de longueur.", 
-            intent_data
-        )
-    }
-    
-    return debug_info
-
-# -----------------------------------------------------------------------------
 # Conversation Memory
 # -----------------------------------------------------------------------------
 conversation_memory = {}
@@ -673,11 +692,20 @@ async def stream_fallback_general(client: OpenAI, text: str):
 # -----------------------------------------------------------------------------
 @router.get("/health")
 def health():
-    # Stats mémoire de conversation
+    global rag_engine
+    
+    # Stats mémoire de conversation (existant)
     memory_stats = {
         "active_conversations": len(conversation_memory),
         "total_exchanges": sum(len(history) for history in conversation_memory.values()),
         "memory_size_kb": len(str(conversation_memory)) // 1024
+    }
+    
+    # Stats RAG (nouveau)
+    rag_stats = {
+        "rag_enabled": os.getenv("RAG_ENABLED", "true").lower() == "true",
+        "rag_engine_loaded": rag_engine is not None,
+        "rag_status": rag_engine.get_status() if rag_engine else {}
     }
     
     return {
@@ -693,7 +721,8 @@ def health():
         "blocked_terms_count": len(BLOCKED_TERMS),
         "blocked_terms_sample": BLOCKED_TERMS[:10],
         "conversation_memory": memory_stats,
-        "max_memory_items": MAX_MEMORY_ITEMS
+        "max_memory_items": MAX_MEMORY_ITEMS,
+        "rag": rag_stats  # Nouveau
     }
 
 @router.get("/debug/intent/{question}")
@@ -761,10 +790,98 @@ async def test_followup_endpoint(request: Request):
         logger.error(f"Erreur test followup: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/rag/status")
+def rag_status():
+    """Status détaillé du système RAG"""
+    global rag_engine
+    
+    base_status = {
+        "rag_enabled": os.getenv("RAG_ENABLED", "true").lower() == "true",
+        "rag_engine_loaded": rag_engine is not None
+    }
+    
+    if rag_engine:
+        detailed_status = rag_engine.get_status()
+        base_status.update(detailed_status)
+    
+    return base_status
+
+@router.post("/rag/add-documents")
+async def add_documents_to_rag(request: Request):
+    """Ajouter des documents à la base de connaissances RAG"""
+    global rag_engine
+    
+    if not rag_engine:
+        raise HTTPException(status_code=503, detail="RAG engine not available")
+    
+    try:
+        payload = await request.json()
+        documents = payload.get("documents", [])
+        
+        if not documents:
+            raise HTTPException(status_code=400, detail="No documents provided")
+        
+        # Validation des documents
+        for i, doc in enumerate(documents):
+            if not isinstance(doc, dict) or "content" not in doc:
+                raise HTTPException(status_code=400, detail=f"Document {i} missing 'content' field")
+        
+        success = await rag_engine.add_knowledge(documents)
+        
+        return {
+            "success": success,
+            "documents_added": len(documents) if success else 0,
+            "message": "Documents ajoutés avec succès" if success else "Erreur lors de l'ajout"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur ajout documents RAG: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/rag/test-query")
+async def test_rag_query(request: Request):
+    """Test direct du pipeline RAG pour debug"""
+    global rag_engine
+    
+    if not rag_engine:
+        raise HTTPException(status_code=503, detail="RAG engine not available")
+    
+    try:
+        payload = await request.json()
+        query = payload.get("query", "").strip()
+        language = payload.get("language", "fr")
+        
+        if not query:
+            raise HTTPException(status_code=400, detail="Query required")
+        
+        result = await process_question_with_rag(rag_engine, query, language)
+        
+        return {
+            "query": query,
+            "language": language,
+            "result": {
+                "source": result.source.value,
+                "answer": result.answer,
+                "confidence": result.confidence,
+                "processing_time": result.processing_time,
+                "context_docs": result.context_docs,
+                "metadata": result.metadata
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur test RAG: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/chat/stream")
 async def chat_stream(request: Request):
     """
     JSON attendu: { "tenant_id": "ten_123", "message": "...", "allow_fallback": true }
+    Version avec intégration RAG complète
     """
     try:
         payload = await request.json()
@@ -795,8 +912,77 @@ async def chat_stream(request: Request):
 
     async def event_source() -> AsyncGenerator[bytes, None]:
         sent_final = False
+        final_response = ""
+        
         try:
-            # 1) Garde-fou: hors-domaine => message fixe depuis languages.json
+            # Initialiser RAG si nécessaire
+            global rag_engine
+            if rag_engine is None:
+                rag_engine = await initialize_rag_engine()
+            
+            # === NOUVEAU PIPELINE RAG ===
+            if rag_engine:
+                logger.info(f"[REQ {request_id}] Traitement via pipeline RAG")
+                
+                # Traitement RAG complet
+                rag_result = await process_question_with_rag(
+                    rag_engine, message, lang, tenant_id
+                )
+                
+                logger.info(f"[REQ {request_id}] RAG result: {rag_result.source.value}, confidence: {rag_result.confidence:.3f}")
+                
+                # Cas 1: Question hors domaine (filtrée par NLI)
+                if rag_result.source == RAGSource.OOD_FILTERED:
+                    answer = clean_text(get_out_of_domain_message(lang))
+                    yield send_event({"type": "final", "answer": answer})
+                    sent_final = True
+                    return
+                
+                # Cas 2: Réponse RAG de qualité trouvée
+                if (rag_result.source == RAGSource.RAG_KNOWLEDGE and 
+                    rag_result.answer and 
+                    rag_result.confidence >= RAG_CONFIDENCE_THRESHOLD):
+                    
+                    final_response = clean_text(rag_result.answer)
+                    
+                    # Streaming intelligent de la réponse RAG
+                    chunks = smart_chunk_with_natural_breaks(final_response, STREAM_CHUNK_LEN)
+                    for chunk in chunks:
+                        if chunk.strip():
+                            yield send_event({"type": "delta", "text": chunk})
+                            await asyncio.sleep(0.02)
+                    
+                    # Métadonnées RAG dans la réponse finale
+                    yield send_event({
+                        "type": "final", 
+                        "answer": final_response,
+                        "metadata": {
+                            "source": "rag",
+                            "confidence": rag_result.confidence,
+                            "processing_time": rag_result.processing_time,
+                            "context_docs": len(rag_result.context_docs),
+                            **rag_result.metadata
+                        }
+                    })
+                    sent_final = True
+                    
+                    # Ajouter à la mémoire et générer relance proactive
+                    add_to_conversation_memory(tenant_id, message, final_response)
+                    proactive_followup = generate_proactive_followup(message, final_response, lang)
+                    if proactive_followup:
+                        logger.info(f"[REQ {request_id}] Sending RAG proactive followup")
+                        yield send_event({"type": "proactive_followup", "answer": proactive_followup})
+                    
+                    return
+                
+                # Cas 3: RAG insuffisant mais pas d'erreur -> fallback
+                logger.info(f"[REQ {request_id}] RAG insuffisant, fallback vers système existant")
+            else:
+                logger.warning(f"[REQ {request_id}] RAG Engine non disponible, fallback immédiat")
+            
+            # === FALLBACK VERS SYSTÈME EXISTANT ===
+            
+            # 1) Garde-fou classique (conservé pour compatibilité)
             if not is_agri_question(message):
                 answer = clean_text(get_out_of_domain_message(lang))
                 yield send_event({"type": "final", "answer": answer})
@@ -810,13 +996,10 @@ async def chat_stream(request: Request):
             text = clean_text(text)
             logger.info(f"[REQ {request_id}] Assistant response: {text[:100]}...")
 
-            final_response = ""
-
             # 3) Fallback GPT si hors base
             if text.lower().startswith("hors base"):
                 if HYBRID_MODE and allow_fallback:
                     logger.info(f"[REQ {request_id}] Basculement vers fallback GPT")
-                    response_chunks = []
                     async for sse in stream_fallback_general(_client, message):
                         yield sse
                         # Collecter pour la mémoire
@@ -829,14 +1012,18 @@ async def chat_stream(request: Request):
                     sent_final = True
                 else:
                     final_response = text
-                    yield send_event({"type": "final", "answer": text})
+                    yield send_event({
+                        "type": "final", 
+                        "answer": text,
+                        "metadata": {"source": "assistant_ood"}
+                    })
                     sent_final = True
             else:
                 # 4) Réponse data-only (stream intelligent)
                 if not text:
                     text = "Désolé, aucune réponse n'a pu être générée."
                 
-                # MODIFICATION : Utilisation du streaming intelligent
+                # Streaming intelligent
                 chunks = smart_chunk_with_natural_breaks(text, STREAM_CHUNK_LEN)
                 for chunk in chunks:
                     if chunk.strip():
@@ -844,15 +1031,19 @@ async def chat_stream(request: Request):
                         await asyncio.sleep(0.02)
                 
                 final_response = text
-                yield send_event({"type": "final", "answer": text})
+                yield send_event({
+                    "type": "final", 
+                    "answer": text,
+                    "metadata": {"source": "assistant_knowledge"}
+                })
                 sent_final = True
 
-            # 5) Ajouter à la mémoire et générer relance
+            # 5) Ajouter à la mémoire et générer relance pour fallback
             if final_response:
                 add_to_conversation_memory(tenant_id, message, final_response)
                 proactive_followup = generate_proactive_followup(message, final_response, lang)
                 if proactive_followup:
-                    logger.info(f"[REQ {request_id}] Sending proactive followup: {proactive_followup[:50]}...")
+                    logger.info(f"[REQ {request_id}] Sending fallback proactive followup")
                     yield send_event({"type": "proactive_followup", "answer": proactive_followup})
 
         except HTTPException:
@@ -860,7 +1051,11 @@ async def chat_stream(request: Request):
         except Exception as e:
             logger.error(f"[REQ {request_id}] Erreur dans event_source: {e}")
             if not sent_final:
-                yield send_event({"type": "final", "answer": "Désolé, une erreur est survenue et la réponse n'a pas pu être générée."})
+                yield send_event({
+                    "type": "final", 
+                    "answer": "Désolé, une erreur est survenue et la réponse n'a pas pu être générée.",
+                    "metadata": {"source": "error", "error": str(e)}
+                })
                 sent_final = True
             else:
                 yield send_event({"type": "error", "message": f"Erreur interne: {str(e)}"})
@@ -881,7 +1076,7 @@ app.include_router(router, prefix=BASE_PATH)
 
 @app.get("/")
 def root():
-    return JSONResponse({"service": "intelia-llm", "sse": f"{BASE_PATH}/chat/stream", "version": "simplified"})
+    return JSONResponse({"service": "intelia-llm", "sse": f"{BASE_PATH}/chat/stream", "version": "simplified-rag"})
 
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def robots():
