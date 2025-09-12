@@ -229,7 +229,7 @@ def guess_lang_from_text(text: str) -> Optional[str]:
 # -----------------------------------------------------------------------------
 # Text helpers
 # -----------------------------------------------------------------------------
-CITATION_PATTERN = re.compile(r"【[^【】]*】")
+CITATION_PATTERN = re.compile(r"【[^【】']*】")
 
 def clean_text(txt: str) -> str:
     if not txt:
@@ -615,7 +615,7 @@ def run_data_only_assistant(client: OpenAI, assistant_id: str, user_text: str, l
         return "Hors base: information absente de la connaissance Intelia."
 
 # -----------------------------------------------------------------------------
-# Fallback general (stream)
+# Fallback general (stream) - VERSION CORRIGÉE
 # -----------------------------------------------------------------------------
 async def stream_fallback_general(client: OpenAI, text: str):
     system = (
@@ -642,15 +642,18 @@ async def stream_fallback_general(client: OpenAI, text: str):
                     chunk = delta.content  # Laissez OpenAI gérer le streaming naturel
                     final_buf.append(chunk)
                     yield send_event({"type": "delta", "text": chunk})
+        
         final_text = clean_text("".join(final_buf).strip())
         if not final_text:
             final_text = "Désolé, aucune réponse n'a pu être générée. Pouvez-vous reformuler ou préciser votre question ?"
-    chunks = smart_chunk_with_natural_breaks(answer, STREAM_CHUNK_LEN)
-    for chunk in chunks:
-        if chunk.strip():
-            yield send_event({"type": "delta", "text": chunk})
-            await asyncio.sleep(0.02)
-    yield send_event({"type": "final", "answer": answer})
+        
+        # Streaming intelligent pour les réponses complètes
+        chunks = smart_chunk_with_natural_breaks(final_text, STREAM_CHUNK_LEN)
+        for chunk in chunks:
+            if chunk.strip():
+                yield send_event({"type": "delta", "text": chunk})
+                await asyncio.sleep(0.02)
+        yield send_event({"type": "final", "answer": final_text})
 
     except Exception as e:
         if "must be verified to stream" in str(e).lower() or "param': 'stream'" in str(e).lower():
