@@ -562,6 +562,43 @@ class RAGEngine:
         self.is_initialized = True
         logger.info("RAG Engine initialisé avec succès")
     
+    def _build_metadata(self, classification_method: str, classification_confidence: float, 
+                       intent_result: Optional[IntentResult], search_query: str, query: str,
+                       search_results: List[SearchResult] = None, reranked_results: List[SearchResult] = None,
+                       high_confidence_results: List[SearchResult] = None, specialized_prompt: bool = False) -> Dict:
+        """Construit les métadonnées de façon consistante"""
+        
+        metadata = {
+            "classification_method": classification_method,
+            "classification_score": classification_confidence,
+            "query_expanded": search_query != query
+        }
+        
+        # Métadonnées de recherche si disponibles
+        if search_results is not None:
+            metadata["search_results_count"] = len(search_results)
+        if reranked_results is not None:
+            metadata["reranked_count"] = len(reranked_results)
+            if reranked_results:
+                metadata["max_score"] = max(r.score for r in reranked_results)
+        if high_confidence_results is not None:
+            metadata["high_confidence_count"] = len(high_confidence_results)
+        
+        # Métadonnées de génération
+        if specialized_prompt:
+            metadata["generation_model"] = "gpt-4o-mini"
+            metadata["specialized_prompt_used"] = specialized_prompt
+        
+        # Ajouter les métadonnées d'intention si disponibles
+        if intent_result:
+            metadata.update({
+                "intent_type": intent_result.intent_type.value,
+                "detected_entities": intent_result.detected_entities,
+                "vocab_confidence": intent_result.metadata.get("vocab_score", 0.0)
+            })
+        
+        return metadata
+    
     async def process_query(self, query: str, language: str = "fr", tenant_id: str = "") -> RAGResult:
         """
         Pipeline RAG complet avec processeur d'intentions
@@ -588,19 +625,16 @@ class RAGEngine:
                 try:
                     intent_result = self.intent_processor.process_query(query)
                     
-                    # Si détecté comme hors-domaine par le vocabulaire métier, court-circuiter
+                    # Si détecté comme hors-domaine par le vocabulaire métier
                     if intent_result.intent_type == IntentType.OUT_OF_DOMAIN:
                         logger.info(f"Question hors-domaine détectée par vocabulaire métier: {query[:50]}...")
                         return RAGResult(
                             source=RAGSource.OOD_FILTERED,
                             confidence=intent_result.confidence,
                             processing_time=time.time() - start_time,
-                            metadata={
-                                "classification_method": "vocabulary_filter",
-                                "intent_type": intent_result.intent_type.value,
-                                "vocab_confidence": intent_result.confidence,
-                                "detected_entities": intent_result.detected_entities
-                            }
+                            metadata=self._build_metadata(
+                                "vocabulary_filter", intent_result.confidence, intent_result, query, query
+                            )
                         )
                     
                     classification_method = "vocabulary_enhanced"
@@ -612,11 +646,9 @@ class RAGEngine:
             
             # Étape 2: Classification NLI (fallback ou complément)
             if intent_result and intent_result.intent_type != IntentType.OUT_OF_DOMAIN:
-                # Vocabulaire métier confirme que c'est avicole, accepter
                 is_in_domain = True
                 classification_confidence = intent_result.confidence
             else:
-                # Fallback vers classification NLI
                 is_in_domain, classification_confidence = await self.classifier.classify_question(query)
                 classification_method = "nli_fallback"
             
@@ -626,10 +658,9 @@ class RAGEngine:
                     source=RAGSource.OOD_FILTERED,
                     confidence=classification_confidence,
                     processing_time=time.time() - start_time,
-                    metadata={
-                        "classification_method": classification_method,
-                        "classification_score": classification_confidence
-                    }
+                    metadata=self._build_metadata(
+                        classification_method, classification_confidence, intent_result, query, query
+                    )
                 )
             
             # Étape 3: Recherche hybride avec expansion de requête
@@ -646,11 +677,10 @@ class RAGEngine:
                     source=RAGSource.FALLBACK_NEEDED,
                     confidence=0.0,
                     processing_time=time.time() - start_time,
-                    metadata={
-                        "classification_method": classification_method,
-                        "search_results_count": 0,
-                        "query_expanded": search_query != query
-                    }
+                    metadata=self._build_metadata(
+                        classification_method, classification_confidence, intent_result, 
+                        search_query, query, search_results
+                    )
                 )
             
             # Étape 4: Reranking avec VoyageAI
@@ -668,13 +698,10 @@ class RAGEngine:
                     source=RAGSource.FALLBACK_NEEDED,
                     confidence=max(r.score for r in reranked_results) if reranked_results else 0.0,
                     processing_time=time.time() - start_time,
-                    metadata={
-                        "classification_method": classification_method,
-                        "search_results_count": len(search_results),
-                        "reranked_count": len(reranked_results),
-                        "max_score": max(r.score for r in reranked_results) if reranked_results else 0.0,
-                        "query_expanded": search_query != query
-                    }
+                    metadata=self._build_metadata(
+                        classification_method, classification_confidence, intent_result,
+                        search_query, query, search_results, reranked_results, high_confidence_results
+                    )
                 )
             
             # Étape 5: Génération contextuelle avec prompt spécialisé
@@ -690,30 +717,14 @@ class RAGEngine:
                 return RAGResult(
                     source=RAGSource.FALLBACK_NEEDED,
                     confidence=0.0,
-                    processing_time=time.time() - start_time
+                    processing_time=time.time() - start_time,
+                    metadata=self._build_metadata(
+                        classification_method, classification_confidence, intent_result,
+                        search_query, query, search_results, reranked_results, high_confidence_results
+                    )
                 )
             
             processing_time = time.time() - start_time
-            
-            # Métadonnées enrichies
-            metadata = {
-                "classification_method": classification_method,
-                "classification_score": classification_confidence,
-                "search_results_count": len(search_results),
-                "reranked_count": len(reranked_results),
-                "high_confidence_count": len(high_confidence_results),
-                "generation_model": "gpt-4o-mini",
-                "query_expanded": search_query != query,
-                "specialized_prompt_used": specialized_prompt is not None
-            }
-            
-            # Ajouter les métadonnées d'intention si disponibles
-            if intent_result:
-                metadata.update({
-                    "intent_type": intent_result.intent_type.value,
-                    "detected_entities": intent_result.detected_entities,
-                    "vocab_confidence": intent_result.metadata.get("vocab_score", 0.0)
-                })
             
             logger.info(f"RAG réussi: {len(high_confidence_results)} docs, conf: {generation_result['confidence']:.3f}, temps: {processing_time:.2f}s")
             
@@ -723,7 +734,11 @@ class RAGEngine:
                 confidence=generation_result["confidence"],
                 context_docs=generation_result["context_used"],
                 processing_time=processing_time,
-                metadata=metadata
+                metadata=self._build_metadata(
+                    classification_method, classification_confidence, intent_result,
+                    search_query, query, search_results, reranked_results, high_confidence_results, 
+                    specialized_prompt is not None
+                )
             )
             
         except Exception as e:
