@@ -196,7 +196,7 @@ class HybridSearchEngine:
                             "model": "ada",
                             "modelVersion": "002",
                             "type": "text",
-                            "apiKey": os.getenv("OPENAI_API_KEY") 
+                            "apiKey": OPENAI_APIKEY
                         }
                     },
                     "properties": [
