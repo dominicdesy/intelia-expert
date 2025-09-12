@@ -811,6 +811,64 @@ async def debug_nli():
             }
     return {"nli_status": "engine_not_available"}
 
+@router.get("/debug/nli-detailed")
+async def debug_nli_detailed():
+    """Diagnostic détaillé du classificateur NLI"""
+    import traceback
+    
+    try:
+        # Test direct d'import
+        from transformers import pipeline
+        model_path = os.getenv("NLI_MODEL_PATH", "MoritzLaurer/deberta-v3-base-zeroshot-v2")
+        
+        # Test de chargement du modèle avec timeout
+        import signal
+        
+        def timeout_handler(signum, frame):
+            raise TimeoutError("Model loading timeout")
+        
+        # Timeout de 30 secondes
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(30)
+        
+        try:
+            classifier = pipeline(
+                "zero-shot-classification",
+                model=model_path,
+                device=-1  # Forcer CPU
+            )
+            signal.alarm(0)  # Annuler timeout
+            
+            # Test rapide du modèle
+            test_result = classifier("test agriculture question", ["agriculture", "technologie"])
+            
+            return {
+                "nli_status": "success",
+                "model_path": model_path,
+                "test_classification": test_result['labels'][0],
+                "confidence": test_result['scores'][0]
+            }
+            
+        except TimeoutError:
+            return {
+                "nli_status": "timeout",
+                "error": "Model loading timeout after 30 seconds",
+                "model_path": model_path
+            }
+            
+    except ImportError as e:
+        return {
+            "nli_status": "import_error",
+            "error": f"Import failed: {str(e)}",
+            "missing_package": str(e)
+        }
+    except Exception as e:
+        return {
+            "nli_status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
 
 @router.get("/rag/status")
 def rag_status():
