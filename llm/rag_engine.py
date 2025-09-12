@@ -20,7 +20,7 @@ async def load_model(self):
                     device=-1  # CPU pour économiser les ressources
                 )
             )
-            self.is_loaded =# -*- coding: utf-8 -*-
+            self.is_loaded
 """
 rag_engine.py - Module RAG hybride pour Intelia Expert
 Intégration: Classification NLI + Recherche hybride + Reranking VoyageAI + Génération contextuelle
@@ -42,6 +42,7 @@ from openai import OpenAI
 from transformers import pipeline
 import numpy as np
 from sentence_transformers import SentenceTransformer
+from intent_processor import create_intent_processor, IntentType, IntentResult
 
 logger = logging.getLogger(__name__)
 
