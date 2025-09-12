@@ -241,6 +241,96 @@ def clean_text(txt: str) -> str:
     return cleaned.strip()
 
 # -----------------------------------------------------------------------------
+# NOUVEAU : Streaming intelligent
+# -----------------------------------------------------------------------------
+def smart_chunk_text(text: str, max_chunk_size: int = 400) -> list:
+    """
+    Découpe le texte en chunks sans casser les mots.
+    Respecte aussi les retours à la ligne et la ponctuation.
+    """
+    if not text or len(text) <= max_chunk_size:
+        return [text] if text else []
+    
+    chunks = []
+    remaining_text = text
+    
+    while remaining_text:
+        if len(remaining_text) <= max_chunk_size:
+            chunks.append(remaining_text)
+            break
+        
+        # Trouver le point de coupe optimal
+        cut_point = max_chunk_size
+        
+        # Chercher le dernier espace avant max_chunk_size
+        while cut_point > 0 and remaining_text[cut_point] != ' ':
+            cut_point -= 1
+        
+        # Si aucun espace trouvé, chercher la prochaine ponctuation
+        if cut_point == 0:
+            cut_point = max_chunk_size
+            while cut_point < len(remaining_text) and remaining_text[cut_point] not in ' .,;:!?\n':
+                cut_point += 1
+        
+        # Si toujours rien, couper au maximum (cas extrême : mot très long)
+        if cut_point == 0 or cut_point > len(remaining_text):
+            cut_point = min(max_chunk_size, len(remaining_text))
+        
+        # Extraire le chunk
+        chunk = remaining_text[:cut_point].rstrip()
+        if chunk:
+            chunks.append(chunk)
+        
+        # Préparer le texte restant (supprimer les espaces de début)
+        remaining_text = remaining_text[cut_point:].lstrip()
+    
+    return [chunk for chunk in chunks if chunk.strip()]
+
+def smart_chunk_with_natural_breaks(text: str, max_chunk_size: int = 400) -> list:
+    """
+    Version avancée qui respecte les paragraphes et listes.
+    Idéal pour le contenu markdown de l'assistant.
+    """
+    if not text or len(text) <= max_chunk_size:
+        return [text] if text else []
+    
+    chunks = []
+    
+    # Séparer par paragraphes d'abord
+    paragraphs = text.split('\n\n')
+    current_chunk = ""
+    
+    for paragraph in paragraphs:
+        paragraph = paragraph.strip()
+        if not paragraph:
+            continue
+        
+        # Si le paragraphe entier tient dans le chunk actuel
+        if len(current_chunk + paragraph) <= max_chunk_size:
+            if current_chunk:
+                current_chunk += '\n\n' + paragraph
+            else:
+                current_chunk = paragraph
+        else:
+            # Envoyer le chunk actuel s'il existe
+            if current_chunk:
+                chunks.append(current_chunk)
+                current_chunk = ""
+            
+            # Si le paragraphe est trop long, le découper
+            if len(paragraph) > max_chunk_size:
+                sub_chunks = smart_chunk_text(paragraph, max_chunk_size)
+                chunks.extend(sub_chunks)
+            else:
+                current_chunk = paragraph
+    
+    # Ajouter le dernier chunk
+    if current_chunk:
+        chunks.append(current_chunk)
+    
+    return [chunk for chunk in chunks if chunk.strip()]
+
+# -----------------------------------------------------------------------------
 # Proactive Followup System - VERSION CORRIGÉE
 # -----------------------------------------------------------------------------
 
@@ -549,13 +639,19 @@ async def stream_fallback_general(client: OpenAI, text: str):
             if hasattr(event, "choices") and event.choices:
                 delta = event.choices[0].delta
                 if delta and getattr(delta, "content", None):
-                    chunk = clean_text(delta.content)
+                    chunk = delta.content  # Laissez OpenAI gérer le streaming naturel
                     final_buf.append(chunk)
                     yield send_event({"type": "delta", "text": chunk})
         final_text = clean_text("".join(final_buf).strip())
         if not final_text:
             final_text = "Désolé, aucune réponse n'a pu être générée. Pouvez-vous reformuler ou préciser votre question ?"
-        yield send_event({"type": "final", "answer": final_text})
+	chunks = smart_chunk_with_natural_breaks(answer, STREAM_CHUNK_LEN)
+	for chunk in chunks:
+    	if chunk.strip():
+        	yield send_event({"type": "delta", "text": chunk})
+        	await asyncio.sleep(0.02)
+	yield send_event({"type": "final", "answer": answer})
+
     except Exception as e:
         if "must be verified to stream" in str(e).lower() or "param': 'stream'" in str(e).lower():
             resp = create_chat_completion_safe(
@@ -733,21 +829,22 @@ async def chat_stream(request: Request):
                     yield send_event({"type": "final", "answer": text})
                     sent_final = True
             else:
-                # 4) Réponse data-only (stream simulé)
+                # 4) Réponse data-only (stream intelligent)
                 if not text:
                     text = "Désolé, aucune réponse n'a pu être générée."
                 
-                for i in range(0, len(text), STREAM_CHUNK_LEN):
-                    chunk = clean_text(text[i:i + STREAM_CHUNK_LEN])
-                    if chunk:
+                # MODIFICATION : Utilisation du streaming intelligent
+                chunks = smart_chunk_with_natural_breaks(text, STREAM_CHUNK_LEN)
+                for chunk in chunks:
+                    if chunk.strip():
                         yield send_event({"type": "delta", "text": chunk})
                         await asyncio.sleep(0.02)
                 
-                final_response = text  # ← CORRECTION : définir final_response pour data-only aussi
+                final_response = text
                 yield send_event({"type": "final", "answer": text})
                 sent_final = True
 
-            # 5) Ajouter à la mémoire et générer relance (maintenant final_response est toujours défini)
+            # 5) Ajouter à la mémoire et générer relance
             if final_response:
                 add_to_conversation_memory(tenant_id, message, final_response)
                 proactive_followup = generate_proactive_followup(message, final_response, lang)
