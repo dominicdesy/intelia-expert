@@ -535,6 +535,7 @@ class RAGEngine:
         self.search_engine = HybridSearchEngine()
         self.reranker = VoyageReranker()
         self.generator = ContextualGenerator(openai_client)
+        self.intent_processor = None  # Processeur d'intentions métier
         self.is_initialized = False
     
     async def initialize(self):
@@ -543,6 +544,14 @@ class RAGEngine:
             return
         
         logger.info("Initialisation RAG Engine...")
+        
+        # Initialisation du processeur d'intentions
+        try:
+            self.intent_processor = create_intent_processor()
+            logger.info("Processeur d'intentions initialisé")
+        except Exception as e:
+            logger.error(f"Erreur init processeur intentions: {e}")
+            self.intent_processor = None
         
         # Initialisation parallèle des composants
         await asyncio.gather(
@@ -555,11 +564,12 @@ class RAGEngine:
     
     async def process_query(self, query: str, language: str = "fr", tenant_id: str = "") -> RAGResult:
         """
-        Pipeline RAG complet
-        1. Classification OOD
-        2. Recherche hybride  
-        3. Reranking
-        4. Génération contextuelle
+        Pipeline RAG complet avec processeur d'intentions
+        1. Analyse d'intention métier
+        2. Classification OOD renforcée
+        3. Recherche hybride avec expansion
+        4. Reranking
+        5. Génération contextuelle avec prompt spécialisé
         """
         if not RAG_ENABLED:
             return RAGResult(source=RAGSource.FALLBACK_NEEDED)
@@ -570,32 +580,81 @@ class RAGEngine:
         start_time = time.time()
         
         try:
-            # Étape 1: Classification hors-domaine
-            is_in_domain, classification_confidence = await self.classifier.classify_question(query)
+            # Étape 1: Analyse d'intention métier
+            intent_result = None
+            classification_method = "nli_only"
+            
+            if self.intent_processor:
+                try:
+                    intent_result = self.intent_processor.process_query(query)
+                    
+                    # Si détecté comme hors-domaine par le vocabulaire métier, court-circuiter
+                    if intent_result.intent_type == IntentType.OUT_OF_DOMAIN:
+                        logger.info(f"Question hors-domaine détectée par vocabulaire métier: {query[:50]}...")
+                        return RAGResult(
+                            source=RAGSource.OOD_FILTERED,
+                            confidence=intent_result.confidence,
+                            processing_time=time.time() - start_time,
+                            metadata={
+                                "classification_method": "vocabulary_filter",
+                                "intent_type": intent_result.intent_type.value,
+                                "vocab_confidence": intent_result.confidence,
+                                "detected_entities": intent_result.detected_entities
+                            }
+                        )
+                    
+                    classification_method = "vocabulary_enhanced"
+                    logger.info(f"Intent détecté: {intent_result.intent_type.value}, entités: {intent_result.detected_entities}")
+                    
+                except Exception as e:
+                    logger.error(f"Erreur processeur intentions: {e}")
+                    intent_result = None
+            
+            # Étape 2: Classification NLI (fallback ou complément)
+            if intent_result and intent_result.intent_type != IntentType.OUT_OF_DOMAIN:
+                # Vocabulaire métier confirme que c'est avicole, accepter
+                is_in_domain = True
+                classification_confidence = intent_result.confidence
+            else:
+                # Fallback vers classification NLI
+                is_in_domain, classification_confidence = await self.classifier.classify_question(query)
+                classification_method = "nli_fallback"
             
             if not is_in_domain:
-                logger.info(f"Question hors-domaine détectée: {query[:50]}... (conf: {classification_confidence:.3f})")
+                logger.info(f"Question hors-domaine (méthode: {classification_method}): {query[:50]}...")
                 return RAGResult(
                     source=RAGSource.OOD_FILTERED,
                     confidence=classification_confidence,
                     processing_time=time.time() - start_time,
-                    metadata={"classification_score": classification_confidence}
+                    metadata={
+                        "classification_method": classification_method,
+                        "classification_score": classification_confidence
+                    }
                 )
             
-            # Étape 2: Recherche hybride
-            search_results = await self.search_engine.search(query, language)
+            # Étape 3: Recherche hybride avec expansion de requête
+            search_query = query
+            if intent_result and intent_result.expanded_query != query:
+                search_query = intent_result.expanded_query
+                logger.info(f"Requête expansée: '{query}' -> '{search_query}'")
+            
+            search_results = await self.search_engine.search(search_query, language)
             
             if not search_results:
-                logger.info(f"Aucun résultat de recherche pour: {query[:50]}...")
+                logger.info(f"Aucun résultat de recherche pour: {search_query[:50]}...")
                 return RAGResult(
                     source=RAGSource.FALLBACK_NEEDED,
                     confidence=0.0,
                     processing_time=time.time() - start_time,
-                    metadata={"search_results_count": 0}
+                    metadata={
+                        "classification_method": classification_method,
+                        "search_results_count": 0,
+                        "query_expanded": search_query != query
+                    }
                 )
             
-            # Étape 3: Reranking avec VoyageAI
-            reranked_results = await self.reranker.rerank(query, search_results)
+            # Étape 4: Reranking avec VoyageAI
+            reranked_results = await self.reranker.rerank(search_query, search_results)
             
             # Filtrer par seuil de confiance
             high_confidence_results = [
@@ -610,15 +669,21 @@ class RAGEngine:
                     confidence=max(r.score for r in reranked_results) if reranked_results else 0.0,
                     processing_time=time.time() - start_time,
                     metadata={
+                        "classification_method": classification_method,
                         "search_results_count": len(search_results),
                         "reranked_count": len(reranked_results),
-                        "max_score": max(r.score for r in reranked_results) if reranked_results else 0.0
+                        "max_score": max(r.score for r in reranked_results) if reranked_results else 0.0,
+                        "query_expanded": search_query != query
                     }
                 )
             
-            # Étape 4: Génération contextuelle
+            # Étape 5: Génération contextuelle avec prompt spécialisé
+            specialized_prompt = None
+            if intent_result and self.intent_processor:
+                specialized_prompt = self.intent_processor.get_specialized_prompt(intent_result)
+            
             generation_result = await self.generator.generate_answer(
-                query, high_confidence_results[:5], language
+                query, high_confidence_results[:5], language, specialized_prompt
             )
             
             if not generation_result["answer"]:
@@ -630,6 +695,26 @@ class RAGEngine:
             
             processing_time = time.time() - start_time
             
+            # Métadonnées enrichies
+            metadata = {
+                "classification_method": classification_method,
+                "classification_score": classification_confidence,
+                "search_results_count": len(search_results),
+                "reranked_count": len(reranked_results),
+                "high_confidence_count": len(high_confidence_results),
+                "generation_model": "gpt-4o-mini",
+                "query_expanded": search_query != query,
+                "specialized_prompt_used": specialized_prompt is not None
+            }
+            
+            # Ajouter les métadonnées d'intention si disponibles
+            if intent_result:
+                metadata.update({
+                    "intent_type": intent_result.intent_type.value,
+                    "detected_entities": intent_result.detected_entities,
+                    "vocab_confidence": intent_result.metadata.get("vocab_score", 0.0)
+                })
+            
             logger.info(f"RAG réussi: {len(high_confidence_results)} docs, conf: {generation_result['confidence']:.3f}, temps: {processing_time:.2f}s")
             
             return RAGResult(
@@ -638,13 +723,7 @@ class RAGEngine:
                 confidence=generation_result["confidence"],
                 context_docs=generation_result["context_used"],
                 processing_time=processing_time,
-                metadata={
-                    "classification_score": classification_confidence,
-                    "search_results_count": len(search_results),
-                    "reranked_count": len(reranked_results),
-                    "high_confidence_count": len(high_confidence_results),
-                    "generation_model": "gpt-4o-mini"
-                }
+                metadata=metadata
             )
             
         except Exception as e:
@@ -665,7 +744,7 @@ class RAGEngine:
     
     def get_status(self) -> Dict:
         """Status des composants RAG"""
-        return {
+        status = {
             "rag_enabled": RAG_ENABLED,
             "initialized": self.is_initialized,
             "classifier_loaded": self.classifier.is_loaded,
@@ -675,6 +754,15 @@ class RAGEngine:
             "voyage_api_configured": bool(VOYAGE_API_KEY),
             "nli_model": NLI_MODEL_PATH
         }
+        
+        # Ajouter le status du processeur d'intentions
+        if self.intent_processor:
+            status["intent_processor_loaded"] = True
+            status["intent_vocabulary_size"] = len(self.intent_processor.vocabulary_extractor.poultry_keywords)
+        else:
+            status["intent_processor_loaded"] = False
+        
+        return status
 
 # Fonctions utilitaires pour l'intégration dans main.py
 async def create_rag_engine(openai_client: OpenAI) -> RAGEngine:
