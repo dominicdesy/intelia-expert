@@ -1,4 +1,26 @@
-# -*- coding: utf-8 -*-
+async def load_model(self):
+        """Chargement asynchrone du modèle NLI"""
+        if self.is_loaded:
+            return
+        
+        # Vérifier si NLI est désactivé
+        if DISABLE_NLI_CLASSIFIER:
+            logger.info("Classificateur NLI désactivé par configuration")
+            self.is_loaded = False
+            return
+        
+        try:
+            logger.info(f"Chargement du modèle NLI: {NLI_MODEL_PATH}")
+            loop = asyncio.get_event_loop()
+            self.classifier = await loop.run_in_executor(
+                None,
+                lambda: pipeline(
+                    "zero-shot-classification",
+                    model=NLI_MODEL_PATH,
+                    device=-1  # CPU pour économiser les ressources
+                )
+            )
+            self.is_loaded =# -*- coding: utf-8 -*-
 """
 rag_engine.py - Module RAG hybride pour Intelia Expert
 Intégration: Classification NLI + Recherche hybride + Reranking VoyageAI + Génération contextuelle
@@ -103,7 +125,7 @@ class InDomainClassifier:
             logger.error(f"Erreur chargement modèle NLI: {e}")
             self.is_loaded = False
     
-    async def classify_question(self, question: str, threshold: float = 0.65) -> Tuple[bool, float]:
+    async def classify_question(self, question: str, threshold: float = 0.45) -> Tuple[bool, float]:
         """
         Classifie si une question est dans le domaine agricole
         Returns: (is_in_domain, confidence_score)
@@ -196,7 +218,7 @@ class HybridSearchEngine:
                             "model": "ada",
                             "modelVersion": "002",
                             "type": "text",
-                            "apiKey": os.getenv("OPENAI_API_KEY") 
+                            "apiKey": OPENAI_APIKEY
                         }
                     },
                     "properties": [
