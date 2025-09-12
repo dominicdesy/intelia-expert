@@ -11,7 +11,7 @@ langdetect==1.0.9
 weaviate-client==3.25.3
 
 # Reranker VoyageAI (200M tokens gratuits/mois)
-voyageai==0.2.0
+voyageai==0.3.5
 
 # Classification NLI et embeddings
 transformers==4.36.2
@@ -46,7 +46,7 @@ scipy==1.11.4
 
 # 1. Installation minimale pour démarrer (ajoutez à votre requirements.txt):
 #    weaviate-client==3.25.3
-#    voyageai==0.2.0
+#    voyageai==0.3.5
 #    transformers==4.36.2
 #    torch>=1.13.0,<2.1.0
 #    sentence-transformers==2.2.2
