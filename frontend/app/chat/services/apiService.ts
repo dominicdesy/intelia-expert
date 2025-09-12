@@ -1,6 +1,6 @@
 // app/chat/services/apiService.ts - VERSION HYBRIDE: Streaming LLM + Backend métier
+// 🔧 FIX: Stockage session IDs sans dépendance conversationService
 
-import { conversationService } from './conversationService'
 import { getSupabaseClient } from '@/lib/supabase/singleton'
 
 // Types pour les callbacks de streaming
@@ -22,6 +22,37 @@ const getApiConfig = () => {
 }
 
 const API_BASE_URL = getApiConfig()
+
+// 🔧 FIX: Stockage direct des session IDs sans dépendance externe
+function storeRecentSessionId(sessionId: string): void {
+  try {
+    const STORAGE_KEY = 'recent_session_ids';
+    const MAX_SESSIONS = 50;
+    
+    // Récupérer les sessions existantes
+    const existing = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    
+    // Éviter les doublons
+    if (existing.includes(sessionId)) {
+      console.log('[apiService] Session ID déjà stocké:', sessionId.substring(0, 8) + '...');
+      return;
+    }
+    
+    // Ajouter en tête de liste
+    const updated = [sessionId, ...existing];
+    
+    // Limiter le nombre de sessions
+    const limited = updated.slice(0, MAX_SESSIONS);
+    
+    // Sauvegarder
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(limited));
+    
+    console.log('[apiService] ✅ Session ID stocké:', sessionId.substring(0, 8) + '...', 'Total:', limited.length);
+    
+  } catch (error) {
+    console.error('[apiService] Erreur stockage session ID:', error);
+  }
+}
 
 // Fonction d'authentification pour le backend métier (conservée)
 const getAuthToken = async (): Promise<string | null> => {
@@ -389,12 +420,8 @@ export const generateAIResponse = async (
       // Ne pas faire échouer la réponse pour une erreur de sauvegarde
     }
 
-    // Stockage du session ID pour l'historique
-    try {
-      conversationService.storeRecentSessionId(finalConversationId)
-    } catch (error) {
-      console.warn('[apiService] Erreur stockage session ID:', error)
-    }
+    // 🔧 FIX: Stockage du session ID pour l'historique (version corrigée)
+    storeRecentSessionId(finalConversationId)
 
     // Construction de la réponse dans le format attendu par l'interface
     const processedResponse: EnhancedAIResponse = {
@@ -525,12 +552,8 @@ export const generateAIResponsePublic = async (
       callbacks  // <<< PROPAGATION DES CALLBACKS
     );
 
-    // Stockage du session ID
-    try {
-      conversationService.storeRecentSessionId(finalConversationId)
-    } catch (error) {
-      console.warn('[apiService] Erreur stockage session ID public:', error)
-    }
+    // 🔧 FIX: Stockage du session ID (version corrigée)
+    storeRecentSessionId(finalConversationId)
 
     return {
       response: finalResponse,

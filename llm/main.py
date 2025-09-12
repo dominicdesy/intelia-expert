@@ -645,12 +645,12 @@ async def stream_fallback_general(client: OpenAI, text: str):
         final_text = clean_text("".join(final_buf).strip())
         if not final_text:
             final_text = "Désolé, aucune réponse n'a pu être générée. Pouvez-vous reformuler ou préciser votre question ?"
-	chunks = smart_chunk_with_natural_breaks(answer, STREAM_CHUNK_LEN)
-	for chunk in chunks:
-    	if chunk.strip():
-        	yield send_event({"type": "delta", "text": chunk})
-        	await asyncio.sleep(0.02)
-	yield send_event({"type": "final", "answer": answer})
+    chunks = smart_chunk_with_natural_breaks(answer, STREAM_CHUNK_LEN)
+    for chunk in chunks:
+        if chunk.strip():
+            yield send_event({"type": "delta", "text": chunk})
+            await asyncio.sleep(0.02)
+    yield send_event({"type": "final", "answer": answer})
 
     except Exception as e:
         if "must be verified to stream" in str(e).lower() or "param': 'stream'" in str(e).lower():
