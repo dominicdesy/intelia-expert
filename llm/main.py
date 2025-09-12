@@ -790,6 +790,28 @@ async def test_followup_endpoint(request: Request):
         logger.error(f"Erreur test followup: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/debug/nli")
+async def debug_nli():
+    """Route de diagnostic pour tester le classificateur NLI"""
+    global rag_engine
+    if rag_engine and rag_engine.classifier:
+        try:
+            await rag_engine.classifier.load_model()
+            is_loaded = rag_engine.classifier.is_loaded
+            return {
+                "nli_status": "loaded" if is_loaded else "failed",
+                "model_path": os.getenv("NLI_MODEL_PATH", "MoritzLaurer/deberta-v3-base-zeroshot-v2"),
+                "error": None
+            }
+        except Exception as e:
+            return {
+                "nli_status": "error",
+                "error": str(e),
+                "model_path": os.getenv("NLI_MODEL_PATH", "MoritzLaurer/deberta-v3-base-zeroshot-v2")
+            }
+    return {"nli_status": "engine_not_available"}
+
+
 @router.get("/rag/status")
 def rag_status():
     """Status détaillé du système RAG"""
