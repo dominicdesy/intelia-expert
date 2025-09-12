@@ -463,8 +463,8 @@ PREGUNTA DEL USUARIO: {query}
 
 RESPUESTA BASADA EN LOS DOCUMENTOS:"""
     
-    async def generate_answer(self, query: str, context_docs: List[SearchResult], language: str = "fr") -> Dict:
-        """Génère une réponse contextuelle"""
+    async def generate_answer(self, query: str, context_docs: List[SearchResult], language: str = "fr", specialized_prompt: str = None) -> Dict:
+        """Génère une réponse contextuelle avec prompt optionnel spécialisé"""
         
         if not context_docs:
             return {
@@ -474,7 +474,12 @@ RESPUESTA BASADA EN LOS DOCUMENTOS:"""
             }
         
         try:
-            prompt = self._build_context_prompt(query, context_docs, language)
+            if specialized_prompt:
+                # Utiliser le prompt spécialisé si fourni
+                prompt = self._build_specialized_context_prompt(query, context_docs, language, specialized_prompt)
+            else:
+                # Utiliser le prompt générique standard
+                prompt = self._build_context_prompt(query, context_docs, language)
             
             # Génération avec OpenAI
             response = self.client.chat.completions.create(
@@ -512,6 +517,33 @@ RESPUESTA BASADA EN LOS DOCUMENTOS:"""
                 "confidence": 0.0,
                 "context_used": []
             }
+    
+    def _build_specialized_context_prompt(self, query: str, context_docs: List[SearchResult], language: str, specialized_prompt: str) -> str:
+        """Construit un prompt avec expertise spécialisée"""
+        
+        # Limiter le contexte pour rester dans la fenêtre
+        context_parts = []
+        total_length = 0
+        
+        for i, doc in enumerate(context_docs):
+            doc_text = f"[Document {i+1}]\nTitre: {doc.metadata.get('title', 'N/A')}\nContenu: {doc.content}\n"
+            
+            if total_length + len(doc_text) > RAG_CONTEXT_WINDOW:
+                break
+                
+            context_parts.append(doc_text)
+            total_length += len(doc_text)
+        
+        context = "\n".join(context_parts)
+        
+        return f"""{specialized_prompt}
+
+DOCUMENTS DE RÉFÉRENCE:
+{context}
+
+QUESTION: {query}
+
+RÉPONSE EXPERTE:"""
 
 class RAGEngine:
     """Pipeline RAG principal - orchestrateur de tous les composants"""
