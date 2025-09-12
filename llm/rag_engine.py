@@ -538,29 +538,43 @@ class RAGEngine:
         self.intent_processor = None  # Processeur d'intentions métier
         self.is_initialized = False
     
+
     async def initialize(self):
-        """Initialisation de tous les composants"""
-        if self.is_initialized:
+        """Initialisation de la connexion Weaviate et du modèle d'embedding"""
+        if self.is_connected:
             return
         
-        logger.info("Initialisation RAG Engine...")
-        
-        # Initialisation du processeur d'intentions
         try:
-            self.intent_processor = create_intent_processor()
-            logger.info("Processeur d'intentions initialisé")
+            # Configuration client Weaviate
+            auth_config = None
+            if WEAVIATE_API_KEY:
+                auth_config = weaviate.AuthApiKey(api_key=WEAVIATE_API_KEY)
+            
+            # ✅ NOUVEAU: Headers additionnels pour OpenAI
+            additional_headers = {}
+            if OPENAI_API_KEY:
+                additional_headers["X-OpenAI-Api-Key"] = OPENAI_API_KEY
+            
+            self.client = weaviate.Client(
+                url=WEAVIATE_URL,
+                auth_client_secret=auth_config,
+                additional_headers=additional_headers  # ✅ CORRECTION
+            )
+            
+            # Test de connexion
+            if self.client.is_ready():
+                logger.info("Connexion Weaviate établie")
+                self.is_connected = True
+                
+                # Créer le schéma si nécessaire
+                await self._ensure_schema_exists()
+            else:
+                logger.warning("Weaviate non disponible, recherche désactivée")
+                
         except Exception as e:
-            logger.error(f"Erreur init processeur intentions: {e}")
-            self.intent_processor = None
-        
-        # Initialisation parallèle des composants
-        await asyncio.gather(
-            self.classifier.load_model(),
-            self.search_engine.initialize()
-        )
-        
-        self.is_initialized = True
-        logger.info("RAG Engine initialisé avec succès")
+            logger.error(f"Erreur connexion Weaviate: {e}")
+            self.is_connected = False
+
     
     def _build_metadata(self, classification_method: str, classification_confidence: float, 
                        intent_result: Optional[IntentResult], search_query: str, query: str,
