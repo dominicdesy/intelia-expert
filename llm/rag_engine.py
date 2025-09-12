@@ -1,26 +1,4 @@
-async def load_model(self):
-        """Chargement asynchrone du modèle NLI"""
-        if self.is_loaded:
-            return
-        
-        # Vérifier si NLI est désactivé
-        if DISABLE_NLI_CLASSIFIER:
-            logger.info("Classificateur NLI désactivé par configuration")
-            self.is_loaded = False
-            return
-        
-        try:
-            logger.info(f"Chargement du modèle NLI: {NLI_MODEL_PATH}")
-            loop = asyncio.get_event_loop()
-            self.classifier = await loop.run_in_executor(
-                None,
-                lambda: pipeline(
-                    "zero-shot-classification",
-                    model=NLI_MODEL_PATH,
-                    device=-1  # CPU pour économiser les ressources
-                )
-            )
-            self.is_loaded
+# -*- coding: utf-8 -*-
 """
 rag_engine.py - Module RAG hybride pour Intelia Expert
 Intégration: Classification NLI + Recherche hybride + Reranking VoyageAI + Génération contextuelle
@@ -42,6 +20,8 @@ from openai import OpenAI
 from transformers import pipeline
 import numpy as np
 from sentence_transformers import SentenceTransformer
+
+# Import du nouveau module
 from intent_processor import create_intent_processor, IntentType, IntentResult
 
 logger = logging.getLogger(__name__)
@@ -51,6 +31,7 @@ RAG_ENABLED = os.getenv("RAG_ENABLED", "true").lower() == "true"
 WEAVIATE_URL = os.getenv("WEAVIATE_URL", "http://localhost:8080")
 WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY")
 VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 NLI_MODEL_PATH = os.getenv("NLI_MODEL_PATH", "MoritzLaurer/deberta-v3-base-zeroshot-v2")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
 RAG_SEARCH_LIMIT = int(os.getenv("RAG_SEARCH_LIMIT", "20"))
@@ -219,7 +200,7 @@ class HybridSearchEngine:
                             "model": "ada",
                             "modelVersion": "002",
                             "type": "text",
-                            "apiKey": OPENAI_APIKEY
+                            "apiKey": OPENAI_API_KEY
                         }
                     },
                     "properties": [
