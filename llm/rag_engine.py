@@ -190,11 +190,13 @@ class HybridSearchEngine:
                 schema = {
                     "class": self.class_name,
                     "description": "Base de connaissances Intelia Expert en aviculture",
-                    "vectorizer": "text2vec-transformers",
+                    "vectorizer": "text2vec-openai",
                     "moduleConfig": {
-                        "text2vec-transformers": {
-                            "poolingStrategy": "masked_mean",
-                            "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+                        "text2vec-openai": {
+                            "model": "ada",
+                            "modelVersion": "002",
+                            "type": "text",
+                            "apiKey": OPENAI_APIKEY
                         }
                     },
                     "properties": [
