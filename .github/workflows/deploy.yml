@@ -44,72 +44,10 @@ jobs:
           echo "Backend changed: ${{ steps.changes.outputs.backend }}"
           echo "LLM changed: ${{ steps.changes.outputs.llm }}"
 
-  # 🧹 NETTOYAGE PRÉVENTIF - AVANT les builds
-  preventive-cleanup:
-    runs-on: ubuntu-latest
-    needs: detect-changes
-    # Se déclenche si n'importe quel composant a changé
-    if: needs.detect-changes.outputs.frontend-changed == 'true' || needs.detect-changes.outputs.backend-changed == 'true' || needs.detect-changes.outputs.llm-changed == 'true'
-    steps:
-      - name: Install doctl
-        uses: digitalocean/action-doctl@v2
-        with:
-          token: ${{ secrets.DOCR_ACCESS_TOKEN }}
-
-      - name: Preventive registry cleanup (keep 6 latest)
-        run: |
-          echo "🧹 Preventive cleanup - keeping 6 latest images per repository..."
-          
-          for repo in intelia-frontend intelia-backend intelia-llm; do
-            echo "Processing $repo..."
-            
-            # Obtenir TOUS les manifests avec timestamp, triés du plus ancien au plus récent
-            manifests_json=$(doctl registry repository list-manifests "$repo" --format Digest,UpdatedAt --output json 2>/dev/null || echo "[]")
-            
-            # Vérifier si on a des manifests
-            if [ "$manifests_json" = "[]" ] || [ -z "$manifests_json" ]; then
-              echo "No manifests found for $repo, skipping..."
-              continue
-            fi
-            
-            # Compter les manifests
-            manifest_count=$(echo "$manifests_json" | jq '. | length' 2>/dev/null || echo "0")
-            echo "Found $manifest_count manifests in $repo"
-            
-            # Si on a plus de 6 manifests, supprimer les plus anciens
-            if [ "$manifest_count" -gt 6 ]; then
-              # Calculer combien supprimer
-              to_delete=$((manifest_count - 6))
-              echo "Need to delete $to_delete old manifests from $repo"
-              
-              # Trier par date (plus anciens en premier) et prendre les N premiers à supprimer
-              old_manifests=$(echo "$manifests_json" | jq -r 'sort_by(.updated_at) | .[0:'$to_delete'] | .[].digest' 2>/dev/null || echo "")
-              
-              # Supprimer les anciens manifests
-              if [ -n "$old_manifests" ]; then
-                echo "$old_manifests" | while IFS= read -r digest; do
-                  if [ -n "$digest" ] && [ "$digest" != "null" ]; then
-                    echo "Deleting old manifest: $digest"
-                    doctl registry repository delete-manifest "$repo" "$digest" --force || echo "Failed to delete $digest"
-                  fi
-                done
-              else
-                echo "No old manifests to delete for $repo"
-              fi
-            else
-              echo "Only $manifest_count manifests in $repo, no cleanup needed"
-            fi
-            
-            echo "Finished processing $repo"
-            echo "---"
-          done
-          
-          echo "✅ Preventive cleanup completed"
-
   # 🎯 Build Frontend - SEULEMENT si changé
   build-frontend:
     runs-on: ubuntu-latest
-    needs: [detect-changes, preventive-cleanup]
+    needs: detect-changes
     if: needs.detect-changes.outputs.frontend-changed == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -143,7 +81,7 @@ jobs:
   # 🎯 Build Backend - SEULEMENT si changé  
   build-backend:
     runs-on: ubuntu-latest
-    needs: [detect-changes, preventive-cleanup]
+    needs: detect-changes
     if: needs.detect-changes.outputs.backend-changed == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -173,7 +111,7 @@ jobs:
   # 🎯 Build LLM - SEULEMENT si changé
   build-llm:
     runs-on: ubuntu-latest
-    needs: [detect-changes, preventive-cleanup]
+    needs: detect-changes
     if: needs.detect-changes.outputs.llm-changed == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -200,11 +138,10 @@ jobs:
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache,mode=max
           build-args: BUILDKIT_INLINE_CACHE=1
 
-  # 🧹 Garbage collection finale pour libérer l'espace
-  final-garbage-collection:
+  # 🧹 Nettoyage automatique du registry
+  cleanup-registry:
     runs-on: ubuntu-latest
     needs: [build-frontend, build-backend, build-llm]
-    # Se déclenche si au moins un build a réussi
     if: always() && (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success' || needs.build-llm.result == 'success')
     continue-on-error: true
     steps:
@@ -213,20 +150,37 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Trigger garbage collection
+      - name: Cleanup old images (keep 4 latest)
         run: |
-          echo "🗑️ Starting garbage collection to free up space..."
+          echo "🧹 Cleaning registry - keeping 4 latest images per repository..."
           
-          # Déclencher le garbage collection pour libérer l'espace des manifests supprimés
-          doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force || echo "Garbage collection already running or failed"
+          for repo in intelia-frontend intelia-backend intelia-llm; do
+            echo "Processing $repo..."
+            
+            # Lister toutes les manifests triées par date (plus récentes en premier)
+            manifests=$(doctl registry repository list-manifests "$repo" --format Digest --no-header 2>/dev/null || true)
+            
+            if [ -n "$manifests" ]; then
+              # Garder les 4 plus récentes, supprimer le reste
+              echo "$manifests" | tail -n +5 | while read digest; do
+                if [ -n "$digest" ]; then
+                  echo "Deleting old manifest: $digest"
+                  doctl registry repository delete-manifest "$repo" "$digest" --force || true
+                fi
+              done
+            else
+              echo "No manifests found for $repo"
+            fi
+          done
           
-          echo "✅ Garbage collection triggered"
-          echo "💡 Space will be freed automatically in 5-30 minutes"
-
+          # Garbage collection pour libérer l'espace
+          echo "🗑️ Running garbage collection..."
+          doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force || true
+          
   # 📊 Résumé final
   summary:
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-frontend, build-backend, build-llm, final-garbage-collection]
+    needs: [detect-changes, build-frontend, build-backend, build-llm, cleanup-registry]
     if: always()
     steps:
       - name: Deployment Summary
@@ -267,7 +221,4 @@ jobs:
             echo "⏸️ LLM: SKIPPED (no changes)"
           fi
           
-          echo ""
-          echo "🧹 Registry cleanup: Keeping 6 latest images per repository"
-          echo "🗑️ Garbage collection triggered automatically"
-          echo "💾 Space will be freed in the next 5-30 minutes"
+          echo "🧹 Registry cleanup and garbage collection completed automatically"
