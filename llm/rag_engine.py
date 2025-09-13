@@ -18,7 +18,7 @@ from enum import Enum
 import weaviate
 import weaviate.classes as wvc
 from weaviate.classes.config import Property, DataType
-from weaviate.classes.query import Filter
+from weaviate.classes.query import Filter, Where
 import voyageai
 from openai import OpenAI
 from transformers import pipeline
@@ -294,31 +294,63 @@ class HybridSearchEngine:
             return []
     
     async def search_by_genetic_line(self, query: str, genetic_line: str, limit: int = None) -> List[SearchResult]:
-        """Recherche filtrée par lignée génétique (tolérant à la casse)"""
+        """Recherche filtrée par lignée génétique - Version compatible v4"""
         if not self.is_connected or not self.client:
             return []
         
         try:
             collection = self.client.collections.get(self.class_name)
             
-            # Normaliser en minuscule pour recherche tolérante à la casse
-            canonical_line = genetic_line.lower()
+            # CORRECTION: Utiliser la syntaxe Where.by_property pour Weaviate v4
+            where_filter = Where.by_property("geneticLine").contains_any([genetic_line.lower()])
             
-            # Recherche avec filtre like pour tolérance à la casse
+            # Recherche avec filtre compatible v4
             response = collection.query.hybrid(
                 query=query,
                 limit=limit or RAG_SEARCH_LIMIT,
                 alpha=0.7,
-                where=Filter.by_property("geneticLine").like(f"*{canonical_line}*"),
+                where=where_filter,
                 return_properties=["content", "title", "category", "source", "language", "geneticLine", "species", "originalFile", "chunkIndex", "totalChunks", "isComplete"],
                 return_metadata=["score", "distance"]
             )
             
-            return self._process_search_results(response)
+            results = self._process_search_results(response)
+            
+            # Si aucun résultat avec filtre strict, fallback vers recherche normale puis filtrage
+            if not results:
+                logger.info(f"Aucun résultat avec filtre strict, fallback vers post-filtrage pour lignée: {genetic_line}")
+                all_results = await self.search(query, "fr", (limit or RAG_SEARCH_LIMIT) * 2)
+                
+                # Filtrer par lignée génétique (tolérant à la casse)
+                filtered_results = []
+                for result in all_results:
+                    result_line = result.metadata.get("genetic_line", "").lower()
+                    if genetic_line.lower() in result_line or result_line in genetic_line.lower():
+                        filtered_results.append(result)
+                
+                results = filtered_results[:limit or RAG_SEARCH_LIMIT]
+            
+            logger.info(f"Recherche par lignée '{genetic_line}': {len(results)} résultats")
+            return results
             
         except Exception as e:
             logger.error(f"Erreur recherche par lignée: {e}")
-            return []
+            # Fallback vers recherche normale puis filtrage
+            try:
+                all_results = await self.search(query, "fr", (limit or RAG_SEARCH_LIMIT) * 2)
+                
+                # Filtrer par lignée génétique
+                filtered_results = []
+                for result in all_results:
+                    result_line = result.metadata.get("genetic_line", "").lower()
+                    if genetic_line.lower() in result_line:
+                        filtered_results.append(result)
+                
+                return filtered_results[:limit or RAG_SEARCH_LIMIT]
+                
+            except Exception as e2:
+                logger.error(f"Erreur fallback recherche par lignée: {e2}")
+                return []
 
     async def search_by_species(self, query: str, species: str, limit: int = None) -> List[SearchResult]:
         """Recherche filtrée par espèce"""
@@ -328,11 +360,14 @@ class HybridSearchEngine:
         try:
             collection = self.client.collections.get(self.class_name)
             
+            # CORRECTION: Utiliser Where.by_property pour Weaviate v4
+            where_filter = Where.by_property("species").equal(species)
+            
             response = collection.query.hybrid(
                 query=query,
                 limit=limit or RAG_SEARCH_LIMIT,
                 alpha=0.7,
-                where=Filter.by_property("species").equal(species),
+                where=where_filter,
                 return_properties=["content", "title", "category", "source", "language", "geneticLine", "species", "originalFile", "chunkIndex", "totalChunks", "isComplete"],
                 return_metadata=["score", "distance"]
             )

@@ -39,15 +39,22 @@ def connect_to_weaviate():
     print("[DEBUG] === DÉBUT CONNEXION WEAVIATE ===")
     try:
         print("[DEBUG] Création des credentials d'authentification...")
-        auth_credentials = wvc.init.Auth.api_key(WEAVIATE_API_KEY)
-        print("[DEBUG] Credentials créés avec succès")
         
-        print(f"[DEBUG] Tentative de connexion à : {WEAVIATE_URL}")
-        client = weaviate.connect_to_weaviate_cloud(
-            cluster_url=WEAVIATE_URL,
-            auth_credentials=auth_credentials
-        )
-        print("[DEBUG] Objet client créé")
+        # Correction A - Connexion améliorée pour Weaviate Cloud
+        if ".weaviate.cloud" in WEAVIATE_URL and WEAVIATE_API_KEY:
+            auth_credentials = wvc.init.Auth.api_key(WEAVIATE_API_KEY)
+            print("[DEBUG] Credentials créés avec succès")
+            
+            print(f"[DEBUG] Tentative de connexion à : {WEAVIATE_URL}")
+            client = weaviate.connect_to_weaviate_cloud(
+                cluster_url=WEAVIATE_URL,
+                auth_credentials=auth_credentials
+            )
+            print("[DEBUG] Objet client créé")
+        else:
+            # Fallback pour connexion locale
+            print("[DEBUG] Configuration pour Weaviate local")
+            client = weaviate.connect_to_local()
         
         print("[DEBUG] Test de disponibilité du cluster...")
         if client.is_ready():
@@ -83,6 +90,22 @@ def connect_to_weaviate():
         print(f"❌ Erreur connexion Weaviate: {e}")
         return None
 
+def reset_collection(client):
+    """Supprime et recrée la collection avec le bon schéma"""
+    print("[DEBUG] === RESET COLLECTION ===")
+    try:
+        if client.collections.exists(CLASS_NAME):
+            print(f"[DEBUG] Suppression de la collection {CLASS_NAME}...")
+            client.collections.delete(CLASS_NAME)
+            print(f"✅ Collection {CLASS_NAME} supprimée")
+        else:
+            print(f"[DEBUG] Collection {CLASS_NAME} n'existe pas, rien à supprimer")
+        return True
+    except Exception as e:
+        print(f"[DEBUG] Exception lors du reset: {type(e).__name__}: {e}")
+        print(f"❌ Erreur suppression: {e}")
+        return False
+
 def ensure_schema_exists(client):
     """Crée le schéma Weaviate si nécessaire (v4) avec debug"""
     print("[DEBUG] === VÉRIFICATION/CRÉATION SCHÉMA ===")
@@ -112,13 +135,17 @@ def ensure_schema_exists(client):
             ]
             print(f"[DEBUG] {len(properties)} propriétés définies")
             
+            # CORRECTION 2 : Activer la vectorisation OpenAI
+            print("[DEBUG] Configuration vectorisation OpenAI...")
             client.collections.create(
                 name=CLASS_NAME,
                 description="Documents de connaissance Intelia Expert avec chunking",
                 properties=properties,
-                vectorizer_config=wvc.config.Configure.Vectorizer.none()
+                vectorizer_config=wvc.config.Configure.Vectorizer.text2vec_openai(
+                    model="text-embedding-3-small"
+                )
             )
-            print(f"[DEBUG] Collection créée avec succès")
+            print(f"[DEBUG] Collection créée avec succès avec vectorisation OpenAI")
             print(f"✅ Collection {CLASS_NAME} créée")
         else:
             print(f"[DEBUG] Collection déjà existante")
@@ -202,7 +229,7 @@ def split_text_into_chunks(text: str, max_chars: int = 7000, overlap: int = 500)
                 text.rfind('\n\n', start, end)  # Ou paragraphe
             )
             
-            # Si on trouve une fin de phrase, couper là
+            # Si on trouve une fin de phrase, couper là 
             if last_sentence_end > start + max_chars // 2:  # Au moins à mi-chemin
                 end = last_sentence_end + 1
             # Sinon, chercher un espace pour éviter de couper un mot
@@ -279,7 +306,8 @@ def load_json_document(file_path: str) -> List[Dict]:
                 'category': determine_category(metadata, chunk_content),
                 'source': 'direct_import',
                 'language': detect_language(chunk_content),
-                'geneticLine': metadata.get('genetic_line', 'unknown'),
+                # Correction B - Normalisation geneticLine
+                'geneticLine': metadata.get('genetic_line', 'unknown').lower(),
                 'species': metadata.get('species', 'unknown'),
                 'originalFile': os.path.basename(file_path),
                 'fileHash': file_hash,
@@ -370,34 +398,6 @@ def detect_language(content: str) -> str:
     language = 'en' if english_count > french_count else 'fr'
     return language
 
-def create_embedding(text: str) -> List[float]:
-    """Crée un embedding pour le texte avec OpenAI SANS TRONCATURE"""
-    print(f"[DEBUG] Création embedding pour texte de {len(text)} caractères")
-    try:
-        # Utiliser OpenAI pour correspondre avec Intelia
-        from openai import OpenAI
-        openai_key = os.getenv("OPENAI_API_KEY")
-        openai_client = OpenAI(api_key=openai_key)
-        
-        # PLUS DE TRONCATURE ! Utiliser tout le texte
-        print(f"[DEBUG] Utilisation du texte COMPLET: {len(text)} caractères")
-        
-        print("[DEBUG] Appel OpenAI embedding...")
-        response = openai_client.embeddings.create(
-            model="text-embedding-ada-002",
-            input=text  # Texte complet, pas de troncature
-        )
-        
-        embedding = response.data[0].embedding
-        print(f"[DEBUG] Embedding OpenAI créé: {len(embedding)} dimensions")
-        print(f"[DEBUG] Premières valeurs: {embedding[:3]}")
-        return embedding
-        
-    except Exception as e:
-        print(f"[DEBUG] Exception création embedding: {type(e).__name__}: {e}")
-        print("[DEBUG] Retour embedding vide par défaut")
-        return [0.0] * 1536  # Vector vide OpenAI par défaut
-
 def upload_documents_to_weaviate(client, documents: List[Dict]) -> int:
     """Upload les documents vers Weaviate par lots (v4) avec debug"""
     print("[DEBUG] === DÉBUT UPLOAD DOCUMENTS ===")
@@ -427,12 +427,7 @@ def upload_documents_to_weaviate(client, documents: List[Dict]) -> int:
                 print(f"[DEBUG] [{doc_index}/{total_docs}] Document: {doc['title'][:50]}...")
                 print(f"[DEBUG] Contenu: {len(doc['content'])} caractères (chunk {doc['chunkIndex']+1}/{doc['totalChunks']})")
                 
-                # Créer l'embedding
-                print(f"[DEBUG] Création embedding...")
-                embedding = create_embedding(doc['content'])
-                print(f"[DEBUG] Embedding terminé ({len(embedding)} dims)")
-                
-                # Préparer l'objet pour Weaviate
+                # Préparer l'objet pour Weaviate (avec vectorisation automatique)
                 print(f"[DEBUG] Préparation objet Weaviate...")
                 
                 # Propriétés séparées du vecteur pour Weaviate v4
@@ -452,11 +447,11 @@ def upload_documents_to_weaviate(client, documents: List[Dict]) -> int:
                     "isComplete": doc['isComplete']
                 }
                 
-                # Créer l'objet DataObject pour Weaviate v4
+                # Créer l'objet DataObject pour Weaviate v4 (sans embedding manuel)
                 from weaviate.classes.data import DataObject
                 data_obj = DataObject(
-                    properties=properties,
-                    vector=embedding
+                    properties=properties
+                    # Pas de vector car Weaviate va automatiquement vectoriser avec OpenAI
                 )
                 
                 objects_to_insert.append(data_obj)
@@ -527,9 +522,10 @@ def main():
     parser.add_argument('--batch-size', type=int, default=5, help='Taille des lots (défaut: 5)')
     parser.add_argument('--dry-run', action='store_true', help='Simulation sans envoi')
     parser.add_argument('--chunk-size', type=int, default=7000, help='Taille max des chunks (défaut: 7000)')
+    parser.add_argument('--reset', action='store_true', help='Supprime et recrée la collection')
     
     args = parser.parse_args()
-    print(f"[DEBUG] Arguments: directory={args.directory}, batch_size={args.batch_size}, dry_run={args.dry_run}, chunk_size={args.chunk_size}")
+    print(f"[DEBUG] Arguments: directory={args.directory}, batch_size={args.batch_size}, dry_run={args.dry_run}, chunk_size={args.chunk_size}, reset={args.reset}")
     
     if not os.path.exists(args.directory):
         print(f"[DEBUG] Répertoire inexistant: {args.directory}")
@@ -556,6 +552,13 @@ def main():
     if not client:
         print("[DEBUG] Échec connexion Weaviate")
         return
+    
+    # Reset de la collection si demandé
+    if args.reset:
+        print("🗑️ Reset de la collection...")
+        if not reset_collection(client):
+            print("[DEBUG] Échec reset collection")
+            return
     
     # Vérification/création du schéma
     print("🔧 Vérification du schéma...")
@@ -586,7 +589,7 @@ def main():
             print(f"[DEBUG] Traitement: {os.path.basename(file_path)}")
             file_hash = get_file_hash(file_path)
             
-            if file_hash in existing_hashes:
+            if file_hash in existing_hashes and not args.reset:
                 skipped_files += 1
                 print(f"[DEBUG] Document déjà présent (hash match)")
                 print(f"⭐ Ignoré (déjà présent): {os.path.basename(file_path)}")
