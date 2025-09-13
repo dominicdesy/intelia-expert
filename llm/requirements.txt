@@ -1,23 +1,66 @@
-# Core FastAPI
+# Core FastAPI - Versions optimisées
 fastapi==0.112.2
 uvicorn[standard]==0.30.6
 python-dotenv==1.0.1
 
-# LlamaIndex avec versions compatibles
-llama-index>=0.10.0
-llama-index-vector-stores-weaviate>=1.4.0
-llama-index-embeddings-openai>=0.1.0
-llama-index-llms-openai>=0.1.0
+# LlamaIndex Core avec versions compatibles stables
+llama-index==0.10.57
+llama-index-core==0.10.57
+
+# LlamaIndex Vector Stores et Embeddings
+llama-index-vector-stores-weaviate==0.1.25
+llama-index-embeddings-openai==0.1.11
+llama-index-llms-openai==0.1.29
+
+# Weaviate Client v4 (nouvelle version stable)
+weaviate-client==4.6.7
 
 # Intelligence métier préservée
 langdetect==1.0.9
 transformers==4.36.2
 torch>=1.13.0,<2.1.0
 
-# APIs externes conservées
+# APIs externes pour fonctionnalités avancées
 openai==1.107.0
+
+# VoyageAI pour reranking amélioré (optionnel mais recommandé)
 voyageai==0.3.5
 
-# Utilitaires
+# Cross-encoder pour reranking multi-stage (optionnel)
+sentence-transformers==2.2.2
+
+# Utilitaires optimisés
 numpy==1.24.4
 scipy==1.11.4
+
+# Monitoring et métriques (optionnel)
+prometheus-client==0.20.0
+
+# Outils de debugging et logging amélioré
+structlog==23.2.0
+
+# Support pour formats de fichiers étendus (si nécessaire)
+pandas==2.0.3
+openpyxl==3.1.2
+
+# Sécurité et validation améliorée
+pydantic==2.5.3
+email-validator==2.1.0
+
+# Cache et performance (optionnel)
+redis==5.0.1
+hiredis==2.3.2
+
+# Tests et qualité (développement)
+pytest==7.4.4
+pytest-asyncio==0.21.1
+black==23.12.1
+flake8==7.0.0
+
+# Documentation (optionnel)
+mkdocs==1.5.3
+mkdocs-material==9.5.3
+
+# Ajouts pour Agent RAG (à ajouter à votre requirements.txt existant)
+dataclasses-json==0.6.3  # Pour sérialisation des dataclasses
+asyncio-throttle==1.0.2   # Pour contrôle de flux parallèle (optionnel)

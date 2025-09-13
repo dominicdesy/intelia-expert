@@ -1,21 +1,13 @@
-// app/chat/services/apiService.ts - VERSION AGENT: Streaming LLM + Agent Callbacks
-// 🤖 NOUVELLE VERSION: Support complet des événements Agent avec callbacks enrichis
+// app/chat/services/apiService.ts - VERSION HYBRIDE: Streaming LLM + Backend métier
+// 🔧 FIX: Stockage session IDs sans dépendance conversationService
 
 import { getSupabaseClient } from '@/lib/supabase/singleton'
 
-// Types enrichis pour les callbacks de streaming Agent
+// Types pour les callbacks de streaming
 type StreamCallbacks = {
   onDelta?: (text: string) => void;
   onFinal?: (full: string) => void;
   onFollowup?: (msg: string) => void;
-  
-  // 🆕 NOUVEAUX CALLBACKS AGENT
-  onAgentStart?: (complexity: string, subQueriesCount: number) => void;
-  onAgentThinking?: (decisions: string[]) => void;
-  onChunk?: (content: string, confidence: number, source?: string) => void;
-  onAgentEnd?: (synthesisMethod: string, sourcesUsed: number) => void;
-  onAgentError?: (error: string) => void;
-  onAgentProgress?: (step: string, progress: number) => void;
 };
 
 // Configuration API pour le backend métier (stats, billing, etc.)
@@ -146,7 +138,7 @@ const generateUUID = (): string => {
   })
 }
 
-// Formatage heure locale (conservée)
+// Formatage heure locale (conservé)
 export const formatToLocalTime = (utcTimestamp: string): string => {
   try {
     const date = new Date(utcTimestamp);
@@ -183,7 +175,7 @@ export const simpleLocalTime = (utcTimestamp: string): string => {
   }
 }
 
-// Interface pour les réponses Agent (adaptée au streaming enrichi)
+// Interface pour les réponses (adaptée au streaming)
 interface EnhancedAIResponse {
   response: string
   conversation_id: string
@@ -209,21 +201,11 @@ interface EnhancedAIResponse {
   sources?: any[]
   confidence_score?: number
   note?: string
-  
-  // 🆕 NOUVELLES PROPRIÉTÉS AGENT
-  agent_metadata?: {
-    complexity: string
-    sub_queries_count: number
-    synthesis_method: string
-    sources_used: number
-    processing_time?: number
-    decisions?: string[]
-  }
 }
 
 /**
- * 🤖 FONCTION STREAMING SSE AGENT - VERSION ENRICHIE
- * Gère l'appel vers /api/chat/stream avec support complet des événements Agent
+ * FONCTION STREAMING SSE INTERNE - VERSION CORRIGÉE AVEC CALLBACKS
+ * Gère l'appel vers /api/chat/stream avec support des callbacks et relances proactives
  */
 async function streamAIResponseInternal(
   tenant_id: string,
@@ -242,12 +224,11 @@ async function streamAIResponseInternal(
     user_context
   };
 
-  console.log('[apiService] 🤖 Streaming Agent vers /api/chat/stream:', {
+  console.log('[apiService] Streaming vers /api/chat/stream:', {
     tenant_id,
     lang,
     message_preview: message.substring(0, 50) + '...',
-    has_callbacks: !!callbacks,
-    agent_callbacks: !!(callbacks?.onAgentStart || callbacks?.onAgentThinking)
+    has_callbacks: !!callbacks
   });
 
   // Headers SSE complets avec Cache-Control
@@ -270,7 +251,7 @@ async function streamAIResponseInternal(
       errorInfo = { error: `http_${response.status}`, message: `Erreur HTTP ${response.status}` };
     }
     
-    console.error('[apiService] Erreur streaming Agent:', errorInfo);
+    console.error('[apiService] Erreur streaming:', errorInfo);
     throw new Error(errorInfo?.message || `Erreur ${response.status}`);
   }
 
@@ -278,33 +259,18 @@ async function streamAIResponseInternal(
     throw new Error("Pas de flux de données reçu");
   }
 
-  // Traitement du flux SSE avec callbacks Agent enrichis
+  // Traitement du flux SSE avec callbacks
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let finalAnswer = "";
   let buffer = "";
-  
-  // Variables de suivi Agent
-  let agentMetadata = {
-    complexity: 'simple',
-    sub_queries_count: 0,
-    synthesis_method: 'direct',
-    sources_used: 0,
-    processing_time: Date.now(),
-    decisions: [] as string[]
-  };
 
   try {
     while (true) {
       const { value, done } = await reader.read();
       
       if (done) {
-        // Calculer le temps de traitement final
-        agentMetadata.processing_time = Date.now() - agentMetadata.processing_time;
-        console.log('[apiService] 🤖 Stream Agent terminé:', {
-          final_length: finalAnswer.length,
-          agent_metadata: agentMetadata
-        });
+        console.log('[apiService] Stream terminé, réponse finale:', finalAnswer.length, 'caractères');
         break;
       }
 
@@ -328,87 +294,25 @@ async function streamAIResponseInternal(
         try {
           const event = JSON.parse(jsonStr);
           
-          // 🤖 GESTION DES NOUVEAUX ÉVÉNEMENTS AGENT
-          switch (event.type) {
-            case "agent_start":
-              console.log('[apiService] 🤖 Agent démarré:', event.complexity, 'sous-requêtes:', event.sub_queries_count);
-              agentMetadata.complexity = event.complexity || 'simple';
-              agentMetadata.sub_queries_count = event.sub_queries_count || 0;
-              callbacks?.onAgentStart?.(event.complexity, event.sub_queries_count);
-              break;
-              
-            case "agent_thinking":
-              console.log('[apiService] 🧠 Agent réflexion:', event.decisions?.length || 0, 'décisions');
-              if (event.decisions && Array.isArray(event.decisions)) {
-                agentMetadata.decisions.push(...event.decisions);
-                callbacks?.onAgentThinking?.(event.decisions);
-              }
-              break;
-              
-            case "chunk":
-              // Nouveau format chunk avec métadonnées
-              const chunkContent = event.content || event.text || '';
-              const confidence = event.confidence || 0.8;
-              const source = event.source || 'unknown';
-              
-              if (chunkContent) {
-                finalAnswer += chunkContent;
-                callbacks?.onChunk?.(chunkContent, confidence, source);
-                // Fallback vers onDelta pour compatibilité
-                callbacks?.onDelta?.(chunkContent);
-              }
-              break;
-              
-            case "agent_progress":
-              console.log('[apiService] 📊 Agent progression:', event.step, event.progress + '%');
-              callbacks?.onAgentProgress?.(event.step, event.progress);
-              break;
-              
-            case "agent_end":
-              console.log('[apiService] 🏁 Agent terminé:', event.synthesis_method, 'sources:', event.sources_used);
-              agentMetadata.synthesis_method = event.synthesis_method || 'direct';
-              agentMetadata.sources_used = event.sources_used || 0;
-              callbacks?.onAgentEnd?.(event.synthesis_method, event.sources_used);
-              break;
-              
-            case "agent_error":
-              console.error('[apiService] ❌ Erreur Agent:', event.error);
-              callbacks?.onAgentError?.(event.error);
-              break;
-              
-            // 📦 ÉVÉNEMENTS LEGACY MAINTENUS
-            case "delta":
-              if (typeof event.text === "string" && event.text) {
-                finalAnswer += event.text;
-                callbacks?.onDelta?.(event.text);
-              }
-              break;
-              
-            case "final":
-              if (event.answer) {
-                finalAnswer = event.answer;
-                callbacks?.onFinal?.(finalAnswer);
-              }
-              break;
-              
-            case "proactive_followup":
-              if (event.answer) {
-                console.log('[apiService] 🔄 Relance proactive reçue:', event.answer);
-                callbacks?.onFollowup?.(event.answer);
-              }
-              break;
-              
-            case "error":
-              console.error('[apiService] ❌ Erreur dans le stream:', event);
-              throw new Error(event.message || 'Erreur de streaming');
-              
-            default:
-              console.log('[apiService] 📡 Événement SSE non géré:', event.type, event);
+          if (event.type === "delta" && typeof event.text === "string" && event.text) {
+            finalAnswer += event.text;
+            callbacks?.onDelta?.(event.text);            // <<< STREAM LIVE
+          } else if (event.type === "final" && event.answer) {
+            finalAnswer = event.answer;
+            callbacks?.onFinal?.(finalAnswer);           // <<< FIN
+            // ne break PAS ici : on laisse sortir proprement (reader.done)
+          } else if (event.type === "proactive_followup" && event.answer) {
+            // ✅ NOUVEAU: on pousse dans le chat via callback (plus de notification/bulle)
+            console.log('[apiService] Relance proactive reçue:', event.answer);
+            callbacks?.onFollowup?.(event.answer);       // <<< RELANCE DANS LE CHAT
+            
+          } else if (event.type === "error") {
+            console.error('[apiService] Erreur dans le stream:', event);
+            throw new Error(event.message || 'Erreur de streaming');
           }
           
         } catch (parseError) {
           // Ignore les lignes JSON malformées (chunks partiels)
-          console.debug('[apiService] Ligne SSE malformée ignorée:', jsonStr.substring(0, 100));
         }
       }
     }
@@ -421,15 +325,12 @@ async function streamAIResponseInternal(
     }
   }
 
-  // Attacher les métadonnées Agent à la réponse
-  (finalAnswer as any).__agentMetadata = agentMetadata;
-
   return finalAnswer;
 }
 
 /**
- * 🤖 NOUVELLE FONCTION generateAIResponse avec support Agent complet
- * Interface compatible avec l'ancien système + nouvelles capacités Agent
+ * NOUVELLE FONCTION generateAIResponse avec streaming intégré
+ * Interface compatible avec l'ancien système
  */
 export const generateAIResponse = async (
   question: string,
@@ -453,12 +354,12 @@ export const generateAIResponse = async (
 
   const finalConversationId = conversationId || generateUUID()
 
-  console.log('[apiService] 🤖 AGENT: Génération AI avec streaming enrichi:', {
+  console.log('[apiService] NOUVEAU: Génération AI avec streaming:', {
     question: question.substring(0, 50) + '...',
     session_id: finalConversationId.substring(0, 8) + '...',
     user_id: user.id,
-    system: 'LLM Backend Agent',
-    has_agent_callbacks: !!(callbacks?.onAgentStart || callbacks?.onAgentThinking)
+    system: 'LLM Backend Streaming',
+    has_callbacks: !!callbacks
   })
 
   try {
@@ -492,7 +393,7 @@ export const generateAIResponse = async (
       }
     }
 
-    // 🤖 Appel au service de streaming Agent avec callbacks enrichis
+    // Appel au service de streaming avec callbacks
     const finalResponse = await streamAIResponseInternal(
       tenant_id,
       language,
@@ -503,24 +404,12 @@ export const generateAIResponse = async (
         concision_level: concisionLevel,
         ...(clarificationEntities && { clarification_entities: clarificationEntities })
       },
-      callbacks  // <<< PROPAGATION DES CALLBACKS AGENT
+      callbacks  // <<< PROPAGATION DES CALLBACKS
     );
 
-    // Récupération des métadonnées Agent
-    const agentMetadata = (finalResponse as any).__agentMetadata || {
-      complexity: 'simple',
-      sub_queries_count: 0,
-      synthesis_method: 'direct',
-      sources_used: 0,
-      processing_time: 0,
-      decisions: []
-    };
-
-    console.log('[apiService] 🤖 Streaming Agent terminé:', {
+    console.log('[apiService] Streaming terminé:', {
       final_length: finalResponse.length,
-      conversation_id: finalConversationId,
-      agent_complexity: agentMetadata.complexity,
-      agent_sources: agentMetadata.sources_used
+      conversation_id: finalConversationId
     })
 
     // Enregistrement de la conversation via le backend métier
@@ -531,7 +420,7 @@ export const generateAIResponse = async (
       // Ne pas faire échouer la réponse pour une erreur de sauvegarde
     }
 
-    // 🔧 FIX: Stockage du session ID pour l'historique
+    // 🔧 FIX: Stockage du session ID pour l'historique (version corrigée)
     storeRecentSessionId(finalConversationId)
 
     // Construction de la réponse dans le format attendu par l'interface
@@ -550,11 +439,8 @@ export const generateAIResponse = async (
       rag_used: true,
       sources: [],
       confidence_score: 0.9,
-      note: 'Généré via streaming LLM Agent',
+      note: 'Généré via streaming LLM',
       full_text: finalResponse,
-      
-      // 🤖 NOUVELLES MÉTADONNÉES AGENT
-      agent_metadata: agentMetadata,
       
       // Génération automatique des versions de réponse
       response_versions: {
@@ -567,23 +453,22 @@ export const generateAIResponse = async (
       }
     }
 
-    console.log('[apiService] 🤖 Réponse Agent traitée:', {
+    console.log('[apiService] Réponse streaming traitée:', {
       response_length: processedResponse.response.length,
-      conversation_id: processedResponse.conversation_id,
-      agent_metadata: processedResponse.agent_metadata
+      conversation_id: processedResponse.conversation_id
     })
 
     return processedResponse
 
   } catch (error) {
-    console.error('[apiService] Erreur génération AI Agent:', error)
+    console.error('[apiService] Erreur génération AI streaming:', error)
     
     // Gestion des erreurs avec messages appropriés
     if (error instanceof Error) {
       throw error
     }
     
-    throw new Error('Erreur de génération avec le service LLM Agent')
+    throw new Error('Erreur de génération avec le service LLM')
   }
 }
 
@@ -607,10 +492,10 @@ async function saveConversationToBackend(
       response: response,
       user_id: userId,
       timestamp: new Date().toISOString(),
-      source: 'llm_streaming_agent',
+      source: 'llm_streaming',
       metadata: {
         mode: 'streaming',
-        backend: 'llm_backend_agent'
+        backend: 'llm_backend'
       }
     }
 
@@ -635,7 +520,7 @@ async function saveConversationToBackend(
 }
 
 /**
- * 🤖 VERSION PUBLIQUE AGENT avec streaming (remplace l'ancienne)
+ * VERSION PUBLIQUE avec streaming (remplace l'ancienne)
  */
 export const generateAIResponsePublic = async (
   question: string,
@@ -651,10 +536,10 @@ export const generateAIResponsePublic = async (
 
   const finalConversationId = conversationId || generateUUID()
 
-  console.log('[apiService] 🤖 Génération AI publique Agent:', {
+  console.log('[apiService] Génération AI publique avec streaming:', {
     question: question.substring(0, 50) + '...',
     session_id: finalConversationId.substring(0, 8) + '...',
-    has_agent_callbacks: !!(callbacks?.onAgentStart || callbacks?.onAgentThinking)
+    has_callbacks: !!callbacks
   })
 
   try {
@@ -664,20 +549,10 @@ export const generateAIResponsePublic = async (
       question.trim(),
       finalConversationId,
       undefined,
-      callbacks  // <<< PROPAGATION DES CALLBACKS AGENT
+      callbacks  // <<< PROPAGATION DES CALLBACKS
     );
 
-    // Récupération des métadonnées Agent
-    const agentMetadata = (finalResponse as any).__agentMetadata || {
-      complexity: 'simple',
-      sub_queries_count: 0,
-      synthesis_method: 'direct',
-      sources_used: 0,
-      processing_time: 0,
-      decisions: []
-    };
-
-    // 🔧 FIX: Stockage du session ID
+    // 🔧 FIX: Stockage du session ID (version corrigée)
     storeRecentSessionId(finalConversationId)
 
     return {
@@ -694,11 +569,8 @@ export const generateAIResponsePublic = async (
       rag_used: true,
       sources: [],
       confidence_score: 0.9,
-      note: 'Généré via streaming LLM Agent (public)',
+      note: 'Généré via streaming LLM (public)',
       full_text: finalResponse,
-      
-      // 🤖 MÉTADONNÉES AGENT
-      agent_metadata: agentMetadata,
       
       response_versions: {
         ultra_concise: finalResponse.length > 200 ? 
@@ -711,7 +583,7 @@ export const generateAIResponsePublic = async (
     }
 
   } catch (error) {
-    console.error('[apiService] Erreur génération AI publique Agent:', error)
+    console.error('[apiService] Erreur génération AI publique streaming:', error)
     throw error
   }
 }
