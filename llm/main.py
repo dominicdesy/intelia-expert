@@ -1,11 +1,6 @@
 # -*- coding: utf-8 -*-
-#
-#
 # main.py — Intelia LLM backend (FastAPI + SSE + RAG)
-#
 # Python 3.11+
-#
-#
 
 import os
 import re
@@ -18,6 +13,7 @@ import urllib.parse
 from typing import Any, Dict, AsyncGenerator, Optional
 from collections import OrderedDict
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -317,7 +313,15 @@ async def shutdown_event():
 # -----------------------------------------------------------------------------
 # FastAPI
 # -----------------------------------------------------------------------------
-app = FastAPI(title="Intelia LLM Backend", debug=False)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    await startup_event()
+    yield
+    # Shutdown  
+    await shutdown_event()
+
+app = FastAPI(title="Intelia LLM Backend", debug=False, lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -326,15 +330,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 router = APIRouter()
-
-# CORRECTION 2: Événements de cycle de vie FastAPI
-@app.on_event("startup")
-async def startup():
-    await startup_event()
-
-@app.on_event("shutdown") 
-async def shutdown():
-    await shutdown_event()
 
 # -----------------------------------------------------------------------------
 # SSE helpers

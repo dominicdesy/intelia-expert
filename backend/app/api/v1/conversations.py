@@ -1,9 +1,10 @@
 # app/api/v1/conversations.py
 """
+
 Router pour la gestion des conversations avec intégration PostgreSQL optimisée.
 Version avec requêtes JSONB fiables + retour messages + index de performance.
 VERSION MISE À JOUR pour support persistance conversations complète.
-🔧 CORRECTIF: Index CONCURRENTLY en mode autocommit + endpoint POST /save
+
 """
 from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Dict, Any, List, Optional

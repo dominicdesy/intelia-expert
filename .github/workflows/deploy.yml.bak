@@ -1,0 +1,224 @@
+name: Smart Selective Docker Build and Deploy
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'docs/**'
+      - 'README.md'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # 🔍 Détecter les changements
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend-changed: ${{ steps.changes.outputs.frontend }}
+      backend-changed: ${{ steps.changes.outputs.backend }}
+      llm-changed: ${{ steps.changes.outputs.llm }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+            backend:
+              - 'backend/**'
+            llm:
+              - 'llm/**'
+
+      - name: Show changes
+        run: |
+          echo "Frontend changed: ${{ steps.changes.outputs.frontend }}"
+          echo "Backend changed: ${{ steps.changes.outputs.backend }}"
+          echo "LLM changed: ${{ steps.changes.outputs.llm }}"
+
+  # 🎯 Build Frontend - SEULEMENT si changé
+  build-frontend:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend-changed == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DOCR
+        uses: docker/login-action@v3
+        with:
+          registry: registry.digitalocean.com
+          username: doctl
+          password: ${{ secrets.DOCR_ACCESS_TOKEN }}
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }}
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
+          cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache
+          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache,mode=max
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+            LLM_BACKEND_URL=${{ secrets.LLM_BACKEND_URL }}
+            BUILDKIT_INLINE_CACHE=1
+
+  # 🎯 Build Backend - SEULEMENT si changé  
+  build-backend:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend-changed == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DOCR
+        uses: docker/login-action@v3
+        with:
+          registry: registry.digitalocean.com
+          username: doctl
+          password: ${{ secrets.DOCR_ACCESS_TOKEN }}
+
+      - name: Build & push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }}
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
+          cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache
+          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache,mode=max
+          build-args: BUILDKIT_INLINE_CACHE=1
+
+  # 🎯 Build LLM - SEULEMENT si changé
+  build-llm:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.llm-changed == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DOCR
+        uses: docker/login-action@v3
+        with:
+          registry: registry.digitalocean.com
+          username: doctl
+          password: ${{ secrets.DOCR_ACCESS_TOKEN }}
+
+      - name: Build & push LLM
+        uses: docker/build-push-action@v6
+        with:
+          context: ./llm
+          push: true
+          tags: |
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main-${{ github.sha }}
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main
+          cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache
+          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache,mode=max
+          build-args: BUILDKIT_INLINE_CACHE=1
+
+  # 🧹 Nettoyage automatique du registry
+  cleanup-registry:
+    runs-on: ubuntu-latest
+    needs: [build-frontend, build-backend, build-llm]
+    if: always() && (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success' || needs.build-llm.result == 'success')
+    continue-on-error: true
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DOCR_ACCESS_TOKEN }}
+
+      - name: Cleanup old images (keep 4 latest)
+        run: |
+          echo "🧹 Cleaning registry - keeping 4 latest images per repository..."
+          
+          for repo in intelia-frontend intelia-backend intelia-llm; do
+            echo "Processing $repo..."
+            
+            # Lister toutes les manifests triées par date (plus récentes en premier)
+            manifests=$(doctl registry repository list-manifests "$repo" --format Digest --no-header 2>/dev/null || true)
+            
+            if [ -n "$manifests" ]; then
+              # Garder les 4 plus récentes, supprimer le reste
+              echo "$manifests" | tail -n +5 | while read digest; do
+                if [ -n "$digest" ]; then
+                  echo "Deleting old manifest: $digest"
+                  doctl registry repository delete-manifest "$repo" "$digest" --force || true
+                fi
+              done
+            else
+              echo "No manifests found for $repo"
+            fi
+          done
+          
+          # Garbage collection pour libérer l'espace
+          echo "🗑️ Running garbage collection..."
+          doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force || true
+          
+  # 📊 Résumé final
+  summary:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, build-frontend, build-backend, build-llm, cleanup-registry]
+    if: always()
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "🚀 DEPLOYMENT SUMMARY"
+          echo "===================="
+          
+          # Frontend
+          if [[ "${{ needs.detect-changes.outputs.frontend-changed }}" == "true" ]]; then
+            if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
+              echo "✅ Frontend: DEPLOYED"
+            else
+              echo "❌ Frontend: FAILED"
+            fi
+          else
+            echo "⏸️ Frontend: SKIPPED (no changes)"
+          fi
+          
+          # Backend  
+          if [[ "${{ needs.detect-changes.outputs.backend-changed }}" == "true" ]]; then
+            if [[ "${{ needs.build-backend.result }}" == "success" ]]; then
+              echo "✅ Backend: DEPLOYED"
+            else
+              echo "❌ Backend: FAILED" 
+            fi
+          else
+            echo "⏸️ Backend: SKIPPED (no changes)"
+          fi
+          
+          # LLM
+          if [[ "${{ needs.detect-changes.outputs.llm-changed }}" == "true" ]]; then
+            if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
+              echo "✅ LLM: DEPLOYED"
+            else
+              echo "❌ LLM: FAILED" 
+            fi
+          else
+            echo "⏸️ LLM: SKIPPED (no changes)"
+          fi
+          
+          echo "🧹 Registry cleanup and garbage collection completed automatically"
