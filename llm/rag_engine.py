@@ -18,11 +18,6 @@ from enum import Enum
 import weaviate
 import weaviate.classes as wvc
 from weaviate.classes.config import Property, DataType
-try:
-    from weaviate.classes.query import Filter
-    # Note: Where n'existe pas en v4, nous utiliserons la syntaxe directe
-except ImportError:
-    Filter = None
 
 try:
     import voyageai
@@ -44,11 +39,8 @@ try:
 except ImportError:
     NUMPY_AVAILABLE = False
 
-try:
-    from sentence_transformers import SentenceTransformer
-    SENTENCE_TRANSFORMERS_AVAILABLE = True
-except ImportError:
-    SENTENCE_TRANSFORMERS_AVAILABLE = False
+# Import du processeur d'intentions
+from intent_processor import create_intent_processor, IntentType, IntentResult
 
 logger = logging.getLogger(__name__)
 
@@ -71,29 +63,6 @@ class RAGSource(Enum):
     OOD_FILTERED = "ood_filtered"
     FALLBACK_NEEDED = "fallback_needed"
     ERROR = "error"
-
-class IntentType(Enum):
-    """Types d'intention de base"""
-    IN_DOMAIN = "in_domain"
-    OUT_OF_DOMAIN = "out_of_domain"
-    GENERAL_QUERY = "general_query"
-
-@dataclass
-class IntentResult:
-    """Résultat d'analyse d'intention de base"""
-    intent_type: IntentType
-    confidence: float
-    detected_entities: Dict = None
-    expanded_query: str = ""
-    metadata: Dict = None
-    
-    def __post_init__(self):
-        if self.detected_entities is None:
-            self.detected_entities = {}
-        if self.metadata is None:
-            self.metadata = {}
-        if not self.expanded_query:
-            self.expanded_query = ""
 
 @dataclass
 class RAGResult:
@@ -122,42 +91,6 @@ class SearchResult:
     def __post_init__(self):
         # Assurer que score est toujours un float
         self.score = float(self.score) if self.score is not None else 0.0
-
-class BasicIntentProcessor:
-    """Processeur d'intentions basique sans dépendances externes"""
-    
-    def __init__(self):
-        self.poultry_keywords = [
-            'poulet', 'poule', 'aviculture', 'élevage', 'volaille',
-            'aliment', 'vaccination', 'maladie', 'production',
-            'chicken', 'poultry', 'broiler', 'layer', 'feed',
-            'ross', 'cobb', 'hubbard', 'nutrition', 'breeding',
-            'oeuf', 'egg', 'incubation', 'poussin', 'chick'
-        ]
-    
-    def process_query(self, query: str) -> IntentResult:
-        """Analyse basique d'intention"""
-        query_lower = query.lower()
-        
-        # Détecter les mots-clés avicoles
-        keyword_matches = [kw for kw in self.poultry_keywords if kw in query_lower]
-        
-        if keyword_matches:
-            confidence = min(0.9, len(keyword_matches) * 0.3)
-            return IntentResult(
-                intent_type=IntentType.IN_DOMAIN,
-                confidence=confidence,
-                detected_entities={"keywords": keyword_matches},
-                expanded_query=query,
-                metadata={"vocab_score": confidence}
-            )
-        else:
-            return IntentResult(
-                intent_type=IntentType.OUT_OF_DOMAIN,
-                confidence=0.8,
-                expanded_query=query,
-                metadata={"vocab_score": 0.0}
-            )
 
 class InDomainClassifier:
     """Classification NLI pour filtrage hors-domaine (économique)"""
@@ -251,20 +184,32 @@ class HybridSearchEngine:
         
         try:
             # Configuration client Weaviate v4
-            if WEAVIATE_API_KEY:
+            if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
                 # Cloud connection avec clé API
                 auth_credentials = wvc.init.Auth.api_key(WEAVIATE_API_KEY)
+                
+                # CORRECTION: Ajouter headers OpenAI pour vectorisation
+                additional_headers = {}
+                if OPENAI_API_KEY:
+                    additional_headers["X-OpenAI-Api-Key"] = OPENAI_API_KEY
+                
                 self.client = weaviate.connect_to_weaviate_cloud(
                     cluster_url=WEAVIATE_URL,
-                    auth_credentials=auth_credentials
+                    auth_credentials=auth_credentials,
+                    headers=additional_headers
                 )
             else:
                 # Connexion locale
+                additional_headers = {}
+                if OPENAI_API_KEY:
+                    additional_headers["X-OpenAI-Api-Key"] = OPENAI_API_KEY
+                    
                 host = WEAVIATE_URL.replace('http://', '').replace('https://', '').split(':')[0]
                 self.client = weaviate.connect_to_local(
                     host=host,
                     port=8080,
-                    grpc_port=50051
+                    grpc_port=50051,
+                    headers=additional_headers
                 )
             
             # Test de connexion
@@ -286,30 +231,38 @@ class HybridSearchEngine:
         try:
             # Vérifier si la collection existe
             if not self.client.collections.exists(self.class_name):
-                # Configuration de la collection avec schéma complet
-                collection_config = wvc.config.Configure.Collection(
-                    name=self.class_name,
-                    description="Base de connaissances Intelia Expert en aviculture",
-                    properties=[
-                        Property(name="content", data_type=DataType.TEXT, description="Contenu principal du document"),
-                        Property(name="title", data_type=DataType.TEXT, description="Titre du document"),
-                        Property(name="category", data_type=DataType.TEXT, description="Catégorie thématique"),
-                        Property(name="source", data_type=DataType.TEXT, description="Source d'origine"),
-                        Property(name="language", data_type=DataType.TEXT, description="Langue du document"),
-                        Property(name="geneticLine", data_type=DataType.TEXT, description="Lignée génétique"),
-                        Property(name="species", data_type=DataType.TEXT, description="Espèce animale"),
-                        Property(name="originalFile", data_type=DataType.TEXT, description="Fichier d'origine"),
-                        Property(name="fileHash", data_type=DataType.TEXT, description="Hash du fichier"),
-                        Property(name="syncTimestamp", data_type=DataType.NUMBER, description="Timestamp de synchronisation"),
-                        Property(name="chunkIndex", data_type=DataType.NUMBER, description="Index du chunk"),
-                        Property(name="totalChunks", data_type=DataType.NUMBER, description="Nombre total de chunks"),
-                        Property(name="isComplete", data_type=DataType.BOOLEAN, description="Document complet ou chunk")
-                    ]
+                logger.info(f"Création collection {self.class_name}...")
+                
+                # Configuration de la collection avec vectorisation OpenAI
+                vectorizer_config = wvc.config.Configure.Vectorizer.text2vec_openai(
+                    model="text-embedding-3-small"
                 )
                 
-                # Créer la collection
-                self.client.collections.create_from_config(collection_config)
-                logger.info(f"Collection {self.class_name} créée avec schéma complet")
+                # Propriétés complètes
+                properties = [
+                    Property(name="content", data_type=DataType.TEXT, description="Contenu principal du document"),
+                    Property(name="title", data_type=DataType.TEXT, description="Titre du document"),
+                    Property(name="category", data_type=DataType.TEXT, description="Catégorie thématique"),
+                    Property(name="source", data_type=DataType.TEXT, description="Source d'origine"),
+                    Property(name="language", data_type=DataType.TEXT, description="Langue du document"),
+                    Property(name="geneticLine", data_type=DataType.TEXT, description="Lignée génétique"),
+                    Property(name="species", data_type=DataType.TEXT, description="Espèce animale"),
+                    Property(name="originalFile", data_type=DataType.TEXT, description="Fichier d'origine"),
+                    Property(name="fileHash", data_type=DataType.TEXT, description="Hash du fichier"),
+                    Property(name="syncTimestamp", data_type=DataType.NUMBER, description="Timestamp de synchronisation"),
+                    Property(name="chunkIndex", data_type=DataType.NUMBER, description="Index du chunk"),
+                    Property(name="totalChunks", data_type=DataType.NUMBER, description="Nombre total de chunks"),
+                    Property(name="isComplete", data_type=DataType.BOOLEAN, description="Document complet ou chunk")
+                ]
+                
+                self.client.collections.create(
+                    name=self.class_name,
+                    description="Base de connaissances Intelia Expert en aviculture",
+                    properties=properties,
+                    vectorizer_config=vectorizer_config
+                )
+                
+                logger.info(f"Collection {self.class_name} créée avec succès")
         except Exception as e:
             logger.error(f"Erreur création collection: {e}")
     
@@ -342,9 +295,7 @@ class HybridSearchEngine:
         return search_results
     
     async def search(self, query: str, language: str = "fr", limit: int = None) -> List[SearchResult]:
-        """
-        Recherche hybride vectorielle + BM25 avec Weaviate v4
-        """
+        """Recherche hybride vectorielle + BM25 avec Weaviate v4"""
         if not self.is_connected or not self.client:
             logger.warning("Weaviate non disponible pour la recherche")
             return []
@@ -376,14 +327,14 @@ class HybridSearchEngine:
             return []
     
     async def search_by_genetic_line(self, query: str, genetic_line: str, limit: int = None) -> List[SearchResult]:
-        """Recherche filtrée par lignée génétique - Version compatible v4"""
+        """Recherche filtrée par lignée génétique - Version corrigée v4"""
         if not self.is_connected or not self.client:
             return []
         
         try:
             collection = self.client.collections.get(self.class_name)
             
-            # Utiliser la syntaxe de filtre v4 correcte
+            # CORRECTION: Syntaxe de filtre Weaviate v4 correcte
             where_filter = {
                 "path": ["geneticLine"],
                 "operator": "ContainsAny",
@@ -446,7 +397,7 @@ class HybridSearchEngine:
         try:
             collection = self.client.collections.get(self.class_name)
             
-            # Utiliser la syntaxe de filtre v4 correcte
+            # CORRECTION: Utiliser la syntaxe de filtre v4 correcte
             where_filter = {
                 "path": ["species"],
                 "operator": "Equal",
@@ -537,9 +488,7 @@ class VoyageReranker:
                 self.is_available = False
     
     async def rerank(self, query: str, results: List[SearchResult], top_k: int = None) -> List[SearchResult]:
-        """
-        Rerank les résultats avec VoyageAI
-        """
+        """Rerank les résultats avec VoyageAI"""
         if not self.is_available or not results:
             return results[:top_k] if top_k else results
         
@@ -735,7 +684,7 @@ class RAGEngine:
         self.search_engine = HybridSearchEngine()
         self.reranker = VoyageReranker()
         self.generator = ContextualGenerator(openai_client)
-        self.intent_processor = BasicIntentProcessor()  # Processeur d'intentions basique
+        self.intent_processor = None  # Processeur d'intentions métier
         self.is_initialized = False
     
     async def initialize(self):
@@ -744,6 +693,14 @@ class RAGEngine:
             return
         
         logger.info("Initialisation RAG Engine v4...")
+        
+        # Initialisation du processeur d'intentions
+        try:
+            self.intent_processor = create_intent_processor()
+            logger.info("Processeur d'intentions initialisé")
+        except Exception as e:
+            logger.error(f"Erreur init processeur intentions: {e}")
+            self.intent_processor = None
         
         # Initialisation parallèle des composants
         await asyncio.gather(
@@ -793,14 +750,7 @@ class RAGEngine:
         return metadata
     
     async def process_query(self, query: str, language: str = "fr", tenant_id: str = "") -> RAGResult:
-        """
-        Pipeline RAG complet avec processeur d'intentions et recherche ciblée
-        1. Analyse d'intention métier
-        2. Classification OOD renforcée
-        3. Recherche hybride avec expansion et filtrage
-        4. Reranking
-        5. Génération contextuelle avec prompt spécialisé
-        """
+        """Pipeline RAG complet avec processeur d'intentions et recherche ciblée"""
         if not RAG_ENABLED:
             return RAGResult(source=RAGSource.FALLBACK_NEEDED)
         
@@ -897,7 +847,7 @@ class RAGEngine:
             # Étape 4: Reranking avec VoyageAI
             reranked_results = await self.reranker.rerank(search_query, search_results)
             
-            # Filtrer par seuil de confiance - Correction: S'assurer que la comparaison fonctionne
+            # Filtrer par seuil de confiance
             high_confidence_results = []
             for r in reranked_results:
                 try:
@@ -928,9 +878,13 @@ class RAGEngine:
                     )
                 )
             
-            # Étape 5: Génération contextuelle
+            # Étape 5: Génération contextuelle avec prompt spécialisé
+            specialized_prompt = None
+            if intent_result and self.intent_processor:
+                specialized_prompt = self.intent_processor.get_specialized_prompt(intent_result)
+            
             generation_result = await self.generator.generate_answer(
-                query, high_confidence_results[:5], language
+                query, high_confidence_results[:5], language, specialized_prompt
             )
             
             if not generation_result["answer"]:
@@ -956,7 +910,8 @@ class RAGEngine:
                 processing_time=processing_time,
                 metadata=self._build_metadata(
                     classification_method, classification_confidence, intent_result,
-                    search_query, query, search_results, reranked_results, high_confidence_results
+                    search_query, query, search_results, reranked_results, high_confidence_results, 
+                    specialized_prompt is not None
                 )
             )
             
@@ -1015,7 +970,7 @@ class RAGEngine:
         # Ajouter le status du processeur d'intentions
         if self.intent_processor:
             status["intent_processor_loaded"] = True
-            status["intent_vocabulary_size"] = len(self.intent_processor.poultry_keywords)
+            status["intent_vocabulary_size"] = len(self.intent_processor.vocabulary_extractor.poultry_keywords)
         else:
             status["intent_processor_loaded"] = False
         

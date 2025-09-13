@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-direct_weaviate_import.py - Import direct vers Weaviate v4 SANS TRONCATURE
-Usage: python direct_weaviate_import.py /path/to/documents/
+sync_to_weaviate.py - Import direct vers Weaviate v4 avec configuration OpenAI corrigée
+Usage: python sync_to_weaviate.py /path/to/documents/
 """
 
 import os
@@ -25,36 +25,54 @@ print("[DEBUG] Fichier .env chargé")
 # Configuration Weaviate Cloud
 WEAVIATE_URL = "https://xmlc4jvtu6hfw9zrrmnw.c0.us-east1.gcp.weaviate.cloud"
 WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
 print(f"[DEBUG] WEAVIATE_URL: {WEAVIATE_URL}")
 print(f"[DEBUG] WEAVIATE_API_KEY présente: {'Oui' if WEAVIATE_API_KEY else 'Non'}")
+print(f"[DEBUG] OPENAI_API_KEY présente: {'Oui' if OPENAI_API_KEY else 'Non'}")
+
 if WEAVIATE_API_KEY:
     print(f"[DEBUG] WEAVIATE_API_KEY longueur: {len(WEAVIATE_API_KEY)} caractères")
+if OPENAI_API_KEY:
+    print(f"[DEBUG] OPENAI_API_KEY longueur: {len(OPENAI_API_KEY)} caractères")
 
 # Nom de la collection dans Weaviate - DOIT CORRESPONDRE À VOTRE APP INTELIA
 CLASS_NAME = "InteliaKnowledge"
 print(f"[DEBUG] Nom de collection: {CLASS_NAME}")
 
 def connect_to_weaviate():
-    """Connexion directe à Weaviate Cloud (v4) avec debug"""
+    """Connexion directe à Weaviate Cloud (v4) avec configuration OpenAI"""
     print("[DEBUG] === DÉBUT CONNEXION WEAVIATE ===")
     try:
         print("[DEBUG] Création des credentials d'authentification...")
         
-        # Correction A - Connexion améliorée pour Weaviate Cloud
         if ".weaviate.cloud" in WEAVIATE_URL and WEAVIATE_API_KEY:
             auth_credentials = wvc.init.Auth.api_key(WEAVIATE_API_KEY)
             print("[DEBUG] Credentials créés avec succès")
             
+            # CORRECTION MAJEURE: Ajout des headers OpenAI
+            additional_headers = {}
+            if OPENAI_API_KEY:
+                additional_headers["X-OpenAI-Api-Key"] = OPENAI_API_KEY
+                print("[DEBUG] Header OpenAI ajouté")
+            
             print(f"[DEBUG] Tentative de connexion à : {WEAVIATE_URL}")
             client = weaviate.connect_to_weaviate_cloud(
                 cluster_url=WEAVIATE_URL,
-                auth_credentials=auth_credentials
+                auth_credentials=auth_credentials,
+                headers=additional_headers  # CORRECTION: Passer la clé OpenAI
             )
-            print("[DEBUG] Objet client créé")
+            print("[DEBUG] Objet client créé avec headers OpenAI")
         else:
             # Fallback pour connexion locale
             print("[DEBUG] Configuration pour Weaviate local")
-            client = weaviate.connect_to_local()
+            additional_headers = {}
+            if OPENAI_API_KEY:
+                additional_headers["X-OpenAI-Api-Key"] = OPENAI_API_KEY
+            
+            client = weaviate.connect_to_local(
+                headers=additional_headers
+            )
         
         print("[DEBUG] Test de disponibilité du cluster...")
         if client.is_ready():
@@ -75,7 +93,7 @@ def connect_to_weaviate():
                 print(f"[DEBUG] Erreur liste collections (non critique): {list_error}")
                 print("[DEBUG] Connexion semble fonctionnelle malgré l'erreur de liste")
             
-            print("✅ Connexion Weaviate réussie")
+            print("✅ Connexion Weaviate réussie avec OpenAI")
             return client
         else:
             print("[DEBUG] Cluster Weaviate non prêt")
@@ -107,7 +125,7 @@ def reset_collection(client):
         return False
 
 def ensure_schema_exists(client):
-    """Crée le schéma Weaviate si nécessaire (v4) avec debug"""
+    """Crée le schéma Weaviate si nécessaire (v4) avec configuration OpenAI corrigée"""
     print("[DEBUG] === VÉRIFICATION/CRÉATION SCHÉMA ===")
     try:
         print(f"[DEBUG] Vérification existence collection '{CLASS_NAME}'...")
@@ -131,19 +149,24 @@ def ensure_schema_exists(client):
                 wvc.config.Property(name="syncTimestamp", data_type=wvc.config.DataType.NUMBER),
                 wvc.config.Property(name="chunkIndex", data_type=wvc.config.DataType.NUMBER),
                 wvc.config.Property(name="totalChunks", data_type=wvc.config.DataType.NUMBER),
-                wvc.config.Property(name="isComplete", data_type=wvc.config.DataType.BOOLEAN)
+                wvc.config.Property(name="isComplete", data_type=wvc.config.DataType.BOOL)
             ]
             print(f"[DEBUG] {len(properties)} propriétés définies")
             
-            # CORRECTION 2 : Activer la vectorisation OpenAI
+            # CORRECTION: Configuration vectorisation OpenAI avec paramètres corrects
             print("[DEBUG] Configuration vectorisation OpenAI...")
+            
+            # La clé API est maintenant passée via headers de connexion
+            vectorizer_config = wvc.config.Configure.Vectorizer.text2vec_openai(
+                model="text-embedding-3-small",
+                # Pas besoin de passer api_key ici car c'est dans les headers
+            )
+            
             client.collections.create(
                 name=CLASS_NAME,
                 description="Documents de connaissance Intelia Expert avec chunking",
                 properties=properties,
-                vectorizer_config=wvc.config.Configure.Vectorizer.text2vec_openai(
-                    model="text-embedding-3-small"
-                )
+                vectorizer_config=vectorizer_config
             )
             print(f"[DEBUG] Collection créée avec succès avec vectorisation OpenAI")
             print(f"✅ Collection {CLASS_NAME} créée")
@@ -306,7 +329,6 @@ def load_json_document(file_path: str) -> List[Dict]:
                 'category': determine_category(metadata, chunk_content),
                 'source': 'direct_import',
                 'language': detect_language(chunk_content),
-                # Correction B - Normalisation geneticLine
                 'geneticLine': metadata.get('genetic_line', 'unknown').lower(),
                 'species': metadata.get('species', 'unknown'),
                 'originalFile': os.path.basename(file_path),
@@ -410,8 +432,8 @@ def upload_documents_to_weaviate(client, documents: List[Dict]) -> int:
         collection = client.collections.get(CLASS_NAME)
         print("[DEBUG] Collection récupérée")
         
-        # Upload par lots
-        batch_size = 1  # Un seul document à la fois pour connexion stable
+        # Upload par lots plus petits pour stabilité avec OpenAI embeddings
+        batch_size = 1  # Un seul document à la fois pour éviter les timeouts
         for i in range(0, len(documents), batch_size):
             batch = documents[i:i + batch_size]
             batch_num = (i // batch_size) + 1
@@ -427,7 +449,7 @@ def upload_documents_to_weaviate(client, documents: List[Dict]) -> int:
                 print(f"[DEBUG] [{doc_index}/{total_docs}] Document: {doc['title'][:50]}...")
                 print(f"[DEBUG] Contenu: {len(doc['content'])} caractères (chunk {doc['chunkIndex']+1}/{doc['totalChunks']})")
                 
-                # Préparer l'objet pour Weaviate (avec vectorisation automatique)
+                # Préparer l'objet pour Weaviate (avec vectorisation automatique OpenAI)
                 print(f"[DEBUG] Préparation objet Weaviate...")
                 
                 # Propriétés séparées du vecteur pour Weaviate v4
@@ -458,7 +480,7 @@ def upload_documents_to_weaviate(client, documents: List[Dict]) -> int:
                 print(f"[DEBUG] Objet préparé pour {doc['title']}")
             
             # Insert du document unique
-            print(f"[DEBUG] Upload document vers Weaviate...")
+            print(f"[DEBUG] Upload document vers Weaviate avec vectorisation OpenAI...")
             try:
                 result = collection.data.insert_many(objects_to_insert)
                 print(f"[DEBUG] Insert terminé")
@@ -484,10 +506,10 @@ def upload_documents_to_weaviate(client, documents: List[Dict]) -> int:
                 print(f"[DEBUG] Exception upload: {type(batch_error).__name__}: {batch_error}")
                 print(f"❌ Erreur upload document {batch_num}: {batch_error}")
             
-            # Pause entre chaque document pour connexion stable
+            # Pause entre chaque document pour éviter de surcharger OpenAI API
             if i + batch_size < len(documents):
-                print("[DEBUG] Pause 1 seconde...")
-                time.sleep(1)
+                print("[DEBUG] Pause 2 secondes pour OpenAI API...")
+                time.sleep(2)
                 
     except Exception as e:
         print(f"[DEBUG] Exception générale upload: {type(e).__name__}: {e}")
@@ -517,12 +539,12 @@ def find_json_files(directory: str) -> List[str]:
 
 def main():
     print("[DEBUG] === DÉBUT SCRIPT ===")
-    parser = argparse.ArgumentParser(description='Import direct vers Weaviate v4 SANS TRONCATURE')
+    parser = argparse.ArgumentParser(description='Import direct vers Weaviate v4 avec vectorisation OpenAI')
     parser.add_argument('directory', help='Répertoire contenant les fichiers JSON')
-    parser.add_argument('--batch-size', type=int, default=5, help='Taille des lots (défaut: 5)')
+    parser.add_argument('--batch-size', type=int, default=1, help='Taille des lots (défaut: 1 pour stabilité OpenAI)')
     parser.add_argument('--dry-run', action='store_true', help='Simulation sans envoi')
     parser.add_argument('--chunk-size', type=int, default=7000, help='Taille max des chunks (défaut: 7000)')
-    parser.add_argument('--reset', action='store_true', help='Supprime et recrée la collection')
+    parser.add_argument('--reset', action='store_true', help='Supprime et recrée TOUTES les collections Intelia')
     
     args = parser.parse_args()
     print(f"[DEBUG] Arguments: directory={args.directory}, batch_size={args.batch_size}, dry_run={args.dry_run}, chunk_size={args.chunk_size}, reset={args.reset}")
@@ -537,9 +559,15 @@ def main():
         print("❌ WEAVIATE_API_KEY non définie. Ajoutez-la dans votre fichier .env")
         return
     
+    if not OPENAI_API_KEY:
+        print("[DEBUG] Clé API OpenAI manquante")
+        print("❌ OPENAI_API_KEY non définie. Ajoutez-la dans votre fichier .env")
+        print("   Cette clé est nécessaire pour la vectorisation automatique des documents")
+        return
+    
     print(f"🔍 Scan du répertoire: {args.directory}")
     json_files = find_json_files(args.directory)
-    print(f"🔍 {len(json_files)} fichiers JSON trouvés")
+    print(f"📁 {len(json_files)} fichiers JSON trouvés")
     
     if not json_files:
         print("[DEBUG] Aucun fichier JSON trouvé")
@@ -547,7 +575,7 @@ def main():
         return
     
     # Connexion à Weaviate
-    print("🔌 Connexion à Weaviate...")
+    print("🔌 Connexion à Weaviate avec configuration OpenAI...")
     client = connect_to_weaviate()
     if not client:
         print("[DEBUG] Échec connexion Weaviate")
@@ -558,24 +586,20 @@ def main():
         print("🗑️ Reset de la collection...")
         if not reset_collection(client):
             print("[DEBUG] Échec reset collection")
+            client.close()
             return
     
     # Vérification/création du schéma
-    print("🔧 Vérification du schéma...")
+    print("🔧 Vérification du schéma avec vectorisation OpenAI...")
     if not ensure_schema_exists(client):
         print("[DEBUG] Échec création/vérification schéma")
+        client.close()
         return
     
-    # Configuration embeddings OpenAI
-    print("🤖 Configuration embeddings OpenAI...")
-    openai_key = os.getenv("OPENAI_API_KEY")
-    if not openai_key:
-        print("❌ OPENAI_API_KEY non définie. Ajoutez-la dans votre fichier .env")
-        return
-    print("✅ Embeddings OpenAI configurés")
+    print("✅ Configuration OpenAI pour embeddings confirmée")
     
     # Récupération des documents existants
-    print("🔍 Vérification des documents existants...")
+    print("📋 Vérification des documents existants...")
     existing_hashes = get_existing_hashes(client)
     print(f"📊 {len(existing_hashes)} documents déjà présents")
     
@@ -634,17 +658,22 @@ def main():
         return
     
     # Upload vers Weaviate
-    print(f"\n🚀 Upload vers Weaviate...")
+    print(f"\n🚀 Upload vers Weaviate avec vectorisation OpenAI...")
+    print(f"⏱️ Estimation: ~{len(all_document_chunks) * 3} secondes (3s/document avec OpenAI)")
     total_uploaded = upload_documents_to_weaviate(client, all_document_chunks)
     
-    # Fermer la connexion Weaviate
+    # Fermer la connexion Weaviate proprement
     print("[DEBUG] Fermeture connexion Weaviate...")
-    client.close()
-    print("[DEBUG] Connexion fermée")
+    try:
+        client.close()
+        print("[DEBUG] Connexion fermée proprement")
+    except Exception as close_error:
+        print(f"[DEBUG] Erreur fermeture connexion: {close_error}")
     
     print(f"\n🎉 Import terminé!")
     print(f"   - Chunks uploadés: {total_uploaded}/{len(all_document_chunks)}")
     print(f"   - Fichiers ignorés: {skipped_files}")
+    print(f"   - Vectorisation: OpenAI text-embedding-3-small")
     print("[DEBUG] === FIN SCRIPT ===")
 
 if __name__ == "__main__":
