@@ -694,19 +694,8 @@ const LoadingFallback = () => {
   )
 }
 
-// ✅ PAGE PRINCIPALE avec Force Refresh - AJOUTEZ CECI
+// PAGE PRINCIPALE avec Suspense
 export default function LoginPage() {
-  // 🚀 SOLUTION 1: Force Refresh au chargement
-  useEffect(() => {
-    const hasRefreshed = sessionStorage.getItem('page-refreshed')
-    
-    if (!hasRefreshed) {
-      sessionStorage.setItem('page-refreshed', 'true')
-      window.location.reload()
-      return
-    }
-  }, [])
-
   return (
     <Suspense fallback={<LoadingFallback />}>
       <LoginPageContent />

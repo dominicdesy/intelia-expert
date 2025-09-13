@@ -294,19 +294,22 @@ class HybridSearchEngine:
             return []
     
     async def search_by_genetic_line(self, query: str, genetic_line: str, limit: int = None) -> List[SearchResult]:
-        """Recherche filtrée par lignée génétique"""
+        """Recherche filtrée par lignée génétique (tolérant à la casse)"""
         if not self.is_connected or not self.client:
             return []
         
         try:
             collection = self.client.collections.get(self.class_name)
             
-            # Recherche avec filtre sur la lignée
+            # Normaliser en minuscule pour recherche tolérante à la casse
+            canonical_line = genetic_line.lower()
+            
+            # Recherche avec filtre like pour tolérance à la casse
             response = collection.query.hybrid(
                 query=query,
                 limit=limit or RAG_SEARCH_LIMIT,
                 alpha=0.7,
-                where=Filter.by_property("geneticLine").equal(genetic_line),
+                where=Filter.by_property("geneticLine").like(f"*{canonical_line}*"),
                 return_properties=["content", "title", "category", "source", "language", "geneticLine", "species", "originalFile", "chunkIndex", "totalChunks", "isComplete"],
                 return_metadata=["score", "distance"]
             )
