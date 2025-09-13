@@ -69,6 +69,10 @@ class SearchResult:
     score: float
     metadata: Dict
     source: str = "hybrid"
+    
+    def __post_init__(self):
+        # Assurer que score est toujours un float
+        self.score = float(self.score) if self.score is not None else 0.0
 
 class InDomainClassifier:
     """Classification NLI pour filtrage hors-domaine (économique)"""
@@ -275,15 +279,19 @@ class HybridSearchEngine:
                 documents = result["data"]["Get"].get(self.class_name, [])
                 
                 for doc in documents:
+                    # Correction: S'assurer que tous les scores sont des floats
+                    raw_score = doc.get("_additional", {}).get("score", 0.0)
+                    raw_distance = doc.get("_additional", {}).get("distance", 1.0)
+                    
                     search_results.append(SearchResult(
                         content=doc.get("content", ""),
-                        score=doc.get("_additional", {}).get("score", 0.0),
+                        score=float(raw_score),  # Correction: Force la conversion en float
                         metadata={
                             "title": doc.get("title", ""),
                             "category": doc.get("category", ""),
                             "source": doc.get("source", ""),
                             "confidence_score": doc.get("confidence_score", 1.0),
-                            "distance": doc.get("_additional", {}).get("distance", 1.0)
+                            "distance": float(raw_distance)  # Correction: Force la conversion en float
                         },
                         source="weaviate_hybrid"
                     ))
@@ -372,9 +380,9 @@ class VoyageReranker:
             reranked_results = []
             for item in rerank_result.results:
                 original_result = results[item.index]
-                # Mise à jour du score avec celui de VoyageAI
-                original_result.score = item.relevance_score
-                original_result.metadata["voyage_score"] = item.relevance_score
+                # Correction: S'assurer que le score est un float
+                original_result.score = float(item.relevance_score)
+                original_result.metadata["voyage_score"] = float(item.relevance_score)
                 original_result.source = "voyage_reranked"
                 reranked_results.append(original_result)
             
@@ -483,7 +491,7 @@ RESPUESTA BASADA EN LOS DOCUMENTOS:"""
             answer = response.choices[0].message.content.strip()
             
             # Calculer un score de confiance basique
-            confidence = min(0.9, sum(doc.score for doc in context_docs) / len(context_docs))
+            confidence = min(0.9, sum(float(doc.score) for doc in context_docs) / len(context_docs))
             
             return {
                 "answer": answer,
@@ -586,7 +594,7 @@ class RAGEngine:
         if reranked_results is not None:
             metadata["reranked_count"] = len(reranked_results)
             if reranked_results:
-                metadata["max_score"] = max(r.score for r in reranked_results)
+                metadata["max_score"] = max(float(r.score) for r in reranked_results)
         if high_confidence_results is not None:
             metadata["high_confidence_count"] = len(high_confidence_results)
         
@@ -692,17 +700,36 @@ class RAGEngine:
             # Étape 4: Reranking avec VoyageAI
             reranked_results = await self.reranker.rerank(search_query, search_results)
             
-            # Filtrer par seuil de confiance
-            high_confidence_results = [
-                r for r in reranked_results 
-                if r.score >= RAG_CONFIDENCE_THRESHOLD
-            ]
+            # Debug temporaire - Correction: Ajouter debug des types et valeurs
+            logger.debug(f"DEBUG RAG: reranked_results count={len(reranked_results)}")
+            for i, r in enumerate(reranked_results[:3]):  # Premiers 3 seulement
+                logger.debug(f"DEBUG RAG: result[{i}] score_type={type(r.score)} score_value={r.score}")
+            logger.debug(f"DEBUG RAG: threshold_type={type(RAG_CONFIDENCE_THRESHOLD)} threshold_value={RAG_CONFIDENCE_THRESHOLD}")
+            
+            # Filtrer par seuil de confiance - Correction: S'assurer que la comparaison fonctionne
+            high_confidence_results = []
+            for r in reranked_results:
+                try:
+                    score_float = float(r.score)
+                    threshold_float = float(RAG_CONFIDENCE_THRESHOLD)
+                    if score_float >= threshold_float:
+                        high_confidence_results.append(r)
+                except (ValueError, TypeError) as e:
+                    logger.error(f"Erreur conversion score: {r.score} -> {e}")
+                    continue
             
             if not high_confidence_results:
+                max_score = 0.0
+                if reranked_results:
+                    try:
+                        max_score = max(float(r.score) for r in reranked_results)
+                    except (ValueError, TypeError):
+                        max_score = 0.0
+                
                 logger.info(f"Résultats sous seuil de confiance ({RAG_CONFIDENCE_THRESHOLD})")
                 return RAGResult(
                     source=RAGSource.FALLBACK_NEEDED,
-                    confidence=max(r.score for r in reranked_results) if reranked_results else 0.0,
+                    confidence=max_score,
                     processing_time=time.time() - start_time,
                     metadata=self._build_metadata(
                         classification_method, classification_confidence, intent_result,
