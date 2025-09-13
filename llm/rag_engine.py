@@ -18,15 +18,37 @@ from enum import Enum
 import weaviate
 import weaviate.classes as wvc
 from weaviate.classes.config import Property, DataType
-from weaviate.classes.query import Filter, Where
-import voyageai
-from openai import OpenAI
-from transformers import pipeline
-import numpy as np
-from sentence_transformers import SentenceTransformer
+try:
+    from weaviate.classes.query import Filter
+    # Note: Where n'existe pas en v4, nous utiliserons la syntaxe directe
+except ImportError:
+    Filter = None
 
-# Import du nouveau module
-from intent_processor import create_intent_processor, IntentType, IntentResult
+try:
+    import voyageai
+    VOYAGEAI_AVAILABLE = True
+except ImportError:
+    VOYAGEAI_AVAILABLE = False
+    
+from openai import OpenAI
+
+try:
+    from transformers import pipeline
+    TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    TRANSFORMERS_AVAILABLE = False
+
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+
+try:
+    from sentence_transformers import SentenceTransformer
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +71,29 @@ class RAGSource(Enum):
     OOD_FILTERED = "ood_filtered"
     FALLBACK_NEEDED = "fallback_needed"
     ERROR = "error"
+
+class IntentType(Enum):
+    """Types d'intention de base"""
+    IN_DOMAIN = "in_domain"
+    OUT_OF_DOMAIN = "out_of_domain"
+    GENERAL_QUERY = "general_query"
+
+@dataclass
+class IntentResult:
+    """Résultat d'analyse d'intention de base"""
+    intent_type: IntentType
+    confidence: float
+    detected_entities: Dict = None
+    expanded_query: str = ""
+    metadata: Dict = None
+    
+    def __post_init__(self):
+        if self.detected_entities is None:
+            self.detected_entities = {}
+        if self.metadata is None:
+            self.metadata = {}
+        if not self.expanded_query:
+            self.expanded_query = ""
 
 @dataclass
 class RAGResult:
@@ -78,6 +123,42 @@ class SearchResult:
         # Assurer que score est toujours un float
         self.score = float(self.score) if self.score is not None else 0.0
 
+class BasicIntentProcessor:
+    """Processeur d'intentions basique sans dépendances externes"""
+    
+    def __init__(self):
+        self.poultry_keywords = [
+            'poulet', 'poule', 'aviculture', 'élevage', 'volaille',
+            'aliment', 'vaccination', 'maladie', 'production',
+            'chicken', 'poultry', 'broiler', 'layer', 'feed',
+            'ross', 'cobb', 'hubbard', 'nutrition', 'breeding',
+            'oeuf', 'egg', 'incubation', 'poussin', 'chick'
+        ]
+    
+    def process_query(self, query: str) -> IntentResult:
+        """Analyse basique d'intention"""
+        query_lower = query.lower()
+        
+        # Détecter les mots-clés avicoles
+        keyword_matches = [kw for kw in self.poultry_keywords if kw in query_lower]
+        
+        if keyword_matches:
+            confidence = min(0.9, len(keyword_matches) * 0.3)
+            return IntentResult(
+                intent_type=IntentType.IN_DOMAIN,
+                confidence=confidence,
+                detected_entities={"keywords": keyword_matches},
+                expanded_query=query,
+                metadata={"vocab_score": confidence}
+            )
+        else:
+            return IntentResult(
+                intent_type=IntentType.OUT_OF_DOMAIN,
+                confidence=0.8,
+                expanded_query=query,
+                metadata={"vocab_score": 0.0}
+            )
+
 class InDomainClassifier:
     """Classification NLI pour filtrage hors-domaine (économique)"""
     
@@ -95,7 +176,7 @@ class InDomainClassifier:
     
     async def load_model(self):
         """Chargement asynchrone du modèle NLI"""
-        if self.is_loaded:
+        if self.is_loaded or not TRANSFORMERS_AVAILABLE:
             return
         
         try:
@@ -179,8 +260,9 @@ class HybridSearchEngine:
                 )
             else:
                 # Connexion locale
+                host = WEAVIATE_URL.replace('http://', '').replace('https://', '').split(':')[0]
                 self.client = weaviate.connect_to_local(
-                    host=WEAVIATE_URL.replace('http://', '').replace('https://', ''),
+                    host=host,
                     port=8080,
                     grpc_port=50051
                 )
@@ -301,8 +383,12 @@ class HybridSearchEngine:
         try:
             collection = self.client.collections.get(self.class_name)
             
-            # CORRECTION: Utiliser la syntaxe Where.by_property pour Weaviate v4
-            where_filter = Where.by_property("geneticLine").contains_any([genetic_line.lower()])
+            # Utiliser la syntaxe de filtre v4 correcte
+            where_filter = {
+                "path": ["geneticLine"],
+                "operator": "ContainsAny",
+                "valueTextArray": [genetic_line.lower()]
+            }
             
             # Recherche avec filtre compatible v4
             response = collection.query.hybrid(
@@ -360,8 +446,12 @@ class HybridSearchEngine:
         try:
             collection = self.client.collections.get(self.class_name)
             
-            # CORRECTION: Utiliser Where.by_property pour Weaviate v4
-            where_filter = Where.by_property("species").equal(species)
+            # Utiliser la syntaxe de filtre v4 correcte
+            where_filter = {
+                "path": ["species"],
+                "operator": "Equal",
+                "valueText": species
+            }
             
             response = collection.query.hybrid(
                 query=query,
@@ -436,7 +526,7 @@ class VoyageReranker:
     
     def __init__(self):
         self.client = None
-        self.is_available = bool(VOYAGE_API_KEY)
+        self.is_available = bool(VOYAGE_API_KEY and VOYAGEAI_AVAILABLE)
         
         if self.is_available:
             try:
@@ -645,7 +735,7 @@ class RAGEngine:
         self.search_engine = HybridSearchEngine()
         self.reranker = VoyageReranker()
         self.generator = ContextualGenerator(openai_client)
-        self.intent_processor = None  # Processeur d'intentions métier
+        self.intent_processor = BasicIntentProcessor()  # Processeur d'intentions basique
         self.is_initialized = False
     
     async def initialize(self):
@@ -654,14 +744,6 @@ class RAGEngine:
             return
         
         logger.info("Initialisation RAG Engine v4...")
-        
-        # Initialisation du processeur d'intentions
-        try:
-            self.intent_processor = create_intent_processor()
-            logger.info("Processeur d'intentions initialisé")
-        except Exception as e:
-            logger.error(f"Erreur init processeur intentions: {e}")
-            self.intent_processor = None
         
         # Initialisation parallèle des composants
         await asyncio.gather(
@@ -846,13 +928,9 @@ class RAGEngine:
                     )
                 )
             
-            # Étape 5: Génération contextuelle avec prompt spécialisé
-            specialized_prompt = None
-            if intent_result and self.intent_processor:
-                specialized_prompt = self.intent_processor.get_specialized_prompt(intent_result)
-            
+            # Étape 5: Génération contextuelle
             generation_result = await self.generator.generate_answer(
-                query, high_confidence_results[:5], language, specialized_prompt
+                query, high_confidence_results[:5], language
             )
             
             if not generation_result["answer"]:
@@ -878,8 +956,7 @@ class RAGEngine:
                 processing_time=processing_time,
                 metadata=self._build_metadata(
                     classification_method, classification_confidence, intent_result,
-                    search_query, query, search_results, reranked_results, high_confidence_results, 
-                    specialized_prompt is not None
+                    search_query, query, search_results, reranked_results, high_confidence_results
                 )
             )
             
@@ -910,22 +987,9 @@ class RAGEngine:
             # Compter les documents
             total_count = collection.aggregate.over_all(total_count=True)
             
-            # Compter par catégorie
-            category_stats = collection.aggregate.over_all(
-                group_by="category"
-            )
-            
-            # Compter par lignée
-            genetic_line_stats = collection.aggregate.over_all(
-                group_by="geneticLine"
-            )
-            
             return {
-                "total_documents": total_count.total_count,
-                "categories": {group.grouped_by["category"]: group.total_count 
-                              for group in category_stats.groups},
-                "genetic_lines": {group.grouped_by["geneticLine"]: group.total_count 
-                                 for group in genetic_line_stats.groups}
+                "total_documents": total_count.total_count if total_count else 0,
+                "weaviate_version": "v4"
             }
             
         except Exception as e:
@@ -943,13 +1007,15 @@ class RAGEngine:
             "weaviate_url": WEAVIATE_URL,
             "weaviate_version": "v4",
             "voyage_api_configured": bool(VOYAGE_API_KEY),
-            "nli_model": NLI_MODEL_PATH
+            "nli_model": NLI_MODEL_PATH,
+            "transformers_available": TRANSFORMERS_AVAILABLE,
+            "voyageai_available": VOYAGEAI_AVAILABLE
         }
         
         # Ajouter le status du processeur d'intentions
         if self.intent_processor:
             status["intent_processor_loaded"] = True
-            status["intent_vocabulary_size"] = len(self.intent_processor.vocabulary_extractor.poultry_keywords)
+            status["intent_vocabulary_size"] = len(self.intent_processor.poultry_keywords)
         else:
             status["intent_processor_loaded"] = False
         
