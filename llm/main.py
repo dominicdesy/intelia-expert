@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 #
+#
 # main.py — Intelia LLM backend (FastAPI + SSE + RAG)
+#
 # Python 3.11+
-# CORRECTIONS: Mémoire bornée par tenant + Cycle de vie Weaviate
+#
 #
 
 import os
