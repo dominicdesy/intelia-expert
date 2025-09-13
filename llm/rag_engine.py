@@ -2,7 +2,7 @@
 """
 rag_engine.py - Module RAG hybride pour Intelia Expert
 Intégration: Classification NLI + Recherche hybride + Reranking VoyageAI + Génération contextuelle
-Version corrigée avec Weaviate v4
+Version corrigée avec Weaviate v4 et schéma complet
 """
 
 import os
@@ -18,6 +18,7 @@ from enum import Enum
 import weaviate
 import weaviate.classes as wvc
 from weaviate.classes.config import Property, DataType
+from weaviate.classes.query import Filter
 import voyageai
 from openai import OpenAI
 from transformers import pipeline
@@ -199,11 +200,11 @@ class HybridSearchEngine:
             self.is_connected = False
     
     async def _ensure_collection_exists(self):
-        """Crée la collection Weaviate v4 si nécessaire"""
+        """Crée la collection Weaviate v4 si nécessaire avec schéma complet"""
         try:
             # Vérifier si la collection existe
             if not self.client.collections.exists(self.class_name):
-                # Configuration de la collection avec vectorisation OpenAI
+                # Configuration de la collection avec schéma complet
                 collection_config = wvc.config.Configure.Collection(
                     name=self.class_name,
                     description="Base de connaissances Intelia Expert en aviculture",
@@ -211,17 +212,52 @@ class HybridSearchEngine:
                         Property(name="content", data_type=DataType.TEXT, description="Contenu principal du document"),
                         Property(name="title", data_type=DataType.TEXT, description="Titre du document"),
                         Property(name="category", data_type=DataType.TEXT, description="Catégorie thématique"),
-                        Property(name="language", data_type=DataType.TEXT, description="Langue du document"),
                         Property(name="source", data_type=DataType.TEXT, description="Source d'origine"),
-                        Property(name="confidence_score", data_type=DataType.NUMBER, description="Score de confiance du contenu")
+                        Property(name="language", data_type=DataType.TEXT, description="Langue du document"),
+                        Property(name="geneticLine", data_type=DataType.TEXT, description="Lignée génétique"),
+                        Property(name="species", data_type=DataType.TEXT, description="Espèce animale"),
+                        Property(name="originalFile", data_type=DataType.TEXT, description="Fichier d'origine"),
+                        Property(name="fileHash", data_type=DataType.TEXT, description="Hash du fichier"),
+                        Property(name="syncTimestamp", data_type=DataType.NUMBER, description="Timestamp de synchronisation"),
+                        Property(name="chunkIndex", data_type=DataType.NUMBER, description="Index du chunk"),
+                        Property(name="totalChunks", data_type=DataType.NUMBER, description="Nombre total de chunks"),
+                        Property(name="isComplete", data_type=DataType.BOOLEAN, description="Document complet ou chunk")
                     ]
                 )
                 
                 # Créer la collection
                 self.client.collections.create_from_config(collection_config)
-                logger.info(f"Collection {self.class_name} créée")
+                logger.info(f"Collection {self.class_name} créée avec schéma complet")
         except Exception as e:
             logger.error(f"Erreur création collection: {e}")
+    
+    def _process_search_results(self, response) -> List[SearchResult]:
+        """Méthode helper pour traiter les résultats de recherche"""
+        search_results = []
+        for obj in response.objects:
+            raw_score = obj.metadata.score if obj.metadata.score is not None else 0.0
+            raw_distance = obj.metadata.distance if obj.metadata.distance is not None else 1.0
+            
+            search_results.append(SearchResult(
+                content=obj.properties.get("content", ""),
+                score=float(raw_score),
+                metadata={
+                    "title": obj.properties.get("title", ""),
+                    "category": obj.properties.get("category", ""),
+                    "source": obj.properties.get("source", ""),
+                    "language": obj.properties.get("language", ""),
+                    "genetic_line": obj.properties.get("geneticLine", ""),
+                    "species": obj.properties.get("species", ""),
+                    "original_file": obj.properties.get("originalFile", ""),
+                    "chunk_index": obj.properties.get("chunkIndex", 0),
+                    "total_chunks": obj.properties.get("totalChunks", 1),
+                    "is_complete": obj.properties.get("isComplete", True),
+                    "distance": float(raw_distance)
+                },
+                source="weaviate_hybrid_v4"
+            ))
+        
+        return search_results
     
     async def search(self, query: str, language: str = "fr", limit: int = None) -> List[SearchResult]:
         """
@@ -243,29 +279,12 @@ class HybridSearchEngine:
                 query=query,
                 limit=limit,
                 alpha=0.7,  # 0.7 = plus vectoriel, 0.3 = plus BM25
-                return_properties=["content", "title", "category", "source", "confidence_score"],
+                return_properties=["content", "title", "category", "source", "language", "geneticLine", "species", "originalFile", "chunkIndex", "totalChunks", "isComplete"],
                 return_metadata=["score", "distance"]
             )
             
-            # Traitement des résultats
-            search_results = []
-            for obj in response.objects:
-                # Correction: S'assurer que tous les scores sont des floats
-                raw_score = obj.metadata.score if obj.metadata.score is not None else 0.0
-                raw_distance = obj.metadata.distance if obj.metadata.distance is not None else 1.0
-                
-                search_results.append(SearchResult(
-                    content=obj.properties.get("content", ""),
-                    score=float(raw_score),  # Force la conversion en float
-                    metadata={
-                        "title": obj.properties.get("title", ""),
-                        "category": obj.properties.get("category", ""),
-                        "source": obj.properties.get("source", ""),
-                        "confidence_score": obj.properties.get("confidence_score", 1.0),
-                        "distance": float(raw_distance)  # Force la conversion en float
-                    },
-                    source="weaviate_hybrid_v4"
-                ))
+            # Traitement des résultats avec méthode helper
+            search_results = self._process_search_results(response)
             
             logger.info(f"Recherche hybride v4: {len(search_results)} résultats pour '{query[:50]}...'")
             return search_results
@@ -274,8 +293,55 @@ class HybridSearchEngine:
             logger.error(f"Erreur recherche Weaviate v4: {e}")
             return []
     
+    async def search_by_genetic_line(self, query: str, genetic_line: str, limit: int = None) -> List[SearchResult]:
+        """Recherche filtrée par lignée génétique"""
+        if not self.is_connected or not self.client:
+            return []
+        
+        try:
+            collection = self.client.collections.get(self.class_name)
+            
+            # Recherche avec filtre sur la lignée
+            response = collection.query.hybrid(
+                query=query,
+                limit=limit or RAG_SEARCH_LIMIT,
+                alpha=0.7,
+                where=Filter.by_property("geneticLine").equal(genetic_line),
+                return_properties=["content", "title", "category", "source", "language", "geneticLine", "species", "originalFile", "chunkIndex", "totalChunks", "isComplete"],
+                return_metadata=["score", "distance"]
+            )
+            
+            return self._process_search_results(response)
+            
+        except Exception as e:
+            logger.error(f"Erreur recherche par lignée: {e}")
+            return []
+
+    async def search_by_species(self, query: str, species: str, limit: int = None) -> List[SearchResult]:
+        """Recherche filtrée par espèce"""
+        if not self.is_connected or not self.client:
+            return []
+        
+        try:
+            collection = self.client.collections.get(self.class_name)
+            
+            response = collection.query.hybrid(
+                query=query,
+                limit=limit or RAG_SEARCH_LIMIT,
+                alpha=0.7,
+                where=Filter.by_property("species").equal(species),
+                return_properties=["content", "title", "category", "source", "language", "geneticLine", "species", "originalFile", "chunkIndex", "totalChunks", "isComplete"],
+                return_metadata=["score", "distance"]
+            )
+            
+            return self._process_search_results(response)
+            
+        except Exception as e:
+            logger.error(f"Erreur recherche par espèce: {e}")
+            return []
+    
     async def add_documents(self, documents: List[Dict]) -> bool:
-        """Ajouter des documents à l'index avec Weaviate v4"""
+        """Ajouter des documents à l'index avec Weaviate v4 et schéma complet"""
         if not self.is_connected:
             await self.initialize()
         
@@ -285,7 +351,7 @@ class HybridSearchEngine:
         try:
             collection = self.client.collections.get(self.class_name)
             
-            # Préparer les objets pour insertion v4
+            # Préparer les objets pour insertion v4 avec schéma complet
             objects_to_insert = []
             for doc in documents:
                 obj_data = {
@@ -294,7 +360,14 @@ class HybridSearchEngine:
                     "category": doc.get("category", "general"),
                     "language": doc.get("language", "fr"),
                     "source": doc.get("source", "manual"),
-                    "confidence_score": doc.get("confidence_score", 1.0)
+                    "geneticLine": doc.get("genetic_line", "unknown"),
+                    "species": doc.get("species", "unknown"),
+                    "originalFile": doc.get("original_file", "manual_add"),
+                    "fileHash": doc.get("file_hash", f"manual_{int(time.time())}"),
+                    "syncTimestamp": doc.get("sync_timestamp", time.time()),
+                    "chunkIndex": doc.get("chunk_index", 0),
+                    "totalChunks": doc.get("total_chunks", 1),
+                    "isComplete": doc.get("is_complete", True)
                 }
                 objects_to_insert.append(obj_data)
             
@@ -601,10 +674,10 @@ class RAGEngine:
     
     async def process_query(self, query: str, language: str = "fr", tenant_id: str = "") -> RAGResult:
         """
-        Pipeline RAG complet avec processeur d'intentions
+        Pipeline RAG complet avec processeur d'intentions et recherche ciblée
         1. Analyse d'intention métier
         2. Classification OOD renforcée
-        3. Recherche hybride avec expansion
+        3. Recherche hybride avec expansion et filtrage
         4. Reranking
         5. Génération contextuelle avec prompt spécialisé
         """
@@ -663,13 +736,31 @@ class RAGEngine:
                     )
                 )
             
-            # Étape 3: Recherche hybride avec expansion de requête
+            # Étape 3: Recherche hybride avec expansion et filtrage par entités
             search_query = query
             if intent_result and intent_result.expanded_query != query:
                 search_query = intent_result.expanded_query
                 logger.info(f"Requête expansée: '{query}' -> '{search_query}'")
             
-            search_results = await self.search_engine.search(search_query, language)
+            # Utiliser les filtres avancés basés sur les entités détectées
+            if intent_result and intent_result.detected_entities:
+                genetic_line = intent_result.detected_entities.get("line")
+                
+                if genetic_line:
+                    # Mapper les alias vers les noms canoniques
+                    line_mapping = {
+                        "ross": "ross 308",
+                        "cobb": "cobb 500", 
+                        "hubbard": "hubbard classic"
+                    }
+                    canonical_line = line_mapping.get(genetic_line.lower(), genetic_line.lower())
+                    
+                    logger.info(f"Recherche ciblée pour lignée: {canonical_line}")
+                    search_results = await self.search_engine.search_by_genetic_line(search_query, canonical_line)
+                else:
+                    search_results = await self.search_engine.search(search_query, language)
+            else:
+                search_results = await self.search_engine.search(search_query, language)
             
             if not search_results:
                 logger.info(f"Aucun résultat de recherche pour: {search_query[:50]}...")
@@ -769,6 +860,39 @@ class RAGEngine:
             await self.initialize()
         
         return await self.search_engine.add_documents(documents)
+    
+    async def get_collection_stats(self) -> Dict:
+        """Statistiques de la collection Weaviate"""
+        if not self.search_engine.is_connected:
+            return {"error": "Weaviate non connecté"}
+        
+        try:
+            collection = self.search_engine.client.collections.get(self.search_engine.class_name)
+            
+            # Compter les documents
+            total_count = collection.aggregate.over_all(total_count=True)
+            
+            # Compter par catégorie
+            category_stats = collection.aggregate.over_all(
+                group_by="category"
+            )
+            
+            # Compter par lignée
+            genetic_line_stats = collection.aggregate.over_all(
+                group_by="geneticLine"
+            )
+            
+            return {
+                "total_documents": total_count.total_count,
+                "categories": {group.grouped_by["category"]: group.total_count 
+                              for group in category_stats.groups},
+                "genetic_lines": {group.grouped_by["geneticLine"]: group.total_count 
+                                 for group in genetic_line_stats.groups}
+            }
+            
+        except Exception as e:
+            logger.error(f"Erreur stats collection: {e}")
+            return {"error": str(e)}
     
     def get_status(self) -> Dict:
         """Status des composants RAG"""
