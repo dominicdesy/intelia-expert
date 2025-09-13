@@ -2,6 +2,7 @@
 """
 rag_engine.py - Module RAG hybride pour Intelia Expert
 Intégration: Classification NLI + Recherche hybride + Reranking VoyageAI + Génération contextuelle
+Version corrigée avec Weaviate v4
 """
 
 import os
@@ -15,6 +16,8 @@ from dataclasses import dataclass
 from enum import Enum
 
 import weaviate
+import weaviate.classes as wvc
+from weaviate.classes.config import Property, DataType
 import voyageai
 from openai import OpenAI
 from transformers import pipeline
@@ -152,108 +155,77 @@ class InDomainClassifier:
             return True, 0.5
 
 class HybridSearchEngine:
-    """Moteur de recherche hybride (vectoriel + BM25) avec Weaviate"""
+    """Moteur de recherche hybride (vectoriel + BM25) avec Weaviate v4"""
     
     def __init__(self):
         self.client = None
-        self.embedding_model = None
         self.is_connected = False
         self.class_name = "InteliaKnowledge"
     
     async def initialize(self):
-        """Initialisation de la connexion Weaviate et du modèle d'embedding"""
+        """Initialisation de la connexion Weaviate v4"""
         if self.is_connected:
             return
         
         try:
-            # Configuration client Weaviate
-            auth_config = None
+            # Configuration client Weaviate v4
             if WEAVIATE_API_KEY:
-                auth_config = weaviate.AuthApiKey(api_key=WEAVIATE_API_KEY)
-            
-            # Headers additionnels pour OpenAI
-            additional_headers = {}
-            if OPENAI_API_KEY:
-                additional_headers["X-OpenAI-Api-Key"] = OPENAI_API_KEY
-            
-            self.client = weaviate.Client(
-                url=WEAVIATE_URL,
-                auth_client_secret=auth_config,
-                additional_headers=additional_headers
-            )
+                # Cloud connection avec clé API
+                auth_credentials = wvc.init.Auth.api_key(WEAVIATE_API_KEY)
+                self.client = weaviate.connect_to_weaviate_cloud(
+                    cluster_url=WEAVIATE_URL,
+                    auth_credentials=auth_credentials
+                )
+            else:
+                # Connexion locale
+                self.client = weaviate.connect_to_local(
+                    host=WEAVIATE_URL.replace('http://', '').replace('https://', ''),
+                    port=8080,
+                    grpc_port=50051
+                )
             
             # Test de connexion
             if self.client.is_ready():
-                logger.info("Connexion Weaviate établie")
+                logger.info("Connexion Weaviate v4 établie")
                 self.is_connected = True
                 
-                # Créer le schéma si nécessaire
-                await self._ensure_schema_exists()
+                # Créer la collection si nécessaire
+                await self._ensure_collection_exists()
             else:
                 logger.warning("Weaviate non disponible, recherche désactivée")
                 
         except Exception as e:
-            logger.error(f"Erreur connexion Weaviate: {e}")
+            logger.error(f"Erreur connexion Weaviate v4: {e}")
             self.is_connected = False
     
-    async def _ensure_schema_exists(self):
-        """Crée le schéma Weaviate si nécessaire"""
+    async def _ensure_collection_exists(self):
+        """Crée la collection Weaviate v4 si nécessaire"""
         try:
-            # Vérifier si la classe existe
-            if not self.client.schema.exists(self.class_name):
-                schema = {
-                    "class": self.class_name,
-                    "description": "Base de connaissances Intelia Expert en aviculture",
-                    "vectorizer": "text2vec-openai",
-                    "moduleConfig": {
-                        "text2vec-openai": {
-                            "model": "ada",
-                            "modelVersion": "002",
-                            "type": "text",
-                            "apiKey": OPENAI_API_KEY
-                        }
-                    },
-                    "properties": [
-                        {
-                            "name": "content",
-                            "dataType": ["text"],
-                            "description": "Contenu principal du document"
-                        },
-                        {
-                            "name": "title",
-                            "dataType": ["string"],
-                            "description": "Titre du document"
-                        },
-                        {
-                            "name": "category",
-                            "dataType": ["string"],
-                            "description": "Catégorie thématique"
-                        },
-                        {
-                            "name": "language",
-                            "dataType": ["string"],
-                            "description": "Langue du document"
-                        },
-                        {
-                            "name": "source",
-                            "dataType": ["string"],
-                            "description": "Source d'origine"
-                        },
-                        {
-                            "name": "confidence_score",
-                            "dataType": ["number"],
-                            "description": "Score de confiance du contenu"
-                        }
+            # Vérifier si la collection existe
+            if not self.client.collections.exists(self.class_name):
+                # Configuration de la collection avec vectorisation OpenAI
+                collection_config = wvc.config.Configure.Collection(
+                    name=self.class_name,
+                    description="Base de connaissances Intelia Expert en aviculture",
+                    properties=[
+                        Property(name="content", data_type=DataType.TEXT, description="Contenu principal du document"),
+                        Property(name="title", data_type=DataType.TEXT, description="Titre du document"),
+                        Property(name="category", data_type=DataType.TEXT, description="Catégorie thématique"),
+                        Property(name="language", data_type=DataType.TEXT, description="Langue du document"),
+                        Property(name="source", data_type=DataType.TEXT, description="Source d'origine"),
+                        Property(name="confidence_score", data_type=DataType.NUMBER, description="Score de confiance du contenu")
                     ]
-                }
-                self.client.schema.create_class(schema)
-                logger.info(f"Schéma {self.class_name} créé")
+                )
+                
+                # Créer la collection
+                self.client.collections.create_from_config(collection_config)
+                logger.info(f"Collection {self.class_name} créée")
         except Exception as e:
-            logger.error(f"Erreur création schéma: {e}")
+            logger.error(f"Erreur création collection: {e}")
     
     async def search(self, query: str, language: str = "fr", limit: int = None) -> List[SearchResult]:
         """
-        Recherche hybride vectorielle + BM25
+        Recherche hybride vectorielle + BM25 avec Weaviate v4
         """
         if not self.is_connected or not self.client:
             logger.warning("Weaviate non disponible pour la recherche")
@@ -263,48 +235,47 @@ class HybridSearchEngine:
             limit = RAG_SEARCH_LIMIT
         
         try:
-            # Recherche hybride Weaviate
-            result = (
-                self.client.query
-                .get(self.class_name, ["content", "title", "category", "source", "confidence_score"])
-                .with_hybrid(query=query, alpha=0.7)  # 0.7 = plus vectoriel, 0.3 = plus BM25
-                .with_limit(limit)
-                .with_additional(["score", "distance"])
-                .do()
+            # Obtenir la collection
+            collection = self.client.collections.get(self.class_name)
+            
+            # Recherche hybride Weaviate v4
+            response = collection.query.hybrid(
+                query=query,
+                limit=limit,
+                alpha=0.7,  # 0.7 = plus vectoriel, 0.3 = plus BM25
+                return_properties=["content", "title", "category", "source", "confidence_score"],
+                return_metadata=["score", "distance"]
             )
             
             # Traitement des résultats
             search_results = []
-            if "data" in result and "Get" in result["data"]:
-                documents = result["data"]["Get"].get(self.class_name, [])
+            for obj in response.objects:
+                # Correction: S'assurer que tous les scores sont des floats
+                raw_score = obj.metadata.score if obj.metadata.score is not None else 0.0
+                raw_distance = obj.metadata.distance if obj.metadata.distance is not None else 1.0
                 
-                for doc in documents:
-                    # Correction: S'assurer que tous les scores sont des floats
-                    raw_score = doc.get("_additional", {}).get("score", 0.0)
-                    raw_distance = doc.get("_additional", {}).get("distance", 1.0)
-                    
-                    search_results.append(SearchResult(
-                        content=doc.get("content", ""),
-                        score=float(raw_score),  # Correction: Force la conversion en float
-                        metadata={
-                            "title": doc.get("title", ""),
-                            "category": doc.get("category", ""),
-                            "source": doc.get("source", ""),
-                            "confidence_score": doc.get("confidence_score", 1.0),
-                            "distance": float(raw_distance)  # Correction: Force la conversion en float
-                        },
-                        source="weaviate_hybrid"
-                    ))
+                search_results.append(SearchResult(
+                    content=obj.properties.get("content", ""),
+                    score=float(raw_score),  # Force la conversion en float
+                    metadata={
+                        "title": obj.properties.get("title", ""),
+                        "category": obj.properties.get("category", ""),
+                        "source": obj.properties.get("source", ""),
+                        "confidence_score": obj.properties.get("confidence_score", 1.0),
+                        "distance": float(raw_distance)  # Force la conversion en float
+                    },
+                    source="weaviate_hybrid_v4"
+                ))
             
-            logger.info(f"Recherche hybride: {len(search_results)} résultats pour '{query[:50]}...'")
+            logger.info(f"Recherche hybride v4: {len(search_results)} résultats pour '{query[:50]}...'")
             return search_results
             
         except Exception as e:
-            logger.error(f"Erreur recherche Weaviate: {e}")
+            logger.error(f"Erreur recherche Weaviate v4: {e}")
             return []
     
     async def add_documents(self, documents: List[Dict]) -> bool:
-        """Ajouter des documents à l'index"""
+        """Ajouter des documents à l'index avec Weaviate v4"""
         if not self.is_connected:
             await self.initialize()
         
@@ -312,28 +283,42 @@ class HybridSearchEngine:
             return False
         
         try:
-            with self.client.batch as batch:
-                batch.batch_size = 100
-                
-                for doc in documents:
-                    batch.add_data_object(
-                        data_object={
-                            "content": doc.get("content", ""),
-                            "title": doc.get("title", ""),
-                            "category": doc.get("category", "general"),
-                            "language": doc.get("language", "fr"),
-                            "source": doc.get("source", "manual"),
-                            "confidence_score": doc.get("confidence_score", 1.0)
-                        },
-                        class_name=self.class_name
-                    )
+            collection = self.client.collections.get(self.class_name)
             
-            logger.info(f"Ajouté {len(documents)} documents à l'index")
+            # Préparer les objets pour insertion v4
+            objects_to_insert = []
+            for doc in documents:
+                obj_data = {
+                    "content": doc.get("content", ""),
+                    "title": doc.get("title", ""),
+                    "category": doc.get("category", "general"),
+                    "language": doc.get("language", "fr"),
+                    "source": doc.get("source", "manual"),
+                    "confidence_score": doc.get("confidence_score", 1.0)
+                }
+                objects_to_insert.append(obj_data)
+            
+            # Insertion par batch v4
+            with collection.batch.dynamic() as batch:
+                for obj_data in objects_to_insert:
+                    batch.add_object(properties=obj_data)
+            
+            logger.info(f"Ajouté {len(documents)} documents à l'index v4")
             return True
             
         except Exception as e:
-            logger.error(f"Erreur ajout documents: {e}")
+            logger.error(f"Erreur ajout documents v4: {e}")
             return False
+    
+    def close(self):
+        """Fermer la connexion Weaviate v4"""
+        if self.client:
+            try:
+                self.client.close()
+                self.is_connected = False
+                logger.info("Connexion Weaviate v4 fermée")
+            except Exception as e:
+                logger.error(f"Erreur fermeture connexion: {e}")
 
 class VoyageReranker:
     """Reranker utilisant l'API VoyageAI (gratuit jusqu'à 200M tokens)"""
@@ -557,7 +542,7 @@ class RAGEngine:
         if self.is_initialized:
             return
         
-        logger.info("Initialisation RAG Engine...")
+        logger.info("Initialisation RAG Engine v4...")
         
         # Initialisation du processeur d'intentions
         try:
@@ -574,7 +559,7 @@ class RAGEngine:
         )
         
         self.is_initialized = True
-        logger.info("RAG Engine initialisé avec succès")
+        logger.info("RAG Engine v4 initialisé avec succès")
     
     def _build_metadata(self, classification_method: str, classification_confidence: float, 
                        intent_result: Optional[IntentResult], search_query: str, query: str,
@@ -585,7 +570,8 @@ class RAGEngine:
         metadata = {
             "classification_method": classification_method,
             "classification_score": classification_confidence,
-            "query_expanded": search_query != query
+            "query_expanded": search_query != query,
+            "weaviate_version": "v4"
         }
         
         # Métadonnées de recherche si disponibles
@@ -700,12 +686,6 @@ class RAGEngine:
             # Étape 4: Reranking avec VoyageAI
             reranked_results = await self.reranker.rerank(search_query, search_results)
             
-            # Debug temporaire - Correction: Ajouter debug des types et valeurs
-            logger.debug(f"DEBUG RAG: reranked_results count={len(reranked_results)}")
-            for i, r in enumerate(reranked_results[:3]):  # Premiers 3 seulement
-                logger.debug(f"DEBUG RAG: result[{i}] score_type={type(r.score)} score_value={r.score}")
-            logger.debug(f"DEBUG RAG: threshold_type={type(RAG_CONFIDENCE_THRESHOLD)} threshold_value={RAG_CONFIDENCE_THRESHOLD}")
-            
             # Filtrer par seuil de confiance - Correction: S'assurer que la comparaison fonctionne
             high_confidence_results = []
             for r in reranked_results:
@@ -759,7 +739,7 @@ class RAGEngine:
             
             processing_time = time.time() - start_time
             
-            logger.info(f"RAG réussi: {len(high_confidence_results)} docs, conf: {generation_result['confidence']:.3f}, temps: {processing_time:.2f}s")
+            logger.info(f"RAG v4 réussi: {len(high_confidence_results)} docs, conf: {generation_result['confidence']:.3f}, temps: {processing_time:.2f}s")
             
             return RAGResult(
                 source=RAGSource.RAG_KNOWLEDGE,
@@ -775,12 +755,12 @@ class RAGEngine:
             )
             
         except Exception as e:
-            logger.error(f"Erreur pipeline RAG: {e}")
+            logger.error(f"Erreur pipeline RAG v4: {e}")
             return RAGResult(
                 source=RAGSource.ERROR,
                 confidence=0.0,
                 processing_time=time.time() - start_time,
-                metadata={"error": str(e)}
+                metadata={"error": str(e), "weaviate_version": "v4"}
             )
     
     async def add_knowledge(self, documents: List[Dict]) -> bool:
@@ -799,6 +779,7 @@ class RAGEngine:
             "search_connected": self.search_engine.is_connected,
             "reranker_available": self.reranker.is_available,
             "weaviate_url": WEAVIATE_URL,
+            "weaviate_version": "v4",
             "voyage_api_configured": bool(VOYAGE_API_KEY),
             "nli_model": NLI_MODEL_PATH
         }
@@ -811,6 +792,15 @@ class RAGEngine:
             status["intent_processor_loaded"] = False
         
         return status
+    
+    async def cleanup(self):
+        """Nettoyage des ressources"""
+        try:
+            if self.search_engine:
+                self.search_engine.close()
+            logger.info("RAG Engine v4 nettoyé")
+        except Exception as e:
+            logger.error(f"Erreur nettoyage RAG Engine: {e}")
 
 # Fonctions utilitaires pour l'intégration dans main.py
 async def create_rag_engine(openai_client: OpenAI) -> RAGEngine:
