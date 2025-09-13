@@ -214,21 +214,37 @@ class InteliaRAGEngine:
     
     async def _build_query_engine(self):
         """Construction du query engine avec votre intelligence métier"""
-        
-        # Vector store LlamaIndex sur votre collection existante
-        self.vector_store = WeaviateVectorStore(
-            weaviate_client=self.weaviate_client,
-            class_name="InteliaKnowledge"  # Votre collection existante
-        )
-        
-        # Index à partir de votre vector store
-        self.index = VectorStoreIndex.from_vector_store(self.vector_store)
-        
-        # Retriever personnalisé avec votre intelligence métier
-        base_retriever = VectorIndexRetriever(
-            index=self.index,
-            similarity_top_k=RAG_SIMILARITY_TOP_K
-        )
+
+	# Vector store LlamaIndex forçant l'utilisation de votre collection
+	try:
+    		# Vérifier d'abord que votre collection existe
+    		collection = self.weaviate_client.collections.get("InteliaKnowledge")
+    		logger.info("Collection InteliaKnowledge trouvée - utilisation des données existantes")
+    
+    		self.vector_store = WeaviateVectorStore(
+        		weaviate_client=self.weaviate_client,
+        		class_name="InteliaKnowledge"
+    		)
+    
+    		# CORRECTION CRITIQUE: Forcer LlamaIndex à ne pas créer de nouvelle collection
+    		self.vector_store._class_name = "InteliaKnowledge"
+    
+	except Exception as e:
+    		logger.warning(f"Collection InteliaKnowledge non accessible: {e}")
+    		logger.info("LlamaIndex va créer une nouvelle collection - données vides")
+    		self.vector_store = WeaviateVectorStore(
+        		weaviate_client=self.weaviate_client,
+        		class_name="InteliaKnowledge"
+    		)
+
+	# Index à partir de votre vector store
+	self.index = VectorStoreIndex.from_vector_store(self.vector_store)
+
+	# Retriever personnalisé avec votre intelligence métier
+	base_retriever = VectorIndexRetriever(
+    		index=self.index,
+    		similarity_top_k=RAG_SIMILARITY_TOP_K
+	)
         
         # Wrapper avec votre logique métier
         poultry_retriever = PoultryFilteredRetriever(
