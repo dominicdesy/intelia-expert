@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 """
+
 rag_engine.py - Module RAG hybride pour Intelia Expert
+
 Intégration: Classification NLI + Recherche hybride + Reranking VoyageAI + Génération contextuelle
+
 Version corrigée avec Weaviate v4 et schéma complet
+
 """
 
 import os
