@@ -8,31 +8,31 @@ httpx==0.27.2
 httpcore==1.0.5
 
 # LlamaIndex versions COMPATIBLES - Résolution du conflit de dépendances
-llama-index-core==0.13.0  # Version minimum requise par weaviate 1.4.1
-llama-index-vector-stores-weaviate==1.4.1  # Version la plus récente disponible
-llama-index-embeddings-openai==0.2.0  # Version compatible avec core 0.13.0
-llama-index-llms-openai==0.2.0  # Version compatible avec core 0.13.0
+llama-index-core==0.13.0
+llama-index-vector-stores-weaviate==1.4.1
+llama-index-embeddings-openai==0.2.0
+llama-index-llms-openai==0.2.0
 
-# Weaviate Client v3 (DERNIÈRE VERSION STABLE v3)
-weaviate-client==3.26.7
+# Weaviate Client - Version mise à jour pour compatibilité LlamaIndex
+weaviate-client==4.5.7
 
 # Intelligence métier préservée - Python 3.13 compatible
 langdetect==1.0.9
-transformers==4.46.0  # Version compatible Python 3.13
-torch>=2.0.0  # Version compatible Python 3.13
+transformers==4.46.0
+torch>=2.0.0
 
 # APIs externes - VERSION COMPATIBLE avec LlamaIndex
-openai==1.42.0  # Version mise à jour pour compatibilité
+openai==1.42.0
 
 # VoyageAI pour reranking amélioré (optionnel mais recommandé)
 voyageai==0.3.5
 
 # Cross-encoder pour reranking multi-stage (optionnel)
-sentence-transformers==3.3.1  # Version compatible Python 3.13
+sentence-transformers==3.3.1
 
 # Utilitaires optimisés
-numpy>=1.24.0  # Compatible Python 3.13
-scipy>=1.11.0  # Compatible Python 3.13
+numpy>=1.24.0
+scipy>=1.11.0
 
 # Monitoring et métriques (optionnel)
 prometheus-client==0.20.0
@@ -41,7 +41,7 @@ prometheus-client==0.20.0
 structlog==23.2.0
 
 # Support pour formats de fichiers étendus (si nécessaire)
-pandas>=2.0.0  # Compatible Python 3.13
+pandas>=2.0.0
 openpyxl==3.1.2
 
 # Sécurité et validation améliorée
@@ -53,17 +53,17 @@ redis==5.0.1
 hiredis==2.3.2
 
 # Tests et qualité (développement)
-pytest==8.3.3  # Version compatible Python 3.13
-pytest-asyncio==0.24.0  # Version compatible Python 3.13
-black==24.10.0  # Version compatible Python 3.13
-flake8==7.1.1  # Version compatible Python 3.13
+pytest==8.3.3
+pytest-asyncio==0.24.0
+black==24.10.0
+flake8==7.1.1
 
 # Documentation (optionnel)
-mkdocs==1.6.1  # Version compatible Python 3.13
-mkdocs-material==9.5.44  # Version compatible Python 3.13
+mkdocs==1.6.1
+mkdocs-material==9.5.44
 
 # Ajouts pour Agent RAG
-dataclasses-json==0.6.7  # Version compatible Python 3.13
+dataclasses-json==0.6.7
 asyncio-throttle==1.0.2
 
 # Fix pour compatibilité Python 3.13
