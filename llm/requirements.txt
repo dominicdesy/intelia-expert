@@ -1,10 +1,10 @@
-# Versions corrigées et TESTÉES pour compatibilité - Python 3.13 compatible (RÉSOLUTION CONFLIT)
+# Versions corrigées et TESTÉES pour compatibilité - Python 3.13 compatible (RÉSOLUTION FINALE)
 
 # Core FastAPI - Versions optimisées
 fastapi==0.112.2
 uvicorn[standard]==0.30.6
 python-dotenv==1.0.1
-httpx==0.27.2
+httpx==0.27.0
 httpcore==1.0.5
 
 # LlamaIndex versions COMPATIBLES - Résolution du conflit de dépendances
@@ -13,8 +13,8 @@ llama-index-vector-stores-weaviate==1.4.1
 llama-index-embeddings-openai==0.5.1
 llama-index-llms-openai==0.5.1
 
-# Weaviate Client v3 (DERNIÈRE VERSION STABLE v3)
-weaviate-client==3.26.7
+# Weaviate Client v4 - Version REQUISE pour compatibilité LlamaIndex
+weaviate-client==4.5.7
 
 # Intelligence métier préservée - Python 3.13 compatible
 langdetect==1.0.9
@@ -54,3 +54,17 @@ hiredis==2.3.2
 
 # Tests et qualité (développement)
 pytest==8.3.3
+pytest-asyncio==0.24.0
+black==24.10.0
+flake8==7.1.1
+
+# Documentation (optionnel)
+mkdocs==1.6.1
+mkdocs-material==9.5.44
+
+# Ajouts pour Agent RAG
+dataclasses-json==0.6.7
+asyncio-throttle==1.0.2
+
+# Fix pour compatibilité Python 3.13
+typing-extensions>=4.8.0
