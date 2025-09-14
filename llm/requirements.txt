@@ -5,11 +5,12 @@ python-dotenv==1.0.1
 
 # LlamaIndex Core avec versions compatibles stables
 # Migration vers 0.14.x pour compatibilité avec weaviate 1.4.1
+llama-index==0.14.0
 llama-index-core==0.14.1
 
 # LlamaIndex Vector Stores et Embeddings - versions compatibles avec 0.14.x
 llama-index-vector-stores-weaviate==1.4.1
-llama-index-embeddings-openai==0.5.1
+llama-index-embeddings-openai==0.3.11
 llama-index-llms-openai==0.5.6
 
 # Weaviate Client v4 (nouvelle version stable)
@@ -44,7 +45,7 @@ pandas==2.0.3
 openpyxl==3.1.2
 
 # Sécurité et validation améliorée
-pydantic==2.5.3
+pydantic>=2.8.0,<3.0.0
 email-validator==2.1.0
 
 # Cache et performance (optionnel)
