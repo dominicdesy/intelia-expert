@@ -2,6 +2,7 @@
 """
 rag_engine.py - RAG Engine amélioré avec LlamaIndex
 Préserve votre intelligence métier avec améliorations de performance
+Version corrigée pour compatibilité Weaviate
 """
 
 import os
@@ -19,11 +20,55 @@ from llama_index.core import VectorStoreIndex, Settings, get_response_synthesize
 from llama_index.core.retrievers import VectorIndexRetriever
 from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.postprocessor import SimilarityPostprocessor
-from llama_index.vector_stores.weaviate import WeaviateVectorStore
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.openai import OpenAI as LlamaOpenAI
 from llama_index.core.schema import QueryBundle, NodeWithScore
 from llama_index.core.base.base_retriever import BaseRetriever
+
+# Import Weaviate avec gestion des versions et erreurs
+try:
+    import weaviate
+    # Vérifier la version de weaviate
+    weaviate_version = getattr(weaviate, '__version__', '4.0.0')
+    
+    if weaviate_version.startswith('4.'):
+        # Version 4.x - nouvelle API
+        try:
+            import weaviate.classes as wvc
+            WEAVIATE_V4 = True
+        except ImportError:
+            wvc = None
+            WEAVIATE_V4 = False
+    else:
+        # Version 3.x - ancienne API
+        WEAVIATE_V4 = False
+        wvc = None
+    
+    WEAVIATE_AVAILABLE = True
+    print(f"Weaviate {weaviate_version} détecté (V4: {WEAVIATE_V4})")
+    
+except ImportError as e:
+    WEAVIATE_AVAILABLE = False
+    WEAVIATE_V4 = False
+    wvc = None
+    weaviate = None
+    print(f"WARNING: Weaviate non disponible: {e}")
+
+# Import LlamaIndex Weaviate avec fallback
+try:
+    from llama_index.vector_stores.weaviate import WeaviateVectorStore
+    LLAMAINDEX_WEAVIATE_AVAILABLE = True
+    print("LlamaIndex WeaviateVectorStore chargé avec succès")
+except ImportError as e1:
+    try:
+        # Fallback pour ancienne structure
+        from llama_index.vector_stores import WeaviateVectorStore
+        LLAMAINDEX_WEAVIATE_AVAILABLE = True
+        print("LlamaIndex WeaviateVectorStore chargé (fallback)")
+    except ImportError as e2:
+        LLAMAINDEX_WEAVIATE_AVAILABLE = False
+        WeaviateVectorStore = None
+        print(f"WARNING: LlamaIndex WeaviateVectorStore non disponible. Erreurs: {e1}, {e2}")
 
 # OpenAI import pour compatibilité
 from openai import OpenAI
@@ -38,10 +83,6 @@ except ImportError:
 
 # Vos imports métier (préservés intégralement)
 from intent_processor import create_intent_processor, IntentType, IntentResult
-
-# Configuration Weaviate (réutilise votre setup)
-import weaviate
-import weaviate.classes as wvc
 
 logger = logging.getLogger(__name__)
 
@@ -575,6 +616,11 @@ class InteliaRAGEngine:
             
         logger.info("Initialisation Intelia RAG Engine Enhanced avec LlamaIndex...")
         
+        # Vérifier les dépendances critiques
+        if not WEAVIATE_AVAILABLE or not LLAMAINDEX_WEAVIATE_AVAILABLE:
+            logger.warning(f"Weaviate non disponible - RAG désactivé. WEAVIATE_AVAILABLE: {WEAVIATE_AVAILABLE}, LLAMAINDEX_WEAVIATE_AVAILABLE: {LLAMAINDEX_WEAVIATE_AVAILABLE}")
+            return RAGResult(source=RAGSource.FALLBACK_NEEDED)
+        
         # Configuration globale LlamaIndex
         Settings.llm = LlamaOpenAI(
             model="gpt-4o-mini",
@@ -613,107 +659,197 @@ class InteliaRAGEngine:
         logger.info("RAG Engine Enhanced initialisé avec succès")
     
     async def _connect_weaviate(self):
-        """Connexion à votre instance Weaviate existante"""
+        """Connexion à votre instance Weaviate existante - version corrigée"""
+        
+        # Vérifier si Weaviate est disponible
+        if not WEAVIATE_AVAILABLE or not LLAMAINDEX_WEAVIATE_AVAILABLE:
+            raise Exception(
+                f"Weaviate non disponible. WEAVIATE_AVAILABLE: {WEAVIATE_AVAILABLE}, "
+                f"LLAMAINDEX_WEAVIATE_AVAILABLE: {LLAMAINDEX_WEAVIATE_AVAILABLE}"
+            )
+        
         try:
-            if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
-                # Cloud connection
-                auth_credentials = wvc.init.Auth.api_key(WEAVIATE_API_KEY)
-                self.weaviate_client = weaviate.connect_to_weaviate_cloud(
-                    cluster_url=WEAVIATE_URL,
-                    auth_credentials=auth_credentials,
-                    headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
-                )
+            if WEAVIATE_V4:
+                # Version 4.x - nouvelle API
+                if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
+                    # Cloud connection
+                    if wvc:
+                        auth_credentials = wvc.init.Auth.api_key(WEAVIATE_API_KEY)
+                        self.weaviate_client = weaviate.connect_to_weaviate_cloud(
+                            cluster_url=WEAVIATE_URL,
+                            auth_credentials=auth_credentials,
+                            headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
+                        )
+                    else:
+                        raise Exception("weaviate.classes (wvc) non disponible pour connexion cloud")
+                else:
+                    # Local connection v4
+                    host = WEAVIATE_URL.replace('http://', '').replace('https://', '')
+                    port = 8080
+                    if ':' in host:
+                        host, port = host.split(':')
+                        port = int(port)
+                    
+                    self.weaviate_client = weaviate.connect_to_local(
+                        host=host,
+                        port=port,
+                        headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
+                    )
             else:
-                # Local connection - gestion améliorée des erreurs
-                host = WEAVIATE_URL.replace('http://', '').replace('https://', '')
-                port = 8080
-                if ':' in host:
-                    host, port = host.split(':')
-                    port = int(port)
-                
-                self.weaviate_client = weaviate.connect_to_local(
-                    host=host,
-                    port=port,
-                    headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
-                )
+                # Version 3.x - ancienne API (compatibilité)
+                if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
+                    # Cloud connection v3
+                    auth_config = weaviate.AuthClientPassword(
+                        username="", 
+                        password=WEAVIATE_API_KEY
+                    ) if WEAVIATE_API_KEY else None
+                    
+                    self.weaviate_client = weaviate.Client(
+                        url=WEAVIATE_URL,
+                        auth_client_secret=auth_config,
+                        additional_headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
+                    )
+                else:
+                    # Local connection v3
+                    self.weaviate_client = weaviate.Client(
+                        url=WEAVIATE_URL,
+                        additional_headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
+                    )
             
-            if self.weaviate_client.is_ready():
-                logger.info("Connexion Weaviate établie")
+            # Vérifier la connexion
+            if hasattr(self.weaviate_client, 'is_ready'):
+                if self.weaviate_client.is_ready():
+                    logger.info(f"Connexion Weaviate établie (Version {weaviate_version})")
+                else:
+                    raise Exception("Weaviate not ready")
             else:
-                raise Exception("Weaviate not ready")
-                
+                # Pour v3, pas de méthode is_ready(), tester avec schema
+                try:
+                    self.weaviate_client.schema.get()
+                    logger.info(f"Connexion Weaviate v3 établie")
+                except Exception:
+                    raise Exception("Weaviate v3 connection failed")
+                    
         except Exception as e:
             logger.error(f"Erreur connexion Weaviate: {e}")
+            # Désactiver le RAG plutôt que de crasher
+            logger.warning("RAG désactivé à cause de l'erreur Weaviate")
+            self.weaviate_client = None
             raise
     
     async def _build_enhanced_query_engine(self):
-        """Construction du query engine avec intelligence métier améliorée"""
+        """Construction du query engine avec intelligence métier améliorée - version corrigée"""
+        
+        # Vérifier que Weaviate est disponible
+        if not self.weaviate_client or not LLAMAINDEX_WEAVIATE_AVAILABLE:
+            logger.warning("Weaviate non disponible - Query engine désactivé")
+            self.query_engine = None
+            return
         
         # Vector store LlamaIndex avec votre collection
         try:
-            collection = self.weaviate_client.collections.get("InteliaKnowledge")
-            logger.info("Collection InteliaKnowledge trouvée - utilisation des données existantes")
+            if WEAVIATE_V4:
+                # Version 4.x - nouvelle API
+                try:
+                    collection = self.weaviate_client.collections.get("InteliaKnowledge")
+                    logger.info("Collection InteliaKnowledge trouvée - utilisation des données existantes")
+                except Exception as e:
+                    logger.warning(f"Collection InteliaKnowledge non accessible (v4): {e}")
+            else:
+                # Version 3.x - vérifier avec schema
+                try:
+                    schema = self.weaviate_client.schema.get()
+                    classes = [cls['class'] for cls in schema.get('classes', [])]
+                    if "InteliaKnowledge" in classes:
+                        logger.info("Collection InteliaKnowledge trouvée (v3) - utilisation des données existantes")
+                    else:
+                        logger.warning("Collection InteliaKnowledge non trouvée dans le schéma v3")
+                except Exception as e:
+                    logger.warning(f"Erreur accès schéma v3: {e}")
         
-            self.vector_store = WeaviateVectorStore(
-                weaviate_client=self.weaviate_client,
-                class_name="InteliaKnowledge"
-            )
-            
-            # Forcer l'utilisation de votre collection
-            self.vector_store._class_name = "InteliaKnowledge"
+            # Créer le vector store avec la classe appropriée
+            if WEAVIATE_V4:
+                self.vector_store = WeaviateVectorStore(
+                    weaviate_client=self.weaviate_client,
+                    index_name="InteliaKnowledge"  # v4 utilise index_name
+                )
+            else:
+                self.vector_store = WeaviateVectorStore(
+                    weaviate_client=self.weaviate_client,
+                    class_name="InteliaKnowledge"  # v3 utilise class_name
+                )
         
         except Exception as e:
-            logger.warning(f"Collection InteliaKnowledge non accessible: {e}")
-            self.vector_store = WeaviateVectorStore(
-                weaviate_client=self.weaviate_client,
-                class_name="InteliaKnowledge"
-            )
+            logger.error(f"Erreur création vector store: {e}")
+            # Créer un vector store par défaut
+            if WEAVIATE_V4:
+                self.vector_store = WeaviateVectorStore(
+                    weaviate_client=self.weaviate_client,
+                    index_name="InteliaKnowledge"
+                )
+            else:
+                self.vector_store = WeaviateVectorStore(
+                    weaviate_client=self.weaviate_client,
+                    class_name="InteliaKnowledge"
+                )
 
         # Index avec recherche hybride activée
-        self.index = VectorStoreIndex.from_vector_store(
-            self.vector_store,
-            show_progress=False
-        )
+        try:
+            self.index = VectorStoreIndex.from_vector_store(
+                self.vector_store,
+                show_progress=False
+            )
 
-        # Retriever personnalisé avec reranking amélioré
-        base_retriever = VectorIndexRetriever(
-            index=self.index,
-            similarity_top_k=RAG_SIMILARITY_TOP_K
-        )
-        
-        # Wrapper avec votre logique métier améliorée
-        enhanced_retriever = PoultryFilteredRetriever(
-            base_retriever=base_retriever,
-            intent_processor=self.intent_processor,
-            reranker=self.reranker
-        )
-        
-        # Post-processor adaptatif
-        postprocessor = SimilarityPostprocessor(
-            similarity_cutoff=RAG_CONFIDENCE_THRESHOLD
-        )
-        
-        # Response synthesizer avec prompts améliorés
-        synthesizer = get_response_synthesizer(
-            response_mode="compact",
-            use_async=True,
-            streaming=False
-        )
-        
-        # Query engine final amélioré
-        self.query_engine = RetrieverQueryEngine(
-            retriever=enhanced_retriever,
-            response_synthesizer=synthesizer,
-            node_postprocessors=[postprocessor]
-        )
-        
-        logger.info("Query engine amélioré construit avec intelligence métier")
+            # Retriever personnalisé avec reranking amélioré
+            base_retriever = VectorIndexRetriever(
+                index=self.index,
+                similarity_top_k=RAG_SIMILARITY_TOP_K
+            )
+            
+            # Wrapper avec votre logique métier améliorée
+            enhanced_retriever = PoultryFilteredRetriever(
+                base_retriever=base_retriever,
+                intent_processor=self.intent_processor,
+                reranker=self.reranker
+            )
+            
+            # Post-processor adaptatif
+            postprocessor = SimilarityPostprocessor(
+                similarity_cutoff=RAG_CONFIDENCE_THRESHOLD
+            )
+            
+            # Response synthesizer avec prompts améliorés
+            synthesizer = get_response_synthesizer(
+                response_mode="compact",
+                use_async=True,
+                streaming=False
+            )
+            
+            # Query engine final amélioré
+            self.query_engine = RetrieverQueryEngine(
+                retriever=enhanced_retriever,
+                response_synthesizer=synthesizer,
+                node_postprocessors=[postprocessor]
+            )
+            
+            logger.info("Query engine amélioré construit avec intelligence métier")
+            
+        except Exception as e:
+            logger.error(f"Erreur construction query engine: {e}")
+            self.query_engine = None
     
     async def process_query(self, query: str, language: str = "fr", tenant_id: str = "") -> RAGResult:
         """Interface compatible avec votre système actuel - version améliorée"""
         
         if not RAG_ENABLED or not self.is_initialized:
             return RAGResult(source=RAGSource.FALLBACK_NEEDED)
+        
+        # Si pas de query engine (Weaviate indisponible), fallback
+        if not self.query_engine:
+            return RAGResult(
+                source=RAGSource.FALLBACK_NEEDED,
+                metadata={"reason": "weaviate_unavailable"}
+            )
         
         start_time = time.time()
         
@@ -804,7 +940,9 @@ class InteliaRAGEngine:
             
             # Construction des métadonnées enrichies
             metadata = {
-                "llama_index_version": "0.10.57",
+                "llama_index_version": "0.14.1",
+                "weaviate_version": weaviate_version if WEAVIATE_AVAILABLE else "N/A",
+                "weaviate_v4": WEAVIATE_V4,
                 "query_expanded": search_query != query,
                 "conversation_context_used": bool(conversation_context),
                 "nodes_used": len(response.source_nodes) if hasattr(response, 'source_nodes') else 0,
@@ -892,12 +1030,16 @@ class InteliaRAGEngine:
         """Status amélioré avec diagnostics détaillés"""
         weaviate_connected = (
             self.weaviate_client is not None and 
-            self.weaviate_client.is_ready() if self.weaviate_client else False
+            (self.weaviate_client.is_ready() if hasattr(self.weaviate_client, 'is_ready') else True)
         )
         
         return {
             "rag_enabled": RAG_ENABLED,
             "initialized": self.is_initialized,
+            "weaviate_available": WEAVIATE_AVAILABLE,
+            "weaviate_version": weaviate_version if WEAVIATE_AVAILABLE else "N/A",
+            "weaviate_v4": WEAVIATE_V4,
+            "llamaindex_weaviate_available": LLAMAINDEX_WEAVIATE_AVAILABLE,
             "weaviate_connected": weaviate_connected,
             "intent_processor_loaded": self.intent_processor is not None,
             "ood_detector_loaded": self.ood_detector is not None,
@@ -905,7 +1047,6 @@ class InteliaRAGEngine:
             "voyage_reranking": VOYAGE_AVAILABLE and VOYAGE_API_KEY is not None,
             "verification_enabled": RAG_VERIFICATION_ENABLED,
             "conversation_memory_active": self.conversation_memory is not None,
-            "llama_index_version": "0.10.57",
             "query_engine_ready": self.query_engine is not None,
             "confidence_threshold": RAG_CONFIDENCE_THRESHOLD,
             "similarity_top_k": RAG_SIMILARITY_TOP_K,
@@ -923,7 +1064,8 @@ class InteliaRAGEngine:
                 "adaptive_confidence_scoring",
                 "diversity_filtering",
                 "contextual_query_expansion",
-                "real_time_verification"
+                "real_time_verification",
+                "weaviate_version_compatibility"
             ]
         }
     
@@ -931,7 +1073,8 @@ class InteliaRAGEngine:
         """Nettoyage des ressources amélioré"""
         try:
             if self.weaviate_client:
-                self.weaviate_client.close()
+                if hasattr(self.weaviate_client, 'close'):
+                    self.weaviate_client.close()
             
             if self.conversation_memory:
                 self.conversation_memory.memory_store.clear()
