@@ -1,19 +1,18 @@
+# Versions corrigées et TESTÉES pour compatibilité
+
 # Core FastAPI - Versions optimisées
 fastapi==0.112.2
 uvicorn[standard]==0.30.6
 python-dotenv==1.0.1
 
-# LlamaIndex Core avec versions compatibles stables
-# Migration vers 0.14.x pour compatibilité avec weaviate 1.4.1
-llama-index-core==0.14.1
+# LlamaIndex versions COMPATIBLES avec Weaviate v3
+llama-index-core==0.10.57
+llama-index-vector-stores-weaviate==0.1.13
+llama-index-embeddings-openai==0.1.10
+llama-index-llms-openai==0.1.25
 
-# LlamaIndex Vector Stores et Embeddings - versions compatibles avec 0.14.x
-llama-index-vector-stores-weaviate==1.4.1
-llama-index-embeddings-openai==0.5.1
-llama-index-llms-openai==0.5.6
-
-# Weaviate Client v4 (nouvelle version stable)
-weaviate-client==4.6.7
+# Weaviate Client v3 (DERNIÈRE VERSION STABLE v3)
+weaviate-client==3.26.7
 
 # Intelligence métier préservée
 langdetect==1.0.9
