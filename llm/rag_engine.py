@@ -3,6 +3,7 @@
 rag_engine.py - RAG Engine amélioré avec LlamaIndex
 Préserve votre intelligence métier avec améliorations de performance
 Version corrigée pour compatibilité et gestion d'erreurs robuste
+Fix httpx >= 0.28 pour éviter les crashes de proxy
 """
 
 import os
@@ -14,6 +15,7 @@ from typing import Dict, List, Optional, Any, Tuple, Union
 from dataclasses import dataclass
 from enum import Enum
 import numpy as np
+import httpx  # ⬅️ AJOUT pour fix proxy
 
 # Configuration de logging améliorée
 logger = logging.getLogger(__name__)
@@ -178,6 +180,24 @@ RAG_CHUNK_OVERLAP = int(os.getenv("RAG_CHUNK_OVERLAP", "200"))
 RAG_RERANK_TOP_K = int(os.getenv("RAG_RERANK_TOP_K", "8"))
 RAG_HYBRID_ALPHA = float(os.getenv("RAG_HYBRID_ALPHA", "0.7"))
 RAG_VERIFICATION_ENABLED = os.getenv("RAG_VERIFICATION_ENABLED", "true").lower() == "true"
+
+
+def _build_openai_client() -> OpenAI:   # ⬅️ AJOUT pour fix proxy
+    """
+    Construit un client OpenAI avec un httpx.Client explicite, sans proxies implicites.
+    Évite le crash avec httpx >= 0.28 où les proxies par défaut peuvent causer des erreurs.
+    
+    Si vous devez absolument utiliser un proxy, remplacez la ligne httpx.Client(...) par:
+        httpx.Client(proxies=os.getenv("OPENAI_HTTP_PROXY") or os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY"), timeout=30.0)
+    """
+    try:
+        # Client httpx sans proxies automatiques pour éviter les crashes
+        http_client = httpx.Client(timeout=30.0)  # pas d'argument 'proxies' -> évite le crash
+        return OpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
+    except Exception as e:
+        logger.warning(f"Erreur création client OpenAI avec httpx personnalisé: {e}")
+        # Fallback vers client OpenAI standard
+        return OpenAI(api_key=OPENAI_API_KEY)
 
 
 class RAGSource(Enum):
@@ -721,10 +741,11 @@ class PoultryFilteredRetriever:
 
 
 class InteliaRAGEngine:
-    """Engine RAG principal utilisant LlamaIndex avec votre intelligence métier - Version robuste"""
+    """Engine RAG principal utilisant LlamaIndex avec votre intelligence métier - Version robuste avec fix httpx"""
     
     def __init__(self, openai_client: OpenAI = None):
-        self.openai_client = openai_client or OpenAI(api_key=OPENAI_API_KEY)
+        # ⬇️ Remplace l'appel direct par la fabrique qui neutralise les proxies implicites
+        self.openai_client = openai_client or _build_openai_client()
         self.intent_processor = None
         self.ood_detector = None
         self.reranker = None
@@ -1149,7 +1170,8 @@ class InteliaRAGEngine:
                 "nodes_used": len(response.source_nodes) if hasattr(response, 'source_nodes') else 0,
                 "processing_time": time.time() - start_time,
                 "reranking_applied": len(context_docs) > 1,
-                "verification_enabled": RAG_VERIFICATION_ENABLED
+                "verification_enabled": RAG_VERIFICATION_ENABLED,
+                "httpx_proxy_fix_applied": True  # ⬅️ Indicateur du fix
             }
             
             if intent_result:
@@ -1268,6 +1290,7 @@ class InteliaRAGEngine:
                 "rerank_top_k": RAG_RERANK_TOP_K,
                 "hybrid_alpha": RAG_HYBRID_ALPHA,
                 "graceful_fallback_available": True,
+                "httpx_proxy_fix_applied": True,  # ⬅️ Indicateur du fix
                 "features": [
                     "enhanced_ood_detection",
                     "multi_stage_reranking", 
@@ -1281,7 +1304,8 @@ class InteliaRAGEngine:
                     "real_time_verification",
                     "weaviate_version_compatibility",
                     "robust_error_handling",
-                    "graceful_degradation"
+                    "graceful_degradation",
+                    "httpx_proxy_crash_protection"  # ⬅️ Nouvelle feature
                 ]
             }
         except Exception as e:
@@ -1308,6 +1332,13 @@ class InteliaRAGEngine:
                     self.conversation_memory.memory_store.clear()
                 except Exception as e:
                     logger.warning(f"Erreur nettoyage mémoire: {e}")
+            
+            # Fermer le client httpx si nécessaire
+            try:
+                if hasattr(self.openai_client, 'http_client') and hasattr(self.openai_client.http_client, 'close'):
+                    await self.openai_client.http_client.aclose()
+            except Exception as e:
+                logger.warning(f"Erreur fermeture httpx client: {e}")
             
             logger.info("RAG Engine Enhanced nettoyé")
         except Exception as e:
