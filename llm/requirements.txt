@@ -4,16 +4,16 @@
 fastapi==0.112.2
 uvicorn[standard]==0.30.6
 python-dotenv==1.0.1
-httpx==0.27.0  # Mis à jour pour résoudre le conflit avec weaviate-client
+httpx==0.27.0
 httpcore==1.0.5
 
 # LlamaIndex versions COMPATIBLES - Résolution du conflit de dépendances
 llama-index-core==0.13.0
 llama-index-vector-stores-weaviate==1.4.1
-llama-index-embeddings-openai==0.2.0
+llama-index-embeddings-openai==0.13.1 # Version mise à jour pour compatibilité
 llama-index-llms-openai==0.2.0
 
-# Weaviate Client - Version mise à jour pour compatibilité LlamaIndex
+# Weaviate Client v3 (DERNIÈRE VERSION STABLE v3)
 weaviate-client==4.5.7
 
 # Intelligence métier préservée - Python 3.13 compatible
