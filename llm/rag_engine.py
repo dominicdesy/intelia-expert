@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-rag_engine.py - RAG Engine amélioré avec LlamaIndex
-Préserve votre intelligence métier avec améliorations de performance
-Version Python 3.13 compatible avec gestion d'erreurs robuste
-Fix httpx >= 0.28 et LlamaIndex LLM workaround
+rag_engine.py - RAG Engine avec OpenAI + Weaviate Direct
+Sans LlamaIndex - Zéro conflit de dépendances
+Version Production-Ready Python 3.13
 """
 
 import os
@@ -17,17 +16,15 @@ from enum import Enum
 import numpy as np
 import httpx
 
-# Configuration de logging améliorée
+# Configuration logging
 logger = logging.getLogger(__name__)
 
-# Import Weaviate avec gestion des versions et erreurs
+# Import Weaviate
 try:
     import weaviate
-    # Vérifier la version de weaviate
     weaviate_version = getattr(weaviate, '__version__', '4.0.0')
     
     if weaviate_version.startswith('4.'):
-        # Version 4.x - nouvelle API
         try:
             import weaviate.classes as wvc
             WEAVIATE_V4 = True
@@ -35,7 +32,6 @@ try:
             wvc = None
             WEAVIATE_V4 = False
     else:
-        # Version 3.x - ancienne API
         WEAVIATE_V4 = False
         wvc = None
     
@@ -47,132 +43,36 @@ except ImportError as e:
     WEAVIATE_V4 = False
     wvc = None
     weaviate = None
-    logger.warning(f"Weaviate non disponible: {e}")
+    logger.error(f"Weaviate non disponible: {e}")
 
-# Tentatives d'import LlamaIndex avec fallbacks multiples - Python 3.13 compatible
-LLAMAINDEX_AVAILABLE = False
-LLAMAINDEX_WEAVIATE_AVAILABLE = False
-LLAMAINDEX_LLM_AVAILABLE = False
-LLAMAINDEX_EMBEDDINGS_AVAILABLE = False
-
-# Import LlamaIndex Core
+# OpenAI Client
 try:
-    from llama_index.core import VectorStoreIndex, Settings, get_response_synthesizer
-    from llama_index.core.retrievers import VectorIndexRetriever
-    from llama_index.core.query_engine import RetrieverQueryEngine
-    from llama_index.core.postprocessor import SimilarityPostprocessor
-    from llama_index.core.schema import QueryBundle, NodeWithScore
-    from llama_index.core.base.base_retriever import BaseRetriever
-    LLAMAINDEX_AVAILABLE = True
-    logger.info("LlamaIndex Core chargé avec succès")
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
 except ImportError as e:
-    logger.warning(f"LlamaIndex Core non disponible: {e}")
-    # Classes de fallback pour éviter les erreurs
-    class VectorStoreIndex:
-        @classmethod
-        def from_vector_store(cls, vector_store, **kwargs):
-            return cls()
-        
-    class Settings:
-        llm = None
-        embed_model = None
-        chunk_size = 1024
-        chunk_overlap = 200
-        
-    class BaseRetriever:
-        pass
-    class NodeWithScore:
-        pass
-    class QueryBundle:
-        pass
-    def get_response_synthesizer(**kwargs):
-        return None
+    OPENAI_AVAILABLE = False
+    logger.error(f"OpenAI non disponible: {e}")
 
-# Import LlamaIndex Embeddings avec fallback Python 3.13
-try:
-    from llama_index.embeddings.openai import OpenAIEmbedding
-    LLAMAINDEX_EMBEDDINGS_AVAILABLE = True
-    logger.info("LlamaIndex OpenAI Embeddings chargé")
-except ImportError:
-    try:
-        from llama_index.core.embeddings import OpenAIEmbedding
-        LLAMAINDEX_EMBEDDINGS_AVAILABLE = True
-        logger.info("LlamaIndex Core Embeddings chargé (fallback)")
-    except ImportError as e:
-        LLAMAINDEX_EMBEDDINGS_AVAILABLE = False
-        logger.warning(f"LlamaIndex Embeddings non disponible: {e}")
-        class OpenAIEmbedding:
-            def __init__(self, *args, **kwargs):
-                pass
-
-# Import LlamaIndex LLM avec fallbacks multiples - Python 3.13 compatible
-try:
-    from llama_index.llms.openai import OpenAI as LlamaOpenAI
-    LLAMAINDEX_LLM_AVAILABLE = True
-    logger.info("LlamaIndex OpenAI LLM chargé")
-except ImportError:
-    try:
-        from llama_index.core.llms.openai import OpenAI as LlamaOpenAI
-        LLAMAINDEX_LLM_AVAILABLE = True
-        logger.info("LlamaIndex Core OpenAI LLM chargé (fallback)")
-    except ImportError:
-        try:
-            from llama_index.core.llms import OpenAI as LlamaOpenAI
-            LLAMAINDEX_LLM_AVAILABLE = True
-            logger.info("LlamaIndex Core LLM chargé (fallback 2)")
-        except ImportError as e:
-            LLAMAINDEX_LLM_AVAILABLE = False
-            logger.warning(f"LlamaIndex LLM non disponible: {e}")
-            # Classe de fallback qui évite l'erreur abstract method
-            class LlamaOpenAI:
-                def __init__(self, *args, **kwargs):
-                    pass
-                def complete(self, *args, **kwargs):
-                    return None
-                def chat(self, *args, **kwargs):
-                    return None
-
-# Import LlamaIndex Weaviate avec fallback Python 3.13
-try:
-    from llama_index.vector_stores.weaviate import WeaviateVectorStore
-    LLAMAINDEX_WEAVIATE_AVAILABLE = True
-    logger.info("LlamaIndex WeaviateVectorStore chargé avec succès")
-except ImportError as e1:
-    try:
-        # Fallback pour ancienne structure
-        from llama_index.vector_stores import WeaviateVectorStore
-        LLAMAINDEX_WEAVIATE_AVAILABLE = True
-        logger.info("LlamaIndex WeaviateVectorStore chargé (fallback)")
-    except ImportError as e2:
-        LLAMAINDEX_WEAVIATE_AVAILABLE = False
-        logger.warning(f"LlamaIndex WeaviateVectorStore non disponible. Erreurs: {e1}, {e2}")
-        # Classe de fallback
-        class WeaviateVectorStore:
-            def __init__(self, *args, **kwargs):
-                pass
-
-# OpenAI import pour compatibilité
-from openai import OpenAI
-
-# VoyageAI pour reranking avancé
+# VoyageAI pour reranking
 try:
     import voyageai
     VOYAGE_AVAILABLE = True
 except ImportError:
     VOYAGE_AVAILABLE = False
-    logger.warning("VoyageAI not available - using basic reranking")
+    logger.warning("VoyageAI non disponible - reranking basique")
 
-# Vos imports métier (préservés intégralement)
+# Intelligence métier (préservée)
 try:
     from intent_processor import create_intent_processor, IntentType, IntentResult
     INTENT_PROCESSOR_AVAILABLE = True
 except ImportError as e:
     INTENT_PROCESSOR_AVAILABLE = False
     logger.warning(f"Intent processor non disponible: {e}")
-    # Classes de fallback
+    
     class IntentType:
         METRIC_QUERY = "metric_query"
         OUT_OF_DOMAIN = "out_of_domain"
+    
     class IntentResult:
         def __init__(self):
             self.intent_type = IntentType.METRIC_QUERY
@@ -181,53 +81,34 @@ except ImportError as e:
             self.expanded_query = ""
             self.metadata = {}
 
-# Configuration par variables d'environnement (améliorées)
+# Configuration
 RAG_ENABLED = os.getenv("RAG_ENABLED", "true").lower() == "true"
 WEAVIATE_URL = os.getenv("WEAVIATE_URL", "http://localhost:8080")
 WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY")
 
-# Paramètres RAG optimisés
+# Paramètres RAG
 RAG_SIMILARITY_TOP_K = int(os.getenv("RAG_SIMILARITY_TOP_K", "15"))
 RAG_CONFIDENCE_THRESHOLD = float(os.getenv("RAG_CONFIDENCE_THRESHOLD", "0.65"))
 RAG_CHUNK_SIZE = int(os.getenv("RAG_CHUNK_SIZE", "1024"))
 RAG_CHUNK_OVERLAP = int(os.getenv("RAG_CHUNK_OVERLAP", "200"))
-
-# Nouveaux paramètres pour optimisation
 RAG_RERANK_TOP_K = int(os.getenv("RAG_RERANK_TOP_K", "8"))
-RAG_HYBRID_ALPHA = float(os.getenv("RAG_HYBRID_ALPHA", "0.7"))
 RAG_VERIFICATION_ENABLED = os.getenv("RAG_VERIFICATION_ENABLED", "true").lower() == "true"
 
 
-def _build_openai_client() -> OpenAI:
-    """
-    Construit un client OpenAI avec un httpx.Client explicite, sans proxies implicites.
-    Compatible Python 3.13 et évite le crash avec httpx >= 0.28.
-    """
-    try:
-        # Client httpx sans proxies automatiques pour éviter les crashes
-        http_client = httpx.Client(timeout=30.0)
-        return OpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
-    except Exception as e:
-        logger.warning(f"Erreur création client OpenAI avec httpx personnalisé: {e}")
-        # Fallback vers client OpenAI standard
-        return OpenAI(api_key=OPENAI_API_KEY)
-
-
 class RAGSource(Enum):
-    """Sources de réponse (compatibilité avec votre système)"""
+    """Sources de réponse"""
     RAG_KNOWLEDGE = "rag_knowledge"
     RAG_VERIFIED = "rag_verified"
     OOD_FILTERED = "ood_filtered" 
     FALLBACK_NEEDED = "fallback_needed"
     ERROR = "error"
-    DEGRADED_MODE = "degraded_mode"
 
 
 @dataclass
 class RAGResult:
-    """Résultat RAG compatible avec votre système actuel - amélioré"""
+    """Résultat RAG"""
     source: RAGSource
     answer: Optional[str] = None
     confidence: float = 0.0
@@ -242,12 +123,153 @@ class RAGResult:
             self.context_docs = []
         if self.metadata is None:
             self.metadata = {}
-        if self.verification_status is None:
-            self.verification_status = {}
+
+
+@dataclass
+class Document:
+    """Document simple pour RAG"""
+    content: str
+    metadata: Dict = None
+    score: float = 0.0
+    
+    def __post_init__(self):
+        if self.metadata is None:
+            self.metadata = {}
+
+
+class OpenAIEmbedder:
+    """Wrapper pour OpenAI Embeddings"""
+    
+    def __init__(self, client: OpenAI, model: str = "text-embedding-3-small"):
+        self.client = client
+        self.model = model
+        
+    async def embed_query(self, text: str) -> List[float]:
+        """Créer embedding pour une requête"""
+        try:
+            response = await self.client.embeddings.create(
+                model=self.model,
+                input=text,
+                encoding_format="float"
+            )
+            return response.data[0].embedding
+        except Exception as e:
+            logger.error(f"Erreur embedding: {e}")
+            return []
+    
+    async def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        """Créer embeddings pour plusieurs documents"""
+        try:
+            response = await self.client.embeddings.create(
+                model=self.model,
+                input=texts,
+                encoding_format="float"
+            )
+            return [item.embedding for item in response.data]
+        except Exception as e:
+            logger.error(f"Erreur embeddings batch: {e}")
+            return []
+
+
+class WeaviateRetriever:
+    """Retriever Weaviate direct"""
+    
+    def __init__(self, client, collection_name: str = "InteliaKnowledge"):
+        self.client = client
+        self.collection_name = collection_name
+        self.is_v4 = WEAVIATE_V4
+        
+    async def search(self, query_vector: List[float], top_k: int = 10, where_filter: Dict = None) -> List[Document]:
+        """Recherche vectorielle dans Weaviate"""
+        try:
+            if self.is_v4:
+                return await self._search_v4(query_vector, top_k, where_filter)
+            else:
+                return await self._search_v3(query_vector, top_k, where_filter)
+        except Exception as e:
+            logger.error(f"Erreur recherche Weaviate: {e}")
+            return []
+    
+    async def _search_v4(self, query_vector: List[float], top_k: int, where_filter: Dict) -> List[Document]:
+        """Recherche Weaviate V4"""
+        try:
+            collection = self.client.collections.get(self.collection_name)
+            
+            query_params = {
+                "vector": query_vector,
+                "limit": top_k,
+                "return_metadata": ["score", "creation_time"]
+            }
+            
+            if where_filter:
+                query_params["where"] = where_filter
+            
+            response = collection.query.near_vector(**query_params)
+            
+            documents = []
+            for obj in response.objects:
+                doc = Document(
+                    content=obj.properties.get("content", ""),
+                    metadata={
+                        "title": obj.properties.get("title", ""),
+                        "source": obj.properties.get("source", ""),
+                        "geneticLine": obj.properties.get("geneticLine", ""),
+                        "species": obj.properties.get("species", ""),
+                        "creation_time": obj.metadata.creation_time if obj.metadata else None
+                    },
+                    score=obj.metadata.score if obj.metadata else 0.0
+                )
+                documents.append(doc)
+            
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Erreur recherche V4: {e}")
+            return []
+    
+    async def _search_v3(self, query_vector: List[float], top_k: int, where_filter: Dict) -> List[Document]:
+        """Recherche Weaviate V3"""
+        try:
+            query_builder = (
+                self.client.query
+                .get(self.collection_name, ["content", "title", "source", "geneticLine", "species"])
+                .with_near_vector({"vector": query_vector})
+                .with_limit(top_k)
+                .with_additional(["score", "id"])
+            )
+            
+            if where_filter:
+                query_builder = query_builder.with_where(where_filter)
+            
+            result = query_builder.do()
+            
+            documents = []
+            objects = result.get("data", {}).get("Get", {}).get(self.collection_name, [])
+            
+            for obj in objects:
+                score = obj.get("_additional", {}).get("score", 0.0)
+                doc = Document(
+                    content=obj.get("content", ""),
+                    metadata={
+                        "title": obj.get("title", ""),
+                        "source": obj.get("source", ""),
+                        "geneticLine": obj.get("geneticLine", ""),
+                        "species": obj.get("species", ""),
+                        "id": obj.get("_additional", {}).get("id")
+                    },
+                    score=float(score) if score else 0.0
+                )
+                documents.append(doc)
+            
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Erreur recherche V3: {e}")
+            return []
 
 
 class EnhancedOODDetector:
-    """Détecteur hors-domaine amélioré avec scoring multi-facteurs"""
+    """Détecteur hors-domaine"""
     
     def __init__(self, blocked_terms_path: str = None):
         self.blocked_terms = self._load_blocked_terms(blocked_terms_path)
@@ -261,7 +283,7 @@ class EnhancedOODDetector:
         }
         
     def _load_blocked_terms(self, path: str = None) -> Dict[str, List[str]]:
-        """Charge les termes bloqués depuis blocked_terms.json"""
+        """Charge les termes bloqués"""
         if path is None:
             base_dir = os.path.dirname(os.path.abspath(__file__))
             path = os.path.join(base_dir, "blocked_terms.json")
@@ -270,19 +292,19 @@ class EnhancedOODDetector:
             with open(path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
-            logger.error(f"Erreur chargement blocked_terms.json: {e}")
+            logger.warning(f"Erreur chargement blocked_terms.json: {e}")
             return {}
     
     def calculate_ood_score(self, query: str) -> Tuple[bool, float, Dict[str, float]]:
-        """Calcul de score OOD multi-facteurs amélioré"""
+        """Calcul score OOD"""
         query_lower = query.lower()
         words = query_lower.split()
         
-        # Score 1: Vocabulaire du domaine
+        # Score vocabulaire domaine
         domain_words = [word for word in words if word in self.domain_keywords]
         vocab_score = len(domain_words) / len(words) if words else 0.0
         
-        # Score 2: Termes bloqués avec pondération par catégorie
+        # Score termes bloqués
         blocked_score = 0.0
         blocked_categories = []
         
@@ -293,7 +315,8 @@ class EnhancedOODDetector:
                 category_penalty = min(1.0, category_matches / max(1, len(words) // 2))
                 blocked_score = max(blocked_score, category_penalty)
         
-        # Score 3: Patterns spécifiques hors-domaine
+        # Score patterns hors-domaine
+        import re
         ood_patterns = [
             r'\b(film|movie|cinema|série|series)\b',
             r'\b(football|sport|match)\b',
@@ -301,14 +324,13 @@ class EnhancedOODDetector:
             r'\b(crypto|bitcoin|bourse)\b'
         ]
         
-        import re
         pattern_score = 0.0
         for pattern in ood_patterns:
             if re.search(pattern, query_lower):
                 pattern_score = 1.0
                 break
         
-        # Fusion des scores avec logique adaptative
+        # Score final
         if blocked_score > 0.5:
             final_score = 0.9
         elif vocab_score > 0.3:
@@ -326,13 +348,11 @@ class EnhancedOODDetector:
             "final_score": final_score
         }
         
-        logger.debug(f"OOD Analysis: '{query}' -> in_domain={is_in_domain}, scores={score_details}")
-        
         return is_in_domain, final_score, score_details
 
 
 class MultiStageReranker:
-    """Système de reranking multi-étapes pour améliorer la pertinence"""
+    """Reranking multi-étapes"""
     
     def __init__(self):
         self.voyage_client = None
@@ -342,143 +362,106 @@ class MultiStageReranker:
                 logger.info("VoyageAI reranker initialisé")
             except Exception as e:
                 logger.warning(f"Erreur init VoyageAI: {e}")
-                self.voyage_client = None
     
-    async def rerank(self, query: str, results: List, intent_result = None) -> List:
-        """Reranking multi-étapes des résultats - version robuste"""
-        
-        if not results:
-            return results
+    async def rerank(self, query: str, documents: List[Document], intent_result=None) -> List[Document]:
+        """Reranking des documents"""
+        if not documents:
+            return documents
         
         try:
-            # Stage 1: VoyageAI semantic reranking (si disponible)
-            if self.voyage_client and len(results) > 2:
-                results = await self._voyage_rerank(query, results)
+            # Stage 1: VoyageAI semantic reranking
+            if self.voyage_client and len(documents) > 2:
+                documents = await self._voyage_rerank(query, documents)
             
-            # Stage 2: Intent-based boosting (votre logique métier préservée)
+            # Stage 2: Intent-based boosting
             if intent_result:
-                results = self._intent_boost(results, intent_result)
+                documents = self._intent_boost(documents, intent_result)
             
-            # Stage 3: Diversity filtering pour éviter la redondance
-            results = self._diversify_results(results)
+            # Stage 3: Diversity filtering
+            documents = self._diversify_results(documents)
             
-            return results[:RAG_RERANK_TOP_K]
+            return documents[:RAG_RERANK_TOP_K]
             
         except Exception as e:
             logger.error(f"Erreur reranking: {e}")
-            return results[:RAG_RERANK_TOP_K]
+            return documents[:RAG_RERANK_TOP_K]
     
-    async def _voyage_rerank(self, query: str, results: List) -> List:
-        """Reranking VoyageAI pour pertinence sémantique"""
+    async def _voyage_rerank(self, query: str, documents: List[Document]) -> List[Document]:
+        """Reranking VoyageAI"""
         try:
-            documents = []
-            for node in results:
-                if hasattr(node, 'text'):
-                    documents.append(node.text)
-                elif hasattr(node, 'content'):
-                    documents.append(node.content)
-                else:
-                    documents.append(str(node))
+            doc_texts = [doc.content for doc in documents]
             
             reranked = self.voyage_client.rerank(
                 query=query,
-                documents=documents,
+                documents=doc_texts,
                 model="rerank-1",
-                top_k=min(len(results), 12)
+                top_k=min(len(documents), 12)
             )
             
-            # Réorganiser selon les scores VoyageAI
-            reranked_results = []
+            reranked_docs = []
             for item in reranked.results:
-                original_node = results[item.index]
-                if hasattr(original_node, 'score'):
-                    try:
-                        original_score = float(original_node.score) if original_node.score is not None else 0.5
-                        combined_score = (original_score * 0.3 + item.relevance_score * 0.7)
-                        original_node.score = combined_score
-                    except (ValueError, TypeError):
-                        original_node.score = item.relevance_score
-                reranked_results.append(original_node)
+                original_doc = documents[item.index]
+                original_doc.score = (original_doc.score * 0.3 + item.relevance_score * 0.7)
+                reranked_docs.append(original_doc)
             
-            logger.debug(f"VoyageAI reranked {len(results)} -> {len(reranked_results)} results")
-            return reranked_results
+            return reranked_docs
             
         except Exception as e:
             logger.error(f"Erreur VoyageAI reranking: {e}")
-            return results
+            return documents
     
-    def _intent_boost(self, results: List, intent_result) -> List:
-        """Boost basé sur l'intention détectée (votre logique métier)"""
-        
-        for node in results:
+    def _intent_boost(self, documents: List[Document], intent_result) -> List[Document]:
+        """Boost basé sur l'intention"""
+        for doc in documents:
             boost_factor = 1.0
             
             try:
-                # Boost pour correspondance de lignée génétique
+                # Boost correspondance lignée
                 if hasattr(intent_result, 'detected_entities') and "line" in intent_result.detected_entities:
                     target_line = intent_result.detected_entities["line"].lower()
-                    if hasattr(node, 'metadata'):
-                        node_line = node.metadata.get("geneticLine", "").lower()
-                        if target_line in node_line or node_line in target_line:
-                            boost_factor *= 1.3
+                    doc_line = doc.metadata.get("geneticLine", "").lower()
+                    if target_line in doc_line or doc_line in target_line:
+                        boost_factor *= 1.3
                 
-                # Boost pour correspondance d'âge
+                # Boost correspondance âge
                 if hasattr(intent_result, 'detected_entities') and "age_days" in intent_result.detected_entities:
                     boost_factor *= 1.2
                 
-                # Boost pour type d'intention
-                if hasattr(intent_result, 'intent_type') and intent_result.intent_type == IntentType.METRIC_QUERY:
-                    # Privilégier les documents avec des données chiffrées
-                    text_content = getattr(node, 'text', '') or getattr(node, 'content', '')
-                    if any(char.isdigit() for char in text_content[:200]):
+                # Boost queries métriques
+                if (hasattr(intent_result, 'intent_type') and 
+                    intent_result.intent_type == IntentType.METRIC_QUERY):
+                    if any(char.isdigit() for char in doc.content[:200]):
                         boost_factor *= 1.1
                 
-                # Appliquer le boost
-                if hasattr(node, 'score') and node.score is not None:
-                    try:
-                        original_score = float(node.score)
-                        node.score = min(1.0, original_score * boost_factor)
-                    except (ValueError, TypeError):
-                        logger.warning(f"Score invalide pour boosting: {node.score}")
+                doc.score = min(1.0, doc.score * boost_factor)
                         
             except Exception as e:
                 logger.warning(f"Erreur intent boost: {e}")
-                continue
         
-        # Retrier par score
-        try:
-            return sorted(results, key=lambda x: getattr(x, 'score', 0.0), reverse=True)
-        except Exception as e:
-            logger.warning(f"Erreur tri par score: {e}")
-            return results
+        return sorted(documents, key=lambda x: x.score, reverse=True)
     
-    def _diversify_results(self, results: List) -> List:
-        """Filtrage de diversité pour éviter la redondance"""
-        if len(results) <= 3:
-            return results
+    def _diversify_results(self, documents: List[Document]) -> List[Document]:
+        """Filtrage diversité"""
+        if len(documents) <= 3:
+            return documents
         
         try:
-            diversified = [results[0]]  # Premier résultat toujours inclus
+            diversified = [documents[0]]
             
-            for candidate in results[1:]:
-                # Vérifier la similarité avec les résultats déjà sélectionnés
+            for candidate in documents[1:]:
                 is_diverse = True
-                candidate_text = (getattr(candidate, 'text', '') or getattr(candidate, 'content', '')).lower()
+                candidate_words = set(candidate.content.lower().split())
                 
                 for selected in diversified:
-                    selected_text = (getattr(selected, 'text', '') or getattr(selected, 'content', '')).lower()
+                    selected_words = set(selected.content.lower().split())
                     
-                    if candidate_text and selected_text:
-                        candidate_words = set(candidate_text.split())
-                        selected_words = set(selected_text.split())
+                    if candidate_words and selected_words:
+                        overlap = len(candidate_words.intersection(selected_words))
+                        similarity = overlap / min(len(candidate_words), len(selected_words))
                         
-                        if len(candidate_words) > 0 and len(selected_words) > 0:
-                            overlap = len(candidate_words.intersection(selected_words))
-                            similarity = overlap / min(len(candidate_words), len(selected_words))
-                            
-                            if similarity > 0.8:  # Trop similaire
-                                is_diverse = False
-                                break
+                        if similarity > 0.8:
+                            is_diverse = False
+                            break
                 
                 if is_diverse:
                     diversified.append(candidate)
@@ -487,31 +470,83 @@ class MultiStageReranker:
             
         except Exception as e:
             logger.warning(f"Erreur diversification: {e}")
-            return results
+            return documents
+
+
+class ResponseGenerator:
+    """Générateur de réponses avec OpenAI"""
+    
+    def __init__(self, client: OpenAI):
+        self.client = client
+    
+    async def generate_response(self, query: str, context_docs: List[Document], conversation_context: str = "") -> str:
+        """Génère une réponse basée sur le contexte"""
+        try:
+            # Construire le contexte
+            context_text = "\n\n".join([
+                f"Document {i+1}:\n{doc.content[:1000]}"
+                for i, doc in enumerate(context_docs[:5])
+            ])
+            
+            # Prompt système pour l'aviculture
+            system_prompt = """Tu es un expert en aviculture spécialisé dans l'aide aux éleveurs de volailles.
+
+INSTRUCTIONS:
+1. Réponds uniquement basé sur les documents fournis
+2. Sois précis et technique quand approprié
+3. Mentionne les lignées génétiques si pertinentes
+4. Fournis des données chiffrées quand disponibles
+5. Si les documents ne contiennent pas l'information, dis-le clairement
+
+DOMAINE: Aviculture, élevage de volailles, performance, nutrition, santé"""
+
+            # Construire le prompt utilisateur
+            user_prompt = f"""CONTEXTE CONVERSATIONNEL:
+{conversation_context}
+
+DOCUMENTS DE RÉFÉRENCE:
+{context_text}
+
+QUESTION:
+{query}
+
+RÉPONSE (basée uniquement sur les documents fournis):"""
+
+            response = await self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.1,
+                max_tokens=800
+            )
+            
+            return response.choices[0].message.content.strip()
+            
+        except Exception as e:
+            logger.error(f"Erreur génération réponse: {e}")
+            return "Désolé, je ne peux pas générer une réponse pour cette question."
 
 
 class ResponseVerifier:
-    """Vérification des réponses pour réduire les hallucinations"""
+    """Vérificateur de réponses"""
     
-    def __init__(self, openai_client: OpenAI):
-        self.client = openai_client
+    def __init__(self, client: OpenAI):
+        self.client = client
     
-    async def verify_response(self, query: str, response: str, context_docs: List[Dict]) -> Dict[str, Any]:
-        """Chain-of-Verification pour détecter les hallucinations"""
-        
+    async def verify_response(self, query: str, response: str, context_docs: List[Document]) -> Dict[str, Any]:
+        """Vérification des réponses"""
         if not RAG_VERIFICATION_ENABLED or not context_docs:
             return {"verified": True, "confidence": 0.8, "corrections": []}
         
         try:
-            # Construire le contexte de vérification
             context_text = "\n\n".join([
-                f"Document {i+1}: {doc.get('content', '')[:500]}"
+                f"Document {i+1}: {doc.content[:500]}"
                 for i, doc in enumerate(context_docs[:3])
             ])
             
-            verification_prompt = f"""Tu es un expert en vérification factuelle pour l'aviculture.
-
-TÂCHE: Vérifie si chaque affirmation dans la RÉPONSE est supportée par les DOCUMENTS fournis.
+            verification_prompt = f"""Vérifie si la RÉPONSE est supportée par les DOCUMENTS.
 
 RÉPONSE À VÉRIFIER:
 {response}
@@ -519,17 +554,10 @@ RÉPONSE À VÉRIFIER:
 DOCUMENTS DE RÉFÉRENCE:
 {context_text}
 
-INSTRUCTIONS:
-1. Identifie chaque affirmation factuelle dans la réponse
-2. Vérifie si elle est explicitement supportée par les documents
-3. Signale toute information non supportée ou potentiellement incorrecte
-4. Propose des corrections si nécessaire
-
-FORMAT DE RÉPONSE:
+FORMAT:
 - STATUT: [VÉRIFIÉ/PARTIELLEMENT_VÉRIFIÉ/NON_VÉRIFIÉ]
 - CONFIANCE: [0.0-1.0]
-- PROBLÈMES: [liste des problèmes identifiés]
-- CORRECTIONS: [corrections suggérées]"""
+- PROBLÈMES: [liste des problèmes]"""
 
             verification = await self.client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -540,10 +568,9 @@ FORMAT DE RÉPONSE:
             
             verification_text = verification.choices[0].message.content
             
-            # Parser la réponse de vérification (simple)
+            # Parser la réponse
             status = "VÉRIFIÉ"
             confidence = 0.8
-            corrections = []
             
             if "NON_VÉRIFIÉ" in verification_text:
                 status = "NON_VÉRIFIÉ"
@@ -552,43 +579,28 @@ FORMAT DE RÉPONSE:
                 status = "PARTIELLEMENT_VÉRIFIÉ"
                 confidence = 0.6
             
-            # Extraire les corrections si mentionnées
-            if "CORRECTIONS:" in verification_text:
-                corrections_section = verification_text.split("CORRECTIONS:")[-1].strip()
-                if corrections_section and len(corrections_section) > 10:
-                    corrections.append(corrections_section)
-            
             return {
                 "verified": status == "VÉRIFIÉ",
                 "status": status,
                 "confidence": confidence,
-                "corrections": corrections,
-                "verification_detail": verification_text,
-                "processing_time": time.time()
+                "verification_detail": verification_text
             }
             
         except Exception as e:
             logger.error(f"Erreur vérification: {e}")
-            return {
-                "verified": True,  # Fail-safe
-                "confidence": 0.7,
-                "corrections": [],
-                "error": str(e)
-            }
+            return {"verified": True, "confidence": 0.7, "error": str(e)}
 
 
-class ConversationMemoryEnhanced:
-    """Mémoire de conversation améliorée avec résumés contextuels"""
+class ConversationMemory:
+    """Mémoire conversationnelle"""
     
-    def __init__(self, openai_client: OpenAI):
-        self.client = openai_client
+    def __init__(self, client: OpenAI):
+        self.client = client
         self.memory_store = {}
         self.max_exchanges = 5
-        self.max_context_length = 2000
     
     async def get_contextual_memory(self, tenant_id: str, current_query: str) -> str:
-        """Récupère et résume le contexte pertinent de la conversation"""
-        
+        """Récupère le contexte conversationnel"""
         if tenant_id not in self.memory_store:
             return ""
         
@@ -596,31 +608,27 @@ class ConversationMemoryEnhanced:
         if not history:
             return ""
         
-        # Si l'historique est court, retourner tel quel
         if len(history) <= 2:
-            context_parts = []
-            for entry in history:
-                context_parts.append(f"Q: {entry['question']}\nR: {entry['answer']}")
-            return "\n\n".join(context_parts)
+            return "\n\n".join([
+                f"Q: {entry['question']}\nR: {entry['answer']}"
+                for entry in history
+            ])
         
-        # Pour un historique plus long, créer un résumé intelligent
+        # Résumé intelligent pour historique long
         try:
             history_text = "\n\n".join([
                 f"Échange {i+1}:\nQ: {entry['question']}\nR: {entry['answer']}"
-                for i, entry in enumerate(history[-4:])  # 4 derniers échanges
+                for i, entry in enumerate(history[-4:])
             ])
             
-            summary_prompt = f"""Résume cette conversation sur l'aviculture en conservant:
-1. Les entités importantes (lignées, âges, métriques)
-2. Le contexte technique pertinent pour cette nouvelle question
-3. Les informations factuelles clés
+            summary_prompt = f"""Résume cette conversation avicole en conservant les informations pertinentes pour la nouvelle question.
 
 HISTORIQUE:
 {history_text}
 
 NOUVELLE QUESTION: {current_query}
 
-Résumé contextuel (maximum 200 mots):"""
+Résumé contextuel (200 mots max):"""
 
             summary = await self.client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -633,11 +641,10 @@ Résumé contextuel (maximum 200 mots):"""
             
         except Exception as e:
             logger.error(f"Erreur résumé conversation: {e}")
-            # Fallback vers contexte simple
             return f"Contexte: {history[-1]['question']} -> {history[-1]['answer'][:100]}..."
     
     def add_exchange(self, tenant_id: str, question: str, answer: str):
-        """Ajoute un échange à la mémoire"""
+        """Ajoute un échange"""
         if tenant_id not in self.memory_store:
             self.memory_store[tenant_id] = []
         
@@ -647,388 +654,142 @@ Résumé contextuel (maximum 200 mots):"""
             "timestamp": time.time()
         })
         
-        # Garder seulement les N derniers échanges
         if len(self.memory_store[tenant_id]) > self.max_exchanges:
             self.memory_store[tenant_id] = self.memory_store[tenant_id][-self.max_exchanges:]
 
 
-class PoultryFilteredRetriever:
-    """Retriever personnalisé utilisant votre intelligence métier - version robuste"""
-    
-    def __init__(self, base_retriever, intent_processor, reranker: MultiStageReranker):
-        self.base_retriever = base_retriever
-        self.intent_processor = intent_processor
-        self.reranker = reranker
-        
-    async def retrieve(self, query_bundle) -> List:
-        """Retrieval avec filtrage intelligent - version robuste"""
-        
-        try:
-            # Analyse avec votre processeur d'intentions
-            intent_result = None
-            if self.intent_processor:
-                try:
-                    intent_result = self.intent_processor.process_query(
-                        query_bundle.query_str if hasattr(query_bundle, 'query_str') else str(query_bundle)
-                    )
-                except Exception as e:
-                    logger.warning(f"Erreur intent processor: {e}")
-                    intent_result = None
-            
-            # Recherche de base avec paramètres adaptatifs selon l'intention
-            if intent_result and hasattr(intent_result, 'intent_type') and intent_result.intent_type == IntentType.METRIC_QUERY:
-                # Plus de résultats pour les questions métriques
-                if hasattr(self.base_retriever, '_similarity_top_k'):
-                    self.base_retriever._similarity_top_k = min(20, RAG_SIMILARITY_TOP_K + 5)
-            else:
-                if hasattr(self.base_retriever, '_similarity_top_k'):
-                    self.base_retriever._similarity_top_k = RAG_SIMILARITY_TOP_K
-            
-            # Exécuter la recherche de base
-            try:
-                if hasattr(self.base_retriever, 'retrieve'):
-                    nodes = self.base_retriever.retrieve(query_bundle)
-                else:
-                    nodes = []
-            except Exception as e:
-                logger.error(f"Erreur base retrieval: {e}")
-                nodes = []
-            
-            # Filtrage post-retrieval basé sur vos critères métier
-            filtered_nodes = []
-            for node in nodes:
-                if self._matches_domain_criteria(node, intent_result):
-                    # Enrichir avec métadonnées métier
-                    if intent_result and hasattr(node, 'metadata'):
-                        if hasattr(intent_result, 'intent_type'):
-                            node.metadata["intent_type"] = intent_result.intent_type.value if hasattr(intent_result.intent_type, 'value') else str(intent_result.intent_type)
-                        if hasattr(intent_result, 'detected_entities'):
-                            node.metadata["detected_entities"] = intent_result.detected_entities
-                    filtered_nodes.append(node)
-            
-            # Reranking multi-étapes
-            if len(filtered_nodes) > 1:
-                query_str = query_bundle.query_str if hasattr(query_bundle, 'query_str') else str(query_bundle)
-                filtered_nodes = await self.reranker.rerank(
-                    query_str, 
-                    filtered_nodes, 
-                    intent_result
-                )
-            
-            logger.debug(f"Enhanced retrieval: {len(filtered_nodes)}/{len(nodes)} nodes after filtering and reranking")
-            return filtered_nodes
-            
-        except Exception as e:
-            logger.error(f"Erreur dans retrieve: {e}")
-            return []
-    
-    def _matches_domain_criteria(self, node, intent_result) -> bool:
-        """Vérification des critères de domaine - logique préservée et robuste"""
-        
-        try:
-            # Vérification domaine avicole (votre logique préservée)
-            if intent_result and hasattr(intent_result, 'intent_type') and intent_result.intent_type == IntentType.OUT_OF_DOMAIN:
-                return False
-            
-            # Filtrage par score de confiance amélioré
-            try:
-                node_score = float(node.score) if hasattr(node, 'score') and node.score is not None else 0.0
-                if node_score < RAG_CONFIDENCE_THRESHOLD:
-                    return False
-            except (ValueError, TypeError):
-                logger.warning(f"Score invalide ignoré: {getattr(node, 'score', None)}")
-                return True  # Garder par défaut si score invalide
-            
-            # Filtrage par lignée génétique si spécifiée (votre logique préservée)
-            if (intent_result and hasattr(intent_result, 'detected_entities') and 
-                "line" in intent_result.detected_entities and hasattr(node, 'metadata')):
-                node_line = node.metadata.get("geneticLine", "").lower()
-                target_line = intent_result.detected_entities["line"].lower()
-                if node_line and target_line not in node_line and node_line not in target_line:
-                    logger.debug(f"Filtered out node: genetic line mismatch ({node_line} vs {target_line})")
-                    return False
-            
-            return True
-            
-        except Exception as e:
-            logger.warning(f"Erreur domain criteria: {e}")
-            return True  # Fail-safe
-
-
 class InteliaRAGEngine:
-    """Engine RAG principal - Version Python 3.13 compatible avec workaround LLM"""
+    """RAG Engine principal avec OpenAI + Weaviate Direct"""
     
     def __init__(self, openai_client: OpenAI = None):
-        self.openai_client = openai_client or _build_openai_client()
+        self.openai_client = openai_client or self._build_openai_client()
+        self.embedder = None
+        self.retriever = None
+        self.generator = None
+        self.verifier = None
+        self.memory = None
         self.intent_processor = None
         self.ood_detector = None
         self.reranker = None
-        self.verifier = None
-        self.conversation_memory = None
         self.weaviate_client = None
-        self.vector_store = None
-        self.index = None
-        self.query_engine = None
         self.is_initialized = False
         self.degraded_mode = False
-        
+    
+    def _build_openai_client(self) -> OpenAI:
+        """Construit le client OpenAI"""
+        try:
+            http_client = httpx.Client(timeout=30.0)
+            return OpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
+        except Exception as e:
+            logger.warning(f"Erreur client OpenAI personnalisé: {e}")
+            return OpenAI(api_key=OPENAI_API_KEY)
+    
     async def initialize(self):
-        """Initialisation avec workaround LLM Python 3.13"""
+        """Initialisation"""
         if self.is_initialized:
             return
             
-        logger.info("Initialisation Intelia RAG Engine Enhanced (Python 3.13 compatible)...")
+        logger.info("Initialisation RAG Engine Direct (OpenAI + Weaviate)...")
         
-        # Vérifier les dépendances critiques
-        if not WEAVIATE_AVAILABLE or not LLAMAINDEX_WEAVIATE_AVAILABLE:
-            logger.warning(f"Weaviate non disponible - Mode dégradé activé.")
+        # Vérifier dépendances
+        if not OPENAI_AVAILABLE:
+            logger.error("OpenAI non disponible")
+            self.degraded_mode = True
+            
+        if not WEAVIATE_AVAILABLE:
+            logger.error("Weaviate non disponible")
             self.degraded_mode = True
         
-        # Configuration LlamaIndex avec workaround Python 3.13
-        try:
-            if LLAMAINDEX_AVAILABLE:
-                # WORKAROUND: Ne pas configurer de LLM global si erreur abstract method
-                if LLAMAINDEX_LLM_AVAILABLE:
-                    try:
-                        # Tentative prudente de configuration LLM
-                        test_llm = LlamaOpenAI(
-                            model="gpt-4o-mini",
-                            api_key=OPENAI_API_KEY,
-                            temperature=0.1,
-                            max_tokens=800
-                        )
-                        # Test si le LLM fonctionne
-                        Settings.llm = test_llm
-                        logger.info("LlamaIndex LLM configuré avec succès")
-                    except Exception as e:
-                        logger.warning(f"LLM configuration failed: {e} - Utilisation d'OpenAI direct")
-                        # Ne pas configurer de LLM global, utiliser OpenAI directement
-                        Settings.llm = None
-                
-                # Configuration Embeddings
-                if LLAMAINDEX_EMBEDDINGS_AVAILABLE:
-                    try:
-                        Settings.embed_model = OpenAIEmbedding(
-                            model="text-embedding-3-small",
-                            api_key=OPENAI_API_KEY
-                        )
-                        logger.info("LlamaIndex Embeddings configuré avec succès")
-                    except Exception as e:
-                        logger.warning(f"Erreur configuration Embeddings: {e}")
-                
-                # Configuration des chunks
-                Settings.chunk_size = RAG_CHUNK_SIZE
-                Settings.chunk_overlap = RAG_CHUNK_OVERLAP
-                
-        except Exception as e:
-            logger.error(f"Erreur configuration LlamaIndex: {e}")
-            logger.info("Fonctionnement en mode dégradé gracieux")
-        
-        # Initialisation des composants métier
-        try:
-            if INTENT_PROCESSOR_AVAILABLE:
-                self.intent_processor = create_intent_processor()
-            else:
-                logger.warning("Intent processor non disponible")
-                
-            self.ood_detector = EnhancedOODDetector()
-            self.reranker = MultiStageReranker()
-            self.verifier = ResponseVerifier(self.openai_client)
-            self.conversation_memory = ConversationMemoryEnhanced(self.openai_client)
-            logger.info("Composants d'intelligence métier initialisés")
-        except Exception as e:
-            logger.error(f"Erreur init composants métier: {e}")
-            # Fallback vers composants minimaux
-            self.ood_detector = EnhancedOODDetector()
-            self.reranker = MultiStageReranker()
-            self.verifier = ResponseVerifier(self.openai_client)
-            self.conversation_memory = ConversationMemoryEnhanced(self.openai_client)
-        
-        # Connexion Weaviate
-        if not self.degraded_mode:
-            try:
-                await self._connect_weaviate()
-                await self._build_enhanced_query_engine()
-            except Exception as e:
-                logger.error(f"Erreur Weaviate/Query Engine: {e}")
-                self.degraded_mode = True
-        
-        self.is_initialized = True
-        status_msg = "RAG Engine Enhanced initialisé avec succès (Python 3.13)"
         if self.degraded_mode:
-            status_msg += " (Mode dégradé)"
-        logger.info(status_msg)
-    
-    async def _connect_weaviate(self):
-        """Connexion Weaviate - identique à l'original"""
-        if not WEAVIATE_AVAILABLE or not LLAMAINDEX_WEAVIATE_AVAILABLE:
-            raise Exception("Weaviate non disponible")
-        
-        try:
-            if WEAVIATE_V4:
-                if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
-                    if wvc:
-                        auth_credentials = wvc.init.Auth.api_key(WEAVIATE_API_KEY)
-                        self.weaviate_client = weaviate.connect_to_weaviate_cloud(
-                            cluster_url=WEAVIATE_URL,
-                            auth_credentials=auth_credentials,
-                            headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
-                        )
-                    else:
-                        raise Exception("weaviate.classes non disponible")
-                else:
-                    host = WEAVIATE_URL.replace('http://', '').replace('https://', '')
-                    port = 8080
-                    if ':' in host:
-                        host, port = host.split(':')
-                        port = int(port)
-                    
-                    self.weaviate_client = weaviate.connect_to_local(
-                        host=host,
-                        port=port,
-                        headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
-                    )
-            else:
-                # Version 3.x
-                if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
-                    auth_config = weaviate.AuthApiKey(api_key=WEAVIATE_API_KEY)
-                    self.weaviate_client = weaviate.Client(
-                        url=WEAVIATE_URL,
-                        auth_client_secret=auth_config,
-                        additional_headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
-                    )
-                else:
-                    self.weaviate_client = weaviate.Client(
-                        url=WEAVIATE_URL,
-                        additional_headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
-                    )
-            
-            # Vérifier la connexion
-            if hasattr(self.weaviate_client, 'is_ready'):
-                if self.weaviate_client.is_ready():
-                    logger.info(f"Connexion Weaviate établie (Version {weaviate_version})")
-                else:
-                    raise Exception("Weaviate not ready")
-            else:
-                try:
-                    self.weaviate_client.schema.get()
-                    logger.info("Connexion Weaviate v3 établie")
-                except Exception:
-                    raise Exception("Weaviate v3 connection failed")
-                    
-        except Exception as e:
-            logger.error(f"Erreur connexion Weaviate: {e}")
-            self.weaviate_client = None
-            raise
-    
-    async def _build_enhanced_query_engine(self):
-        """Construction du query engine - Python 3.13 compatible"""
-        
-        if not self.weaviate_client or not LLAMAINDEX_WEAVIATE_AVAILABLE:
-            logger.warning("Weaviate non disponible - Query engine désactivé")
-            self.query_engine = None
+            logger.warning("Mode dégradé activé")
+            self.is_initialized = True
             return
         
+        # Initialiser composants
         try:
-            # Vérifier la collection
-            if WEAVIATE_V4:
-                try:
-                    collection = self.weaviate_client.collections.get("InteliaKnowledge")
-                    logger.info("Collection InteliaKnowledge trouvée - utilisation des données existantes")
-                except Exception as e:
-                    logger.warning(f"Collection InteliaKnowledge non accessible (v4): {e}")
-            else:
-                try:
-                    schema = self.weaviate_client.schema.get()
-                    classes = [cls['class'] for cls in schema.get('classes', [])]
-                    if "InteliaKnowledge" in classes:
-                        logger.info("Collection InteliaKnowledge trouvée (v3)")
-                    else:
-                        logger.warning("Collection InteliaKnowledge non trouvée")
-                except Exception as e:
-                    logger.warning(f"Erreur accès schéma v3: {e}")
-        
-            # Créer le vector store
-            try:
-                if WEAVIATE_V4:
-                    self.vector_store = WeaviateVectorStore(
-                        weaviate_client=self.weaviate_client,
-                        index_name="InteliaKnowledge"
-                    )
-                else:
-                    self.vector_store = WeaviateVectorStore(
-                        weaviate_client=self.weaviate_client,
-                        class_name="InteliaKnowledge"
-                    )
-            except Exception as e:
-                logger.error(f"Erreur création vector store: {e}")
-                self.query_engine = None
-                return
-
-            # Index et query engine
-            try:
-                self.index = VectorStoreIndex.from_vector_store(
-                    self.vector_store,
-                    show_progress=False
-                )
-
-                # Retriever avec intelligence métier
-                base_retriever = VectorIndexRetriever(
-                    index=self.index,
-                    similarity_top_k=RAG_SIMILARITY_TOP_K
-                )
-                
-                enhanced_retriever = PoultryFilteredRetriever(
-                    base_retriever=base_retriever,
-                    intent_processor=self.intent_processor,
-                    reranker=self.reranker
-                )
-                
-                # Post-processor et synthesizer
-                postprocessor = SimilarityPostprocessor(
-                    similarity_cutoff=RAG_CONFIDENCE_THRESHOLD
-                )
-                
-                synthesizer = get_response_synthesizer(
-                    response_mode="compact",
-                    use_async=True,
-                    streaming=False
-                )
-                
-                # Query engine final
-                self.query_engine = RetrieverQueryEngine(
-                    retriever=enhanced_retriever,
-                    response_synthesizer=synthesizer,
-                    node_postprocessors=[postprocessor]
-                )
-                
-                logger.info("Query engine amélioré construit avec intelligence métier")
-                
-            except Exception as e:
-                logger.error(f"Erreur construction query engine: {e}")
-                self.query_engine = None
+            self.embedder = OpenAIEmbedder(self.openai_client)
+            self.generator = ResponseGenerator(self.openai_client)
+            self.verifier = ResponseVerifier(self.openai_client)
+            self.memory = ConversationMemory(self.openai_client)
+            self.ood_detector = EnhancedOODDetector()
+            self.reranker = MultiStageReranker()
             
+            if INTENT_PROCESSOR_AVAILABLE:
+                self.intent_processor = create_intent_processor()
+            
+            logger.info("Composants initialisés")
         except Exception as e:
-            logger.error(f"Erreur construction index: {e}")
-            self.query_engine = None
+            logger.error(f"Erreur init composants: {e}")
+            self.degraded_mode = True
+        
+        # Connexion Weaviate
+        try:
+            await self._connect_weaviate()
+            self.retriever = WeaviateRetriever(self.weaviate_client)
+            logger.info("Weaviate connecté")
+        except Exception as e:
+            logger.error(f"Erreur connexion Weaviate: {e}")
+            self.degraded_mode = True
+        
+        self.is_initialized = True
+        logger.info(f"RAG Engine initialisé (dégradé: {self.degraded_mode})")
+    
+    async def _connect_weaviate(self):
+        """Connexion Weaviate"""
+        if WEAVIATE_V4:
+            if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
+                auth_credentials = wvc.init.Auth.api_key(WEAVIATE_API_KEY)
+                self.weaviate_client = weaviate.connect_to_weaviate_cloud(
+                    cluster_url=WEAVIATE_URL,
+                    auth_credentials=auth_credentials,
+                    headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
+                )
+            else:
+                host = WEAVIATE_URL.replace('http://', '').replace('https://', '')
+                port = 8080
+                if ':' in host:
+                    host, port = host.split(':')
+                    port = int(port)
+                
+                self.weaviate_client = weaviate.connect_to_local(
+                    host=host,
+                    port=port,
+                    headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
+                )
+        else:
+            # Version 3.x
+            if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
+                auth_config = weaviate.AuthApiKey(api_key=WEAVIATE_API_KEY)
+                self.weaviate_client = weaviate.Client(
+                    url=WEAVIATE_URL,
+                    auth_client_secret=auth_config,
+                    additional_headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
+                )
+            else:
+                self.weaviate_client = weaviate.Client(
+                    url=WEAVIATE_URL,
+                    additional_headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
+                )
+        
+        # Vérifier connexion
+        if hasattr(self.weaviate_client, 'is_ready'):
+            if not self.weaviate_client.is_ready():
+                raise Exception("Weaviate not ready")
+        else:
+            self.weaviate_client.schema.get()  # Test V3
     
     async def process_query(self, query: str, language: str = "fr", tenant_id: str = "") -> RAGResult:
-        """Interface de traitement des requêtes - identique à l'original"""
-        
+        """Traitement des requêtes"""
         if not RAG_ENABLED:
             return RAGResult(source=RAGSource.FALLBACK_NEEDED, metadata={"reason": "rag_disabled"})
         
         if not self.is_initialized:
-            try:
-                await self.initialize()
-            except Exception as e:
-                logger.error(f"Erreur initialisation tardive: {e}")
-                return RAGResult(source=RAGSource.ERROR, metadata={"error": str(e)})
+            await self.initialize()
         
-        if not self.query_engine or self.degraded_mode:
+        if self.degraded_mode:
             return RAGResult(
                 source=RAGSource.FALLBACK_NEEDED,
-                metadata={"reason": "weaviate_unavailable", "degraded_mode": self.degraded_mode}
+                metadata={"reason": "degraded_mode"}
             )
         
         start_time = time.time()
@@ -1036,11 +797,8 @@ class InteliaRAGEngine:
         try:
             # Contexte conversationnel
             conversation_context = ""
-            if tenant_id and self.conversation_memory:
-                try:
-                    conversation_context = await self.conversation_memory.get_contextual_memory(tenant_id, query)
-                except Exception as e:
-                    logger.warning(f"Erreur mémoire conversationnelle: {e}")
+            if tenant_id and self.memory:
+                conversation_context = await self.memory.get_contextual_memory(tenant_id, query)
             
             # Intent processing
             intent_result = None
@@ -1052,133 +810,119 @@ class InteliaRAGEngine:
             
             # OOD detection
             if self.ood_detector:
-                try:
-                    is_in_domain, domain_score, score_details = self.ood_detector.calculate_ood_score(query)
-                    
-                    if not is_in_domain:
-                        return RAGResult(
-                            source=RAGSource.OOD_FILTERED,
-                            confidence=1.0 - domain_score,
-                            processing_time=time.time() - start_time,
-                            metadata={
-                                "classification_method": "enhanced_ood_detector",
-                                "domain_score": domain_score,
-                                "score_details": score_details,
-                                "intent_type": intent_result.intent_type.value if intent_result and hasattr(intent_result, 'intent_type') else "unknown"
-                            },
-                            intent_result=intent_result
-                        )
-                except Exception as e:
-                    logger.warning(f"Erreur OOD detector: {e}")
+                is_in_domain, domain_score, score_details = self.ood_detector.calculate_ood_score(query)
+                
+                if not is_in_domain:
+                    return RAGResult(
+                        source=RAGSource.OOD_FILTERED,
+                        confidence=1.0 - domain_score,
+                        processing_time=time.time() - start_time,
+                        metadata={
+                            "domain_score": domain_score,
+                            "score_details": score_details
+                        },
+                        intent_result=intent_result
+                    )
             
-            # Construction requête enrichie
+            # Embedding de la requête
             search_query = query
             if intent_result and hasattr(intent_result, 'expanded_query') and intent_result.expanded_query:
                 search_query = intent_result.expanded_query
             
-            if conversation_context:
-                search_query = f"Contexte: {conversation_context}\n\nQuestion: {search_query}"
-            
-            # Requête LlamaIndex
-            try:
-                response = await self.query_engine.aquery(search_query)
-            except Exception as e:
-                logger.error(f"Erreur query engine: {e}")
+            query_vector = await self.embedder.embed_query(search_query)
+            if not query_vector:
                 return RAGResult(
                     source=RAGSource.ERROR,
-                    confidence=0.0,
-                    processing_time=time.time() - start_time,
-                    metadata={"error": str(e)},
-                    intent_result=intent_result
+                    metadata={"error": "embedding_failed"}
                 )
             
-            if not response or not response.response:
+            # Recherche documents
+            documents = await self.retriever.search(query_vector, RAG_SIMILARITY_TOP_K)
+            
+            if not documents:
                 return RAGResult(
                     source=RAGSource.FALLBACK_NEEDED,
-                    confidence=0.0,
-                    processing_time=time.time() - start_time,
-                    intent_result=intent_result,
-                    metadata={"reason": "empty_response"}
+                    metadata={"reason": "no_documents_found"}
+                )
+            
+            # Filtrage par confiance
+            filtered_docs = [doc for doc in documents if doc.score >= RAG_CONFIDENCE_THRESHOLD]
+            
+            if not filtered_docs:
+                return RAGResult(
+                    source=RAGSource.FALLBACK_NEEDED,
+                    metadata={"reason": "low_confidence_documents"}
+                )
+            
+            # Reranking
+            if len(filtered_docs) > 1:
+                filtered_docs = await self.reranker.rerank(search_query, filtered_docs, intent_result)
+            
+            # Génération réponse
+            response_text = await self.generator.generate_response(
+                query, filtered_docs, conversation_context
+            )
+            
+            if not response_text or "ne peux pas" in response_text.lower():
+                return RAGResult(
+                    source=RAGSource.FALLBACK_NEEDED,
+                    metadata={"reason": "generation_failed"}
+                )
+            
+            # Vérification
+            verification_result = None
+            if self.verifier:
+                verification_result = await self.verifier.verify_response(
+                    query, response_text, filtered_docs
                 )
             
             # Calcul confiance
-            confidence = self._calculate_enhanced_confidence(response, intent_result)
+            confidence = self._calculate_confidence(filtered_docs, verification_result)
             
-            # Context docs
-            context_docs = []
-            if hasattr(response, 'source_nodes') and response.source_nodes:
-                for node in response.source_nodes:
-                    try:
-                        score = float(node.score) if hasattr(node, 'score') and node.score is not None else 0.8
-                    except (ValueError, TypeError):
-                        score = 0.8
-                    
-                    metadata = getattr(node, 'metadata', {})
-                    context_docs.append({
-                        "title": metadata.get("title", ""),
-                        "content": getattr(node, 'text', ''),
-                        "score": score,
-                        "source": metadata.get("source", ""),
-                        "genetic_line": metadata.get("geneticLine", ""),
-                        "species": metadata.get("species", ""),
-                        "intent_type": metadata.get("intent_type", ""),
-                        "detected_entities": metadata.get("detected_entities", {})
-                    })
-            
-            # Vérification réponses
-            verification_result = None
-            if self.verifier and confidence > 0.7:
-                try:
-                    verification_result = await self.verifier.verify_response(
-                        query, response.response, context_docs
-                    )
-                except Exception as e:
-                    logger.warning(f"Erreur vérification: {e}")
-            
-            # Source selon vérification
+            # Source résultat
             result_source = RAGSource.RAG_KNOWLEDGE
             if verification_result and verification_result.get("verified", True):
                 result_source = RAGSource.RAG_VERIFIED
                 confidence = min(confidence * 1.1, 0.95)
             
-            # Métadonnées enrichies
+            # Context docs pour résultat
+            context_docs = []
+            for doc in filtered_docs:
+                context_docs.append({
+                    "title": doc.metadata.get("title", ""),
+                    "content": doc.content,
+                    "score": doc.score,
+                    "source": doc.metadata.get("source", ""),
+                    "genetic_line": doc.metadata.get("geneticLine", ""),
+                    "species": doc.metadata.get("species", "")
+                })
+            
+            # Métadonnées
             metadata = {
-                "llama_index_available": LLAMAINDEX_AVAILABLE,
-                "weaviate_version": weaviate_version if WEAVIATE_AVAILABLE else "N/A",
+                "approach": "openai_weaviate_direct",
+                "weaviate_version": weaviate_version,
                 "weaviate_v4": WEAVIATE_V4,
-                "degraded_mode": self.degraded_mode,
+                "documents_found": len(documents),
+                "documents_used": len(filtered_docs),
                 "query_expanded": search_query != query,
                 "conversation_context_used": bool(conversation_context),
-                "nodes_used": len(response.source_nodes) if hasattr(response, 'source_nodes') else 0,
-                "processing_time": time.time() - start_time,
-                "reranking_applied": len(context_docs) > 1,
-                "verification_enabled": RAG_VERIFICATION_ENABLED,
-                "httpx_proxy_fix_applied": True,
-                "python_version": "3.13",
-                "llamaindex_llm_workaround": not LLAMAINDEX_LLM_AVAILABLE or Settings.llm is None
+                "reranking_applied": len(filtered_docs) > 1,
+                "verification_enabled": RAG_VERIFICATION_ENABLED
             }
             
             if intent_result:
                 metadata.update({
-                    "intent_type": intent_result.intent_type.value if hasattr(intent_result, 'intent_type') and hasattr(intent_result.intent_type, 'value') else str(getattr(intent_result, 'intent_type', 'unknown')),
-                    "detected_entities": getattr(intent_result, 'detected_entities', {}),
-                    "vocab_confidence": getattr(intent_result, 'metadata', {}).get("vocab_score", 0.0),
-                    "query_expansion_applied": hasattr(intent_result, 'expanded_query') and intent_result.expanded_query != query
+                    "intent_type": intent_result.intent_type.value if hasattr(intent_result.intent_type, 'value') else str(intent_result.intent_type),
+                    "detected_entities": getattr(intent_result, 'detected_entities', {})
                 })
             
-            if self.ood_detector and 'score_details' in locals():
-                metadata["domain_analysis"] = score_details
-            
             # Sauvegarde mémoire
-            if tenant_id and self.conversation_memory:
-                try:
-                    self.conversation_memory.add_exchange(tenant_id, query, response.response)
-                except Exception as e:
-                    logger.warning(f"Erreur sauvegarde mémoire: {e}")
+            if tenant_id and self.memory:
+                self.memory.add_exchange(tenant_id, query, response_text)
             
             return RAGResult(
                 source=result_source,
-                answer=response.response,
+                answer=response_text,
                 confidence=confidence,
                 context_docs=context_docs,
                 processing_time=time.time() - start_time,
@@ -1193,49 +937,37 @@ class InteliaRAGEngine:
                 source=RAGSource.ERROR,
                 confidence=0.0,
                 processing_time=time.time() - start_time,
-                metadata={"error": str(e), "degraded_mode": self.degraded_mode},
+                metadata={"error": str(e)},
                 intent_result=intent_result if 'intent_result' in locals() else None
             )
     
-    def _calculate_enhanced_confidence(self, response, intent_result) -> float:
-        """Calcul de confiance - identique à l'original"""
-        try:
-            if not hasattr(response, 'source_nodes') or not response.source_nodes:
-                return 0.0
-            
-            scores = []
-            for node in response.source_nodes:
-                try:
-                    if hasattr(node, 'score') and node.score is not None:
-                        scores.append(float(node.score))
-                except (ValueError, TypeError):
-                    continue
-            
-            if not scores:
-                return 0.5
-            
-            avg_score = sum(scores) / len(scores)
-            coherence_factor = min(1.2, 1 + (len(scores) - 1) * 0.05)
-            
-            intent_factor = 1.0
-            if intent_result and hasattr(intent_result, 'confidence') and intent_result.confidence > 0.8:
-                intent_factor = 1.1
-            
-            if len(scores) > 1:
-                score_std = np.std(scores)
-                distribution_factor = max(0.9, 1 - score_std * 0.5)
-            else:
-                distribution_factor = 1.0
-            
-            final_confidence = avg_score * coherence_factor * intent_factor * distribution_factor
-            return min(0.95, max(0.1, final_confidence))
-            
-        except Exception as e:
-            logger.error(f"Erreur calcul confiance: {e}")
+    def _calculate_confidence(self, documents: List[Document], verification_result: Dict = None) -> float:
+        """Calcul de confiance"""
+        if not documents:
+            return 0.0
+        
+        scores = [doc.score for doc in documents if doc.score > 0]
+        if not scores:
             return 0.5
+        
+        avg_score = sum(scores) / len(scores)
+        coherence_factor = min(1.2, 1 + (len(scores) - 1) * 0.05)
+        
+        if len(scores) > 1:
+            score_std = np.std(scores)
+            distribution_factor = max(0.9, 1 - score_std * 0.5)
+        else:
+            distribution_factor = 1.0
+        
+        verification_factor = 1.0
+        if verification_result and verification_result.get("verified", True):
+            verification_factor = 1.1
+        
+        final_confidence = avg_score * coherence_factor * distribution_factor * verification_factor
+        return min(0.95, max(0.1, final_confidence))
     
     def get_status(self) -> Dict:
-        """Status avec diagnostics Python 3.13"""
+        """Status du système"""
         try:
             weaviate_connected = (
                 self.weaviate_client is not None and 
@@ -1246,47 +978,32 @@ class InteliaRAGEngine:
                 "rag_enabled": RAG_ENABLED,
                 "initialized": self.is_initialized,
                 "degraded_mode": self.degraded_mode,
-                "python_version": "3.13",
+                "approach": "openai_weaviate_direct",
+                "no_llamaindex_conflicts": True,
+                "openai_available": OPENAI_AVAILABLE,
                 "weaviate_available": WEAVIATE_AVAILABLE,
                 "weaviate_version": weaviate_version if WEAVIATE_AVAILABLE else "N/A",
                 "weaviate_v4": WEAVIATE_V4,
-                "llamaindex_available": LLAMAINDEX_AVAILABLE,
-                "llamaindex_llm_available": LLAMAINDEX_LLM_AVAILABLE,
-                "llamaindex_llm_configured": Settings.llm is not None if LLAMAINDEX_AVAILABLE else False,
-                "llamaindex_embeddings_available": LLAMAINDEX_EMBEDDINGS_AVAILABLE,
-                "llamaindex_weaviate_available": LLAMAINDEX_WEAVIATE_AVAILABLE,
                 "weaviate_connected": weaviate_connected,
                 "intent_processor_available": INTENT_PROCESSOR_AVAILABLE,
-                "intent_processor_loaded": self.intent_processor is not None,
-                "ood_detector_loaded": self.ood_detector is not None,
-                "reranker_available": self.reranker is not None,
                 "voyage_reranking": VOYAGE_AVAILABLE and VOYAGE_API_KEY is not None,
                 "verification_enabled": RAG_VERIFICATION_ENABLED,
-                "conversation_memory_active": self.conversation_memory is not None,
-                "query_engine_ready": self.query_engine is not None,
                 "confidence_threshold": RAG_CONFIDENCE_THRESHOLD,
                 "similarity_top_k": RAG_SIMILARITY_TOP_K,
                 "rerank_top_k": RAG_RERANK_TOP_K,
-                "hybrid_alpha": RAG_HYBRID_ALPHA,
-                "graceful_fallback_available": True,
-                "httpx_proxy_fix_applied": True,
                 "features": [
+                    "zero_dependency_conflicts",
+                    "openai_direct_integration",
+                    "weaviate_direct_integration",
                     "enhanced_ood_detection",
-                    "multi_stage_reranking", 
+                    "multi_stage_reranking",
                     "voyage_ai_integration",
-                    "chain_of_verification",
-                    "enhanced_conversation_memory",
+                    "response_verification",
+                    "conversation_memory",
                     "intent_based_boosting",
-                    "adaptive_confidence_scoring",
+                    "confidence_scoring",
                     "diversity_filtering",
-                    "contextual_query_expansion",
-                    "real_time_verification",
-                    "weaviate_version_compatibility",
-                    "robust_error_handling",
-                    "graceful_degradation",
-                    "httpx_proxy_crash_protection",
-                    "python_313_compatibility",
-                    "llamaindex_llm_workaround"
+                    "production_ready"
                 ]
             }
         except Exception as e:
@@ -1295,48 +1012,36 @@ class InteliaRAGEngine:
                 "error": str(e),
                 "rag_enabled": RAG_ENABLED,
                 "initialized": False,
-                "degraded_mode": True,
-                "python_version": "3.13"
+                "degraded_mode": True
             }
     
     async def cleanup(self):
-        """Nettoyage des ressources - Python 3.13 compatible"""
+        """Nettoyage des ressources"""
         try:
             if self.weaviate_client:
-                try:
-                    if hasattr(self.weaviate_client, 'close'):
-                        self.weaviate_client.close()
-                except Exception as e:
-                    logger.warning(f"Erreur fermeture Weaviate: {e}")
+                if hasattr(self.weaviate_client, 'close'):
+                    self.weaviate_client.close()
             
-            if self.conversation_memory:
-                try:
-                    self.conversation_memory.memory_store.clear()
-                except Exception as e:
-                    logger.warning(f"Erreur nettoyage mémoire: {e}")
+            if self.memory:
+                self.memory.memory_store.clear()
             
-            # Fermer client httpx
-            try:
-                if hasattr(self.openai_client, 'http_client') and hasattr(self.openai_client.http_client, 'close'):
-                    await self.openai_client.http_client.aclose()
-            except Exception as e:
-                logger.warning(f"Erreur fermeture httpx client: {e}")
+            if hasattr(self.openai_client, 'http_client'):
+                await self.openai_client.http_client.aclose()
             
-            logger.info("RAG Engine Enhanced nettoyé (Python 3.13)")
+            logger.info("RAG Engine nettoyé")
         except Exception as e:
             logger.error(f"Erreur nettoyage: {e}")
 
 
 # Fonctions utilitaires pour compatibilité
 async def create_rag_engine(openai_client: OpenAI = None) -> InteliaRAGEngine:
-    """Factory pour créer le RAG engine - Python 3.13 compatible"""
+    """Factory pour créer le RAG engine"""
     try:
         engine = InteliaRAGEngine(openai_client)
         await engine.initialize()
         return engine
     except Exception as e:
         logger.error(f"Erreur création RAG engine: {e}")
-        # Mode dégradé
         engine = InteliaRAGEngine(openai_client)
         engine.degraded_mode = True
         engine.is_initialized = True
@@ -1349,7 +1054,7 @@ async def process_question_with_rag(
     language: str = "fr", 
     tenant_id: str = ""
 ) -> RAGResult:
-    """Interface compatible avec votre système actuel - Python 3.13"""
+    """Interface compatible"""
     try:
         return await rag_engine.process_query(question, language, tenant_id)
     except Exception as e:
