@@ -8,7 +8,7 @@ llama-index==0.10.57
 llama-index-core==0.10.57
 
 # LlamaIndex Vector Stores et Embeddings
-llama-index-vector-stores-weaviate==0.1.25
+llama-index-vector-stores-weaviate==1.4.1
 llama-index-embeddings-openai==0.1.11
 llama-index-llms-openai==0.1.29
 

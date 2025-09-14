@@ -63,7 +63,6 @@ RAG_RERANK_TOP_K = int(os.getenv("RAG_RERANK_TOP_K", "8"))
 RAG_HYBRID_ALPHA = float(os.getenv("RAG_HYBRID_ALPHA", "0.7"))
 RAG_VERIFICATION_ENABLED = os.getenv("RAG_VERIFICATION_ENABLED", "true").lower() == "true"
 
-
 class RAGSource(Enum):
     """Sources de réponse (compatibilité avec votre système)"""
     RAG_KNOWLEDGE = "rag_knowledge"
@@ -71,7 +70,6 @@ class RAGSource(Enum):
     OOD_FILTERED = "ood_filtered" 
     FALLBACK_NEEDED = "fallback_needed"
     ERROR = "error"
-
 
 @dataclass
 class RAGResult:
@@ -92,7 +90,6 @@ class RAGResult:
             self.metadata = {}
         if self.verification_status is None:
             self.verification_status = {}
-
 
 class EnhancedOODDetector:
     """Détecteur hors-domaine amélioré avec scoring multi-facteurs"""
@@ -178,7 +175,6 @@ class EnhancedOODDetector:
         logger.debug(f"OOD Analysis: '{query}' -> in_domain={is_in_domain}, scores={score_details}")
         
         return is_in_domain, final_score, score_details
-
 
 class MultiStageReranker:
     """Système de reranking multi-étapes pour améliorer la pertinence"""
@@ -311,7 +307,6 @@ class MultiStageReranker:
         
         return diversified
 
-
 class ResponseVerifier:
     """Vérification des réponses pour réduire les hallucinations"""
     
@@ -398,7 +393,6 @@ FORMAT DE RÉPONSE:
                 "error": str(e)
             }
 
-
 class ConversationMemoryEnhanced:
     """Mémoire de conversation améliorée avec résumés contextuels"""
     
@@ -472,7 +466,6 @@ Résumé contextuel (maximum 200 mots):"""
         # Garder seulement les N derniers échanges
         if len(self.memory_store[tenant_id]) > self.max_exchanges:
             self.memory_store[tenant_id] = self.memory_store[tenant_id][-self.max_exchanges:]
-
 
 class PoultryFilteredRetriever(BaseRetriever):
     """Retriever personnalisé utilisant votre intelligence métier - amélioré"""
@@ -550,7 +543,6 @@ class PoultryFilteredRetriever(BaseRetriever):
                 return False
         
         return True
-
 
 class InteliaRAGEngine:
     """Engine RAG principal utilisant LlamaIndex avec votre intelligence métier - Amélioré"""
@@ -940,14 +932,12 @@ class InteliaRAGEngine:
         except Exception as e:
             logger.error(f"Erreur nettoyage: {e}")
 
-
 # Fonctions utilitaires pour compatibilité avec votre système (préservées)
 async def create_rag_engine(openai_client: OpenAI = None) -> InteliaRAGEngine:
     """Factory pour créer le RAG engine amélioré"""
     engine = InteliaRAGEngine(openai_client)
     await engine.initialize()
     return engine
-
 
 async def process_question_with_rag(
     rag_engine: InteliaRAGEngine, 
