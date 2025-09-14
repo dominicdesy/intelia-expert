@@ -4,11 +4,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_ONLY_BINARY=:all: \
-    PIP_NO_BINARY=langdetect \
     LANG=C.UTF-8
 
 WORKDIR /app
+
+# Installation des dépendances système pour compiler langdetect
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --upgrade pip setuptools wheel
 
