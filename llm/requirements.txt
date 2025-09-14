@@ -18,21 +18,21 @@ weaviate-client==3.26.7
 
 # Intelligence métier préservée - Python 3.13 compatible
 langdetect==1.0.9
-transformers==4.46.0  # Version compatible Python 3.13
-torch>=2.0.0  # Version compatible Python 3.13
+transformers==4.46.0
+torch>=2.0.0
 
 # APIs externes - VERSION COMPATIBLE avec LlamaIndex
-openai==1.42.0  # Version mise à jour pour compatibilité
+openai==1.42.0
 
 # VoyageAI pour reranking amélioré (optionnel mais recommandé)
 voyageai==0.3.5
 
 # Cross-encoder pour reranking multi-stage (optionnel)
-sentence-transformers==3.3.1  # Version compatible Python 3.13
+sentence-transformers==3.3.1
 
 # Utilitaires optimisés
-numpy>=1.24.0  # Compatible Python 3.13
-scipy>=1.11.0  # Compatible Python 3.13
+numpy>=1.24.0
+scipy>=1.11.0
 
 # Monitoring et métriques (optionnel)
 prometheus-client==0.20.0
@@ -41,7 +41,7 @@ prometheus-client==0.20.0
 structlog==23.2.0
 
 # Support pour formats de fichiers étendus (si nécessaire)
-pandas>=2.0.0  # Compatible Python 3.13
+pandas>=2.0.0
 openpyxl==3.1.2
 
 # Sécurité et validation améliorée
@@ -53,5 +53,4 @@ redis==5.0.1
 hiredis==2.3.2
 
 # Tests et qualité (développement)
-pytest==8.3.3  # Version
-The key changes are updating llama-index-embeddings-openai and llama-index-llms-openai to 0.5.1, which is compatible with llama-index-core==0.13.0 and llama-index-vector-stores-weaviate==1.4.1.
+pytest==8.3.3
