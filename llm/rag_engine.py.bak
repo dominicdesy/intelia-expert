@@ -2,8 +2,8 @@
 """
 rag_engine.py - RAG Engine amélioré avec LlamaIndex
 Préserve votre intelligence métier avec améliorations de performance
-Version Python 3.13 compatible avec gestion d'erreurs robuste
-Fix httpx >= 0.28 et LlamaIndex LLM workaround
+Version corrigée pour compatibilité et gestion d'erreurs robuste
+Fix httpx >= 0.28 pour éviter les crashes de proxy
 """
 
 import os
@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Any, Tuple, Union
 from dataclasses import dataclass
 from enum import Enum
 import numpy as np
-import httpx
+import httpx  # ⬅️ AJOUT pour fix proxy
 
 # Configuration de logging améliorée
 logger = logging.getLogger(__name__)
@@ -49,11 +49,10 @@ except ImportError as e:
     weaviate = None
     logger.warning(f"Weaviate non disponible: {e}")
 
-# Tentatives d'import LlamaIndex avec fallbacks multiples - Python 3.13 compatible
+# Tentatives d'import LlamaIndex avec fallbacks multiples
 LLAMAINDEX_AVAILABLE = False
 LLAMAINDEX_WEAVIATE_AVAILABLE = False
 LLAMAINDEX_LLM_AVAILABLE = False
-LLAMAINDEX_EMBEDDINGS_AVAILABLE = False
 
 # Import LlamaIndex Core
 try:
@@ -69,26 +68,17 @@ except ImportError as e:
     logger.warning(f"LlamaIndex Core non disponible: {e}")
     # Classes de fallback pour éviter les erreurs
     class VectorStoreIndex:
-        @classmethod
-        def from_vector_store(cls, vector_store, **kwargs):
-            return cls()
-        
+        pass
     class Settings:
-        llm = None
-        embed_model = None
-        chunk_size = 1024
-        chunk_overlap = 200
-        
+        pass
     class BaseRetriever:
         pass
     class NodeWithScore:
         pass
     class QueryBundle:
         pass
-    def get_response_synthesizer(**kwargs):
-        return None
 
-# Import LlamaIndex Embeddings avec fallback Python 3.13
+# Import LlamaIndex Embeddings avec fallback
 try:
     from llama_index.embeddings.openai import OpenAIEmbedding
     LLAMAINDEX_EMBEDDINGS_AVAILABLE = True
@@ -105,7 +95,7 @@ except ImportError:
             def __init__(self, *args, **kwargs):
                 pass
 
-# Import LlamaIndex LLM avec fallbacks multiples - Python 3.13 compatible
+# Import LlamaIndex LLM avec fallbacks multiples
 try:
     from llama_index.llms.openai import OpenAI as LlamaOpenAI
     LLAMAINDEX_LLM_AVAILABLE = True
@@ -123,16 +113,11 @@ except ImportError:
         except ImportError as e:
             LLAMAINDEX_LLM_AVAILABLE = False
             logger.warning(f"LlamaIndex LLM non disponible: {e}")
-            # Classe de fallback qui évite l'erreur abstract method
             class LlamaOpenAI:
                 def __init__(self, *args, **kwargs):
                     pass
-                def complete(self, *args, **kwargs):
-                    return None
-                def chat(self, *args, **kwargs):
-                    return None
 
-# Import LlamaIndex Weaviate avec fallback Python 3.13
+# Import LlamaIndex Weaviate avec fallback
 try:
     from llama_index.vector_stores.weaviate import WeaviateVectorStore
     LLAMAINDEX_WEAVIATE_AVAILABLE = True
@@ -145,11 +130,8 @@ except ImportError as e1:
         logger.info("LlamaIndex WeaviateVectorStore chargé (fallback)")
     except ImportError as e2:
         LLAMAINDEX_WEAVIATE_AVAILABLE = False
+        WeaviateVectorStore = None
         logger.warning(f"LlamaIndex WeaviateVectorStore non disponible. Erreurs: {e1}, {e2}")
-        # Classe de fallback
-        class WeaviateVectorStore:
-            def __init__(self, *args, **kwargs):
-                pass
 
 # OpenAI import pour compatibilité
 from openai import OpenAI
@@ -200,14 +182,17 @@ RAG_HYBRID_ALPHA = float(os.getenv("RAG_HYBRID_ALPHA", "0.7"))
 RAG_VERIFICATION_ENABLED = os.getenv("RAG_VERIFICATION_ENABLED", "true").lower() == "true"
 
 
-def _build_openai_client() -> OpenAI:
+def _build_openai_client() -> OpenAI:   # ⬅️ AJOUT pour fix proxy
     """
     Construit un client OpenAI avec un httpx.Client explicite, sans proxies implicites.
-    Compatible Python 3.13 et évite le crash avec httpx >= 0.28.
+    Évite le crash avec httpx >= 0.28 où les proxies par défaut peuvent causer des erreurs.
+    
+    Si vous devez absolument utiliser un proxy, remplacez la ligne httpx.Client(...) par:
+        httpx.Client(proxies=os.getenv("OPENAI_HTTP_PROXY") or os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY"), timeout=30.0)
     """
     try:
         # Client httpx sans proxies automatiques pour éviter les crashes
-        http_client = httpx.Client(timeout=30.0)
+        http_client = httpx.Client(timeout=30.0)  # pas d'argument 'proxies' -> évite le crash
         return OpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
     except Exception as e:
         logger.warning(f"Erreur création client OpenAI avec httpx personnalisé: {e}")
@@ -756,9 +741,10 @@ class PoultryFilteredRetriever:
 
 
 class InteliaRAGEngine:
-    """Engine RAG principal - Version Python 3.13 compatible avec workaround LLM"""
+    """Engine RAG principal utilisant LlamaIndex avec votre intelligence métier - Version robuste avec fix httpx"""
     
     def __init__(self, openai_client: OpenAI = None):
+        # ⬇️ Remplace l'appel direct par la fabrique qui neutralise les proxies implicites
         self.openai_client = openai_client or _build_openai_client()
         self.intent_processor = None
         self.ood_detector = None
@@ -773,63 +759,59 @@ class InteliaRAGEngine:
         self.degraded_mode = False
         
     async def initialize(self):
-        """Initialisation avec workaround LLM Python 3.13"""
+        """Initialisation du système RAG hybride amélioré - Version robuste"""
         if self.is_initialized:
             return
             
-        logger.info("Initialisation Intelia RAG Engine Enhanced (Python 3.13 compatible)...")
+        logger.info("Initialisation Intelia RAG Engine Enhanced avec LlamaIndex...")
         
         # Vérifier les dépendances critiques
         if not WEAVIATE_AVAILABLE or not LLAMAINDEX_WEAVIATE_AVAILABLE:
-            logger.warning(f"Weaviate non disponible - Mode dégradé activé.")
+            logger.warning(f"Weaviate non disponible - Mode dégradé activé. WEAVIATE_AVAILABLE: {WEAVIATE_AVAILABLE}, LLAMAINDEX_WEAVIATE_AVAILABLE: {LLAMAINDEX_WEAVIATE_AVAILABLE}")
             self.degraded_mode = True
         
-        # Configuration LlamaIndex avec workaround Python 3.13
+        # Configuration globale LlamaIndex avec gestion d'erreurs robuste
         try:
+            if LLAMAINDEX_AVAILABLE and LLAMAINDEX_LLM_AVAILABLE:
+                try:
+                    Settings.llm = LlamaOpenAI(
+                        model="gpt-4o-mini",
+                        api_key=OPENAI_API_KEY,
+                        temperature=0.1,
+                        max_tokens=800
+                    )
+                    logger.info("LlamaIndex LLM configuré avec succès")
+                except Exception as e:
+                    logger.warning(f"Erreur configuration LlamaIndex LLM: {e}")
+                    # Continuer sans LLM configuré
+                    pass
+            
+            if LLAMAINDEX_AVAILABLE and LLAMAINDEX_EMBEDDINGS_AVAILABLE:
+                try:
+                    Settings.embed_model = OpenAIEmbedding(
+                        model="text-embedding-3-small",
+                        api_key=OPENAI_API_KEY
+                    )
+                    logger.info("LlamaIndex Embeddings configuré avec succès")
+                except Exception as e:
+                    logger.warning(f"Erreur configuration LlamaIndex Embeddings: {e}")
+                    # Continuer sans embeddings configurés
+                    pass
+            
             if LLAMAINDEX_AVAILABLE:
-                # WORKAROUND: Ne pas configurer de LLM global si erreur abstract method
-                if LLAMAINDEX_LLM_AVAILABLE:
-                    try:
-                        # Tentative prudente de configuration LLM
-                        test_llm = LlamaOpenAI(
-                            model="gpt-4o-mini",
-                            api_key=OPENAI_API_KEY,
-                            temperature=0.1,
-                            max_tokens=800
-                        )
-                        # Test si le LLM fonctionne
-                        Settings.llm = test_llm
-                        logger.info("LlamaIndex LLM configuré avec succès")
-                    except Exception as e:
-                        logger.warning(f"LLM configuration failed: {e} - Utilisation d'OpenAI direct")
-                        # Ne pas configurer de LLM global, utiliser OpenAI directement
-                        Settings.llm = None
-                
-                # Configuration Embeddings
-                if LLAMAINDEX_EMBEDDINGS_AVAILABLE:
-                    try:
-                        Settings.embed_model = OpenAIEmbedding(
-                            model="text-embedding-3-small",
-                            api_key=OPENAI_API_KEY
-                        )
-                        logger.info("LlamaIndex Embeddings configuré avec succès")
-                    except Exception as e:
-                        logger.warning(f"Erreur configuration Embeddings: {e}")
-                
-                # Configuration des chunks
                 Settings.chunk_size = RAG_CHUNK_SIZE
                 Settings.chunk_overlap = RAG_CHUNK_OVERLAP
                 
         except Exception as e:
             logger.error(f"Erreur configuration LlamaIndex: {e}")
-            logger.info("Fonctionnement en mode dégradé gracieux")
+            self.degraded_mode = True
         
-        # Initialisation des composants métier
+        # Initialisation des composants améliorés
         try:
             if INTENT_PROCESSOR_AVAILABLE:
                 self.intent_processor = create_intent_processor()
             else:
-                logger.warning("Intent processor non disponible")
+                logger.warning("Intent processor non disponible - fonctionnalité désactivée")
                 
             self.ood_detector = EnhancedOODDetector()
             self.reranker = MultiStageReranker()
@@ -838,35 +820,43 @@ class InteliaRAGEngine:
             logger.info("Composants d'intelligence métier initialisés")
         except Exception as e:
             logger.error(f"Erreur init composants métier: {e}")
-            # Fallback vers composants minimaux
+            # Continuer avec composants par défaut
             self.ood_detector = EnhancedOODDetector()
             self.reranker = MultiStageReranker()
             self.verifier = ResponseVerifier(self.openai_client)
             self.conversation_memory = ConversationMemoryEnhanced(self.openai_client)
         
-        # Connexion Weaviate
+        # Connexion Weaviate (votre configuration préservée)
         if not self.degraded_mode:
             try:
                 await self._connect_weaviate()
+                # Construction de l'index et query engine améliorés
                 await self._build_enhanced_query_engine()
             except Exception as e:
                 logger.error(f"Erreur Weaviate/Query Engine: {e}")
                 self.degraded_mode = True
         
         self.is_initialized = True
-        status_msg = "RAG Engine Enhanced initialisé avec succès (Python 3.13)"
+        status_msg = "RAG Engine Enhanced initialisé avec succès"
         if self.degraded_mode:
-            status_msg += " (Mode dégradé)"
+            status_msg += " (Mode dégradé - certaines fonctionnalités limitées)"
         logger.info(status_msg)
     
     async def _connect_weaviate(self):
-        """Connexion Weaviate - identique à l'original"""
+        """Connexion à votre instance Weaviate existante - version robuste"""
+        
+        # Vérifier si Weaviate est disponible
         if not WEAVIATE_AVAILABLE or not LLAMAINDEX_WEAVIATE_AVAILABLE:
-            raise Exception("Weaviate non disponible")
+            raise Exception(
+                f"Weaviate non disponible. WEAVIATE_AVAILABLE: {WEAVIATE_AVAILABLE}, "
+                f"LLAMAINDEX_WEAVIATE_AVAILABLE: {LLAMAINDEX_WEAVIATE_AVAILABLE}"
+            )
         
         try:
             if WEAVIATE_V4:
+                # Version 4.x - nouvelle API
                 if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
+                    # Cloud connection
                     if wvc:
                         auth_credentials = wvc.init.Auth.api_key(WEAVIATE_API_KEY)
                         self.weaviate_client = weaviate.connect_to_weaviate_cloud(
@@ -875,8 +865,9 @@ class InteliaRAGEngine:
                             headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
                         )
                     else:
-                        raise Exception("weaviate.classes non disponible")
+                        raise Exception("weaviate.classes (wvc) non disponible pour connexion cloud")
                 else:
+                    # Local connection v4
                     host = WEAVIATE_URL.replace('http://', '').replace('https://', '')
                     port = 8080
                     if ':' in host:
@@ -889,15 +880,18 @@ class InteliaRAGEngine:
                         headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
                     )
             else:
-                # Version 3.x
+                # Version 3.x - ancienne API (compatibilité)
                 if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
+                    # Cloud connection v3
                     auth_config = weaviate.AuthApiKey(api_key=WEAVIATE_API_KEY)
+                    
                     self.weaviate_client = weaviate.Client(
                         url=WEAVIATE_URL,
                         auth_client_secret=auth_config,
                         additional_headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
                     )
                 else:
+                    # Local connection v3
                     self.weaviate_client = weaviate.Client(
                         url=WEAVIATE_URL,
                         additional_headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
@@ -910,9 +904,10 @@ class InteliaRAGEngine:
                 else:
                     raise Exception("Weaviate not ready")
             else:
+                # Pour v3, pas de méthode is_ready(), tester avec schema
                 try:
                     self.weaviate_client.schema.get()
-                    logger.info("Connexion Weaviate v3 établie")
+                    logger.info(f"Connexion Weaviate v3 établie")
                 except Exception:
                     raise Exception("Weaviate v3 connection failed")
                     
@@ -922,33 +917,50 @@ class InteliaRAGEngine:
             raise
     
     async def _build_enhanced_query_engine(self):
-        """Construction du query engine - Python 3.13 compatible"""
+        """Construction du query engine avec intelligence métier améliorée - version robuste"""
         
+        # Vérifier que Weaviate est disponible
         if not self.weaviate_client or not LLAMAINDEX_WEAVIATE_AVAILABLE:
             logger.warning("Weaviate non disponible - Query engine désactivé")
             self.query_engine = None
             return
         
+        # Vector store LlamaIndex avec votre collection
         try:
-            # Vérifier la collection
             if WEAVIATE_V4:
+                # Version 4.x - nouvelle API
                 try:
                     collection = self.weaviate_client.collections.get("InteliaKnowledge")
                     logger.info("Collection InteliaKnowledge trouvée - utilisation des données existantes")
                 except Exception as e:
                     logger.warning(f"Collection InteliaKnowledge non accessible (v4): {e}")
             else:
+                # Version 3.x - vérifier avec schema
                 try:
                     schema = self.weaviate_client.schema.get()
                     classes = [cls['class'] for cls in schema.get('classes', [])]
                     if "InteliaKnowledge" in classes:
-                        logger.info("Collection InteliaKnowledge trouvée (v3)")
+                        logger.info("Collection InteliaKnowledge trouvée (v3) - utilisation des données existantes")
                     else:
-                        logger.warning("Collection InteliaKnowledge non trouvée")
+                        logger.warning("Collection InteliaKnowledge non trouvée dans le schéma v3")
                 except Exception as e:
                     logger.warning(f"Erreur accès schéma v3: {e}")
         
-            # Créer le vector store
+            # Créer le vector store avec la classe appropriée
+            if WEAVIATE_V4:
+                self.vector_store = WeaviateVectorStore(
+                    weaviate_client=self.weaviate_client,
+                    index_name="InteliaKnowledge"  # v4 utilise index_name
+                )
+            else:
+                self.vector_store = WeaviateVectorStore(
+                    weaviate_client=self.weaviate_client,
+                    class_name="InteliaKnowledge"  # v3 utilise class_name
+                )
+        
+        except Exception as e:
+            logger.error(f"Erreur création vector store: {e}")
+            # Créer un vector store par défaut
             try:
                 if WEAVIATE_V4:
                     self.vector_store = WeaviateVectorStore(
@@ -960,42 +972,45 @@ class InteliaRAGEngine:
                         weaviate_client=self.weaviate_client,
                         class_name="InteliaKnowledge"
                     )
-            except Exception as e:
-                logger.error(f"Erreur création vector store: {e}")
+            except Exception as e2:
+                logger.error(f"Impossible de créer vector store: {e2}")
                 self.query_engine = None
                 return
 
-            # Index et query engine
-            try:
-                self.index = VectorStoreIndex.from_vector_store(
-                    self.vector_store,
-                    show_progress=False
-                )
+        # Index avec recherche hybride activée
+        try:
+            self.index = VectorStoreIndex.from_vector_store(
+                self.vector_store,
+                show_progress=False
+            )
 
-                # Retriever avec intelligence métier
+            # Retriever personnalisé avec reranking amélioré
+            try:
                 base_retriever = VectorIndexRetriever(
                     index=self.index,
                     similarity_top_k=RAG_SIMILARITY_TOP_K
                 )
                 
+                # Wrapper avec votre logique métier améliorée
                 enhanced_retriever = PoultryFilteredRetriever(
                     base_retriever=base_retriever,
                     intent_processor=self.intent_processor,
                     reranker=self.reranker
                 )
                 
-                # Post-processor et synthesizer
+                # Post-processor adaptatif
                 postprocessor = SimilarityPostprocessor(
                     similarity_cutoff=RAG_CONFIDENCE_THRESHOLD
                 )
                 
+                # Response synthesizer avec prompts améliorés
                 synthesizer = get_response_synthesizer(
                     response_mode="compact",
                     use_async=True,
                     streaming=False
                 )
                 
-                # Query engine final
+                # Query engine final amélioré
                 self.query_engine = RetrieverQueryEngine(
                     retriever=enhanced_retriever,
                     response_synthesizer=synthesizer,
@@ -1005,7 +1020,7 @@ class InteliaRAGEngine:
                 logger.info("Query engine amélioré construit avec intelligence métier")
                 
             except Exception as e:
-                logger.error(f"Erreur construction query engine: {e}")
+                logger.error(f"Erreur construction retriever/query engine: {e}")
                 self.query_engine = None
             
         except Exception as e:
@@ -1013,11 +1028,12 @@ class InteliaRAGEngine:
             self.query_engine = None
     
     async def process_query(self, query: str, language: str = "fr", tenant_id: str = "") -> RAGResult:
-        """Interface de traitement des requêtes - identique à l'original"""
+        """Interface compatible avec votre système actuel - version robuste"""
         
         if not RAG_ENABLED:
             return RAGResult(source=RAGSource.FALLBACK_NEEDED, metadata={"reason": "rag_disabled"})
         
+        # Mode dégradé si pas initialisé
         if not self.is_initialized:
             try:
                 await self.initialize()
@@ -1025,6 +1041,7 @@ class InteliaRAGEngine:
                 logger.error(f"Erreur initialisation tardive: {e}")
                 return RAGResult(source=RAGSource.ERROR, metadata={"error": str(e)})
         
+        # Si pas de query engine (Weaviate indisponible), fallback
         if not self.query_engine or self.degraded_mode:
             return RAGResult(
                 source=RAGSource.FALLBACK_NEEDED,
@@ -1034,7 +1051,7 @@ class InteliaRAGEngine:
         start_time = time.time()
         
         try:
-            # Contexte conversationnel
+            # Récupération du contexte conversationnel
             conversation_context = ""
             if tenant_id and self.conversation_memory:
                 try:
@@ -1042,7 +1059,7 @@ class InteliaRAGEngine:
                 except Exception as e:
                     logger.warning(f"Erreur mémoire conversationnelle: {e}")
             
-            # Intent processing
+            # Classification améliorée avec votre intelligence métier
             intent_result = None
             if self.intent_processor:
                 try:
@@ -1050,7 +1067,7 @@ class InteliaRAGEngine:
                 except Exception as e:
                     logger.warning(f"Erreur intent processor: {e}")
             
-            # OOD detection
+            # Détection hors-domaine améliorée
             if self.ood_detector:
                 try:
                     is_in_domain, domain_score, score_details = self.ood_detector.calculate_ood_score(query)
@@ -1071,15 +1088,16 @@ class InteliaRAGEngine:
                 except Exception as e:
                     logger.warning(f"Erreur OOD detector: {e}")
             
-            # Construction requête enrichie
+            # Construction de la requête enrichie
             search_query = query
             if intent_result and hasattr(intent_result, 'expanded_query') and intent_result.expanded_query:
                 search_query = intent_result.expanded_query
             
+            # Ajout du contexte conversationnel si pertinent
             if conversation_context:
                 search_query = f"Contexte: {conversation_context}\n\nQuestion: {search_query}"
             
-            # Requête LlamaIndex
+            # Requête LlamaIndex avec votre contexte métier
             try:
                 response = await self.query_engine.aquery(search_query)
             except Exception as e:
@@ -1101,10 +1119,10 @@ class InteliaRAGEngine:
                     metadata={"reason": "empty_response"}
                 )
             
-            # Calcul confiance
+            # Calcul de confiance amélioré
             confidence = self._calculate_enhanced_confidence(response, intent_result)
             
-            # Context docs
+            # Construction des context docs
             context_docs = []
             if hasattr(response, 'source_nodes') and response.source_nodes:
                 for node in response.source_nodes:
@@ -1125,7 +1143,7 @@ class InteliaRAGEngine:
                         "detected_entities": metadata.get("detected_entities", {})
                     })
             
-            # Vérification réponses
+            # Vérification des réponses (Chain-of-Verification)
             verification_result = None
             if self.verifier and confidence > 0.7:
                 try:
@@ -1135,13 +1153,13 @@ class InteliaRAGEngine:
                 except Exception as e:
                     logger.warning(f"Erreur vérification: {e}")
             
-            # Source selon vérification
+            # Ajustement de la source selon la vérification
             result_source = RAGSource.RAG_KNOWLEDGE
             if verification_result and verification_result.get("verified", True):
                 result_source = RAGSource.RAG_VERIFIED
-                confidence = min(confidence * 1.1, 0.95)
+                confidence = min(confidence * 1.1, 0.95)  # Boost pour réponse vérifiée
             
-            # Métadonnées enrichies
+            # Construction des métadonnées enrichies
             metadata = {
                 "llama_index_available": LLAMAINDEX_AVAILABLE,
                 "weaviate_version": weaviate_version if WEAVIATE_AVAILABLE else "N/A",
@@ -1153,9 +1171,7 @@ class InteliaRAGEngine:
                 "processing_time": time.time() - start_time,
                 "reranking_applied": len(context_docs) > 1,
                 "verification_enabled": RAG_VERIFICATION_ENABLED,
-                "httpx_proxy_fix_applied": True,
-                "python_version": "3.13",
-                "llamaindex_llm_workaround": not LLAMAINDEX_LLM_AVAILABLE or Settings.llm is None
+                "httpx_proxy_fix_applied": True  # ⬅️ Indicateur du fix
             }
             
             if intent_result:
@@ -1169,7 +1185,7 @@ class InteliaRAGEngine:
             if self.ood_detector and 'score_details' in locals():
                 metadata["domain_analysis"] = score_details
             
-            # Sauvegarde mémoire
+            # Sauvegarde dans la mémoire conversationnelle
             if tenant_id and self.conversation_memory:
                 try:
                     self.conversation_memory.add_exchange(tenant_id, query, response.response)
@@ -1188,7 +1204,7 @@ class InteliaRAGEngine:
             )
             
         except Exception as e:
-            logger.error(f"Erreur traitement query: {e}")
+            logger.error(f"Erreur traitement query amélioré: {e}")
             return RAGResult(
                 source=RAGSource.ERROR,
                 confidence=0.0,
@@ -1198,7 +1214,7 @@ class InteliaRAGEngine:
             )
     
     def _calculate_enhanced_confidence(self, response, intent_result) -> float:
-        """Calcul de confiance - identique à l'original"""
+        """Calcul de confiance amélioré avec facteurs multiples - version robuste"""
         try:
             if not hasattr(response, 'source_nodes') or not response.source_nodes:
                 return 0.0
@@ -1212,22 +1228,29 @@ class InteliaRAGEngine:
                     continue
             
             if not scores:
-                return 0.5
+                return 0.5  # Confiance par défaut
             
+            # Score de base: moyenne pondérée
             avg_score = sum(scores) / len(scores)
+            
+            # Facteur de cohérence: plus de documents = plus de confiance
             coherence_factor = min(1.2, 1 + (len(scores) - 1) * 0.05)
             
+            # Facteur d'intention: bonus si l'intention est bien détectée
             intent_factor = 1.0
             if intent_result and hasattr(intent_result, 'confidence') and intent_result.confidence > 0.8:
                 intent_factor = 1.1
             
+            # Facteur de distribution des scores: pénaliser si trop dispersé
             if len(scores) > 1:
                 score_std = np.std(scores)
                 distribution_factor = max(0.9, 1 - score_std * 0.5)
             else:
                 distribution_factor = 1.0
             
+            # Calcul final
             final_confidence = avg_score * coherence_factor * intent_factor * distribution_factor
+            
             return min(0.95, max(0.1, final_confidence))
             
         except Exception as e:
@@ -1235,7 +1258,7 @@ class InteliaRAGEngine:
             return 0.5
     
     def get_status(self) -> Dict:
-        """Status avec diagnostics Python 3.13"""
+        """Status amélioré avec diagnostics détaillés - version robuste"""
         try:
             weaviate_connected = (
                 self.weaviate_client is not None and 
@@ -1246,13 +1269,11 @@ class InteliaRAGEngine:
                 "rag_enabled": RAG_ENABLED,
                 "initialized": self.is_initialized,
                 "degraded_mode": self.degraded_mode,
-                "python_version": "3.13",
                 "weaviate_available": WEAVIATE_AVAILABLE,
                 "weaviate_version": weaviate_version if WEAVIATE_AVAILABLE else "N/A",
                 "weaviate_v4": WEAVIATE_V4,
                 "llamaindex_available": LLAMAINDEX_AVAILABLE,
                 "llamaindex_llm_available": LLAMAINDEX_LLM_AVAILABLE,
-                "llamaindex_llm_configured": Settings.llm is not None if LLAMAINDEX_AVAILABLE else False,
                 "llamaindex_embeddings_available": LLAMAINDEX_EMBEDDINGS_AVAILABLE,
                 "llamaindex_weaviate_available": LLAMAINDEX_WEAVIATE_AVAILABLE,
                 "weaviate_connected": weaviate_connected,
@@ -1269,7 +1290,7 @@ class InteliaRAGEngine:
                 "rerank_top_k": RAG_RERANK_TOP_K,
                 "hybrid_alpha": RAG_HYBRID_ALPHA,
                 "graceful_fallback_available": True,
-                "httpx_proxy_fix_applied": True,
+                "httpx_proxy_fix_applied": True,  # ⬅️ Indicateur du fix
                 "features": [
                     "enhanced_ood_detection",
                     "multi_stage_reranking", 
@@ -1284,9 +1305,7 @@ class InteliaRAGEngine:
                     "weaviate_version_compatibility",
                     "robust_error_handling",
                     "graceful_degradation",
-                    "httpx_proxy_crash_protection",
-                    "python_313_compatibility",
-                    "llamaindex_llm_workaround"
+                    "httpx_proxy_crash_protection"  # ⬅️ Nouvelle feature
                 ]
             }
         except Exception as e:
@@ -1295,12 +1314,11 @@ class InteliaRAGEngine:
                 "error": str(e),
                 "rag_enabled": RAG_ENABLED,
                 "initialized": False,
-                "degraded_mode": True,
-                "python_version": "3.13"
+                "degraded_mode": True
             }
     
     async def cleanup(self):
-        """Nettoyage des ressources - Python 3.13 compatible"""
+        """Nettoyage des ressources amélioré - version robuste"""
         try:
             if self.weaviate_client:
                 try:
@@ -1315,28 +1333,28 @@ class InteliaRAGEngine:
                 except Exception as e:
                     logger.warning(f"Erreur nettoyage mémoire: {e}")
             
-            # Fermer client httpx
+            # Fermer le client httpx si nécessaire
             try:
                 if hasattr(self.openai_client, 'http_client') and hasattr(self.openai_client.http_client, 'close'):
                     await self.openai_client.http_client.aclose()
             except Exception as e:
                 logger.warning(f"Erreur fermeture httpx client: {e}")
             
-            logger.info("RAG Engine Enhanced nettoyé (Python 3.13)")
+            logger.info("RAG Engine Enhanced nettoyé")
         except Exception as e:
             logger.error(f"Erreur nettoyage: {e}")
 
 
-# Fonctions utilitaires pour compatibilité
+# Fonctions utilitaires pour compatibilité avec votre système (préservées)
 async def create_rag_engine(openai_client: OpenAI = None) -> InteliaRAGEngine:
-    """Factory pour créer le RAG engine - Python 3.13 compatible"""
+    """Factory pour créer le RAG engine amélioré - version robuste"""
     try:
         engine = InteliaRAGEngine(openai_client)
         await engine.initialize()
         return engine
     except Exception as e:
         logger.error(f"Erreur création RAG engine: {e}")
-        # Mode dégradé
+        # Retourner un engine en mode dégradé
         engine = InteliaRAGEngine(openai_client)
         engine.degraded_mode = True
         engine.is_initialized = True
@@ -1349,7 +1367,7 @@ async def process_question_with_rag(
     language: str = "fr", 
     tenant_id: str = ""
 ) -> RAGResult:
-    """Interface compatible avec votre système actuel - Python 3.13"""
+    """Interface compatible avec votre système actuel - version robuste"""
     try:
         return await rag_engine.process_query(question, language, tenant_id)
     except Exception as e:
