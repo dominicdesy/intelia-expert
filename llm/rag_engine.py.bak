@@ -249,20 +249,6 @@ class Document:
     def __post_init__(self):
         if self.metadata is None:
             self.metadata = {}
-    
-    def get(self, key: str, default=None):
-        """Méthode get() pour compatibilité avec les guardrails"""
-        if key == "content":
-            return self.content
-        elif key == "metadata":
-            return self.metadata
-        elif key == "score":
-            return self.score
-        elif key in self.metadata:
-            return self.metadata[key]
-        else:
-            return getattr(self, key, default)
-
 
 # === GESTIONNAIRE DE CACHE REDIS ===
 class RAGCacheManager:
