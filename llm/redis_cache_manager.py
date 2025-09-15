@@ -3,6 +3,7 @@
 redis_cache_manager.py - Gestionnaire de cache Redis optimisé pour performance
 Version Enhanced avec intégration des aliases d'intents.json
 NOUVELLES FONCTIONNALITÉS: Cache sémantique intelligent basé sur configuration métier
+CORRECTIONS: Méthode get_semantic_response() dédiée + normalisation renforcée
 """
 
 import json
@@ -100,6 +101,9 @@ class RAGCacheManager:
         # Monitoring
         self.last_memory_check = 0
         self.last_stats_log = 0
+        
+        # NOUVEAU: Tracking du dernier type de hit
+        self.hit_type_last = None
     
     def _load_intent_aliases(self) -> Dict:
         """Charge les aliases depuis intents.json avec fallback robuste"""
@@ -259,6 +263,9 @@ class RAGCacheManager:
         normalized = re.sub(r'\b(indice\s+conversion|conversion\s+alimentaire)\b', 'fcr', normalized)
         normalized = re.sub(r'\bà\s+(\d+)\s*j\b', r'\1j', normalized)
         
+        # CORRECTION 2: Coller les tokens alpha-num consécutifs (ross 308 -> ross308)
+        normalized = re.sub(r'([a-z]+)\s+(\d+)', r'\1\2', normalized)
+        
         return normalized.strip()
     
     def _apply_aliases(self, text: str) -> str:
@@ -390,6 +397,44 @@ class RAGCacheManager:
             fallback_keys.append(f"intelia_rag:response:nostop:{no_stopwords_hash}")
         
         return fallback_keys[:2]  # Limiter à 2 fallbacks max
+    
+    # CORRECTION 1: Méthode get_semantic_response() dédiée (lookup "pur")
+    async def get_semantic_response(self, query: str, language: str = "fr") -> Optional[str]:
+        """
+        Lecture sémantique pure (ultra précoce, avant tout calcul)
+        Ne fait QUE la tentative de cache sémantique, rien d'autre
+        """
+        if not self.enabled or not self.client or not self.ENABLE_SEMANTIC_CACHE:
+            return None
+        
+        try:
+            normalized_query = self._normalize_text(query)
+            keywords = self._extract_semantic_keywords_fast(normalized_query)
+            
+            # Assouplir le seuil à 1 terme si l'un d'eux est critique
+            critical_terms = {'ross308', 'cobb500', 'fcr', 'mortalite', 'performance'}
+            has_critical = bool(keywords & critical_terms)
+            min_keywords = 1 if has_critical else 2
+            
+            if len(keywords) < min_keywords:
+                return None
+            
+            # Générer clé sémantique uniquement
+            semantic_signature = '|'.join(sorted(keywords))
+            hash_obj = hashlib.md5(semantic_signature.encode('utf-8'))
+            semantic_key = f"intelia_rag:response:semantic:{hash_obj.hexdigest()}"
+            
+            stored = await self.client.get(semantic_key)
+            if stored:
+                self.hit_type_last = "semantic"
+                self.cache_stats["semantic_hits"] += 1
+                logger.info(f"Cache HIT (sémantique pur): '{query[:30]}...' -> keywords: {list(keywords)[:5]}")
+                return stored.decode("utf-8")
+            
+        except Exception as e:
+            logger.warning(f"Erreur get_semantic_response: {e}")
+        
+        return None
     
     async def _get_memory_usage_mb(self) -> float:
         """Récupère l'usage mémoire Redis en MB"""
@@ -961,7 +1006,7 @@ class RAGCacheManager:
             
             return {
                 "enabled": True,
-                "approach": "enhanced_semantic_cache_with_aliases",
+                "approach": "enhanced_semantic_cache_with_aliases_v2",
                 "memory": {
                     "used_mb": round(memory_usage_mb, 2),
                     "used_human": info.get("used_memory_human", "N/A"),
@@ -1004,7 +1049,8 @@ class RAGCacheManager:
                         "compression": self.ENABLE_COMPRESSION,
                         "semantic_cache": self.ENABLE_SEMANTIC_CACHE,
                         "fallback_keys": self.ENABLE_FALLBACK_KEYS,
-                        "intelligent_aliases": bool(self.aliases)
+                        "intelligent_aliases": bool(self.aliases),
+                        "pure_semantic_lookup": True  # Nouvelle fonctionnalité
                     }
                 }
             }
@@ -1053,7 +1099,8 @@ class RAGCacheManager:
                 "feature_flags": {
                     "semantic_enabled": self.ENABLE_SEMANTIC_CACHE,
                     "fallback_enabled": self.ENABLE_FALLBACK_KEYS,
-                    "compression_enabled": self.ENABLE_COMPRESSION
+                    "compression_enabled": self.ENABLE_COMPRESSION,
+                    "pure_semantic_lookup": True
                 }
             }
             
