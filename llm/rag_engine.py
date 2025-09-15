@@ -1788,6 +1788,7 @@ RÈGLE: Réponds strictement en {language}."""
                 "optimizations": {
                     "external_cache_enabled": self.cache_manager.enabled if self.cache_manager else False,
                     "hybrid_search_enabled": HYBRID_SEARCH_ENABLED,
+		    "semantic_cache_enabled": self.cache_manager.ENABLE_SEMANTIC_CACHE if self.cache_manager else False,
                     "entity_enrichment_enabled": ENTITY_ENRICHMENT_ENABLED,
                     "guardrails_level": GUARDRAILS_LEVEL,
                     "verification_smart": RAG_VERIFICATION_SMART,
