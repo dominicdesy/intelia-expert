@@ -6,6 +6,8 @@ NOUVELLES FONCTIONNALITÉS:
 - Cache sémantique basé sur aliases métier
 - Debug tools intégrés
 - Métriques de performance étendues
+- Harmonisation OpenAI Async/Sync
+- OPTIMISATIONS v2.3: Initialisation Redis asynchrone, détection langue améliorée, monitoring enrichi
 """
 
 import os
@@ -22,7 +24,7 @@ from fastapi import FastAPI, APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
 from langdetect import detect, DetectorFactory
 
 # Import du RAG Engine Enhanced (remplace l'ancien import)
@@ -69,7 +71,8 @@ ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "https://expert.intelia.com").spl
 # Nouveaux paramètres pour fonctionnalités améliorées
 ENABLE_RESPONSE_STREAMING = os.getenv("ENABLE_RESPONSE_STREAMING", "true").lower() == "true"
 ENABLE_METRICS_LOGGING = os.getenv("ENABLE_METRICS_LOGGING", "true").lower() == "true"
-MAX_CONVERSATION_CONTEXT = int(os.getenv("MAX_CONVERSATION_CONTEXT", "3"))
+# MODIFIÉ: Augmentation du contexte de conversation
+MAX_CONVERSATION_CONTEXT = int(os.getenv("MAX_CONVERSATION_CONTEXT", "6"))  # 3 → 6 pour meilleure désambiguïsation
 
 # Nouveaux paramètres RAG Enhanced
 USE_AGENT_RAG = os.getenv("USE_AGENT_RAG", "false").lower() == "true"  # Désactivé par défaut
@@ -78,11 +81,23 @@ PREFER_ENHANCED_RAG = os.getenv("PREFER_ENHANCED_RAG", "true").lower() == "true"
 # NOUVEAU: Paramètres cache sémantique
 ENABLE_SEMANTIC_DEBUG = os.getenv("ENABLE_SEMANTIC_DEBUG", "true").lower() == "true"
 
+# NOUVEAU: Seuil de détection de langue court
+LANG_DETECTION_MIN_LENGTH = int(os.getenv("LANG_DETECTION_MIN_LENGTH", "20"))
+
 # Validation configuration
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY is required")
 
-logger.info(f"Mode RAG Enhanced: Cache Sémantique Intelligent + Aliases + Debug Tools")
+logger.info(f"Mode RAG Enhanced: Cache Sémantique Intelligent + Aliases + Debug Tools v2.3")
+
+# Helpers OpenAI harmonisés
+def get_openai_sync() -> OpenAI:
+    """Factory pour client OpenAI synchrone"""
+    return OpenAI(api_key=OPENAI_API_KEY)
+
+def get_openai_async() -> AsyncOpenAI:
+    """Factory pour client OpenAI asynchrone"""
+    return AsyncOpenAI(api_key=OPENAI_API_KEY)
 
 # Chargement des messages multilingues (votre logique préservée)
 def _load_language_messages(path: str) -> Dict[str, str]:
@@ -111,13 +126,14 @@ def get_out_of_domain_message(lang: str) -> str:
     short = code.split("-")[0]
     return OUT_OF_DOMAIN_MESSAGES.get(short, OUT_OF_DOMAIN_MESSAGES["default"])
 
-# OpenAI client
+# OpenAI clients harmonisés
 try:
-    openai_client = OpenAI(api_key=OPENAI_API_KEY)
-    logger.info("OpenAI client initialized")
+    openai_client_sync = get_openai_sync()
+    openai_client_async = get_openai_async()
+    logger.info("Clients OpenAI (sync + async) initialisés")
 except Exception as e:
-    logger.error(f"Erreur initialisation OpenAI client: {e}")
-    raise RuntimeError(f"Impossible d'initialiser le client OpenAI: {e}")
+    logger.error(f"Erreur initialisation clients OpenAI: {e}")
+    raise RuntimeError(f"Impossible d'initialiser les clients OpenAI: {e}")
 
 # Mémoire de conversation simplifiée (préservée avec améliorations mineures)
 class TenantMemory(OrderedDict):
@@ -180,7 +196,7 @@ def add_to_conversation_memory(tenant_id: str, question: str, answer: str, sourc
 
 # Classe de métriques pour monitoring amélioré - ÉTENDUE pour Cache Sémantique
 class MetricsCollector:
-    """Collecteur de métriques pour monitoring des performances - Version Enhanced"""
+    """Collecteur de métriques pour monitoring des performances - Version Enhanced v2.3"""
     
     def __init__(self):
         self.metrics = {
@@ -199,11 +215,14 @@ class MetricsCollector:
             "fallback_cache_hits": 0,
             "hybrid_searches": 0,
             "guardrail_violations": 0,
+            "api_corrections": 0,
             "avg_processing_time": 0.0,
             "avg_confidence": 0.0,
         }
         self.recent_processing_times = []
         self.recent_confidences = []
+        # NOUVEAU: Métriques de latence enrichies
+        self.latency_percentiles = {"p50": 0.0, "p95": 0.0, "p99": 0.0}
         self.max_recent_samples = 100
         # NOUVEAU: Stockage des temps de traitement endpoint
         self.endpoint_processing_times = []
@@ -248,8 +267,9 @@ class MetricsCollector:
             self.metrics["fallback_cache_hits"] += opt_stats.get("fallback_cache_hits", 0)
             self.metrics["hybrid_searches"] += opt_stats.get("hybrid_searches", 0)
             self.metrics["guardrail_violations"] += opt_stats.get("guardrail_violations", 0)
+            self.metrics["api_corrections"] += opt_stats.get("api_corrections", 0)
         
-        # Temps de traitement avec temps endpoint
+        # NOUVEAU: Calcul des percentiles de latence
         processing_time = endpoint_time if endpoint_time > 0 else getattr(result, 'processing_time', 0)
         
         if processing_time > 0:
@@ -257,9 +277,18 @@ class MetricsCollector:
             if len(self.recent_processing_times) > self.max_recent_samples:
                 self.recent_processing_times.pop(0)
             
+            # Calcul de la moyenne
             self.metrics["avg_processing_time"] = (
                 sum(self.recent_processing_times) / len(self.recent_processing_times)
             )
+            
+            # Calcul des percentiles
+            if len(self.recent_processing_times) >= 10:  # Minimum d'échantillons
+                sorted_times = sorted(self.recent_processing_times)
+                n = len(sorted_times)
+                self.latency_percentiles["p50"] = sorted_times[int(n * 0.5)]
+                self.latency_percentiles["p95"] = sorted_times[int(n * 0.95)]
+                self.latency_percentiles["p99"] = sorted_times[int(n * 0.99)]
         
         # Confiance
         confidence = getattr(result, 'confidence', 0)
@@ -288,7 +317,10 @@ class MetricsCollector:
             "semantic_cache_hit_rate": self.metrics["semantic_cache_hits"] / total_cache_requests,
             "fallback_cache_hit_rate": self.metrics["fallback_cache_hits"] / total_cache_requests,
             "hybrid_search_rate": self.metrics["hybrid_searches"] / total_queries,
-            "guardrail_violation_rate": self.metrics["guardrail_violations"] / total_queries
+            "guardrail_violation_rate": self.metrics["guardrail_violations"] / total_queries,
+            "api_correction_rate": self.metrics["api_corrections"] / total_queries,
+            # NOUVEAU: Percentiles de latence
+            "latency_percentiles": self.latency_percentiles
         }
 
 metrics_collector = MetricsCollector()
@@ -344,10 +376,32 @@ def smart_chunk_text(text: str, max_chunk_size: int = 400) -> list:
     
     return [chunk for chunk in chunks if chunk.strip()]
 
-# Détection de langue (votre logique préservée)
+# MODIFIÉ: Détection de langue améliorée
 def guess_lang_from_text(text: str) -> Optional[str]:
-    """Détection automatique de la langue - Version améliorée"""
+    """Détection automatique de la langue - Version améliorée v2.3"""
     try:
+        # NOUVEAU: Pour les textes courts, utiliser détection légère d'abord
+        if len(text) < LANG_DETECTION_MIN_LENGTH:
+            text_lower = text.lower()
+            
+            # Patterns linguistiques spécifiques pour textes courts
+            quick_patterns = {
+                'fr': ['fcr', 'poulet', 'ross', 'cobb', 'jours', 'jour', 'kg', 'poids', 'conversion'],
+                'en': ['fcr', 'chicken', 'broiler', 'days', 'day', 'weight', 'feed', 'conversion'],
+                'es': ['fcr', 'pollo', 'días', 'día', 'peso', 'conversión', 'alimento'],
+                'de': ['fcr', 'huhn', 'tage', 'tag', 'gewicht', 'futter', 'umwandlung']
+            }
+            
+            for lang, patterns in quick_patterns.items():
+                if any(pattern in text_lower for pattern in patterns):
+                    logger.debug(f"Détection rapide: {lang} pour '{text[:20]}...'")
+                    return lang
+            
+            # Fallback français pour les textes courts non reconnus
+            logger.debug(f"Fallback FR pour texte court: '{text[:20]}...'")
+            return 'fr'
+        
+        # Pour les textes plus longs, utiliser langdetect
         detected = detect(text)
         lang_mapping = {
             'de': 'de', 'ger': 'de',
@@ -359,28 +413,36 @@ def guess_lang_from_text(text: str) -> Optional[str]:
             'pl': 'pl', 'pol': 'pl',
             'pt': 'pt', 'por': 'pt'
         }
-        return lang_mapping.get(detected, detected)
-    except Exception:
-        # Fallback par mots-clés amélioré
+        
+        result = lang_mapping.get(detected, detected)
+        logger.debug(f"Détection longue: {result} pour '{text[:30]}...'")
+        return result
+        
+    except Exception as e:
+        logger.debug(f"Erreur détection langue: {e}, fallback vers patterns")
+        
+        # Fallback par mots-clés améliorés
         text_lower = text.lower()
         
-        # Patterns linguistiques spécifiques
+        # Patterns linguistiques spécifiques étendus
         lang_patterns = {
-            'fr': ['poulet', 'aviculture', 'qu\'est', 'comment', 'quelle', 'combien'],
-            'en': ['chicken', 'poultry', 'what', 'how', 'which', 'where'],
-            'es': ['pollo', 'avicultura', 'qué', 'cómo', 'cuál', 'dónde'],
-            'de': ['huhn', 'geflügel', 'was', 'wie', 'welche', 'wo']
+            'fr': ['poulet', 'aviculture', 'qu\'est', 'comment', 'quelle', 'combien', 'ross', 'cobb', 'fcr'],
+            'en': ['chicken', 'poultry', 'what', 'how', 'which', 'where', 'broiler', 'ross', 'cobb'],
+            'es': ['pollo', 'avicultura', 'qué', 'cómo', 'cuál', 'dónde', 'broiler', 'ross', 'cobb'],
+            'de': ['huhn', 'geflügel', 'was', 'wie', 'welche', 'wo', 'masthuhn', 'ross', 'cobb']
         }
         
         for lang, patterns in lang_patterns.items():
             if any(pattern in text_lower for pattern in patterns):
+                logger.debug(f"Fallback pattern: {lang} pour '{text[:20]}...'")
                 return lang
         
+        logger.debug(f"Fallback final FR pour '{text[:20]}...'")
         return 'fr'  # Défaut français
 
-# Générateur de prompts spécialisés amélioré (préservé)
+# Générateur de prompts spécialisés amélioré (HARMONISÉ avec AsyncOpenAI)
 async def generate_specialized_response(query: str, language: str = "fr", intent_result = None) -> str:
-    """Génération de réponse avec prompts spécialisés selon l'intention"""
+    """Génération de réponse avec prompts spécialisés selon l'intention - Version Async"""
     
     # Prompt de base selon la langue
     system_prompts = {
@@ -409,7 +471,8 @@ async def generate_specialized_response(query: str, language: str = "fr", intent
             system_message += " Fournis des analyses de coûts détaillées et des calculs de rentabilité."
     
     try:
-        response = openai_client.chat.completions.create(
+        # Utiliser le client async global
+        response = await openai_client_async.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_message},
@@ -423,9 +486,9 @@ async def generate_specialized_response(query: str, language: str = "fr", intent
         logger.error(f"Erreur génération spécialisée: {e}")
         return "Désolé, une erreur est survenue lors de la génération de la réponse."
 
-# Initialisation RAG - MODIFIÉ pour RAG Enhanced
+# MODIFIÉ: Initialisation RAG avec vérification Redis asynchrone
 async def initialize_rag_engines():
-    """Initialise les engines RAG (Enhanced + optionnel Agent)"""
+    """Initialise les engines RAG (Enhanced + optionnel Agent) avec vérification Redis"""
     global rag_engine_enhanced, agent_rag_engine
     
     if rag_engine_enhanced is not None:
@@ -434,13 +497,24 @@ async def initialize_rag_engines():
     # 1. Initialiser RAG Enhanced (prioritaire)
     if PREFER_ENHANCED_RAG:
         try:
-            logger.info("🚀 Initialisation RAG Engine Enhanced avec Cache Sémantique...")
+            logger.info("🚀 Initialisation RAG Engine Enhanced avec Cache Sémantique v2.3...")
             
-            # Créer client OpenAI async pour RAG Enhanced
-            from openai import AsyncOpenAI
-            async_openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+            # Utiliser le client async pour RAG Enhanced
+            rag_engine_enhanced = await create_rag_engine(openai_client_async)
             
-            rag_engine_enhanced = await create_rag_engine(async_openai_client)
+            # NOUVEAU: Vérifier explicitement l'initialisation Redis
+            if rag_engine_enhanced.cache_manager:
+                try:
+                    logger.info("🔄 Vérification initialisation Redis...")
+                    await rag_engine_enhanced.cache_manager.initialize()
+                    
+                    # Test de connectivité Redis
+                    test_result = await rag_engine_enhanced.cache_manager.get_response("test", "test", "fr")
+                    logger.info("✅ Cache Redis initialisé et testé avec succès")
+                    
+                except Exception as e:
+                    logger.warning(f"⚠️ Problème initialisation Redis: {e}")
+                    logger.info("🔄 Continuant en mode dégradé sans cache Redis")
             
             status = rag_engine_enhanced.get_status()
             optimizations = status.get("optimizations", {})
@@ -454,10 +528,18 @@ async def initialize_rag_engines():
             
             # NOUVEAU: Log des stats cache sémantique
             if rag_engine_enhanced.cache_manager:
-                cache_stats = await rag_engine_enhanced.cache_manager.get_cache_stats()
-                semantic_info = cache_stats.get("semantic_enhancements", {})
-                logger.info(f"   - Aliases chargés: {semantic_info.get('aliases_categories', 0)} catégories")
-                logger.info(f"   - Vocabulaire sémantique: {semantic_info.get('vocabulary_size', 0)} termes")
+                try:
+                    cache_stats = await rag_engine_enhanced.cache_manager.get_cache_stats()
+                    semantic_info = cache_stats.get("semantic_enhancements", {})
+                    logger.info(f"   - Aliases chargés: {semantic_info.get('aliases_categories', 0)} catégories")
+                    logger.info(f"   - Vocabulaire sémantique: {semantic_info.get('vocabulary_size', 0)} termes")
+                except Exception as e:
+                    logger.warning(f"Impossible de récupérer stats cache sémantique: {e}")
+            
+            # NOUVEAU: Log des capacités API détectées
+            api_capabilities = status.get("api_capabilities", {})
+            if api_capabilities.get("diagnosed", False):
+                logger.info(f"   - API Weaviate diagnostiquée: {api_capabilities}")
             
         except Exception as e:
             logger.error(f"❌ Erreur initialisation RAG Enhanced: {e}")
@@ -467,9 +549,7 @@ async def initialize_rag_engines():
     if USE_AGENT_RAG and AGENT_RAG_AVAILABLE:
         try:
             logger.info("🤖 Initialisation Agent RAG...")
-            from openai import AsyncOpenAI
-            async_openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
-            agent_rag_engine = await create_agent_rag_engine(async_openai_client)
+            agent_rag_engine = await create_agent_rag_engine(openai_client_async)
             agent_status = agent_rag_engine.get_agent_status()
             logger.info(f"✅ Agent RAG initialisé: {agent_status.get('agent_features', [])}")
         except Exception as e:
@@ -495,8 +575,8 @@ async def _stream_enhanced_rag_response(rag_result: RAGResult, language: str, te
                 "processing_time": rag_result.processing_time
             })
             
-            # NOUVEAU: Afficher les métriques cache sémantique si disponibles
-            if optimizations.get("external_redis_cache") and metadata.get("cache_stats"):
+            # NOUVEAU: Afficher les métriques cache sémantique si disponibles et debug activé
+            if ENABLE_SEMANTIC_DEBUG and optimizations.get("external_redis_cache") and metadata.get("cache_stats"):
                 cache_stats = metadata["cache_stats"]
                 yield sse_event({
                     "type": "cache_info",
@@ -504,6 +584,17 @@ async def _stream_enhanced_rag_response(rag_result: RAGResult, language: str, te
                     "exact_hits": cache_stats.get("exact_hits", 0),
                     "fallback_hits": cache_stats.get("fallback_hits", 0),
                     "keywords_extracted": cache_stats.get("keyword_extractions", 0)
+                })
+            
+            # NOUVEAU: Afficher les capacités API si diagnostiquées
+            api_capabilities = metadata.get("api_capabilities", {})
+            if ENABLE_SEMANTIC_DEBUG and api_capabilities.get("diagnosed", False):
+                yield sse_event({
+                    "type": "api_capabilities",
+                    "hybrid_with_vector": api_capabilities.get("hybrid_with_vector", False),
+                    "hybrid_with_where": api_capabilities.get("hybrid_with_where", False),
+                    "near_vector_format": api_capabilities.get("near_vector_format", "unknown"),
+                    "corrections_applied": metadata.get("api_corrections_applied", False)
                 })
             
             # Stream de la réponse
@@ -532,6 +623,18 @@ async def _stream_enhanced_rag_response(rag_result: RAGResult, language: str, te
             # Ajouter stats sémantiques si disponibles
             if metadata.get("semantic_keywords_used"):
                 final_data["semantic_keywords"] = metadata["semantic_keywords_used"]
+            
+            # NOUVEAU: Ajouter explain_score si disponible et debug activé
+            if ENABLE_SEMANTIC_DEBUG and rag_result.context_docs:
+                explain_scores = []
+                for doc in rag_result.context_docs:
+                    if isinstance(doc, dict) and doc.get("explain_score"):
+                        explain_scores.append({
+                            "title": doc.get("title", ""),
+                            "explain_score": doc["explain_score"]
+                        })
+                if explain_scores:
+                    final_data["explain_scores"] = explain_scores
             
             yield sse_event(final_data)
             
@@ -598,7 +701,7 @@ async def _stream_agent_response(agent_result, language: str, tenant_id: str):
 # Gestionnaires de cycle de vie - MODIFIÉS
 async def startup_event():
     """Démarrage de l'application amélioré"""
-    logger.info("🚀 Démarrage Intelia Expert - Version RAG Enhanced avec Cache Sémantique")
+    logger.info("🚀 Démarrage Intelia Expert - Version RAG Enhanced avec Cache Sémantique v2.3")
     await initialize_rag_engines()
 
 async def shutdown_event():
@@ -612,6 +715,10 @@ async def shutdown_event():
         
         if agent_rag_engine and hasattr(agent_rag_engine, 'cleanup'):
             await agent_rag_engine.cleanup()
+        
+        # Fermer les clients OpenAI
+        if hasattr(openai_client_async, 'http_client'):
+            await openai_client_async.http_client.aclose()
         
         rag_engine_enhanced = None
         agent_rag_engine = None
@@ -629,7 +736,7 @@ async def lifespan(app: FastAPI):
     await shutdown_event()
 
 app = FastAPI(
-    title="Intelia Expert - RAG Enhanced Backend avec Cache Sémantique", 
+    title="Intelia Expert - RAG Enhanced Backend avec Cache Sémantique v2.3", 
     debug=False, 
     lifespan=lifespan
 )
@@ -644,10 +751,10 @@ app.add_middleware(
 
 router = APIRouter()
 
-# Routes améliorées
+# NOUVEAU: Route status enrichie
 @router.get("/health")
-def health():
-    """Health check avec status RAG Enhanced et Cache Sémantique détaillé"""
+async def health():
+    """Health check avec status RAG Enhanced et Cache Sémantique détaillé - v2.3"""
     global rag_engine_enhanced, agent_rag_engine
     
     memory_stats = {
@@ -658,7 +765,7 @@ def health():
     
     health_data = {
         "ok": True,
-        "version": "rag_enhanced_semantic_v2.1",
+        "version": "rag_enhanced_semantic_v2.3_optimized",
         "memory_stats": memory_stats,
         "performance_metrics": metrics_collector.get_metrics()
     }
@@ -672,14 +779,21 @@ def health():
                 "rag_enhanced_status": rag_status,
                 "optimizations": rag_status.get("optimizations", {}),
                 "components": rag_status.get("components", {}),
-                "degraded_mode": rag_status.get("degraded_mode", False)
+                "degraded_mode": rag_status.get("degraded_mode", False),
+                "api_capabilities": rag_status.get("api_capabilities", {})  # NOUVEAU: capacités API
             })
             
             # NOUVEAU: Stats cache sémantique spécifiques
             if rag_engine_enhanced.cache_manager:
                 try:
-                    cache_stats = rag_engine_enhanced.cache_manager.get_cache_stats()
+                    cache_stats = await rag_engine_enhanced.cache_manager.get_cache_stats()
                     health_data["semantic_cache_stats"] = cache_stats.get("semantic_enhancements", {})
+                    
+                    # NOUVEAU: Intent coverage stats
+                    intent_stats = cache_stats.get("intent_coverage_stats", {})
+                    if intent_stats:
+                        health_data["intent_coverage_stats"] = intent_stats
+                        
                 except:
                     health_data["semantic_cache_stats"] = {"error": "unavailable"}
                     
@@ -712,10 +826,68 @@ def health():
     
     return health_data
 
+# NOUVEAU: Route status riche exposée
+@router.get("/status")
+async def get_rich_status():
+    """Status riche avec toutes les métriques et diagnostics"""
+    global rag_engine_enhanced, agent_rag_engine
+    
+    status_data = {
+        "timestamp": time.time(),
+        "version": "rag_enhanced_semantic_v2.3_optimized",
+        "components": {
+            "rag_enhanced": rag_engine_enhanced is not None,
+            "agent_rag": agent_rag_engine is not None,
+            "openai_clients": True,
+            "conversation_memory": True
+        }
+    }
+    
+    # Métriques de performance avec percentiles
+    status_data["performance_metrics"] = metrics_collector.get_metrics()
+    
+    # Stats RAG Enhanced détaillées
+    if rag_engine_enhanced:
+        try:
+            rag_status = rag_engine_enhanced.get_status()
+            status_data["rag_status"] = rag_status
+            
+            # Capacités Weaviate
+            api_capabilities = rag_status.get("api_capabilities", {})
+            if api_capabilities.get("diagnosed", False):
+                status_data["weaviate_capabilities"] = api_capabilities
+            
+            # Stats cache sémantique
+            if rag_engine_enhanced.cache_manager:
+                try:
+                    cache_stats = await rag_engine_enhanced.cache_manager.get_cache_stats()
+                    status_data["cache_stats"] = cache_stats
+                    
+                    # Intent coverage
+                    intent_stats = cache_stats.get("intent_coverage_stats", {})
+                    if intent_stats:
+                        status_data["intent_coverage_stats"] = intent_stats
+                        
+                except Exception as e:
+                    status_data["cache_error"] = str(e)
+                    
+        except Exception as e:
+            status_data["rag_error"] = str(e)
+    
+    # API corrections counter
+    if rag_engine_enhanced and hasattr(rag_engine_enhanced, 'get_api_corrections_count'):
+        try:
+            corrections_count = rag_engine_enhanced.get_api_corrections_count()
+            status_data["api_corrections"] = corrections_count
+        except:
+            pass
+    
+    return status_data
+
 # Route CHAT principale - MODIFICATION MAJEURE pour Cache Sémantique
 @router.post(f"{BASE_PATH}/chat")
 async def chat(request: Request):
-    """Chat endpoint avec RAG Enhanced + Cache Sémantique Intelligent"""
+    """Chat endpoint avec RAG Enhanced + Cache Sémantique Intelligent v2.3"""
     global rag_engine_enhanced, agent_rag_engine
     
     # Mesure du temps total endpoint
@@ -779,7 +951,7 @@ async def chat(request: Request):
             return StreamingResponse(ood_response(), media_type="text/plain")
         
         elif rag_result.source == RAGSource.FALLBACK_NEEDED:
-            # Fallback vers génération spécialisée
+            # Fallback vers génération spécialisée (maintenant async)
             try:
                 specialized_answer = await generate_specialized_response(message, language, rag_result.intent_result)
                 

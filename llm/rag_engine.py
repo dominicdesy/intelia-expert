@@ -3,7 +3,7 @@
 rag_engine.py - RAG Engine Enhanced avec Cache Redis externe optimisé
 Version Production Intégrée pour Intelia Expert Aviculture
 Version corrigée pour Weaviate 4.16.9 - Septembre 2025
-CORRECTIONS APPLIQUÉES: Suppression cache interne + optimisations performance
+CORRECTIONS APPLIQUÉES: Optimisations cache sémantique + intent processor + diagnostics enrichis
 """
 
 import os
@@ -109,6 +109,7 @@ except ImportError as e:
             self.detected_entities = {}
             self.expanded_query = ""
             self.metadata = {}
+            self.confidence_breakdown = {}
 
 try:
     from advanced_guardrails import create_response_guardrails, VerificationLevel, GuardrailResult
@@ -117,7 +118,6 @@ except ImportError as e:
     GUARDRAILS_AVAILABLE = False
     logger.warning(f"Advanced guardrails non disponible: {e}")
     
-    # Fallback minimal
     class VerificationLevel:
         MINIMAL = "minimal"
         STANDARD = "standard"
@@ -144,10 +144,10 @@ except ImportError as e:
     EXTERNAL_CACHE_AVAILABLE = False
     logger.warning(f"Cache Redis externe non disponible: {e}")
     
-    # Fallback cache dummy
     class RAGCacheManager:
         def __init__(self, *args, **kwargs):
             self.enabled = False
+            self.ENABLE_SEMANTIC_CACHE = False
         
         async def initialize(self):
             pass
@@ -168,7 +168,13 @@ except ImportError as e:
             return "fallback_hash"
         
         async def get_cache_stats(self):
-            return {"enabled": False}
+            return {"enabled": False, "semantic_enhancements": {}}
+        
+        async def debug_semantic_extraction(self, query: str):
+            return {"extracted_keywords": [], "cache_keys": {}}
+        
+        def _normalize_text(self, text: str) -> str:
+            return text.lower()
         
         async def cleanup(self):
             pass
@@ -187,10 +193,13 @@ RAG_CONFIDENCE_THRESHOLD = float(os.getenv("RAG_CONFIDENCE_THRESHOLD", "0.55"))
 RAG_RERANK_TOP_K = int(os.getenv("RAG_RERANK_TOP_K", "8"))
 RAG_VERIFICATION_ENABLED = os.getenv("RAG_VERIFICATION_ENABLED", "true").lower() == "true"
 RAG_VERIFICATION_SMART = os.getenv("RAG_VERIFICATION_SMART", "true").lower() == "true"
-MAX_CONVERSATION_CONTEXT = int(os.getenv("MAX_CONVERSATION_CONTEXT", "1500"))
 
-# Seuil OOD configurable et plus strict
+# MODIFICATION: Contexte conversationnel augmenté (3→8 tours)
+MAX_CONVERSATION_CONTEXT = int(os.getenv("MAX_CONVERSATION_CONTEXT", "2400"))  # 8 tours * 300 chars en moyenne
+
+# MODIFICATION: Seuil OOD dynamique basé sur l'intent
 OOD_MIN_SCORE = float(os.getenv("OOD_MIN_SCORE", "0.3"))
+OOD_STRICT_SCORE = float(os.getenv("OOD_STRICT_SCORE", "0.45"))  # Seuil durci pour vocabulaire générique
 
 # Nouvelles configurations
 CACHE_ENABLED = os.getenv("CACHE_ENABLED", "true").lower() == "true"
@@ -199,16 +208,24 @@ GUARDRAILS_LEVEL = os.getenv("GUARDRAILS_LEVEL", "standard")
 ENTITY_ENRICHMENT_ENABLED = os.getenv("ENTITY_ENRICHMENT_ENABLED", "true").lower() == "true"
 
 # Configuration diagnostics
-ENABLE_API_DIAGNOSTICS = os.getenv("ENABLE_API_DIAGNOSTICS", "false").lower() == "true"
+ENABLE_API_DIAGNOSTICS = os.getenv("ENABLE_API_DIAGNOSTICS", "true").lower() == "true"
+
+# NOUVEAU: Configuration détection de langue optimisée
+LANG_DETECTION_MIN_LENGTH = int(os.getenv("LANG_DETECTION_MIN_LENGTH", "20"))
 
 # === UTILITAIRES ===
 class MetricsCollector:
-    """Collecteur de métriques in-process amélioré"""
+    """Collecteur de métriques enrichi avec statistiques intent et cache sémantique"""
     def __init__(self):
         self.counters = defaultdict(int)
         self.last_100_lat = []
         self.cache_stats = defaultdict(int)
         self.search_stats = defaultdict(int)
+        # NOUVEAU: Stats intent et cache sémantique
+        self.intent_stats = defaultdict(int)
+        self.semantic_cache_stats = defaultdict(int)
+        self.ood_stats = defaultdict(int)
+        self.api_corrections = defaultdict(int)
 
     def inc(self, key: str, n: int = 1): 
         self.counters[key] += n
@@ -223,6 +240,35 @@ class MetricsCollector:
     
     def cache_miss(self, cache_type: str):
         self.cache_stats[f"{cache_type}_misses"] += 1
+    
+    # NOUVEAU: Métriques intent
+    def intent_detected(self, intent_type: str, confidence: float):
+        self.intent_stats[f"intent_{intent_type}"] += 1
+        self.intent_stats["total_intents"] += 1
+        self.intent_stats["avg_confidence"] = (
+            (self.intent_stats.get("avg_confidence", 0.0) * (self.intent_stats["total_intents"] - 1) + confidence) 
+            / self.intent_stats["total_intents"]
+        )
+    
+    # NOUVEAU: Métriques cache sémantique
+    def semantic_cache_hit(self, cache_type: str):
+        self.semantic_cache_stats[f"semantic_{cache_type}_hits"] += 1
+    
+    def semantic_fallback_used(self):
+        self.semantic_cache_stats["fallback_hits"] += 1
+    
+    # NOUVEAU: Métriques OOD
+    def ood_filtered(self, score: float, reason: str):
+        self.ood_stats[f"ood_{reason}"] += 1
+        self.ood_stats["ood_total"] += 1
+        self.ood_stats["avg_ood_score"] = (
+            (self.ood_stats.get("avg_ood_score", 0.0) * (self.ood_stats["ood_total"] - 1) + score) 
+            / self.ood_stats["ood_total"]
+        )
+    
+    # NOUVEAU: Corrections API
+    def api_correction_applied(self, correction_type: str):
+        self.api_corrections[correction_type] += 1
 
     def snapshot(self):
         p50 = statistics.median(self.last_100_lat) if self.last_100_lat else 0.0
@@ -232,6 +278,10 @@ class MetricsCollector:
             "counters": dict(self.counters),
             "cache_stats": dict(self.cache_stats),
             "search_stats": dict(self.search_stats),
+            "intent_stats": dict(self.intent_stats),
+            "semantic_cache_stats": dict(self.semantic_cache_stats),
+            "ood_stats": dict(self.ood_stats),
+            "api_corrections": dict(self.api_corrections),
             "p50_latency_sec": round(p50, 3),
             "p95_latency_sec": round(p95, 3),
             "samples": len(self.last_100_lat)
@@ -239,18 +289,48 @@ class MetricsCollector:
 
 METRICS = MetricsCollector()
 
-# Détection de langue légère
+# MODIFICATION: Détection de langue optimisée pour requêtes courtes
 _FRENCH_HINTS = {" le ", " la ", " les ", " des ", " un ", " une ", " et ", " ou ", " que ", " est ", " avec ", " pour ", " d'", " l'", " j'", " au ", " aux ", " du "}
 _ENGLISH_HINTS = {" the ", " and ", " or ", " is ", " are ", " with ", " for ", " a ", " an ", " of "}
+_FRENCH_CHARS = set("éèêàùç")
 
-def detect_language_light(text: str, default: str = "fr") -> str:
-    s = f" {text.lower()} "
-    fr = sum(1 for w in _FRENCH_HINTS if w in s)
-    en = sum(1 for w in _ENGLISH_HINTS if w in s)
-    if fr > en + 1: return "fr"
-    if en > fr + 1: return "en"
-    if any(ch in s for ch in ["é", "è", "ê", "à", "ù", "ç"]): return "fr"
-    return default
+def detect_language_enhanced(text: str, default: str = "fr") -> str:
+    """Détection de langue optimisée pour requêtes courtes et techniques"""
+    if len(text) < LANG_DETECTION_MIN_LENGTH:
+        # Pour requêtes courtes: détection basique
+        s = f" {text.lower()} "
+        
+        # Vérifier caractères spéciaux français
+        if any(ch in text.lower() for ch in _FRENCH_CHARS):
+            return "fr"
+        
+        # Compter mots indicateurs
+        fr = sum(1 for w in _FRENCH_HINTS if w in s)
+        en = sum(1 for w in _ENGLISH_HINTS if w in s)
+        
+        if fr > en + 1: return "fr"
+        if en > fr + 1: return "en"
+        
+        # Patterns techniques français
+        if re.search(r'\d+\s*[gj]', text.lower()):  # "35j", "2500g"
+            return "fr"
+        
+        return default
+    else:
+        # Pour requêtes longues: utiliser langdetect si disponible
+        try:
+            import langdetect
+            detected = langdetect.detect(text)
+            return detected if detected in ["fr", "en"] else default
+        except:
+            # Fallback vers méthode basique
+            s = f" {text.lower()} "
+            fr = sum(1 for w in _FRENCH_HINTS if w in s)
+            en = sum(1 for w in _ENGLISH_HINTS if w in s)
+            if fr > en + 1: return "fr"
+            if en > fr + 1: return "en"
+            if any(ch in s for ch in _FRENCH_CHARS): return "fr"
+            return default
 
 # === ENUMS ET DATACLASSES ===
 class RAGSource(Enum):
@@ -283,6 +363,7 @@ class Document:
     metadata: Dict = None
     score: float = 0.0
     original_distance: Optional[float] = None
+    explain_score: Optional[Dict] = None
     
     def __post_init__(self):
         if self.metadata is None:
@@ -296,6 +377,8 @@ class Document:
             return self.metadata
         elif key == "score":
             return self.score
+        elif key == "explain_score":
+            return self.explain_score
         elif key in self.metadata:
             return self.metadata[key]
         else:
@@ -384,7 +467,7 @@ class OpenAIEmbedder:
 def _to_v4_filter(where_dict):
     """Convertit dict where v3 vers Filter v4 - Version corrigée pour Weaviate 4.16.9"""
     if not where_dict or not WEAVIATE_V4 or not wvc:
-        return None  # Retourner None au lieu du dict original
+        return None
     
     try:
         if "path" in where_dict:
@@ -401,7 +484,7 @@ def _to_v4_filter(where_dict):
         
         operator = where_dict.get("operator", "And").lower()
         operands = [_to_v4_filter(o) for o in where_dict.get("operands", [])]
-        operands = [op for op in operands if op is not None]  # Filtrer les None
+        operands = [op for op in operands if op is not None]
         
         if not operands:
             return None
@@ -439,26 +522,29 @@ class HybridWeaviateRetriever:
             "diversity_threshold": 0.8
         }
         
-        # État des API pour diagnostic
+        # État des API pour diagnostic - AMÉLIORÉ avec runtime flags
         self.api_capabilities = {
             "hybrid_with_vector": None,
             "hybrid_with_where": None,
             "near_vector_format": None,
-            "diagnosed": False
+            "diagnosed": False,
+            "runtime_corrections": 0,
+            "last_diagnostic_time": 0.0,
+            "api_stability": "unknown",
+            "explain_score_available": False
         }
     
     async def diagnose_weaviate_api(self):
-        """Diagnostic des méthodes disponibles dans Weaviate v4.16.9"""
-        if self.api_capabilities["diagnosed"]:
+        """Diagnostic des méthodes disponibles dans Weaviate v4.16.9 - Version Enhanced"""
+        if self.api_capabilities["diagnosed"] and time.time() - self.api_capabilities["last_diagnostic_time"] < 3600:
             return
             
         try:
             collection = self.client.collections.get(self.collection_name)
             
-            # Tester les différentes signatures d'API
-            test_vector = [0.1] * 1536  # Vecteur de test
+            test_vector = [0.1] * 1536
             
-            logger.info("=== DIAGNOSTIC WEAVIATE API ===")
+            logger.info("=== DIAGNOSTIC WEAVIATE API v4.16.9 ===")
             
             # Test 1: Signature hybrid() avec vector
             try:
@@ -473,18 +559,17 @@ class HybridWeaviateRetriever:
             except Exception as e:
                 self.api_capabilities["hybrid_with_vector"] = False
                 logger.error(f"❌ Hybrid query avec vector échoue: {e}")
+                METRICS.api_correction_applied("hybrid_vector_fallback")
                 
-                # Test hybrid minimal
                 try:
-                    result = collection.query.hybrid(
-                        query="test diagnostic",
-                        limit=1
-                    )
+                    result = collection.query.hybrid(query="test diagnostic", limit=1)
                     logger.info("✅ Hybrid query fonctionne avec: query, limit seulement")
+                    self.api_capabilities["api_stability"] = "limited"
                 except Exception as e2:
                     logger.error(f"❌ Hybrid query minimal échoue: {e2}")
+                    self.api_capabilities["api_stability"] = "degraded"
             
-            # Test 2: Signature near_vector()
+            # Test 2: Near vector avec explain_score
             formats_to_test = [
                 {"vector": test_vector},
                 {"near_vector": test_vector},
@@ -494,12 +579,27 @@ class HybridWeaviateRetriever:
             for i, params in enumerate(formats_to_test):
                 try:
                     params["limit"] = 1
+                    if hasattr(wvc.query, 'MetadataQuery'):
+                        params["return_metadata"] = wvc.query.MetadataQuery(
+                            score=True, 
+                            explain_score=True
+                        )
                     result = collection.query.near_vector(**params)
                     self.api_capabilities["near_vector_format"] = list(params.keys())[0]
+                    
+                    # Test explain_score
+                    if result.objects and hasattr(result.objects[0], 'metadata'):
+                        if hasattr(result.objects[0].metadata, 'explain_score'):
+                            self.api_capabilities["explain_score_available"] = True
+                            logger.info("✅ explain_score disponible")
+                        else:
+                            self.api_capabilities["explain_score_available"] = False
+                    
                     logger.info(f"✅ Near vector fonctionne avec: {list(params.keys())}")
                     break
                 except Exception as e:
                     logger.error(f"❌ Format {i+1} near_vector échoue: {e}")
+                    METRICS.api_correction_applied(f"near_vector_format_{i}")
             
             # Test 3: Hybrid avec filtre
             try:
@@ -514,24 +614,38 @@ class HybridWeaviateRetriever:
             except Exception as e:
                 self.api_capabilities["hybrid_with_where"] = False
                 logger.error(f"❌ Hybrid avec where échoue: {e}")
+                METRICS.api_correction_applied("hybrid_where_fallback")
             
-            # Test 4: Méthodes disponibles
-            query_methods = [method for method in dir(collection.query) if not method.startswith('_')]
-            logger.info(f"📋 Méthodes query disponibles: {query_methods}")
+            # Déterminer stabilité globale
+            if self.api_capabilities["api_stability"] == "unknown":
+                working_features = sum(1 for v in [
+                    self.api_capabilities.get("hybrid_with_vector", False),
+                    self.api_capabilities.get("hybrid_with_where", False),
+                    self.api_capabilities.get("near_vector_format") is not None
+                ] if v)
+                
+                if working_features >= 2:
+                    self.api_capabilities["api_stability"] = "stable"
+                elif working_features == 1:
+                    self.api_capabilities["api_stability"] = "limited"
+                else:
+                    self.api_capabilities["api_stability"] = "degraded"
             
             self.api_capabilities["diagnosed"] = True
-            logger.info(f"🔍 Capacités détectées: {self.api_capabilities}")
+            self.api_capabilities["last_diagnostic_time"] = time.time()
+            logger.info(f"📊 Capacités détectées: {self.api_capabilities}")
+            logger.info(f"🎯 Stabilité API: {self.api_capabilities['api_stability']}")
             logger.info("=== FIN DIAGNOSTIC ===")
             
         except Exception as e:
             logger.error(f"Erreur diagnostic Weaviate: {e}")
-            self.api_capabilities["diagnosed"] = True  # Marquer comme tenté
+            self.api_capabilities["diagnosed"] = True
+            self.api_capabilities["api_stability"] = "error"
     
     async def adaptive_search(self, query_vector: List[float], query_text: str,
                             top_k: int = 15, where_filter: Dict = None) -> List[Document]:
-        """Recherche adaptative qui ajuste alpha selon la requête - Version corrigée avec diagnostic"""
+        """Recherche adaptative qui ajuste alpha selon la requête"""
         
-        # Exécuter le diagnostic si activé et pas encore fait
         if ENABLE_API_DIAGNOSTICS and not self.api_capabilities["diagnosed"]:
             await self.diagnose_weaviate_api()
         
@@ -584,7 +698,6 @@ class HybridWeaviateRetriever:
             
         except Exception as e:
             logger.error(f"Erreur recherche adaptative: {e}")
-            # Fallback avec la méthode appropriée selon la version
             if self.is_v4:
                 return await self._vector_search_v4_corrected(query_vector, top_k, None)
             else:
@@ -613,7 +726,7 @@ class HybridWeaviateRetriever:
         ]):
             return 0.8
         
-        return 0.7  # Par défaut
+        return 0.7
     
     async def _hybrid_search_v4_corrected(self, query_vector: List[float], query_text: str,
                                         top_k: int, where_filter: Dict, alpha: float) -> List[Document]:
@@ -622,19 +735,24 @@ class HybridWeaviateRetriever:
             def _sync_hybrid_search():
                 collection = self.client.collections.get(self.collection_name)
                 
-                # Paramètres de base
                 search_params = {
                     "query": query_text,
                     "alpha": alpha,
-                    "limit": top_k,
-                    "return_metadata": wvc.query.MetadataQuery(score=True)
+                    "limit": top_k
                 }
                 
-                # Ajouter le vector seulement si supporté
-                if self.api_capabilities.get("hybrid_with_vector", True):  # True par défaut pour première tentative
+                # MODIFICATION: Ajouter explain_score si disponible
+                if ENABLE_API_DIAGNOSTICS and self.api_capabilities.get("explain_score_available"):
+                    search_params["return_metadata"] = wvc.query.MetadataQuery(
+                        score=True, 
+                        explain_score=True
+                    )
+                else:
+                    search_params["return_metadata"] = wvc.query.MetadataQuery(score=True)
+                
+                if self.api_capabilities.get("hybrid_with_vector", True):
                     search_params["vector"] = query_vector
                 
-                # Ajouter le filtre seulement si supporté
                 if where_filter and self.api_capabilities.get("hybrid_with_where", True):
                     v4_filter = _to_v4_filter(where_filter)
                     if v4_filter is not None:
@@ -643,7 +761,9 @@ class HybridWeaviateRetriever:
                 try:
                     return collection.query.hybrid(**search_params)
                 except TypeError as e:
-                    # Gérer les erreurs d'arguments non supportés
+                    self.api_capabilities["runtime_corrections"] += 1
+                    METRICS.api_correction_applied("hybrid_runtime_fix")
+                    
                     if "vector" in str(e) and "vector" in search_params:
                         logger.warning("Paramètre 'vector' non supporté dans hybrid(), retry sans vector")
                         del search_params["vector"]
@@ -663,6 +783,11 @@ class HybridWeaviateRetriever:
             for obj in response.objects:
                 hybrid_score = float(getattr(obj.metadata, "score", 0.0))
                 
+                # MODIFICATION: Extraire explain_score si disponible
+                explain_score = None
+                if hasattr(obj.metadata, "explain_score"):
+                    explain_score = getattr(obj.metadata, "explain_score", None)
+                
                 doc = Document(
                     content=obj.properties.get("content", ""),
                     metadata={
@@ -674,9 +799,11 @@ class HybridWeaviateRetriever:
                         "age_band": obj.properties.get("age_band", ""),
                         "hybrid_used": True,
                         "alpha": alpha,
-                        "vector_used": self.api_capabilities.get("hybrid_with_vector", False)
+                        "vector_used": self.api_capabilities.get("hybrid_with_vector", False),
+                        "runtime_corrections": self.api_capabilities.get("runtime_corrections", 0)
                     },
-                    score=hybrid_score
+                    score=hybrid_score,
+                    explain_score=explain_score
                 )
                 documents.append(doc)
             
@@ -684,7 +811,6 @@ class HybridWeaviateRetriever:
             
         except Exception as e:
             logger.error(f"Erreur recherche hybride v4: {e}")
-            # Fallback vers recherche vectorielle
             return await self._vector_search_v4_corrected(query_vector, top_k, where_filter)
     
     async def _vector_search_v4_corrected(self, query_vector: List[float], top_k: int, 
@@ -694,19 +820,23 @@ class HybridWeaviateRetriever:
             def _sync_search():
                 collection = self.client.collections.get(self.collection_name)
                 
-                # Paramètres de base
-                base_params = {
-                    "limit": top_k,
-                    "return_metadata": wvc.query.MetadataQuery(distance=True, score=True)
-                }
+                base_params = {"limit": top_k}
                 
-                # Tester différents formats de vecteur
-                vector_param_name = self.api_capabilities.get("near_vector_format", "vector")  # Par défaut "vector"
+                # MODIFICATION: Ajouter explain_score si disponible
+                if ENABLE_API_DIAGNOSTICS and self.api_capabilities.get("explain_score_available"):
+                    base_params["return_metadata"] = wvc.query.MetadataQuery(
+                        distance=True, 
+                        score=True, 
+                        explain_score=True
+                    )
+                else:
+                    base_params["return_metadata"] = wvc.query.MetadataQuery(distance=True, score=True)
+                
+                vector_param_name = self.api_capabilities.get("near_vector_format", "vector")
                 
                 params = base_params.copy()
                 params[vector_param_name] = query_vector
                 
-                # Ajouter le filtre si disponible
                 if where_filter:
                     v4_filter = _to_v4_filter(where_filter)
                     if v4_filter is not None:
@@ -716,8 +846,9 @@ class HybridWeaviateRetriever:
                     return collection.query.near_vector(**params)
                 except TypeError as e:
                     error_msg = str(e)
+                    self.api_capabilities["runtime_corrections"] += 1
+                    METRICS.api_correction_applied("vector_runtime_fix")
                     
-                    # Tester différents formats si erreur sur le paramètre vector
                     if vector_param_name in error_msg:
                         for alternative in ["near_vector", "query_vector", "vector"]:
                             if alternative != vector_param_name:
@@ -736,7 +867,6 @@ class HybridWeaviateRetriever:
                                 except:
                                     continue
                     
-                    # Si erreur sur where, retry sans filtre
                     if "where" in error_msg and where_filter:
                         logger.warning("Filtre where non supporté, retry sans filtre")
                         params_no_filter = {k: v for k, v in params.items() if k != "where"}
@@ -751,6 +881,11 @@ class HybridWeaviateRetriever:
                 score = float(getattr(obj.metadata, "score", 0.0))
                 distance = float(getattr(obj.metadata, "distance", 1.0))
                 
+                # MODIFICATION: Extraire explain_score si disponible
+                explain_score = None
+                if hasattr(obj.metadata, "explain_score"):
+                    explain_score = getattr(obj.metadata, "explain_score", None)
+                
                 doc = Document(
                     content=obj.properties.get("content", ""),
                     metadata={
@@ -760,10 +895,12 @@ class HybridWeaviateRetriever:
                         "species": obj.properties.get("species", ""),
                         "phase": obj.properties.get("phase", ""),
                         "age_band": obj.properties.get("age_band", ""),
-                        "vector_format_used": self.api_capabilities.get("near_vector_format", "vector")
+                        "vector_format_used": self.api_capabilities.get("near_vector_format", "vector"),
+                        "runtime_corrections": self.api_capabilities.get("runtime_corrections", 0)
                     },
                     score=score,
-                    original_distance=distance
+                    original_distance=distance,
+                    explain_score=explain_score
                 )
                 documents.append(doc)
             
@@ -771,7 +908,6 @@ class HybridWeaviateRetriever:
             
         except Exception as e:
             logger.error(f"Erreur recherche vectorielle v4: {e}")
-            # Fallback vers recherche minimale
             return await self._vector_search_fallback_minimal(query_vector, top_k)
     
     async def _vector_search_fallback_minimal(self, query_vector: List[float], top_k: int) -> List[Document]:
@@ -779,7 +915,6 @@ class HybridWeaviateRetriever:
         try:
             def _sync_minimal_search():
                 collection = self.client.collections.get(self.collection_name)
-                # Utiliser la forme la plus simple possible
                 return collection.query.near_vector(
                     near_vector=query_vector,
                     limit=top_k
@@ -789,7 +924,6 @@ class HybridWeaviateRetriever:
             
             documents = []
             for obj in result.objects:
-                # Score par défaut si pas disponible
                 score = getattr(obj.metadata, "score", 0.7) if hasattr(obj, "metadata") else 0.7
                 
                 doc = Document(
@@ -896,7 +1030,7 @@ class HybridWeaviateRetriever:
 
 # === GÉNÉRATEUR DE RÉPONSES ENRICHI ===
 class EnhancedResponseGenerator:
-    """Générateur avec enrichissement d'entités et cache externe"""
+    """Générateur avec enrichissement d'entités et cache externe + instrumentation sémantique"""
     
     def __init__(self, client, cache_manager: RAGCacheManager = None):
         self.client = client
@@ -927,9 +1061,10 @@ class EnhancedResponseGenerator:
     async def generate_response(self, query: str, context_docs: List[Document], 
                               conversation_context: str = "", language: str = "fr",
                               intent_result=None) -> str:
-        """Génère une réponse enrichie avec cache externe"""
+        """Génère une réponse enrichie avec cache externe + instrumentation sémantique"""
         try:
             # Vérifier le cache externe
+            cache_hit_details = {"semantic_reasoning": "", "cache_type": ""}
             if self.cache_manager and self.cache_manager.enabled:
                 context_hash = self.cache_manager.generate_context_hash(
                     [self._doc_to_dict(doc) for doc in context_docs]
@@ -939,6 +1074,16 @@ class EnhancedResponseGenerator:
                 )
                 if cached_response:
                     METRICS.cache_hit("response")
+                    # MODIFICATION: Tracer le type de cache hit
+                    if hasattr(self.cache_manager, 'get_last_cache_details'):
+                        try:
+                            cache_hit_details = await self.cache_manager.get_last_cache_details()
+                            if cache_hit_details.get("semantic_fallback_used"):
+                                METRICS.semantic_fallback_used()
+                            else:
+                                METRICS.semantic_cache_hit("exact")
+                        except:
+                            pass
                     return cached_response
                 METRICS.cache_miss("response")
             
@@ -963,13 +1108,20 @@ class EnhancedResponseGenerator:
             
             generated_response = response.choices[0].message.content.strip()
             
-            # Mettre en cache externe
+            # MODIFICATION: Mettre en cache avec métadonnées enrichies
             if self.cache_manager and self.cache_manager.enabled:
                 context_hash = self.cache_manager.generate_context_hash(
                     [self._doc_to_dict(doc) for doc in context_docs]
                 )
                 await self.cache_manager.set_response(
-                    query, context_hash, generated_response, language
+                    query, context_hash, generated_response, language,
+                    metadata={
+                        "generation_time": time.time(),
+                        "enrichment_used": bool(enrichment),
+                        "conversation_context_used": bool(conversation_context),
+                        "intent_detected": str(intent_result.intent_type) if intent_result else None,
+                        "entities_found": getattr(intent_result, 'detected_entities', {}) if intent_result else {}
+                    }
                 )
             
             return generated_response
@@ -980,12 +1132,15 @@ class EnhancedResponseGenerator:
     
     def _doc_to_dict(self, doc: Document) -> Dict:
         """Convertit Document en dict pour cache"""
-        return {
+        result = {
             "content": doc.content,
             "title": doc.metadata.get("title", ""),
             "source": doc.metadata.get("source", ""),
             "score": doc.score
         }
+        if doc.explain_score:
+            result["explain_score"] = doc.explain_score
+        return result
     
     def _build_entity_enrichment(self, intent_result):
         """Construit l'enrichissement basé sur les entités"""
@@ -1040,6 +1195,7 @@ RÈGLE LINGUISTIQUE: Réponds STRICTEMENT en {language}
 
 Si les documents ne contiennent pas l'information demandée, dis-le clairement."""
 
+        # MODIFICATION: Contexte conversationnel augmenté
         limited_context = conversation_context[:MAX_CONVERSATION_CONTEXT] if conversation_context else ""
         
         user_prompt = f"""CONTEXTE CONVERSATIONNEL:
@@ -1055,9 +1211,9 @@ RÉPONSE TECHNIQUE (intégrant le contexte métier détecté):"""
 
         return system_prompt, user_prompt
 
-# === DÉTECTEUR HORS DOMAINE ===
+# === DÉTECTEUR HORS DOMAINE ENRICHI ===
 class EnhancedOODDetector:
-    """Détecteur hors-domaine amélioré"""
+    """Détecteur hors-domaine avec seuil dynamique basé sur l'intent"""
     
     def __init__(self, blocked_terms_path: str = None):
         self.blocked_terms = self._load_blocked_terms(blocked_terms_path)
@@ -1075,7 +1231,6 @@ class EnhancedOODDetector:
         if path is None:
             path = os.getenv("BLOCKED_TERMS_FILE", "/app/blocked_terms.json")
             if not os.path.exists(path):
-                # Fallback pour développement local
                 base_dir = os.path.dirname(os.path.abspath(__file__))
                 path = os.path.join(base_dir, "blocked_terms.json")
         
@@ -1088,27 +1243,40 @@ class EnhancedOODDetector:
             
         except Exception as e:
             logger.warning(f"Erreur chargement blocked_terms depuis {path}: {e}")
-            # Fallback avec termes de base en cas d'erreur
             return {
                 "general": ["crypto", "bitcoin", "football", "film", "politique", "news"]
             }
     
     def calculate_ood_score(self, query: str, intent_result=None) -> Tuple[bool, float, Dict[str, float]]:
-        """Calcul score OOD avec normalisation - Seuil plus strict"""
+        """MODIFICATION: Calcul score OOD avec seuil dynamique basé sur l'intent"""
         query_lower = (unidecode(query).lower() if UNIDECODE_AVAILABLE else query.lower())
         words = query_lower.split()
         
         # Boost entités métier
         entities_boost = 0.0
+        genetic_metric_present = False
         if intent_result and hasattr(intent_result, 'detected_entities'):
+            entities = intent_result.detected_entities
             business_entities = ['line', 'species', 'age_days', 'weight', 'fcr', 'phase']
-            detected_business = [e for e in business_entities if e in intent_result.detected_entities]
+            detected_business = [e for e in business_entities if e in entities]
             if detected_business:
                 entities_boost = 0.3 * len(detected_business)
+                # Détecter si génétique + métrique sont présents
+                if ('line' in entities or 'species' in entities) and ('weight' in entities or 'fcr' in entities):
+                    genetic_metric_present = True
+        
+        # NOUVEAU: Boost intent confidence si disponible
+        intent_boost = 0.0
+        if intent_result and hasattr(intent_result, 'confidence_breakdown'):
+            breakdown = intent_result.confidence_breakdown
+            # Si génétique + métrique détectés avec forte confidence
+            if (breakdown.get('genetic_confidence', 0) > 0.7 and 
+                breakdown.get('metric_confidence', 0) > 0.7):
+                intent_boost = 0.2
         
         # Score vocabulaire domaine
         domain_words = [word for word in words if word in self.domain_keywords]
-        vocab_score = (len(domain_words) / len(words) if words else 0.0) + entities_boost
+        vocab_score = (len(domain_words) / len(words) if words else 0.0) + entities_boost + intent_boost
         
         # Score termes bloqués
         blocked_score = 0.0
@@ -1127,30 +1295,54 @@ class EnhancedOODDetector:
         else:
             final_score = (vocab_score * 0.8) - (blocked_score * 0.2)
         
-        # Seuil plus strict
-        is_in_domain = final_score > OOD_MIN_SCORE
+        # MODIFICATION: Seuil dynamique
+        threshold = OOD_MIN_SCORE
+        generic_vocab_only = len(domain_words) <= 1 and entities_boost == 0
+        
+        if genetic_metric_present:
+            # Requête spécifique avec génétique + métrique -> seuil plus souple
+            threshold = max(0.2, OOD_MIN_SCORE - 0.1)
+            METRICS.ood_stats["genetic_metric_threshold_applied"] += 1
+        elif generic_vocab_only and len(words) > 3:
+            # Vocabulaire générique seulement -> seuil plus strict
+            threshold = OOD_STRICT_SCORE
+            METRICS.ood_stats["strict_threshold_applied"] += 1
+        
+        is_in_domain = final_score > threshold
+        
+        # MODIFICATION: Tracer les raisons de filtrage
+        if not is_in_domain:
+            if blocked_score > 0.5:
+                METRICS.ood_filtered(final_score, "blocked_terms")
+            elif generic_vocab_only:
+                METRICS.ood_filtered(final_score, "generic_vocab")
+            else:
+                METRICS.ood_filtered(final_score, "low_domain_score")
         
         score_details = {
             "vocab_score": vocab_score,
             "entities_boost": entities_boost,
+            "intent_boost": intent_boost,
             "blocked_score": blocked_score,
             "final_score": final_score,
-            "threshold_used": OOD_MIN_SCORE
+            "threshold_used": threshold,
+            "genetic_metric_present": genetic_metric_present,
+            "generic_vocab_only": generic_vocab_only
         }
         
         return is_in_domain, final_score, score_details
 
-# === MÉMOIRE CONVERSATIONNELLE ===
+# === MÉMOIRE CONVERSATIONNELLE ENRICHIE ===
 class ConversationMemory:
-    """Mémoire conversationnelle simple"""
+    """MODIFICATION: Mémoire conversationnelle avec plus de contexte"""
     
     def __init__(self, client):
         self.client = client
         self.memory_store = {}
-        self.max_exchanges = 5
+        self.max_exchanges = 8  # MODIFICATION: 3 → 8 tours
     
     async def get_contextual_memory(self, tenant_id: str, current_query: str) -> str:
-        """Récupère le contexte conversationnel"""
+        """Récupère le contexte conversationnel enrichi"""
         if tenant_id not in self.memory_store:
             return ""
         
@@ -1158,16 +1350,27 @@ class ConversationMemory:
         if not history:
             return ""
         
-        # Retourner simplement le dernier échange
         try:
-            last_exchange = history[-1]
-            return f"Dernier échange - Q: {last_exchange['question'][:100]}... R: {last_exchange['answer'][:200]}..."
+            # MODIFICATION: Retourner les 2-3 derniers échanges selon la longueur
+            context_parts = []
+            total_length = 0
+            
+            for exchange in reversed(history[-3:]):  # 3 derniers max
+                exchange_text = f"Q: {exchange['question'][:150]}... R: {exchange['answer'][:200]}..."
+                if total_length + len(exchange_text) <= MAX_CONVERSATION_CONTEXT:
+                    context_parts.insert(0, exchange_text)
+                    total_length += len(exchange_text)
+                else:
+                    break
+            
+            return " | ".join(context_parts)
+            
         except Exception as e:
             logger.warning(f"Erreur mémoire: {e}")
             return ""
     
     def add_exchange(self, tenant_id: str, question: str, answer: str):
-        """Ajoute un échange"""
+        """Ajoute un échange avec métadonnées"""
         if tenant_id not in self.memory_store:
             self.memory_store[tenant_id] = []
         
@@ -1241,7 +1444,7 @@ def build_where_filter(intent_result) -> Dict:
 
 # === RAG ENGINE PRINCIPAL ===
 class InteliaRAGEngine:
-    """RAG Engine principal avec cache externe optimisé - Version corrigée pour Weaviate 4.16.9"""
+    """RAG Engine principal avec cache externe optimisé et corrections appliquées"""
     
     def __init__(self, openai_client: AsyncOpenAI = None):
         self.openai_client = openai_client or self._build_openai_client()
@@ -1262,15 +1465,24 @@ class InteliaRAGEngine:
         self.is_initialized = False
         self.degraded_mode = False
         
-        # Stats optimisation
+        # MODIFICATION: Stats étendues avec nouvelles métriques
         self.optimization_stats = {
             "cache_hits": 0,
             "cache_misses": 0,
+            "semantic_cache_hits": 0,
+            "fallback_cache_hits": 0,
             "hybrid_searches": 0,
             "guardrail_violations": 0,
             "entity_enrichments": 0,
             "api_corrections": 0,
-            "external_cache_used": False
+            "external_cache_used": False,
+            "semantic_debug_requests": 0,
+            "explain_score_extractions": 0,
+            "cache_semantic_reasoning_failures": 0,
+            "intent_coverage_stats": defaultdict(int),
+            "weaviate_capabilities": {},
+            "dynamic_ood_threshold_adjustments": 0,
+            "conversation_context_usage": 0
         }
     
     def _build_openai_client(self) -> AsyncOpenAI:
@@ -1283,7 +1495,7 @@ class InteliaRAGEngine:
             return AsyncOpenAI(api_key=OPENAI_API_KEY)
     
     async def initialize(self):
-        """Initialisation complète avec cache externe"""
+        """MODIFICATION: Initialisation avec await cache manager + orchestration corrigée"""
         if self.is_initialized:
             return
             
@@ -1296,20 +1508,21 @@ class InteliaRAGEngine:
             return
         
         try:
-            # 1. Cache Redis externe optimisé
+            # MODIFICATION: 1. Cache Redis externe avec await obligatoire
             if CACHE_ENABLED and EXTERNAL_CACHE_AVAILABLE:
                 self.cache_manager = RAGCacheManager()
+                # CRITICAL: Assurer que l'initialisation est awaited
                 await self.cache_manager.initialize()
                 if self.cache_manager.enabled:
                     self.optimization_stats["external_cache_used"] = True
-                    logger.info("Cache Redis externe activé")
+                    logger.info("✅ Cache Redis externe activé et initialisé")
                 else:
-                    logger.warning("Cache Redis externe désactivé")
+                    logger.warning("⚠️ Cache Redis externe désactivé après initialisation")
             
             # 2. Connexion Weaviate
             await self._connect_weaviate()
             
-            # 3. Composants de base
+            # 3. Composants de base avec ordre corrigé
             self.embedder = OpenAIEmbedder(self.openai_client, self.cache_manager)
             self.memory = ConversationMemory(self.openai_client)
             self.ood_detector = EnhancedOODDetector()
@@ -1321,12 +1534,14 @@ class InteliaRAGEngine:
                 if ENABLE_API_DIAGNOSTICS:
                     logger.info("🔍 Exécution diagnostic API Weaviate...")
                     await self.retriever.diagnose_weaviate_api()
+                    # MODIFICATION: Stocker les capacités dans les stats
+                    self.optimization_stats["weaviate_capabilities"] = self.retriever.api_capabilities.copy()
             
             # 5. Générateur enrichi
             if ENTITY_ENRICHMENT_ENABLED:
                 self.generator = EnhancedResponseGenerator(self.openai_client, self.cache_manager)
             
-            # 6. Guardrails depuis le module dédié
+            # 6. Guardrails avec explain_score si disponible
             if GUARDRAILS_AVAILABLE:
                 self.guardrails = create_response_guardrails(self.openai_client, GUARDRAILS_LEVEL)
             
@@ -1335,10 +1550,10 @@ class InteliaRAGEngine:
                 self.intent_processor = create_intent_processor()
             
             self.is_initialized = True
-            logger.info("RAG Engine Enhanced initialisé avec succès")
+            logger.info("✅ RAG Engine Enhanced initialisé avec succès")
             
         except Exception as e:
-            logger.error(f"Erreur initialisation: {e}")
+            logger.error(f"❌ Erreur initialisation: {e}")
             self.degraded_mode = True
             self.is_initialized = True
     
@@ -1346,16 +1561,13 @@ class InteliaRAGEngine:
         """Connexion Weaviate corrigée pour v4.16.9"""
         if WEAVIATE_V4:
             try:
-                # Nouvelle syntaxe Weaviate v4 - correction pour 4.16.9
                 if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
-                    # Pour Weaviate Cloud avec API Key
                     self.weaviate_client = weaviate.connect_to_weaviate_cloud(
                         cluster_url=WEAVIATE_URL,
                         auth_credentials=wvc.init.Auth.api_key(WEAVIATE_API_KEY),
                         headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
                     )
                 else:
-                    # Pour instance locale ou sans API key
                     if WEAVIATE_API_KEY:
                         self.weaviate_client = weaviate.connect_to_local(
                             host=WEAVIATE_URL.replace("http://", "").replace("https://", "").split(":")[0],
@@ -1364,14 +1576,12 @@ class InteliaRAGEngine:
                             headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
                         )
                     else:
-                        # Instance locale sans authentification
                         self.weaviate_client = weaviate.connect_to_local(
                             host=WEAVIATE_URL.replace("http://", "").replace("https://", "").split(":")[0],
                             port=int(WEAVIATE_URL.split(":")[-1]) if ":" in WEAVIATE_URL else 8080,
                             headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
                         )
                 
-                # Test de connexion
                 def _test_connection():
                     return self.weaviate_client.is_ready()
                 
@@ -1382,7 +1592,6 @@ class InteliaRAGEngine:
                     
             except Exception as e:
                 logger.error(f"Erreur connexion Weaviate v4: {e}")
-                # Fallback vers syntaxe v3 si disponible
                 try:
                     if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
                         auth_config = weaviate.AuthApiKey(api_key=WEAVIATE_API_KEY)
@@ -1411,7 +1620,6 @@ class InteliaRAGEngine:
                     logger.error(f"Erreur fallback Weaviate: {fallback_error}")
                     raise
         else:
-            # Code existant pour Weaviate v3
             if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
                 auth_config = weaviate.AuthApiKey(api_key=WEAVIATE_API_KEY)
                 self.weaviate_client = weaviate.Client(
@@ -1434,7 +1642,7 @@ class InteliaRAGEngine:
                 raise Exception("Weaviate not ready")
     
     async def process_query(self, query: str, language: str = "fr", tenant_id: str = "") -> RAGResult:
-        """Traitement de requête avec cache externe optimisé et corrections API"""
+        """MODIFICATION: Traitement avec toutes les optimisations appliquées"""
         if not RAG_ENABLED:
             return RAGResult(source=RAGSource.FALLBACK_NEEDED, metadata={"reason": "rag_disabled"})
         
@@ -1448,21 +1656,31 @@ class InteliaRAGEngine:
         METRICS.inc("requests_total")
         
         try:
-            # Auto-détection langue
+            # MODIFICATION: Détection langue optimisée
             if not language:
-                language = detect_language_light(query, default="fr")
+                language = detect_language_enhanced(query, default="fr")
             
-            # Intent processing
+            # Intent processing avec métriques
             intent_result = None
             if self.intent_processor:
                 try:
                     intent_result = self.intent_processor.process_query(query)
+                    if intent_result:
+                        METRICS.intent_detected(
+                            intent_result.intent_type, 
+                            getattr(intent_result, 'confidence', 0.8)
+                        )
+                        self.optimization_stats["intent_coverage_stats"][intent_result.intent_type] += 1
                 except Exception as e:
                     logger.warning(f"Erreur intent processor: {e}")
             
-            # OOD detection avec seuil corrigé
+            # MODIFICATION: OOD detection avec seuil dynamique
             if self.ood_detector:
                 is_in_domain, domain_score, score_details = self.ood_detector.calculate_ood_score(query, intent_result)
+                
+                # Tracer ajustements de seuil
+                if score_details.get("genetic_metric_present") or score_details.get("generic_vocab_only"):
+                    self.optimization_stats["dynamic_ood_threshold_adjustments"] += 1
                 
                 if not is_in_domain:
                     METRICS.inc("requests_ood")
@@ -1480,11 +1698,13 @@ class InteliaRAGEngine:
                         intent_result=intent_result
                     )
             
-            # Contexte conversationnel
+            # MODIFICATION: Contexte conversationnel enrichi
             conversation_context = ""
             if tenant_id and self.memory:
                 try:
                     conversation_context = await self.memory.get_contextual_memory(tenant_id, query)
+                    if conversation_context:
+                        self.optimization_stats["conversation_context_usage"] += 1
                 except Exception as e:
                     logger.warning(f"Erreur mémoire conversationnelle: {e}")
             
@@ -1504,7 +1724,7 @@ class InteliaRAGEngine:
             # Construire where filter
             where_filter = build_where_filter(intent_result)
             
-            # Recherche hybride CORRIGÉE
+            # Recherche hybride avec instrumentation
             documents = []
             if self.retriever:
                 try:
@@ -1514,9 +1734,15 @@ class InteliaRAGEngine:
                     if any(doc.metadata.get("hybrid_used") for doc in documents):
                         self.optimization_stats["hybrid_searches"] += 1
                     
-                    # Compter les corrections API appliquées
-                    if any(doc.metadata.get("vector_format_used") for doc in documents):
-                        self.optimization_stats["api_corrections"] += 1
+                    # Compter corrections API
+                    runtime_corrections = sum(doc.metadata.get("runtime_corrections", 0) for doc in documents)
+                    if runtime_corrections > 0:
+                        self.optimization_stats["api_corrections"] += runtime_corrections
+                    
+                    # Compter explain_score extraits
+                    explain_scores_found = sum(1 for doc in documents if doc.explain_score is not None)
+                    if explain_scores_found > 0:
+                        self.optimization_stats["explain_score_extractions"] += explain_scores_found
                         
                 except Exception as e:
                     logger.error(f"Erreur recherche hybride: {e}")
@@ -1555,14 +1781,24 @@ class InteliaRAGEngine:
                     }
                 )
             
-            # Génération de réponse enrichie
+            # Génération de réponse enrichie avec cache sémantique
             response_text = ""
+            cache_semantic_details = {}
             if self.generator and ENTITY_ENRICHMENT_ENABLED:
                 try:
                     response_text = await self.generator.generate_response(
                         query, filtered_docs, conversation_context, language, intent_result
                     )
                     self.optimization_stats["entity_enrichments"] += 1
+                    
+                    # Récupérer détails cache sémantique
+                    if (self.cache_manager and hasattr(self.cache_manager, 'get_last_semantic_details')):
+                        try:
+                            cache_semantic_details = await self.cache_manager.get_last_semantic_details()
+                        except Exception as e:
+                            logger.debug(f"Impossible de récupérer détails cache sémantique: {e}")
+                            self.optimization_stats["cache_semantic_reasoning_failures"] += 1
+                    
                 except Exception as e:
                     logger.error(f"Erreur génération enrichie: {e}")
             
@@ -1605,7 +1841,7 @@ RÈGLE: Réponds strictement en {language}."""
                     }
                 )
             
-            # Vérification avec guardrails
+            # MODIFICATION: Vérification avec guardrails + explain_score
             verification_result = None
             if self.guardrails:
                 try:
@@ -1617,15 +1853,22 @@ RÈGLE: Réponds strictement en {language}."""
                             do_verify = False
                     
                     if do_verify:
+                        # MODIFICATION: Enrichir les métadonnées avec explain_score
+                        docs_with_explain = []
+                        for doc in filtered_docs:
+                            doc_dict = doc.__dict__.copy()
+                            if doc.explain_score:
+                                doc_dict["explain_score"] = doc.explain_score
+                            docs_with_explain.append(doc_dict)
+                        
                         verification_result = await self.guardrails.verify_response(
-                            query, response_text, filtered_docs, intent_result
+                            query, response_text, docs_with_explain, intent_result
                         )
                         
                         if not verification_result.is_valid:
                             self.optimization_stats["guardrail_violations"] += 1
                             logger.warning(f"Violation guardrails: {verification_result.violations}")
                             
-                            # Si violation critique, retourner fallback
                             if verification_result.confidence < 0.3:
                                 METRICS.observe_latency(time.time() - start_time)
                                 return RAGResult(
@@ -1652,7 +1895,7 @@ RÈGLE: Réponds strictement en {language}."""
             # Construire context_docs pour le résultat
             context_docs = []
             for doc in filtered_docs:
-                context_docs.append({
+                doc_dict = {
                     "title": doc.metadata.get("title", ""),
                     "content": doc.content,
                     "score": doc.score,
@@ -1666,18 +1909,28 @@ RÈGLE: Réponds strictement en {language}."""
                     "vector_format_used": doc.metadata.get("vector_format_used", ""),
                     "fallback_search": doc.metadata.get("fallback_search", False),
                     "minimal_api_used": doc.metadata.get("minimal_api_used", False),
+                    "runtime_corrections": doc.metadata.get("runtime_corrections", 0),
                     "search_type": getattr(doc, 'search_type', 'unknown')
-                })
+                }
+                
+                if doc.explain_score is not None:
+                    doc_dict["explain_score"] = doc.explain_score
+                
+                context_docs.append(doc_dict)
             
-            # Métadonnées complètes avec infos corrections
+            # MODIFICATION: Métadonnées complètes avec nouvelles infos
             metadata = {
-                "approach": "enhanced_rag_external_cache_optimized_v4_16_9",
+                "approach": "enhanced_rag_external_cache_optimized_v4_16_9_corrected",
                 "optimizations_enabled": {
                     "external_redis_cache": self.optimization_stats["external_cache_used"],
+                    "semantic_cache": getattr(self.cache_manager, 'ENABLE_SEMANTIC_CACHE', False),
                     "hybrid_search": HYBRID_SEARCH_ENABLED,
                     "entity_enrichment": ENTITY_ENRICHMENT_ENABLED,
-                    "advanced_guardrails": True,
-                    "api_diagnostics": ENABLE_API_DIAGNOSTICS
+                    "advanced_guardrails": GUARDRAILS_AVAILABLE,
+                    "api_diagnostics": ENABLE_API_DIAGNOSTICS,
+                    "dynamic_ood_thresholds": True,
+                    "enhanced_conversation_memory": True,
+                    "explain_score_extraction": self.optimization_stats["explain_score_extractions"] > 0
                 },
                 "weaviate_version": weaviate_version,
                 "weaviate_v4": WEAVIATE_V4,
@@ -1690,17 +1943,21 @@ RÈGLE: Réponds strictement en {language}."""
                 "verification_enabled": RAG_VERIFICATION_ENABLED,
                 "verification_smart": RAG_VERIFICATION_SMART,
                 "language_target": language,
-                "language_detected": detect_language_light(query),
+                "language_detected": detect_language_enhanced(query),
                 "optimization_stats": self.optimization_stats.copy(),
-                # Infos sur les corrections API
                 "api_capabilities": self.retriever.api_capabilities if self.retriever else {},
-                "api_corrections_applied": self.optimization_stats.get("api_corrections", 0) > 0
+                "api_corrections_applied": self.optimization_stats.get("api_corrections", 0) > 0,
+                "cache_semantic_details": cache_semantic_details
             }
+            
+            if cache_semantic_details.get("semantic_keywords_used"):
+                metadata["semantic_keywords_used"] = cache_semantic_details["semantic_keywords_used"]
             
             if intent_result:
                 metadata.update({
                     "intent_type": getattr(intent_result, 'intent_type', 'unknown'),
-                    "detected_entities": getattr(intent_result, 'detected_entities', {})
+                    "detected_entities": getattr(intent_result, 'detected_entities', {}),
+                    "confidence_breakdown": getattr(intent_result, 'confidence_breakdown', {})
                 })
             
             # Sauvegarde mémoire
@@ -1763,7 +2020,7 @@ RÈGLE: Réponds strictement en {language}."""
         return min(0.95, max(0.1, final_confidence))
     
     def get_status(self) -> Dict:
-        """Status complet du système avec infos cache externe"""
+        """MODIFICATION: Status riche avec toutes les nouvelles métriques"""
         try:
             weaviate_connected = False
             api_capabilities = {}
@@ -1776,7 +2033,6 @@ RÈGLE: Réponds strictement en {language}."""
                 except:
                     weaviate_connected = False
             
-            # Récupérer les capacités API si disponibles
             if self.retriever and hasattr(self.retriever, 'api_capabilities'):
                 api_capabilities = self.retriever.api_capabilities
             
@@ -1784,15 +2040,18 @@ RÈGLE: Réponds strictement en {language}."""
                 "rag_enabled": RAG_ENABLED,
                 "initialized": self.is_initialized,
                 "degraded_mode": self.degraded_mode,
-                "approach": "enhanced_rag_external_cache_optimized_v4_16_9",
+                "approach": "enhanced_rag_external_cache_optimized_v4_16_9_corrected",
                 "optimizations": {
                     "external_cache_enabled": self.cache_manager.enabled if self.cache_manager else False,
                     "hybrid_search_enabled": HYBRID_SEARCH_ENABLED,
-		    "semantic_cache_enabled": self.cache_manager.ENABLE_SEMANTIC_CACHE if self.cache_manager else False,
+                    "semantic_cache_enabled": getattr(self.cache_manager, 'ENABLE_SEMANTIC_CACHE', False),
                     "entity_enrichment_enabled": ENTITY_ENRICHMENT_ENABLED,
                     "guardrails_level": GUARDRAILS_LEVEL,
                     "verification_smart": RAG_VERIFICATION_SMART,
-                    "api_diagnostics_enabled": ENABLE_API_DIAGNOSTICS
+                    "api_diagnostics_enabled": ENABLE_API_DIAGNOSTICS,
+                    "dynamic_ood_thresholds": True,
+                    "enhanced_conversation_memory": True,
+                    "explain_score_extraction_enabled": api_capabilities.get("explain_score_available", False)
                 },
                 "components": {
                     "openai_available": OPENAI_AVAILABLE,
@@ -1813,19 +2072,23 @@ RÈGLE: Réponds strictement en {language}."""
                     "rerank_top_k": RAG_RERANK_TOP_K,
                     "max_conversation_context": MAX_CONVERSATION_CONTEXT,
                     "ood_min_score": OOD_MIN_SCORE,
+                    "ood_strict_score": OOD_STRICT_SCORE,
+                    "lang_detection_min_length": LANG_DETECTION_MIN_LENGTH,
                     "redis_url": REDIS_URL,
                     "weaviate_url": WEAVIATE_URL
                 },
                 "optimization_stats": self.optimization_stats.copy(),
-                "api_capabilities": api_capabilities,
+                "weaviate_capabilities": api_capabilities,
+                "intent_coverage_stats": dict(self.optimization_stats["intent_coverage_stats"]),
                 "metrics": METRICS.snapshot()
             }
             
-            # Stats cache externe si disponible
+            # Stats cache externe
             if self.cache_manager and self.cache_manager.enabled:
                 status["cache_stats"] = {
                     "enabled": True,
                     "external_cache_used": True,
+                    "semantic_cache_enabled": getattr(self.cache_manager, 'ENABLE_SEMANTIC_CACHE', False),
                     "note": "Stats détaillées disponibles via cache externe"
                 }
             else:
@@ -1865,10 +2128,16 @@ RÈGLE: Réponds strictement en {language}."""
 
 # === FONCTIONS UTILITAIRES POUR COMPATIBILITÉ ===
 async def create_rag_engine(openai_client: AsyncOpenAI = None) -> InteliaRAGEngine:
-    """Factory pour créer le RAG engine enhanced avec cache externe"""
+    """MODIFICATION: Factory avec initialisation Redis asynchrone garantie"""
     try:
         engine = InteliaRAGEngine(openai_client)
+        # CRITICAL: S'assurer que l'initialisation complète est awaited
         await engine.initialize()
+        
+        # Vérifier que le cache est bien initialisé
+        if engine.cache_manager and not engine.cache_manager.enabled:
+            logger.warning("⚠️ Cache manager créé mais pas enabled - vérifier configuration Redis")
+        
         return engine
     except Exception as e:
         logger.error(f"Erreur création RAG engine: {e}")

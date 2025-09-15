@@ -3,6 +3,11 @@
 redis_cache_manager.py - Gestionnaire de cache Redis optimisé pour performance
 Version Enhanced avec intégration des aliases d'intents.json
 CORRECTIONS APPLIQUÉES: Cache sémantique STRICT + toutes les fonctionnalités conservées
+AMÉLIORATIONS AJOUTÉES:
+- Initialisation Redis asynchrone sécurisée avec statut
+- Fallback sémantique "line+metric (sans âge)" avec TTL réduit  
+- Normalisation étendue pour variantes R-308, C-500
+- Métriques fallback_semantic distinctes
 """
 
 import json
@@ -11,6 +16,7 @@ import logging
 import time
 import os
 import re
+import asyncio
 from typing import Dict, List, Optional, Any, Tuple, Set
 from dataclasses import asdict
 import pickle
@@ -28,7 +34,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 class RAGCacheManager:
-    """Gestionnaire de cache Redis optimisé avec cache sémantique intelligent CORRIGÉ"""
+    """Gestionnaire de cache Redis optimisé avec cache sémantique intelligent STRICT + Fallback"""
     
     def __init__(self, redis_url: str = None, default_ttl: int = None):
         # Configuration Redis de base
@@ -36,6 +42,9 @@ class RAGCacheManager:
         self.default_ttl = default_ttl or int(os.getenv("CACHE_DEFAULT_TTL", "3600"))
         self.client = None
         self.enabled = REDIS_AVAILABLE and os.getenv("CACHE_ENABLED", "true").lower() == "true"
+        
+        # NOUVEAU: Statut d'initialisation pour éviter les accès prématurés
+        self.initialized = False
         
         # Limites mémoire depuis variables d'environnement
         self.MAX_VALUE_BYTES = int(os.getenv("CACHE_MAX_VALUE_BYTES", "200000"))
@@ -47,14 +56,15 @@ class RAGCacheManager:
         self.PURGE_THRESHOLD_MB = int(os.getenv("CACHE_PURGE_THRESHOLD_MB", "130"))
         self.STATS_LOG_INTERVAL = int(os.getenv("CACHE_STATS_LOG_INTERVAL", "600"))
         
-        # TTL configurables via variables d'environnement
+        # TTL configurables via variables d'environnement + NOUVEAU TTL fallback
         self.ttl_config = {
             "embeddings": int(os.getenv("CACHE_TTL_EMBEDDINGS", "3600")),
             "search_results": int(os.getenv("CACHE_TTL_SEARCHES", "1800")),
             "responses": int(os.getenv("CACHE_TTL_RESPONSES", "1800")),
             "intent_results": int(os.getenv("CACHE_TTL_INTENTS", "3600")),
             "verification": int(os.getenv("CACHE_TTL_VERIFICATION", "1800")),
-            "normalized": int(os.getenv("CACHE_TTL_NORMALIZED", "3600"))
+            "normalized": int(os.getenv("CACHE_TTL_NORMALIZED", "3600")),
+            "semantic_fallback": int(os.getenv("CACHE_TTL_SEMANTIC_FALLBACK", "900"))  # NOUVEAU: 15min
         }
         
         # Fonctionnalités configurables via variables d'environnement
@@ -62,6 +72,9 @@ class RAGCacheManager:
         self.ENABLE_SEMANTIC_CACHE = os.getenv("CACHE_ENABLE_SEMANTIC", "true").lower() == "true"
         self.ENABLE_FALLBACK_KEYS = os.getenv("CACHE_ENABLE_FALLBACK", "true").lower() == "true"
         self.MAX_SEARCH_CONTENT_LENGTH = int(os.getenv("CACHE_MAX_SEARCH_CONTENT", "300"))
+        
+        # NOUVEAU: Fallback sémantique line+metric sans âge
+        self.ENABLE_SEMANTIC_FALLBACK = os.getenv("CACHE_ENABLE_SEMANTIC_FALLBACK", "true").lower() == "true"
         
         # Configuration purge depuis variables d'environnement
         self.LRU_PURGE_RATIO = float(os.getenv("CACHE_LRU_PURGE_RATIO", "0.4"))
@@ -75,6 +88,21 @@ class RAGCacheManager:
         self.SEMANTIC_MIN_KEYWORDS = int(os.getenv("CACHE_SEMANTIC_MIN_KW", "2"))
         self.SEMANTIC_CONTEXT_REQUIRED = True
         
+        # AMÉLIORÉ: Patterns de normalisation étendus pour variantes
+        self.extended_line_patterns = {
+            # Ross 308 variants
+            r'\b(?:ross[\s\-_]*308|r[\s\-_]*308)\b': 'ross308',
+            r'\brosse?[\s\-_]*308\b': 'ross308',
+            
+            # Cobb 500 variants  
+            r'\b(?:cobb[\s\-_]*500|c[\s\-_]*500)\b': 'cobb500',
+            r'\bcob[\s\-_]*500\b': 'cobb500',
+            
+            # Hubbard variants
+            r'\bhubbard[\s\-_]*classic\b': 'hubbardclassic',
+            r'\bhub[\s\-_]*classic\b': 'hubbardclassic'
+        }
+        
         # Mots vides (activés seulement si fallback activé)
         self.stopwords = {
             'le', 'la', 'les', 'un', 'une', 'et', 'ou', 'que', 'est', 'pour',
@@ -82,25 +110,28 @@ class RAGCacheManager:
             'quel', 'quelle', 'quels', 'quelles', 'combien', 'comment'
         } if self.ENABLE_FALLBACK_KEYS else set()
         
-        # Statistiques enrichies
+        # Statistiques enrichies avec métriques fallback sémantique
         self.protection_stats = {
             "oversized_rejects": 0,
             "lru_purges": 0,
             "namespace_limits_hit": 0,
             "memory_warnings": 0,
             "auto_purges": 0,
-            "semantic_rejections": 0  # NOUVEAU
+            "semantic_rejections": 0,
+            "init_failures": 0  # NOUVEAU
         }
         
         self.cache_stats = {
             "exact_hits": 0,
             "semantic_hits": 0,
+            "semantic_fallback_hits": 0,  # NOUVEAU
             "fallback_hits": 0,
             "total_requests": 0,
             "saved_operations": 0,
             "alias_normalizations": 0,
             "keyword_extractions": 0,
-            "semantic_false_positives_avoided": 0  # NOUVEAU
+            "semantic_false_positives_avoided": 0,
+            "init_attempts": 0  # NOUVEAU
         }
         
         # Monitoring
@@ -140,8 +171,8 @@ class RAGCacheManager:
         """Aliases de base si intents.json indisponible"""
         return {
             "line": {
-                "ross 308": ["ross308", "ross-308", "r308", "ross"],
-                "cobb 500": ["cobb500", "cobb-500", "c500", "cobb"],
+                "ross 308": ["ross308", "ross-308", "r308", "ross", "r-308"],
+                "cobb 500": ["cobb500", "cobb-500", "c500", "cobb", "c-500"],
                 "hubbard classic": ["classic", "hubbard-classic", "hclassic"]
             },
             "phase": {
@@ -158,7 +189,7 @@ class RAGCacheManager:
         # CORRECTION: Vocabulaire beaucoup plus spécifique
         specific_keywords = {
             # Lignées UNIQUEMENT (pas de termes génériques)
-            'ross308', 'cobb500', 'hubbard',
+            'ross308', 'cobb500', 'hubbardclassic',
             # Métriques SPÉCIFIQUES (pas de génériques)
             'fcr', 'pv', 'gmd', 'epef',
             # Unités CONTEXTUELLES
@@ -180,25 +211,35 @@ class RAGCacheManager:
         return vocabulary
     
     def _clean_term(self, term: str) -> str:
-        """Nettoie un terme pour l'indexation sémantique"""
-        if not term:
+        """AMÉLIORÉ: Nettoie un terme avec garde-fous renforcés"""
+        if not term or len(term) < 3:  # NOUVEAU: Garde-fou longueur minimale
             return ""
+        
         # Supprimer caractères spéciaux et normaliser
         cleaned = re.sub(r'[^\w\s]', '', term.lower().strip())
         # Supprimer espaces multiples
         cleaned = re.sub(r'\s+', '', cleaned)
+        
+        # NOUVEAU: Éviter les collisions sur termes trop courts
+        if len(cleaned) < 3:
+            return ""
+            
         return cleaned
     
     async def initialize(self):
-        """Initialise la connexion Redis avec affichage des optimisations"""
+        """AMÉLIORÉ: Initialise la connexion Redis avec validation robuste"""
+        self.cache_stats["init_attempts"] += 1
+        
         if not self.enabled:
             logger.warning("Cache Redis désactivé via CACHE_ENABLED=false")
-            return
+            self.initialized = False
+            return False
         
         if not REDIS_AVAILABLE:
             logger.warning("Redis non disponible - cache désactivé")
             self.enabled = False
-            return
+            self.initialized = False
+            return False
         
         try:
             self.client = redis.from_url(
@@ -207,27 +248,42 @@ class RAGCacheManager:
                 decode_responses=False,
                 socket_keepalive=True,
                 socket_keepalive_options={},
-                health_check_interval=60
+                health_check_interval=60,
+                socket_connect_timeout=5,  # NOUVEAU: Timeout connexion
+                socket_timeout=5           # NOUVEAU: Timeout socket
             )
             
-            # Test de connexion
-            await self.client.ping()
+            # Test de connexion avec timeout
+            await asyncio.wait_for(self.client.ping(), timeout=3.0)
             
-            # Log de la configuration avec CORRECTIONS
-            logger.info("Cache Redis Enhanced CORRIGÉ initialisé avec validations strictes:")
+            # NOUVEAU: Marquer comme initialisé
+            self.initialized = True
+            
+            # Log de la configuration avec AMÉLIORATIONS
+            logger.info("Cache Redis Enhanced STRICT + Fallback initialisé:")
             logger.info(f"  - Limite valeur: {self.MAX_VALUE_BYTES/1024:.0f} KB")
             logger.info(f"  - Cache sémantique: {self.ENABLE_SEMANTIC_CACHE} (STRICT MODE)")
+            logger.info(f"  - Fallback sémantique: {self.ENABLE_SEMANTIC_FALLBACK} (TTL: {self.ttl_config['semantic_fallback']}s)")
             logger.info(f"  - Min keywords requis: {self.SEMANTIC_MIN_KEYWORDS}")
-            logger.info(f"  - Validation contextuelle: {self.SEMANTIC_CONTEXT_REQUIRED}")
+            logger.info(f"  - Patterns lignées étendus: {len(self.extended_line_patterns)}")
             logger.info(f"  - Aliases chargés: {len(self.aliases)} catégories")
-            logger.info(f"  - Vocabulaire sémantique STRICT: {len(self.poultry_keywords)} termes")
+            logger.info(f"  - Vocabulaire sémantique: {len(self.poultry_keywords)} termes")
+            
+            return True
             
         except Exception as e:
             logger.warning(f"Erreur connexion Redis: {e} - cache désactivé")
             self.enabled = False
+            self.initialized = False
+            self.protection_stats["init_failures"] += 1
+            return False
     
-    def _normalize_text(self, text: str) -> str:
-        """CORRIGÉ: Normalisation moins aggressive pour éviter les faux positifs"""
+    def _is_initialized(self) -> bool:
+        """NOUVEAU: Vérifie l'état d'initialisation"""
+        return self.enabled and self.initialized and self.client is not None
+    
+    def _normalize_text_extended(self, text: str) -> str:
+        """AMÉLIORÉ: Normalisation avec patterns étendus pour variantes"""
         if not text:
             return ""
         
@@ -249,6 +305,10 @@ class RAGCacheManager:
         
         normalized = ' '.join(filtered_words)
         
+        # NOUVEAU: Appliquer patterns étendus AVANT les aliases
+        for pattern, replacement in self.extended_line_patterns.items():
+            normalized = re.sub(pattern, replacement, normalized, flags=re.IGNORECASE)
+        
         # CORRECTION: Appliquer les aliases SEULEMENT si pertinent
         if self.aliases and len(normalized.split()) >= 2:  # Minimum 2 mots
             normalized = self._apply_aliases_strict(normalized)
@@ -256,23 +316,15 @@ class RAGCacheManager:
         
         # Normalisation spécifique aviculture RÉDUITE
         normalized = re.sub(r'\bjours?\b', 'j', normalized)
-        normalized = re.sub(r'\bross\s*308\b', 'ross308', normalized)
-        normalized = re.sub(r'\bcobb\s*500\b', 'cobb500', normalized)
-        
-        # CORRECTION: Coller les tokens UNIQUEMENT pour les lignées connues
-        known_patterns = [
-            (r'(ross)\s+(308)', r'\1\2'),
-            (r'(cobb)\s+(500)', r'\1\2'),
-            (r'(hubbard)\s+(classic)', r'\1\2')
-        ]
-        
-        for pattern, replacement in known_patterns:
-            normalized = re.sub(pattern, replacement, normalized)
         
         return normalized.strip()
     
+    def _normalize_text(self, text: str) -> str:
+        """Wrapper pour compatibilité - utilise la version étendue"""
+        return self._normalize_text_extended(text)
+    
     def _apply_aliases_strict(self, text: str) -> str:
-        """CORRIGÉ: Applique les aliases de façon STRICTE"""
+        """CORRIGÉ: Applique les aliases de façon STRICTE avec garde-fous"""
         if not self.aliases:
             return text
         
@@ -284,6 +336,10 @@ class RAGCacheManager:
             for main_line, aliases in self.aliases['line'].items():
                 main_normalized = main_line.replace(' ', '').lower()
                 
+                # NOUVEAU: Validation longueur avant application
+                if len(main_normalized) < 3:
+                    continue
+                
                 # Pattern strict pour la lignée principale
                 main_pattern = re.escape(main_line.lower())
                 if re.search(rf'\b{main_pattern}\b', result):
@@ -292,7 +348,7 @@ class RAGCacheManager:
                 
                 # Patterns stricts pour les aliases VALIDÉS
                 for alias in aliases:
-                    if alias and len(alias) >= 3:  # Minimum 3 caractères
+                    if alias and len(alias) >= 3:  # RENFORCÉ: Minimum 3 caractères
                         alias_pattern = re.escape(alias.lower())
                         if re.search(rf'\b{alias_pattern}\b', result):
                             result = re.sub(rf'\b{alias_pattern}\b', main_normalized, result)
@@ -304,37 +360,6 @@ class RAGCacheManager:
         
         return result
     
-    def _generate_key(self, prefix: str, data: Any, use_semantic: bool = False) -> str:
-        """CORRIGÉ: Génère une clé de cache avec validation sémantique STRICTE"""
-        if isinstance(data, str):
-            # CORRECTION: Cache sémantique BEAUCOUP plus strict
-            if use_semantic and self.ENABLE_SEMANTIC_CACHE and prefix in ["response", "intent", "embedding"]:
-                keywords = self._extract_semantic_keywords_strict(data)
-                
-                # CORRECTION: Validation stricte avant génération de clé
-                if self._validate_semantic_cache_eligibility(keywords, data):
-                    semantic_signature = '|'.join(sorted(keywords))
-                    hash_obj = hashlib.md5(semantic_signature.encode('utf-8'))
-                    logger.debug(f"Clé sémantique générée: {list(keywords)} pour '{data[:30]}...'")
-                    return f"intelia_rag:{prefix}:semantic:{hash_obj.hexdigest()}"
-                else:
-                    # Rejeter le cache sémantique
-                    self.protection_stats["semantic_rejections"] += 1
-            
-            # Cache normalisé standard
-            content = self._normalize_text(data)
-        elif isinstance(data, dict):
-            # Normaliser les dictionnaires contenant des requêtes
-            normalized_dict = data.copy()
-            if "query" in normalized_dict:
-                normalized_dict["query"] = self._normalize_text(normalized_dict["query"])
-            content = json.dumps(normalized_dict, sort_keys=True, separators=(',', ':'))
-        else:
-            content = str(data)
-        
-        hash_obj = hashlib.md5(content.encode('utf-8'))
-        return f"intelia_rag:{prefix}:simple:{hash_obj.hexdigest()}"
-    
     def _extract_semantic_keywords_strict(self, text: str) -> Set[str]:
         """CORRIGÉ: Extraction STRICTE des keywords sémantiques"""
         if not self.ENABLE_SEMANTIC_CACHE:
@@ -342,7 +367,7 @@ class RAGCacheManager:
         
         self.cache_stats["keyword_extractions"] += 1
         
-        text_lower = self._normalize_text(text).lower()
+        text_lower = self._normalize_text_extended(text).lower()
         
         # CORRECTION: Extraction par catégories STRICTES
         semantic_components = {
@@ -379,28 +404,56 @@ class RAGCacheManager:
                 semantic_components['metric'].add(metric)
                 metric_detected = True
         
-        # 3. ÂGE/CONTEXTE (obligatoire pour certaines métriques)
+        # 3. ÂGE/CONTEXTE (requis pour strict, optionnel pour fallback)
         age_pattern = re.search(r'(\d+)\s*(?:j|jours?|day|days?|semaines?|semaine|wk|w)', text_lower)
+        age_detected = False
         if age_pattern:
             age_value = age_pattern.group(1)
             semantic_components['age'].add(f"{age_value}j")
             semantic_components['context'].add('age_specified')
+            age_detected = True
         
-        # 4. VALIDATION STRICTE: Tous les composants requis doivent être présents
+        # 4. VALIDATION STRICTE vs FALLBACK
         if not (line_detected and metric_detected):
             logger.debug(f"Cache sémantique rejeté (composants manquants): line={line_detected}, metric={metric_detected}")
             return set()
         
-        # 5. Construire l'ensemble final
+        # 5. Construire l'ensemble final avec métadonnées
         all_keywords = set()
         for component_set in semantic_components.values():
             all_keywords.update(component_set)
         
+        # NOUVEAU: Ajouter métadonnée pour fallback
+        if not age_detected and line_detected and metric_detected:
+            all_keywords.add('_fallback_eligible')
+        
         logger.debug(f"Keywords sémantiques STRICTS extraits: {all_keywords} de '{text[:50]}...'")
         return all_keywords
     
+    def _extract_semantic_fallback_keywords(self, text: str) -> Set[str]:
+        """NOUVEAU: Extraction pour fallback sémantique (line+metric sans âge)"""
+        keywords = self._extract_semantic_keywords_strict(text)
+        
+        # Filtrer pour garder seulement line+metric
+        fallback_keywords = set()
+        for kw in keywords:
+            if any(line in kw for line in ['ross', 'cobb', 'hubbard']):
+                fallback_keywords.add(kw)
+            elif kw in ['fcr', 'poids', 'température', 'mortalité']:
+                fallback_keywords.add(kw)
+        
+        # Valider minimum line+metric
+        has_line = any('ross' in kw or 'cobb' in kw or 'hubbard' in kw for kw in fallback_keywords)
+        has_metric = any(kw in ['fcr', 'poids', 'température', 'mortalité'] for kw in fallback_keywords)
+        
+        if has_line and has_metric:
+            fallback_keywords.add('_fallback_mode')
+            return fallback_keywords
+        
+        return set()
+    
     def _validate_semantic_cache_eligibility(self, keywords: Set[str], original_text: str) -> bool:
-        """NOUVEAU: Valide l'éligibilité au cache sémantique"""
+        """NOUVEAU: Valide l'éligibilité au cache sémantique STRICT"""
         
         # Règle 1: Minimum de keywords requis
         if len(keywords) < self.SEMANTIC_MIN_KEYWORDS:
@@ -415,8 +468,15 @@ class RAGCacheManager:
             logger.debug(f"Rejeté: composants manquants - line={has_line}, metric={has_metric}")
             return False
         
-        # Règle 3: Cohérence contextuelle
-        text_lower = original_text.lower()
+        # Règle 3: Pour le strict, l'âge est REQUIS (sinon fallback)
+        has_age = any('j' in kw and kw != '_fallback_eligible' for kw in keywords)
+        
+        if not has_age:
+            logger.debug(f"Rejeté: âge requis pour cache strict")
+            return False  # Sera traité par fallback
+        
+        # Règle 4: Cohérence contextuelle
+        text_lower = self._normalize_text_extended(original_text).lower()
         
         # Si c'est une question sur une lignée spécifique + métrique spécifique, c'est bon
         specific_contexts = [
@@ -438,6 +498,48 @@ class RAGCacheManager:
         logger.debug(f"Cache sémantique VALIDÉ pour: {keywords}")
         return True
     
+    def _generate_key(self, prefix: str, data: Any, use_semantic: bool = False, 
+                     fallback_semantic: bool = False) -> str:
+        """AMÉLIORÉ: Génère une clé avec support fallback sémantique"""
+        if isinstance(data, str):
+            # CORRECTION: Cache sémantique BEAUCOUP plus strict
+            if use_semantic and self.ENABLE_SEMANTIC_CACHE and prefix in ["response", "intent", "embedding"]:
+                keywords = self._extract_semantic_keywords_strict(data)
+                
+                # CORRECTION: Validation stricte avant génération de clé
+                if self._validate_semantic_cache_eligibility(keywords, data):
+                    semantic_signature = '|'.join(sorted(keywords))
+                    hash_obj = hashlib.md5(semantic_signature.encode('utf-8'))
+                    logger.debug(f"Clé sémantique générée: {list(keywords)} pour '{data[:30]}...'")
+                    return f"intelia_rag:{prefix}:semantic:{hash_obj.hexdigest()}"
+                else:
+                    # Rejeter le cache sémantique
+                    self.protection_stats["semantic_rejections"] += 1
+            
+            # NOUVEAU: Cache fallback sémantique (line+metric sans âge)
+            if fallback_semantic and self.ENABLE_SEMANTIC_FALLBACK:
+                fallback_keywords = self._extract_semantic_fallback_keywords(data)
+                
+                if len(fallback_keywords) >= 2:  # line + metric minimum
+                    fallback_signature = '|'.join(sorted(fallback_keywords))
+                    hash_obj = hashlib.md5(fallback_signature.encode('utf-8'))
+                    logger.debug(f"Clé fallback sémantique générée: {list(fallback_keywords)} pour '{data[:30]}...'")
+                    return f"intelia_rag:{prefix}:semantic_fb:{hash_obj.hexdigest()}"
+            
+            # Cache normalisé standard
+            content = self._normalize_text_extended(data)
+        elif isinstance(data, dict):
+            # Normaliser les dictionnaires contenant des requêtes
+            normalized_dict = data.copy()
+            if "query" in normalized_dict:
+                normalized_dict["query"] = self._normalize_text_extended(normalized_dict["query"])
+            content = json.dumps(normalized_dict, sort_keys=True, separators=(',', ':'))
+        else:
+            content = str(data)
+        
+        hash_obj = hashlib.md5(content.encode('utf-8'))
+        return f"intelia_rag:{prefix}:simple:{hash_obj.hexdigest()}"
+    
     def _generate_fallback_keys(self, primary_key: str, original_data: Any) -> List[str]:
         """CORRIGÉ: Génère des clés de fallback plus conservatrices"""
         if not self.ENABLE_FALLBACK_KEYS:
@@ -450,7 +552,7 @@ class RAGCacheManager:
             minimal_normalized = re.sub(r'\s+', ' ', original_data.lower().strip())
             minimal_normalized = re.sub(r'[?!.]+$', '', minimal_normalized)
             
-            if minimal_normalized != self._normalize_text(original_data):
+            if minimal_normalized != self._normalize_text_extended(original_data):
                 simple_hash = hashlib.md5(minimal_normalized.encode()).hexdigest()
                 fallback_keys.append(f"intelia_rag:response:fallback:{simple_hash}")
         
@@ -459,11 +561,11 @@ class RAGCacheManager:
     # CORRECTION 1: Méthode get_semantic_response() dédiée (lookup "pur")
     async def get_semantic_response(self, query: str, language: str = "fr") -> Optional[str]:
         """CORRIGÉ: Lecture sémantique pure avec validation stricte"""
-        if not self.enabled or not self.client or not self.ENABLE_SEMANTIC_CACHE:
+        if not self._is_initialized() or not self.ENABLE_SEMANTIC_CACHE:
             return None
         
         try:
-            normalized_query = self._normalize_text(query)
+            normalized_query = self._normalize_text_extended(query)
             keywords = self._extract_semantic_keywords_strict(normalized_query)
             
             # CORRECTION: Validation stricte obligatoire
@@ -652,7 +754,7 @@ class RAGCacheManager:
     
     async def get_embedding(self, text: str) -> Optional[List[float]]:
         """Récupère un embedding avec cache sémantique intelligent"""
-        if not self.enabled or not self.client:
+        if not self._is_initialized():
             return None
         
         self.cache_stats["total_requests"] += 1
@@ -702,7 +804,7 @@ class RAGCacheManager:
     
     async def set_embedding(self, text: str, embedding: List[float]):
         """Met en cache un embedding avec stockage sémantique intelligent"""
-        if not self.enabled or not self.client:
+        if not self._is_initialized():
             return
         
         try:
@@ -740,8 +842,8 @@ class RAGCacheManager:
     
     async def get_response(self, query: str, context_hash: str, 
                           language: str = "fr") -> Optional[str]:
-        """Récupère une réponse avec cache sémantique avancé"""
-        if not self.enabled or not self.client:
+        """AMÉLIORÉ: Récupère une réponse avec cascade strict → fallback → simple"""
+        if not self._is_initialized():
             return None
         
         self.cache_stats["total_requests"] += 1
@@ -753,7 +855,7 @@ class RAGCacheManager:
                 "language": language
             }
             
-            # Essayer cache sémantique en premier si activé
+            # 1. Essayer cache sémantique STRICT en premier
             if self.ENABLE_SEMANTIC_CACHE:
                 semantic_key = self._generate_key("response", query, use_semantic=True)
                 cached = await self.client.get(semantic_key)
@@ -761,20 +863,34 @@ class RAGCacheManager:
                 if cached:
                     response = cached.decode('utf-8')
                     self.cache_stats["semantic_hits"] += 1
-                    logger.info(f"Cache HIT (sémantique): '{query[:30]}...'")
+                    self.hit_type_last = "semantic_strict"
+                    logger.info(f"Cache HIT (sémantique STRICT): '{query[:30]}...'")
                     return response
             
-            # Essayer cache exact
+            # 2. NOUVEAU: Essayer cache fallback sémantique (line+metric sans âge)
+            if self.ENABLE_SEMANTIC_FALLBACK:
+                fallback_semantic_key = self._generate_key("response", query, fallback_semantic=True)
+                cached = await self.client.get(fallback_semantic_key)
+                
+                if cached:
+                    response = cached.decode('utf-8')
+                    self.cache_stats["semantic_fallback_hits"] += 1
+                    self.hit_type_last = "semantic_fallback"
+                    logger.info(f"Cache HIT (sémantique FALLBACK): '{query[:30]}...'")
+                    return response
+            
+            # 3. Essayer cache exact
             key = self._generate_key("response", cache_data, use_semantic=False)
             cached = await self.client.get(key)
             
             if cached:
                 response = cached.decode('utf-8')
                 self.cache_stats["exact_hits"] += 1
-                logger.info(f"Cache HIT: '{query[:30]}...'")
+                self.hit_type_last = "exact"
+                logger.info(f"Cache HIT (exact): '{query[:30]}...'")
                 return response
             
-            # Essayer fallback keys
+            # 4. Essayer fallback keys traditionnel
             if self.ENABLE_FALLBACK_KEYS:
                 fallback_keys = self._generate_fallback_keys(key, query)
                 for fallback_key in fallback_keys:
@@ -782,7 +898,8 @@ class RAGCacheManager:
                     if cached:
                         response = cached.decode('utf-8')
                         self.cache_stats["fallback_hits"] += 1
-                        logger.info(f"Cache HIT (fallback): '{query[:30]}...'")
+                        self.hit_type_last = "fallback"
+                        logger.info(f"Cache HIT (fallback traditionnel): '{query[:30]}...'")
                         return response
             
             logger.info(f"Cache MISS: '{query[:30]}...'")
@@ -794,8 +911,8 @@ class RAGCacheManager:
     
     async def set_response(self, query: str, context_hash: str, 
                           response: str, language: str = "fr"):
-        """CORRIGÉ: Met en cache une réponse avec validation sémantique stricte"""
-        if not self.enabled or not self.client:
+        """AMÉLIORÉ: Met en cache avec support fallback sémantique"""
+        if not self._is_initialized():
             return
         
         try:
@@ -818,20 +935,31 @@ class RAGCacheManager:
                 response_bytes
             )
             
-            # CORRECTION: Stocker cache sémantique SEULEMENT si validation stricte réussit
+            # Cache sémantique STRICT (avec âge requis)
             if self.ENABLE_SEMANTIC_CACHE:
                 keywords = self._extract_semantic_keywords_strict(query)
                 if self._validate_semantic_cache_eligibility(keywords, query):
                     semantic_key = self._generate_key("response", query, use_semantic=True)
-                    if semantic_key != key:  # Éviter duplication
+                    if semantic_key != key:
                         await self.client.setex(
                             semantic_key,
                             self.ttl_config["responses"],
                             response_bytes
                         )
                         logger.debug(f"Cache SET (sémantique STRICT): '{query[:30]}...' -> keywords: {list(keywords)}")
-                else:
-                    logger.debug(f"Cache sémantique rejeté pour SET: '{query[:30]}...'")
+            
+            # NOUVEAU: Cache fallback sémantique (line+metric sans âge, TTL réduit)
+            if self.ENABLE_SEMANTIC_FALLBACK:
+                fallback_keywords = self._extract_semantic_fallback_keywords(query)
+                if len(fallback_keywords) >= 2:
+                    fallback_semantic_key = self._generate_key("response", query, fallback_semantic=True)
+                    if fallback_semantic_key not in [key, semantic_key if 'semantic_key' in locals() else None]:
+                        await self.client.setex(
+                            fallback_semantic_key,
+                            self.ttl_config["semantic_fallback"],  # TTL réduit (15min)
+                            response_bytes
+                        )
+                        logger.debug(f"Cache SET (sémantique FALLBACK): '{query[:30]}...' -> keywords: {list(fallback_keywords)}")
             
             logger.debug(f"Cache SET: réponse '{query[:30]}...' ({len(response_bytes)} bytes)")
             
@@ -842,7 +970,7 @@ class RAGCacheManager:
                                where_filter: Dict = None, 
                                top_k: int = 10) -> Optional[List[Dict]]:
         """Récupère des résultats de recherche depuis le cache"""
-        if not self.enabled or not self.client:
+        if not self._is_initialized():
             return None
         
         try:
@@ -871,7 +999,7 @@ class RAGCacheManager:
                                where_filter: Dict, top_k: int, 
                                results: List[Dict]):
         """Met en cache des résultats de recherche"""
-        if not self.enabled or not self.client:
+        if not self._is_initialized():
             return
         
         try:
@@ -913,7 +1041,7 @@ class RAGCacheManager:
     
     async def get_intent_result(self, query: str) -> Optional[Dict]:
         """Récupère un résultat d'analyse d'intention avec cache sémantique"""
-        if not self.enabled or not self.client:
+        if not self._is_initialized():
             return None
         
         try:
@@ -947,7 +1075,7 @@ class RAGCacheManager:
     
     async def set_intent_result(self, query: str, intent_result: Any):
         """Met en cache un résultat d'analyse d'intention"""
-        if not self.enabled or not self.client:
+        if not self._is_initialized():
             return
         
         try:
@@ -1013,7 +1141,7 @@ class RAGCacheManager:
     
     async def invalidate_pattern(self, pattern: str):
         """Invalide les clés correspondant à un pattern"""
-        if not self.enabled or not self.client:
+        if not self._is_initialized():
             return
         
         try:
@@ -1041,25 +1169,33 @@ class RAGCacheManager:
             logger.warning(f"Erreur invalidation pattern: {e}")
     
     async def get_cache_stats(self) -> Dict[str, Any]:
-        """CORRIGÉ: Récupère les statistiques avec nouvelles métriques de validation"""
-        if not self.enabled or not self.client:
-            return {"enabled": False}
+        """AMÉLIORÉ: Récupère les statistiques avec métriques fallback sémantique"""
+        if not self._is_initialized():
+            return {"enabled": False, "initialized": False}
         
         try:
             info = await self.client.info("memory")
             memory_usage_mb = await self._get_memory_usage_mb()
             total_keys = await self.client.dbsize()
             
-            # Calculer les taux de hit
+            # Calculer les taux de hit avec fallback sémantique
             total_requests = max(1, self.cache_stats["total_requests"])
             exact_hit_rate = self.cache_stats["exact_hits"] / total_requests
             semantic_hit_rate = self.cache_stats["semantic_hits"] / total_requests
+            semantic_fallback_hit_rate = self.cache_stats["semantic_fallback_hits"] / total_requests
             fallback_hit_rate = self.cache_stats["fallback_hits"] / total_requests
-            total_hit_rate = (self.cache_stats["exact_hits"] + self.cache_stats["semantic_hits"] + self.cache_stats["fallback_hits"]) / total_requests
+            
+            total_hit_rate = (
+                self.cache_stats["exact_hits"] + 
+                self.cache_stats["semantic_hits"] + 
+                self.cache_stats["semantic_fallback_hits"] +
+                self.cache_stats["fallback_hits"]
+            ) / total_requests
             
             return {
                 "enabled": True,
-                "approach": "enhanced_semantic_cache_with_strict_validation_v2.1",
+                "initialized": self.initialized,
+                "approach": "enhanced_semantic_cache_with_strict_validation_and_fallback_v2.2",
                 "memory": {
                     "used_mb": round(memory_usage_mb, 2),
                     "used_human": info.get("used_memory_human", "N/A"),
@@ -1074,23 +1210,29 @@ class RAGCacheManager:
                     "total_requests": total_requests,
                     "exact_hits": self.cache_stats["exact_hits"],
                     "semantic_hits": self.cache_stats["semantic_hits"],
+                    "semantic_fallback_hits": self.cache_stats["semantic_fallback_hits"],  # NOUVEAU
                     "fallback_hits": self.cache_stats["fallback_hits"],
                     "exact_hit_rate": round(exact_hit_rate, 3),
                     "semantic_hit_rate": round(semantic_hit_rate, 3),
+                    "semantic_fallback_hit_rate": round(semantic_fallback_hit_rate, 3),  # NOUVEAU
                     "fallback_hit_rate": round(fallback_hit_rate, 3),
-                    "total_hit_rate": round(total_hit_rate, 3)
+                    "total_hit_rate": round(total_hit_rate, 3),
+                    "last_hit_type": self.hit_type_last
                 },
                 "semantic_validation": {
                     "min_keywords_required": self.SEMANTIC_MIN_KEYWORDS,
                     "context_required": self.SEMANTIC_CONTEXT_REQUIRED,
                     "rejections": self.protection_stats["semantic_rejections"],
-                    "false_positives_avoided": self.cache_stats["semantic_false_positives_avoided"]
+                    "false_positives_avoided": self.cache_stats["semantic_false_positives_avoided"],
+                    "fallback_enabled": self.ENABLE_SEMANTIC_FALLBACK,
+                    "extended_patterns": len(self.extended_line_patterns)
                 },
                 "configuration": {
                     "max_value_kb": round(self.MAX_VALUE_BYTES / 1024, 1),
                     "ttl_config_minutes": {k: round(v/60, 1) for k, v in self.ttl_config.items()},
                     "compression_enabled": self.ENABLE_COMPRESSION,
                     "semantic_cache_enabled": self.ENABLE_SEMANTIC_CACHE,
+                    "semantic_fallback_enabled": self.ENABLE_SEMANTIC_FALLBACK,
                     "fallback_keys_enabled": self.ENABLE_FALLBACK_KEYS,
                     "auto_purge_enabled": self.ENABLE_AUTO_PURGE
                 },
@@ -1099,45 +1241,54 @@ class RAGCacheManager:
                     "vocabulary_size": len(self.poultry_keywords),
                     "alias_normalizations": self.cache_stats["alias_normalizations"],
                     "keyword_extractions": self.cache_stats["keyword_extractions"],
-                    "stopwords_count": len(self.stopwords)
+                    "stopwords_count": len(self.stopwords),
+                    "extended_line_patterns": len(self.extended_line_patterns)
                 },
                 "protection_stats": self.protection_stats,
                 "performance": {
                     "saved_operations": self.cache_stats["saved_operations"],
+                    "init_attempts": self.cache_stats["init_attempts"],
                     "features_enabled": {
                         "compression": self.ENABLE_COMPRESSION,
                         "semantic_cache": self.ENABLE_SEMANTIC_CACHE,
+                        "semantic_fallback": self.ENABLE_SEMANTIC_FALLBACK,
                         "fallback_keys": self.ENABLE_FALLBACK_KEYS,
                         "intelligent_aliases": bool(self.aliases),
-                        "strict_semantic_validation": True  # NOUVEAU
+                        "strict_semantic_validation": True,
+                        "extended_normalization": True
                     }
                 }
             }
             
         except Exception as e:
             logger.warning(f"Erreur stats cache: {e}")
-            return {"enabled": True, "error": str(e)}
+            return {"enabled": True, "initialized": self.initialized, "error": str(e)}
     
     async def debug_semantic_extraction(self, query: str) -> Dict[str, Any]:
         """Debug de l'extraction sémantique pour une requête"""
         try:
             # Normalisation étapes par étapes
             original = query
-            normalized = self._normalize_text(query)
+            normalized = self._normalize_text_extended(query)
             keywords = self._extract_semantic_keywords_strict(query)
+            fallback_keywords = self._extract_semantic_fallback_keywords(query)
             
             # Test génération clés
             semantic_key = self._generate_key("response", query, use_semantic=True)
+            fallback_semantic_key = self._generate_key("response", query, fallback_semantic=True)
             simple_key = self._generate_key("response", query, use_semantic=False)
             
             # Test existence cache
             semantic_exists = False
+            fallback_semantic_exists = False
             simple_exists = False
             if self.client:
                 try:
                     semantic_cached = await self.client.get(semantic_key)
+                    fallback_semantic_cached = await self.client.get(fallback_semantic_key)
                     simple_cached = await self.client.get(simple_key)
                     semantic_exists = semantic_cached is not None
+                    fallback_semantic_exists = fallback_semantic_cached is not None
                     simple_exists = simple_cached is not None
                 except:
                     pass
@@ -1146,128 +1297,8 @@ class RAGCacheManager:
                 "original_query": original,
                 "normalized_query": normalized,
                 "extracted_keywords": list(keywords),
+                "fallback_keywords": list(fallback_keywords),
                 "keyword_count": len(keywords),
+                "fallback_keyword_count": len(fallback_keywords),
                 "vocabulary_size": len(self.poultry_keywords),
                 "aliases_loaded": len(self.aliases),
-                "validation_result": self._validate_semantic_cache_eligibility(keywords, query) if keywords else False,
-                "cache_keys": {
-                    "semantic": semantic_key[-16:],
-                    "simple": simple_key[-16:],
-                    "semantic_exists": semantic_exists,
-                    "simple_exists": simple_exists
-                },
-                "feature_flags": {
-                    "semantic_enabled": self.ENABLE_SEMANTIC_CACHE,
-                    "fallback_enabled": self.ENABLE_FALLBACK_KEYS,
-                    "compression_enabled": self.ENABLE_COMPRESSION,
-                    "strict_semantic_validation": True
-                }
-            }
-            
-        except Exception as e:
-            return {"error": str(e)}
-    
-    async def force_namespace_cleanup(self, namespace: str, target_key_count: int = None) -> Dict[str, int]:
-        """Force le nettoyage d'un namespace"""
-        if not self.enabled or not self.client:
-            return {"error": "cache_disabled"}
-        
-        try:
-            if target_key_count is None:
-                target_key_count = int(self.MAX_KEYS_PER_NAMESPACE * self.LRU_PURGE_RATIO)
-            
-            purged = await self._purge_namespace_lru(namespace, target_key_count)
-            
-            final_count = 0
-            cursor = 0
-            scan_count = 0
-            while cursor != 0 or scan_count == 0:
-                cursor, keys = await self.client.scan(cursor, match=f"intelia_rag:{namespace}:*", count=100)
-                final_count += len(keys)
-                scan_count += 1
-                if scan_count > 5:
-                    final_count = f"~{final_count}+"
-                    break
-            
-            return {
-                "namespace": namespace,
-                "keys_purged": purged,
-                "final_key_count": final_count,
-                "target_was": target_key_count
-            }
-            
-        except Exception as e:
-            logger.error(f"Erreur force cleanup namespace {namespace}: {e}")
-            return {"error": str(e)}
-    
-    async def cleanup(self):
-        """Nettoie les ressources Redis"""
-        if self.client:
-            try:
-                stats = await self.get_cache_stats()
-                if "hit_statistics" in stats:
-                    hit_stats = stats["hit_statistics"]
-                    memory_stats = stats.get("memory", {})
-                    logger.info(f"Stats cache Enhanced finales - Hit rate total: {hit_stats['total_hit_rate']:.1%}")
-                    logger.info(f"  - Exact: {hit_stats['exact_hit_rate']:.1%}, Sémantique: {hit_stats['semantic_hit_rate']:.1%}")
-                    logger.info(f"  - Fallback: {hit_stats['fallback_hit_rate']:.1%}")
-                    logger.info(f"  - Mémoire: {memory_stats.get('used_mb', 0):.1f}MB")
-                
-                await self.client.close()
-                logger.info("Connexion Redis Enhanced fermée")
-            except Exception as e:
-                logger.warning(f"Erreur fermeture Redis: {e}")
-
-
-# Classe wrapper pour intégration dans RAG Engine
-class CachedOpenAIEmbedder:
-    """Wrapper pour OpenAI Embedder avec cache Redis Enhanced"""
-    
-    def __init__(self, original_embedder, cache_manager: RAGCacheManager):
-        self.original_embedder = original_embedder
-        self.cache_manager = cache_manager
-    
-    async def embed_query(self, text: str) -> List[float]:
-        """Embedding avec cache sémantique intelligent"""
-        # Essayer le cache d'abord
-        cached_embedding = await self.cache_manager.get_embedding(text)
-        if cached_embedding:
-            return cached_embedding
-        
-        # Générer si pas en cache
-        embedding = await self.original_embedder.embed_query(text)
-        
-        # Mettre en cache
-        if embedding:
-            await self.cache_manager.set_embedding(text, embedding)
-        
-        return embedding
-    
-    async def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        """Embedding batch avec cache optimisé"""
-        results = []
-        uncached_texts = []
-        uncached_indices = []
-        
-        # Vérifier le cache pour chaque texte
-        for i, text in enumerate(texts):
-            cached = await self.cache_manager.get_embedding(text)
-            if cached:
-                results.append((i, cached))
-            else:
-                uncached_texts.append(text)
-                uncached_indices.append(i)
-        
-        # Générer les embeddings manquants
-        if uncached_texts:
-            new_embeddings = await self.original_embedder.embed_documents(uncached_texts)
-            
-            # Mettre en cache et ajouter aux résultats
-            for idx, embedding in zip(uncached_indices, new_embeddings):
-                if embedding:
-                    await self.cache_manager.set_embedding(texts[idx], embedding)
-                results.append((idx, embedding))
-        
-        # Trier par index original
-        results.sort(key=lambda x: x[0])
-        return [embedding for _, embedding in results]
