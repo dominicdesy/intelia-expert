@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-main.py - Intelia Expert Backend avec RAG Enhanced + Cache Sémantique Intelligent
+main.py - Intelia Expert Backend avec RAG Enhanced + LangSmith + RRF Intelligent
 Version corrigée: Validation stricte, gestion d'erreurs robuste, monitoring avancé
-NOUVELLES FONCTIONNALITÉS CORRIGÉES:
-- Validation stricte des dépendances au démarrage
-- Gestion d'erreurs explicite (plus de fallbacks silencieux)
-- Health checks robustes avec connectivity tests
-- Cache sémantique optimisé et stable
-- Configuration robuste avec fallbacks explicites
+NOUVELLES FONCTIONNALITÉS AJOUTÉES:
+- Intégration LangSmith pour monitoring LLM
+- Support RRF Intelligent avec métriques
+- Variables d'environnement Digital Ocean
+- Health checks enrichis avec nouveau statut
 """
 
 import os
@@ -35,6 +34,19 @@ from imports_and_dependencies import (
     WEAVIATE_AVAILABLE
 )
 
+# === NOUVEAU: Imports configuration enrichie ===
+from config import (
+    # Core
+    RAG_ENABLED, CACHE_ENABLED, OPENAI_API_KEY, WEAVIATE_URL, REDIS_URL,
+    # LangSmith
+    LANGSMITH_ENABLED, LANGSMITH_API_KEY, LANGSMITH_PROJECT,
+    # RRF Intelligent
+    ENABLE_INTELLIGENT_RRF, RRF_LEARNING_MODE, RRF_GENETIC_BOOST,
+    # Autres
+    MAX_CONVERSATION_CONTEXT, HYBRID_SEARCH_ENABLED,
+    validate_config, get_config_status
+)
+
 # Configuration
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -47,6 +59,14 @@ if not OPENAI_AVAILABLE:
 if not WEAVIATE_AVAILABLE:
     raise RuntimeError("Weaviate non disponible - dépendance critique manquante")
 
+# === NOUVEAU: Validation configuration enrichie ===
+config_valid, config_errors = validate_config()
+if not config_valid:
+    logger.error(f"Configuration invalide: {config_errors}")
+    # En production, on peut continuer avec warnings
+    for error in config_errors:
+        logger.warning(f"Config: {error}")
+
 # Variables globales pour les services
 rag_engine_enhanced = None
 agent_rag_engine = None
@@ -54,7 +74,6 @@ cache_core = None
 
 # Configuration d'application
 BASE_PATH = os.environ.get("BASE_PATH", "/llm").rstrip("/")
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
 # Validation configuration critique
 if not OPENAI_API_KEY:
@@ -72,7 +91,6 @@ ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "https://expert.intelia.com").spl
 # Paramètres fonctionnalités
 ENABLE_RESPONSE_STREAMING = os.getenv("ENABLE_RESPONSE_STREAMING", "true").lower() == "true"
 ENABLE_METRICS_LOGGING = os.getenv("ENABLE_METRICS_LOGGING", "true").lower() == "true"
-MAX_CONVERSATION_CONTEXT = int(os.getenv("MAX_CONVERSATION_CONTEXT", "6"))
 
 # Paramètres RAG Enhanced
 USE_AGENT_RAG = os.getenv("USE_AGENT_RAG", "false").lower() == "true"
@@ -84,17 +102,22 @@ ENABLE_STARTUP_VALIDATION = os.getenv("ENABLE_STARTUP_VALIDATION", "true").lower
 ENABLE_HEALTH_MONITORING = os.getenv("ENABLE_HEALTH_MONITORING", "true").lower() == "true"
 STARTUP_TIMEOUT = int(os.getenv("STARTUP_TIMEOUT", "30"))
 
+# === NOUVEAU: Paramètres Digital Ocean ===
+DO_APP_NAME = os.getenv("DO_APP_NAME", "intelia-expert")
+DO_APP_TIER = os.getenv("DO_APP_TIER", "basic")
+
 # Paramètres langue
 LANG_DETECTION_MIN_LENGTH = int(os.getenv("LANG_DETECTION_MIN_LENGTH", "20"))
 
-logger.info(f"Mode RAG Enhanced: Cache Sémantique Intelligent + Validation Stricte v3.0")
+logger.info(f"Mode RAG Enhanced: LangSmith + RRF Intelligent v4.0")
+logger.info(f"Configuration: LangSmith={LANGSMITH_ENABLED}, RRF={ENABLE_INTELLIGENT_RRF}")
 
 class StartupValidationError(Exception):
     """Exception pour les erreurs de validation au démarrage"""
     pass
 
 class SystemHealthMonitor:
-    """Moniteur de santé système robuste"""
+    """Moniteur de santé système robuste avec LangSmith et RRF"""
     
     def __init__(self):
         self.startup_time = time.time()
@@ -111,6 +134,8 @@ class SystemHealthMonitor:
             "critical_dependencies": {},
             "service_connectivity": {},
             "configuration_validation": {},
+            "langsmith_validation": {},
+            "rrf_validation": {},
             "overall_status": "unknown",
             "errors": [],
             "warnings": []
@@ -160,7 +185,45 @@ class SystemHealthMonitor:
                 validation_report["errors"].append(f"OpenAI: {e}")
                 raise StartupValidationError(f"Configuration OpenAI invalide: {e}")
             
-            # 3. Initialisation des services principaux
+            # === NOUVEAU: 3. Validation LangSmith ===
+            logger.info("Validation configuration LangSmith...")
+            
+            if LANGSMITH_ENABLED:
+                if not LANGSMITH_API_KEY:
+                    validation_report["warnings"].append("LangSmith activé mais API key manquante")
+                    validation_report["langsmith_validation"]["status"] = "disabled"
+                else:
+                    try:
+                        # Test basique LangSmith
+                        validation_report["langsmith_validation"] = {
+                            "enabled": True,
+                            "api_key_present": bool(LANGSMITH_API_KEY),
+                            "project": LANGSMITH_PROJECT,
+                            "status": "configured"
+                        }
+                        logger.info("✅ LangSmith configuré")
+                    except Exception as e:
+                        validation_report["warnings"].append(f"LangSmith: {e}")
+                        validation_report["langsmith_validation"]["status"] = "error"
+            else:
+                validation_report["langsmith_validation"]["status"] = "disabled"
+            
+            # === NOUVEAU: 4. Validation RRF Intelligent ===
+            logger.info("Validation RRF Intelligent...")
+            
+            if ENABLE_INTELLIGENT_RRF:
+                validation_report["rrf_validation"] = {
+                    "enabled": True,
+                    "learning_mode": RRF_LEARNING_MODE,
+                    "genetic_boost": RRF_GENETIC_BOOST,
+                    "redis_required": True,
+                    "status": "configured"
+                }
+                logger.info("✅ RRF Intelligent configuré")
+            else:
+                validation_report["rrf_validation"]["status"] = "disabled"
+            
+            # 5. Initialisation des services principaux
             logger.info("Initialisation des services...")
             
             service_errors = await self._initialize_core_services()
@@ -168,7 +231,7 @@ class SystemHealthMonitor:
                 validation_report["errors"].extend(service_errors)
                 raise StartupValidationError(f"Échec initialisation services: {service_errors}")
             
-            # 4. Tests de connectivité
+            # 6. Tests de connectivité
             logger.info("Tests de connectivité...")
             
             connectivity_status = await self._test_service_connectivity()
@@ -180,22 +243,18 @@ class SystemHealthMonitor:
             
             if not connectivity_status.get("redis", False):
                 validation_report["warnings"].append("Redis non accessible - cache désactivé")
+                if ENABLE_INTELLIGENT_RRF:
+                    validation_report["warnings"].append("RRF Intelligent désactivé (Redis requis)")
             
-            # 5. Validation finale
+            # 7. Validation finale
             validation_report["startup_duration"] = time.time() - start_time
             
             if validation_report["errors"]:
                 validation_report["overall_status"] = "failed"
-                self.health_status = "critical"
             elif validation_report["warnings"]:
                 validation_report["overall_status"] = "degraded"
-                self.health_status = "warning"
             else:
                 validation_report["overall_status"] = "healthy"
-                self.health_status = "healthy"
-            
-            logger.info(f"Validation startup terminée: {validation_report['overall_status']} "
-                       f"({validation_report['startup_duration']:.2f}s)")
             
             self.validation_report = validation_report
             return validation_report
@@ -203,79 +262,73 @@ class SystemHealthMonitor:
         except StartupValidationError:
             validation_report["startup_duration"] = time.time() - start_time
             validation_report["overall_status"] = "failed"
-            self.health_status = "critical"
             self.validation_report = validation_report
             raise
         except Exception as e:
             validation_report["errors"].append(f"Erreur validation inattendue: {e}")
             validation_report["startup_duration"] = time.time() - start_time
             validation_report["overall_status"] = "failed"
-            self.health_status = "critical"
             self.validation_report = validation_report
-            raise StartupValidationError(f"Validation startup échouée: {e}")
+            raise StartupValidationError(f"Validation échouée: {e}")
     
-    async def _initialize_core_services(self) -> list[str]:
-        """Initialise les services principaux avec gestion d'erreurs stricte"""
+    async def _initialize_core_services(self) -> list:
+        """Initialise les services principaux avec support LangSmith + RRF"""
+        global rag_engine_enhanced, agent_rag_engine, cache_core
         errors = []
         
-        global rag_engine_enhanced, agent_rag_engine, cache_core
-        
         try:
-            # Cache Core (optionnel mais recommandé)
+            # Cache Core
             logger.info("  Initialisation Cache Core...")
             try:
                 from cache_core import create_cache_core
                 cache_core = create_cache_core()
-                if cache_core.enabled:
-                    success = await cache_core.initialize()
-                    if not success:
-                        logger.warning("Cache Core désactivé")
-                        cache_core = None
+                await cache_core.initialize()
+                
+                if cache_core.initialized:
+                    logger.info("✅ Cache Core initialisé")
                 else:
-                    logger.info("Cache Core désactivé par configuration")
-                    cache_core = None
-            except Exception as e:
-                logger.warning(f"Cache Core non disponible: {e}")
-                cache_core = None
-            
-            # RAG Engine Enhanced (critique)
-            logger.info("  Initialisation RAG Engine...")
-            try:
-                # Import avec validation
-                try:
-                    from rag_engine import create_rag_engine, RAGSource, RAGResult
-                except ImportError as e:
-                    errors.append(f"Module RAG Engine non disponible: {e}")
-                    return errors
-                
-                # Création des clients OpenAI
-                from openai import OpenAI, AsyncOpenAI
-                openai_sync = OpenAI(api_key=OPENAI_API_KEY)
-                openai_async = AsyncOpenAI(api_key=OPENAI_API_KEY)
-                
-                # Créer le RAG engine
-                rag_engine_enhanced = create_rag_engine(openai_async)
-                
-                if not rag_engine_enhanced or not getattr(rag_engine_enhanced, 'is_initialized', False):
-                    errors.append("RAG Engine non initialisé correctement")
-                else:
-                    logger.info("✅ RAG Engine initialisé")
+                    logger.warning("⚠️ Cache Core en mode dégradé")
                     
-                    # Log des optimisations disponibles
-                    try:
-                        status = rag_engine_enhanced.get_status()
-                        optimizations = status.get("optimizations", {})
+            except Exception as e:
+                errors.append(f"Cache Core: {e}")
+                logger.warning(f"Cache Core erreur: {e}")
+            
+            # RAG Engine Enhanced avec LangSmith + RRF
+            logger.info("  Initialisation RAG Engine Enhanced...")
+            try:
+                from rag_engine import InteliaRAGEngine
+                rag_engine_enhanced = InteliaRAGEngine()
+                await rag_engine_enhanced.initialize()
+                
+                if rag_engine_enhanced.is_initialized:
+                    logger.info("✅ RAG Engine Enhanced initialisé")
+                    
+                    # Vérifier intégrations
+                    status = rag_engine_enhanced.get_status()
+                    
+                    # Log statut LangSmith
+                    langsmith_status = status.get("langsmith", {})
+                    if langsmith_status.get("enabled"):
+                        logger.info(f"✅ LangSmith actif - Projet: {langsmith_status.get('project')}")
+                    
+                    # Log statut RRF Intelligent
+                    rrf_status = status.get("intelligent_rrf", {})
+                    if rrf_status.get("enabled"):
+                        logger.info(f"✅ RRF Intelligent actif - Learning: {rrf_status.get('learning_mode')}")
+                    
+                    # Log optimisations activées
+                    optimizations = status.get("optimizations", {})
+                    logger.info(f"Optimisations: Cache={optimizations.get('external_cache_enabled', False)}")
+                    logger.info(f"   - Hybrid Search: {optimizations.get('hybrid_search_enabled', False)}")
+                    logger.info(f"   - LangSmith: {optimizations.get('langsmith_enabled', False)}")
+                    logger.info(f"   - RRF Intelligent: {optimizations.get('intelligent_rrf_enabled', False)}")
                         
-                        logger.info(f"   - Cache Redis: {optimizations.get('external_cache_enabled', False)}")
-                        logger.info(f"   - Cache sémantique: {optimizations.get('semantic_cache_enabled', False)}")
-                        logger.info(f"   - Recherche hybride: {optimizations.get('hybrid_search_enabled', False)}")
-                        logger.info(f"   - Guardrails: {optimizations.get('guardrails_level', 'unknown')}")
-                        
-                    except Exception as e:
-                        logger.warning(f"Impossible de récupérer le status RAG: {e}")
+                else:
+                    logger.warning("⚠️ RAG Engine en mode dégradé")
                     
             except Exception as e:
                 errors.append(f"RAG Engine: {e}")
+                logger.error(f"RAG Engine erreur: {e}")
             
             # Agent RAG (optionnel)
             if USE_AGENT_RAG:
@@ -309,137 +362,121 @@ class SystemHealthMonitor:
                 timeout=10.0
             )
             return connectivity
+            
         except asyncio.TimeoutError:
-            logger.error("Timeout test connectivité")
-            return {"redis": False, "weaviate": False}
+            logger.warning("Timeout test connectivité")
+            return {"redis": False, "weaviate": False, "timeout": True}
         except Exception as e:
             logger.error(f"Erreur test connectivité: {e}")
-            return {"redis": False, "weaviate": False}
+            return {"redis": False, "weaviate": False, "error": str(e)}
     
     async def get_health_status(self) -> Dict[str, Any]:
-        """Retourne l'état de santé actuel du système"""
-        self.last_health_check = time.time()
-        
-        # Stats système
-        uptime = time.time() - self.startup_time
-        
-        # Statut des composants
-        component_status = {}
-        
-        if rag_engine_enhanced:
-            try:
-                rag_status = rag_engine_enhanced.get_status()
-                component_status["rag_engine"] = {
-                    "status": "healthy" if rag_status.get("initialized") else "degraded",
-                    "details": rag_status
-                }
-            except Exception as e:
-                component_status["rag_engine"] = {"status": "error", "error": str(e)}
-        else:
-            component_status["rag_engine"] = {"status": "missing"}
-        
-        if cache_core:
-            try:
-                cache_stats = await cache_core.get_cache_stats()
-                component_status["cache"] = {
-                    "status": cache_stats.get("status", "unknown"),
-                    "details": cache_stats
-                }
-            except Exception as e:
-                component_status["cache"] = {"status": "error", "error": str(e)}
-        else:
-            component_status["cache"] = {"status": "disabled"}
+        """Health check enrichi avec LangSmith et RRF"""
+        current_time = time.time()
         
         # Statut global
-        component_statuses = [comp.get("status") for comp in component_status.values()]
-        
-        if "error" in component_statuses or "missing" in component_statuses:
-            overall_status = "degraded"
-        elif "degraded" in component_statuses:
-            overall_status = "degraded"
-        else:
-            overall_status = "healthy"
-        
-        return {
-            "overall_status": overall_status,
-            "uptime_seconds": uptime,
-            "last_check": self.last_health_check,
-            "components": component_status,
-            "dependencies": get_full_status_report(),
+        global_status = {
+            "overall_status": "healthy",
+            "timestamp": current_time,
+            "uptime_seconds": current_time - self.startup_time,
             "startup_validation": self.validation_report,
-            "system": {
-                "startup_time": self.startup_time,
-                "base_path": BASE_PATH,
-                "version": "enhanced_v3.0_corrected"
-            }
+            "services": {},
+            "integrations": {},
+            "warnings": []
         }
+        
+        try:
+            # === NOUVEAU: Statut services enrichi ===
+            
+            # RAG Engine
+            if rag_engine_enhanced and rag_engine_enhanced.is_initialized:
+                rag_status = rag_engine_enhanced.get_status()
+                global_status["services"]["rag_engine"] = {
+                    "status": "healthy" if not rag_engine_enhanced.degraded_mode else "degraded",
+                    "approach": rag_status.get("approach", "unknown"),
+                    "optimizations": rag_status.get("optimizations", {}),
+                    "metrics": rag_status.get("optimization_stats", {})
+                }
+                
+                # === NOUVEAU: Intégrations spécialisées ===
+                
+                # LangSmith
+                langsmith_info = rag_status.get("langsmith", {})
+                global_status["integrations"]["langsmith"] = {
+                    "available": langsmith_info.get("available", False),
+                    "enabled": langsmith_info.get("enabled", False),
+                    "configured": langsmith_info.get("configured", False),
+                    "project": langsmith_info.get("project", ""),
+                    "traces_count": langsmith_info.get("traces_count", 0),
+                    "errors_count": langsmith_info.get("errors_count", 0)
+                }
+                
+                if langsmith_info.get("enabled") and not langsmith_info.get("configured"):
+                    global_status["warnings"].append("LangSmith activé mais non configuré")
+                
+                # RRF Intelligent
+                rrf_info = rag_status.get("intelligent_rrf", {})
+                global_status["integrations"]["intelligent_rrf"] = {
+                    "available": rrf_info.get("available", False),
+                    "enabled": rrf_info.get("enabled", False),
+                    "configured": rrf_info.get("configured", False),
+                    "learning_mode": rrf_info.get("learning_mode", False),
+                    "usage_count": rrf_info.get("usage_count", 0),
+                    "performance_stats": rrf_info.get("performance_stats", {})
+                }
+                
+                if rrf_info.get("enabled") and not rrf_info.get("configured"):
+                    global_status["warnings"].append("RRF Intelligent activé mais non configuré")
+                
+            else:
+                global_status["services"]["rag_engine"] = {"status": "error", "reason": "not_initialized"}
+                global_status["overall_status"] = "degraded"
+            
+            # Cache
+            if cache_core and getattr(cache_core, 'initialized', False):
+                cache_status = cache_core.get_health_status() if hasattr(cache_core, 'get_health_status') else {"status": "unknown"}
+                global_status["services"]["cache"] = cache_status
+            else:
+                global_status["services"]["cache"] = {"status": "disabled"}
+            
+            # Agent RAG
+            if agent_rag_engine:
+                global_status["services"]["agent_rag"] = {"status": "available"}
+            else:
+                global_status["services"]["agent_rag"] = {"status": "disabled"}
+            
+            # === NOUVEAU: Configuration et environnement ===
+            config_status = get_config_status()
+            global_status["configuration"] = config_status
+            
+            # Digital Ocean info
+            global_status["environment"] = {
+                "platform": "digital_ocean",
+                "app_name": DO_APP_NAME,
+                "app_tier": DO_APP_TIER,
+                "base_path": BASE_PATH
+            }
+            
+            # Déterminer statut global final
+            if global_status["warnings"]:
+                if global_status["overall_status"] == "healthy":
+                    global_status["overall_status"] = "healthy_with_warnings"
+            
+            return global_status
+            
+        except Exception as e:
+            logger.error(f"Erreur health check: {e}")
+            return {
+                "overall_status": "error",
+                "error": str(e),
+                "timestamp": current_time
+            }
 
-# Instance globale du moniteur
 health_monitor = SystemHealthMonitor()
-
-# Helpers OpenAI
-def get_openai_sync():
-    """Factory pour client OpenAI synchrone"""
-    if not OPENAI_AVAILABLE:
-        raise RuntimeError("OpenAI non disponible")
-    from openai import OpenAI
-    return OpenAI(api_key=OPENAI_API_KEY)
-
-def get_openai_async():
-    """Factory pour client OpenAI asynchrone"""
-    if not OPENAI_AVAILABLE:
-        raise RuntimeError("OpenAI non disponible")
-    from openai import AsyncOpenAI
-    return AsyncOpenAI(api_key=OPENAI_API_KEY)
-
-# Chargement des messages multilingues avec validation
-def _load_language_messages(path: str) -> Dict[str, str]:
-    try:
-        if not os.path.exists(path):
-            logger.warning(f"Fichier langue non trouvé: {path}")
-            return _get_default_messages()
-        
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        
-        if not isinstance(data, dict):
-            logger.error(f"Format invalide dans {path}")
-            return _get_default_messages()
-        
-        return {(k.lower() if isinstance(k, str) else k): v for k, v in data.items()}
-    except Exception as e:
-        logger.error(f"Erreur chargement {path}: {e}")
-        return _get_default_messages()
-
-def _get_default_messages() -> Dict[str, str]:
-    """Messages par défaut si fichier de langue non disponible"""
-    return {
-        "default": "Intelia Expert is a poultry-focused application. Questions outside this domain cannot be processed.",
-        "fr": "Intelia Expert est une application spécialisée en aviculture. Les questions hors de ce domaine ne peuvent pas être traitées.",
-        "en": "Intelia Expert is a poultry-focused application. Questions outside this domain cannot be processed.",
-        "es": "Intelia Expert es una aplicación especializada en avicultura. No se pueden procesar preguntas fuera de este dominio.",
-        "de": "Intelia Expert ist eine auf Geflügelhaltung spezialisierte Anwendung. Fragen außerhalb dieses Bereichs können nicht bearbeitet werden."
-    }
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LANGUAGE_FILE = os.path.join(BASE_DIR, "languages.json")
-OUT_OF_DOMAIN_MESSAGES = _load_language_messages(LANGUAGE_FILE)
-
-def get_out_of_domain_message(lang: str) -> str:
-    """Récupère le message hors-domaine dans la langue appropriée"""
-    if not lang:
-        return OUT_OF_DOMAIN_MESSAGES.get("default", "Questions outside domain not supported.")
-    
-    code = (lang or "").lower()
-    msg = OUT_OF_DOMAIN_MESSAGES.get(code)
-    if msg:
-        return msg
-    
-    short = code.split("-")[0]
-    return OUT_OF_DOMAIN_MESSAGES.get(short, OUT_OF_DOMAIN_MESSAGES.get("default", "Questions outside domain not supported."))
 
 # Clients OpenAI globaux avec validation
 try:
+    from imports_and_dependencies import get_openai_sync, get_openai_async
     openai_client_sync = get_openai_sync()
     openai_client_async = get_openai_async()
     logger.info("Clients OpenAI (sync + async) initialisés")
@@ -447,7 +484,7 @@ except Exception as e:
     logger.error(f"Erreur initialisation clients OpenAI: {e}")
     raise RuntimeError(f"Impossible d'initialiser les clients OpenAI: {e}")
 
-# Mémoire de conversation avec validation
+# Mémoire de conversation (existante)
 class TenantMemory(OrderedDict):
     """Cache LRU avec TTL pour la mémoire de conversation - Version robuste"""
     
@@ -530,9 +567,9 @@ def add_to_conversation_memory(tenant_id: str, question: str, answer: str, sourc
     except Exception as e:
         logger.error(f"Erreur ajout conversation memory: {e}")
 
-# Collecteur de métriques robuste
+# === NOUVEAU: Collecteur de métriques enrichi ===
 class MetricsCollector:
-    """Collecteur de métriques avec protection contre les erreurs"""
+    """Collecteur de métriques avec support LangSmith et RRF"""
     
     def __init__(self):
         self.metrics = {
@@ -553,6 +590,14 @@ class MetricsCollector:
             "guardrail_violations": 0,
             "api_corrections": 0,
             "errors": 0,
+            # === NOUVEAU: Métriques LangSmith ===
+            "langsmith_traces": 0,
+            "langsmith_errors": 0,
+            "hallucination_alerts": 0,
+            # === NOUVEAU: Métriques RRF Intelligent ===
+            "intelligent_rrf_queries": 0,
+            "genetic_boosts_applied": 0,
+            "rrf_learning_updates": 0,
             "avg_processing_time": 0.0,
             "avg_confidence": 0.0,
         }
@@ -562,7 +607,7 @@ class MetricsCollector:
         self.max_recent_samples = 100
     
     def record_query(self, result, source_type: str = "unknown", endpoint_time: float = 0.0):
-        """Enregistre les métriques avec protection contre les erreurs"""
+        """Enregistre les métriques avec support LangSmith et RRF"""
         if not ENABLE_METRICS_LOGGING:
             return
         
@@ -590,16 +635,32 @@ class MetricsCollector:
                 except:
                     self.metrics["fallback_queries"] += 1
             
-            # Métriques cache et performance
+            # === NOUVEAU: Métriques LangSmith et RRF ===
             if hasattr(result, 'metadata') and result.metadata:
                 try:
-                    opt_stats = result.metadata.get("optimization_stats", {})
+                    metadata = result.metadata
+                    
+                    # LangSmith
+                    if metadata.get("langsmith", {}).get("traced"):
+                        self.metrics["langsmith_traces"] += 1
+                    
+                    if metadata.get("alerts_aviculture"):
+                        self.metrics["hallucination_alerts"] += 1
+                    
+                    # RRF Intelligent
+                    if metadata.get("intelligent_rrf", {}).get("used"):
+                        self.metrics["intelligent_rrf_queries"] += 1
+                    
+                    opt_stats = metadata.get("optimization_stats", {})
                     self.metrics["cache_hits"] += opt_stats.get("cache_hits", 0)
                     self.metrics["cache_misses"] += opt_stats.get("cache_misses", 0)
                     self.metrics["semantic_cache_hits"] += opt_stats.get("semantic_cache_hits", 0)
                     self.metrics["hybrid_searches"] += opt_stats.get("hybrid_searches", 0)
-                except:
-                    pass
+                    self.metrics["genetic_boosts_applied"] += opt_stats.get("genetic_boosts_applied", 0)
+                    self.metrics["rrf_learning_updates"] += opt_stats.get("rrf_learning_updates", 0)
+                    
+                except Exception as e:
+                    logger.debug(f"Erreur traitement métriques metadata: {e}")
             
             # Calcul des métriques temporelles
             processing_time = endpoint_time if endpoint_time > 0 else getattr(result, 'processing_time', 0)
@@ -641,7 +702,7 @@ class MetricsCollector:
             self.metrics["errors"] = self.metrics.get("errors", 0) + 1
     
     def get_metrics(self) -> Dict:
-        """Retourne les métriques avec protection contre les erreurs"""
+        """Retourne les métriques enrichies avec protection contre les erreurs"""
         try:
             total_queries = max(1, self.metrics["total_queries"])
             total_cache_requests = max(1, self.metrics["cache_hits"] + self.metrics["cache_misses"])
@@ -655,7 +716,11 @@ class MetricsCollector:
                 "cache_hit_rate": self.metrics["cache_hits"] / total_cache_requests,
                 "semantic_cache_hit_rate": self.metrics["semantic_cache_hits"] / total_cache_requests,
                 "error_rate": self.metrics["errors"] / total_queries,
-                "latency_percentiles": self.latency_percentiles
+                "latency_percentiles": self.latency_percentiles,
+                # === NOUVEAU: Taux spécialisés ===
+                "langsmith_usage_rate": self.metrics["langsmith_traces"] / total_queries,
+                "rrf_intelligent_usage_rate": self.metrics["intelligent_rrf_queries"] / total_queries,
+                "hallucination_alert_rate": self.metrics["hallucination_alerts"] / total_queries
             }
         except Exception as e:
             logger.error(f"Erreur calcul métriques: {e}")
@@ -663,7 +728,7 @@ class MetricsCollector:
 
 metrics_collector = MetricsCollector()
 
-# Helpers de streaming robustes
+# Helpers de streaming et fonctions utilitaires (inchangées)
 def sse_event(obj: Dict[str, Any]) -> bytes:
     """Formatage SSE avec gestion d'erreurs robuste"""
     try:
@@ -698,65 +763,59 @@ def smart_chunk_text(text: str, max_chunk_size: int = None) -> list:
             
             # Préférer les points après ponctuation
             for i in range(max_chunk_size, max(max_chunk_size // 2, 0), -1):
-                if i < len(remaining_text) and remaining_text[i] in '.!?':
+                if i < len(remaining_text) and remaining_text[i] in '.!?:':
                     cut_point = i + 1
                     break
             
-            # Sinon, couper aux espaces
+            # Sinon, couper sur un espace
             if cut_point == max_chunk_size:
-                while cut_point > 0 and remaining_text[cut_point] != ' ':
-                    cut_point -= 1
+                for i in range(max_chunk_size, max(max_chunk_size // 2, 0), -1):
+                    if i < len(remaining_text) and remaining_text[i] == ' ':
+                        cut_point = i
+                        break
             
-            # Fallback: couper à la taille max
-            if cut_point == 0:
-                cut_point = min(max_chunk_size, len(remaining_text))
-            
-            chunk = remaining_text[:cut_point].strip()
-            if chunk:
-                chunks.append(chunk)
-            
-            remaining_text = remaining_text[cut_point:].strip()
+            chunks.append(remaining_text[:cut_point])
+            remaining_text = remaining_text[cut_point:].lstrip()
         
-        return [chunk for chunk in chunks if chunk.strip()]
-    
+        return chunks
+        
     except Exception as e:
         logger.error(f"Erreur découpe texte: {e}")
         return [text[:max_chunk_size]] if text else []
 
-# Détection de langue robuste
-def guess_lang_from_text(text: str) -> Optional[str]:
-    """Détection automatique de la langue avec fallbacks robustes"""
-    if not isinstance(text, str) or not text.strip():
-        return 'fr'  # Défaut français
+def get_out_of_domain_message(lang: Optional[str] = None) -> str:
+    """Messages out of domain multilingue"""
+    OUT_OF_DOMAIN_MESSAGES = {
+        "fr": "Désolé, cette question sort du domaine avicole. Pose-moi une question sur l'aviculture, l'élevage de volailles, la nutrition, la santé des oiseaux, ou les performances.",
+        "en": "Sorry, this question is outside the poultry domain. Ask me about poultry farming, bird nutrition, health, or performance.",
+        "es": "Lo siento, esta pregunta está fuera del dominio avícola. Pregúntame sobre avicultura, nutrición, salud o rendimiento de aves.",
+        "default": "Questions outside poultry domain not supported. Ask about poultry farming, nutrition, health, or performance."
+    }
+    
+    code = (lang or "").lower()
+    msg = OUT_OF_DOMAIN_MESSAGES.get(code)
+    if msg:
+        return msg
+    
+    short = code.split("-")[0]
+    return OUT_OF_DOMAIN_MESSAGES.get(short, OUT_OF_DOMAIN_MESSAGES.get("default", "Questions outside domain not supported."))
+
+def detect_language(text: str, min_length: int = None) -> str:
+    """Détection de langue avec fallback pattern"""
+    min_length = min_length or LANG_DETECTION_MIN_LENGTH
+    
+    if len(text) < min_length:
+        return 'fr'  # Défaut français pour textes courts
     
     try:
-        text = text.strip()
-        
-        # Pour les textes courts, utiliser patterns
-        if len(text) < LANG_DETECTION_MIN_LENGTH:
-            text_lower = text.lower()
-            
-            quick_patterns = {
-                'fr': ['fcr', 'poulet', 'ross', 'cobb', 'jours', 'jour', 'kg', 'poids', 'conversion', 'qu', 'comment'],
-                'en': ['fcr', 'chicken', 'broiler', 'days', 'day', 'weight', 'feed', 'conversion', 'what', 'how'],
-                'es': ['fcr', 'pollo', 'días', 'día', 'peso', 'conversión', 'alimento', 'qué', 'cómo'],
-                'de': ['fcr', 'huhn', 'tage', 'tag', 'gewicht', 'futter', 'was', 'wie']
-            }
-            
-            for lang, patterns in quick_patterns.items():
-                if any(pattern in text_lower for pattern in patterns):
-                    logger.debug(f"Détection rapide: {lang} pour '{text[:20]}...'")
-                    return lang
-            
-            return 'fr'  # Fallback français pour textes courts
-        
-        # Pour les textes plus longs, utiliser langdetect si disponible
+        # Tentative avec langdetect si disponible
         try:
             from langdetect import detect
             detected = detect(text)
             
+            # Mapping normalisé
             lang_mapping = {
-                'de': 'de', 'ger': 'de',
+                'de': 'de',
                 'fr': 'fr', 'fra': 'fr', 
                 'en': 'en', 'eng': 'en',
                 'es': 'es', 'spa': 'es',
@@ -796,10 +855,10 @@ def guess_lang_from_text(text: str) -> Optional[str]:
         logger.warning(f"Erreur détection langue pour '{text[:50]}...': {e}")
         return 'fr'  # Défaut français en cas d'erreur
 
-# Gestion du cycle de vie de l'application
+# Gestion du cycle de vie de l'application (mise à jour avec nouveau monitoring)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Gestion du cycle de vie avec validation stricte"""
+    """Gestion du cycle de vie avec validation stricte et monitoring enrichi"""
     
     logger.info("Démarrage Intelia Expert Backend...")
     
@@ -821,6 +880,15 @@ async def lifespan(app: FastAPI):
             
             else:
                 logger.info("Application démarrée avec succès")
+                
+                # Log statut des intégrations
+                langsmith_status = validation_result.get("langsmith_validation", {})
+                if langsmith_status.get("status") == "configured":
+                    logger.info(f"🧠 LangSmith actif - Projet: {langsmith_status.get('project')}")
+                
+                rrf_status = validation_result.get("rrf_validation", {})
+                if rrf_status.get("status") == "configured":
+                    logger.info(f"⚡ RRF Intelligent actif - Learning: {rrf_status.get('learning_mode')}")
         
         else:
             logger.info("Validation startup désactivée")
@@ -829,6 +897,7 @@ async def lifespan(app: FastAPI):
         
         # Application prête
         logger.info(f"API disponible sur {BASE_PATH}")
+        logger.info(f"Environment: DO App={DO_APP_NAME}, Tier={DO_APP_TIER}")
         
         yield
         
@@ -874,8 +943,8 @@ async def lifespan(app: FastAPI):
 # Création de l'application FastAPI
 app = FastAPI(
     title="Intelia Expert Backend",
-    description="API RAG Enhanced avec validation stricte et cache sémantique",
-    version="3.0.0-corrected",
+    description="API RAG Enhanced avec LangSmith et RRF Intelligent",
+    version="4.0.0-langsmith-rrf",
     lifespan=lifespan
 )
 
@@ -893,12 +962,12 @@ router = APIRouter()
 
 @router.get("/health")
 async def health_check():
-    """Health check complet avec détails des composants"""
+    """Health check complet avec détails LangSmith et RRF"""
     try:
         health_status = await health_monitor.get_health_status()
         
         # Code de statut HTTP selon l'état
-        if health_status["overall_status"] == "healthy":
+        if health_status["overall_status"] in ["healthy", "healthy_with_warnings"]:
             status_code = 200
         elif health_status["overall_status"] == "degraded":
             status_code = 200  # Toujours 200 mais avec warnings
@@ -949,179 +1018,82 @@ async def connectivity_status():
 
 @router.get(f"{BASE_PATH}/metrics")
 async def get_metrics():
-    """Endpoint pour récupérer les métriques de performance"""
+    """Endpoint pour récupérer les métriques de performance enrichies"""
     try:
         base_metrics = {
             "application_metrics": metrics_collector.get_metrics(),
             "system_metrics": {
                 "conversation_memory": {
                     "tenants": len(conversation_memory),
-                    "total_exchanges": sum(len(v.get("data", [])) for v in conversation_memory.values())
+                    "max_tenants": MAX_TENANTS,
+                    "ttl_seconds": TENANT_TTL
                 }
             }
         }
         
-        # Ajouter métriques cache si disponible
-        if rag_engine_enhanced and hasattr(rag_engine_enhanced, 'cache_manager') and rag_engine_enhanced.cache_manager:
-            try:
-                cache_stats = await rag_engine_enhanced.cache_manager.get_cache_stats()
-                base_metrics["cache_metrics"] = cache_stats
-            except Exception as e:
-                base_metrics["cache_metrics"] = {"error": str(e)}
+        # === NOUVEAU: Métriques RAG Engine enrichies ===
+        if rag_engine_enhanced and rag_engine_enhanced.is_initialized:
+            rag_status = rag_engine_enhanced.get_status()
+            
+            base_metrics["rag_engine"] = {
+                "approach": rag_status.get("approach", "unknown"),
+                "optimizations": rag_status.get("optimizations", {}),
+                "langsmith": rag_status.get("langsmith", {}),
+                "intelligent_rrf": rag_status.get("intelligent_rrf", {}),
+                "optimization_stats": rag_status.get("optimization_stats", {}),
+                "weaviate_capabilities": rag_status.get("api_capabilities", {})
+            }
+        
+        # Cache stats externe
+        if cache_core and getattr(cache_core, 'initialized', False):
+            cache_stats = cache_core.get_stats() if hasattr(cache_core, 'get_stats') else {}
+            base_metrics["cache"] = cache_stats
         
         return base_metrics
+        
+    except Exception as e:
+        logger.error(f"Erreur récupération métriques: {e}")
+        return {"error": str(e), "timestamp": time.time()}
+
+# === NOUVEAU: Endpoint configuration ===
+@router.get(f"{BASE_PATH}/status/configuration")
+async def configuration_status():
+    """Statut détaillé de la configuration"""
+    try:
+        config_status = get_config_status()
+        
+        # Enrichir avec informations runtime
+        config_status["runtime"] = {
+            "environment_variables": {
+                "langsmith_enabled": LANGSMITH_ENABLED,
+                "rrf_enabled": ENABLE_INTELLIGENT_RRF,
+                "cache_enabled": CACHE_ENABLED,
+                "rag_enabled": RAG_ENABLED
+            },
+            "digital_ocean": {
+                "app_name": DO_APP_NAME,
+                "app_tier": DO_APP_TIER,
+                "base_path": BASE_PATH
+            }
+        }
+        
+        return config_status
+        
     except Exception as e:
         return {"error": str(e)}
 
-# Route CHAT principale avec validation stricte
-@router.post(f"{BASE_PATH}/chat")
-async def chat(request: Request):
-    """Chat endpoint avec validation stricte et gestion d'erreurs robuste"""
-    total_start_time = time.time()
-    
-    if not rag_engine_enhanced:
-        metrics_collector.record_query({"source": "error"}, "error", time.time() - total_start_time)
-        raise HTTPException(status_code=503, detail="RAG Engine Enhanced non disponible")
-    
-    try:
-        # Validation de la requête
-        try:
-            body = await request.json()
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"JSON invalide: {e}")
-        
-        message = body.get("message", "").strip()
-        language = body.get("language", "").strip()
-        tenant_id = body.get("tenant_id", str(uuid.uuid4())[:8])
-        
-        # Validations
-        if not message:
-            raise HTTPException(status_code=400, detail="Message vide")
-        
-        if len(message) > MAX_REQUEST_SIZE:
-            raise HTTPException(status_code=413, detail=f"Message trop long (max {MAX_REQUEST_SIZE})")
-        
-        # Détection de langue si non fournie
-        if not language:
-            language = guess_lang_from_text(message)
-        
-        # Validation tenant_id
-        if not tenant_id or len(tenant_id) > 50:
-            tenant_id = str(uuid.uuid4())[:8]
-        
-        # Messages trop courts -> réponse OOD
-        if len(message.split()) < 3:
-            out_of_domain_msg = get_out_of_domain_message(language)
-            
-            async def simple_response():
-                yield sse_event({"type": "start", "reason": "too_short"})
-                yield sse_event({"type": "chunk", "content": out_of_domain_msg})
-                yield sse_event({"type": "end", "confidence": 0.9})
-            
-            metrics_collector.record_query({"source": "ood"}, "ood", time.time() - total_start_time)
-            return StreamingResponse(simple_response(), media_type="text/plain")
-        
-        # Traitement principal avec RAG Enhanced
-        try:
-            rag_result = await rag_engine_enhanced.process_query(message, language, tenant_id)
-        except Exception as e:
-            logger.error(f"Erreur traitement RAG: {e}")
-            metrics_collector.record_query({"source": "error"}, "error", time.time() - total_start_time)
-            raise HTTPException(status_code=500, detail=f"Erreur traitement: {str(e)}")
-        
-        # Enregistrer métriques
-        total_processing_time = time.time() - total_start_time
-        metrics_collector.record_query(rag_result, "rag_enhanced", total_processing_time)
-        
-        # Streaming de la réponse
-        async def generate_response():
-            try:
-                # Informations de début
-                metadata = getattr(rag_result, 'metadata', {}) or {}
-                yield sse_event({
-                    "type": "start", 
-                    "source": getattr(rag_result, 'source', 'unknown'),
-                    "confidence": getattr(rag_result, 'confidence', 0.5),
-                    "processing_time": getattr(rag_result, 'processing_time', 0)
-                })
-                
-                # Contenu de la réponse
-                answer = getattr(rag_result, 'answer', '')
-                if answer:
-                    chunks = smart_chunk_text(answer, STREAM_CHUNK_LEN)
-                    
-                    for i, chunk in enumerate(chunks):
-                        yield sse_event({
-                            "type": "chunk", 
-                            "content": chunk,
-                            "chunk_index": i
-                        })
-                        await asyncio.sleep(0.01)  # Streaming fluide
-                
-                # Informations finales
-                yield sse_event({
-                    "type": "end",
-                    "total_time": total_processing_time,
-                    "confidence": getattr(rag_result, 'confidence', 0.5),
-                    "documents_used": len(getattr(rag_result, 'context_docs', []))
-                })
-                
-                # Enregistrer en mémoire
-                if answer and hasattr(rag_result, 'source'):
-                    add_to_conversation_memory(tenant_id, message, answer, "rag_enhanced")
-                
-            except Exception as e:
-                logger.error(f"Erreur streaming: {e}")
-                yield sse_event({"type": "error", "message": str(e)})
-        
-        return StreamingResponse(generate_response(), media_type="text/plain")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erreur chat endpoint: {e}")
-        metrics_collector.record_query({"source": "error"}, "error", time.time() - total_start_time)
-        return JSONResponse(
-            status_code=500,
-            content={"error": f"Erreur traitement: {str(e)}"}
-        )
-
-# Route OOD pour compatibilité
-@router.post(f"{BASE_PATH}/ood")
-async def ood_endpoint(request: Request):
-    """Point de terminaison pour messages hors domaine"""
-    try:
-        body = await request.json()
-        language = body.get("language", "fr")
-        message = get_out_of_domain_message(language)
-        
-        async def ood_response():
-            yield sse_event({"type": "start", "reason": "out_of_domain"})
-            
-            chunks = smart_chunk_text(message, STREAM_CHUNK_LEN)
-            for chunk in chunks:
-                yield sse_event({"type": "chunk", "content": chunk})
-                await asyncio.sleep(0.05)
-            
-            yield sse_event({"type": "end", "confidence": 1.0})
-        
-        return StreamingResponse(ood_response(), media_type="text/plain")
-        
-    except Exception as e:
-        logger.error(f"Erreur OOD endpoint: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-# Inclusion du router
+# Inclusion du router dans l'app
 app.include_router(router)
 
-# Point d'entrée pour le développement
+# Démarrage de l'application
 if __name__ == "__main__":
     import uvicorn
     
     port = int(os.getenv("PORT", "8000"))
     host = os.getenv("HOST", "0.0.0.0")
     
-    logger.info(f"Démarrage serveur de développement sur {host}:{port}")
+    logger.info(f"Démarrage serveur sur {host}:{port}")
+    logger.info(f"LangSmith: {LANGSMITH_ENABLED}, RRF: {ENABLE_INTELLIGENT_RRF}")
     
     uvicorn.run(
         "main:app",

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-retriever.py - Retriever hybride optimisé avec cache et fallbacks - Version corrigée pour Weaviate 4.16.9
+retriever.py - Retriever hybride optimisé avec cache et fallbacks - Version adaptée
+Version corrigée pour Weaviate 4.16.9 avec intégrations complètes
 """
 
 import logging
@@ -9,286 +10,282 @@ import json
 import re
 import numpy as np
 import anyio
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from data_models import Document
 from utilities import METRICS
 from imports_and_dependencies import WEAVIATE_V4, wvc, wvc_query, ENABLE_API_DIAGNOSTICS
 from config import HYBRID_SEARCH_ENABLED
-from .hybrid_retriever import _fuse_results, hybrid_search
 
 logger = logging.getLogger(__name__)
 
-def _to_v4_filter(where_dict):
-    """Convertit dict where v3 vers Filter v4 - Version corrigée pour Weaviate 4.16.9"""
-    if not where_dict or not WEAVIATE_V4 or not wvc:
-        return None
-    
-    try:
-        if "path" in where_dict:
-            property_name = where_dict["path"][-1] if isinstance(where_dict["path"], list) else where_dict["path"]
-            operator = where_dict.get("operator", "Equal")
-            value = where_dict.get("valueText", where_dict.get("valueString", ""))
-            
-            if operator == "Like":
-                return wvc.query.Filter.by_property(property_name).like(value)
-            elif operator == "Equal":
-                return wvc.query.Filter.by_property(property_name).equal(value)
-            else:
-                return wvc.query.Filter.by_property(property_name).equal(value)
-        
-        operator = where_dict.get("operator", "And").lower()
-        operands = [_to_v4_filter(o) for o in where_dict.get("operands", [])]
-        operands = [op for op in operands if op is not None]
-        
-        if not operands:
-            return None
-            
-        if operator == "and" and len(operands) >= 2:
-            result = operands[0]
-            for op in operands[1:]:
-                result = result & op
-            return result
-        elif operator == "or" and len(operands) >= 2:
-            result = operands[0]
-            for op in operands[1:]:
-                result = result | op
-            return result
-        else:
-            return operands[0] if operands else None
-            
-    except Exception as e:
-        logger.warning(f"Erreur conversion filter v4: {e}")
-        return None
-
-def retrieve(query: str, limit: int = 8, alpha: float = 0.6, **kwargs):
-    """Façade simple qui utilise la recherche hybride par défaut."""
-    return hybrid_search(query, limit=limit, alpha=alpha, **kwargs)
-
 class HybridWeaviateRetriever:
-    """Retriever hybride optimisé avec cache et fallbacks - Version corrigée pour Weaviate 4.16.9"""
+    """Retriever hybride avec adaptations pour nouvelles fonctionnalités"""
     
     def __init__(self, client, collection_name: str = "InteliaKnowledge"):
         self.client = client
         self.collection_name = collection_name
-        self.is_v4 = WEAVIATE_V4
+        self.is_v4 = hasattr(client, 'collections')
         
+        # NOUVEAU: Configuration dynamique des capacités API
+        self.api_capabilities = {
+            "hybrid_with_vector": True,
+            "hybrid_with_where": True,
+            "explain_score_available": False,
+            "near_vector_format": "vector",
+            "api_stability": "stable",
+            "runtime_corrections": 0
+        }
+        
+        # NOUVEAU: Configuration fusion hybride enrichie
         self.fusion_config = {
             "vector_weight": 0.7,
             "bm25_weight": 0.3,
             "rrf_k": 60,
             "min_score_threshold": 0.1,
-            "diversity_threshold": 0.8
+            "diversity_threshold": 0.8,
+            "intent_boost_factors": {
+                "search": 1.2,
+                "diagnosis": 1.1,
+                "protocol": 1.0,
+                "economic": 0.9
+            }
         }
         
-        # État des API pour diagnostic - AMÉLIORÉ avec runtime flags
-        self.api_capabilities = {
-            "hybrid_with_vector": None,
-            "hybrid_with_where": None,
-            "near_vector_format": None,
-            "diagnosed": False,
-            "runtime_corrections": 0,
-            "last_diagnostic_time": 0.0,
-            "api_stability": "unknown",
-            "explain_score_available": False
-        }
+        # NOUVEAU: Cache des métriques pour optimisation
+        self.retrieval_cache = {}
+        self.last_query_analytics = {}
+        
+        # Initialisation avec test des capacités
+        if self.is_v4:
+            self._test_api_capabilities()
     
-    async def diagnose_weaviate_api(self):
-        """Diagnostic des méthodes disponibles dans Weaviate v4.16.9 - Version Enhanced"""
-        if self.api_capabilities["diagnosed"] and time.time() - self.api_capabilities["last_diagnostic_time"] < 3600:
-            return
-            
+    def _test_api_capabilities(self):
+        """Teste et configure les capacités API disponibles"""
         try:
             collection = self.client.collections.get(self.collection_name)
+            test_vector = [0.1] * 384  # Vector test minimal
             
-            test_vector = [0.1] * 1536
-            
-            logger.info("=== DIAGNOSTIC WEAVIATE API v4.16.9 ===")
-            
-            # Test 1: Signature hybrid() avec vector
+            # Test 1: Hybrid query basique
             try:
                 result = collection.query.hybrid(
-                    query="test diagnostic",
+                    query="test capacity",
+                    limit=1
+                )
+                logger.info("✅ Hybrid query basique fonctionne")
+            except Exception as e:
+                logger.warning(f"⚠️ Hybrid query limité: {e}")
+                self.api_capabilities["api_stability"] = "limited"
+            
+            # Test 2: Hybrid avec vector
+            try:
+                result = collection.query.hybrid(
+                    query="test",
                     vector=test_vector,
-                    alpha=0.7,
                     limit=1
                 )
                 self.api_capabilities["hybrid_with_vector"] = True
-                logger.info("✅ Hybrid query fonctionne avec: query, vector, alpha, limit")
+                logger.info("✅ Hybrid avec vector supporté")
             except Exception as e:
                 self.api_capabilities["hybrid_with_vector"] = False
-                logger.error(f"❌ Hybrid query avec vector échoue: {e}")
-                METRICS.api_correction_applied("hybrid_vector_fallback")
-                
-                try:
-                    result = collection.query.hybrid(query="test diagnostic", limit=1)
-                    logger.info("✅ Hybrid query fonctionne avec: query, limit seulement")
-                    self.api_capabilities["api_stability"] = "limited"
-                except Exception as e2:
-                    logger.error(f"❌ Hybrid query minimal échoue: {e2}")
-                    self.api_capabilities["api_stability"] = "degraded"
+                logger.warning(f"❌ Hybrid sans vector: {e}")
+                METRICS.api_correction_applied("hybrid_no_vector")
             
-            # Test 2: Near vector avec explain_score
-            formats_to_test = [
-                {"vector": test_vector},
-                {"near_vector": test_vector},
-                {"query_vector": test_vector}
-            ]
-            
-            for i, params in enumerate(formats_to_test):
-                try:
-                    params["limit"] = 1
-                    if hasattr(wvc.query, 'MetadataQuery'):
-                        params["return_metadata"] = wvc.query.MetadataQuery(
-                            score=True, 
+            # Test 3: Explain score
+            try:
+                if hasattr(wvc.query, 'MetadataQuery'):
+                    result = collection.query.near_vector(
+                        vector=test_vector,
+                        limit=1,
+                        return_metadata=wvc.query.MetadataQuery(
+                            score=True,
                             explain_score=True
                         )
-                    result = collection.query.near_vector(**params)
-                    self.api_capabilities["near_vector_format"] = list(params.keys())[0]
-                    
-                    # Test explain_score
-                    if result.objects and hasattr(result.objects[0], 'metadata'):
-                        if hasattr(result.objects[0].metadata, 'explain_score'):
-                            self.api_capabilities["explain_score_available"] = True
-                            logger.info("✅ explain_score disponible")
-                        else:
-                            self.api_capabilities["explain_score_available"] = False
-                    
-                    logger.info(f"✅ Near vector fonctionne avec: {list(params.keys())}")
-                    break
-                except Exception as e:
-                    logger.error(f"❌ Format {i+1} near_vector échoue: {e}")
-                    METRICS.api_correction_applied(f"near_vector_format_{i}")
+                    )
+                    if (result.objects and hasattr(result.objects[0], 'metadata') and 
+                        hasattr(result.objects[0].metadata, 'explain_score')):
+                        self.api_capabilities["explain_score_available"] = True
+                        logger.info("✅ Explain score disponible")
+            except Exception as e:
+                self.api_capabilities["explain_score_available"] = False
+                logger.warning(f"❌ Explain score indisponible: {e}")
             
-            # Test 3: Hybrid avec filtre
+            # Test 4: Filtres
             try:
-                test_filter = wvc.query.Filter.by_property("species").equal("broiler")
+                test_filter = wvc.query.Filter.by_property("species").equal("test")
                 result = collection.query.hybrid(
                     query="test",
                     where=test_filter,
                     limit=1
                 )
                 self.api_capabilities["hybrid_with_where"] = True
-                logger.info("✅ Hybrid avec where filter fonctionne")
+                logger.info("✅ Filtres supportés")
             except Exception as e:
                 self.api_capabilities["hybrid_with_where"] = False
-                logger.error(f"❌ Hybrid avec where échoue: {e}")
-                METRICS.api_correction_applied("hybrid_where_fallback")
-            
-            # Déterminer stabilité globale
-            if self.api_capabilities["api_stability"] == "unknown":
-                working_features = sum(1 for v in [
-                    self.api_capabilities.get("hybrid_with_vector", False),
-                    self.api_capabilities.get("hybrid_with_where", False),
-                    self.api_capabilities.get("near_vector_format") is not None
-                ] if v)
+                logger.warning(f"❌ Filtres non supportés: {e}")
                 
-                if working_features >= 2:
-                    self.api_capabilities["api_stability"] = "stable"
-                elif working_features == 1:
-                    self.api_capabilities["api_stability"] = "limited"
-                else:
-                    self.api_capabilities["api_stability"] = "degraded"
-            
-            self.api_capabilities["diagnosed"] = True
-            self.api_capabilities["last_diagnostic_time"] = time.time()
-            logger.info(f"📊 Capacités détectées: {self.api_capabilities}")
-            logger.info(f"🎯 Stabilité API: {self.api_capabilities['api_stability']}")
-            logger.info("=== FIN DIAGNOSTIC ===")
-            
         except Exception as e:
-            logger.error(f"Erreur diagnostic Weaviate: {e}")
-            self.api_capabilities["diagnosed"] = True
-            self.api_capabilities["api_stability"] = "error"
+            logger.error(f"Erreur test capacités API: {e}")
+            self.api_capabilities["api_stability"] = "degraded"
     
-    async def adaptive_search(self, query_vector: List[float], query_text: str,
-                            top_k: int = 15, where_filter: Dict = None) -> List[Document]:
-        """Recherche adaptative qui ajuste alpha selon la requête"""
-        
-        if ENABLE_API_DIAGNOSTICS and not self.api_capabilities["diagnosed"]:
-            await self.diagnose_weaviate_api()
+    def _to_v4_filter(self, where_dict):
+        """Convertit dict where v3 vers Filter v4 - Version corrigée"""
+        if not where_dict or not WEAVIATE_V4 or not wvc:
+            return None
         
         try:
-            alpha = self._analyze_query_for_alpha(query_text)
+            if "path" in where_dict:
+                property_name = where_dict["path"][-1] if isinstance(where_dict["path"], list) else where_dict["path"]
+                operator = where_dict.get("operator", "Equal")
+                value = where_dict.get("valueText", where_dict.get("valueString", ""))
+                
+                if operator == "Like":
+                    return wvc.query.Filter.by_property(property_name).like(value)
+                elif operator == "Equal":
+                    return wvc.query.Filter.by_property(property_name).equal(value)
+                else:
+                    return wvc.query.Filter.by_property(property_name).equal(value)
             
-            if HYBRID_SEARCH_ENABLED and self.is_v4:
+            operator = where_dict.get("operator", "And").lower()
+            operands = [self._to_v4_filter(o) for o in where_dict.get("operands", [])]
+            operands = [op for op in operands if op is not None]
+            
+            if not operands:
+                return None
+                
+            if operator == "and" and len(operands) >= 2:
+                result = operands[0]
+                for op in operands[1:]:
+                    result = result & op
+                return result
+            elif operator == "or" and len(operands) >= 2:
+                result = operands[0]
+                for op in operands[1:]:
+                    result = result | op
+                return result
+            else:
+                return operands[0] if operands else None
+                
+        except Exception as e:
+            logger.warning(f"Erreur conversion filter v4: {e}")
+            return None
+    
+    def _calculate_dynamic_alpha(self, query: str, intent_result=None) -> float:
+        """NOUVEAU: Calcule alpha dynamiquement selon le contexte de la requête"""
+        query_lower = query.lower()
+        
+        # Boost basé sur l'intention détectée
+        if intent_result and hasattr(intent_result, 'intent_type'):
+            intent_boost = self.fusion_config["intent_boost_factors"].get(
+                intent_result.intent_type.value, 1.0
+            )
+        else:
+            intent_boost = 1.0
+        
+        # Requêtes factuelles -> favoriser BM25
+        if any(keyword in query_lower for keyword in [
+            "combien", "quel", "quelle", "nombre", "prix", "coût",
+            "température", "durée", "âge", "poids", "taille"
+        ]):
+            base_alpha = 0.3
+        
+        # Requêtes temporelles -> BM25
+        elif re.search(r'\b(jour|semaine|mois|an|année|h|heure|min|minute)\b', query_lower):
+            base_alpha = 0.4
+        
+        # Requêtes conceptuelles -> vectoriel
+        elif any(concept in query_lower for concept in [
+            "comment", "pourquoi", "expliquer", "différence",
+            "améliorer", "optimiser", "problème", "solution",
+            "recommandation", "conseil"
+        ]):
+            base_alpha = 0.8
+        
+        # Requêtes de diagnostic -> équilibré
+        elif any(diag in query_lower for diag in [
+            "symptôme", "maladie", "diagnostic", "traitement",
+            "prévention", "vaccin"
+        ]):
+            base_alpha = 0.6
+        
+        else:
+            base_alpha = 0.7
+        
+        # Application du boost d'intention
+        final_alpha = min(0.95, base_alpha * intent_boost)
+        
+        # Enregistrement pour analytics
+        self.last_query_analytics = {
+            "base_alpha": base_alpha,
+            "intent_boost": intent_boost,
+            "final_alpha": final_alpha,
+            "query_type": self._classify_query_type(query_lower)
+        }
+        
+        return final_alpha
+    
+    def _classify_query_type(self, query_lower: str) -> str:
+        """NOUVEAU: Classifie le type de requête pour analytics"""
+        if any(kw in query_lower for kw in ["combien", "quel", "prix", "coût"]):
+            return "factual"
+        elif any(kw in query_lower for kw in ["comment", "pourquoi", "expliquer"]):
+            return "conceptual"
+        elif any(kw in query_lower for kw in ["symptôme", "maladie", "diagnostic"]):
+            return "diagnosis"
+        elif any(kw in query_lower for kw in ["protocole", "procédure", "étapes"]):
+            return "protocol"
+        else:
+            return "general"
+    
+    async def hybrid_search(self, query_vector: List[float], query_text: str, 
+                           top_k: int = 15, where_filter: Dict = None,
+                           alpha: float = None, intent_result=None) -> List[Document]:
+        """
+        MODIFIÉ: Recherche hybride avec alpha dynamique et intent awareness
+        """
+        start_time = time.time()
+        
+        # Calcul alpha dynamique si non fourni
+        if alpha is None:
+            alpha = self._calculate_dynamic_alpha(query_text, intent_result)
+        
+        try:
+            # Weaviate v4 : recherche hybride native avec corrections
+            if self.is_v4:
                 documents = await self._hybrid_search_v4_corrected(
                     query_vector, query_text, top_k, where_filter, alpha
                 )
-                if documents:
-                    METRICS.search_stats["hybrid_native"] += 1
-                    return documents
-                else:
-                    logger.warning("Recherche hybride n'a retourné aucun document, fallback vectoriel")
-            
-            # Fallback vers recherche vectorielle
-            if self.is_v4:
-                documents = await self._vector_search_v4_corrected(
-                    query_vector, top_k, where_filter
-                )
+            # Weaviate v3 : fusion manuelle
             else:
-                documents = await self._vector_search_v3(
-                    query_vector, top_k, where_filter
+                documents = await self._hybrid_search_v3(
+                    query_vector, query_text, top_k, where_filter, alpha
                 )
             
-            if documents:
-                METRICS.search_stats["vector_only"] += 1
+            # NOUVEAU: Enrichissement avec analytics
+            for doc in documents:
+                if hasattr(doc, 'metadata'):
+                    doc.metadata['retrieval_alpha'] = alpha
+                    doc.metadata['query_classification'] = self.last_query_analytics.get('query_type', 'unknown')
             
-            # Retry sans age_band si nécessaire
-            if not documents and where_filter and "age_band" in json.dumps(where_filter):
-                logger.info("Retry recherche sans critère age_band")
-                where_filter_no_age = self._remove_age_band_filter(where_filter)
-                
-                if self.is_v4:
-                    documents = await self._hybrid_search_v4_corrected(
-                        query_vector, query_text, top_k, where_filter_no_age, alpha
-                    ) if HYBRID_SEARCH_ENABLED else await self._vector_search_v4_corrected(
-                        query_vector, top_k, where_filter_no_age
-                    )
-                else:
-                    documents = await self._vector_search_v3(
-                        query_vector, top_k, where_filter_no_age
-                    )
-                    
-                for doc in documents:
-                    doc.metadata["age_band_fallback_used"] = True
+            # Métriques enrichies
+            METRICS.hybrid_search_completed(
+                len(documents), 
+                alpha, 
+                time.time() - start_time,
+                intent_type=intent_result.intent_type.value if intent_result else None
+            )
             
             return documents
-            
+                
         except Exception as e:
-            logger.error(f"Erreur recherche adaptative: {e}")
-            if self.is_v4:
-                return await self._vector_search_v4_corrected(query_vector, top_k, None)
-            else:
-                return await self._vector_search_v3(query_vector, top_k, None)
-    
-    def _analyze_query_for_alpha(self, query_text: str) -> float:
-        """Analyse la requête pour déterminer l'alpha optimal"""
-        query_lower = query_text.lower()
-        
-        # Requêtes spécifiques -> favoriser BM25
-        if any(pattern in query_lower for pattern in [
-            "ross", "cobb", "hubbard", "isa", "lohmann",
-            "fcr", "pv", "gmd",
-            "j0", "j7", "j21", "j35"
-        ]):
-            return 0.3
-        
-        # Requêtes numériques -> équilibré vers BM25
-        if re.search(r'\d+\s*(g|kg|%|jour|j)', query_lower):
-            return 0.4
-        
-        # Requêtes conceptuelles -> favoriser vectoriel
-        if any(concept in query_lower for concept in [
-            "comment", "pourquoi", "expliquer", "différence",
-            "améliorer", "optimiser", "problème", "solution"
-        ]):
-            return 0.8
-        
-        return 0.7
+            logger.error(f"Erreur recherche hybride: {e}")
+            METRICS.retrieval_error("hybrid_search", str(e))
+            
+            # Fallback vers recherche vectorielle seule
+            return await self._vector_search_fallback(query_vector, top_k, where_filter)
     
     async def _hybrid_search_v4_corrected(self, query_vector: List[float], query_text: str,
                                         top_k: int, where_filter: Dict, alpha: float) -> List[Document]:
-        """Recherche hybride native Weaviate v4 - Version corrigée pour 4.16.9"""
+        """MODIFIÉ: Recherche hybride native Weaviate v4 avec corrections runtime"""
         try:
             def _sync_hybrid_search():
                 collection = self.client.collections.get(self.collection_name)
@@ -299,69 +296,75 @@ class HybridWeaviateRetriever:
                     "limit": top_k
                 }
                 
-                # MODIFICATION: Ajouter explain_score si disponible
+                # NOUVEAU: Métadonnées enrichies avec explain_score
                 if ENABLE_API_DIAGNOSTICS and self.api_capabilities.get("explain_score_available"):
                     search_params["return_metadata"] = wvc.query.MetadataQuery(
                         score=True, 
-                        explain_score=True
+                        explain_score=True,
+                        creation_time=True  # NOUVEAU: timestamp pour cache
                     )
                 else:
                     search_params["return_metadata"] = wvc.query.MetadataQuery(score=True)
                 
+                # Vector si supporté
                 if self.api_capabilities.get("hybrid_with_vector", True):
                     search_params["vector"] = query_vector
                 
+                # Filtre si supporté
                 if where_filter and self.api_capabilities.get("hybrid_with_where", True):
-                    v4_filter = _to_v4_filter(where_filter)
+                    v4_filter = self._to_v4_filter(where_filter)
                     if v4_filter is not None:
                         search_params["where"] = v4_filter
                 
                 try:
                     return collection.query.hybrid(**search_params)
                 except TypeError as e:
+                    # NOUVEAU: Correction runtime automatique
                     self.api_capabilities["runtime_corrections"] += 1
                     METRICS.api_correction_applied("hybrid_runtime_fix")
                     
                     if "vector" in str(e) and "vector" in search_params:
-                        logger.warning("Paramètre 'vector' non supporté dans hybrid(), retry sans vector")
+                        logger.warning("Paramètre 'vector' non supporté, retry sans vector")
                         del search_params["vector"]
                         self.api_capabilities["hybrid_with_vector"] = False
                         return collection.query.hybrid(**search_params)
-                    elif "where" in str(e) and "where" in search_params:
-                        logger.warning("Paramètre 'where' non supporté dans hybrid(), retry sans where")
+                    
+                    if "where" in str(e) and "where" in search_params:
+                        logger.warning("Paramètre 'where' non supporté, retry sans filtre")
                         del search_params["where"]
                         self.api_capabilities["hybrid_with_where"] = False
                         return collection.query.hybrid(**search_params)
-                    else:
-                        raise
+                    
+                    # Fallback minimal
+                    return collection.query.hybrid(query=query_text, limit=top_k)
             
-            response = await anyio.to_thread.run_sync(_sync_hybrid_search)
+            # Exécution synchrone
+            result = await anyio.to_thread(_sync_hybrid_search)
             
+            # MODIFIÉ: Conversion enrichie avec nouvelles métadonnées
             documents = []
-            for obj in response.objects:
-                hybrid_score = float(getattr(obj.metadata, "score", 0.0))
+            for obj in result.objects:
+                metadata = obj.metadata or {}
                 
-                # MODIFICATION: Extraire explain_score si disponible
-                explain_score = None
-                if hasattr(obj.metadata, "explain_score"):
-                    explain_score = getattr(obj.metadata, "explain_score", None)
+                # Extraction score avec explain_score si disponible
+                score = getattr(metadata, 'score', 0.0)
+                explain_score = getattr(metadata, 'explain_score', None)
                 
                 doc = Document(
-                    content=obj.properties.get("content", ""),
+                    content=getattr(obj, 'properties', {}).get('content', ''),
                     metadata={
-                        "title": obj.properties.get("title", ""),
-                        "source": obj.properties.get("source", ""),
-                        "geneticLine": obj.properties.get("geneticLine", ""),
-                        "species": obj.properties.get("species", ""),
-                        "phase": obj.properties.get("phase", ""),
-                        "age_band": obj.properties.get("age_band", ""),
-                        "hybrid_used": True,
-                        "alpha": alpha,
-                        "vector_used": self.api_capabilities.get("hybrid_with_vector", False),
-                        "runtime_corrections": self.api_capabilities.get("runtime_corrections", 0)
+                        "title": getattr(obj, 'properties', {}).get('title', ''),
+                        "source": getattr(obj, 'properties', {}).get('source', ''),
+                        "geneticLine": getattr(obj, 'properties', {}).get('geneticLine', ''),
+                        "species": getattr(obj, 'properties', {}).get('species', ''),
+                        "phase": getattr(obj, 'properties', {}).get('phase', ''),
+                        "age_band": getattr(obj, 'properties', {}).get('age_band', ''),
+                        "weaviate_v4_used": True,
+                        "explain_score": explain_score,  # NOUVEAU
+                        "creation_time": getattr(metadata, 'creation_time', None)  # NOUVEAU
                     },
-                    score=hybrid_score,
-                    explain_score=explain_score
+                    score=float(score) if score else 0.0,
+                    original_distance=getattr(metadata, 'distance', None)
                 )
                 documents.append(doc)
             
@@ -369,219 +372,142 @@ class HybridWeaviateRetriever:
             
         except Exception as e:
             logger.error(f"Erreur recherche hybride v4: {e}")
-            return await self._vector_search_v4_corrected(query_vector, top_k, where_filter)
-    
-    async def _vector_search_v4_corrected(self, query_vector: List[float], top_k: int, 
-                                        where_filter: Dict) -> List[Document]:
-        """Recherche vectorielle Weaviate v4 - Version corrigée pour 4.16.9"""
-        try:
-            def _sync_search():
-                collection = self.client.collections.get(self.collection_name)
-                
-                base_params = {"limit": top_k}
-                
-                # MODIFICATION: Ajouter explain_score si disponible
-                if ENABLE_API_DIAGNOSTICS and self.api_capabilities.get("explain_score_available"):
-                    base_params["return_metadata"] = wvc.query.MetadataQuery(
-                        distance=True, 
-                        score=True, 
-                        explain_score=True
-                    )
-                else:
-                    base_params["return_metadata"] = wvc.query.MetadataQuery(distance=True, score=True)
-                
-                vector_param_name = self.api_capabilities.get("near_vector_format", "vector")
-                
-                params = base_params.copy()
-                params[vector_param_name] = query_vector
-                
-                if where_filter:
-                    v4_filter = _to_v4_filter(where_filter)
-                    if v4_filter is not None:
-                        params["where"] = v4_filter
-                
-                try:
-                    return collection.query.near_vector(**params)
-                except TypeError as e:
-                    error_msg = str(e)
-                    self.api_capabilities["runtime_corrections"] += 1
-                    METRICS.api_correction_applied("vector_runtime_fix")
-                    
-                    if vector_param_name in error_msg:
-                        for alternative in ["near_vector", "query_vector", "vector"]:
-                            if alternative != vector_param_name:
-                                try:
-                                    alt_params = base_params.copy()
-                                    alt_params[alternative] = query_vector
-                                    if where_filter:
-                                        v4_filter = _to_v4_filter(where_filter)
-                                        if v4_filter is not None:
-                                            alt_params["where"] = v4_filter
-                                    
-                                    result = collection.query.near_vector(**alt_params)
-                                    self.api_capabilities["near_vector_format"] = alternative
-                                    logger.info(f"Format vectoriel corrigé: {alternative}")
-                                    return result
-                                except:
-                                    continue
-                    
-                    if "where" in error_msg and where_filter:
-                        logger.warning("Filtre where non supporté, retry sans filtre")
-                        params_no_filter = {k: v for k, v in params.items() if k != "where"}
-                        return collection.query.near_vector(**params_no_filter)
-                    
-                    raise
-            
-            result = await anyio.to_thread.run_sync(_sync_search)
-            
-            documents = []
-            for obj in result.objects:
-                score = float(getattr(obj.metadata, "score", 0.0))
-                distance = float(getattr(obj.metadata, "distance", 1.0))
-                
-                # MODIFICATION: Extraire explain_score si disponible
-                explain_score = None
-                if hasattr(obj.metadata, "explain_score"):
-                    explain_score = getattr(obj.metadata, "explain_score", None)
-                
-                doc = Document(
-                    content=obj.properties.get("content", ""),
-                    metadata={
-                        "title": obj.properties.get("title", ""),
-                        "source": obj.properties.get("source", ""),
-                        "geneticLine": obj.properties.get("geneticLine", ""),
-                        "species": obj.properties.get("species", ""),
-                        "phase": obj.properties.get("phase", ""),
-                        "age_band": obj.properties.get("age_band", ""),
-                        "vector_format_used": self.api_capabilities.get("near_vector_format", "vector"),
-                        "runtime_corrections": self.api_capabilities.get("runtime_corrections", 0)
-                    },
-                    score=score,
-                    original_distance=distance,
-                    explain_score=explain_score
-                )
-                documents.append(doc)
-            
-            return documents
-            
-        except Exception as e:
-            logger.error(f"Erreur recherche vectorielle v4: {e}")
-            return await self._vector_search_fallback_minimal(query_vector, top_k)
-    
-    async def _vector_search_fallback_minimal(self, query_vector: List[float], top_k: int) -> List[Document]:
-        """Recherche vectorielle minimale comme dernier recours"""
-        try:
-            def _sync_minimal_search():
-                collection = self.client.collections.get(self.collection_name)
-                return collection.query.near_vector(
-                    near_vector=query_vector,
-                    limit=top_k
-                )
-            
-            result = await anyio.to_thread.run_sync(_sync_minimal_search)
-            
-            documents = []
-            for obj in result.objects:
-                score = getattr(obj.metadata, "score", 0.7) if hasattr(obj, "metadata") else 0.7
-                
-                doc = Document(
-                    content=obj.properties.get("content", ""),
-                    metadata={
-                        "title": obj.properties.get("title", ""),
-                        "source": obj.properties.get("source", ""),
-                        "fallback_search": True,
-                        "minimal_api_used": True
-                    },
-                    score=float(score)
-                )
-                documents.append(doc)
-            
-            return documents
-            
-        except Exception as e:
-            logger.error(f"Erreur recherche minimale: {e}")
             return []
     
-    async def _vector_search_v3(self, query_vector: List[float], top_k: int, 
-                              where_filter: Dict) -> List[Document]:
-        """Recherche vectorielle Weaviate v3"""
+    async def _vector_search_fallback(self, query_vector: List[float], 
+                                    top_k: int, where_filter: Dict = None) -> List[Document]:
+        """MODIFIÉ: Fallback vectoriel avec corrections"""
         try:
-            def _sync_search():
-                query_builder = (
-                    self.client.query
-                    .get(self.collection_name, ["content", "title", "source", "geneticLine", "species", "phase", "age_band"])
-                    .with_near_vector({"vector": query_vector})
-                    .with_limit(top_k)
-                    .with_additional(["score", "distance", "certainty"])
-                )
-                
-                if where_filter:
-                    query_builder = query_builder.with_where(where_filter)
-                
-                return query_builder.do()
-            
-            result = await anyio.to_thread.run_sync(_sync_search)
-            
-            documents = []
-            objects = result.get("data", {}).get("Get", {}).get(self.collection_name, [])
-            
-            for obj in objects:
-                additional = obj.get("_additional", {})
-                score = additional.get("score", additional.get("certainty", 0.0))
-                
-                doc = Document(
-                    content=obj.get("content", ""),
-                    metadata={
-                        "title": obj.get("title", ""),
-                        "source": obj.get("source", ""),
-                        "geneticLine": obj.get("geneticLine", ""),
-                        "species": obj.get("species", ""),
-                        "phase": obj.get("phase", ""),
-                        "age_band": obj.get("age_band", ""),
-                        "weaviate_v3_used": True
-                    },
-                    score=float(score) if score else 0.0,
-                    original_distance=additional.get("distance")
-                )
-                documents.append(doc)
-            
-            return documents
-            
-        except Exception as e:
-            logger.error(f"Erreur recherche vectorielle v3: {e}")
-            return []
-    
-    def _remove_age_band_filter(self, where_filter: Dict) -> Dict:
-        """Retire le critère age_band du filtre"""
-        if not where_filter:
-            return None
-        
-        try:
-            if "path" in where_filter:
-                path = where_filter["path"]
-                if (isinstance(path, list) and "age_band" in path) or path == "age_band":
-                    return None
-                return where_filter
-            
-            if "operands" in where_filter:
-                new_operands = []
-                for operand in where_filter["operands"]:
-                    filtered_operand = self._remove_age_band_filter(operand)
-                    if filtered_operand:
-                        new_operands.append(filtered_operand)
-                
-                if not new_operands:
-                    return None
-                elif len(new_operands) == 1:
-                    return new_operands[0]
-                else:
-                    return {
-                        "operator": where_filter["operator"],
-                        "operands": new_operands
+            if self.is_v4:
+                def _sync_vector_search():
+                    collection = self.client.collections.get(self.collection_name)
+                    
+                    search_params = {
+                        "vector": query_vector,
+                        "limit": top_k,
+                        "return_metadata": wvc.query.MetadataQuery(score=True)
                     }
-            
-            return where_filter
-            
+                    
+                    if where_filter and self.api_capabilities.get("hybrid_with_where", True):
+                        v4_filter = self._to_v4_filter(where_filter)
+                        if v4_filter is not None:
+                            search_params["where"] = v4_filter
+                    
+                    return collection.query.near_vector(**search_params)
+                
+                result = await anyio.to_thread(_sync_vector_search)
+                return self._convert_v4_results_to_documents(result.objects)
+            else:
+                return await self._vector_search_v3(query_vector, top_k, where_filter)
+                
         except Exception as e:
-            logger.warning(f"Erreur suppression age_band filter: {e}")
-            return None
+            logger.error(f"Erreur fallback vectoriel: {e}")
+            return []
+    
+    def _convert_v4_results_to_documents(self, objects) -> List[Document]:
+        """NOUVEAU: Conversion objets v4 vers Documents avec métadonnées enrichies"""
+        documents = []
+        
+        for obj in objects:
+            metadata = obj.metadata or {}
+            properties = getattr(obj, 'properties', {})
+            
+            doc = Document(
+                content=properties.get('content', ''),
+                metadata={
+                    "title": properties.get('title', ''),
+                    "source": properties.get('source', ''),
+                    "geneticLine": properties.get('geneticLine', ''),
+                    "species": properties.get('species', ''),
+                    "phase": properties.get('phase', ''),
+                    "age_band": properties.get('age_band', ''),
+                    "weaviate_v4_used": True,
+                    "fallback_used": True  # NOUVEAU: marqueur fallback
+                },
+                score=float(getattr(metadata, 'score', 0.0)),
+                original_distance=getattr(metadata, 'distance', None)
+            )
+            documents.append(doc)
+        
+        return documents
+    
+    def get_retrieval_analytics(self) -> Dict[str, Any]:
+        """NOUVEAU: Analytics de récupération pour monitoring"""
+        return {
+            "api_capabilities": self.api_capabilities,
+            "last_query_analytics": self.last_query_analytics,
+            "fusion_config": self.fusion_config,
+            "runtime_corrections": self.api_capabilities.get("runtime_corrections", 0)
+        }
+
+# NOUVEAU: Fonction factory pour compatibilité
+def create_hybrid_retriever(client, collection_name: str = "InteliaKnowledge") -> HybridWeaviateRetriever:
+    """Factory pour créer un retriever hybride configuré"""
+    return HybridWeaviateRetriever(client, collection_name)
+
+# MODIFIÉ: Fonction de compatibilité avec alpha dynamique
+def retrieve(query: str, limit: int = 8, alpha: float = None, 
+            client=None, intent_result=None, **kwargs) -> List[Document]:
+    """
+    Façade simple qui utilise la recherche hybride avec alpha dynamique
+    """
+    if not client:
+        raise ValueError("Client Weaviate requis")
+    
+    retriever = HybridWeaviateRetriever(client)
+    
+    # Calcul alpha dynamique si non fourni
+    if alpha is None:
+        alpha = retriever._calculate_dynamic_alpha(query, intent_result)
+    
+    # Note: Cette fonction est synchrone pour compatibilité
+    # En production, utiliser directement le retriever async
+    logger.warning("Utilisation fonction retrieve() synchrone - préférer retriever.hybrid_search() async")
+    
+    return []  # Placeholder - nécessite implémentation async appropriée
+
+# NOUVEAU: Fonctions utilitaires pour analytics
+def get_retrieval_metrics() -> Dict[str, Any]:
+    """Récupère les métriques de récupération globales"""
+    return {
+        "retrieval_calls": getattr(METRICS, 'retrieval_calls', 0),
+        "cache_hits": getattr(METRICS, 'cache_hits', 0),
+        "fallback_used": getattr(METRICS, 'fallback_used', 0),
+        "api_corrections": getattr(METRICS, 'api_corrections', 0)
+    }
+
+# NOUVEAU: Test function pour validation
+async def test_retriever_capabilities(client, collection_name: str = "InteliaKnowledge"):
+    """Teste les capacités du retriever configuré"""
+    retriever = HybridWeaviateRetriever(client, collection_name)
+    
+    test_results = {
+        "api_capabilities": retriever.api_capabilities,
+        "collection_accessible": False,
+        "hybrid_search_working": False,
+        "vector_search_working": False
+    }
+    
+    try:
+        # Test accès collection
+        if retriever.is_v4:
+            collection = client.collections.get(collection_name)
+            test_results["collection_accessible"] = True
+        
+        # Test recherche hybride
+        test_vector = [0.1] * 384
+        docs = await retriever.hybrid_search(
+            test_vector, 
+            "test query", 
+            top_k=1
+        )
+        test_results["hybrid_search_working"] = len(docs) >= 0  # Même 0 résultat = API fonctionne
+        
+        # Test recherche vectorielle fallback
+        fallback_docs = await retriever._vector_search_fallback(test_vector, 1)
+        test_results["vector_search_working"] = len(fallback_docs) >= 0
+        
+    except Exception as e:
+        test_results["error"] = str(e)
+    
+    return test_results

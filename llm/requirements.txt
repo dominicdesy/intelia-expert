@@ -33,6 +33,10 @@ unidecode==1.3.8
 sentence-transformers==3.1.1
 voyageai==0.2.3
 
+# === NOUVEAU: LangSmith pour monitoring LLM ===
+langsmith==0.0.69
+langchain-core==0.1.16
+
 # Utilitaires de base - Versions stables
 numpy>=1.24.0,<2.0.0
 scipy>=1.11.0,<1.15.0
@@ -92,12 +96,19 @@ psutil>=5.9.0
 # Torch <2.5.0 : Évite les incompatibilités récentes
 # Numpy <2.0.0 : Évite les breaking changes v2
 # Pydantic <3.0.0 : Reste sur v2 pour stabilité
+# LangSmith 0.0.69 : Monitoring LLM et prompt optimization
 
-# ===== VARIABLES D'ENVIRONNEMENT RECOMMANDÉES =====
+# ===== VARIABLES D'ENVIRONNEMENT DIGITAL OCEAN =====
 
+# À configurer dans Digital Ocean App Platform :
 # REDIS_URL=redis://localhost:6379
 # WEAVIATE_URL=http://localhost:8080
 # OPENAI_API_KEY=your_key_here
+# LANGSMITH_API_KEY=your_langsmith_key_here
+# LANGSMITH_PROJECT=intelia-aviculture
 # CACHE_ENABLED=true
 # CACHE_TOTAL_MEMORY_LIMIT_MB=100
+# ENABLE_INTELLIGENT_RRF=false
+# RRF_LEARNING_MODE=true
+# RRF_GENETIC_BOOST=true
 # LOG_LEVEL=INFO

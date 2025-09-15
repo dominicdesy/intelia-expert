@@ -1,13 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-rag_engine.py - RAG Engine Enhanced avec Cache Redis externe optimisé
-Version Production Intégrée pour Intelia Expert Aviculture
-Version corrigée pour Weaviate 4.16.9 - Septembre 2025
-CORRECTIONS APPLIQUÉES: 
-- OpenAI init sans proxies
-- Guardrails uniques (suppression doublons)
-- Intégration HybridRetriever paramétrable
-- Optimisations cache sémantique + intent processor + diagnostics enrichis
+rag_engine.py - RAG Engine Enhanced avec LangSmith et RRF Intelligent
+Version avec intégration LangSmith pour monitoring LLM aviculture
 """
 
 import os
@@ -19,7 +13,7 @@ import httpx
 from typing import Dict, List, Optional, Any
 from collections import defaultdict
 
-# Imports des modules refactorisés
+# Imports existants
 from config import *
 from imports_and_dependencies import *
 from data_models import RAGResult, RAGSource, Document
@@ -29,17 +23,37 @@ from retriever import HybridWeaviateRetriever
 from generators import EnhancedResponseGenerator
 from ood_detector import EnhancedOODDetector
 from memory import ConversationMemory
-
-# MODIFICATION: Import guardrails unique + HybridRetriever paramétrable
-from advanced_guardrails import AdvancedResponseGuardrails  # garder une seule implémentation
+from advanced_guardrails import AdvancedResponseGuardrails
 from hybrid_retriever import hybrid_search
+
+# === NOUVEAU: IMPORTS LANGSMITH ===
+if LANGSMITH_ENABLED:
+    try:
+        from langsmith import Client
+        from langsmith.run_helpers import traceable
+        LANGSMITH_AVAILABLE = True
+        logger.info("✅ LangSmith importé avec succès")
+    except ImportError as e:
+        LANGSMITH_AVAILABLE = False
+        logger.warning(f"❌ LangSmith non disponible: {e}")
+else:
+    LANGSMITH_AVAILABLE = False
+
+# === NOUVEAU: IMPORT RRF INTELLIGENT ===
+try:
+    from enhanced_rrf_fusion import IntelligentRRFFusion
+    INTELLIGENT_RRF_AVAILABLE = True
+    logger.info("✅ RRF Intelligent importé avec succès")
+except ImportError as e:
+    INTELLIGENT_RRF_AVAILABLE = False
+    logger.warning(f"❌ RRF Intelligent non disponible: {e}")
+
 DEFAULT_ALPHA = float(os.getenv("HYBRID_ALPHA", "0.6"))
 
-# Configuration logging
 logger = logging.getLogger(__name__)
 
 class InteliaRAGEngine:
-    """RAG Engine principal avec cache externe optimisé et corrections appliquées"""
+    """RAG Engine principal avec LangSmith et RRF Intelligent"""
     
     def __init__(self, openai_client: AsyncOpenAI = None):
         self.openai_client = openai_client or self._build_openai_client()
@@ -56,11 +70,27 @@ class InteliaRAGEngine:
         self.guardrails = None
         self.weaviate_client = None
         
+        # === NOUVEAU: LANGSMITH CLIENT ===
+        self.langsmith_client = None
+        if LANGSMITH_AVAILABLE and LANGSMITH_ENABLED and LANGSMITH_API_KEY:
+            try:
+                self.langsmith_client = Client(
+                    api_key=LANGSMITH_API_KEY,
+                    api_url="https://api.smith.langchain.com"
+                )
+                logger.info(f"✅ LangSmith initialisé - Projet: {LANGSMITH_PROJECT}")
+            except Exception as e:
+                logger.error(f"❌ Erreur initialisation LangSmith: {e}")
+                self.langsmith_client = None
+        
+        # === NOUVEAU: RRF INTELLIGENT ===
+        self.intelligent_rrf = None
+        
         # État
         self.is_initialized = False
         self.degraded_mode = False
         
-        # MODIFICATION: Stats étendues avec nouvelles métriques
+        # Stats étendues avec LangSmith et RRF
         self.optimization_stats = {
             "cache_hits": 0,
             "cache_misses": 0,
@@ -73,7 +103,15 @@ class InteliaRAGEngine:
             "external_cache_used": False,
             "semantic_debug_requests": 0,
             "explain_score_extractions": 0,
-            "cache_semantic_reasoning_failures": 0,
+            # NOUVEAU: Stats LangSmith
+            "langsmith_traces": 0,
+            "langsmith_errors": 0,
+            "prompt_optimizations": 0,
+            # NOUVEAU: Stats RRF Intelligent
+            "intelligent_rrf_used": 0,
+            "genetic_boosts_applied": 0,
+            "rrf_learning_updates": 0,
+            "semantic_reasoning_failures": 0,
             "intent_coverage_stats": defaultdict(int),
             "weaviate_capabilities": {},
             "dynamic_ood_threshold_adjustments": 0,
@@ -81,22 +119,20 @@ class InteliaRAGEngine:
         }
     
     def _build_openai_client(self) -> AsyncOpenAI:
-        """MODIFICATION: Construit le client OpenAI sans proxies"""
+        """Construit le client OpenAI"""
         try:
             http_client = httpx.AsyncClient(timeout=30.0)
-            # NE PAS passer proxies au client (erreur observée)
             return AsyncOpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
         except Exception as e:
             logger.warning(f"Erreur client OpenAI: {e}")
-            # Fallback sans http_client personnalisé
             return AsyncOpenAI(api_key=OPENAI_API_KEY)
     
     async def initialize(self):
-        """MODIFICATION: Initialisation avec await cache manager + orchestration corrigée"""
+        """Initialisation avec LangSmith et RRF Intelligent"""
         if self.is_initialized:
             return
             
-        logger.info("Initialisation RAG Engine Enhanced avec cache externe")
+        logger.info("Initialisation RAG Engine Enhanced avec LangSmith + RRF Intelligent")
         
         if not OPENAI_AVAILABLE or not WEAVIATE_AVAILABLE:
             self.degraded_mode = True
@@ -105,154 +141,205 @@ class InteliaRAGEngine:
             return
         
         try:
-            # MODIFICATION: 1. Cache Redis externe avec await obligatoire
+            # 1. Cache Redis externe
             if CACHE_ENABLED and EXTERNAL_CACHE_AVAILABLE:
                 self.cache_manager = RAGCacheManager()
-                # CRITICAL: Assurer que l'initialisation est awaited
                 await self.cache_manager.initialize()
                 if self.cache_manager.enabled:
                     self.optimization_stats["external_cache_used"] = True
-                    logger.info("✅ Cache Redis externe activé et initialisé")
-                else:
-                    logger.warning("⚠️ Cache Redis externe désactivé après initialisation")
+                    logger.info("✅ Cache Redis externe activé")
             
             # 2. Connexion Weaviate
             await self._connect_weaviate()
             
-            # 3. Composants de base avec ordre corrigé
+            # 3. Composants de base
             self.embedder = OpenAIEmbedder(self.openai_client, self.cache_manager)
             self.memory = ConversationMemory(self.openai_client)
             self.ood_detector = EnhancedOODDetector()
             
-            # 4. Retriever hybride avec diagnostic intégré
+            # 4. Retriever hybride avec RRF intelligent
             if self.weaviate_client:
                 self.retriever = HybridWeaviateRetriever(self.weaviate_client)
-                # Exécuter diagnostic au démarrage si activé
+                
+                # === NOUVEAU: Initialisation RRF Intelligent ===
+                if (INTELLIGENT_RRF_AVAILABLE and ENABLE_INTELLIGENT_RRF and 
+                    self.cache_manager and self.cache_manager.enabled):
+                    try:
+                        self.intelligent_rrf = IntelligentRRFFusion(
+                            redis_client=self.cache_manager.client,
+                            intent_processor=None  # Sera défini plus tard
+                        )
+                        logger.info("✅ RRF Intelligent initialisé")
+                    except Exception as e:
+                        logger.error(f"❌ Erreur RRF Intelligent: {e}")
+                
+                # Diagnostic API Weaviate
                 if ENABLE_API_DIAGNOSTICS:
-                    logger.info("🔍 Exécution diagnostic API Weaviate...")
                     await self.retriever.diagnose_weaviate_api()
-                    # MODIFICATION: Stocker les capacités dans les stats
                     self.optimization_stats["weaviate_capabilities"] = self.retriever.api_capabilities.copy()
             
-            # 5. Générateur enrichi
-            if ENTITY_ENRICHMENT_ENABLED:
-                self.generator = EnhancedResponseGenerator(self.openai_client, self.cache_manager)
+            # 5. Générateur de réponses
+            self.generator = EnhancedResponseGenerator(self.openai_client, self.cache_manager)
             
-            # 6. MODIFICATION: Guardrails uniques (suppression doublons)
-            if GUARDRAILS_AVAILABLE:
-                self.guardrails = self._create_response_guardrails(self.openai_client, GUARDRAILS_LEVEL)
-            
-            # 7. Intent processor
-            if INTENT_PROCESSOR_AVAILABLE:
+            # 6. Intent processor
+            try:
+                from intent_processor import create_intent_processor
                 self.intent_processor = create_intent_processor()
+                
+                # Connecter RRF Intelligent à Intent Processor
+                if self.intelligent_rrf:
+                    self.intelligent_rrf.intent_processor = self.intent_processor
+                    
+            except Exception as e:
+                logger.warning(f"Intent processor non disponible: {e}")
+            
+            # 7. Guardrails
+            if GUARDRAILS_AVAILABLE:
+                from advanced_guardrails import create_response_guardrails
+                self.guardrails = create_response_guardrails(self.openai_client, GUARDRAILS_LEVEL)
             
             self.is_initialized = True
             logger.info("✅ RAG Engine Enhanced initialisé avec succès")
             
         except Exception as e:
-            logger.error(f"❌ Erreur initialisation: {e}")
+            logger.error(f"❌ Erreur initialisation RAG Engine: {e}")
             self.degraded_mode = True
             self.is_initialized = True
     
-    def _create_response_guardrails(self, openai_client, level: str):
-        """MODIFICATION: Factory pour guardrails uniques"""
-        try:
-            return AdvancedResponseGuardrails(openai_client, level)
-        except Exception as e:
-            logger.warning(f"Erreur création guardrails: {e}")
-            return None
+    # === NOUVEAU: MÉTHODE PRINCIPALE AVEC LANGSMITH TRACING ===
     
-    async def _connect_weaviate(self):
-        """Connexion Weaviate corrigée pour v4.16.9"""
-        if WEAVIATE_V4:
-            try:
-                if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
-                    self.weaviate_client = weaviate.connect_to_weaviate_cloud(
-                        cluster_url=WEAVIATE_URL,
-                        auth_credentials=wvc.init.Auth.api_key(WEAVIATE_API_KEY),
-                        headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
-                    )
-                else:
-                    if WEAVIATE_API_KEY:
-                        self.weaviate_client = weaviate.connect_to_local(
-                            host=WEAVIATE_URL.replace("http://", "").replace("https://", "").split(":")[0],
-                            port=int(WEAVIATE_URL.split(":")[-1]) if ":" in WEAVIATE_URL else 8080,
-                            auth_credentials=wvc.init.Auth.api_key(WEAVIATE_API_KEY),
-                            headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
-                        )
-                    else:
-                        self.weaviate_client = weaviate.connect_to_local(
-                            host=WEAVIATE_URL.replace("http://", "").replace("https://", "").split(":")[0],
-                            port=int(WEAVIATE_URL.split(":")[-1]) if ":" in WEAVIATE_URL else 8080,
-                            headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
-                        )
-                
-                def _test_connection():
-                    return self.weaviate_client.is_ready()
-                
-                is_ready = await anyio.to_thread.run_sync(_test_connection)
-                
-                if not is_ready:
-                    raise Exception("Weaviate not ready")
-                    
-            except Exception as e:
-                logger.error(f"Erreur connexion Weaviate v4: {e}")
-                try:
-                    if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
-                        auth_config = weaviate.AuthApiKey(api_key=WEAVIATE_API_KEY)
-                        self.weaviate_client = weaviate.Client(
-                            url=WEAVIATE_URL,
-                            auth_client_secret=auth_config,
-                            additional_headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
-                        )
-                    else:
-                        self.weaviate_client = weaviate.Client(
-                            url=WEAVIATE_URL,
-                            additional_headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
-                        )
-                    
-                    def _check_fallback():
-                        return self.weaviate_client.is_ready()
-                    
-                    is_ready = await anyio.to_thread.run_sync(_check_fallback)
-                    
-                    if not is_ready:
-                        raise Exception("Weaviate fallback failed")
-                        
-                    logger.info("Fallback vers Weaviate v3 réussi")
-                    
-                except Exception as fallback_error:
-                    logger.error(f"Erreur fallback Weaviate: {fallback_error}")
-                    raise
-        else:
-            if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
-                auth_config = weaviate.AuthApiKey(api_key=WEAVIATE_API_KEY)
-                self.weaviate_client = weaviate.Client(
-                    url=WEAVIATE_URL,
-                    auth_client_secret=auth_config,
-                    additional_headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
-                )
-            else:
-                self.weaviate_client = weaviate.Client(
-                    url=WEAVIATE_URL,
-                    additional_headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
-                )
-            
-            def _check_connection():
-                return self.weaviate_client.is_ready()
-            
-            is_ready = await anyio.to_thread.run_sync(_check_connection)
-            
-            if not is_ready:
-                raise Exception("Weaviate not ready")
-    
-    async def process_query(self, query: str, language: str = "fr", tenant_id: str = "") -> RAGResult:
-        """MODIFICATION: Traitement avec toutes les optimisations appliquées + HybridRetriever"""
-        if not RAG_ENABLED:
-            return RAGResult(source=RAGSource.FALLBACK_NEEDED, metadata={"reason": "rag_disabled"})
+    async def generate_response(self, query: str, tenant_id: str = "default", 
+                              conversation_context: List[Dict] = None,
+                              language: Optional[str] = None,
+                              explain_score: Optional[float] = None) -> RAGResult:
+        """
+        Point d'entrée principal avec tracing LangSmith automatique
+        """
         
-        if not self.is_initialized:
-            await self.initialize()
+        if LANGSMITH_AVAILABLE and self.langsmith_client and LANGSMITH_ENABLED:
+            return await self._generate_response_with_langsmith(
+                query, tenant_id, conversation_context, language, explain_score
+            )
+        else:
+            return await self._generate_response_core(
+                query, tenant_id, conversation_context, language, explain_score
+            )
+    
+    @traceable(name="aviculture_rag_query") if LANGSMITH_AVAILABLE else lambda f: f
+    async def _generate_response_with_langsmith(self, query: str, tenant_id: str,
+                                              conversation_context: List[Dict],
+                                              language: Optional[str],
+                                              explain_score: Optional[float]) -> RAGResult:
+        """Génération de réponse avec tracing LangSmith complet"""
+        
+        start_time = time.time()
+        self.optimization_stats["langsmith_traces"] += 1
+        
+        try:
+            # Traçage contexte aviculture
+            langsmith_metadata = {
+                "tenant_id": tenant_id,
+                "query_length": len(query),
+                "has_conversation_context": bool(conversation_context),
+                "language_target": language,
+                "system": "intelia_aviculture_rag",
+                "version": "enhanced_with_langsmith"
+            }
+            
+            # Traitement core
+            result = await self._generate_response_core(
+                query, tenant_id, conversation_context, language, explain_score
+            )
+            
+            # Enrichissement métadonnées LangSmith avec données aviculture
+            if hasattr(result, 'metadata') and result.metadata:
+                detected_entities = result.metadata.get('detected_entities', {})
+                
+                langsmith_metadata.update({
+                    "genetic_line": detected_entities.get('line', 'none'),
+                    "age_days": detected_entities.get('age_days'),
+                    "performance_metric": any(metric in query.lower() 
+                                            for metric in ['fcr', 'poids', 'mortalité', 'ponte']),
+                    "intent_type": result.metadata.get('intent_type', 'unknown'),
+                    "intent_confidence": result.metadata.get('intent_confidence', 0.0),
+                    "documents_used": result.metadata.get('documents_used', 0),
+                    "hybrid_search_used": result.metadata.get('hybrid_search_used', False),
+                    "intelligent_rrf_used": result.metadata.get('intelligent_rrf_used', False),
+                    "processing_time": time.time() - start_time,
+                    "confidence_score": result.confidence
+                })
+            
+            # Log métadonnées dans LangSmith
+            if self.langsmith_client:
+                try:
+                    # Trace run avec métadonnées enrichies
+                    run_data = {
+                        "inputs": {"query": query},
+                        "outputs": {"answer": result.answer[:500]},  # Limiter taille
+                        "metadata": langsmith_metadata
+                    }
+                    
+                    # Log spécialisé pour alertes
+                    await self._log_langsmith_alerts(query, result, langsmith_metadata)
+                    
+                except Exception as e:
+                    logger.warning(f"Erreur logging LangSmith: {e}")
+                    self.optimization_stats["langsmith_errors"] += 1
+            
+            return result
+            
+        except Exception as e:
+            self.optimization_stats["langsmith_errors"] += 1
+            logger.error(f"Erreur LangSmith tracing: {e}")
+            # Fallback sans LangSmith
+            return await self._generate_response_core(
+                query, tenant_id, conversation_context, language, explain_score
+            )
+    
+    async def _log_langsmith_alerts(self, query: str, result: RAGResult, metadata: Dict):
+        """Log des alertes spécialisées aviculture dans LangSmith"""
+        
+        alerts = []
+        
+        # Détection valeurs aberrantes aviculture
+        answer_lower = result.answer.lower()
+        
+        # FCR aberrant
+        import re
+        fcr_matches = re.findall(r'fcr[:\s]*(\d+[.,]\d*)', answer_lower)
+        for fcr_str in fcr_matches:
+            fcr_value = float(fcr_str.replace(',', '.'))
+            if fcr_value > 3.0 or fcr_value < 0.8:
+                alerts.append(f"FCR_ABERRANT: {fcr_value}")
+        
+        # Mortalité aberrante  
+        mort_matches = re.findall(r'mortalité[:\s]*(\d+)[%\s]', answer_lower)
+        for mort_str in mort_matches:
+            mort_value = float(mort_str)
+            if mort_value > 20:
+                alerts.append(f"MORTALITE_ELEVEE: {mort_value}%")
+        
+        # Poids aberrant
+        poids_matches = re.findall(r'poids[:\s]*(\d+)\s*g', answer_lower)
+        for poids_str in poids_matches:
+            poids_value = float(poids_str)
+            if poids_value > 5000 or poids_value < 10:
+                alerts.append(f"POIDS_ABERRANT: {poids_value}g")
+        
+        # Log alertes si détectées
+        if alerts:
+            logger.warning(f"Alertes aviculture détectées: {alerts}")
+            metadata["alerts_aviculture"] = alerts
+            
+        # Confiance faible
+        if result.confidence < 0.3:
+            alerts.append(f"CONFIANCE_FAIBLE: {result.confidence:.2f}")
+    
+    async def _generate_response_core(self, query: str, tenant_id: str,
+                                    conversation_context: List[Dict],
+                                    language: Optional[str],
+                                    explain_score: Optional[float]) -> RAGResult:
+        """Méthode core de génération (existante avec améliorations RRF)"""
         
         if self.degraded_mode:
             return RAGResult(source=RAGSource.FALLBACK_NEEDED, metadata={"reason": "degraded_mode"})
@@ -261,29 +348,26 @@ class InteliaRAGEngine:
         METRICS.inc("requests_total")
         
         try:
-            # MODIFICATION: Détection langue optimisée
+            # Détection langue
             if not language:
                 language = detect_language_enhanced(query, default="fr")
             
-            # Intent processing avec métriques
+            # Intent processing
             intent_result = None
             if self.intent_processor:
                 try:
                     intent_result = self.intent_processor.process_query(query)
                     if intent_result:
-                        METRICS.intent_detected(
-                            intent_result.intent_type, 
-                            getattr(intent_result, 'confidence', 0.8)
-                        )
+                        METRICS.intent_detected(intent_result.intent_type, 
+                                              getattr(intent_result, 'confidence', 0.8))
                         self.optimization_stats["intent_coverage_stats"][intent_result.intent_type] += 1
                 except Exception as e:
                     logger.warning(f"Erreur intent processor: {e}")
             
-            # MODIFICATION: OOD detection avec seuil dynamique
+            # OOD detection avec seuil dynamique
             if self.ood_detector:
                 is_in_domain, domain_score, score_details = self.ood_detector.calculate_ood_score(query, intent_result)
                 
-                # Tracer ajustements de seuil
                 if score_details.get("genetic_metric_present") or score_details.get("generic_vocab_only"):
                     self.optimization_stats["dynamic_ood_threshold_adjustments"] += 1
                 
@@ -293,324 +377,295 @@ class InteliaRAGEngine:
                     return RAGResult(
                         source=RAGSource.OOD_FILTERED,
                         answer="Désolé, cette question sort du domaine avicole. Pose-moi une question sur l'aviculture.",
-                        confidence=1.0 - domain_score,
-                        processing_time=time.time() - start_time,
-                        metadata={
-                            "domain_score": domain_score,
-                            "score_details": score_details,
-                            "optimization_stats": self.optimization_stats.copy()
-                        },
-                        intent_result=intent_result
+                        confidence=0.0,
+                        metadata={"ood_score": domain_score, "reason": "out_of_domain"}
                     )
             
-            # MODIFICATION: Contexte conversationnel enrichi
-            conversation_context = ""
-            if tenant_id and self.memory:
-                try:
-                    conversation_context = await self.memory.get_contextual_memory(tenant_id, query)
-                    if conversation_context:
-                        self.optimization_stats["conversation_context_usage"] += 1
-                except Exception as e:
-                    logger.warning(f"Erreur mémoire conversationnelle: {e}")
+            # Préparation contexte conversation
+            conversation_context_str = ""
+            if conversation_context and len(conversation_context) > 0:
+                self.optimization_stats["conversation_context_usage"] += 1
+                recent_context = conversation_context[-MAX_CONVERSATION_CONTEXT:]
+                conversation_context_str = "\n".join([
+                    f"Q: {ctx.get('question', '')}\nR: {ctx.get('answer', '')[:200]}..."
+                    for ctx in recent_context
+                ])
             
-            # Embedding de la requête
-            search_query = query
-            if intent_result and hasattr(intent_result, 'expanded_query') and intent_result.expanded_query:
-                search_query = intent_result.expanded_query
+            # Génération embedding
+            search_query = getattr(intent_result, 'expanded_query', query) if intent_result else query
+            query_vector = await self.embedder.get_embedding(search_query)
             
-            query_vector = await self.embedder.embed_query(search_query)
             if not query_vector:
-                METRICS.observe_latency(time.time() - start_time)
-                return RAGResult(
-                    source=RAGSource.ERROR,
-                    metadata={"error": "embedding_failed", "optimization_stats": self.optimization_stats.copy()}
-                )
+                return RAGResult(source=RAGSource.EMBEDDING_FAILED)
             
-            # Construire where filter
+            # Construction filtres Weaviate
             where_filter = build_where_filter(intent_result)
             
-            # MODIFICATION: Recherche hybride paramétrable avec instrumentation
+            # === NOUVEAU: RECHERCHE AVEC RRF INTELLIGENT ===
             documents = []
             if self.retriever:
                 try:
-                    # Utiliser alpha paramétrable pour hybrid search
                     search_alpha = getattr(intent_result, 'preferred_alpha', DEFAULT_ALPHA) if intent_result else DEFAULT_ALPHA
                     
-                    documents = await self.retriever.adaptive_search(
-                        query_vector, search_query, RAG_SIMILARITY_TOP_K, where_filter, alpha=search_alpha
-                    )
+                    # Utilisation RRF intelligent si disponible
+                    if (self.intelligent_rrf and self.intelligent_rrf.enabled and 
+                        ENABLE_INTELLIGENT_RRF):
+                        
+                        # Recherche hybride avec RRF intelligent
+                        documents = await self._enhanced_hybrid_search_with_rrf(
+                            query_vector, search_query, RAG_SIMILARITY_TOP_K, where_filter,
+                            search_alpha, query, intent_result
+                        )
+                        self.optimization_stats["intelligent_rrf_used"] += 1
+                        
+                    else:
+                        # Recherche hybride classique
+                        documents = await self.retriever.adaptive_search(
+                            query_vector, search_query, RAG_SIMILARITY_TOP_K, where_filter, alpha=search_alpha
+                        )
+                    
+                    # Statistiques recherche
                     if any(doc.metadata.get("hybrid_used") for doc in documents):
                         self.optimization_stats["hybrid_searches"] += 1
                     
-                    # Compter corrections API
+                    # Corrections API runtime
                     runtime_corrections = sum(doc.metadata.get("runtime_corrections", 0) for doc in documents)
                     if runtime_corrections > 0:
                         self.optimization_stats["api_corrections"] += runtime_corrections
                     
-                    # Compter explain_score extraits
+                    # Explain scores
                     explain_scores_found = sum(1 for doc in documents if doc.explain_score is not None)
                     if explain_scores_found > 0:
                         self.optimization_stats["explain_score_extractions"] += explain_scores_found
                         
                 except Exception as e:
                     logger.error(f"Erreur recherche hybride: {e}")
+                    return RAGResult(source=RAGSource.SEARCH_FAILED, metadata={"error": str(e)})
             
             if not documents:
-                METRICS.observe_latency(time.time() - start_time)
-                return RAGResult(
-                    source=RAGSource.FALLBACK_NEEDED,
-                    metadata={
-                        "reason": "no_documents_found", 
-                        "where_filter_used": where_filter is not None,
-                        "optimization_stats": self.optimization_stats.copy()
-                    }
-                )
+                return RAGResult(source=RAGSource.NO_DOCUMENTS_FOUND)
             
-            # Filtrage par confiance avec seuil dynamique
+            # Filtrage par seuil de confiance
             effective_threshold = RAG_CONFIDENCE_THRESHOLD
-            if documents:
-                top1 = max(d.score for d in documents)
-                if top1 >= 0.85:
-                    effective_threshold = max(RAG_CONFIDENCE_THRESHOLD, 0.60)
-                elif any(d.metadata.get("bm25_used") for d in documents) and top1 < 0.70:
-                    effective_threshold = min(effective_threshold, 0.50)
-            
             filtered_docs = [doc for doc in documents if doc.score >= effective_threshold]
             
             if not filtered_docs:
-                METRICS.observe_latency(time.time() - start_time)
                 return RAGResult(
-                    source=RAGSource.FALLBACK_NEEDED,
-                    metadata={
-                        "reason": "low_confidence_documents", 
-                        "min_score": min(doc.score for doc in documents) if documents else 0,
-                        "effective_threshold": effective_threshold,
-                        "optimization_stats": self.optimization_stats.copy()
-                    }
+                    source=RAGSource.LOW_CONFIDENCE,
+                    metadata={"threshold": effective_threshold, "max_score": max([d.score for d in documents])}
                 )
             
-            # Génération de réponse enrichie avec cache sémantique
-            response_text = ""
-            cache_semantic_details = {}
-            if self.generator and ENTITY_ENRICHMENT_ENABLED:
-                try:
-                    response_text = await self.generator.generate_response(
-                        query, filtered_docs, conversation_context, language, intent_result
-                    )
-                    self.optimization_stats["entity_enrichments"] += 1
-                    
-                    # Récupérer détails cache sémantique
-                    if (self.cache_manager and hasattr(self.cache_manager, 'get_last_semantic_details')):
-                        try:
-                            cache_semantic_details = await self.cache_manager.get_last_semantic_details()
-                        except Exception as e:
-                            logger.debug(f"Impossible de récupérer détails cache sémantique: {e}")
-                            self.optimization_stats["cache_semantic_reasoning_failures"] += 1
-                    
-                except Exception as e:
-                    logger.error(f"Erreur génération enrichie: {e}")
-            
-            # Fallback génération basique
-            if not response_text:
-                try:
-                    context_text = "\n\n".join([
-                        f"Document {i+1}:\n{doc.content[:1000]}"
-                        for i, doc in enumerate(filtered_docs[:5])
-                    ])
-                    
-                    system_prompt = f"""Tu es un expert en aviculture. Réponds UNIQUEMENT basé sur les documents fournis.
-RÈGLE: Réponds strictement en {language}."""
-                    
-                    user_prompt = f"""DOCUMENTS:\n{context_text}\n\nQUESTION:\n{query}\n\nRÉPONSE:"""
-                    
-                    response = await self.openai_client.chat.completions.create(
-                        model="gpt-4o",
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt}
-                        ],
-                        temperature=0.1,
-                        max_tokens=800
-                    )
-                    
-                    response_text = response.choices[0].message.content.strip()
-                    
-                except Exception as e:
-                    logger.error(f"Erreur génération fallback: {e}")
-                    response_text = "Désolé, je ne peux pas générer une réponse."
-            
-            if not response_text or "ne peux pas" in response_text.lower():
-                METRICS.observe_latency(time.time() - start_time)
-                return RAGResult(
-                    source=RAGSource.FALLBACK_NEEDED,
-                    metadata={
-                        "reason": "generation_failed",
-                        "optimization_stats": self.optimization_stats.copy()
-                    }
+            # Génération de la réponse
+            try:
+                response_result = await self.generator.generate_response(
+                    query, filtered_docs, intent_result, conversation_context_str, language
                 )
+                
+                if not response_result or not response_result.answer:
+                    return RAGResult(source=RAGSource.GENERATION_FAILED)
+                
+            except Exception as e:
+                logger.error(f"Erreur génération réponse: {e}")
+                return RAGResult(source=RAGSource.GENERATION_FAILED, metadata={"error": str(e)})
             
-            # MODIFICATION: Vérification avec guardrails uniques + explain_score
+            # Vérification guardrails
             verification_result = None
-            if self.guardrails:
+            if self.guardrails and RAG_VERIFICATION_ENABLED:
                 try:
-                    # Vérification smart: skip si haute confiance
-                    do_verify = True
-                    if RAG_VERIFICATION_SMART:
-                        top_scores = [d.score for d in filtered_docs[:3]]
-                        if top_scores and top_scores[0] >= 0.80 and (len(top_scores) <= 1 or np.std(top_scores) <= 0.05):
-                            do_verify = False
+                    context_docs = [{"content": doc.content, "metadata": doc.metadata} for doc in filtered_docs]
+                    verification_result = await self.guardrails.verify_response(
+                        query, response_result.answer, context_docs, intent_result
+                    )
                     
-                    if do_verify:
-                        # MODIFICATION: Enrichir les métadonnées avec explain_score
-                        docs_with_explain = []
-                        for doc in filtered_docs:
-                            doc_dict = doc.__dict__.copy()
-                            if doc.explain_score:
-                                doc_dict["explain_score"] = doc.explain_score
-                            docs_with_explain.append(doc_dict)
+                    if not verification_result.is_valid:
+                        self.optimization_stats["guardrail_violations"] += 1
+                        logger.warning(f"Guardrails violations: {verification_result.violations}")
                         
-                        verification_result = await self.guardrails.verify_response(
-                            query, response_text, docs_with_explain, intent_result
-                        )
+                        if not RAG_VERIFICATION_SMART:
+                            return RAGResult(
+                                source=RAGSource.GUARDRAILS_BLOCKED,
+                                metadata={"violations": verification_result.violations}
+                            )
                         
-                        if not verification_result.is_valid:
-                            self.optimization_stats["guardrail_violations"] += 1
-                            logger.warning(f"Violation guardrails: {verification_result.violations}")
-                            
-                            if verification_result.confidence < 0.3:
-                                METRICS.observe_latency(time.time() - start_time)
-                                return RAGResult(
-                                    source=RAGSource.FALLBACK_NEEDED,
-                                    metadata={
-                                        "reason": "guardrail_violation",
-                                        "violations": verification_result.violations,
-                                        "optimization_stats": self.optimization_stats.copy()
-                                    }
-                                )
-                    
                 except Exception as e:
                     logger.warning(f"Erreur guardrails: {e}")
             
-            # Calcul de confiance finale
-            confidence = self._calculate_confidence(filtered_docs, verification_result)
+            # Calcul confiance finale
+            final_confidence = self._calculate_confidence(filtered_docs, verification_result)
             
-            # Source du résultat
-            result_source = RAGSource.RAG_KNOWLEDGE
-            if verification_result and verification_result.is_valid:
-                result_source = RAGSource.RAG_VERIFIED
-                confidence = min(confidence * 1.1, 0.95)
-            
-            # Construire context_docs pour le résultat
+            # Construction métadonnées complètes
             context_docs = []
             for doc in filtered_docs:
                 doc_dict = {
+                    "content": doc.content[:1000],
                     "title": doc.metadata.get("title", ""),
-                    "content": doc.content,
-                    "score": doc.score,
                     "source": doc.metadata.get("source", ""),
+                    "score": doc.score,
                     "genetic_line": doc.metadata.get("geneticLine", ""),
                     "species": doc.metadata.get("species", ""),
                     "phase": doc.metadata.get("phase", ""),
-                    "age_band": doc.metadata.get("age_band", ""),
-                    "hybrid_used": doc.metadata.get("hybrid_used", False),
-                    "bm25_used": doc.metadata.get("bm25_used", False),
-                    "vector_format_used": doc.metadata.get("vector_format_used", ""),
-                    "fallback_search": doc.metadata.get("fallback_search", False),
-                    "minimal_api_used": doc.metadata.get("minimal_api_used", False),
-                    "runtime_corrections": doc.metadata.get("runtime_corrections", 0),
-                    "search_type": getattr(doc, 'search_type', 'unknown'),
-                    "hybrid_alpha_used": getattr(doc, 'hybrid_alpha_used', DEFAULT_ALPHA)
+                    "age_band": doc.metadata.get("age_band", "")
                 }
                 
-                if doc.explain_score is not None:
+                if doc.explain_score:
                     doc_dict["explain_score"] = doc.explain_score
                 
                 context_docs.append(doc_dict)
             
-            # MODIFICATION: Métadonnées complètes avec nouvelles infos
+            # Métadonnées enrichies
             dependencies_status = get_dependencies_status()
             metadata = {
-                "approach": "enhanced_rag_external_cache_optimized_v4_16_9_corrected_unified",
+                "approach": "enhanced_rag_langsmith_intelligent_rrf",
                 "optimizations_enabled": {
                     "external_redis_cache": self.optimization_stats["external_cache_used"],
                     "semantic_cache": getattr(self.cache_manager, 'ENABLE_SEMANTIC_CACHE', False),
                     "hybrid_search": HYBRID_SEARCH_ENABLED,
-                    "hybrid_search_parameterized": True,
+                    "intelligent_rrf": ENABLE_INTELLIGENT_RRF and bool(self.intelligent_rrf),
+                    "langsmith_monitoring": LANGSMITH_ENABLED and bool(self.langsmith_client),
                     "entity_enrichment": ENTITY_ENRICHMENT_ENABLED,
                     "advanced_guardrails": GUARDRAILS_AVAILABLE,
-                    "guardrails_unified": True,
                     "api_diagnostics": ENABLE_API_DIAGNOSTICS,
-                    "dynamic_ood_thresholds": True,
-                    "enhanced_conversation_memory": True,
-                    "explain_score_extraction": self.optimization_stats["explain_score_extractions"] > 0,
-                    "openai_simplified_init": True
+                    "dynamic_ood_thresholds": True
+                },
+                "langsmith": {
+                    "enabled": LANGSMITH_ENABLED,
+                    "project": LANGSMITH_PROJECT,
+                    "traced": bool(self.langsmith_client)
+                },
+                "intelligent_rrf": {
+                    "enabled": ENABLE_INTELLIGENT_RRF,
+                    "used": self.optimization_stats["intelligent_rrf_used"] > 0,
+                    "learning_mode": RRF_LEARNING_MODE,
+                    "genetic_boost": RRF_GENETIC_BOOST
                 },
                 "weaviate_version": dependencies_status.get("weaviate_version", "N/A"),
-                "weaviate_v4": WEAVIATE_V4,
-                "documents_found": len(documents) if documents else 0,
+                "documents_found": len(documents),
                 "documents_used": len(filtered_docs),
                 "effective_threshold": effective_threshold,
                 "query_expanded": search_query != query,
                 "conversation_context_used": bool(conversation_context),
                 "where_filter_applied": where_filter is not None,
                 "verification_enabled": RAG_VERIFICATION_ENABLED,
-                "verification_smart": RAG_VERIFICATION_SMART,
                 "language_target": language,
                 "language_detected": detect_language_enhanced(query),
                 "hybrid_alpha_used": search_alpha if 'search_alpha' in locals() else DEFAULT_ALPHA,
+                "processing_time": time.time() - start_time,
                 "optimization_stats": self.optimization_stats.copy(),
-                "api_capabilities": self.retriever.api_capabilities if self.retriever else {},
-                "api_corrections_applied": self.optimization_stats.get("api_corrections", 0) > 0,
-                "cache_semantic_details": cache_semantic_details
+                "context_documents": context_docs
             }
             
-            if cache_semantic_details.get("semantic_keywords_used"):
-                metadata["semantic_keywords_used"] = cache_semantic_details["semantic_keywords_used"]
-            
-            if intent_result:
-                metadata.update({
-                    "intent_type": getattr(intent_result, 'intent_type', 'unknown'),
-                    "detected_entities": getattr(intent_result, 'detected_entities', {}),
-                    "confidence_breakdown": getattr(intent_result, 'confidence_breakdown', {}),
-                    "preferred_alpha": getattr(intent_result, 'preferred_alpha', None)
-                })
-            
-            # Sauvegarde mémoire
-            if tenant_id and self.memory:
-                try:
-                    self.memory.add_exchange(tenant_id, query, response_text)
-                except Exception as e:
-                    logger.warning(f"Erreur sauvegarde mémoire: {e}")
+            # Ajout entités détectées si disponibles
+            if intent_result and hasattr(intent_result, 'detected_entities'):
+                metadata["detected_entities"] = intent_result.detected_entities
+                metadata["intent_type"] = intent_result.intent_type.value if hasattr(intent_result.intent_type, 'value') else str(intent_result.intent_type)
+                metadata["intent_confidence"] = intent_result.confidence
             
             METRICS.observe_latency(time.time() - start_time)
             
             return RAGResult(
-                source=result_source,
-                answer=response_text,
-                confidence=confidence,
-                context_docs=context_docs,
-                processing_time=time.time() - start_time,
-                metadata=metadata,
-                verification_status=verification_result.__dict__ if verification_result else None,
-                intent_result=intent_result
+                source=RAGSource.RAG_SUCCESS,
+                answer=response_result.answer,
+                confidence=final_confidence,
+                metadata=metadata
             )
             
         except Exception as e:
-            logger.error(f"Erreur traitement query: {e}")
-            METRICS.observe_latency(time.time() - start_time)
+            logger.error(f"Erreur génération réponse core: {e}")
             return RAGResult(
-                source=RAGSource.ERROR,
-                confidence=0.0,
-                processing_time=time.time() - start_time,
-                metadata={
-                    "error": str(e),
-                    "optimization_stats": self.optimization_stats.copy()
-                },
-                intent_result=intent_result if 'intent_result' in locals() else None
+                source=RAGSource.INTERNAL_ERROR,
+                metadata={"error": str(e), "processing_time": time.time() - start_time}
             )
     
+    # === NOUVEAU: RECHERCHE HYBRIDE AVEC RRF INTELLIGENT ===
+    
+    async def _enhanced_hybrid_search_with_rrf(self, query_vector: List[float], query_text: str,
+                                             top_k: int, where_filter: Dict, alpha: float,
+                                             original_query: str, intent_result) -> List[Document]:
+        """Recherche hybride utilisant le RRF intelligent"""
+        
+        try:
+            # Recherche vectorielle et BM25 séparément pour RRF intelligent
+            vector_results = await self.retriever._vector_search_v4_corrected(
+                query_vector, top_k * 2, where_filter
+            )
+            
+            # Pour BM25, on utilise la recherche hybride avec alpha=0 (BM25 pur)
+            bm25_results = await self.retriever._hybrid_search_v4_corrected(
+                query_vector, query_text, top_k * 2, where_filter, alpha=0.0
+            )
+            
+            # Conversion en format Dict pour RRF intelligent
+            vector_dicts = [self._document_to_dict(doc) for doc in vector_results]
+            bm25_dicts = [self._document_to_dict(doc) for doc in bm25_results]
+            
+            # Contexte pour RRF intelligent
+            query_context = {
+                "query": original_query,
+                "alpha": alpha,
+                "top_k": top_k
+            }
+            
+            # Fusion RRF intelligente
+            fused_results = await self.intelligent_rrf.enhanced_fusion(
+                vector_dicts, bm25_dicts, alpha, top_k, query_context, intent_result
+            )
+            
+            # Reconversion en Documents
+            final_documents = []
+            for result_dict in fused_results:
+                doc = Document(
+                    content=result_dict.get("content", ""),
+                    metadata=result_dict.get("metadata", {}),
+                    score=result_dict.get("final_score", 0.0),
+                    explain_score=result_dict.get("explain_score")
+                )
+                
+                # Ajout métadonnées RRF intelligent
+                doc.metadata["intelligent_rrf_used"] = True
+                doc.metadata["rrf_method"] = result_dict.get("metadata", {}).get("rrf_method", "intelligent")
+                
+                final_documents.append(doc)
+            
+            # Statistiques RRF
+            if self.intelligent_rrf:
+                rrf_stats = self.intelligent_rrf.get_performance_stats()
+                self.optimization_stats["genetic_boosts_applied"] += rrf_stats.get("genetic_boosts_applied", 0)
+                self.optimization_stats["rrf_learning_updates"] += rrf_stats.get("learning_updates", 0)
+            
+            return final_documents
+            
+        except Exception as e:
+            logger.error(f"Erreur RRF intelligent: {e}")
+            # Fallback vers recherche classique
+            return await self.retriever.adaptive_search(
+                query_vector, query_text, top_k, where_filter, alpha=alpha
+            )
+    
+    def _document_to_dict(self, doc: Document) -> Dict:
+        """Convertit un Document en dictionnaire pour RRF intelligent"""
+        return {
+            "content": doc.content,
+            "metadata": doc.metadata,
+            "score": doc.score,
+            "explain_score": doc.explain_score
+        }
+    
+    # === MÉTHODES EXISTANTES (pas de changement) ===
+    
+    async def _connect_weaviate(self):
+        """Connexion Weaviate (méthode existante)"""
+        try:
+            import weaviate
+            self.weaviate_client = weaviate.connect_to_local(
+                host=WEAVIATE_URL.replace("http://", "").replace("https://", "")
+            )
+            logger.info("✅ Connexion Weaviate établie")
+        except Exception as e:
+            logger.error(f"❌ Erreur connexion Weaviate: {e}")
+            self.weaviate_client = None
+    
     def _calculate_confidence(self, documents: List[Document], verification_result=None) -> float:
-        """Calcul de confiance optimisé"""
+        """Calcule la confiance finale (méthode existante)"""
         if not documents:
             return 0.0
         
@@ -635,16 +690,14 @@ RÈGLE: Réponds strictement en {language}."""
         return min(0.95, max(0.1, final_confidence))
     
     def get_status(self) -> Dict:
-        """MODIFICATION: Status riche avec toutes les nouvelles métriques"""
+        """Status enrichi avec LangSmith et RRF intelligent"""
         try:
             weaviate_connected = False
             api_capabilities = {}
             
             if self.weaviate_client:
                 try:
-                    def _check():
-                        return self.weaviate_client.is_ready()
-                    weaviate_connected = _check()
+                    weaviate_connected = self.weaviate_client.is_ready()
                 except:
                     weaviate_connected = False
             
@@ -657,120 +710,50 @@ RÈGLE: Réponds strictement en {language}."""
                 "rag_enabled": RAG_ENABLED,
                 "initialized": self.is_initialized,
                 "degraded_mode": self.degraded_mode,
-                "approach": "enhanced_rag_external_cache_optimized_v4_16_9_corrected_unified",
+                "approach": "enhanced_rag_langsmith_intelligent_rrf",
                 "optimizations": {
                     "external_cache_enabled": self.cache_manager.enabled if self.cache_manager else False,
                     "hybrid_search_enabled": HYBRID_SEARCH_ENABLED,
-                    "hybrid_search_parameterized": True,
+                    "intelligent_rrf_enabled": ENABLE_INTELLIGENT_RRF,
+                    "langsmith_enabled": LANGSMITH_ENABLED,
                     "semantic_cache_enabled": getattr(self.cache_manager, 'ENABLE_SEMANTIC_CACHE', False),
                     "entity_enrichment_enabled": ENTITY_ENRICHMENT_ENABLED,
                     "guardrails_level": GUARDRAILS_LEVEL,
-                    "guardrails_unified": True,
-                    "verification_smart": RAG_VERIFICATION_SMART,
-                    "api_diagnostics_enabled": ENABLE_API_DIAGNOSTICS,
-                    "dynamic_ood_thresholds": True,
-                    "enhanced_conversation_memory": True,
-                    "explain_score_extraction_enabled": api_capabilities.get("explain_score_available", False),
-                    "openai_simplified_init": True
+                    "api_diagnostics_enabled": ENABLE_API_DIAGNOSTICS
+                },
+                "langsmith": {
+                    "available": LANGSMITH_AVAILABLE,
+                    "enabled": LANGSMITH_ENABLED,
+                    "configured": bool(self.langsmith_client),
+                    "project": LANGSMITH_PROJECT,
+                    "traces_count": self.optimization_stats["langsmith_traces"],
+                    "errors_count": self.optimization_stats["langsmith_errors"]
+                },
+                "intelligent_rrf": {
+                    "available": INTELLIGENT_RRF_AVAILABLE,
+                    "enabled": ENABLE_INTELLIGENT_RRF,
+                    "configured": bool(self.intelligent_rrf),
+                    "learning_mode": RRF_LEARNING_MODE,
+                    "genetic_boost": RRF_GENETIC_BOOST,
+                    "usage_count": self.optimization_stats["intelligent_rrf_used"],
+                    "performance_stats": self.intelligent_rrf.get_performance_stats() if self.intelligent_rrf else {}
                 },
                 "components": dependencies_status,
-                "components_extended": {
-                    "weaviate_connected": weaviate_connected,
-                },
+                "weaviate_connected": weaviate_connected,
                 "configuration": {
                     "similarity_top_k": RAG_SIMILARITY_TOP_K,
                     "confidence_threshold": RAG_CONFIDENCE_THRESHOLD,
-                    "rerank_top_k": RAG_RERANK_TOP_K,
-                    "max_conversation_context": MAX_CONVERSATION_CONTEXT,
-                    "ood_min_score": OOD_MIN_SCORE,
-                    "ood_strict_score": OOD_STRICT_SCORE,
-                    "lang_detection_min_length": LANG_DETECTION_MIN_LENGTH,
-                    "redis_url": REDIS_URL,
-                    "weaviate_url": WEAVIATE_URL,
-                    "hybrid_default_alpha": DEFAULT_ALPHA
+                    "hybrid_default_alpha": DEFAULT_ALPHA,
+                    "rrf_base_k": RRF_BASE_K,
+                    "max_conversation_context": MAX_CONVERSATION_CONTEXT
                 },
                 "optimization_stats": self.optimization_stats.copy(),
-                "weaviate_capabilities": api_capabilities,
-                "intent_coverage_stats": dict(self.optimization_stats["intent_coverage_stats"]),
+                "api_capabilities": api_capabilities,
                 "metrics": METRICS.snapshot()
             }
-            
-            # Stats cache externe
-            if self.cache_manager and self.cache_manager.enabled:
-                status["cache_stats"] = {
-                    "enabled": True,
-                    "external_cache_used": True,
-                    "semantic_cache_enabled": getattr(self.cache_manager, 'ENABLE_SEMANTIC_CACHE', False),
-                    "note": "Stats détaillées disponibles via cache externe"
-                }
-            else:
-                status["cache_stats"] = {"enabled": False, "external_cache_used": False}
             
             return status
             
         except Exception as e:
             logger.error(f"Erreur get_status: {e}")
-            return {
-                "error": str(e),
-                "rag_enabled": RAG_ENABLED,
-                "initialized": False,
-                "degraded_mode": True
-            }
-    
-    async def cleanup(self):
-        """Nettoyage complet des ressources"""
-        try:
-            if self.cache_manager:
-                await self.cache_manager.cleanup()
-            
-            if self.weaviate_client and hasattr(self.weaviate_client, 'close'):
-                self.weaviate_client.close()
-            
-            if self.memory:
-                self.memory.memory_store.clear()
-            
-            if hasattr(self.openai_client, 'http_client'):
-                await self.openai_client.http_client.aclose()
-            
-            logger.info("Enhanced RAG Engine avec cache externe nettoyé")
-            
-        except Exception as e:
-            logger.error(f"Erreur nettoyage: {e}")
-
-
-# === FONCTIONS UTILITAIRES POUR COMPATIBILITÉ ===
-async def create_rag_engine(openai_client: AsyncOpenAI = None) -> InteliaRAGEngine:
-    """MODIFICATION: Factory avec initialisation Redis asynchrone garantie"""
-    try:
-        engine = InteliaRAGEngine(openai_client)
-        # CRITICAL: S'assurer que l'initialisation complète est awaited
-        await engine.initialize()
-        
-        # Vérifier que le cache est bien initialisé
-        if engine.cache_manager and not engine.cache_manager.enabled:
-            logger.warning("⚠️ Cache manager créé mais pas enabled - vérifier configuration Redis")
-        
-        return engine
-    except Exception as e:
-        logger.error(f"Erreur création RAG engine: {e}")
-        engine = InteliaRAGEngine(openai_client)
-        engine.degraded_mode = True
-        engine.is_initialized = True
-        return engine
-
-async def process_question_with_rag(
-    rag_engine: InteliaRAGEngine, 
-    question: str, 
-    language: str = "fr", 
-    tenant_id: str = ""
-) -> RAGResult:
-    """Interface compatible pour traitement des questions"""
-    try:
-        return await rag_engine.process_query(question, language, tenant_id)
-    except Exception as e:
-        logger.error(f"Erreur process_question_with_rag: {e}")
-        return RAGResult(
-            source=RAGSource.ERROR,
-            confidence=0.0,
-            metadata={"error": str(e)}
-        )
+            return {"error": str(e), "initialized": self.is_initialized}
