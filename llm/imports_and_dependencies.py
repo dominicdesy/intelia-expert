@@ -1,229 +1,375 @@
 # -*- coding: utf-8 -*-
 """
-imports_and_dependencies.py - Gestion centralisée des imports conditionnels
+imports_and_dependencies.py - Gestion robuste des dépendances avec validation stricte
+Version corrigée: Élimination des fallbacks silencieux, validation explicite
 """
 
 import logging
 import os
-from typing import Dict
+import asyncio
+from typing import Dict, Optional, List, Any
+from dataclasses import dataclass
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 
-def require(cond: bool, name: str) -> None:
-    """
-    Loggue un warning bloquant quand une fonctionnalité critique est absente.
-    N'élève pas d'exception à l'import, mais rend le statut visible au boot.
-    """
-    if not cond:
-        logger.warning("⚠️ Required dependency or feature is unavailable: %s", name)
+class DependencyStatus(Enum):
+    """Statuts possibles des dépendances"""
+    AVAILABLE = "available"
+    MISSING = "missing"
+    VERSION_INCOMPATIBLE = "version_incompatible"
+    CONNECTION_FAILED = "connection_failed"
 
-# === IMPORTS CONDITIONNELS ===
-try:
-    import weaviate
-    weaviate_version = getattr(weaviate, '__version__', '4.0.0')
-    if weaviate_version.startswith('4.'):
+@dataclass
+class DependencyInfo:
+    """Informations sur une dépendance"""
+    name: str
+    status: DependencyStatus
+    version: Optional[str] = None
+    error_message: Optional[str] = None
+    is_critical: bool = False
+
+class DependencyManager:
+    """Gestionnaire centralisé des dépendances avec validation stricte"""
+    
+    def __init__(self):
+        self.dependencies: Dict[str, DependencyInfo] = {}
+        self._initialize_dependencies()
+    
+    def _initialize_dependencies(self):
+        """Initialise et valide toutes les dépendances"""
+        
+        # OpenAI - CRITIQUE
         try:
-            import weaviate.classes as wvc
-            import weaviate.classes.query as wvc_query
-            WEAVIATE_V4 = True
-        except ImportError:
-            wvc = None
-            wvc_query = None
-            WEAVIATE_V4 = False
-    else:
-        WEAVIATE_V4 = False
-        wvc = None
-        wvc_query = None
-    WEAVIATE_AVAILABLE = True
-    logger.info(f"Weaviate {weaviate_version} détecté (V4: {WEAVIATE_V4})")
-except ImportError as e:
-    WEAVIATE_AVAILABLE = False
-    WEAVIATE_V4 = False
-    wvc = None
-    wvc_query = None
-    weaviate = None
-    logger.error(f"Weaviate non disponible: {e}")
-
-try:
-    from openai import AsyncOpenAI, OpenAI
-    OPENAI_AVAILABLE = True
-except ImportError as e:
-    OPENAI_AVAILABLE = False
-    logger.error(f"OpenAI non disponible: {e}")
-
-try:
-    import redis.asyncio as redis
-    import hiredis
-    REDIS_AVAILABLE = True
-except ImportError:
-    REDIS_AVAILABLE = False
-    redis = None
-    logger.warning("Redis non disponible - cache désactivé")
-
-try:
-    import voyageai
-    VOYAGE_AVAILABLE = True
-except ImportError:
-    VOYAGE_AVAILABLE = False
-    logger.warning("VoyageAI non disponible")
-
-try:
-    from sentence_transformers import SentenceTransformer, util
-    SENTENCE_TRANSFORMERS_AVAILABLE = True
-except ImportError:
-    SENTENCE_TRANSFORMERS_AVAILABLE = False
-    logger.warning("SentenceTransformers non disponible")
-
-try:
-    from unidecode import unidecode
-    UNIDECODE_AVAILABLE = True
-except ImportError:
-    UNIDECODE_AVAILABLE = False
-    logger.warning("Unidecode non disponible")
-
-try:
-    from intent_processor import create_intent_processor, IntentType, IntentResult
-    INTENT_PROCESSOR_AVAILABLE = True
-except ImportError as e:
-    INTENT_PROCESSOR_AVAILABLE = False
-    logger.warning(f"Intent processor non disponible: {e}")
-    
-    class IntentType:
-        METRIC_QUERY = "metric_query"
-        OUT_OF_DOMAIN = "out_of_domain"
-    
-    class IntentResult:
-        def __init__(self):
-            self.intent_type = IntentType.METRIC_QUERY
-            self.confidence = 0.8
-            self.detected_entities = {}
-            self.expanded_query = ""
-            self.metadata = {}
-            self.confidence_breakdown = {}
-
-try:
-    from advanced_guardrails import create_response_guardrails, VerificationLevel, GuardrailResult
-    GUARDRAILS_AVAILABLE = True
-except ImportError as e:
-    GUARDRAILS_AVAILABLE = False
-    logger.warning(f"Advanced guardrails non disponible: {e}")
-    
-    class VerificationLevel:
-        MINIMAL = "minimal"
-        STANDARD = "standard"
-        STRICT = "strict"
-        CRITICAL = "critical"
-    
-    class GuardrailResult:
-        def __init__(self):
-            self.is_valid = True
-            self.confidence = 0.8
-            self.violations = []
-            self.warnings = []
-            self.evidence_support = 0.8
-            self.hallucination_risk = 0.2
-            self.correction_suggestions = []
-            self.metadata = {}
-
-# IMPORT DU CACHE EXTERNE OPTIMISÉ
-try:
-    from redis_cache_manager import RAGCacheManager
-    EXTERNAL_CACHE_AVAILABLE = True
-    logger.info("Cache Redis externe importé avec succès")
-except ImportError as e:
-    EXTERNAL_CACHE_AVAILABLE = False
-    logger.warning(f"Cache Redis externe non disponible: {e}")
-    
-    class RAGCacheManager:
-        def __init__(self, *args, **kwargs):
-            self.enabled = False
-            self.ENABLE_SEMANTIC_CACHE = False
+            from openai import AsyncOpenAI, OpenAI
+            openai_version = getattr(__import__('openai'), '__version__', 'unknown')
+            self.dependencies['openai'] = DependencyInfo(
+                name='openai',
+                status=DependencyStatus.AVAILABLE,
+                version=openai_version,
+                is_critical=True
+            )
+            # Export global pour compatibilité
+            globals()['OPENAI_AVAILABLE'] = True
+            globals()['AsyncOpenAI'] = AsyncOpenAI
+            globals()['OpenAI'] = OpenAI
+        except ImportError as e:
+            self.dependencies['openai'] = DependencyInfo(
+                name='openai',
+                status=DependencyStatus.MISSING,
+                error_message=str(e),
+                is_critical=True
+            )
+            globals()['OPENAI_AVAILABLE'] = False
         
-        async def initialize(self):
-            pass
-        
-        async def get_embedding(self, text: str):
-            return None
-        
-        async def set_embedding(self, text: str, embedding: list):
-            pass
-        
-        async def get_response(self, query: str, context_hash: str, language: str = "fr"):
-            return None
-        
-        async def set_response(self, query: str, context_hash: str, response: str, language: str = "fr"):
-            pass
-        
-        def generate_context_hash(self, documents: list) -> str:
-            return "fallback_hash"
-        
-        async def get_cache_stats(self):
-            return {"enabled": False, "semantic_enhancements": {}}
-        
-        async def debug_semantic_extraction(self, query: str):
-            return {"extracted_keywords": [], "cache_keys": {}}
-        
-        def _normalize_text(self, text: str) -> str:
-            return text.lower()
-        
-        async def cleanup(self):
-            pass
-
-def quick_connectivity_check(redis_client=None, weaviate_client=None) -> Dict[str, bool]:
-    """
-    Vérifie rapidement la connectivité aux services externes.
-    Retourne un dictionnaire avec le statut de chaque service.
-    """
-    ok = {"redis": False, "weaviate": False}
-    
-    # Test Redis
-    try:
-        if redis_client and REDIS_AVAILABLE:
-            # Pour redis.asyncio, utiliser ping() de manière synchrone si possible
-            # Sinon, on assume que le client est disponible
-            if hasattr(redis_client, 'ping'):
-                redis_client.ping()
-            ok["redis"] = True
-    except Exception as e:
-        logger.debug(f"Redis connectivity check failed: {e}")
-        pass
-    
-    # Test Weaviate
-    try:
-        if weaviate_client and WEAVIATE_AVAILABLE:
-            if WEAVIATE_V4:
-                # Weaviate v4
-                weaviate_client.is_ready()
+        # Weaviate - CRITIQUE
+        try:
+            import weaviate
+            weaviate_version = getattr(weaviate, '__version__', '4.0.0')
+            
+            # Validation de version
+            if not weaviate_version.startswith(('4.', '3.')):
+                raise ImportError(f"Version Weaviate non supportée: {weaviate_version}")
+            
+            weaviate_v4 = weaviate_version.startswith('4.')
+            
+            if weaviate_v4:
+                try:
+                    import weaviate.classes as wvc
+                    import weaviate.classes.query as wvc_query
+                    globals()['wvc'] = wvc
+                    globals()['wvc_query'] = wvc_query
+                except ImportError:
+                    raise ImportError("Impossible d'importer les classes Weaviate v4")
             else:
-                # Weaviate v3 ou antérieur
-                weaviate_client.is_ready()
-            ok["weaviate"] = True
-    except Exception as e:
-        logger.debug(f"Weaviate connectivity check failed: {e}")
-        pass
+                globals()['wvc'] = None
+                globals()['wvc_query'] = None
+            
+            self.dependencies['weaviate'] = DependencyInfo(
+                name='weaviate',
+                status=DependencyStatus.AVAILABLE,
+                version=weaviate_version,
+                is_critical=True
+            )
+            
+            # Export global pour compatibilité
+            globals()['WEAVIATE_AVAILABLE'] = True
+            globals()['WEAVIATE_V4'] = weaviate_v4
+            globals()['weaviate'] = weaviate
+            globals()['weaviate_version'] = weaviate_version
+            
+        except ImportError as e:
+            self.dependencies['weaviate'] = DependencyInfo(
+                name='weaviate',
+                status=DependencyStatus.MISSING,
+                error_message=str(e),
+                is_critical=True
+            )
+            globals()['WEAVIATE_AVAILABLE'] = False
+            globals()['WEAVIATE_V4'] = False
+            globals()['weaviate'] = None
+            globals()['weaviate_version'] = 'N/A'
+        
+        # Redis - Important pour cache
+        try:
+            import redis.asyncio as redis
+            import hiredis
+            redis_version = getattr(redis, '__version__', 'unknown')
+            
+            self.dependencies['redis'] = DependencyInfo(
+                name='redis',
+                status=DependencyStatus.AVAILABLE,
+                version=redis_version,
+                is_critical=False
+            )
+            globals()['REDIS_AVAILABLE'] = True
+            globals()['redis'] = redis
+        except ImportError as e:
+            self.dependencies['redis'] = DependencyInfo(
+                name='redis',
+                status=DependencyStatus.MISSING,
+                error_message=str(e),
+                is_critical=False
+            )
+            globals()['REDIS_AVAILABLE'] = False
+            globals()['redis'] = None
+        
+        # Dépendances optionnelles
+        self._load_optional_dependencies()
     
-    return ok
+    def _load_optional_dependencies(self):
+        """Charge les dépendances optionnelles"""
+        optional_deps = {
+            'voyageai': {'import_name': 'voyageai'},
+            'sentence_transformers': {'import_name': 'sentence_transformers'},
+            'unidecode': {'import_name': 'unidecode'},
+            'transformers': {'import_name': 'transformers'},
+            'langdetect': {'import_name': 'langdetect'}
+        }
+        
+        for dep_name, config in optional_deps.items():
+            try:
+                module = __import__(config['import_name'])
+                version = getattr(module, '__version__', 'unknown')
+                
+                self.dependencies[dep_name] = DependencyInfo(
+                    name=dep_name,
+                    status=DependencyStatus.AVAILABLE,
+                    version=version,
+                    is_critical=False
+                )
+                
+                # Export global pour compatibilité
+                globals()[f'{dep_name.upper()}_AVAILABLE'] = True
+                
+            except ImportError as e:
+                self.dependencies[dep_name] = DependencyInfo(
+                    name=dep_name,
+                    status=DependencyStatus.MISSING,
+                    error_message=str(e),
+                    is_critical=False
+                )
+                globals()[f'{dep_name.upper()}_AVAILABLE'] = False
+        
+        # Imports spéciaux pour modules internes
+        self._load_internal_modules()
+    
+    def _load_internal_modules(self):
+        """Charge les modules internes avec validation stricte"""
+        
+        # Intent Processor
+        try:
+            from intent_processor import create_intent_processor, IntentType, IntentResult
+            self.dependencies['intent_processor'] = DependencyInfo(
+                name='intent_processor',
+                status=DependencyStatus.AVAILABLE,
+                is_critical=False
+            )
+            globals()['INTENT_PROCESSOR_AVAILABLE'] = True
+            globals()['IntentType'] = IntentType
+            globals()['IntentResult'] = IntentResult
+        except ImportError as e:
+            self.dependencies['intent_processor'] = DependencyInfo(
+                name='intent_processor',
+                status=DependencyStatus.MISSING,
+                error_message=str(e),
+                is_critical=False
+            )
+            globals()['INTENT_PROCESSOR_AVAILABLE'] = False
+            # PAS de fallback - le code doit gérer l'absence explicitement
+        
+        # Advanced Guardrails
+        try:
+            from advanced_guardrails import create_response_guardrails, VerificationLevel, GuardrailResult
+            self.dependencies['guardrails'] = DependencyInfo(
+                name='guardrails',
+                status=DependencyStatus.AVAILABLE,
+                is_critical=False
+            )
+            globals()['GUARDRAILS_AVAILABLE'] = True
+            globals()['VerificationLevel'] = VerificationLevel
+            globals()['GuardrailResult'] = GuardrailResult
+        except ImportError as e:
+            self.dependencies['guardrails'] = DependencyInfo(
+                name='guardrails',
+                status=DependencyStatus.MISSING,
+                error_message=str(e),
+                is_critical=False
+            )
+            globals()['GUARDRAILS_AVAILABLE'] = False
+        
+        # Cache externe
+        try:
+            from redis_cache_manager import RAGCacheManager
+            self.dependencies['external_cache'] = DependencyInfo(
+                name='external_cache',
+                status=DependencyStatus.AVAILABLE,
+                is_critical=False
+            )
+            globals()['EXTERNAL_CACHE_AVAILABLE'] = True
+            globals()['RAGCacheManager'] = RAGCacheManager
+        except ImportError as e:
+            self.dependencies['external_cache'] = DependencyInfo(
+                name='external_cache',
+                status=DependencyStatus.MISSING,
+                error_message=str(e),
+                is_critical=False
+            )
+            globals()['EXTERNAL_CACHE_AVAILABLE'] = False
+    
+    async def validate_connectivity(self, redis_client=None, weaviate_client=None) -> Dict[str, bool]:
+        """
+        Validation de connectivité asynchrone robuste
+        """
+        connectivity = {}
+        
+        # Test Redis (async)
+        if redis_client and self.dependencies['redis'].status == DependencyStatus.AVAILABLE:
+            try:
+                await asyncio.wait_for(redis_client.ping(), timeout=3.0)
+                connectivity['redis'] = True
+                self.dependencies['redis'].status = DependencyStatus.AVAILABLE
+            except Exception as e:
+                connectivity['redis'] = False
+                self.dependencies['redis'].status = DependencyStatus.CONNECTION_FAILED
+                self.dependencies['redis'].error_message = f"Connexion échouée: {e}"
+                logger.warning(f"Redis connexion échouée: {e}")
+        else:
+            connectivity['redis'] = False
+        
+        # Test Weaviate
+        if weaviate_client and self.dependencies['weaviate'].status == DependencyStatus.AVAILABLE:
+            try:
+                # Test asynchrone pour Weaviate
+                def _test_weaviate():
+                    return weaviate_client.is_ready()
+                
+                # Exécuter le test dans un thread pour éviter les blocages
+                loop = asyncio.get_event_loop()
+                is_ready = await asyncio.wait_for(
+                    loop.run_in_executor(None, _test_weaviate),
+                    timeout=5.0
+                )
+                
+                connectivity['weaviate'] = is_ready
+                if not is_ready:
+                    self.dependencies['weaviate'].status = DependencyStatus.CONNECTION_FAILED
+                    self.dependencies['weaviate'].error_message = "Service non prêt"
+                    
+            except Exception as e:
+                connectivity['weaviate'] = False
+                self.dependencies['weaviate'].status = DependencyStatus.CONNECTION_FAILED
+                self.dependencies['weaviate'].error_message = f"Connexion échouée: {e}"
+                logger.warning(f"Weaviate connexion échouée: {e}")
+        else:
+            connectivity['weaviate'] = False
+        
+        return connectivity
+    
+    def get_status_report(self) -> Dict[str, Any]:
+        """Rapport de statut complet"""
+        critical_missing = [
+            dep.name for dep in self.dependencies.values()
+            if dep.is_critical and dep.status != DependencyStatus.AVAILABLE
+        ]
+        
+        optional_missing = [
+            dep.name for dep in self.dependencies.values()
+            if not dep.is_critical and dep.status != DependencyStatus.AVAILABLE
+        ]
+        
+        return {
+            'critical_dependencies_ok': len(critical_missing) == 0,
+            'critical_missing': critical_missing,
+            'optional_missing': optional_missing,
+            'total_dependencies': len(self.dependencies),
+            'available_count': len([d for d in self.dependencies.values() 
+                                  if d.status == DependencyStatus.AVAILABLE]),
+            'details': {
+                name: {
+                    'status': dep.status.value,
+                    'version': dep.version,
+                    'error': dep.error_message,
+                    'critical': dep.is_critical
+                }
+                for name, dep in self.dependencies.items()
+            }
+        }
+    
+    def require_critical_dependencies(self):
+        """Vérifie que toutes les dépendances critiques sont disponibles"""
+        critical_missing = [
+            dep for dep in self.dependencies.values()
+            if dep.is_critical and dep.status != DependencyStatus.AVAILABLE
+        ]
+        
+        if critical_missing:
+            missing_names = [dep.name for dep in critical_missing]
+            error_details = "\n".join([
+                f"  - {dep.name}: {dep.error_message}"
+                for dep in critical_missing
+            ])
+            
+            raise RuntimeError(
+                f"Dépendances critiques manquantes: {missing_names}\n"
+                f"Détails:\n{error_details}"
+            )
+    
+    def get_legacy_status(self) -> Dict[str, bool]:
+        """Compatibilité avec l'ancien format get_dependencies_status()"""
+        return {
+            name: dep.status == DependencyStatus.AVAILABLE
+            for name, dep in self.dependencies.items()
+        }
 
-# Fonction pour obtenir les informations sur les dépendances
-def get_dependencies_status():
-    """Retourne le statut de toutes les dépendances"""
-    status = {
-        "openai": OPENAI_AVAILABLE,
-        "weaviate": WEAVIATE_AVAILABLE,
-        "weaviate_v4": WEAVIATE_V4,
-        "weaviate_version": weaviate_version if WEAVIATE_AVAILABLE else "N/A",
-        "redis": REDIS_AVAILABLE,
-        "external_cache": EXTERNAL_CACHE_AVAILABLE,
-        "voyage": VOYAGE_AVAILABLE,
-        "sentence_transformers": SENTENCE_TRANSFORMERS_AVAILABLE,
-        "unidecode": UNIDECODE_AVAILABLE,
-        "intent_processor": INTENT_PROCESSOR_AVAILABLE,
-        "guardrails": GUARDRAILS_AVAILABLE
-    }
-    
-    # Vérifications des dépendances critiques
-    require(OPENAI_AVAILABLE, "OpenAI API client")
-    require(WEAVIATE_AVAILABLE, "Weaviate vector database")
-    require(REDIS_AVAILABLE or not EXTERNAL_CACHE_AVAILABLE, "Redis cache (if external cache enabled)")
-    
-    return status
+# Instance globale
+dependency_manager = DependencyManager()
+
+# Fonctions pour compatibilité avec l'ancien code
+def get_dependencies_status() -> Dict[str, bool]:
+    """Fonction de compatibilité"""
+    return dependency_manager.get_legacy_status()
+
+async def quick_connectivity_check(redis_client=None, weaviate_client=None) -> Dict[str, bool]:
+    """Fonction de compatibilité pour test de connectivité"""
+    return await dependency_manager.validate_connectivity(redis_client, weaviate_client)
+
+def require_critical_dependencies():
+    """Vérifie les dépendances critiques - à appeler au démarrage"""
+    dependency_manager.require_critical_dependencies()
+
+def get_full_status_report() -> Dict[str, Any]:
+    """Rapport de statut complet pour debugging"""
+    return dependency_manager.get_status_report()
+
+# Log du statut au chargement
+status_report = dependency_manager.get_status_report()
+if status_report['critical_dependencies_ok']:
+    logger.info("✅ Toutes les dépendances critiques sont disponibles")
+else:
+    logger.error(f"❌ Dépendances critiques manquantes: {status_report['critical_missing']}")
+
+if status_report['optional_missing']:
+    logger.warning(f"⚠️ Dépendances optionnelles manquantes: {status_report['optional_missing']}")
+
+logger.info(f"Dépendances chargées: {status_report['available_count']}/{status_report['total_dependencies']}")

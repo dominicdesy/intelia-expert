@@ -1,370 +1,473 @@
 # -*- coding: utf-8 -*-
 """
-utils.py - Fonctions utilitaires pour l'intégration du processeur d'intentions
+utils.py - Fonctions utilitaires robustes pour l'intégration du processeur d'intentions
+Version corrigée: Validation stricte, gestion d'erreurs explicite
 """
 
 import time
 import logging
-from typing import Dict, List, Optional, Any
+import json
+from typing import Dict, List, Optional, Any, Union
 from pathlib import Path
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
-# Exemples de requêtes de test pour validation avec variantes normalisées
-SAMPLE_TEST_QUERIES = [
+@dataclass
+class ValidationReport:
+    """Rapport de validation détaillé"""
+    is_valid: bool
+    errors: List[str]
+    warnings: List[str]
+    stats: Dict[str, Any]
+    recommendations: List[str]
+
+@dataclass
+class ProcessingResult:
+    """Résultat de traitement d'une requête"""
+    success: bool
+    result: Optional[Any] = None
+    error_message: Optional[str] = None
+    processing_time: float = 0.0
+    metadata: Dict[str, Any] = None
+
+# Exemples de requêtes de test améliorés avec variantes métier
+COMPREHENSIVE_TEST_QUERIES = [
+    # Requêtes métriques de base
     "Quel est le poids cible à 21 jours pour du Ross 308?",
     "FCR optimal pour poulet de chair Cobb 500 à 35 jours",
+    "Consommation d'eau à 28 jours pour élevage tunnel",
+    
+    # Requêtes environnementales
     "Température de démarrage pour poussins en tunnel",
+    "Ventilation minimale à 14 jours Ross 308",
+    "Humidité optimale phase starter",
+    
+    # Protocoles et procédures
     "Programme de vaccination pour reproducteur",
-    "Mes poulets ont des signes respiratoires",
-    "Coût alimentaire par kg de poids vif produit",
-    "Consommation d'eau à 28 jours",
-    "Densité optimale en élevage au sol",
     "Protocole biosécurité couvoir",
+    "Densité optimale en élevage au sol",
+    
+    # Diagnostic et santé
+    "Mes poulets ont des signes respiratoires",
+    "Mortalité élevée à 10 jours que faire",
+    "Symptômes Newcastle chez reproducteurs",
+    
+    # Économie et performance
+    "Coût alimentaire par kg de poids vif produit",
     "Performance EPEF Ross 308 standard",
-    # Nouveaux: tests normalisation
+    "Marge bénéficiaire par sujet abattu",
+    
+    # Tests de normalisation et aliases
     "Ross-308 35j FCR",
     "C-500 poids 42 jours",
     "Hubbard Flex vaccination",
-    "ISA Brown ponte pic"
+    "ISA Brown ponte pic",
+    "R308 démarrage température",
+    
+    # Tests de domaine et complexité
+    "Météo demain",  # Hors domaine
+    "Comment élever des chats",  # Hors domaine
+    "Performance globale exploitation complète multi-bâtiments",  # Complexe
 ]
 
-def create_intent_processor(intents_file_path: Optional[str] = None):
-    """
-    Factory pour créer un processeur d'intentions avec résolution automatique du chemin.
+class IntentProcessorFactory:
+    """Factory robuste pour créer des processeurs d'intentions"""
     
-    Args:
-        intents_file_path: Chemin vers intents.json (optionnel, résolution auto si None)
-    
-    Returns:
-        IntentProcessor: Instance configurée et prête à l'emploi
+    @staticmethod
+    def create_processor(intents_file_path: Optional[str] = None, 
+                        validate_on_creation: bool = True) -> 'IntentProcessor':
+        """
+        Crée un processeur d'intentions avec validation optionnelle
         
-    Note:
-        La factory résout automatiquement le chemin relatif pour éviter les problèmes
-        de déploiement Docker (WORKDIR). Si intents.json n'est pas trouvé,
-        une configuration de fallback est utilisée.
-    """
-    from .intent_processor import IntentProcessor
-    
-    if intents_file_path is None:
-        # Résolution automatique du chemin - Compatible Docker
-        base_dir = Path(__file__).parent.resolve()
-        intents_file_path = base_dir / "intents.json"
+        Args:
+            intents_file_path: Chemin vers intents.json
+            validate_on_creation: Si True, valide la configuration à la création
         
-        logger.info(f"Résolution automatique du chemin: {intents_file_path}")
-    
-    processor = IntentProcessor(str(intents_file_path))
-    
-    # Log de vérification pour le déploiement
-    stats = processor.get_processing_stats()
-    logger.info(f"IntentProcessor créé - Santé: {stats['health_status']['status']}")
-    
-    return processor
+        Returns:
+            IntentProcessor: Instance configurée
+            
+        Raises:
+            FileNotFoundError: Si le fichier de configuration n'existe pas
+            ValueError: Si la configuration est invalide
+            RuntimeError: Si l'initialisation échoue
+        """
+        # Import tardif pour éviter les dépendances circulaires
+        try:
+            from intent_processor import IntentProcessor, ConfigurationError
+        except ImportError as e:
+            raise RuntimeError(f"Module intent_processor non disponible: {e}")
+        
+        # Résolution automatique du chemin
+        if intents_file_path is None:
+            base_dir = Path(__file__).parent.resolve()
+            intents_file_path = base_dir / "intents.json"
+            logger.info(f"Utilisation du chemin par défaut: {intents_file_path}")
+        
+        try:
+            processor = IntentProcessor(str(intents_file_path))
+            
+            if validate_on_creation:
+                validation_result = processor.validate_current_config()
+                if not validation_result.is_valid:
+                    raise ValueError(f"Configuration invalide: {validation_result.errors}")
+            
+            # Vérification de santé après création
+            stats = processor.get_processing_stats()
+            health = stats.get('health_status', {})
+            
+            if health.get('status') == 'critical':
+                logger.error(f"Processeur créé mais en état critique: {health.get('reason')}")
+                raise RuntimeError(f"Processeur en état critique: {health.get('reason')}")
+            
+            logger.info(f"IntentProcessor créé avec succès - Statut: {health.get('status', 'unknown')}")
+            return processor
+            
+        except ConfigurationError as e:
+            logger.error(f"Erreur de configuration: {e}")
+            raise ValueError(f"Configuration IntentProcessor invalide: {e}")
+        except Exception as e:
+            logger.error(f"Erreur création IntentProcessor: {e}")
+            raise RuntimeError(f"Impossible de créer IntentProcessor: {e}")
 
 def process_query_with_intents(processor, query: str, 
-                              explain_score: Optional[float] = None):
+                              explain_score: Optional[float] = None,
+                              timeout: float = 5.0) -> ProcessingResult:
     """
-    Interface simple pour traiter une requête avec gestion d'erreurs robuste et intégration explain_score.
+    Interface robuste pour traiter une requête avec gestion d'erreurs complète
     
     Args:
-        processor: Instance du processeur d'intentions
-        query: Requête utilisateur à traiter
-        explain_score: Score d'évidence du retriever pour guardrails (optionnel)
-        
-    Returns:
-        IntentResult: Résultat du traitement avec métriques complètes
-    """
-    from .intent_types import IntentResult, IntentType
+        processor: Instance IntentProcessor
+        query: Requête à traiter
+        explain_score: Score d'explication optionnel
+        timeout: Timeout en secondes
     
-    try:
-        return processor.process_query(query, explain_score)
-    except Exception as e:
-        logger.error(f"Erreur critique dans process_query_with_intents: {e}")
-        
-        # Fallback gracieux
-        return IntentResult(
-            intent_type=IntentType.GENERAL_POULTRY,
-            confidence=0.3,
-            detected_entities={},
-            expanded_query=query,
-            metadata={
-                "error": "critical_processing_error",
-                "error_details": str(e),
-                "fallback_applied": True
-            },
+    Returns:
+        ProcessingResult: Résultat avec gestion d'erreurs
+    """
+    start_time = time.time()
+    
+    # Validation des paramètres d'entrée
+    if not processor:
+        return ProcessingResult(
+            success=False,
+            error_message="Processeur non fourni",
             processing_time=0.0
         )
-
-def get_intent_processor_health(processor) -> Dict[str, Any]:
-    """
-    Retourne l'état de santé du processeur pour monitoring/health-check avec métriques étendues.
     
-    Args:
-        processor: Instance du processeur d'intentions
-        
-    Returns:
-        Dict: Métriques de santé complètes pour exposition dans get_status()
-        
-    Usage:
-        # Dans votre moteur principal:
-        health_data = get_intent_processor_health(intent_processor)
-        # Exposer dans l'endpoint /status ou équivalent
-    """
+    if not query or not query.strip():
+        return ProcessingResult(
+            success=False,
+            error_message="Requête vide ou invalide",
+            processing_time=0.0
+        )
+    
+    # Vérification de l'état du processeur
+    if not getattr(processor, 'is_initialized', False):
+        return ProcessingResult(
+            success=False,
+            error_message="Processeur non initialisé",
+            processing_time=0.0
+        )
+    
     try:
-        stats = processor.get_processing_stats()
-        coverage = processor.get_coverage_summary()
+        # Traitement avec timeout simulé (pour les futures implémentations async)
+        result = processor.process_query(query.strip(), explain_score)
+        processing_time = time.time() - start_time
         
-        return {
-            "intent_processor": {
-                "status": stats["health_status"]["status"],
-                "uptime_seconds": stats["processing"]["uptime_seconds"],
-                "total_queries": stats["processing"]["total_queries"],
-                "error_rate": stats["processing"]["error_rate"],
-                "avg_response_time": stats["processing"]["avg_processing_time"],
-                "vocabulary_loaded": stats["vocabulary"]["total_keywords"] > 0,
-                "config_version": stats["configuration"]["config_version"],
-                "coverage_summary": coverage,
-                "cache_performance": stats["vocabulary"]["cache_info"],
-                "adaptive_thresholds": stats["health_status"]["adaptive_thresholds"],
-                "semantic_fallback": stats["health_status"]["fallback_usage"],
-                "guardrails_integration": stats["health_status"]["guardrails_integration"],
-                "last_health_check": time.time()
+        # Validation du résultat
+        if not result:
+            return ProcessingResult(
+                success=False,
+                error_message="Aucun résultat retourné par le processeur",
+                processing_time=processing_time
+            )
+        
+        # Vérification de la cohérence du résultat
+        if result.confidence < 0.0 or result.confidence > 1.0:
+            logger.warning(f"Confidence invalide: {result.confidence}")
+            result.confidence = max(0.0, min(1.0, result.confidence))
+        
+        return ProcessingResult(
+            success=True,
+            result=result,
+            processing_time=processing_time,
+            metadata={
+                "query_length": len(query),
+                "entities_detected": len(result.detected_entities),
+                "intent_type": result.intent_type.value if hasattr(result.intent_type, 'value') else str(result.intent_type),
+                "confidence_level": "high" if result.confidence > 0.8 else "medium" if result.confidence > 0.5 else "low"
             }
-        }
+        )
+        
+    except TimeoutError:
+        return ProcessingResult(
+            success=False,
+            error_message=f"Timeout après {timeout}s",
+            processing_time=time.time() - start_time
+        )
     except Exception as e:
-        logger.error(f"Erreur health check intent processor: {e}")
-        return {
-            "intent_processor": {
-                "status": "error",
-                "error": str(e),
-                "last_health_check": time.time()
-            }
-        }
+        logger.error(f"Erreur traitement requête '{query[:50]}...': {e}")
+        return ProcessingResult(
+            success=False,
+            error_message=f"Erreur de traitement: {str(e)}",
+            processing_time=time.time() - start_time,
+            metadata={"exception_type": type(e).__name__}
+        )
 
-def get_cache_key_from_intent(intent_result) -> str:
+def validate_intents_config(config_path: str, strict_mode: bool = True) -> ValidationReport:
     """
-    Extrait la clé de cache normalisée d'un résultat d'intention pour Redis.
-    
-    Args:
-        intent_result: Résultat du traitement d'intention
-        
-    Returns:
-        str: Clé de cache normalisée pour Redis
-        
-    Usage:
-        # Dans redis_cache_manager.py ou rag_engine.py:
-        cache_key = get_cache_key_from_intent(intent_result)
-        # Utiliser pour lookup Redis avec fallback sémantique
-    """
-    return intent_result.cache_key_normalized or "general"
-
-def get_semantic_fallback_keys(intent_result) -> List[str]:
-    """
-    Extrait les clés de fallback sémantique pour cache Redis en mode STRICT.
-    
-    Args:
-        intent_result: Résultat du traitement d'intention
-        
-    Returns:
-        List[str]: Liste des clés de fallback sémantique
-        
-    Usage:
-        # Dans redis_cache_manager.py pour mode STRICT:
-        fallback_keys = get_semantic_fallback_keys(intent_result)
-        for key in fallback_keys:
-            if cache_hit := await redis.get(key):
-                return cache_hit  # avec TTL plus court
-    """
-    return intent_result.semantic_fallback_candidates
-
-def should_use_strict_threshold(intent_result) -> bool:
-    """
-    Détermine si un seuil strict doit être appliqué pour le filtre OOD.
-    
-    Args:
-        intent_result: Résultat du traitement d'intention
-        
-    Returns:
-        bool: True si seuil strict recommandé, False sinon
-        
-    Usage:
-        # Dans rag_engine.py pour filtrage OOD adaptatif:
-        if should_use_strict_threshold(intent_result):
-            ood_threshold = 0.85  # Seuil plus strict
-        else:
-            ood_threshold = 0.70  # Seuil normal
-    """
-    adaptive_factors = intent_result.vocabulary_coverage.get("adaptive_factors", {})
-    
-    # Seuil strict si pas de patterns haute confiance
-    if not adaptive_factors.get("high_confidence", False):
-        if not adaptive_factors.get("genetics_present", False):
-            if len(intent_result.detected_entities) <= 1:
-                return True
-    
-    return False
-
-def get_guardrails_context(intent_result) -> Dict[str, Any]:
-    """
-    Génère le contexte pour les guardrails basé sur l'analyse d'intention.
-    
-    Args:
-        intent_result: Résultat du traitement d'intention
-        
-    Returns:
-        Dict: Contexte enrichi pour guardrails
-        
-    Usage:
-        # Dans rag_engine.py pour guardrails:
-        guardrails_context = get_guardrails_context(intent_result)
-        # Passer à evaluate_guardrails() pour améliorer evidence_support
-    """
-    return {
-        "intent_confidence": intent_result.confidence,
-        "intent_type": intent_result.intent_type.value,
-        "entities_detected": len(intent_result.detected_entities),
-        "technical_context": intent_result.vocabulary_coverage.get("adaptive_factors", {}),
-        "domain_coverage": intent_result.vocabulary_coverage.get("domain_coverage", {}),
-        "explain_score_used": intent_result.metadata.get("explain_score_used"),
-        "high_confidence_indicators": {
-            "genetics_present": intent_result.vocabulary_coverage.get("adaptive_factors", {}).get("genetics_present", False),
-            "technical_metrics": intent_result.vocabulary_coverage.get("adaptive_factors", {}).get("technical_metrics", False),
-            "specific_entities": "line" in intent_result.detected_entities and "metrics" in intent_result.detected_entities
-        }
-    }
-
-def test_query_processing(processor, test_queries: List[str]) -> Dict[str, Any]:
-    """
-    Teste le processeur sur une liste de requêtes pour validation avec métriques intégration.
-    
-    Args:
-        processor: Instance du processeur
-        test_queries: Liste de requêtes de test
-        
-    Returns:
-        Dict: Résultats des tests avec métriques
-    """
-    results = []
-    
-    for i, query in enumerate(test_queries):
-        start_time = time.time()
-        # Test avec explain_score simulé
-        explain_score = 0.8 if i % 2 == 0 else None
-        result = processor.process_query(query, explain_score)
-        
-        results.append({
-            "query": query,
-            "intent": result.intent_type.value,
-            "confidence": result.confidence,
-            "entities_count": len(result.detected_entities),
-            "expanded": result.expanded_query != query,
-            "cache_key": result.cache_key_normalized,
-            "fallback_candidates": len(result.semantic_fallback_candidates),
-            "explain_score": explain_score,
-            "processing_time": time.time() - start_time
-        })
-    
-    # Statistiques globales
-    avg_confidence = sum(r["confidence"] for r in results) / len(results)
-    avg_processing_time = sum(r["processing_time"] for r in results) / len(results)
-    expansion_rate = sum(1 for r in results if r["expanded"]) / len(results)
-    cache_key_diversity = len(set(r["cache_key"] for r in results)) / len(results)
-    
-    return {
-        "results": results,
-        "summary": {
-            "total_queries": len(test_queries),
-            "avg_confidence": avg_confidence,
-            "avg_processing_time": avg_processing_time,
-            "expansion_rate": expansion_rate,
-            "cache_key_diversity": cache_key_diversity,
-            "intent_distribution": {
-                intent: sum(1 for r in results if r["intent"] == intent)
-                for intent in set(r["intent"] for r in results)
-            },
-            "integration_metrics": {
-                "fallback_candidates_avg": sum(r["fallback_candidates"] for r in results) / len(results),
-                "explain_score_usage": sum(1 for r in results if r["explain_score"] is not None) / len(results)
-            }
-        }
-    }
-
-def validate_intents_config(config_path: str) -> Dict[str, Any]:
-    """
-    Valide un fichier de configuration intents.json
+    Valide rigoureusement un fichier de configuration intents.json
     
     Args:
         config_path: Chemin vers le fichier de configuration
+        strict_mode: Si True, applique des validations strictes
         
     Returns:
-        Dict: Résultat de la validation avec erreurs et warnings
+        ValidationReport: Rapport de validation détaillé
     """
-    import json
+    errors = []
+    warnings = []
+    recommendations = []
+    stats = {}
     
     try:
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
+        # Vérification de l'existence du fichier
+        config_file = Path(config_path)
+        if not config_file.exists():
+            return ValidationReport(
+                is_valid=False,
+                errors=[f"Fichier non trouvé: {config_path}"],
+                warnings=[],
+                stats={},
+                recommendations=["Vérifiez le chemin du fichier de configuration"]
+            )
         
-        errors = []
-        warnings = []
+        # Lecture et parsing JSON
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        except json.JSONDecodeError as e:
+            return ValidationReport(
+                is_valid=False,
+                errors=[f"Erreur JSON: {e}"],
+                warnings=[],
+                stats={},
+                recommendations=["Vérifiez la syntaxe JSON avec un validateur"]
+            )
         
-        # Validation structure de base
-        required_keys = ["aliases", "intents", "universal_slots"]
-        for key in required_keys:
-            if key not in config:
-                errors.append(f"Clé manquante: {key}")
+        # Validation de structure avec le validateur intégré
+        try:
+            from intent_processor import ConfigurationValidator
+            validation_result = ConfigurationValidator.validate_configuration(config)
+            errors.extend(validation_result.errors)
+            warnings.extend(validation_result.warnings)
+            stats.update(validation_result.stats)
+        except ImportError:
+            # Validation de base si le module n'est pas disponible
+            errors.extend(_basic_validation(config))
         
-        # Validation aliases
-        if "aliases" in config:
-            expected_categories = ["line", "site_type", "bird_type", "phase", "sex"]
-            for category in expected_categories:
-                if category not in config["aliases"]:
-                    warnings.append(f"Catégorie alias manquante: {category}")
+        # Validations étendues en mode strict
+        if strict_mode:
+            strict_errors, strict_warnings, strict_recommendations = _strict_validation(config)
+            errors.extend(strict_errors)
+            warnings.extend(strict_warnings)
+            recommendations.extend(strict_recommendations)
         
-        # Validation intents
-        if "intents" in config:
-            for intent_name, intent_config in config["intents"].items():
-                if "metrics" not in intent_config:
-                    errors.append(f"Métriques manquantes pour intent: {intent_name}")
-                
-                # Vérification cohérence métriques
-                metrics = intent_config.get("metrics", {})
-                for metric_name, metric_config in metrics.items():
-                    if not isinstance(metric_config, dict):
-                        errors.append(f"Configuration métrique invalide: {intent_name}.{metric_name}")
+        # Statistiques finales
+        stats.update({
+            "file_size_bytes": config_file.stat().st_size,
+            "validation_timestamp": time.time(),
+            "strict_mode": strict_mode
+        })
         
-        return {
-            "valid": len(errors) == 0,
-            "errors": errors,
-            "warnings": warnings,
-            "stats": {
-                "total_aliases": sum(len(aliases) for aliases in config.get("aliases", {}).values()),
-                "total_intents": len(config.get("intents", {})),
-                "total_metrics": sum(
-                    len(intent.get("metrics", {})) 
-                    for intent in config.get("intents", {}).values()
-                )
-            }
-        }
+        # Recommandations basées sur les statistiques
+        if stats.get("total_aliases", 0) < 50:
+            recommendations.append("Considérez l'ajout de plus d'aliases pour améliorer la couverture")
         
-    except FileNotFoundError:
-        return {
-            "valid": False,
-            "errors": [f"Fichier non trouvé: {config_path}"],
-            "warnings": [],
-            "stats": {}
-        }
-    except json.JSONDecodeError as e:
-        return {
-            "valid": False,
-            "errors": [f"Erreur JSON: {e}"],
-            "warnings": [],
-            "stats": {}
-        }
+        if stats.get("total_metrics", 0) < 20:
+            recommendations.append("Ajoutez plus de métriques pour une meilleure richesse fonctionnelle")
+        
+        return ValidationReport(
+            is_valid=len(errors) == 0,
+            errors=errors,
+            warnings=warnings,
+            stats=stats,
+            recommendations=recommendations
+        )
+        
     except Exception as e:
-        return {
-            "valid": False,
-            "errors": [f"Erreur validation: {e}"],
-            "warnings": [],
-            "stats": {}
-        }
+        return ValidationReport(
+            is_valid=False,
+            errors=[f"Erreur validation inattendue: {e}"],
+            warnings=[],
+            stats={},
+            recommendations=["Contactez le support technique"]
+        )
+
+def _basic_validation(config: Dict[str, Any]) -> List[str]:
+    """Validation de base sans dépendances externes"""
+    errors = []
+    
+    required_sections = ["aliases", "intents", "universal_slots"]
+    for section in required_sections:
+        if section not in config:
+            errors.append(f"Section manquante: {section}")
+        elif not isinstance(config[section], dict):
+            errors.append(f"Section {section} doit être un dictionnaire")
+    
+    return errors
+
+def _strict_validation(config: Dict[str, Any]) -> tuple[List[str], List[str], List[str]]:
+    """Validations strictes supplémentaires"""
+    errors = []
+    warnings = []
+    recommendations = []
+    
+    # Validation des versions
+    if "version" not in config:
+        warnings.append("Pas de numéro de version défini")
+        recommendations.append("Ajoutez un champ 'version' pour le suivi des configurations")
+    
+    # Validation de la completeness des aliases
+    aliases = config.get("aliases", {})
+    critical_categories = ["line", "site_type", "bird_type"]
+    
+    for category in critical_categories:
+        if category not in aliases or not aliases[category]:
+            errors.append(f"Catégorie d'alias critique manquante ou vide: {category}")
+    
+    # Validation de la cohérence des métriques
+    intents = config.get("intents", {})
+    for intent_name, intent_config in intents.items():
+        metrics = intent_config.get("metrics", {})
+        if not metrics:
+            warnings.append(f"Intent {intent_name} sans métriques")
+        
+        for metric_name, metric_config in metrics.items():
+            if not isinstance(metric_config, dict):
+                errors.append(f"Configuration métrique invalide: {intent_name}.{metric_name}")
+            elif "unit" not in metric_config:
+                errors.append(f"Unité manquante pour {intent_name}.{metric_name}")
+    
+    return errors, warnings, recommendations
+
+def run_comprehensive_validation_suite(processor, test_queries: Optional[List[str]] = None) -> Dict[str, Any]:
+    """
+    Suite de validation complète pour un processeur d'intentions
+    
+    Args:
+        processor: Instance IntentProcessor à tester
+        test_queries: Requêtes de test (optionnel, utilise les requêtes par défaut)
+    
+    Returns:
+        Dict: Rapport complet de validation
+    """
+    if test_queries is None:
+        test_queries = COMPREHENSIVE_TEST_QUERIES
+    
+    start_time = time.time()
+    results = []
+    errors = []
+    
+    # Tests de traitement
+    for i, query in enumerate(test_queries):
+        try:
+            result = process_query_with_intents(processor, query)
+            results.append({
+                "query": query,
+                "success": result.success,
+                "confidence": result.result.confidence if result.result else 0.0,
+                "intent": result.result.intent_type.value if result.result and hasattr(result.result.intent_type, 'value') else None,
+                "processing_time": result.processing_time,
+                "entities_count": len(result.result.detected_entities) if result.result else 0,
+                "error": result.error_message
+            })
+        except Exception as e:
+            errors.append(f"Erreur requête {i+1} '{query[:30]}...': {e}")
+            results.append({
+                "query": query,
+                "success": False,
+                "error": str(e)
+            })
+    
+    # Calcul des métriques agrégées
+    successful_results = [r for r in results if r["success"]]
+    total_time = time.time() - start_time
+    
+    if successful_results:
+        avg_confidence = sum(r["confidence"] for r in successful_results) / len(successful_results)
+        avg_processing_time = sum(r["processing_time"] for r in successful_results) / len(successful_results)
+        avg_entities = sum(r["entities_count"] for r in successful_results) / len(successful_results)
+    else:
+        avg_confidence = avg_processing_time = avg_entities = 0.0
+    
+    # Analyse de distribution des intents
+    intent_distribution = {}
+    for result in successful_results:
+        intent = result.get("intent", "unknown")
+        intent_distribution[intent] = intent_distribution.get(intent, 0) + 1
+    
+    return {
+        "summary": {
+            "total_queries": len(test_queries),
+            "successful_queries": len(successful_results),
+            "success_rate": len(successful_results) / len(test_queries) if test_queries else 0,
+            "total_validation_time": total_time,
+            "avg_confidence": avg_confidence,
+            "avg_processing_time": avg_processing_time,
+            "avg_entities_detected": avg_entities
+        },
+        "intent_distribution": intent_distribution,
+        "performance_metrics": {
+            "queries_per_second": len(test_queries) / max(0.001, total_time),
+            "high_confidence_rate": len([r for r in successful_results if r["confidence"] > 0.8]) / max(1, len(successful_results))
+        },
+        "detailed_results": results,
+        "errors": errors,
+        "recommendations": _generate_recommendations(results, successful_results)
+    }
+
+def _generate_recommendations(all_results: List[Dict], successful_results: List[Dict]) -> List[str]:
+    """Génère des recommandations basées sur les résultats de validation"""
+    recommendations = []
+    
+    success_rate = len(successful_results) / max(1, len(all_results))
+    
+    if success_rate < 0.8:
+        recommendations.append(f"Taux de succès faible ({success_rate:.1%}) - vérifiez la configuration")
+    
+    if successful_results:
+        avg_confidence = sum(r["confidence"] for r in successful_results) / len(successful_results)
+        if avg_confidence < 0.6:
+            recommendations.append(f"Confiance moyenne faible ({avg_confidence:.1%}) - enrichissez les aliases")
+        
+        low_entity_queries = [r for r in successful_results if r["entities_count"] == 0]
+        if len(low_entity_queries) > len(successful_results) * 0.3:
+            recommendations.append("Beaucoup de requêtes sans entités détectées - améliorez la couverture du vocabulaire")
+    
+    return recommendations
+
+# Fonction principale de création (pour compatibilité)
+def create_intent_processor(intents_file_path: Optional[str] = None) -> 'IntentProcessor':
+    """
+    Factory principale pour créer un processeur d'intentions
+    
+    Args:
+        intents_file_path: Chemin vers intents.json (optionnel)
+    
+    Returns:
+        IntentProcessor: Instance configurée et validée
+    """
+    return IntentProcessorFactory.create_processor(intents_file_path, validate_on_creation=True)
+
+# Export des fonctions principales pour l'API publique
+__all__ = [
+    'create_intent_processor',
+    'process_query_with_intents', 
+    'validate_intents_config',
+    'run_comprehensive_validation_suite',
+    'ValidationReport',
+    'ProcessingResult',
+    'COMPREHENSIVE_TEST_QUERIES'
+]

@@ -1,53 +1,55 @@
-# APPROCHE DIRECTE : OpenAI + Weaviate sans LlamaIndex
-# Zéro conflit de dépendances - Production ready
-# Version corrigée - Septembre 2025
+# APPROCHE DIRECTE : OpenAI + Weaviate + Redis - Version stabilisée
+# Version corrigée pour compatibilité et stabilité maximale
+# Septembre 2025 - Production ready
 
-# Core FastAPI
+# Core FastAPI - Versions stables
 fastapi==0.112.2
 uvicorn[standard]==0.30.6
 python-dotenv==1.0.1
+
+# HTTP clients - Versions compatibles
 httpx==0.27.0
 httpcore==1.0.5
 
-# OpenAI API - Direct et stable
+# OpenAI API - Version LTS stable
 openai==1.42.0
 
-# Weaviate Client - Version mise à jour (était 4.5.7)
-weaviate-client==4.16.9
+# Weaviate Client - Version stable compatible v4
+weaviate-client==4.7.1
 
-# Intelligence métier préservée
-langdetect==1.0.9
-transformers==4.46.0
-torch>=2.0.0
-
-# Traitement de texte - AJOUT CRITIQUE
-unidecode==1.3.8
-
-# Reranking et similarité
-sentence-transformers==3.3.1
-voyageai==0.3.5
-
-# Utilitaires de base
-numpy>=1.24.0
-scipy>=1.11.0
-pandas>=2.0.0
-
-# Sécurité et validation
-pydantic>=2.8.0,<3.0.0
-email-validator==2.1.0
-
-# Cache et performance
+# Redis pour cache - Versions synchronisées
 redis==5.0.1
 hiredis==2.3.2
 
-# Monitoring
+# Intelligence métier - Versions testées
+langdetect==1.0.9
+transformers==4.45.2
+torch>=2.0.0,<2.5.0
+
+# Traitement de texte - CRITIQUE pour normalisation
+unidecode==1.3.8
+
+# Reranking et similarité - Versions compatibles
+sentence-transformers==3.1.1
+voyageai==0.2.3
+
+# Utilitaires de base - Versions stables
+numpy>=1.24.0,<2.0.0
+scipy>=1.11.0,<1.15.0
+pandas>=2.0.0,<3.0.0
+
+# Sécurité et validation - Pydantic v2 stable
+pydantic>=2.8.0,<3.0.0
+email-validator==2.1.0
+
+# Monitoring et logging
 prometheus-client==0.20.0
 structlog==23.2.0
 
 # Support fichiers
 openpyxl==3.1.2
 
-# Tests
+# Tests - Versions compatibles
 pytest==8.3.3
 pytest-asyncio==0.24.0
 
@@ -55,9 +57,47 @@ pytest-asyncio==0.24.0
 black==24.10.0
 flake8==7.1.1
 
-# Agents et async
+# Async et agents
 dataclasses-json==0.6.7
 asyncio-throttle==1.0.2
 
 # Compatibilité Python 3.13
 typing-extensions>=4.8.0
+
+# ===== CONTRAINTES DE SÉCURITÉ =====
+
+# Éviter les vulnérabilités connues
+urllib3>=2.0.0,<3.0.0
+certifi>=2023.7.22
+
+# Versions minimales pour sécurité
+cryptography>=41.0.0
+requests>=2.31.0
+
+# ===== OPTIMISATIONS POUR DÉPLOIEMENT =====
+
+# Compression et performance
+brotli>=1.0.9
+zstandard>=0.22.0
+
+# Monitoring système
+psutil>=5.9.0
+
+# ===== NOTES DE COMPATIBILITÉ =====
+
+# Weaviate 4.7.1 : Version stable avec support v4 complet
+# Redis 5.0.1 : Compatible avec toutes les fonctionnalités async
+# OpenAI 1.42.0 : API stable avec support streaming
+# Transformers 4.45.2 : Dernière version stable sans breaking changes
+# Torch <2.5.0 : Évite les incompatibilités récentes
+# Numpy <2.0.0 : Évite les breaking changes v2
+# Pydantic <3.0.0 : Reste sur v2 pour stabilité
+
+# ===== VARIABLES D'ENVIRONNEMENT RECOMMANDÉES =====
+
+# REDIS_URL=redis://localhost:6379
+# WEAVIATE_URL=http://localhost:8080
+# OPENAI_API_KEY=your_key_here
+# CACHE_ENABLED=true
+# CACHE_TOTAL_MEMORY_LIMIT_MB=100
+# LOG_LEVEL=INFO
