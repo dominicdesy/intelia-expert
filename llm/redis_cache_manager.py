@@ -1,12 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-redis_cache_manager.py - Gestionnaire de cache Redis CORRIGÉ
-Version Enhanced avec cache sémantique STRICT - Corrections appliquées
-CORRECTIONS MAJEURES:
-- Cache sémantique beaucoup plus strict
-- Faux positifs éliminés
-- Logique de matching améliorée
-- Seuils rehaussés
+redis_cache_manager.py - Gestionnaire de cache Redis optimisé pour performance
+Version Enhanced avec intégration des aliases d'intents.json
+CORRECTIONS APPLIQUÉES: Cache sémantique STRICT + toutes les fonctionnalités conservées
 """
 
 import json
@@ -32,7 +28,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 class RAGCacheManager:
-    """Gestionnaire de cache Redis optimisé avec cache sémantique STRICT - VERSION CORRIGÉE"""
+    """Gestionnaire de cache Redis optimisé avec cache sémantique intelligent CORRIGÉ"""
     
     def __init__(self, redis_url: str = None, default_ttl: int = None):
         # Configuration Redis de base
@@ -75,9 +71,9 @@ class RAGCacheManager:
         self.aliases = self._load_intent_aliases()
         self.poultry_keywords = self._build_semantic_vocabulary()
         
-        # CORRECTION: Seuils beaucoup plus stricts
+        # CORRECTION: Seuils beaucoup plus stricts pour validation sémantique
         self.SEMANTIC_MIN_KEYWORDS = 3  # Au lieu de 1-2
-        self.SEMANTIC_CONTEXT_REQUIRED = True  # Contexte obligatoire
+        self.SEMANTIC_CONTEXT_REQUIRED = True
         
         # Mots vides (activés seulement si fallback activé)
         self.stopwords = {
@@ -111,7 +107,7 @@ class RAGCacheManager:
         self.last_memory_check = 0
         self.last_stats_log = 0
         
-        # NOUVEAU: Tracking du dernier type de hit
+        # Tracking du dernier type de hit
         self.hit_type_last = None
     
     def _load_intent_aliases(self) -> Dict:
@@ -193,8 +189,45 @@ class RAGCacheManager:
         cleaned = re.sub(r'\s+', '', cleaned)
         return cleaned
     
+    async def initialize(self):
+        """Initialise la connexion Redis avec affichage des optimisations"""
+        if not self.enabled:
+            logger.warning("Cache Redis désactivé via CACHE_ENABLED=false")
+            return
+        
+        if not REDIS_AVAILABLE:
+            logger.warning("Redis non disponible - cache désactivé")
+            self.enabled = False
+            return
+        
+        try:
+            self.client = redis.from_url(
+                self.redis_url,
+                encoding="utf-8",
+                decode_responses=False,
+                socket_keepalive=True,
+                socket_keepalive_options={},
+                health_check_interval=60
+            )
+            
+            # Test de connexion
+            await self.client.ping()
+            
+            # Log de la configuration avec CORRECTIONS
+            logger.info("Cache Redis Enhanced CORRIGÉ initialisé avec validations strictes:")
+            logger.info(f"  - Limite valeur: {self.MAX_VALUE_BYTES/1024:.0f} KB")
+            logger.info(f"  - Cache sémantique: {self.ENABLE_SEMANTIC_CACHE} (STRICT MODE)")
+            logger.info(f"  - Min keywords requis: {self.SEMANTIC_MIN_KEYWORDS}")
+            logger.info(f"  - Validation contextuelle: {self.SEMANTIC_CONTEXT_REQUIRED}")
+            logger.info(f"  - Aliases chargés: {len(self.aliases)} catégories")
+            logger.info(f"  - Vocabulaire sémantique STRICT: {len(self.poultry_keywords)} termes")
+            
+        except Exception as e:
+            logger.warning(f"Erreur connexion Redis: {e} - cache désactivé")
+            self.enabled = False
+    
     def _normalize_text(self, text: str) -> str:
-        """CORRIGÉ: Normalisation moins agressive pour éviter les faux positifs"""
+        """CORRIGÉ: Normalisation moins aggressive pour éviter les faux positifs"""
         if not text:
             return ""
         
@@ -423,6 +456,7 @@ class RAGCacheManager:
         
         return fallback_keys[:1]  # CORRECTION: Une seule clé fallback
     
+    # CORRECTION 1: Méthode get_semantic_response() dédiée (lookup "pur")
     async def get_semantic_response(self, query: str, language: str = "fr") -> Optional[str]:
         """CORRIGÉ: Lecture sémantique pure avec validation stricte"""
         if not self.enabled or not self.client or not self.ENABLE_SEMANTIC_CACHE:
@@ -453,7 +487,6 @@ class RAGCacheManager:
         
         return None
     
-    # [Tous les autres methods restent identiques - _get_memory_usage_mb, _check_memory_limits, etc.]
     async def _get_memory_usage_mb(self) -> float:
         """Récupère l'usage mémoire Redis en MB"""
         try:
@@ -463,7 +496,301 @@ class RAGCacheManager:
         except:
             return 0.0
     
-    # [Le reste des méthodes reste identique...]
+    async def _check_memory_limits(self) -> bool:
+        """Vérification mémoire avec fréquence configurable"""
+        now = time.time()
+        
+        # Vérifier selon la fréquence configurée
+        if now - self.last_memory_check < 60:
+            return True
+        
+        self.last_memory_check = now
+        
+        try:
+            memory_usage_mb = await self._get_memory_usage_mb()
+            
+            # Log périodique selon l'intervalle configuré
+            if now - self.last_stats_log > self.STATS_LOG_INTERVAL:
+                self.last_stats_log = now
+                logger.info(f"Cache Redis Enhanced: {memory_usage_mb:.1f}MB utilisés / {self.TOTAL_MEMORY_LIMIT_MB}MB limite")
+                logger.info(f"Stats sémantiques: {self.cache_stats['semantic_hits']} hits, {self.cache_stats['keyword_extractions']} extractions")
+            
+            # Alertes selon seuils configurés
+            if memory_usage_mb > self.WARNING_THRESHOLD_MB:
+                self.protection_stats["memory_warnings"] += 1
+                logger.warning(f"Cache Redis proche de la limite: {memory_usage_mb:.1f}MB / {self.TOTAL_MEMORY_LIMIT_MB}MB")
+            
+            # Purge automatique selon seuil configuré
+            if memory_usage_mb > self.PURGE_THRESHOLD_MB and self.ENABLE_AUTO_PURGE:
+                self.protection_stats["auto_purges"] += 1
+                logger.warning(f"Purge automatique déclenchée: {memory_usage_mb:.1f}MB > {self.PURGE_THRESHOLD_MB}MB")
+                
+                for namespace in ["response", "search", "intent", "embedding"]:
+                    await self._purge_namespace_lru(namespace, int(self.MAX_KEYS_PER_NAMESPACE * self.LRU_PURGE_RATIO))
+                
+                return True
+            
+            # Rejet si dépassement critique
+            if memory_usage_mb > self.TOTAL_MEMORY_LIMIT_MB:
+                logger.error(f"Cache Redis saturé: {memory_usage_mb:.1f}MB > {self.TOTAL_MEMORY_LIMIT_MB}MB")
+                return False
+            
+            return True
+            
+        except Exception as e:
+            logger.warning(f"Erreur vérification mémoire Redis: {e}")
+            return True
+    
+    async def _check_size_and_namespace_quota(self, namespace: str, serialized_data: bytes) -> bool:
+        """Vérification taille et quota selon configuration"""
+        data_size = len(serialized_data)
+        
+        # Vérification taille maximale configurée
+        if data_size > self.MAX_VALUE_BYTES:
+            self.protection_stats["oversized_rejects"] += 1
+            logger.warning(f"Valeur rejetée (trop large): {data_size/1024:.1f}KB > {self.MAX_VALUE_BYTES/1024:.1f}KB")
+            return False
+        
+        if not await self._check_memory_limits():
+            return False
+        
+        # Vérification quota namespace configuré
+        try:
+            key_count = 0
+            pattern = f"intelia_rag:{namespace}:*"
+            
+            cursor = 0
+            scan_count = 0
+            while cursor != 0 or scan_count == 0:
+                cursor, keys = await self.client.scan(cursor, match=pattern, count=100)
+                key_count += len(keys)
+                scan_count += 1
+                
+                if scan_count > 10:
+                    break
+            
+            if key_count >= self.MAX_KEYS_PER_NAMESPACE:
+                self.protection_stats["namespace_limits_hit"] += 1
+                logger.info(f"Quota namespace {namespace} atteint ({key_count}/{self.MAX_KEYS_PER_NAMESPACE}) - Purge LRU")
+                
+                purge_count = int(self.MAX_KEYS_PER_NAMESPACE * self.LRU_PURGE_RATIO)
+                purged_count = await self._purge_namespace_lru(namespace, purge_count)
+                self.protection_stats["lru_purges"] += purged_count
+                
+                if purged_count == 0:
+                    logger.warning(f"Échec purge LRU namespace {namespace}")
+                    return False
+        
+        except Exception as e:
+            logger.warning(f"Erreur vérification quota namespace {namespace}: {e}")
+            return True
+        
+        return True
+    
+    async def _purge_namespace_lru(self, namespace: str, target_purge_count: int) -> int:
+        """Purge LRU avec ratio configuré"""
+        try:
+            keys_to_delete = []
+            pattern = f"intelia_rag:{namespace}:*"
+            
+            cursor = 0
+            scan_count = 0
+            while cursor != 0 or scan_count == 0:
+                cursor, keys = await self.client.scan(cursor, match=pattern, count=50)
+                
+                if keys:
+                    pipeline = self.client.pipeline()
+                    for key in keys:
+                        pipeline.ttl(key)
+                    ttls = await pipeline.execute()
+                    
+                    for key, ttl in zip(keys, ttls):
+                        keys_to_delete.append((key, ttl if ttl >= 0 else 0))
+                
+                scan_count += 1
+                if scan_count > 5 or len(keys_to_delete) >= target_purge_count * 2:
+                    break
+            
+            if not keys_to_delete:
+                return 0
+            
+            keys_to_delete.sort(key=lambda x: x[1])
+            final_keys = [key for key, _ in keys_to_delete[:target_purge_count]]
+            
+            if final_keys:
+                deleted_count = await self.client.delete(*final_keys)
+                logger.info(f"Purge LRU namespace {namespace}: {deleted_count} clés supprimées")
+                return deleted_count
+            
+            return 0
+            
+        except Exception as e:
+            logger.error(f"Erreur purge LRU namespace {namespace}: {e}")
+            return 0
+    
+    def _compress_data(self, data: bytes) -> bytes:
+        """Compression selon configuration"""
+        if not self.ENABLE_COMPRESSION:
+            return data
+        
+        try:
+            compressed = zlib.compress(data, level=1)
+            self.cache_stats["saved_operations"] += 1
+            return compressed
+        except:
+            return data
+    
+    def _decompress_data(self, data: bytes) -> bytes:
+        """Décompression selon configuration"""
+        if not self.ENABLE_COMPRESSION:
+            return data
+        
+        try:
+            return zlib.decompress(data)
+        except:
+            return data
+    
+    async def get_embedding(self, text: str) -> Optional[List[float]]:
+        """Récupère un embedding avec cache sémantique intelligent"""
+        if not self.enabled or not self.client:
+            return None
+        
+        self.cache_stats["total_requests"] += 1
+        
+        try:
+            # Essayer d'abord cache sémantique
+            if self.ENABLE_SEMANTIC_CACHE:
+                semantic_key = self._generate_key("embedding", text, use_semantic=True)
+                cached = await self.client.get(semantic_key)
+                
+                if cached:
+                    decompressed = self._decompress_data(cached)
+                    embedding = pickle.loads(decompressed)
+                    self.cache_stats["semantic_hits"] += 1
+                    logger.debug(f"Cache HIT (sémantique): embedding pour '{text[:30]}...'")
+                    return embedding
+            
+            # Essayer cache simple
+            key = self._generate_key("embedding", text, use_semantic=False)
+            cached = await self.client.get(key)
+            
+            if cached:
+                decompressed = self._decompress_data(cached)
+                embedding = pickle.loads(decompressed)
+                self.cache_stats["exact_hits"] += 1
+                logger.debug(f"Cache HIT: embedding pour '{text[:30]}...'")
+                return embedding
+            
+            # Essayer fallback keys si activé
+            if self.ENABLE_FALLBACK_KEYS:
+                fallback_keys = self._generate_fallback_keys(key, text)
+                for fallback_key in fallback_keys:
+                    cached = await self.client.get(fallback_key)
+                    if cached:
+                        decompressed = self._decompress_data(cached)
+                        embedding = pickle.loads(decompressed)
+                        self.cache_stats["fallback_hits"] += 1
+                        logger.debug(f"Cache HIT (fallback): embedding pour '{text[:30]}...'")
+                        return embedding
+            
+            logger.debug(f"Cache MISS: embedding pour '{text[:30]}...'")
+                
+        except Exception as e:
+            logger.warning(f"Erreur lecture cache embedding: {e}")
+        
+        return None
+    
+    async def set_embedding(self, text: str, embedding: List[float]):
+        """Met en cache un embedding avec stockage sémantique intelligent"""
+        if not self.enabled or not self.client:
+            return
+        
+        try:
+            serialized = pickle.dumps(embedding, protocol=pickle.HIGHEST_PROTOCOL)
+            compressed = self._compress_data(serialized)
+            
+            if not await self._check_size_and_namespace_quota("embedding", compressed):
+                return
+            
+            # Stocker avec clé principale
+            key = self._generate_key("embedding", text, use_semantic=False)
+            await self.client.setex(
+                key, 
+                self.ttl_config["embeddings"], 
+                compressed
+            )
+            
+            # CORRECTION: Stocker cache sémantique SEULEMENT si validation stricte réussit
+            if self.ENABLE_SEMANTIC_CACHE:
+                keywords = self._extract_semantic_keywords_strict(text)
+                if self._validate_semantic_cache_eligibility(keywords, text):
+                    semantic_key = self._generate_key("embedding", text, use_semantic=True)
+                    if semantic_key != key:  # Éviter duplication
+                        await self.client.setex(
+                            semantic_key,
+                            self.ttl_config["embeddings"],
+                            compressed
+                        )
+                        logger.debug(f"Cache SET (sémantique STRICT): embedding '{text[:30]}...' -> keywords: {list(keywords)}")
+            
+            logger.debug(f"Cache SET: embedding pour '{text[:30]}...' ({len(compressed)} bytes)")
+            
+        except Exception as e:
+            logger.warning(f"Erreur écriture cache embedding: {e}")
+    
+    async def get_response(self, query: str, context_hash: str, 
+                          language: str = "fr") -> Optional[str]:
+        """Récupère une réponse avec cache sémantique avancé"""
+        if not self.enabled or not self.client:
+            return None
+        
+        self.cache_stats["total_requests"] += 1
+        
+        try:
+            cache_data = {
+                "query": query,
+                "context_hash": context_hash,
+                "language": language
+            }
+            
+            # Essayer cache sémantique en premier si activé
+            if self.ENABLE_SEMANTIC_CACHE:
+                semantic_key = self._generate_key("response", query, use_semantic=True)
+                cached = await self.client.get(semantic_key)
+                
+                if cached:
+                    response = cached.decode('utf-8')
+                    self.cache_stats["semantic_hits"] += 1
+                    logger.info(f"Cache HIT (sémantique): '{query[:30]}...'")
+                    return response
+            
+            # Essayer cache exact
+            key = self._generate_key("response", cache_data, use_semantic=False)
+            cached = await self.client.get(key)
+            
+            if cached:
+                response = cached.decode('utf-8')
+                self.cache_stats["exact_hits"] += 1
+                logger.info(f"Cache HIT: '{query[:30]}...'")
+                return response
+            
+            # Essayer fallback keys
+            if self.ENABLE_FALLBACK_KEYS:
+                fallback_keys = self._generate_fallback_keys(key, query)
+                for fallback_key in fallback_keys:
+                    cached = await self.client.get(fallback_key)
+                    if cached:
+                        response = cached.decode('utf-8')
+                        self.cache_stats["fallback_hits"] += 1
+                        logger.info(f"Cache HIT (fallback): '{query[:30]}...'")
+                        return response
+            
+            logger.info(f"Cache MISS: '{query[:30]}...'")
+                
+        except Exception as e:
+            logger.warning(f"Erreur lecture cache réponse: {e}")
+        
+        return None
     
     async def set_response(self, query: str, context_hash: str, 
                           response: str, language: str = "fr"):
@@ -510,6 +837,208 @@ class RAGCacheManager:
             
         except Exception as e:
             logger.warning(f"Erreur écriture cache réponse: {e}")
+    
+    async def get_search_results(self, query_vector: List[float], 
+                               where_filter: Dict = None, 
+                               top_k: int = 10) -> Optional[List[Dict]]:
+        """Récupère des résultats de recherche depuis le cache"""
+        if not self.enabled or not self.client:
+            return None
+        
+        try:
+            vector_hash = hashlib.md5(str(query_vector[:5]).encode()).hexdigest()
+            cache_data = {
+                "vector_hash": vector_hash,
+                "where_filter": where_filter,
+                "top_k": top_k
+            }
+            
+            key = self._generate_key("search", cache_data, use_semantic=False)
+            cached = await self.client.get(key)
+            
+            if cached:
+                decompressed = self._decompress_data(cached)
+                results = pickle.loads(decompressed)
+                logger.debug("Cache HIT: résultats de recherche")
+                return results
+                
+        except Exception as e:
+            logger.warning(f"Erreur lecture cache recherche: {e}")
+        
+        return None
+    
+    async def set_search_results(self, query_vector: List[float], 
+                               where_filter: Dict, top_k: int, 
+                               results: List[Dict]):
+        """Met en cache des résultats de recherche"""
+        if not self.enabled or not self.client:
+            return
+        
+        try:
+            vector_hash = hashlib.md5(str(query_vector[:5]).encode()).hexdigest()
+            cache_data = {
+                "vector_hash": vector_hash,
+                "where_filter": where_filter,
+                "top_k": top_k
+            }
+            
+            limited_results = [
+                {
+                    "content": r.get("content", "")[:self.MAX_SEARCH_CONTENT_LENGTH],
+                    "metadata": {
+                        "title": r.get("metadata", {}).get("title", ""),
+                        "source": r.get("metadata", {}).get("source", "")
+                    },
+                    "score": round(r.get("score", 0.0), 3)
+                }
+                for r in results[:top_k]
+            ]
+            
+            serialized = pickle.dumps(limited_results, protocol=pickle.HIGHEST_PROTOCOL)
+            compressed = self._compress_data(serialized)
+            
+            if not await self._check_size_and_namespace_quota("search", compressed):
+                return
+            
+            key = self._generate_key("search", cache_data, use_semantic=False)
+            await self.client.setex(
+                key,
+                self.ttl_config["search_results"],
+                compressed
+            )
+            logger.debug(f"Cache SET: {len(results)} résultats de recherche ({len(compressed)} bytes)")
+            
+        except Exception as e:
+            logger.warning(f"Erreur écriture cache recherche: {e}")
+    
+    async def get_intent_result(self, query: str) -> Optional[Dict]:
+        """Récupère un résultat d'analyse d'intention avec cache sémantique"""
+        if not self.enabled or not self.client:
+            return None
+        
+        try:
+            # Cache sémantique en premier si activé
+            if self.ENABLE_SEMANTIC_CACHE:
+                semantic_key = self._generate_key("intent", query, use_semantic=True)
+                cached = await self.client.get(semantic_key)
+                
+                if cached:
+                    decompressed = self._decompress_data(cached)
+                    intent_result = pickle.loads(decompressed)
+                    self.cache_stats["semantic_hits"] += 1
+                    logger.debug(f"Cache HIT (sémantique): intention pour '{query[:30]}...'")
+                    return intent_result
+            
+            # Cache simple
+            key = self._generate_key("intent", query, use_semantic=False)
+            cached = await self.client.get(key)
+            
+            if cached:
+                decompressed = self._decompress_data(cached)
+                intent_result = pickle.loads(decompressed)
+                self.cache_stats["exact_hits"] += 1
+                logger.debug(f"Cache HIT: analyse d'intention pour '{query[:30]}...'")
+                return intent_result
+                
+        except Exception as e:
+            logger.warning(f"Erreur lecture cache intention: {e}")
+        
+        return None
+    
+    async def set_intent_result(self, query: str, intent_result: Any):
+        """Met en cache un résultat d'analyse d'intention"""
+        if not self.enabled or not self.client:
+            return
+        
+        try:
+            if hasattr(intent_result, '__dict__'):
+                data = {
+                    "intent_type": getattr(intent_result, 'intent_type', 'unknown'),
+                    "confidence": round(getattr(intent_result, 'confidence', 0.0), 3),
+                    "detected_entities": getattr(intent_result, 'detected_entities', {}),
+                    "expanded_query": getattr(intent_result, 'expanded_query', "")[:200]
+                }
+            else:
+                data = intent_result
+            
+            serialized = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
+            compressed = self._compress_data(serialized)
+            
+            if not await self._check_size_and_namespace_quota("intent", compressed):
+                return
+            
+            # Stocker cache principal
+            key = self._generate_key("intent", query, use_semantic=False)
+            await self.client.setex(
+                key,
+                self.ttl_config["intent_results"],
+                compressed
+            )
+            
+            # CORRECTION: Stocker cache sémantique SEULEMENT si validation stricte réussit
+            if self.ENABLE_SEMANTIC_CACHE:
+                keywords = self._extract_semantic_keywords_strict(query)
+                if self._validate_semantic_cache_eligibility(keywords, query):
+                    semantic_key = self._generate_key("intent", query, use_semantic=True)
+                    if semantic_key != key:
+                        await self.client.setex(
+                            semantic_key,
+                            self.ttl_config["intent_results"],
+                            compressed
+                        )
+            
+            logger.debug(f"Cache SET: analyse d'intention '{query[:30]}...' ({len(compressed)} bytes)")
+            
+        except Exception as e:
+            logger.warning(f"Erreur écriture cache intention: {e}")
+    
+    def generate_context_hash(self, documents: List[Dict]) -> str:
+        """Génère un hash du contexte pour le cache"""
+        try:
+            content_summary = []
+            for doc in documents[:2]:
+                summary = {
+                    "source": doc.get("source", "")[:50],
+                    "score_rounded": round(doc.get("score", 0.0), 1)
+                }
+                content_summary.append(summary)
+            
+            return hashlib.md5(
+                json.dumps(content_summary, sort_keys=True, separators=(',', ':')).encode()
+            ).hexdigest()
+            
+        except Exception as e:
+            logger.warning(f"Erreur génération hash contexte: {e}")
+            return "fallback_hash"
+    
+    async def invalidate_pattern(self, pattern: str):
+        """Invalide les clés correspondant à un pattern"""
+        if not self.enabled or not self.client:
+            return
+        
+        try:
+            keys = []
+            cursor = 0
+            scan_count = 0
+            while cursor != 0 or scan_count == 0:
+                cursor, batch_keys = await self.client.scan(cursor, match=f"intelia_rag:{pattern}:*", count=100)
+                keys.extend(batch_keys)
+                scan_count += 1
+                if scan_count > 10:
+                    break
+            
+            if keys:
+                batch_size = 50
+                deleted_total = 0
+                for i in range(0, len(keys), batch_size):
+                    batch = keys[i:i + batch_size]
+                    deleted = await self.client.delete(*batch)
+                    deleted_total += deleted
+                
+                logger.info(f"Invalidé {deleted_total} clés pour pattern {pattern}")
+                
+        except Exception as e:
+            logger.warning(f"Erreur invalidation pattern: {e}")
     
     async def get_cache_stats(self) -> Dict[str, Any]:
         """CORRIGÉ: Récupère les statistiques avec nouvelles métriques de validation"""
@@ -589,46 +1118,108 @@ class RAGCacheManager:
             logger.warning(f"Erreur stats cache: {e}")
             return {"enabled": True, "error": str(e)}
     
-    # [Autres méthodes restent identiques...]
-    async def initialize(self):
-        """Initialise la connexion Redis avec affichage des optimisations"""
-        if not self.enabled:
-            logger.warning("Cache Redis désactivé via CACHE_ENABLED=false")
-            return
-        
-        if not REDIS_AVAILABLE:
-            logger.warning("Redis non disponible - cache désactivé")
-            self.enabled = False
-            return
-        
+    async def debug_semantic_extraction(self, query: str) -> Dict[str, Any]:
+        """Debug de l'extraction sémantique pour une requête"""
         try:
-            self.client = redis.from_url(
-                self.redis_url,
-                encoding="utf-8",
-                decode_responses=False,
-                socket_keepalive=True,
-                socket_keepalive_options={},
-                health_check_interval=60
-            )
+            # Normalisation étapes par étapes
+            original = query
+            normalized = self._normalize_text(query)
+            keywords = self._extract_semantic_keywords_strict(query)
             
-            # Test de connexion
-            await self.client.ping()
+            # Test génération clés
+            semantic_key = self._generate_key("response", query, use_semantic=True)
+            simple_key = self._generate_key("response", query, use_semantic=False)
             
-            # Log de la configuration avec CORRECTIONS
-            logger.info("Cache Redis Enhanced CORRIGÉ initialisé avec validations strictes:")
-            logger.info(f"  - Limite valeur: {self.MAX_VALUE_BYTES/1024:.0f} KB")
-            logger.info(f"  - Cache sémantique: {self.ENABLE_SEMANTIC_CACHE} (STRICT MODE)")
-            logger.info(f"  - Min keywords requis: {self.SEMANTIC_MIN_KEYWORDS}")
-            logger.info(f"  - Validation contextuelle: {self.SEMANTIC_CONTEXT_REQUIRED}")
-            logger.info(f"  - Aliases chargés: {len(self.aliases)} catégories")
-            logger.info(f"  - Vocabulaire sémantique STRICT: {len(self.poultry_keywords)} termes")
+            # Test existence cache
+            semantic_exists = False
+            simple_exists = False
+            if self.client:
+                try:
+                    semantic_cached = await self.client.get(semantic_key)
+                    simple_cached = await self.client.get(simple_key)
+                    semantic_exists = semantic_cached is not None
+                    simple_exists = simple_cached is not None
+                except:
+                    pass
+            
+            return {
+                "original_query": original,
+                "normalized_query": normalized,
+                "extracted_keywords": list(keywords),
+                "keyword_count": len(keywords),
+                "vocabulary_size": len(self.poultry_keywords),
+                "aliases_loaded": len(self.aliases),
+                "validation_result": self._validate_semantic_cache_eligibility(keywords, query) if keywords else False,
+                "cache_keys": {
+                    "semantic": semantic_key[-16:],
+                    "simple": simple_key[-16:],
+                    "semantic_exists": semantic_exists,
+                    "simple_exists": simple_exists
+                },
+                "feature_flags": {
+                    "semantic_enabled": self.ENABLE_SEMANTIC_CACHE,
+                    "fallback_enabled": self.ENABLE_FALLBACK_KEYS,
+                    "compression_enabled": self.ENABLE_COMPRESSION,
+                    "strict_semantic_validation": True
+                }
+            }
             
         except Exception as e:
-            logger.warning(f"Erreur connexion Redis: {e} - cache désactivé")
-            self.enabled = False
+            return {"error": str(e)}
+    
+    async def force_namespace_cleanup(self, namespace: str, target_key_count: int = None) -> Dict[str, int]:
+        """Force le nettoyage d'un namespace"""
+        if not self.enabled or not self.client:
+            return {"error": "cache_disabled"}
+        
+        try:
+            if target_key_count is None:
+                target_key_count = int(self.MAX_KEYS_PER_NAMESPACE * self.LRU_PURGE_RATIO)
+            
+            purged = await self._purge_namespace_lru(namespace, target_key_count)
+            
+            final_count = 0
+            cursor = 0
+            scan_count = 0
+            while cursor != 0 or scan_count == 0:
+                cursor, keys = await self.client.scan(cursor, match=f"intelia_rag:{namespace}:*", count=100)
+                final_count += len(keys)
+                scan_count += 1
+                if scan_count > 5:
+                    final_count = f"~{final_count}+"
+                    break
+            
+            return {
+                "namespace": namespace,
+                "keys_purged": purged,
+                "final_key_count": final_count,
+                "target_was": target_key_count
+            }
+            
+        except Exception as e:
+            logger.error(f"Erreur force cleanup namespace {namespace}: {e}")
+            return {"error": str(e)}
+    
+    async def cleanup(self):
+        """Nettoie les ressources Redis"""
+        if self.client:
+            try:
+                stats = await self.get_cache_stats()
+                if "hit_statistics" in stats:
+                    hit_stats = stats["hit_statistics"]
+                    memory_stats = stats.get("memory", {})
+                    logger.info(f"Stats cache Enhanced finales - Hit rate total: {hit_stats['total_hit_rate']:.1%}")
+                    logger.info(f"  - Exact: {hit_stats['exact_hit_rate']:.1%}, Sémantique: {hit_stats['semantic_hit_rate']:.1%}")
+                    logger.info(f"  - Fallback: {hit_stats['fallback_hit_rate']:.1%}")
+                    logger.info(f"  - Mémoire: {memory_stats.get('used_mb', 0):.1f}MB")
+                
+                await self.client.close()
+                logger.info("Connexion Redis Enhanced fermée")
+            except Exception as e:
+                logger.warning(f"Erreur fermeture Redis: {e}")
 
 
-# [Classes wrapper restent identiques...]
+# Classe wrapper pour intégration dans RAG Engine
 class CachedOpenAIEmbedder:
     """Wrapper pour OpenAI Embedder avec cache Redis Enhanced"""
     
@@ -651,3 +1242,32 @@ class CachedOpenAIEmbedder:
             await self.cache_manager.set_embedding(text, embedding)
         
         return embedding
+    
+    async def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        """Embedding batch avec cache optimisé"""
+        results = []
+        uncached_texts = []
+        uncached_indices = []
+        
+        # Vérifier le cache pour chaque texte
+        for i, text in enumerate(texts):
+            cached = await self.cache_manager.get_embedding(text)
+            if cached:
+                results.append((i, cached))
+            else:
+                uncached_texts.append(text)
+                uncached_indices.append(i)
+        
+        # Générer les embeddings manquants
+        if uncached_texts:
+            new_embeddings = await self.original_embedder.embed_documents(uncached_texts)
+            
+            # Mettre en cache et ajouter aux résultats
+            for idx, embedding in zip(uncached_indices, new_embeddings):
+                if embedding:
+                    await self.cache_manager.set_embedding(texts[idx], embedding)
+                results.append((idx, embedding))
+        
+        # Trier par index original
+        results.sort(key=lambda x: x[0])
+        return [embedding for _, embedding in results]
