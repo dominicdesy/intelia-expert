@@ -3,6 +3,7 @@
 rag_engine.py - RAG Engine Enhanced avec Cache Redis, Recherche Hybride et Guardrails
 Version Production Intégrée pour Intelia Expert Aviculture
 Version corrigée pour Weaviate 4.16.9 - Septembre 2025
+CORRECTIONS APPLIQUÉES: API Weaviate 4.16.9 + Diagnostic intégré
 """
 
 import os
@@ -158,6 +159,9 @@ CACHE_ENABLED = os.getenv("CACHE_ENABLED", "true").lower() == "true"
 HYBRID_SEARCH_ENABLED = os.getenv("HYBRID_SEARCH_ENABLED", "true").lower() == "true"
 GUARDRAILS_LEVEL = os.getenv("GUARDRAILS_LEVEL", "standard")
 ENTITY_ENRICHMENT_ENABLED = os.getenv("ENTITY_ENRICHMENT_ENABLED", "true").lower() == "true"
+
+# Configuration diagnostics
+ENABLE_API_DIAGNOSTICS = os.getenv("ENABLE_API_DIAGNOSTICS", "false").lower() == "true"
 
 # === UTILITAIRES ===
 class MetricsCollector:
@@ -558,7 +562,7 @@ class OpenAIEmbedder:
         results.sort(key=lambda x: x[0])
         return [embedding for _, embedding in results]
 
-# === RETRIEVER HYBRIDE ===
+# === RETRIEVER HYBRIDE CORRIGÉ ===
 def _to_v4_filter(where_dict):
     """Convertit dict where v3 vers Filter v4 - Version corrigée pour Weaviate 4.16.9"""
     if not where_dict or not WEAVIATE_V4 or not wvc:
@@ -617,27 +621,126 @@ class HybridWeaviateRetriever:
             "diversity_threshold": 0.8
         }
         
+        # AJOUT: État des API pour diagnostic
+        self.api_capabilities = {
+            "hybrid_with_vector": None,
+            "hybrid_with_where": None,
+            "near_vector_format": None,
+            "diagnosed": False
+        }
+    
+    async def diagnose_weaviate_api(self):
+        """CORRECTION 3: Diagnostic des méthodes disponibles dans Weaviate v4.16.9"""
+        if self.api_capabilities["diagnosed"]:
+            return
+            
+        try:
+            collection = self.client.collections.get(self.collection_name)
+            
+            # Tester les différentes signatures d'API
+            test_vector = [0.1] * 1536  # Vecteur de test
+            
+            logger.info("=== DIAGNOSTIC WEAVIATE API ===")
+            
+            # Test 1: Signature hybrid() avec vector
+            try:
+                result = collection.query.hybrid(
+                    query="test diagnostic",
+                    vector=test_vector,
+                    alpha=0.7,
+                    limit=1
+                )
+                self.api_capabilities["hybrid_with_vector"] = True
+                logger.info("✅ Hybrid query fonctionne avec: query, vector, alpha, limit")
+            except Exception as e:
+                self.api_capabilities["hybrid_with_vector"] = False
+                logger.error(f"❌ Hybrid query avec vector échoue: {e}")
+                
+                # Test hybrid minimal
+                try:
+                    result = collection.query.hybrid(
+                        query="test diagnostic",
+                        limit=1
+                    )
+                    logger.info("✅ Hybrid query fonctionne avec: query, limit seulement")
+                except Exception as e2:
+                    logger.error(f"❌ Hybrid query minimal échoue: {e2}")
+            
+            # Test 2: Signature near_vector()
+            formats_to_test = [
+                {"vector": test_vector},
+                {"near_vector": test_vector},
+                {"query_vector": test_vector}
+            ]
+            
+            for i, params in enumerate(formats_to_test):
+                try:
+                    params["limit"] = 1
+                    result = collection.query.near_vector(**params)
+                    self.api_capabilities["near_vector_format"] = list(params.keys())[0]
+                    logger.info(f"✅ Near vector fonctionne avec: {list(params.keys())}")
+                    break
+                except Exception as e:
+                    logger.error(f"❌ Format {i+1} near_vector échoue: {e}")
+            
+            # Test 3: Hybrid avec filtre
+            try:
+                test_filter = wvc.query.Filter.by_property("species").equal("broiler")
+                result = collection.query.hybrid(
+                    query="test",
+                    where=test_filter,
+                    limit=1
+                )
+                self.api_capabilities["hybrid_with_where"] = True
+                logger.info("✅ Hybrid avec where filter fonctionne")
+            except Exception as e:
+                self.api_capabilities["hybrid_with_where"] = False
+                logger.error(f"❌ Hybrid avec where échoue: {e}")
+            
+            # Test 4: Méthodes disponibles
+            query_methods = [method for method in dir(collection.query) if not method.startswith('_')]
+            logger.info(f"📋 Méthodes query disponibles: {query_methods}")
+            
+            self.api_capabilities["diagnosed"] = True
+            logger.info(f"🔍 Capacités détectées: {self.api_capabilities}")
+            logger.info("=== FIN DIAGNOSTIC ===")
+            
+        except Exception as e:
+            logger.error(f"Erreur diagnostic Weaviate: {e}")
+            self.api_capabilities["diagnosed"] = True  # Marquer comme tenté
+    
     async def adaptive_search(self, query_vector: List[float], query_text: str,
                             top_k: int = 15, where_filter: Dict = None) -> List[Document]:
-        """Recherche adaptative qui ajuste alpha selon la requête - Version corrigée"""
+        """CORRECTION 1: Recherche adaptative qui ajuste alpha selon la requête - Version corrigée avec diagnostic"""
+        
+        # Exécuter le diagnostic si activé et pas encore fait
+        if ENABLE_API_DIAGNOSTICS and not self.api_capabilities["diagnosed"]:
+            await self.diagnose_weaviate_api()
+        
         try:
             alpha = self._analyze_query_for_alpha(query_text)
             
             if HYBRID_SEARCH_ENABLED and self.is_v4:
-                documents = await self._hybrid_search_v4(
+                documents = await self._hybrid_search_v4_corrected(
                     query_vector, query_text, top_k, where_filter, alpha
                 )
-                METRICS.search_stats["hybrid_native"] += 1
-            else:
-                # Utiliser la recherche vectorielle v4 si disponible
-                if self.is_v4:
-                    documents = await self._vector_search_v4(
-                        query_vector, top_k, where_filter
-                    )
+                if documents:
+                    METRICS.search_stats["hybrid_native"] += 1
+                    return documents
                 else:
-                    documents = await self._vector_search_v3(
-                        query_vector, top_k, where_filter
-                    )
+                    logger.warning("Recherche hybride n'a retourné aucun document, fallback vectoriel")
+            
+            # Fallback vers recherche vectorielle
+            if self.is_v4:
+                documents = await self._vector_search_v4_corrected(
+                    query_vector, top_k, where_filter
+                )
+            else:
+                documents = await self._vector_search_v3(
+                    query_vector, top_k, where_filter
+                )
+            
+            if documents:
                 METRICS.search_stats["vector_only"] += 1
             
             # Retry sans age_band si nécessaire
@@ -646,9 +749,9 @@ class HybridWeaviateRetriever:
                 where_filter_no_age = self._remove_age_band_filter(where_filter)
                 
                 if self.is_v4:
-                    documents = await self._hybrid_search_v4(
+                    documents = await self._hybrid_search_v4_corrected(
                         query_vector, query_text, top_k, where_filter_no_age, alpha
-                    ) if HYBRID_SEARCH_ENABLED else await self._vector_search_v4(
+                    ) if HYBRID_SEARCH_ENABLED else await self._vector_search_v4_corrected(
                         query_vector, top_k, where_filter_no_age
                     )
                 else:
@@ -665,9 +768,9 @@ class HybridWeaviateRetriever:
             logger.error(f"Erreur recherche adaptative: {e}")
             # Fallback avec la méthode appropriée selon la version
             if self.is_v4:
-                return await self._vector_search_v4(query_vector, top_k, where_filter)
+                return await self._vector_search_v4_corrected(query_vector, top_k, None)
             else:
-                return await self._vector_search_v3(query_vector, top_k, where_filter)
+                return await self._vector_search_v3(query_vector, top_k, None)
     
     def _analyze_query_for_alpha(self, query_text: str) -> float:
         """Analyse la requête pour déterminer l'alpha optimal"""
@@ -694,29 +797,47 @@ class HybridWeaviateRetriever:
         
         return 0.7  # Par défaut
     
-    async def _hybrid_search_v4(self, query_vector: List[float], query_text: str,
-                               top_k: int, where_filter: Dict, alpha: float) -> List[Document]:
-        """Recherche hybride native Weaviate v4 - Version corrigée pour 4.16.9"""
+    async def _hybrid_search_v4_corrected(self, query_vector: List[float], query_text: str,
+                                        top_k: int, where_filter: Dict, alpha: float) -> List[Document]:
+        """CORRECTION 1: Recherche hybride native Weaviate v4 - Version corrigée pour 4.16.9"""
         try:
             def _sync_hybrid_search():
                 collection = self.client.collections.get(self.collection_name)
                 
-                # Préparer les paramètres de base avec MetadataQuery corrigé
+                # Paramètres de base
                 search_params = {
                     "query": query_text,
-                    "vector": query_vector,
                     "alpha": alpha,
                     "limit": top_k,
                     "return_metadata": wvc.query.MetadataQuery(score=True)
                 }
                 
-                # Ajouter le filtre seulement s'il est valide
-                if where_filter:
+                # CORRECTION: Ajouter le vector seulement si supporté
+                if self.api_capabilities.get("hybrid_with_vector", True):  # True par défaut pour première tentative
+                    search_params["vector"] = query_vector
+                
+                # CORRECTION: Ajouter le filtre seulement si supporté
+                if where_filter and self.api_capabilities.get("hybrid_with_where", True):
                     v4_filter = _to_v4_filter(where_filter)
                     if v4_filter is not None:
                         search_params["where"] = v4_filter
                 
-                return collection.query.hybrid(**search_params)
+                try:
+                    return collection.query.hybrid(**search_params)
+                except TypeError as e:
+                    # Gérer les erreurs d'arguments non supportés
+                    if "vector" in str(e) and "vector" in search_params:
+                        logger.warning("Paramètre 'vector' non supporté dans hybrid(), retry sans vector")
+                        del search_params["vector"]
+                        self.api_capabilities["hybrid_with_vector"] = False
+                        return collection.query.hybrid(**search_params)
+                    elif "where" in str(e) and "where" in search_params:
+                        logger.warning("Paramètre 'where' non supporté dans hybrid(), retry sans where")
+                        del search_params["where"]
+                        self.api_capabilities["hybrid_with_where"] = False
+                        return collection.query.hybrid(**search_params)
+                    else:
+                        raise
             
             response = await anyio.to_thread.run_sync(_sync_hybrid_search)
             
@@ -734,7 +855,8 @@ class HybridWeaviateRetriever:
                         "phase": obj.properties.get("phase", ""),
                         "age_band": obj.properties.get("age_band", ""),
                         "hybrid_used": True,
-                        "alpha": alpha
+                        "alpha": alpha,
+                        "vector_used": self.api_capabilities.get("hybrid_with_vector", False)
                     },
                     score=hybrid_score
                 )
@@ -744,27 +866,65 @@ class HybridWeaviateRetriever:
             
         except Exception as e:
             logger.error(f"Erreur recherche hybride v4: {e}")
-            raise
+            # Fallback vers recherche vectorielle
+            return await self._vector_search_v4_corrected(query_vector, top_k, where_filter)
     
-    async def _vector_search_v4(self, query_vector: List[float], top_k: int, 
-                              where_filter: Dict) -> List[Document]:
-        """Recherche vectorielle Weaviate v4 - Version corrigée"""
+    async def _vector_search_v4_corrected(self, query_vector: List[float], top_k: int, 
+                                        where_filter: Dict) -> List[Document]:
+        """CORRECTION 1: Recherche vectorielle Weaviate v4 - Version corrigée pour 4.16.9"""
         try:
             def _sync_search():
                 collection = self.client.collections.get(self.collection_name)
                 
-                params = {
-                    "vector": query_vector,
+                # Paramètres de base
+                base_params = {
                     "limit": top_k,
                     "return_metadata": wvc.query.MetadataQuery(distance=True, score=True)
                 }
                 
+                # CORRECTION: Tester différents formats de vecteur
+                vector_param_name = self.api_capabilities.get("near_vector_format", "vector")  # Par défaut "vector"
+                
+                params = base_params.copy()
+                params[vector_param_name] = query_vector
+                
+                # Ajouter le filtre si disponible
                 if where_filter:
                     v4_filter = _to_v4_filter(where_filter)
                     if v4_filter is not None:
                         params["where"] = v4_filter
                 
-                return collection.query.near_vector(**params)
+                try:
+                    return collection.query.near_vector(**params)
+                except TypeError as e:
+                    error_msg = str(e)
+                    
+                    # Tester différents formats si erreur sur le paramètre vector
+                    if vector_param_name in error_msg:
+                        for alternative in ["near_vector", "query_vector", "vector"]:
+                            if alternative != vector_param_name:
+                                try:
+                                    alt_params = base_params.copy()
+                                    alt_params[alternative] = query_vector
+                                    if where_filter:
+                                        v4_filter = _to_v4_filter(where_filter)
+                                        if v4_filter is not None:
+                                            alt_params["where"] = v4_filter
+                                    
+                                    result = collection.query.near_vector(**alt_params)
+                                    self.api_capabilities["near_vector_format"] = alternative
+                                    logger.info(f"Format vectoriel corrigé: {alternative}")
+                                    return result
+                                except:
+                                    continue
+                    
+                    # Si erreur sur where, retry sans filtre
+                    if "where" in error_msg and where_filter:
+                        logger.warning("Filtre where non supporté, retry sans filtre")
+                        params_no_filter = {k: v for k, v in params.items() if k != "where"}
+                        return collection.query.near_vector(**params_no_filter)
+                    
+                    raise
             
             result = await anyio.to_thread.run_sync(_sync_search)
             
@@ -782,6 +942,7 @@ class HybridWeaviateRetriever:
                         "species": obj.properties.get("species", ""),
                         "phase": obj.properties.get("phase", ""),
                         "age_band": obj.properties.get("age_band", ""),
+                        "vector_format_used": self.api_capabilities.get("near_vector_format", "vector")
                     },
                     score=score,
                     original_distance=distance
@@ -792,6 +953,43 @@ class HybridWeaviateRetriever:
             
         except Exception as e:
             logger.error(f"Erreur recherche vectorielle v4: {e}")
+            # Fallback vers recherche minimale
+            return await self._vector_search_fallback_minimal(query_vector, top_k)
+    
+    async def _vector_search_fallback_minimal(self, query_vector: List[float], top_k: int) -> List[Document]:
+        """Recherche vectorielle minimale comme dernier recours"""
+        try:
+            def _sync_minimal_search():
+                collection = self.client.collections.get(self.collection_name)
+                # Utiliser la forme la plus simple possible
+                return collection.query.near_vector(
+                    near_vector=query_vector,
+                    limit=top_k
+                )
+            
+            result = await anyio.to_thread.run_sync(_sync_minimal_search)
+            
+            documents = []
+            for obj in result.objects:
+                # Score par défaut si pas disponible
+                score = getattr(obj.metadata, "score", 0.7) if hasattr(obj, "metadata") else 0.7
+                
+                doc = Document(
+                    content=obj.properties.get("content", ""),
+                    metadata={
+                        "title": obj.properties.get("title", ""),
+                        "source": obj.properties.get("source", ""),
+                        "fallback_search": True,
+                        "minimal_api_used": True
+                    },
+                    score=float(score)
+                )
+                documents.append(doc)
+            
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Erreur recherche minimale: {e}")
             return []
     
     async def _hybrid_search_fallback(self, query_vector: List[float], query_text: str,
@@ -903,6 +1101,7 @@ class HybridWeaviateRetriever:
                         "species": obj.get("species", ""),
                         "phase": obj.get("phase", ""),
                         "age_band": obj.get("age_band", ""),
+                        "weaviate_v3_used": True
                     },
                     score=float(score) if score else 0.0,
                     original_distance=additional.get("distance")
@@ -968,7 +1167,7 @@ class HybridWeaviateRetriever:
                                     where_filter: Dict) -> List[Document]:
         """Recherche vectorielle simple de fallback"""
         if self.is_v4:
-            return await self._vector_search_v4(query_vector, top_k, where_filter)
+            return await self._vector_search_v4_corrected(query_vector, top_k, where_filter)
         else:
             return await self._vector_search_v3(query_vector, top_k, where_filter)
     
@@ -1381,7 +1580,8 @@ class InteliaRAGEngine:
             "cache_misses": 0,
             "hybrid_searches": 0,
             "guardrail_violations": 0,
-            "entity_enrichments": 0
+            "entity_enrichments": 0,
+            "api_corrections": 0  # AJOUT: Stats corrections API
         }
     
     def _build_openai_client(self) -> AsyncOpenAI:
@@ -1394,7 +1594,7 @@ class InteliaRAGEngine:
             return AsyncOpenAI(api_key=OPENAI_API_KEY)
     
     async def initialize(self):
-        """Initialisation complète"""
+        """Initialisation complète avec diagnostic API"""
         if self.is_initialized:
             return
             
@@ -1420,9 +1620,13 @@ class InteliaRAGEngine:
             self.memory = ConversationMemory(self.openai_client)
             self.ood_detector = EnhancedOODDetector()
             
-            # 4. Retriever hybride
+            # 4. Retriever hybride avec diagnostic intégré
             if self.weaviate_client:
                 self.retriever = HybridWeaviateRetriever(self.weaviate_client)
+                # CORRECTION 3: Exécuter diagnostic au démarrage si activé
+                if ENABLE_API_DIAGNOSTICS:
+                    logger.info("🔍 Exécution diagnostic API Weaviate...")
+                    await self.retriever.diagnose_weaviate_api()
             
             # 5. Générateur enrichi
             if ENTITY_ENRICHMENT_ENABLED:
@@ -1536,7 +1740,7 @@ class InteliaRAGEngine:
                 raise Exception("Weaviate not ready")
     
     async def process_query(self, query: str, language: str = "fr", tenant_id: str = "") -> RAGResult:
-        """Traitement de requête avec toutes les optimisations"""
+        """Traitement de requête avec toutes les optimisations et corrections API"""
         if not RAG_ENABLED:
             return RAGResult(source=RAGSource.FALLBACK_NEEDED, metadata={"reason": "rag_disabled"})
         
@@ -1606,7 +1810,7 @@ class InteliaRAGEngine:
             # Construire where filter
             where_filter = build_where_filter(intent_result)
             
-            # Recherche hybride
+            # Recherche hybride CORRIGÉE
             documents = []
             if self.retriever:
                 try:
@@ -1615,6 +1819,11 @@ class InteliaRAGEngine:
                     )
                     if any(doc.metadata.get("hybrid_used") for doc in documents):
                         self.optimization_stats["hybrid_searches"] += 1
+                    
+                    # Compter les corrections API appliquées
+                    if any(doc.metadata.get("vector_format_used") for doc in documents):
+                        self.optimization_stats["api_corrections"] += 1
+                        
                 except Exception as e:
                     logger.error(f"Erreur recherche hybride: {e}")
             
@@ -1760,17 +1969,21 @@ RÈGLE: Réponds strictement en {language}."""
                     "age_band": doc.metadata.get("age_band", ""),
                     "hybrid_used": doc.metadata.get("hybrid_used", False),
                     "bm25_used": doc.metadata.get("bm25_used", False),
+                    "vector_format_used": doc.metadata.get("vector_format_used", ""),
+                    "fallback_search": doc.metadata.get("fallback_search", False),
+                    "minimal_api_used": doc.metadata.get("minimal_api_used", False),
                     "search_type": getattr(doc, 'search_type', 'unknown')
                 })
             
-            # Métadonnées complètes
+            # Métadonnées complètes avec infos corrections
             metadata = {
-                "approach": "enhanced_rag_integrated_complete_v4_16_9",
+                "approach": "enhanced_rag_integrated_complete_v4_16_9_corrected",
                 "optimizations_enabled": {
                     "redis_cache": self.cache_manager.enabled if self.cache_manager else False,
                     "hybrid_search": HYBRID_SEARCH_ENABLED,
                     "entity_enrichment": ENTITY_ENRICHMENT_ENABLED,
-                    "advanced_guardrails": True
+                    "advanced_guardrails": True,
+                    "api_diagnostics": ENABLE_API_DIAGNOSTICS
                 },
                 "weaviate_version": weaviate_version,
                 "weaviate_v4": WEAVIATE_V4,
@@ -1784,7 +1997,10 @@ RÈGLE: Réponds strictement en {language}."""
                 "verification_smart": RAG_VERIFICATION_SMART,
                 "language_target": language,
                 "language_detected": detect_language_light(query),
-                "optimization_stats": self.optimization_stats.copy()
+                "optimization_stats": self.optimization_stats.copy(),
+                # AJOUT: Infos sur les corrections API
+                "api_capabilities": self.retriever.api_capabilities if self.retriever else {},
+                "api_corrections_applied": self.optimization_stats.get("api_corrections", 0) > 0
             }
             
             if intent_result:
@@ -1853,9 +2069,11 @@ RÈGLE: Réponds strictement en {language}."""
         return min(0.95, max(0.1, final_confidence))
     
     def get_status(self) -> Dict:
-        """Status complet du système - Version corrigée"""
+        """Status complet du système avec infos corrections API"""
         try:
             weaviate_connected = False
+            api_capabilities = {}
+            
             if self.weaviate_client:
                 try:
                     def _check():
@@ -1864,17 +2082,22 @@ RÈGLE: Réponds strictement en {language}."""
                 except:
                     weaviate_connected = False
             
+            # Récupérer les capacités API si disponibles
+            if self.retriever and hasattr(self.retriever, 'api_capabilities'):
+                api_capabilities = self.retriever.api_capabilities
+            
             status = {
                 "rag_enabled": RAG_ENABLED,
                 "initialized": self.is_initialized,
                 "degraded_mode": self.degraded_mode,
-                "approach": "enhanced_rag_integrated_complete_v4_16_9",
+                "approach": "enhanced_rag_integrated_complete_v4_16_9_corrected",
                 "optimizations": {
                     "cache_enabled": self.cache_manager.enabled if self.cache_manager else False,
                     "hybrid_search_enabled": HYBRID_SEARCH_ENABLED,
                     "entity_enrichment_enabled": ENTITY_ENRICHMENT_ENABLED,
                     "guardrails_level": GUARDRAILS_LEVEL,
-                    "verification_smart": RAG_VERIFICATION_SMART
+                    "verification_smart": RAG_VERIFICATION_SMART,
+                    "api_diagnostics_enabled": ENABLE_API_DIAGNOSTICS
                 },
                 "components": {
                     "openai_available": OPENAI_AVAILABLE,
@@ -1898,6 +2121,7 @@ RÈGLE: Réponds strictement en {language}."""
                     "weaviate_url": WEAVIATE_URL
                 },
                 "optimization_stats": self.optimization_stats.copy(),
+                "api_capabilities": api_capabilities,  # AJOUT: Capacités API détectées
                 "metrics": METRICS.snapshot()
             }
             
