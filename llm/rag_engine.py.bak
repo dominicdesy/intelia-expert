@@ -104,6 +104,7 @@ except ImportError as e:
             self.expanded_query = ""
             self.metadata = {}
 
+# CORRECTION POINT 1 : Import des guardrails depuis le module dédié
 try:
     from advanced_guardrails import create_response_guardrails, VerificationLevel, GuardrailResult
     GUARDRAILS_AVAILABLE = True
@@ -145,7 +146,7 @@ RAG_VERIFICATION_ENABLED = os.getenv("RAG_VERIFICATION_ENABLED", "true").lower()
 RAG_VERIFICATION_SMART = os.getenv("RAG_VERIFICATION_SMART", "true").lower() == "true"
 MAX_CONVERSATION_CONTEXT = int(os.getenv("MAX_CONVERSATION_CONTEXT", "1500"))
 
-# Seuil OOD configurable et plus strict
+# CORRECTION POINT 3 : Seuil OOD configurable et plus strict
 OOD_MIN_SCORE = float(os.getenv("OOD_MIN_SCORE", "0.3"))
 
 # Nouvelles configurations
@@ -251,7 +252,7 @@ class RAGCacheManager:
         self.client = None
         self.enabled = REDIS_AVAILABLE and CACHE_ENABLED
         
-        # Protection OOM
+        # CORRECTION POINT 4 : Protection OOM
         self.MAX_VALUE_BYTES = int(os.getenv("CACHE_MAX_VALUE_BYTES", "2000000"))  # 2MB
         self.MAX_KEYS_PER_NAMESPACE = int(os.getenv("CACHE_MAX_KEYS_PER_NS", "1000"))
         
@@ -294,7 +295,7 @@ class RAGCacheManager:
         return f"intelia_rag:{prefix}:{hash_obj.hexdigest()}"
     
     async def _check_size_and_purge(self, namespace: str, data_size: int) -> bool:
-        """Vérification taille et purge LRU"""
+        """CORRECTION POINT 4 : Vérification taille et purge LRU"""
         if data_size > self.MAX_VALUE_BYTES:
             logger.warning(f"Valeur trop large pour cache: {data_size} bytes (max: {self.MAX_VALUE_BYTES})")
             return False
@@ -359,7 +360,7 @@ class RAGCacheManager:
             serialized = pickle.dumps(embedding)
             compressed = zlib.compress(serialized)
             
-            # Vérification taille
+            # CORRECTION POINT 4 : Vérification taille
             if not await self._check_size_and_purge("embedding", len(compressed)):
                 return
             
@@ -394,7 +395,7 @@ class RAGCacheManager:
         try:
             response_bytes = response.encode('utf-8')
             
-            # Vérification taille
+            # CORRECTION POINT 4 : Vérification taille
             if not await self._check_size_and_purge("response", len(response_bytes)):
                 return
             
@@ -424,47 +425,30 @@ class RAGCacheManager:
             return "fallback_hash"
     
     async def get_cache_stats(self) -> Dict[str, Any]:
-        """Récupère les statistiques du cache - Version corrigée"""
+        """Récupère les statistiques du cache"""
         if not self.enabled or not self.client:
             return {"enabled": False}
         
         try:
-            # Utiliser une approche synchrone pour éviter les conflits d'event loop
-            def _get_stats_sync():
-                import redis  # Import redis synchrone
-                
-                # Créer un client Redis synchrone temporaire pour les stats
-                sync_redis = redis.from_url(
-                    self.redis_url,
-                    encoding="utf-8", 
-                    decode_responses=True
-                )
-                
-                try:
-                    info = sync_redis.info("memory")
-                    
-                    # Compter les clés par type
-                    type_counts = {}
-                    for cache_type in ["embeddings", "search_results", "responses", "intent_results", "verification"]:
-                        count = 0
-                        for _ in sync_redis.scan_iter(match=f"intelia_rag:{cache_type}:*"):
-                            count += 1
-                        type_counts[cache_type] = count
-                    
-                    return {
-                        "enabled": True,
-                        "memory_used": info.get("used_memory_human", "N/A"),
-                        "total_keys": sync_redis.dbsize(),
-                        "type_counts": type_counts,
-                        "ttl_config": self.ttl_config,
-                        "max_value_bytes": self.MAX_VALUE_BYTES,
-                        "max_keys_per_namespace": self.MAX_KEYS_PER_NAMESPACE
-                    }
-                finally:
-                    sync_redis.close()
+            info = await self.client.info("memory")
             
-            # Exécuter de manière thread-safe
-            return await anyio.to_thread.run_sync(_get_stats_sync)
+            # Compter les clés par type
+            type_counts = {}
+            for cache_type in ["embeddings", "search_results", "responses", "intent_results", "verification"]:
+                count = 0
+                async for _ in self.client.scan_iter(match=f"intelia_rag:{cache_type}:*"):
+                    count += 1
+                type_counts[cache_type] = count
+            
+            return {
+                "enabled": True,
+                "memory_used": info.get("used_memory_human", "N/A"),
+                "total_keys": await self.client.dbsize(),
+                "type_counts": type_counts,
+                "ttl_config": self.ttl_config,
+                "max_value_bytes": self.MAX_VALUE_BYTES,
+                "max_keys_per_namespace": self.MAX_KEYS_PER_NAMESPACE
+            }
             
         except Exception as e:
             logger.warning(f"Erreur stats cache: {e}")
@@ -1103,10 +1087,12 @@ class EnhancedOODDetector:
             'couvoir', 'hatchery', 'biosécurité', 'mortalité', 'mortality', 'performance',
             'ross', 'cobb', 'hubbard', 'isa', 'lohmann', 'ponte', 'eggs', 'laying'
         }
+        
 
     def _load_blocked_terms(self, path: str = None) -> Dict[str, List[str]]:
         """Charge les termes bloqués depuis le fichier configuré"""
         if path is None:
+            # CORRECTION: Utiliser la variable d'environnement de Digital Ocean
             path = os.getenv("BLOCKED_TERMS_FILE", "/app/blocked_terms.json")
             if not os.path.exists(path):
                 # Fallback pour développement local
@@ -1128,7 +1114,7 @@ class EnhancedOODDetector:
             }
     
     def calculate_ood_score(self, query: str, intent_result=None) -> Tuple[bool, float, Dict[str, float]]:
-        """Calcul score OOD avec normalisation - Seuil plus strict"""
+        """Calcul score OOD avec normalisation - CORRECTION POINT 3: Seuil plus strict"""
         query_lower = (unidecode(query).lower() if UNIDECODE_AVAILABLE else query.lower())
         words = query_lower.split()
         
@@ -1161,7 +1147,7 @@ class EnhancedOODDetector:
         else:
             final_score = (vocab_score * 0.8) - (blocked_score * 0.2)
         
-        # Seuil plus strict
+        # CORRECTION POINT 3 : Seuil plus strict
         is_in_domain = final_score > OOD_MIN_SCORE
         
         score_details = {
@@ -1349,7 +1335,7 @@ class InteliaRAGEngine:
             if ENTITY_ENRICHMENT_ENABLED:
                 self.generator = EnhancedResponseGenerator(self.openai_client, self.cache_manager)
             
-            # 6. Guardrails depuis le module dédié
+            # 6. CORRECTION POINT 1 : Guardrails depuis le module dédié
             if GUARDRAILS_AVAILABLE:
                 self.guardrails = create_response_guardrails(self.openai_client, GUARDRAILS_LEVEL)
             
@@ -1366,38 +1352,32 @@ class InteliaRAGEngine:
             self.is_initialized = True
     
     async def _connect_weaviate(self):
-        """Connexion Weaviate corrigée pour v4"""
+        """Connexion Weaviate"""
         if WEAVIATE_V4:
             try:
-                import weaviate.classes as wvc
-                
-                # Nouvelle syntaxe Weaviate v4 - pas de paramètre 'url' dans le constructeur
                 if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
-                    # Pour Weaviate Cloud avec API Key
-                    self.weaviate_client = weaviate.connect_to_weaviate_cloud(
-                        cluster_url=WEAVIATE_URL,
-                        auth_credentials=wvc.init.Auth.api_key(WEAVIATE_API_KEY),
-                        headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
+                    self.weaviate_client = weaviate.WeaviateClient(
+                        url=WEAVIATE_URL,
+                        auth_client_secret=weaviate.AuthApiKey(WEAVIATE_API_KEY),
+                        additional_headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
                     )
                 else:
-                    # Pour instance locale ou sans API key
+                    additional_headers = {"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
+                    
                     if WEAVIATE_API_KEY:
-                        self.weaviate_client = weaviate.connect_to_local(
-                            host=WEAVIATE_URL.replace("http://", "").replace("https://", "").split(":")[0],
-                            port=int(WEAVIATE_URL.split(":")[-1]) if ":" in WEAVIATE_URL else 8080,
-                            auth_credentials=wvc.init.Auth.api_key(WEAVIATE_API_KEY),
-                            headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
+                        self.weaviate_client = weaviate.WeaviateClient(
+                            url=WEAVIATE_URL,
+                            auth_client_secret=weaviate.AuthApiKey(WEAVIATE_API_KEY),
+                            additional_headers=additional_headers
                         )
                     else:
-                        # Instance locale sans authentification
-                        self.weaviate_client = weaviate.connect_to_local(
-                            host=WEAVIATE_URL.replace("http://", "").replace("https://", "").split(":")[0],
-                            port=int(WEAVIATE_URL.split(":")[-1]) if ":" in WEAVIATE_URL else 8080,
-                            headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
+                        self.weaviate_client = weaviate.WeaviateClient(
+                            url=WEAVIATE_URL,
+                            additional_headers=additional_headers
                         )
                 
-                # Test de connexion
                 def _test_connection():
+                    self.weaviate_client.connect()
                     return self.weaviate_client.is_ready()
                 
                 is_ready = await anyio.to_thread.run_sync(_test_connection)
@@ -1407,36 +1387,9 @@ class InteliaRAGEngine:
                     
             except Exception as e:
                 logger.error(f"Erreur connexion Weaviate v4: {e}")
-                # Fallback vers syntaxe v3 si disponible
-                try:
-                    if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
-                        auth_config = weaviate.AuthApiKey(api_key=WEAVIATE_API_KEY)
-                        self.weaviate_client = weaviate.Client(
-                            url=WEAVIATE_URL,
-                            auth_client_secret=auth_config,
-                            additional_headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
-                        )
-                    else:
-                        self.weaviate_client = weaviate.Client(
-                            url=WEAVIATE_URL,
-                            additional_headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
-                        )
-                    
-                    def _check_fallback():
-                        return self.weaviate_client.is_ready()
-                    
-                    is_ready = await anyio.to_thread.run_sync(_check_fallback)
-                    
-                    if not is_ready:
-                        raise Exception("Weaviate fallback failed")
-                        
-                    logger.info("Fallback vers Weaviate v3 réussi")
-                    
-                except Exception as fallback_error:
-                    logger.error(f"Erreur fallback Weaviate: {fallback_error}")
-                    raise
+                raise
         else:
-            # Code existant pour Weaviate v3
+            # Weaviate v3
             if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
                 auth_config = weaviate.AuthApiKey(api_key=WEAVIATE_API_KEY)
                 self.weaviate_client = weaviate.Client(
@@ -1776,7 +1729,7 @@ RÈGLE: Réponds strictement en {language}."""
         return min(0.95, max(0.1, final_confidence))
     
     def get_status(self) -> Dict:
-        """Status complet du système - Version corrigée"""
+        """Status complet du système"""
         try:
             weaviate_connected = False
             if self.weaviate_client:
@@ -1824,14 +1777,32 @@ RÈGLE: Réponds strictement en {language}."""
                 "metrics": METRICS.snapshot()
             }
             
-            # Simplifier l'ajout des stats cache pour éviter les erreurs d'event loop
-            if self.cache_manager and self.cache_manager.enabled:
-                status["cache_stats"] = {
-                    "enabled": True,
-                    "note": "Stats détaillées disponibles via endpoint dédié"
-                }
-            else:
-                status["cache_stats"] = {"enabled": False}
+            # Ajout stats cache si disponible
+            if self.cache_manager:
+                try:
+                    # Utiliser l'event loop existant ou en créer un nouveau
+                    try:
+                        loop = asyncio.get_running_loop()
+                        # Si on est déjà dans un event loop async, créer une tâche
+                        import concurrent.futures
+                        with concurrent.futures.ThreadPoolExecutor() as executor:
+                            future = executor.submit(
+                                lambda: asyncio.run(self.cache_manager.get_cache_stats())
+                            )
+                            cache_stats = future.result(timeout=5.0)
+                    except RuntimeError:
+                        # Si pas d'event loop actif, utiliser run_until_complete
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        try:
+                            cache_stats = loop.run_until_complete(self.cache_manager.get_cache_stats())
+                        finally:
+                            loop.close()
+                    
+                    status["cache_stats"] = cache_stats
+                except Exception as e:
+                    logger.warning(f"Erreur récupération stats cache: {e}")
+                    status["cache_stats"] = {"error": "unavailable"}
             
             return status
             
