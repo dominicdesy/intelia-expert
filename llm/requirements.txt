@@ -1,5 +1,6 @@
 # APPROCHE DIRECTE : OpenAI + Weaviate sans LlamaIndex
 # Zéro conflit de dépendances - Production ready
+# Version corrigée - Septembre 2025
 
 # Core FastAPI
 fastapi==0.112.2
@@ -11,13 +12,16 @@ httpcore==1.0.5
 # OpenAI API - Direct et stable
 openai==1.42.0
 
-# Weaviate Client - Direct sans intermédiaires
-weaviate-client==4.5.7
+# Weaviate Client - Version mise à jour (était 4.5.7)
+weaviate-client==4.16.9
 
 # Intelligence métier préservée
 langdetect==1.0.9
 transformers==4.46.0
 torch>=2.0.0
+
+# Traitement de texte - AJOUT CRITIQUE
+unidecode==1.3.8
 
 # Reranking et similarité
 sentence-transformers==3.3.1
