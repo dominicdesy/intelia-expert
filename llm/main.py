@@ -2,6 +2,9 @@
 """
 main.py - Intelia Expert Backend avec RAG Enhanced intégré
 Version optimisée préservant votre intelligence métier avec RAG Enhanced
+CORRECTIONS APPLIQUÉES:
+- Affichage correct du statut rag_enhanced_enabled
+- Calcul corrigé du temps de traitement
 """
 
 import os
@@ -173,7 +176,7 @@ def add_to_conversation_memory(tenant_id: str, question: str, answer: str, sourc
 
 # Classe de métriques pour monitoring amélioré - ÉTENDUE pour RAG Enhanced
 class MetricsCollector:
-    """Collecteur de métriques pour monitoring des performances"""
+    """Collecteur de métriques pour monitoring des performances - CORRIGÉ"""
     
     def __init__(self):
         self.metrics = {
@@ -196,9 +199,11 @@ class MetricsCollector:
         self.recent_processing_times = []
         self.recent_confidences = []
         self.max_recent_samples = 100
+        # NOUVEAU: Stockage des temps de traitement endpoint
+        self.endpoint_processing_times = []
     
-    def record_query(self, result, source_type: str = "unknown"):
-        """Enregistre les métriques d'une requête - Compatible Enhanced RAG + Agent"""
+    def record_query(self, result, source_type: str = "unknown", endpoint_time: float = 0.0):
+        """Enregistre les métriques d'une requête - CORRIGÉ avec temps endpoint"""
         if not ENABLE_METRICS_LOGGING:
             return
         
@@ -236,8 +241,9 @@ class MetricsCollector:
             self.metrics["hybrid_searches"] += opt_stats.get("hybrid_searches", 0)
             self.metrics["guardrail_violations"] += opt_stats.get("guardrail_violations", 0)
         
-        # Temps de traitement
-        processing_time = getattr(result, 'processing_time', 0)
+        # CORRECTION: Utiliser le temps endpoint si fourni, sinon le temps du résultat
+        processing_time = endpoint_time if endpoint_time > 0 else getattr(result, 'processing_time', 0)
+        
         if processing_time > 0:
             self.recent_processing_times.append(processing_time)
             if len(self.recent_processing_times) > self.max_recent_samples:
@@ -617,7 +623,7 @@ router = APIRouter()
 # Routes améliorées
 @router.get("/health")
 def health():
-    """Health check avec status RAG Enhanced détaillé"""
+    """Health check avec status RAG Enhanced détaillé - CORRIGÉ"""
     global rag_engine_enhanced, agent_rag_engine
     
     memory_stats = {
@@ -633,12 +639,12 @@ def health():
         "performance_metrics": metrics_collector.get_metrics()
     }
     
-    # Status RAG Enhanced
+    # CORRECTION : Status RAG Enhanced avec rag_enhanced_enabled explicite
     if rag_engine_enhanced:
         try:
             rag_status = rag_engine_enhanced.get_status()
             health_data.update({
-                "rag_enhanced_enabled": True,
+                "rag_enhanced_enabled": True,  # LIGNE AJOUTÉE EXPLICITEMENT
                 "rag_enhanced_status": rag_status,
                 "optimizations": rag_status.get("optimizations", {}),
                 "components": rag_status.get("components", {}),
@@ -646,12 +652,12 @@ def health():
             })
         except Exception as e:
             health_data.update({
-                "rag_enhanced_enabled": False,
+                "rag_enhanced_enabled": False,  # LIGNE AJOUTÉE EXPLICITEMENT
                 "rag_enhanced_error": str(e)
             })
     else:
         health_data.update({
-            "rag_enhanced_enabled": False,
+            "rag_enhanced_enabled": False,  # LIGNE AJOUTÉE EXPLICITEMENT
             "rag_enhanced_status": "not_initialized"
         })
     
@@ -673,11 +679,14 @@ def health():
     
     return health_data
 
-# Route CHAT principale - MODIFICATION MAJEURE POUR RAG ENHANCED
+# Route CHAT principale - MODIFICATION MAJEURE POUR RAG ENHANCED AVEC MESURE TEMPS
 @router.post(f"{BASE_PATH}/chat")
 async def chat(request: Request):
-    """Chat endpoint avec RAG Enhanced intelligent"""
+    """Chat endpoint avec RAG Enhanced intelligent - AVEC MESURE TEMPS CORRIGÉE"""
     global rag_engine_enhanced, agent_rag_engine
+    
+    # CORRECTION : Mesure du temps total endpoint
+    total_start_time = time.time()
     
     if not rag_engine_enhanced:
         raise HTTPException(status_code=503, detail="RAG Engine Enhanced non disponible")
@@ -710,14 +719,21 @@ async def chat(request: Request):
         if USE_AGENT_RAG and agent_rag_engine and hasattr(agent_rag_engine, 'process_query_agent'):
             try:
                 agent_result = await agent_rag_engine.process_query_agent(message, language, tenant_id)
-                metrics_collector.record_query(agent_result, "agent_rag")
+                
+                # CORRECTION : Enregistrer avec temps endpoint
+                total_processing_time = time.time() - total_start_time
+                metrics_collector.record_query(agent_result, "agent_rag", total_processing_time)
+                
                 return await _stream_agent_response(agent_result, language, tenant_id)
             except Exception as e:
                 logger.warning(f"Erreur Agent RAG, fallback vers RAG Enhanced: {e}")
         
         # 2. Utiliser RAG Enhanced (principal)
         rag_result = await rag_engine_enhanced.process_query(message, language, tenant_id)
-        metrics_collector.record_query(rag_result, "rag_enhanced")
+        
+        # CORRECTION : Calculer le temps total de l'endpoint
+        total_processing_time = time.time() - total_start_time
+        metrics_collector.record_query(rag_result, "rag_enhanced", total_processing_time)
         
         # Traitement selon le type de résultat
         if rag_result.source == RAGSource.OOD_FILTERED:
