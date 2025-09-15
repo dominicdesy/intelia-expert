@@ -72,7 +72,7 @@ class RAGCacheManager:
         self.poultry_keywords = self._build_semantic_vocabulary()
         
         # CORRECTION: Seuils beaucoup plus stricts pour validation sémantique
-        self.SEMANTIC_MIN_KEYWORDS = 3  # Au lieu de 1-2
+        self.SEMANTIC_MIN_KEYWORDS = int(os.getenv("CACHE_SEMANTIC_MIN_KW", "2"))
         self.SEMANTIC_CONTEXT_REQUIRED = True
         
         # Mots vides (activés seulement si fallback activé)
@@ -342,7 +342,7 @@ class RAGCacheManager:
         
         self.cache_stats["keyword_extractions"] += 1
         
-        text_lower = text.lower()
+        text_lower = self._normalize_text(text).lower()
         
         # CORRECTION: Extraction par catégories STRICTES
         semantic_components = {
@@ -380,7 +380,7 @@ class RAGCacheManager:
                 metric_detected = True
         
         # 3. ÂGE/CONTEXTE (obligatoire pour certaines métriques)
-        age_pattern = re.search(r'(\d+)\s*(?:j|jour|day|semaine)', text_lower)
+        age_pattern = re.search(r'(\d+)\s*(?:j|jours?|day|days?|semaines?|semaine|wk|w)', text_lower)
         if age_pattern:
             age_value = age_pattern.group(1)
             semantic_components['age'].add(f"{age_value}j")
