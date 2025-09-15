@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-rag_engine.py - RAG Engine Enhanced avec Cache Redis, Recherche Hybride et Guardrails
+rag_engine.py - RAG Engine Enhanced avec Cache Redis externe optimisé
 Version Production Intégrée pour Intelia Expert Aviculture
 Version corrigée pour Weaviate 4.16.9 - Septembre 2025
-CORRECTIONS APPLIQUÉES: API Weaviate 4.16.9 + Diagnostic intégré
+CORRECTIONS APPLIQUÉES: Suppression cache interne + optimisations performance
 """
 
 import os
@@ -135,6 +135,44 @@ except ImportError as e:
             self.correction_suggestions = []
             self.metadata = {}
 
+# IMPORT DU CACHE EXTERNE OPTIMISÉ
+try:
+    from redis_cache_manager import RAGCacheManager
+    EXTERNAL_CACHE_AVAILABLE = True
+    logger.info("Cache Redis externe importé avec succès")
+except ImportError as e:
+    EXTERNAL_CACHE_AVAILABLE = False
+    logger.warning(f"Cache Redis externe non disponible: {e}")
+    
+    # Fallback cache dummy
+    class RAGCacheManager:
+        def __init__(self, *args, **kwargs):
+            self.enabled = False
+        
+        async def initialize(self):
+            pass
+        
+        async def get_embedding(self, text: str):
+            return None
+        
+        async def set_embedding(self, text: str, embedding: List[float]):
+            pass
+        
+        async def get_response(self, query: str, context_hash: str, language: str = "fr"):
+            return None
+        
+        async def set_response(self, query: str, context_hash: str, response: str, language: str = "fr"):
+            pass
+        
+        def generate_context_hash(self, documents: List[Dict]) -> str:
+            return "fallback_hash"
+        
+        async def get_cache_stats(self):
+            return {"enabled": False}
+        
+        async def cleanup(self):
+            pass
+
 # === CONFIGURATION ===
 RAG_ENABLED = os.getenv("RAG_ENABLED", "true").lower() == "true"
 WEAVIATE_URL = os.getenv("WEAVIATE_URL", "http://localhost:8080")
@@ -263,247 +301,9 @@ class Document:
         else:
             return getattr(self, key, default)
 
-
-# === GESTIONNAIRE DE CACHE REDIS ===
-class RAGCacheManager:
-    """Gestionnaire de cache Redis optimisé"""
-    
-    def __init__(self, redis_url: str = REDIS_URL, default_ttl: int = 3600):
-        self.redis_url = redis_url
-        self.default_ttl = default_ttl
-        self.client = None
-        self.enabled = REDIS_AVAILABLE and CACHE_ENABLED
-        
-        # Protection OOM
-        self.MAX_VALUE_BYTES = int(os.getenv("CACHE_MAX_VALUE_BYTES", "2000000"))  # 2MB
-        self.MAX_KEYS_PER_NAMESPACE = int(os.getenv("CACHE_MAX_KEYS_PER_NS", "1000"))
-        
-        self.ttl_config = {
-            "embeddings": 7200,
-            "search_results": 1800,
-            "responses": 900,
-            "intent_results": 3600,
-            "verification": 1800
-        }
-    
-    async def initialize(self):
-        if not self.enabled:
-            logger.warning("Redis cache désactivé")
-            return
-        
-        try:
-            self.client = redis.from_url(
-                self.redis_url,
-                encoding="utf-8",
-                decode_responses=False,
-                socket_keepalive=True,
-                health_check_interval=30
-            )
-            await self.client.ping()
-            logger.info("Cache Redis initialisé")
-        except Exception as e:
-            logger.warning(f"Erreur connexion Redis: {e} - cache désactivé")
-            self.enabled = False
-    
-    def _generate_key(self, prefix: str, data: Any) -> str:
-        if isinstance(data, str):
-            content = data
-        elif isinstance(data, dict):
-            content = json.dumps(data, sort_keys=True)
-        else:
-            content = str(data)
-        
-        hash_obj = hashlib.md5(content.encode('utf-8'))
-        return f"intelia_rag:{prefix}:{hash_obj.hexdigest()}"
-    
-    async def _check_size_and_purge(self, namespace: str, data_size: int) -> bool:
-        """Vérification taille et purge LRU"""
-        if data_size > self.MAX_VALUE_BYTES:
-            logger.warning(f"Valeur trop large pour cache: {data_size} bytes (max: {self.MAX_VALUE_BYTES})")
-            return False
-        
-        # Purge LRU par namespace si nécessaire
-        try:
-            count = 0
-            async for _ in self.client.scan_iter(match=f"intelia_rag:{namespace}:*"):
-                count += 1
-            
-            if count >= self.MAX_KEYS_PER_NAMESPACE:
-                logger.info(f"Purge LRU namespace {namespace}: {count} clés")
-                await self._purge_namespace_lru(namespace, count // 2)  # Supprimer la moitié
-        except Exception as e:
-            logger.warning(f"Erreur purge LRU: {e}")
-        
-        return True
-    
-    async def _purge_namespace_lru(self, namespace: str, to_delete: int):
-        """Purge LRU pour un namespace"""
-        try:
-            keys_with_ttl = []
-            async for key in self.client.scan_iter(match=f"intelia_rag:{namespace}:*"):
-                ttl = await self.client.ttl(key)
-                keys_with_ttl.append((key, ttl))
-            
-            # Trier par TTL (les plus anciens d'abord)
-            keys_with_ttl.sort(key=lambda x: x[1])
-            keys_to_delete = [key for key, _ in keys_with_ttl[:to_delete]]
-            
-            if keys_to_delete:
-                await self.client.delete(*keys_to_delete)
-                logger.info(f"Supprimé {len(keys_to_delete)} clés du namespace {namespace}")
-                
-        except Exception as e:
-            logger.warning(f"Erreur purge LRU détaillée: {e}")
-    
-    async def get_embedding(self, text: str) -> Optional[List[float]]:
-        if not self.enabled or not self.client:
-            return None
-        
-        try:
-            key = self._generate_key("embedding", text)
-            cached = await self.client.get(key)
-            
-            if cached:
-                decompressed = zlib.decompress(cached)
-                embedding = pickle.loads(decompressed)
-                METRICS.cache_hit("embedding")
-                return embedding
-        except Exception as e:
-            logger.warning(f"Erreur lecture cache embedding: {e}")
-        
-        METRICS.cache_miss("embedding")
-        return None
-    
-    async def set_embedding(self, text: str, embedding: List[float]):
-        if not self.enabled or not self.client:
-            return
-        
-        try:
-            serialized = pickle.dumps(embedding)
-            compressed = zlib.compress(serialized)
-            
-            # Vérification taille
-            if not await self._check_size_and_purge("embedding", len(compressed)):
-                return
-            
-            key = self._generate_key("embedding", text)
-            await self.client.setex(key, self.ttl_config["embeddings"], compressed)
-        except Exception as e:
-            logger.warning(f"Erreur écriture cache embedding: {e}")
-    
-    async def get_response(self, query: str, context_hash: str, language: str = "fr") -> Optional[str]:
-        if not self.enabled or not self.client:
-            return None
-        
-        try:
-            cache_data = {"query": query, "context_hash": context_hash, "language": language}
-            key = self._generate_key("response", cache_data)
-            cached = await self.client.get(key)
-            
-            if cached:
-                response = cached.decode('utf-8')
-                METRICS.cache_hit("response")
-                return response
-        except Exception as e:
-            logger.warning(f"Erreur lecture cache réponse: {e}")
-        
-        METRICS.cache_miss("response")
-        return None
-    
-    async def set_response(self, query: str, context_hash: str, response: str, language: str = "fr"):
-        if not self.enabled or not self.client:
-            return
-        
-        try:
-            response_bytes = response.encode('utf-8')
-            
-            # Vérification taille
-            if not await self._check_size_and_purge("response", len(response_bytes)):
-                return
-            
-            cache_data = {"query": query, "context_hash": context_hash, "language": language}
-            key = self._generate_key("response", cache_data)
-            await self.client.setex(key, self.ttl_config["responses"], response_bytes)
-        except Exception as e:
-            logger.warning(f"Erreur écriture cache réponse: {e}")
-    
-    def generate_context_hash(self, documents: List[Dict]) -> str:
-        try:
-            content_summary = []
-            for doc in documents[:5]:
-                summary = {
-                    "title": doc.get("title", ""),
-                    "source": doc.get("source", ""),
-                    "content_length": len(doc.get("content", "")),
-                    "score": round(doc.get("score", 0.0), 3)
-                }
-                content_summary.append(summary)
-            
-            return hashlib.md5(
-                json.dumps(content_summary, sort_keys=True).encode()
-            ).hexdigest()
-        except Exception as e:
-            logger.warning(f"Erreur génération hash contexte: {e}")
-            return "fallback_hash"
-    
-    async def get_cache_stats(self) -> Dict[str, Any]:
-        """Récupère les statistiques du cache - Version corrigée"""
-        if not self.enabled or not self.client:
-            return {"enabled": False}
-        
-        try:
-            # Utiliser une approche synchrone pour éviter les conflits d'event loop
-            def _get_stats_sync():
-                import redis  # Import redis synchrone
-                
-                # Créer un client Redis synchrone temporaire pour les stats
-                sync_redis = redis.from_url(
-                    self.redis_url,
-                    encoding="utf-8", 
-                    decode_responses=True
-                )
-                
-                try:
-                    info = sync_redis.info("memory")
-                    
-                    # Compter les clés par type
-                    type_counts = {}
-                    for cache_type in ["embeddings", "search_results", "responses", "intent_results", "verification"]:
-                        count = 0
-                        for _ in sync_redis.scan_iter(match=f"intelia_rag:{cache_type}:*"):
-                            count += 1
-                        type_counts[cache_type] = count
-                    
-                    return {
-                        "enabled": True,
-                        "memory_used": info.get("used_memory_human", "N/A"),
-                        "total_keys": sync_redis.dbsize(),
-                        "type_counts": type_counts,
-                        "ttl_config": self.ttl_config,
-                        "max_value_bytes": self.MAX_VALUE_BYTES,
-                        "max_keys_per_namespace": self.MAX_KEYS_PER_NAMESPACE
-                    }
-                finally:
-                    sync_redis.close()
-            
-            # Exécuter de manière thread-safe
-            return await anyio.to_thread.run_sync(_get_stats_sync)
-            
-        except Exception as e:
-            logger.warning(f"Erreur stats cache: {e}")
-            return {"enabled": True, "error": str(e)}
-    
-    async def cleanup(self):
-        if self.client:
-            try:
-                await self.client.close()
-                logger.info("Connexion Redis fermée")
-            except Exception as e:
-                logger.warning(f"Erreur fermeture Redis: {e}")
-
-# === EMBEDDER AVEC CACHE ===
+# === EMBEDDER AVEC CACHE EXTERNE ===
 class OpenAIEmbedder:
-    """Embedder OpenAI avec cache Redis intégré"""
+    """Embedder OpenAI avec cache Redis externe optimisé"""
     
     def __init__(self, client: AsyncOpenAI, cache_manager: RAGCacheManager = None, 
                  model: str = "text-embedding-3-small"):
@@ -512,10 +312,11 @@ class OpenAIEmbedder:
         self.model = model
         
     async def embed_query(self, text: str) -> List[float]:
-        # Vérifier le cache
-        if self.cache_manager:
+        # Vérifier le cache externe
+        if self.cache_manager and self.cache_manager.enabled:
             cached_embedding = await self.cache_manager.get_embedding(text)
             if cached_embedding:
+                METRICS.cache_hit("embedding")
                 return cached_embedding
         
         try:
@@ -526,10 +327,11 @@ class OpenAIEmbedder:
             )
             embedding = response.data[0].embedding
             
-            # Mettre en cache
-            if self.cache_manager:
+            # Mettre en cache externe
+            if self.cache_manager and self.cache_manager.enabled:
                 await self.cache_manager.set_embedding(text, embedding)
             
+            METRICS.cache_miss("embedding")
             return embedding
         except Exception as e:
             logger.error(f"Erreur embedding: {e}")
@@ -541,11 +343,12 @@ class OpenAIEmbedder:
         uncached_indices = []
         
         # Vérifier le cache pour chaque texte
-        if self.cache_manager:
+        if self.cache_manager and self.cache_manager.enabled:
             for i, text in enumerate(texts):
                 cached = await self.cache_manager.get_embedding(text)
                 if cached:
                     results.append((i, cached))
+                    METRICS.cache_hit("embedding")
                 else:
                     uncached_texts.append(text)
                     uncached_indices.append(i)
@@ -565,9 +368,10 @@ class OpenAIEmbedder:
                 
                 # Ajouter aux résultats et mettre en cache
                 for idx, embedding in zip(uncached_indices, new_embeddings):
-                    if self.cache_manager:
+                    if self.cache_manager and self.cache_manager.enabled:
                         await self.cache_manager.set_embedding(texts[idx], embedding)
                     results.append((idx, embedding))
+                    METRICS.cache_miss("embedding")
             except Exception as e:
                 logger.error(f"Erreur embeddings batch: {e}")
                 return []
@@ -635,7 +439,7 @@ class HybridWeaviateRetriever:
             "diversity_threshold": 0.8
         }
         
-        # AJOUT: État des API pour diagnostic
+        # État des API pour diagnostic
         self.api_capabilities = {
             "hybrid_with_vector": None,
             "hybrid_with_where": None,
@@ -644,7 +448,7 @@ class HybridWeaviateRetriever:
         }
     
     async def diagnose_weaviate_api(self):
-        """CORRECTION 3: Diagnostic des méthodes disponibles dans Weaviate v4.16.9"""
+        """Diagnostic des méthodes disponibles dans Weaviate v4.16.9"""
         if self.api_capabilities["diagnosed"]:
             return
             
@@ -725,7 +529,7 @@ class HybridWeaviateRetriever:
     
     async def adaptive_search(self, query_vector: List[float], query_text: str,
                             top_k: int = 15, where_filter: Dict = None) -> List[Document]:
-        """CORRECTION 1: Recherche adaptative qui ajuste alpha selon la requête - Version corrigée avec diagnostic"""
+        """Recherche adaptative qui ajuste alpha selon la requête - Version corrigée avec diagnostic"""
         
         # Exécuter le diagnostic si activé et pas encore fait
         if ENABLE_API_DIAGNOSTICS and not self.api_capabilities["diagnosed"]:
@@ -813,7 +617,7 @@ class HybridWeaviateRetriever:
     
     async def _hybrid_search_v4_corrected(self, query_vector: List[float], query_text: str,
                                         top_k: int, where_filter: Dict, alpha: float) -> List[Document]:
-        """CORRECTION 1: Recherche hybride native Weaviate v4 - Version corrigée pour 4.16.9"""
+        """Recherche hybride native Weaviate v4 - Version corrigée pour 4.16.9"""
         try:
             def _sync_hybrid_search():
                 collection = self.client.collections.get(self.collection_name)
@@ -826,11 +630,11 @@ class HybridWeaviateRetriever:
                     "return_metadata": wvc.query.MetadataQuery(score=True)
                 }
                 
-                # CORRECTION: Ajouter le vector seulement si supporté
+                # Ajouter le vector seulement si supporté
                 if self.api_capabilities.get("hybrid_with_vector", True):  # True par défaut pour première tentative
                     search_params["vector"] = query_vector
                 
-                # CORRECTION: Ajouter le filtre seulement si supporté
+                # Ajouter le filtre seulement si supporté
                 if where_filter and self.api_capabilities.get("hybrid_with_where", True):
                     v4_filter = _to_v4_filter(where_filter)
                     if v4_filter is not None:
@@ -885,7 +689,7 @@ class HybridWeaviateRetriever:
     
     async def _vector_search_v4_corrected(self, query_vector: List[float], top_k: int, 
                                         where_filter: Dict) -> List[Document]:
-        """CORRECTION 1: Recherche vectorielle Weaviate v4 - Version corrigée pour 4.16.9"""
+        """Recherche vectorielle Weaviate v4 - Version corrigée pour 4.16.9"""
         try:
             def _sync_search():
                 collection = self.client.collections.get(self.collection_name)
@@ -896,7 +700,7 @@ class HybridWeaviateRetriever:
                     "return_metadata": wvc.query.MetadataQuery(distance=True, score=True)
                 }
                 
-                # CORRECTION: Tester différents formats de vecteur
+                # Tester différents formats de vecteur
                 vector_param_name = self.api_capabilities.get("near_vector_format", "vector")  # Par défaut "vector"
                 
                 params = base_params.copy()
@@ -1006,79 +810,6 @@ class HybridWeaviateRetriever:
             logger.error(f"Erreur recherche minimale: {e}")
             return []
     
-    async def _hybrid_search_fallback(self, query_vector: List[float], query_text: str,
-                                    top_k: int, where_filter: Dict, alpha: float) -> List[Document]:
-        """Recherche hybride manuelle pour v3 ou fallback"""
-        try:
-            # Recherche vectorielle et BM25 en parallèle
-            vector_docs = await self._vector_search_v3(query_vector, top_k * 2, where_filter)
-            bm25_docs = await self._bm25_search_fallback(query_text, top_k, where_filter)
-            
-            # Fusion avec RRF
-            fused_docs = self._fuse_results_rrf(vector_docs, bm25_docs, alpha, top_k)
-            return fused_docs
-            
-        except Exception as e:
-            logger.error(f"Erreur recherche hybride fallback: {e}")
-            return await self._vector_search_fallback(query_vector, top_k, where_filter)
-    
-    def _fuse_results_rrf(self, vector_docs: List[Document], bm25_docs: List[Document],
-                         alpha: float, top_k: int) -> List[Document]:
-        """Fusion avec Reciprocal Rank Fusion"""
-        all_docs = {}
-        
-        # Indexer documents vectoriels
-        for i, doc in enumerate(vector_docs):
-            content_key = doc.content[:100]
-            if content_key not in all_docs:
-                all_docs[content_key] = {
-                    "doc": doc,
-                    "vector_rank": i + 1,
-                    "vector_score": doc.score,
-                    "bm25_rank": None,
-                    "bm25_score": 0.0
-                }
-        
-        # Indexer documents BM25
-        for i, doc in enumerate(bm25_docs):
-            content_key = doc.content[:100]
-            if content_key in all_docs:
-                all_docs[content_key]["bm25_rank"] = i + 1
-                all_docs[content_key]["bm25_score"] = doc.score
-            else:
-                all_docs[content_key] = {
-                    "doc": doc,
-                    "vector_rank": None,
-                    "vector_score": 0.0,
-                    "bm25_rank": i + 1,
-                    "bm25_score": doc.score
-                }
-        
-        # Calcul score RRF
-        fused_docs = []
-        for content_key, data in all_docs.items():
-            doc = data["doc"]
-            
-            rrf_score = 0.0
-            if data["vector_rank"]:
-                rrf_score += alpha / (self.fusion_config["rrf_k"] + data["vector_rank"])
-            if data["bm25_rank"]:
-                rrf_score += (1 - alpha) / (self.fusion_config["rrf_k"] + data["bm25_rank"])
-            
-            if rrf_score >= self.fusion_config["min_score_threshold"]:
-                doc.score = rrf_score * 10  # Normaliser
-                doc.metadata.update({
-                    "hybrid_used": True,
-                    "fusion_method": "rrf",
-                    "alpha": alpha,
-                    "vector_rank": data["vector_rank"],
-                    "bm25_rank": data["bm25_rank"]
-                })
-                fused_docs.append(doc)
-        
-        fused_docs.sort(key=lambda x: x.score, reverse=True)
-        return fused_docs[:top_k]
-    
     async def _vector_search_v3(self, query_vector: List[float], top_k: int, 
                               where_filter: Dict) -> List[Document]:
         """Recherche vectorielle Weaviate v3"""
@@ -1128,63 +859,6 @@ class HybridWeaviateRetriever:
             logger.error(f"Erreur recherche vectorielle v3: {e}")
             return []
     
-    async def _bm25_search_fallback(self, query_text: str, top_k: int, 
-                                  where_filter: Dict) -> List[Document]:
-        """Recherche BM25 de fallback - Version corrigée pour 4.16.9"""
-        if not self.is_v4:
-            return []
-        
-        try:
-            def _sync_bm25():
-                collection = self.client.collections.get(self.collection_name)
-                params = {
-                    "query": query_text,
-                    "limit": top_k,
-                    "return_metadata": wvc.query.MetadataQuery(score=True)
-                }
-                
-                if where_filter:
-                    v4_filter = _to_v4_filter(where_filter)
-                    if v4_filter is not None:
-                        params["where"] = v4_filter
-                
-                return collection.query.bm25(**params)
-            
-            response = await anyio.to_thread.run_sync(_sync_bm25)
-            
-            documents = []
-            for obj in response.objects:
-                score = float(getattr(obj.metadata, "score", 0.0))
-                
-                doc = Document(
-                    content=obj.properties.get("content", ""),
-                    metadata={
-                        "title": obj.properties.get("title", ""),
-                        "source": obj.properties.get("source", ""),
-                        "geneticLine": obj.properties.get("geneticLine", ""),
-                        "species": obj.properties.get("species", ""),
-                        "phase": obj.properties.get("phase", ""),
-                        "age_band": obj.properties.get("age_band", ""),
-                        "bm25_used": True
-                    },
-                    score=score
-                )
-                documents.append(doc)
-            
-            return documents
-            
-        except Exception as e:
-            logger.error(f"Erreur BM25 fallback: {e}")
-            return []
-    
-    async def _vector_search_fallback(self, query_vector: List[float], top_k: int, 
-                                    where_filter: Dict) -> List[Document]:
-        """Recherche vectorielle simple de fallback"""
-        if self.is_v4:
-            return await self._vector_search_v4_corrected(query_vector, top_k, where_filter)
-        else:
-            return await self._vector_search_v3(query_vector, top_k, where_filter)
-    
     def _remove_age_band_filter(self, where_filter: Dict) -> Dict:
         """Retire le critère age_band du filtre"""
         if not where_filter:
@@ -1222,7 +896,7 @@ class HybridWeaviateRetriever:
 
 # === GÉNÉRATEUR DE RÉPONSES ENRICHI ===
 class EnhancedResponseGenerator:
-    """Générateur avec enrichissement d'entités et cache"""
+    """Générateur avec enrichissement d'entités et cache externe"""
     
     def __init__(self, client, cache_manager: RAGCacheManager = None):
         self.client = client
@@ -1253,10 +927,10 @@ class EnhancedResponseGenerator:
     async def generate_response(self, query: str, context_docs: List[Document], 
                               conversation_context: str = "", language: str = "fr",
                               intent_result=None) -> str:
-        """Génère une réponse enrichie avec cache"""
+        """Génère une réponse enrichie avec cache externe"""
         try:
-            # Vérifier le cache
-            if self.cache_manager:
+            # Vérifier le cache externe
+            if self.cache_manager and self.cache_manager.enabled:
                 context_hash = self.cache_manager.generate_context_hash(
                     [self._doc_to_dict(doc) for doc in context_docs]
                 )
@@ -1289,8 +963,8 @@ class EnhancedResponseGenerator:
             
             generated_response = response.choices[0].message.content.strip()
             
-            # Mettre en cache
-            if self.cache_manager:
+            # Mettre en cache externe
+            if self.cache_manager and self.cache_manager.enabled:
                 context_hash = self.cache_manager.generate_context_hash(
                     [self._doc_to_dict(doc) for doc in context_docs]
                 )
@@ -1567,7 +1241,7 @@ def build_where_filter(intent_result) -> Dict:
 
 # === RAG ENGINE PRINCIPAL ===
 class InteliaRAGEngine:
-    """RAG Engine principal avec toutes les optimisations intégrées - Version corrigée pour Weaviate 4.16.9"""
+    """RAG Engine principal avec cache externe optimisé - Version corrigée pour Weaviate 4.16.9"""
     
     def __init__(self, openai_client: AsyncOpenAI = None):
         self.openai_client = openai_client or self._build_openai_client()
@@ -1595,7 +1269,8 @@ class InteliaRAGEngine:
             "hybrid_searches": 0,
             "guardrail_violations": 0,
             "entity_enrichments": 0,
-            "api_corrections": 0  # AJOUT: Stats corrections API
+            "api_corrections": 0,
+            "external_cache_used": False
         }
     
     def _build_openai_client(self) -> AsyncOpenAI:
@@ -1608,11 +1283,11 @@ class InteliaRAGEngine:
             return AsyncOpenAI(api_key=OPENAI_API_KEY)
     
     async def initialize(self):
-        """Initialisation complète avec diagnostic API"""
+        """Initialisation complète avec cache externe"""
         if self.is_initialized:
             return
             
-        logger.info("Initialisation RAG Engine Enhanced")
+        logger.info("Initialisation RAG Engine Enhanced avec cache externe")
         
         if not OPENAI_AVAILABLE or not WEAVIATE_AVAILABLE:
             self.degraded_mode = True
@@ -1621,10 +1296,15 @@ class InteliaRAGEngine:
             return
         
         try:
-            # 1. Cache Redis
-            if CACHE_ENABLED and REDIS_AVAILABLE:
+            # 1. Cache Redis externe optimisé
+            if CACHE_ENABLED and EXTERNAL_CACHE_AVAILABLE:
                 self.cache_manager = RAGCacheManager()
                 await self.cache_manager.initialize()
+                if self.cache_manager.enabled:
+                    self.optimization_stats["external_cache_used"] = True
+                    logger.info("Cache Redis externe activé")
+                else:
+                    logger.warning("Cache Redis externe désactivé")
             
             # 2. Connexion Weaviate
             await self._connect_weaviate()
@@ -1637,7 +1317,7 @@ class InteliaRAGEngine:
             # 4. Retriever hybride avec diagnostic intégré
             if self.weaviate_client:
                 self.retriever = HybridWeaviateRetriever(self.weaviate_client)
-                # CORRECTION 3: Exécuter diagnostic au démarrage si activé
+                # Exécuter diagnostic au démarrage si activé
                 if ENABLE_API_DIAGNOSTICS:
                     logger.info("🔍 Exécution diagnostic API Weaviate...")
                     await self.retriever.diagnose_weaviate_api()
@@ -1754,7 +1434,7 @@ class InteliaRAGEngine:
                 raise Exception("Weaviate not ready")
     
     async def process_query(self, query: str, language: str = "fr", tenant_id: str = "") -> RAGResult:
-        """Traitement de requête avec toutes les optimisations et corrections API"""
+        """Traitement de requête avec cache externe optimisé et corrections API"""
         if not RAG_ENABLED:
             return RAGResult(source=RAGSource.FALLBACK_NEEDED, metadata={"reason": "rag_disabled"})
         
@@ -1991,9 +1671,9 @@ RÈGLE: Réponds strictement en {language}."""
             
             # Métadonnées complètes avec infos corrections
             metadata = {
-                "approach": "enhanced_rag_integrated_complete_v4_16_9_corrected",
+                "approach": "enhanced_rag_external_cache_optimized_v4_16_9",
                 "optimizations_enabled": {
-                    "redis_cache": self.cache_manager.enabled if self.cache_manager else False,
+                    "external_redis_cache": self.optimization_stats["external_cache_used"],
                     "hybrid_search": HYBRID_SEARCH_ENABLED,
                     "entity_enrichment": ENTITY_ENRICHMENT_ENABLED,
                     "advanced_guardrails": True,
@@ -2012,7 +1692,7 @@ RÈGLE: Réponds strictement en {language}."""
                 "language_target": language,
                 "language_detected": detect_language_light(query),
                 "optimization_stats": self.optimization_stats.copy(),
-                # AJOUT: Infos sur les corrections API
+                # Infos sur les corrections API
                 "api_capabilities": self.retriever.api_capabilities if self.retriever else {},
                 "api_corrections_applied": self.optimization_stats.get("api_corrections", 0) > 0
             }
@@ -2083,7 +1763,7 @@ RÈGLE: Réponds strictement en {language}."""
         return min(0.95, max(0.1, final_confidence))
     
     def get_status(self) -> Dict:
-        """Status complet du système avec infos corrections API"""
+        """Status complet du système avec infos cache externe"""
         try:
             weaviate_connected = False
             api_capabilities = {}
@@ -2104,9 +1784,9 @@ RÈGLE: Réponds strictement en {language}."""
                 "rag_enabled": RAG_ENABLED,
                 "initialized": self.is_initialized,
                 "degraded_mode": self.degraded_mode,
-                "approach": "enhanced_rag_integrated_complete_v4_16_9_corrected",
+                "approach": "enhanced_rag_external_cache_optimized_v4_16_9",
                 "optimizations": {
-                    "cache_enabled": self.cache_manager.enabled if self.cache_manager else False,
+                    "external_cache_enabled": self.cache_manager.enabled if self.cache_manager else False,
                     "hybrid_search_enabled": HYBRID_SEARCH_ENABLED,
                     "entity_enrichment_enabled": ENTITY_ENRICHMENT_ENABLED,
                     "guardrails_level": GUARDRAILS_LEVEL,
@@ -2120,6 +1800,7 @@ RÈGLE: Réponds strictement en {language}."""
                     "weaviate_v4": WEAVIATE_V4,
                     "weaviate_connected": weaviate_connected,
                     "redis_available": REDIS_AVAILABLE,
+                    "external_cache_available": EXTERNAL_CACHE_AVAILABLE,
                     "voyage_available": VOYAGE_AVAILABLE,
                     "sentence_transformers_available": SENTENCE_TRANSFORMERS_AVAILABLE,
                     "intent_processor_available": INTENT_PROCESSOR_AVAILABLE,
@@ -2135,18 +1816,19 @@ RÈGLE: Réponds strictement en {language}."""
                     "weaviate_url": WEAVIATE_URL
                 },
                 "optimization_stats": self.optimization_stats.copy(),
-                "api_capabilities": api_capabilities,  # AJOUT: Capacités API détectées
+                "api_capabilities": api_capabilities,
                 "metrics": METRICS.snapshot()
             }
             
-            # Simplifier l'ajout des stats cache pour éviter les erreurs d'event loop
+            # Stats cache externe si disponible
             if self.cache_manager and self.cache_manager.enabled:
                 status["cache_stats"] = {
                     "enabled": True,
-                    "note": "Stats détaillées disponibles via endpoint dédié"
+                    "external_cache_used": True,
+                    "note": "Stats détaillées disponibles via cache externe"
                 }
             else:
-                status["cache_stats"] = {"enabled": False}
+                status["cache_stats"] = {"enabled": False, "external_cache_used": False}
             
             return status
             
@@ -2174,7 +1856,7 @@ RÈGLE: Réponds strictement en {language}."""
             if hasattr(self.openai_client, 'http_client'):
                 await self.openai_client.http_client.aclose()
             
-            logger.info("Enhanced RAG Engine nettoyé")
+            logger.info("Enhanced RAG Engine avec cache externe nettoyé")
             
         except Exception as e:
             logger.error(f"Erreur nettoyage: {e}")
@@ -2182,7 +1864,7 @@ RÈGLE: Réponds strictement en {language}."""
 
 # === FONCTIONS UTILITAIRES POUR COMPATIBILITÉ ===
 async def create_rag_engine(openai_client: AsyncOpenAI = None) -> InteliaRAGEngine:
-    """Factory pour créer le RAG engine enhanced"""
+    """Factory pour créer le RAG engine enhanced avec cache externe"""
     try:
         engine = InteliaRAGEngine(openai_client)
         await engine.initialize()
