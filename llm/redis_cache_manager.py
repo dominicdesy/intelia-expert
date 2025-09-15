@@ -3,7 +3,7 @@
 redis_cache_manager.py - Gestionnaire de cache Redis optimisé pour performance
 Version Enhanced avec intégration des aliases d'intents.json
 CORRECTIONS APPLIQUÉES: Cache sémantique STRICT + toutes les fonctionnalités conservées
-AMÉLIORATIONS AJOUTÉES:
+AMéLIORATIONS AJOUTÉES:
 - Initialisation Redis asynchrone sécurisée avec statut
 - Fallback sémantique "line+metric (sans âge)" avec TTL réduit  
 - Normalisation étendue pour variantes R-308, C-500
@@ -220,7 +220,7 @@ class RAGCacheManager:
         # Supprimer espaces multiples
         cleaned = re.sub(r'\s+', '', cleaned)
         
-        # NOUVEAU: Éviter les collisions sur termes trop courts
+        # NOUVEAU: éviter les collisions sur termes trop courts
         if len(cleaned) < 3:
             return ""
             
@@ -259,7 +259,7 @@ class RAGCacheManager:
             # NOUVEAU: Marquer comme initialisé
             self.initialized = True
             
-            # Log de la configuration avec AMÉLIORATIONS
+            # Log de la configuration avec AMéLIORATIONS
             logger.info("Cache Redis Enhanced STRICT + Fallback initialisé:")
             logger.info(f"  - Limite valeur: {self.MAX_VALUE_BYTES/1024:.0f} KB")
             logger.info(f"  - Cache sémantique: {self.ENABLE_SEMANTIC_CACHE} (STRICT MODE)")
@@ -558,37 +558,6 @@ class RAGCacheManager:
         
         return fallback_keys[:1]  # CORRECTION: Une seule clé fallback
     
-    # CORRECTION 1: Méthode get_semantic_response() dédiée (lookup "pur")
-    async def get_semantic_response(self, query: str, language: str = "fr") -> Optional[str]:
-        """CORRIGÉ: Lecture sémantique pure avec validation stricte"""
-        if not self._is_initialized() or not self.ENABLE_SEMANTIC_CACHE:
-            return None
-        
-        try:
-            normalized_query = self._normalize_text_extended(query)
-            keywords = self._extract_semantic_keywords_strict(normalized_query)
-            
-            # CORRECTION: Validation stricte obligatoire
-            if not self._validate_semantic_cache_eligibility(keywords, query):
-                return None
-            
-            # Générer clé sémantique uniquement
-            semantic_signature = '|'.join(sorted(keywords))
-            hash_obj = hashlib.md5(semantic_signature.encode('utf-8'))
-            semantic_key = f"intelia_rag:response:semantic:{hash_obj.hexdigest()}"
-            
-            stored = await self.client.get(semantic_key)
-            if stored:
-                self.hit_type_last = "semantic"
-                self.cache_stats["semantic_hits"] += 1
-                logger.info(f"Cache HIT (sémantique STRICT): '{query[:30]}...' -> keywords: {list(keywords)}")
-                return stored.decode("utf-8")
-            
-        except Exception as e:
-            logger.warning(f"Erreur get_semantic_response: {e}")
-        
-        return None
-    
     async def _get_memory_usage_mb(self) -> float:
         """Récupère l'usage mémoire Redis en MB"""
         try:
@@ -680,7 +649,7 @@ class RAGCacheManager:
                 self.protection_stats["lru_purges"] += purged_count
                 
                 if purged_count == 0:
-                    logger.warning(f"Échec purge LRU namespace {namespace}")
+                    logger.warning(f"échec purge LRU namespace {namespace}")
                     return False
         
         except Exception as e:
@@ -827,7 +796,7 @@ class RAGCacheManager:
                 keywords = self._extract_semantic_keywords_strict(text)
                 if self._validate_semantic_cache_eligibility(keywords, text):
                     semantic_key = self._generate_key("embedding", text, use_semantic=True)
-                    if semantic_key != key:  # Éviter duplication
+                    if semantic_key != key:  # éviter duplication
                         await self.client.setex(
                             semantic_key,
                             self.ttl_config["embeddings"],
@@ -1302,3 +1271,39 @@ class RAGCacheManager:
                 "fallback_keyword_count": len(fallback_keywords),
                 "vocabulary_size": len(self.poultry_keywords),
                 "aliases_loaded": len(self.aliases),
+                "semantic_key": semantic_key,
+                "fallback_semantic_key": fallback_semantic_key,
+                "simple_key": simple_key,
+                "semantic_cache_exists": semantic_exists,
+                "fallback_semantic_cache_exists": fallback_semantic_exists,
+                "simple_cache_exists": simple_exists,
+                "is_semantic_eligible": self._validate_semantic_cache_eligibility(keywords, original),
+                "validation": {
+                    "has_line": any('ross' in kw or 'cobb' in kw or 'hubbard' in kw for kw in keywords),
+                    "has_metric": any(kw in ['fcr', 'poids', 'température', 'mortalité'] for kw in keywords),
+                    "has_age": any('j' in kw and kw != '_fallback_eligible' for kw in keywords),
+                    "min_keywords_met": len(keywords) >= self.SEMANTIC_MIN_KEYWORDS
+                },
+                "extended_patterns_applied": bool(self.extended_line_patterns),
+                "semantic_cache_enabled": self.ENABLE_SEMANTIC_CACHE,
+                "semantic_fallback_enabled": self.ENABLE_SEMANTIC_FALLBACK
+            }
+            
+        except Exception as e:
+            return {
+                "error": str(e),
+                "original_query": query,
+                "extraction_failed": True
+            }
+
+    async def close(self):
+        """Ferme la connexion Redis proprement"""
+        if self.client:
+            try:
+                await self.client.close()
+                logger.info("Connexion Redis fermée")
+            except Exception as e:
+                logger.warning(f"Erreur fermeture Redis: {e}")
+        
+        self.client = None
+        self.initialized = False
