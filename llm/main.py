@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-main.py - Intelia Expert Backend amélioré avec Agent RAG
-Version optimisée préservant votre intelligence métier avec Agent RAG intelligent
+main.py - Intelia Expert Backend avec RAG Enhanced intégré
+Version optimisée préservant votre intelligence métier avec RAG Enhanced
 """
 
 import os
@@ -21,19 +21,21 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from langdetect import detect, DetectorFactory
 
-# Import de votre RAG Engine amélioré
-from rag_engine import create_rag_engine, process_question_with_rag, RAGSource, RAGResult
+# Import du RAG Engine Enhanced (remplace l'ancien import)
+from rag_engine import InteliaRAGEngine, create_rag_engine, RAGSource, RAGResult
 
-# Import de l'Agent RAG (nouveau)
+# Tentative d'import Agent RAG (optionnel)
 try:
     from agent_rag_extension import InteliaAgentRAG, create_agent_rag_engine, AgentResult, QueryComplexity
     AGENT_RAG_AVAILABLE = True
+    logger = logging.getLogger(__name__)
+    logger.info("Agent RAG disponible")
 except ImportError as e:
-    logger.warning(f"Agent RAG non disponible: {e}")
     AGENT_RAG_AVAILABLE = False
-    # Fallback types
+    # Fallback types pour compatibilité
     class QueryComplexity:
         SIMPLE = "simple"
+        COMPLEX = "complex"
     class AgentResult:
         pass
 
@@ -43,8 +45,9 @@ logger = logging.getLogger(__name__)
 DetectorFactory.seed = 0
 load_dotenv()
 
-# Variables globales - modification pour Agent RAG
-agent_rag_engine = None  # Remplace rag_engine
+# Variables globales - MODIFIÉ pour RAG Enhanced
+rag_engine_enhanced = None  # Nouvelle instance RAG Enhanced
+agent_rag_engine = None     # Agent RAG optionnel
 
 # Configuration (préservée de votre version originale)
 BASE_PATH = os.environ.get("BASE_PATH", "/llm").rstrip("/")
@@ -64,11 +67,15 @@ ENABLE_RESPONSE_STREAMING = os.getenv("ENABLE_RESPONSE_STREAMING", "true").lower
 ENABLE_METRICS_LOGGING = os.getenv("ENABLE_METRICS_LOGGING", "true").lower() == "true"
 MAX_CONVERSATION_CONTEXT = int(os.getenv("MAX_CONVERSATION_CONTEXT", "3"))
 
+# Nouveaux paramètres RAG Enhanced
+USE_AGENT_RAG = os.getenv("USE_AGENT_RAG", "false").lower() == "true"  # Désactivé par défaut
+PREFER_ENHANCED_RAG = os.getenv("PREFER_ENHANCED_RAG", "true").lower() == "true"
+
 # Validation configuration
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY is required")
 
-logger.info(f"Mode Agent RAG Enhanced: Intelligence multi-requêtes avec synthèse")
+logger.info(f"Mode RAG Enhanced: Cache Redis + Recherche Hybride + Guardrails")
 
 # Chargement des messages multilingues (votre logique préservée)
 def _load_language_messages(path: str) -> Dict[str, str]:
@@ -145,7 +152,7 @@ class TenantMemory(OrderedDict):
 
 conversation_memory = TenantMemory()
 
-def add_to_conversation_memory(tenant_id: str, question: str, answer: str):
+def add_to_conversation_memory(tenant_id: str, question: str, answer: str, source: str = "rag_enhanced"):
     """Ajoute un échange à la mémoire de conversation - Version améliorée"""
     tenant_data = conversation_memory.get(tenant_id, {"data": []})
     history = tenant_data["data"]
@@ -154,7 +161,7 @@ def add_to_conversation_memory(tenant_id: str, question: str, answer: str):
         "question": question, 
         "answer": answer, 
         "timestamp": time.time(),
-        "answer_source": "agent_rag"  # Traçabilité améliorée
+        "answer_source": source  # Traçabilité améliorée
     })
     
     # Limiter selon la configuration
@@ -164,64 +171,73 @@ def add_to_conversation_memory(tenant_id: str, question: str, answer: str):
     conversation_memory.set(tenant_id, history)
     conversation_memory.update_last_query(tenant_id, question)
 
-# Classe de métriques pour monitoring amélioré
+# Classe de métriques pour monitoring amélioré - ÉTENDUE pour RAG Enhanced
 class MetricsCollector:
     """Collecteur de métriques pour monitoring des performances"""
     
     def __init__(self):
         self.metrics = {
             "total_queries": 0,
+            "rag_enhanced_queries": 0,
             "agent_queries": 0,
             "simple_queries": 0,
             "complex_queries": 0,
-            "rag_queries": 0,
+            "rag_standard_queries": 0,
             "ood_filtered": 0,
             "fallback_queries": 0,
             "verified_responses": 0,
+            "cache_hits": 0,
+            "cache_misses": 0,
+            "hybrid_searches": 0,
+            "guardrail_violations": 0,
             "avg_processing_time": 0.0,
             "avg_confidence": 0.0,
-            "synthesis_success_rate": 0.0
         }
         self.recent_processing_times = []
         self.recent_confidences = []
         self.max_recent_samples = 100
     
-    def record_query(self, result):
-        """Enregistre les métriques d'une requête - compatible Agent et RAG"""
+    def record_query(self, result, source_type: str = "unknown"):
+        """Enregistre les métriques d'une requête - Compatible Enhanced RAG + Agent"""
         if not ENABLE_METRICS_LOGGING:
             return
         
         self.metrics["total_queries"] += 1
         
-        # Gestion Agent Result
-        if isinstance(result, AgentResult):
-            self.metrics["agent_queries"] += 1
-            if result.complexity == QueryComplexity.SIMPLE:
-                self.metrics["simple_queries"] += 1
-            else:
-                self.metrics["complex_queries"] += 1
-                
-            processing_time = result.processing_time
-            confidence = result.confidence
+        # Gestion selon le type de source
+        if source_type == "rag_enhanced":
+            self.metrics["rag_enhanced_queries"] += 1
             
-        # Gestion RAG Result standard
-        elif hasattr(result, 'source') and hasattr(result, 'confidence'):
+        elif source_type == "agent_rag":
+            self.metrics["agent_queries"] += 1
+            if hasattr(result, 'complexity'):
+                if result.complexity == QueryComplexity.SIMPLE:
+                    self.metrics["simple_queries"] += 1
+                else:
+                    self.metrics["complex_queries"] += 1
+        
+        # Traitement selon le type de résultat
+        if hasattr(result, 'source'):
             if result.source == RAGSource.RAG_KNOWLEDGE:
-                self.metrics["rag_queries"] += 1
+                self.metrics["rag_standard_queries"] += 1
             elif result.source == RAGSource.RAG_VERIFIED:
-                self.metrics["rag_queries"] += 1
+                self.metrics["rag_standard_queries"] += 1
                 self.metrics["verified_responses"] += 1
             elif result.source == RAGSource.OOD_FILTERED:
                 self.metrics["ood_filtered"] += 1
             else:
                 self.metrics["fallback_queries"] += 1
-                
-            processing_time = result.processing_time
-            confidence = result.confidence
-        else:
-            return  # Format non reconnu
+        
+        # Métriques des optimisations
+        if hasattr(result, 'metadata') and result.metadata:
+            opt_stats = result.metadata.get("optimization_stats", {})
+            self.metrics["cache_hits"] += opt_stats.get("cache_hits", 0)
+            self.metrics["cache_misses"] += opt_stats.get("cache_misses", 0)
+            self.metrics["hybrid_searches"] += opt_stats.get("hybrid_searches", 0)
+            self.metrics["guardrail_violations"] += opt_stats.get("guardrail_violations", 0)
         
         # Temps de traitement
+        processing_time = getattr(result, 'processing_time', 0)
         if processing_time > 0:
             self.recent_processing_times.append(processing_time)
             if len(self.recent_processing_times) > self.max_recent_samples:
@@ -232,6 +248,7 @@ class MetricsCollector:
             )
         
         # Confiance
+        confidence = getattr(result, 'confidence', 0)
         if confidence > 0:
             self.recent_confidences.append(confidence)
             if len(self.recent_confidences) > self.max_recent_samples:
@@ -243,59 +260,25 @@ class MetricsCollector:
     
     def get_metrics(self) -> Dict:
         """Retourne les métriques actuelles"""
+        total_queries = max(1, self.metrics["total_queries"])
+        
         return {
             **self.metrics,
             "success_rate": (
-                (self.metrics["rag_queries"] + self.metrics["verified_responses"] + self.metrics["agent_queries"]) / 
-                max(1, self.metrics["total_queries"])
+                (self.metrics["rag_enhanced_queries"] + self.metrics["verified_responses"] + self.metrics["agent_queries"]) / total_queries
             ),
-            "agent_usage_rate": self.metrics["agent_queries"] / max(1, self.metrics["total_queries"]),
-            "complexity_rate": self.metrics["complex_queries"] / max(1, self.metrics["agent_queries"]) if self.metrics["agent_queries"] > 0 else 0.0
+            "enhanced_rag_usage_rate": self.metrics["rag_enhanced_queries"] / total_queries,
+            "agent_usage_rate": self.metrics["agent_queries"] / total_queries,
+            "cache_hit_rate": (
+                self.metrics["cache_hits"] / max(1, self.metrics["cache_hits"] + self.metrics["cache_misses"])
+            ),
+            "hybrid_search_rate": self.metrics["hybrid_searches"] / total_queries,
+            "guardrail_violation_rate": self.metrics["guardrail_violations"] / total_queries
         }
 
 metrics_collector = MetricsCollector()
 
-# Wrapper de compatibilité pour RAG standard (nouveau)
-class AgentCompatibilityWrapper:
-    """Wrapper pour compatibilité avec RAG standard"""
-    def __init__(self, rag_engine):
-        self.rag_engine = rag_engine
-        self.is_agent = False
-    
-    async def process_query_agent(self, query: str, language: str = "fr", tenant_id: str = "") -> AgentResult:
-        """Simule l'interface agent avec RAG standard"""
-        rag_result = await self.rag_engine.process_query(query, language, tenant_id)
-        
-        # Créer un AgentResult simple pour compatibilité
-        agent_result = type('AgentResult', (), {
-            'final_answer': rag_result.answer or "Aucune réponse trouvée",
-            'confidence': rag_result.confidence,
-            'sub_results': [rag_result],
-            'synthesis_method': "standard_rag_fallback",
-            'processing_time': rag_result.processing_time,
-            'complexity': QueryComplexity.SIMPLE,
-            'decomposition_used': False,
-            'agent_decisions': ["Fallback vers RAG standard"]
-        })()
-        
-        return agent_result
-    
-    def get_agent_status(self):
-        base_status = self.rag_engine.get_status() if hasattr(self.rag_engine, 'get_status') else {}
-        return {**base_status, "agent_enabled": False, "fallback_mode": True}
-    
-    # Déléguer les autres méthodes
-    async def process_query(self, *args, **kwargs):
-        return await self.rag_engine.process_query(*args, **kwargs)
-    
-    def get_status(self):
-        return self.rag_engine.get_status() if hasattr(self.rag_engine, 'get_status') else {}
-    
-    async def cleanup(self):
-        if hasattr(self.rag_engine, 'cleanup'):
-            await self.rag_engine.cleanup()
-
-# Helpers de streaming améliorés
+# Helpers de streaming (préservés, légèrement optimisés)
 def sse_event(obj: Dict[str, Any]) -> bytes:
     """Formatage SSE amélioré avec gestion d'erreurs robuste"""
     try:
@@ -425,79 +408,119 @@ async def generate_specialized_response(query: str, language: str = "fr", intent
         logger.error(f"Erreur génération spécialisée: {e}")
         return "Désolé, une erreur est survenue lors de la génération de la réponse."
 
-# Initialisation RAG - MODIFICATION MAJEURE POUR AGENT RAG
-async def initialize_rag_engine():
-    """Initialise le RAG engine avec Agent RAG ou fallback standard"""
-    global agent_rag_engine
-    if agent_rag_engine is not None:
-        return agent_rag_engine
+# Initialisation RAG - MODIFIÉ pour RAG Enhanced
+async def initialize_rag_engines():
+    """Initialise les engines RAG (Enhanced + optionnel Agent)"""
+    global rag_engine_enhanced, agent_rag_engine
     
-    # Essayer d'initialiser Agent RAG d'abord
-    if AGENT_RAG_AVAILABLE:
+    if rag_engine_enhanced is not None:
+        return rag_engine_enhanced
+    
+    # 1. Initialiser RAG Enhanced (prioritaire)
+    if PREFER_ENHANCED_RAG:
         try:
-            logger.info("Initialisation de l'Agent RAG Enhanced...")
+            logger.info("🚀 Initialisation RAG Engine Enhanced...")
+            
+            # Créer client OpenAI async pour RAG Enhanced
+            from openai import AsyncOpenAI
+            async_openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+            
+            rag_engine_enhanced = await create_rag_engine(async_openai_client)
+            
+            status = rag_engine_enhanced.get_status()
+            optimizations = status.get("optimizations", {})
+            
+            logger.info(f"✅ RAG Enhanced initialisé:")
+            logger.info(f"   - Cache: {optimizations.get('cache_enabled', False)}")
+            logger.info(f"   - Recherche hybride: {optimizations.get('hybrid_search_enabled', False)}")
+            logger.info(f"   - Enrichissement entités: {optimizations.get('entity_enrichment_enabled', False)}")
+            logger.info(f"   - Guardrails: {optimizations.get('guardrails_level', 'unknown')}")
+            
+        except Exception as e:
+            logger.error(f"❌ Erreur initialisation RAG Enhanced: {e}")
+            rag_engine_enhanced = None
+    
+    # 2. Optionnel: Initialiser Agent RAG
+    if USE_AGENT_RAG and AGENT_RAG_AVAILABLE:
+        try:
+            logger.info("🤖 Initialisation Agent RAG...")
             agent_rag_engine = await create_agent_rag_engine(openai_client)
             agent_status = agent_rag_engine.get_agent_status()
-            logger.info(f"Agent RAG Enhanced initialisé: {agent_status.get('agent_features', [])}")
-            return agent_rag_engine
+            logger.info(f"✅ Agent RAG initialisé: {agent_status.get('agent_features', [])}")
         except Exception as e:
-            logger.error(f"Erreur initialisation Agent RAG: {e}")
-            logger.info("Tentative de fallback vers RAG standard...")
+            logger.error(f"❌ Erreur initialisation Agent RAG: {e}")
+            agent_rag_engine = None
     
-    # Fallback vers RAG standard
-    try:
-        logger.info("Initialisation du RAG Engine standard...")
-        standard_rag = await create_rag_engine(openai_client)
-        # Wrapper pour compatibilité
-        agent_rag_engine = AgentCompatibilityWrapper(standard_rag)
-        logger.info("RAG standard initialisé avec wrapper de compatibilité")
-        return agent_rag_engine
-    except Exception as e:
-        logger.error(f"Erreur initialisation RAG standard: {e}")
-        return None
+    return rag_engine_enhanced
 
-# Fonctions de streaming spécialisées (nouvelles)
-async def _stream_simple_response(agent_result, language: str, tenant_id: str):
-    """Streaming pour réponses simples"""
+# Fonctions de streaming spécialisées - ADAPTÉES pour RAG Enhanced
+async def _stream_enhanced_rag_response(rag_result: RAGResult, language: str, tenant_id: str):
+    """Streaming pour réponses RAG Enhanced avec métadonnées"""
     async def generate():
         try:
-            yield sse_event({"type": "start", "complexity": "simple"})
-            
-            # Chunking intelligent de la réponse
-            chunks = smart_chunk_text(agent_result.final_answer, STREAM_CHUNK_LEN)
-            
-            for chunk in chunks:
-                yield sse_event({
-                    "type": "chunk", 
-                    "content": chunk,
-                    "confidence": agent_result.confidence
-                })
-                await asyncio.sleep(0.01)  # Smooth streaming
+            # Informations sur les optimisations utilisées
+            metadata = rag_result.metadata or {}
+            optimizations = metadata.get("optimizations_enabled", {})
             
             yield sse_event({
-                "type": "end",
-                "total_time": agent_result.processing_time,
-                "confidence": agent_result.confidence
+                "type": "enhanced_start", 
+                "source": rag_result.source.value if rag_result.source else "unknown",
+                "optimizations": optimizations,
+                "confidence": rag_result.confidence,
+                "processing_time": rag_result.processing_time
+            })
+            
+            # Optionnel: Montrer les optimisations utilisées
+            if optimizations.get("redis_cache") or optimizations.get("hybrid_search"):
+                yield sse_event({
+                    "type": "optimization_info",
+                    "cache_used": optimizations.get("redis_cache", False),
+                    "hybrid_search": optimizations.get("hybrid_search", False),
+                    "entity_enrichment": optimizations.get("entity_enrichment", False)
+                })
+            
+            # Stream de la réponse
+            if rag_result.answer:
+                chunks = smart_chunk_text(rag_result.answer, STREAM_CHUNK_LEN)
+                
+                for i, chunk in enumerate(chunks):
+                    yield sse_event({
+                        "type": "chunk", 
+                        "content": chunk,
+                        "confidence": rag_result.confidence,
+                        "chunk_index": i
+                    })
+                    await asyncio.sleep(0.01)  # Smooth streaming
+            
+            # Informations finales
+            yield sse_event({
+                "type": "enhanced_end",
+                "total_time": rag_result.processing_time,
+                "confidence": rag_result.confidence,
+                "documents_used": len(rag_result.context_docs),
+                "verification_status": rag_result.verification_status,
+                "source": rag_result.source.value if rag_result.source else "unknown"
             })
             
             # Enregistrer dans la mémoire
-            add_to_conversation_memory(tenant_id, "question", agent_result.final_answer)
+            if rag_result.answer:
+                add_to_conversation_memory(tenant_id, "question", rag_result.answer, "rag_enhanced")
             
         except Exception as e:
-            logger.error(f"Erreur streaming simple: {e}")
+            logger.error(f"Erreur streaming enhanced RAG: {e}")
             yield sse_event({"type": "error", "message": str(e)})
     
     return StreamingResponse(generate(), media_type="text/plain")
 
 async def _stream_agent_response(agent_result, language: str, tenant_id: str):
-    """Streaming pour réponses complexes avec détails agent"""
+    """Streaming pour réponses Agent RAG (préservé)"""
     async def generate():
         try:
             yield sse_event({
                 "type": "agent_start", 
-                "complexity": agent_result.complexity,
-                "decomposition_used": agent_result.decomposition_used,
-                "sub_queries_count": len(agent_result.sub_results)
+                "complexity": getattr(agent_result, 'complexity', 'unknown'),
+                "decomposition_used": getattr(agent_result, 'decomposition_used', False),
+                "sub_queries_count": len(getattr(agent_result, 'sub_results', []))
             })
             
             # Optionnel: Montrer les décisions de l'agent
@@ -508,27 +531,30 @@ async def _stream_agent_response(agent_result, language: str, tenant_id: str):
                 })
             
             # Stream de la réponse finale
-            chunks = smart_chunk_text(agent_result.final_answer, STREAM_CHUNK_LEN)
-            
-            for i, chunk in enumerate(chunks):
-                yield sse_event({
-                    "type": "chunk", 
-                    "content": chunk,
-                    "confidence": agent_result.confidence,
-                    "chunk_index": i
-                })
-                await asyncio.sleep(0.02)  # Slightly slower for complex responses
+            answer = getattr(agent_result, 'final_answer', '')
+            if answer:
+                chunks = smart_chunk_text(answer, STREAM_CHUNK_LEN)
+                
+                for i, chunk in enumerate(chunks):
+                    yield sse_event({
+                        "type": "chunk", 
+                        "content": chunk,
+                        "confidence": getattr(agent_result, 'confidence', 0.5),
+                        "chunk_index": i
+                    })
+                    await asyncio.sleep(0.02)  # Slightly slower for complex responses
             
             yield sse_event({
                 "type": "agent_end",
-                "total_time": agent_result.processing_time,
-                "confidence": agent_result.confidence,
+                "total_time": getattr(agent_result, 'processing_time', 0),
+                "confidence": getattr(agent_result, 'confidence', 0.5),
                 "synthesis_method": getattr(agent_result, 'synthesis_method', 'unknown'),
-                "sources_used": len(agent_result.sub_results)
+                "sources_used": len(getattr(agent_result, 'sub_results', []))
             })
             
             # Enregistrer dans la mémoire
-            add_to_conversation_memory(tenant_id, "question", agent_result.final_answer)
+            if answer:
+                add_to_conversation_memory(tenant_id, "question", answer, "agent_rag")
             
         except Exception as e:
             logger.error(f"Erreur streaming agent: {e}")
@@ -539,18 +565,25 @@ async def _stream_agent_response(agent_result, language: str, tenant_id: str):
 # Gestionnaires de cycle de vie - MODIFIÉS
 async def startup_event():
     """Démarrage de l'application amélioré"""
-    logger.info("🚀 Démarrage Intelia Expert - Version Enhanced Agent RAG")
-    await initialize_rag_engine()
+    logger.info("🚀 Démarrage Intelia Expert - Version RAG Enhanced")
+    await initialize_rag_engines()
 
 async def shutdown_event():
     """Arrêt de l'application amélioré"""
-    global agent_rag_engine
+    global rag_engine_enhanced, agent_rag_engine
     try:
         logger.info("🔄 Arrêt de l'application...")
+        
+        if rag_engine_enhanced and hasattr(rag_engine_enhanced, 'cleanup'):
+            await rag_engine_enhanced.cleanup()
+        
         if agent_rag_engine and hasattr(agent_rag_engine, 'cleanup'):
             await agent_rag_engine.cleanup()
+        
+        rag_engine_enhanced = None
         agent_rag_engine = None
         conversation_memory.clear()
+        
         logger.info("🛑 Arrêt propre terminé")
     except Exception as e:
         logger.error(f"⚠️ Erreur lors du nettoyage: {e}")
@@ -563,7 +596,7 @@ async def lifespan(app: FastAPI):
     await shutdown_event()
 
 app = FastAPI(
-    title="Intelia Expert - Agent RAG Backend", 
+    title="Intelia Expert - RAG Enhanced Backend", 
     debug=False, 
     lifespan=lifespan
 )
@@ -581,8 +614,8 @@ router = APIRouter()
 # Routes améliorées
 @router.get("/health")
 def health():
-    """Health check avec status Agent RAG détaillé"""
-    global agent_rag_engine
+    """Health check avec status RAG Enhanced détaillé"""
+    global rag_engine_enhanced, agent_rag_engine
     
     memory_stats = {
         "total_tenants": len(conversation_memory),
@@ -590,36 +623,61 @@ def health():
         "memory_usage_mb": len(str(conversation_memory)) / (1024 * 1024)
     }
     
-    if agent_rag_engine:
-        agent_status = agent_rag_engine.get_agent_status()
-        return {
-            "ok": True,
-            "version": "enhanced_agent_rag_v3.0",
-            "agent_enabled": agent_status.get("agent_enabled", False),
-            "fallback_mode": agent_status.get("fallback_mode", False),
-            "rag_status": agent_status,
-            "memory_stats": memory_stats,
-            "agent_features": agent_status.get("agent_features", []),
-            "agent_stats": agent_status.get("agent_stats", {}),
-            "performance_metrics": metrics_collector.get_metrics()
-        }
+    health_data = {
+        "ok": True,
+        "version": "rag_enhanced_v2.0",
+        "memory_stats": memory_stats,
+        "performance_metrics": metrics_collector.get_metrics()
+    }
+    
+    # Status RAG Enhanced
+    if rag_engine_enhanced:
+        try:
+            rag_status = rag_engine_enhanced.get_status()
+            health_data.update({
+                "rag_enhanced_enabled": True,
+                "rag_enhanced_status": rag_status,
+                "optimizations": rag_status.get("optimizations", {}),
+                "components": rag_status.get("components", {}),
+                "degraded_mode": rag_status.get("degraded_mode", False)
+            })
+        except Exception as e:
+            health_data.update({
+                "rag_enhanced_enabled": False,
+                "rag_enhanced_error": str(e)
+            })
     else:
-        return {
-            "ok": False,
-            "version": "enhanced_agent_rag_v3.0",
-            "error": "Agent RAG non initialisé",
-            "memory_stats": memory_stats,
-            "performance_metrics": metrics_collector.get_metrics()
-        }
+        health_data.update({
+            "rag_enhanced_enabled": False,
+            "rag_enhanced_status": "not_initialized"
+        })
+    
+    # Status Agent RAG (optionnel)
+    if agent_rag_engine:
+        try:
+            agent_status = agent_rag_engine.get_agent_status()
+            health_data.update({
+                "agent_rag_enabled": True,
+                "agent_rag_status": agent_status
+            })
+        except Exception as e:
+            health_data.update({
+                "agent_rag_enabled": False,
+                "agent_rag_error": str(e)
+            })
+    else:
+        health_data["agent_rag_enabled"] = False
+    
+    return health_data
 
-# Route CHAT principale - MODIFICATION MAJEURE
+# Route CHAT principale - MODIFICATION MAJEURE POUR RAG ENHANCED
 @router.post(f"{BASE_PATH}/chat")
 async def chat(request: Request):
-    """Chat endpoint avec Agent RAG intelligent"""
-    global agent_rag_engine
+    """Chat endpoint avec RAG Enhanced intelligent"""
+    global rag_engine_enhanced, agent_rag_engine
     
-    if not agent_rag_engine:
-        raise HTTPException(status_code=503, detail="RAG Engine non disponible")
+    if not rag_engine_enhanced:
+        raise HTTPException(status_code=503, detail="RAG Engine Enhanced non disponible")
     
     try:
         body = await request.json()
@@ -644,34 +702,63 @@ async def chat(request: Request):
             
             return StreamingResponse(simple_response(), media_type="text/plain")
         
-        # Utiliser l'Agent RAG si disponible
-        if hasattr(agent_rag_engine, 'process_query_agent'):
-            agent_result = await agent_rag_engine.process_query_agent(message, language, tenant_id)
-            
-            # Enregistrer les métriques
-            metrics_collector.record_query(agent_result)
-            
-            # Traitement selon le type de complexité
-            if hasattr(agent_result, 'complexity') and agent_result.complexity == QueryComplexity.SIMPLE:
-                return await _stream_simple_response(agent_result, language, tenant_id)
-            else:
+        # Stratégie de traitement intelligente
+        # 1. Essayer Agent RAG si disponible et activé
+        if USE_AGENT_RAG and agent_rag_engine and hasattr(agent_rag_engine, 'process_query_agent'):
+            try:
+                agent_result = await agent_rag_engine.process_query_agent(message, language, tenant_id)
+                metrics_collector.record_query(agent_result, "agent_rag")
                 return await _stream_agent_response(agent_result, language, tenant_id)
+            except Exception as e:
+                logger.warning(f"Erreur Agent RAG, fallback vers RAG Enhanced: {e}")
+        
+        # 2. Utiliser RAG Enhanced (principal)
+        rag_result = await rag_engine_enhanced.process_query(message, language, tenant_id)
+        metrics_collector.record_query(rag_result, "rag_enhanced")
+        
+        # Traitement selon le type de résultat
+        if rag_result.source == RAGSource.OOD_FILTERED:
+            # Message hors domaine
+            async def ood_response():
+                yield sse_event({"type": "start", "reason": "out_of_domain"})
+                yield sse_event({"type": "chunk", "content": rag_result.answer})
+                yield sse_event({"type": "end", "confidence": rag_result.confidence})
+            
+            return StreamingResponse(ood_response(), media_type="text/plain")
+        
+        elif rag_result.source == RAGSource.FALLBACK_NEEDED:
+            # Fallback vers génération spécialisée
+            try:
+                specialized_answer = await generate_specialized_response(message, language, rag_result.intent_result)
+                
+                async def fallback_response():
+                    yield sse_event({"type": "start", "reason": "fallback_specialized"})
+                    chunks = smart_chunk_text(specialized_answer, STREAM_CHUNK_LEN)
+                    for chunk in chunks:
+                        yield sse_event({"type": "chunk", "content": chunk})
+                        await asyncio.sleep(0.05)
+                    yield sse_event({"type": "end", "confidence": 0.6})
+                
+                add_to_conversation_memory(tenant_id, message, specialized_answer, "specialized_fallback")
+                return StreamingResponse(fallback_response(), media_type="text/plain")
+                
+            except Exception as e:
+                logger.error(f"Erreur fallback spécialisé: {e}")
+                out_of_domain_msg = get_out_of_domain_message(language)
+                
+                async def error_response():
+                    yield sse_event({"type": "start", "reason": "error_fallback"})
+                    yield sse_event({"type": "chunk", "content": out_of_domain_msg})
+                    yield sse_event({"type": "end", "confidence": 0.3})
+                
+                return StreamingResponse(error_response(), media_type="text/plain")
+        
+        elif rag_result.source == RAGSource.ERROR:
+            raise HTTPException(status_code=500, detail="Erreur traitement RAG Enhanced")
+        
         else:
-            # Fallback vers traitement standard si pas d'agent
-            rag_result = await agent_rag_engine.process_query(message, language, tenant_id)
-            
-            # Enregistrer les métriques
-            metrics_collector.record_query(rag_result)
-            
-            # Créer un AgentResult simulé pour compatibilité
-            simulated_agent_result = type('AgentResult', (), {
-                'final_answer': rag_result.answer or get_out_of_domain_message(language),
-                'confidence': rag_result.confidence,
-                'processing_time': rag_result.processing_time,
-                'complexity': QueryComplexity.SIMPLE
-            })()
-            
-            return await _stream_simple_response(simulated_agent_result, language, tenant_id)
+            # Réponse RAG Enhanced normale
+            return await _stream_enhanced_rag_response(rag_result, language, tenant_id)
             
     except Exception as e:
         logger.error(f"Erreur chat endpoint: {e}")
@@ -704,6 +791,51 @@ async def ood_endpoint(request: Request):
     except Exception as e:
         logger.error(f"Erreur OOD endpoint: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+# Nouvelles routes pour RAG Enhanced
+@router.get(f"{BASE_PATH}/rag/status")
+async def rag_status():
+    """Status détaillé du RAG Enhanced"""
+    if not rag_engine_enhanced:
+        return {"error": "RAG Engine Enhanced non initialisé"}
+    
+    try:
+        return rag_engine_enhanced.get_status()
+    except Exception as e:
+        return {"error": str(e)}
+
+@router.post(f"{BASE_PATH}/rag/cache/clear")
+async def clear_cache():
+    """Vider le cache Redis (utile pour développement)"""
+    if not rag_engine_enhanced or not hasattr(rag_engine_enhanced, 'cache_manager'):
+        raise HTTPException(status_code=404, detail="Cache non disponible")
+    
+    try:
+        cache_manager = rag_engine_enhanced.cache_manager
+        if cache_manager and hasattr(cache_manager, 'invalidate_pattern'):
+            await cache_manager.invalidate_pattern("*")
+            return {"status": "cache_cleared"}
+        else:
+            raise HTTPException(status_code=404, detail="Cache manager non configuré")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get(f"{BASE_PATH}/metrics")
+async def get_metrics():
+    """Endpoint pour récupérer les métriques de performance"""
+    try:
+        return {
+            "application_metrics": metrics_collector.get_metrics(),
+            "system_metrics": {
+                "conversation_memory": {
+                    "tenants": len(conversation_memory),
+                    "total_exchanges": sum(len(v["data"]) for v in conversation_memory.values())
+                }
+            },
+            "rag_enhanced_metrics": rag_engine_enhanced.get_status().get("metrics", {}) if rag_engine_enhanced else {}
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 # Inclure le router
 app.include_router(router)

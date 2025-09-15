@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-rag_engine.py - RAG Engine avec OpenAI + Weaviate Direct - Version Finale Complète
-Corrections appliquées: Métadonnées Weaviate v4, Filtres v4, Seuils, Retry age_band, 
-BM25 fallback, Langue de réponse, HTTPS self-hosted, Vérification smart
-Améliorations: Normalisation unités, Observabilité, Auto-détection langue, Messages OOD, Seuils dynamiques
-Version Production-Ready Python 3.13
+rag_engine.py - RAG Engine Enhanced avec Cache Redis, Recherche Hybride et Guardrails
+Version Production Intégrée pour Intelia Expert Aviculture
 """
 
 import os
@@ -14,6 +11,9 @@ import time
 import json
 import re
 import statistics
+import hashlib
+import pickle
+import zlib
 from typing import Dict, List, Optional, Any, Tuple, Union
 from dataclasses import dataclass
 from enum import Enum
@@ -25,11 +25,10 @@ import anyio
 # Configuration logging
 logger = logging.getLogger(__name__)
 
-# Import Weaviate
+# === IMPORTS CONDITIONNELS ===
 try:
     import weaviate
     weaviate_version = getattr(weaviate, '__version__', '4.0.0')
-    
     if weaviate_version.startswith('4.'):
         try:
             import weaviate.classes as wvc
@@ -40,10 +39,8 @@ try:
     else:
         WEAVIATE_V4 = False
         wvc = None
-    
     WEAVIATE_AVAILABLE = True
     logger.info(f"Weaviate {weaviate_version} détecté (V4: {WEAVIATE_V4})")
-    
 except ImportError as e:
     WEAVIATE_AVAILABLE = False
     WEAVIATE_V4 = False
@@ -51,7 +48,6 @@ except ImportError as e:
     weaviate = None
     logger.error(f"Weaviate non disponible: {e}")
 
-# OpenAI Client
 try:
     from openai import AsyncOpenAI, OpenAI
     OPENAI_AVAILABLE = True
@@ -59,15 +55,22 @@ except ImportError as e:
     OPENAI_AVAILABLE = False
     logger.error(f"OpenAI non disponible: {e}")
 
-# VoyageAI pour reranking
+try:
+    import redis.asyncio as redis
+    import hiredis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    redis = None
+    logger.warning("Redis non disponible - cache désactivé")
+
 try:
     import voyageai
     VOYAGE_AVAILABLE = True
 except ImportError:
     VOYAGE_AVAILABLE = False
-    logger.warning("VoyageAI non disponible - reranking basique")
+    logger.warning("VoyageAI non disponible")
 
-# Sentence transformers pour reranking local
 try:
     from sentence_transformers import SentenceTransformer, util
     SENTENCE_TRANSFORMERS_AVAILABLE = True
@@ -75,15 +78,13 @@ except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
     logger.warning("SentenceTransformers non disponible")
 
-# Unidecode pour normalisation des accents
 try:
     from unidecode import unidecode
     UNIDECODE_AVAILABLE = True
 except ImportError:
     UNIDECODE_AVAILABLE = False
-    logger.warning("Unidecode non disponible - pas de normalisation d'accents")
+    logger.warning("Unidecode non disponible")
 
-# Intelligence métier
 try:
     from intent_processor import create_intent_processor, IntentType, IntentResult
     INTENT_PROCESSOR_AVAILABLE = True
@@ -103,29 +104,36 @@ except ImportError as e:
             self.expanded_query = ""
             self.metadata = {}
 
-# Configuration
+# === CONFIGURATION ===
 RAG_ENABLED = os.getenv("RAG_ENABLED", "true").lower() == "true"
 WEAVIATE_URL = os.getenv("WEAVIATE_URL", "http://localhost:8080")
 WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY")
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
-# Paramètres RAG - CORRECTION: Seuil ajusté pour distance→score
+# Paramètres RAG optimisés
 RAG_SIMILARITY_TOP_K = int(os.getenv("RAG_SIMILARITY_TOP_K", "15"))
-RAG_CONFIDENCE_THRESHOLD = float(os.getenv("RAG_CONFIDENCE_THRESHOLD", "0.55"))  # CORRECTION: Réduit de 0.65 à 0.55
-RAG_CHUNK_SIZE = int(os.getenv("RAG_CHUNK_SIZE", "1024"))
-RAG_CHUNK_OVERLAP = int(os.getenv("RAG_CHUNK_OVERLAP", "200"))
+RAG_CONFIDENCE_THRESHOLD = float(os.getenv("RAG_CONFIDENCE_THRESHOLD", "0.55"))
 RAG_RERANK_TOP_K = int(os.getenv("RAG_RERANK_TOP_K", "8"))
 RAG_VERIFICATION_ENABLED = os.getenv("RAG_VERIFICATION_ENABLED", "true").lower() == "true"
-RAG_VERIFICATION_SMART = os.getenv("RAG_VERIFICATION_SMART", "true").lower() == "true"  # CORRECTION: Activé par défaut
+RAG_VERIFICATION_SMART = os.getenv("RAG_VERIFICATION_SMART", "true").lower() == "true"
 MAX_CONVERSATION_CONTEXT = int(os.getenv("MAX_CONVERSATION_CONTEXT", "1500"))
 
+# Nouvelles configurations
+CACHE_ENABLED = os.getenv("CACHE_ENABLED", "true").lower() == "true"
+HYBRID_SEARCH_ENABLED = os.getenv("HYBRID_SEARCH_ENABLED", "true").lower() == "true"
+GUARDRAILS_LEVEL = os.getenv("GUARDRAILS_LEVEL", "standard")
+ENTITY_ENRICHMENT_ENABLED = os.getenv("ENTITY_ENRICHMENT_ENABLED", "true").lower() == "true"
 
-# --- Simple in-process metrics collector ---
+# === UTILITAIRES ===
 class MetricsCollector:
+    """Collecteur de métriques in-process amélioré"""
     def __init__(self):
         self.counters = defaultdict(int)
         self.last_100_lat = []
+        self.cache_stats = defaultdict(int)
+        self.search_stats = defaultdict(int)
 
     def inc(self, key: str, n: int = 1): 
         self.counters[key] += n
@@ -135,12 +143,20 @@ class MetricsCollector:
         if len(self.last_100_lat) > 100: 
             self.last_100_lat = self.last_100_lat[-100:]
 
+    def cache_hit(self, cache_type: str):
+        self.cache_stats[f"{cache_type}_hits"] += 1
+    
+    def cache_miss(self, cache_type: str):
+        self.cache_stats[f"{cache_type}_misses"] += 1
+
     def snapshot(self):
         p50 = statistics.median(self.last_100_lat) if self.last_100_lat else 0.0
         p95 = (sorted(self.last_100_lat)[int(0.95*len(self.last_100_lat))-1]
                if len(self.last_100_lat) >= 20 else p50)
         return {
             "counters": dict(self.counters),
+            "cache_stats": dict(self.cache_stats),
+            "search_stats": dict(self.search_stats),
             "p50_latency_sec": round(p50, 3),
             "p95_latency_sec": round(p95, 3),
             "samples": len(self.last_100_lat)
@@ -148,8 +164,7 @@ class MetricsCollector:
 
 METRICS = MetricsCollector()
 
-
-# --- Light FR/EN language detector ---
+# Détection de langue légère
 _FRENCH_HINTS = {" le ", " la ", " les ", " des ", " un ", " une ", " et ", " ou ", " que ", " est ", " avec ", " pour ", " d'", " l'", " j'", " au ", " aux ", " du "}
 _ENGLISH_HINTS = {" the ", " and ", " or ", " is ", " are ", " with ", " for ", " a ", " an ", " of "}
 
@@ -162,80 +177,22 @@ def detect_language_light(text: str, default: str = "fr") -> str:
     if any(ch in s for ch in ["é", "è", "ê", "à", "ù", "ç"]): return "fr"
     return default
 
-
-# --- Unit normalization helpers ---
-class UnitNormalizer:
-    WEIGHT_UNITS = {"kg", "kilogram", "kilograms", "lb", "lbs", "pound", "pounds"}
-    TEMP_UNITS = {"c", "°c", "celsius", "f", "°f", "fahrenheit"}
-
-    @staticmethod
-    def _detect_target_units(question: str) -> Tuple[Optional[str], Optional[str]]:
-        q = question.lower()
-        target_weight = "kg" if re.search(r"\bkg|kilogram", q) else ("lb" if re.search(r"\blb|pound", q) else None)
-        target_temp = "c" if re.search(r"°?\s?c|celsius", q) else ("f" if re.search(r"°?\s?f|fahrenheit", q) else None)
-        return target_weight, target_temp
-
-    @staticmethod
-    def kg_to_lb(x: float) -> float: 
-        return x * 2.2046226218
-    
-    @staticmethod
-    def lb_to_kg(x: float) -> float: 
-        return x / 2.2046226218
-    
-    @staticmethod
-    def c_to_f(x: float) -> float:   
-        return x * 9.0/5.0 + 32.0
-    
-    @staticmethod
-    def f_to_c(x: float) -> float:   
-        return (x - 32.0) * 5.0/9.0
-
-    @staticmethod
-    def normalize_text(answer: str, question: str) -> str:
-        tgt_w, tgt_t = UnitNormalizer._detect_target_units(question)
-        if not tgt_w and not tgt_t:
-            return answer
-        # remplace virgules par points pour float()
-        text = re.sub(r"(\d+),(\d+)", r"\1.\2", answer)
-
-        def repl_weight(m):
-            val = float(m.group("val"))
-            unit = m.group("unit").lower()
-            if tgt_w == "kg" and unit in {"lb", "lbs", "pound", "pounds"}:
-                return f"{UnitNormalizer.lb_to_kg(val):.3f} kg"
-            if tgt_w == "lb" and unit in {"kg", "kilogram", "kilograms"}:
-                return f"{UnitNormalizer.kg_to_lb(val):.3f} lb"
-            return m.group(0)
-
-        def repl_temp(m):
-            val = float(m.group("val"))
-            unit = m.group("unit").lower()
-            if tgt_t == "c" and unit in {"f", "°f", "fahrenheit"}:
-                return f"{UnitNormalizer.f_to_c(val):.1f} °C"
-            if tgt_t == "f" and unit in {"c", "°c", "celsius"}:
-                return f"{UnitNormalizer.c_to_f(val):.1f} °F"
-            return m.group(0)
-
-        weight_pat = re.compile(r"(?P<val>\d+(?:[.]\d+)?)\s?(?P<unit>kg|kilograms?|lb|lbs|pounds?)\b", re.I)
-        temp_pat   = re.compile(r"(?P<val>\d+(?:[.]\d+)?)\s?°?\s?(?P<unit>C|F|celsius|fahrenheit)\b", re.I)
-        text = weight_pat.sub(repl_weight, text)
-        text = temp_pat.sub(repl_temp, text)
-        return text
-
-
+# === ENUMS ET DATACLASSES ===
 class RAGSource(Enum):
-    """Sources de réponse"""
     RAG_KNOWLEDGE = "rag_knowledge"
     RAG_VERIFIED = "rag_verified"
     OOD_FILTERED = "ood_filtered" 
     FALLBACK_NEEDED = "fallback_needed"
     ERROR = "error"
 
+class VerificationLevel(Enum):
+    MINIMAL = "minimal"
+    STANDARD = "standard"
+    STRICT = "strict"
+    CRITICAL = "critical"
 
 @dataclass
 class RAGResult:
-    """Résultat RAG"""
     source: RAGSource
     answer: Optional[str] = None
     confidence: float = 0.0
@@ -251,61 +208,274 @@ class RAGResult:
         if self.metadata is None:
             self.metadata = {}
 
-
 @dataclass
 class Document:
-    """Document simple pour RAG"""
     content: str
     metadata: Dict = None
     score: float = 0.0
-    original_distance: Optional[float] = None  # CORRECTION: Ajouté pour tracking
+    original_distance: Optional[float] = None
     
     def __post_init__(self):
         if self.metadata is None:
             self.metadata = {}
 
+@dataclass
+class GuardrailResult:
+    is_valid: bool
+    confidence: float
+    violations: List[str]
+    warnings: List[str]
+    evidence_support: float
+    hallucination_risk: float
+    correction_suggestions: List[str]
+    metadata: Dict[str, Any]
 
-class OpenAIEmbedder:
-    """Wrapper pour OpenAI Embeddings"""
+# === GESTIONNAIRE DE CACHE REDIS ===
+class RAGCacheManager:
+    """Gestionnaire de cache Redis optimisé"""
     
-    def __init__(self, client: AsyncOpenAI, model: str = "text-embedding-3-small"):
+    def __init__(self, redis_url: str = REDIS_URL, default_ttl: int = 3600):
+        self.redis_url = redis_url
+        self.default_ttl = default_ttl
+        self.client = None
+        self.enabled = REDIS_AVAILABLE and CACHE_ENABLED
+        
+        self.ttl_config = {
+            "embeddings": 7200,
+            "search_results": 1800,
+            "responses": 900,
+            "intent_results": 3600,
+            "verification": 1800
+        }
+    
+    async def initialize(self):
+        if not self.enabled:
+            logger.warning("Redis cache désactivé")
+            return
+        
+        try:
+            self.client = redis.from_url(
+                self.redis_url,
+                encoding="utf-8",
+                decode_responses=False,
+                socket_keepalive=True,
+                health_check_interval=30
+            )
+            await self.client.ping()
+            logger.info("Cache Redis initialisé")
+        except Exception as e:
+            logger.warning(f"Erreur connexion Redis: {e} - cache désactivé")
+            self.enabled = False
+    
+    def _generate_key(self, prefix: str, data: Any) -> str:
+        if isinstance(data, str):
+            content = data
+        elif isinstance(data, dict):
+            content = json.dumps(data, sort_keys=True)
+        else:
+            content = str(data)
+        
+        hash_obj = hashlib.md5(content.encode('utf-8'))
+        return f"intelia_rag:{prefix}:{hash_obj.hexdigest()}"
+    
+    async def get_embedding(self, text: str) -> Optional[List[float]]:
+        if not self.enabled or not self.client:
+            return None
+        
+        try:
+            key = self._generate_key("embedding", text)
+            cached = await self.client.get(key)
+            
+            if cached:
+                decompressed = zlib.decompress(cached)
+                embedding = pickle.loads(decompressed)
+                METRICS.cache_hit("embedding")
+                return embedding
+        except Exception as e:
+            logger.warning(f"Erreur lecture cache embedding: {e}")
+        
+        METRICS.cache_miss("embedding")
+        return None
+    
+    async def set_embedding(self, text: str, embedding: List[float]):
+        if not self.enabled or not self.client:
+            return
+        
+        try:
+            key = self._generate_key("embedding", text)
+            serialized = pickle.dumps(embedding)
+            compressed = zlib.compress(serialized)
+            await self.client.setex(key, self.ttl_config["embeddings"], compressed)
+        except Exception as e:
+            logger.warning(f"Erreur écriture cache embedding: {e}")
+    
+    async def get_response(self, query: str, context_hash: str, language: str = "fr") -> Optional[str]:
+        if not self.enabled or not self.client:
+            return None
+        
+        try:
+            cache_data = {"query": query, "context_hash": context_hash, "language": language}
+            key = self._generate_key("response", cache_data)
+            cached = await self.client.get(key)
+            
+            if cached:
+                response = cached.decode('utf-8')
+                METRICS.cache_hit("response")
+                return response
+        except Exception as e:
+            logger.warning(f"Erreur lecture cache réponse: {e}")
+        
+        METRICS.cache_miss("response")
+        return None
+    
+    async def set_response(self, query: str, context_hash: str, response: str, language: str = "fr"):
+        if not self.enabled or not self.client:
+            return
+        
+        try:
+            cache_data = {"query": query, "context_hash": context_hash, "language": language}
+            key = self._generate_key("response", cache_data)
+            await self.client.setex(key, self.ttl_config["responses"], response.encode('utf-8'))
+        except Exception as e:
+            logger.warning(f"Erreur écriture cache réponse: {e}")
+    
+    def generate_context_hash(self, documents: List[Dict]) -> str:
+        try:
+            content_summary = []
+            for doc in documents[:5]:
+                summary = {
+                    "title": doc.get("title", ""),
+                    "source": doc.get("source", ""),
+                    "content_length": len(doc.get("content", "")),
+                    "score": round(doc.get("score", 0.0), 3)
+                }
+                content_summary.append(summary)
+            
+            return hashlib.md5(
+                json.dumps(content_summary, sort_keys=True).encode()
+            ).hexdigest()
+        except Exception as e:
+            logger.warning(f"Erreur génération hash contexte: {e}")
+            return "fallback_hash"
+    
+    async def get_cache_stats(self) -> Dict[str, Any]:
+        """Récupère les statistiques du cache"""
+        if not self.enabled or not self.client:
+            return {"enabled": False}
+        
+        try:
+            info = await self.client.info("memory")
+            
+            # Compter les clés par type
+            type_counts = {}
+            for cache_type in ["embeddings", "search_results", "responses", "intent_results", "verification"]:
+                count = 0
+                async for _ in self.client.scan_iter(match=f"intelia_rag:{cache_type}:*"):
+                    count += 1
+                type_counts[cache_type] = count
+            
+            return {
+                "enabled": True,
+                "memory_used": info.get("used_memory_human", "N/A"),
+                "total_keys": await self.client.dbsize(),
+                "type_counts": type_counts,
+                "ttl_config": self.ttl_config
+            }
+            
+        except Exception as e:
+            logger.warning(f"Erreur stats cache: {e}")
+            return {"enabled": True, "error": str(e)}
+    
+    async def cleanup(self):
+        if self.client:
+            try:
+                await self.client.close()
+                logger.info("Connexion Redis fermée")
+            except Exception as e:
+                logger.warning(f"Erreur fermeture Redis: {e}")
+
+# === EMBEDDER AVEC CACHE ===
+class OpenAIEmbedder:
+    """Embedder OpenAI avec cache Redis intégré"""
+    
+    def __init__(self, client: AsyncOpenAI, cache_manager: RAGCacheManager = None, 
+                 model: str = "text-embedding-3-small"):
         self.client = client
+        self.cache_manager = cache_manager
         self.model = model
         
     async def embed_query(self, text: str) -> List[float]:
-        """Créer embedding pour une requête"""
+        # Vérifier le cache
+        if self.cache_manager:
+            cached_embedding = await self.cache_manager.get_embedding(text)
+            if cached_embedding:
+                return cached_embedding
+        
         try:
             response = await self.client.embeddings.create(
                 model=self.model,
                 input=text,
                 encoding_format="float"
             )
-            return response.data[0].embedding
+            embedding = response.data[0].embedding
+            
+            # Mettre en cache
+            if self.cache_manager:
+                await self.cache_manager.set_embedding(text, embedding)
+            
+            return embedding
         except Exception as e:
             logger.error(f"Erreur embedding: {e}")
             return []
     
     async def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        """Créer embeddings pour plusieurs documents"""
-        try:
-            response = await self.client.embeddings.create(
-                model=self.model,
-                input=texts,
-                encoding_format="float"
-            )
-            return [item.embedding for item in response.data]
-        except Exception as e:
-            logger.error(f"Erreur embeddings batch: {e}")
-            return []
+        results = []
+        uncached_texts = []
+        uncached_indices = []
+        
+        # Vérifier le cache pour chaque texte
+        if self.cache_manager:
+            for i, text in enumerate(texts):
+                cached = await self.cache_manager.get_embedding(text)
+                if cached:
+                    results.append((i, cached))
+                else:
+                    uncached_texts.append(text)
+                    uncached_indices.append(i)
+        else:
+            uncached_texts = texts
+            uncached_indices = list(range(len(texts)))
+        
+        # Générer les embeddings manquants
+        if uncached_texts:
+            try:
+                response = await self.client.embeddings.create(
+                    model=self.model,
+                    input=uncached_texts,
+                    encoding_format="float"
+                )
+                new_embeddings = [item.embedding for item in response.data]
+                
+                # Ajouter aux résultats et mettre en cache
+                for idx, embedding in zip(uncached_indices, new_embeddings):
+                    if self.cache_manager:
+                        await self.cache_manager.set_embedding(texts[idx], embedding)
+                    results.append((idx, embedding))
+            except Exception as e:
+                logger.error(f"Erreur embeddings batch: {e}")
+                return []
+        
+        # Trier par index original
+        results.sort(key=lambda x: x[0])
+        return [embedding for _, embedding in results]
 
-
+# === RETRIEVER HYBRIDE ===
 def _to_v4_filter(where_dict):
-    """CORRECTION: Convertit dict where v3 vers Filter v4"""
+    """Convertit dict where v3 vers Filter v4"""
     if not where_dict or not WEAVIATE_V4 or not wvc:
         return where_dict
     
     try:
-        # Cas feuille
         if "path" in where_dict:
             property_name = where_dict["path"][-1] if isinstance(where_dict["path"], list) else where_dict["path"]
             operator = where_dict.get("operator", "Equal")
@@ -316,10 +486,8 @@ def _to_v4_filter(where_dict):
             elif operator == "Equal":
                 return wvc.query.Filter.by_property(property_name).equal(value)
             else:
-                # Fallback
                 return wvc.query.Filter.by_property(property_name).equal(value)
         
-        # Cas composé
         operator = where_dict.get("operator", "And").lower()
         operands = [_to_v4_filter(o) for o in where_dict.get("operands", [])]
         
@@ -340,38 +508,258 @@ def _to_v4_filter(where_dict):
         logger.warning(f"Erreur conversion filter v4: {e}")
         return None
 
-
-class WeaviateRetriever:
-    """Retriever Weaviate direct avec corrections v4 + BM25 fallback"""
+class HybridWeaviateRetriever:
+    """Retriever hybride optimisé avec cache et fallbacks"""
     
     def __init__(self, client, collection_name: str = "InteliaKnowledge"):
         self.client = client
         self.collection_name = collection_name
         self.is_v4 = WEAVIATE_V4
         
-    async def search(self, query_vector: List[float], top_k: int = 10, where_filter: Dict = None) -> List[Document]:
-        """Recherche vectorielle dans Weaviate avec retry age_band"""
+        self.fusion_config = {
+            "vector_weight": 0.7,
+            "bm25_weight": 0.3,
+            "rrf_k": 60,
+            "min_score_threshold": 0.1,
+            "diversity_threshold": 0.8
+        }
+        
+    async def adaptive_search(self, query_vector: List[float], query_text: str,
+                            top_k: int = 15, where_filter: Dict = None) -> List[Document]:
+        """Recherche adaptative qui ajuste alpha selon la requête"""
         try:
-            documents = await self._search_internal(query_vector, top_k, where_filter)
+            alpha = self._analyze_query_for_alpha(query_text)
             
-            # CORRECTION: Retry sans age_band si zéro résultat
+            if HYBRID_SEARCH_ENABLED and self.is_v4:
+                documents = await self._hybrid_search_v4(
+                    query_vector, query_text, top_k, where_filter, alpha
+                )
+                METRICS.search_stats["hybrid_native"] += 1
+            else:
+                # Fallback recherche vectorielle + BM25 manuel
+                documents = await self._hybrid_search_fallback(
+                    query_vector, query_text, top_k, where_filter, alpha
+                )
+                METRICS.search_stats["hybrid_manual"] += 1
+            
+            # Retry sans age_band si nécessaire
             if not documents and where_filter and "age_band" in json.dumps(where_filter):
                 logger.info("Retry recherche sans critère age_band")
                 where_filter_no_age = self._remove_age_band_filter(where_filter)
-                documents = await self._search_internal(query_vector, top_k, where_filter_no_age)
+                documents = await self._hybrid_search_v4(
+                    query_vector, query_text, top_k, where_filter_no_age, alpha
+                ) if self.is_v4 else await self._vector_search_fallback(
+                    query_vector, top_k, where_filter_no_age
+                )
                 
-                # Marquer les docs comme issus du fallback
                 for doc in documents:
                     doc.metadata["age_band_fallback_used"] = True
             
             return documents
             
         except Exception as e:
-            logger.error(f"Erreur recherche Weaviate: {e}")
+            logger.error(f"Erreur recherche adaptative: {e}")
+            return await self._vector_search_fallback(query_vector, top_k, where_filter)
+    
+    def _analyze_query_for_alpha(self, query_text: str) -> float:
+        """Analyse la requête pour déterminer l'alpha optimal"""
+        query_lower = query_text.lower()
+        
+        # Requêtes spécifiques -> favoriser BM25
+        if any(pattern in query_lower for pattern in [
+            "ross", "cobb", "hubbard", "isa", "lohmann",
+            "fcr", "pv", "gmd",
+            "j0", "j7", "j21", "j35"
+        ]):
+            return 0.3
+        
+        # Requêtes numériques -> équilibré vers BM25
+        if re.search(r'\d+\s*(g|kg|%|jour|j)', query_lower):
+            return 0.4
+        
+        # Requêtes conceptuelles -> favoriser vectoriel
+        if any(concept in query_lower for concept in [
+            "comment", "pourquoi", "expliquer", "différence",
+            "améliorer", "optimiser", "problème", "solution"
+        ]):
+            return 0.8
+        
+        return 0.7  # Par défaut
+    
+    async def _hybrid_search_v4(self, query_vector: List[float], query_text: str,
+                               top_k: int, where_filter: Dict, alpha: float) -> List[Document]:
+        """Recherche hybride native Weaviate v4"""
+        try:
+            def _sync_hybrid_search():
+                collection = self.client.collections.get(self.collection_name)
+                
+                search_params = {
+                    "query": query_text,
+                    "vector": query_vector,
+                    "alpha": alpha,
+                    "limit": top_k,
+                    "return_metadata": ["score"]
+                }
+                
+                if where_filter:
+                    v4_filter = _to_v4_filter(where_filter)
+                    if v4_filter:
+                        search_params["where"] = v4_filter
+                
+                return collection.query.hybrid(**search_params)
+            
+            response = await anyio.to_thread.run_sync(_sync_hybrid_search)
+            
+            documents = []
+            for obj in response.objects:
+                hybrid_score = float(getattr(obj.metadata, "score", 0.0))
+                
+                doc = Document(
+                    content=obj.properties.get("content", ""),
+                    metadata={
+                        "title": obj.properties.get("title", ""),
+                        "source": obj.properties.get("source", ""),
+                        "geneticLine": obj.properties.get("geneticLine", ""),
+                        "species": obj.properties.get("species", ""),
+                        "phase": obj.properties.get("phase", ""),
+                        "age_band": obj.properties.get("age_band", ""),
+                        "hybrid_used": True,
+                        "alpha": alpha
+                    },
+                    score=hybrid_score
+                )
+                documents.append(doc)
+            
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Erreur recherche hybride v4: {e}")
+            raise
+    
+    async def _hybrid_search_fallback(self, query_vector: List[float], query_text: str,
+                                    top_k: int, where_filter: Dict, alpha: float) -> List[Document]:
+        """Recherche hybride manuelle pour v3 ou fallback"""
+        try:
+            # Recherche vectorielle et BM25 en parallèle
+            vector_docs = await self._vector_search_v3(query_vector, top_k * 2, where_filter)
+            bm25_docs = await self._bm25_search_fallback(query_text, top_k, where_filter)
+            
+            # Fusion avec RRF
+            fused_docs = self._fuse_results_rrf(vector_docs, bm25_docs, alpha, top_k)
+            return fused_docs
+            
+        except Exception as e:
+            logger.error(f"Erreur recherche hybride fallback: {e}")
+            return await self._vector_search_fallback(query_vector, top_k, where_filter)
+    
+    def _fuse_results_rrf(self, vector_docs: List[Document], bm25_docs: List[Document],
+                         alpha: float, top_k: int) -> List[Document]:
+        """Fusion avec Reciprocal Rank Fusion"""
+        all_docs = {}
+        
+        # Indexer documents vectoriels
+        for i, doc in enumerate(vector_docs):
+            content_key = doc.content[:100]
+            if content_key not in all_docs:
+                all_docs[content_key] = {
+                    "doc": doc,
+                    "vector_rank": i + 1,
+                    "vector_score": doc.score,
+                    "bm25_rank": None,
+                    "bm25_score": 0.0
+                }
+        
+        # Indexer documents BM25
+        for i, doc in enumerate(bm25_docs):
+            content_key = doc.content[:100]
+            if content_key in all_docs:
+                all_docs[content_key]["bm25_rank"] = i + 1
+                all_docs[content_key]["bm25_score"] = doc.score
+            else:
+                all_docs[content_key] = {
+                    "doc": doc,
+                    "vector_rank": None,
+                    "vector_score": 0.0,
+                    "bm25_rank": i + 1,
+                    "bm25_score": doc.score
+                }
+        
+        # Calcul score RRF
+        fused_docs = []
+        for content_key, data in all_docs.items():
+            doc = data["doc"]
+            
+            rrf_score = 0.0
+            if data["vector_rank"]:
+                rrf_score += alpha / (self.fusion_config["rrf_k"] + data["vector_rank"])
+            if data["bm25_rank"]:
+                rrf_score += (1 - alpha) / (self.fusion_config["rrf_k"] + data["bm25_rank"])
+            
+            if rrf_score >= self.fusion_config["min_score_threshold"]:
+                doc.score = rrf_score * 10  # Normaliser
+                doc.metadata.update({
+                    "hybrid_used": True,
+                    "fusion_method": "rrf",
+                    "alpha": alpha,
+                    "vector_rank": data["vector_rank"],
+                    "bm25_rank": data["bm25_rank"]
+                })
+                fused_docs.append(doc)
+        
+        fused_docs.sort(key=lambda x: x.score, reverse=True)
+        return fused_docs[:top_k]
+    
+    async def _vector_search_v3(self, query_vector: List[float], top_k: int, 
+                              where_filter: Dict) -> List[Document]:
+        """Recherche vectorielle Weaviate v3"""
+        try:
+            def _sync_search():
+                query_builder = (
+                    self.client.query
+                    .get(self.collection_name, ["content", "title", "source", "geneticLine", "species", "phase", "age_band"])
+                    .with_near_vector({"vector": query_vector})
+                    .with_limit(top_k)
+                    .with_additional(["score", "distance", "certainty"])
+                )
+                
+                if where_filter:
+                    query_builder = query_builder.with_where(where_filter)
+                
+                return query_builder.do()
+            
+            result = await anyio.to_thread.run_sync(_sync_search)
+            
+            documents = []
+            objects = result.get("data", {}).get("Get", {}).get(self.collection_name, [])
+            
+            for obj in objects:
+                additional = obj.get("_additional", {})
+                score = additional.get("score", additional.get("certainty", 0.0))
+                
+                doc = Document(
+                    content=obj.get("content", ""),
+                    metadata={
+                        "title": obj.get("title", ""),
+                        "source": obj.get("source", ""),
+                        "geneticLine": obj.get("geneticLine", ""),
+                        "species": obj.get("species", ""),
+                        "phase": obj.get("phase", ""),
+                        "age_band": obj.get("age_band", ""),
+                    },
+                    score=float(score) if score else 0.0,
+                    original_distance=additional.get("distance")
+                )
+                documents.append(doc)
+            
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Erreur recherche vectorielle v3: {e}")
             return []
     
-    async def _bm25_v4(self, query: str, top_k: int = 8, where_filter: Dict = None) -> List[Document]:
-        """NOUVEAU: Recherche BM25 en fallback pour Weaviate v4"""
+    async def _bm25_search_fallback(self, query_text: str, top_k: int, 
+                                  where_filter: Dict) -> List[Document]:
+        """Recherche BM25 de fallback"""
         if not self.is_v4:
             return []
         
@@ -379,7 +767,7 @@ class WeaviateRetriever:
             def _sync_bm25():
                 collection = self.client.collections.get(self.collection_name)
                 params = {
-                    "query": query,
+                    "query": query_text,
                     "limit": top_k,
                     "return_metadata": ["score"]
                 }
@@ -404,18 +792,22 @@ class WeaviateRetriever:
                         "species": obj.properties.get("species", ""),
                         "phase": obj.properties.get("phase", ""),
                         "age_band": obj.properties.get("age_band", ""),
-                        "bm25_used": True  # Marquer comme BM25
+                        "bm25_used": True
                     },
                     score=score
                 )
                 documents.append(doc)
             
-            logger.debug(f"BM25 fallback: {len(documents)} documents trouvés")
             return documents
             
         except Exception as e:
             logger.error(f"Erreur BM25 fallback: {e}")
             return []
+    
+    async def _vector_search_fallback(self, query_vector: List[float], top_k: int, 
+                                    where_filter: Dict) -> List[Document]:
+        """Recherche vectorielle simple de fallback"""
+        return await self._vector_search_v3(query_vector, top_k, where_filter)
     
     def _remove_age_band_filter(self, where_filter: Dict) -> Dict:
         """Retire le critère age_band du filtre"""
@@ -423,14 +815,12 @@ class WeaviateRetriever:
             return None
         
         try:
-            # Cas feuille avec age_band
             if "path" in where_filter:
                 path = where_filter["path"]
                 if (isinstance(path, list) and "age_band" in path) or path == "age_band":
                     return None
                 return where_filter
             
-            # Cas composé
             if "operands" in where_filter:
                 new_operands = []
                 for operand in where_filter["operands"]:
@@ -453,129 +843,171 @@ class WeaviateRetriever:
         except Exception as e:
             logger.warning(f"Erreur suppression age_band filter: {e}")
             return None
+
+# === GÉNÉRATEUR DE RÉPONSES ENRICHI ===
+class EnhancedResponseGenerator:
+    """Générateur avec enrichissement d'entités et cache"""
     
-    async def _search_internal(self, query_vector: List[float], top_k: int, where_filter: Dict) -> List[Document]:
-        """Recherche interne"""
-        if self.is_v4:
-            return await self._search_v4_async(query_vector, top_k, where_filter)
-        else:
-            return await self._search_v3_async(query_vector, top_k, where_filter)
+    def __init__(self, client, cache_manager: RAGCacheManager = None):
+        self.client = client
+        self.cache_manager = cache_manager
+        
+        self.entity_contexts = {
+            "line": {
+                "ross": "lignée à croissance rapide, optimisée pour le rendement carcasse",
+                "cobb": "lignée équilibrée performance/robustesse, bonne conversion alimentaire", 
+                "hubbard": "lignée rustique, adaptée à l'élevage extensif et labels qualité",
+                "isa": "lignée ponte, optimisée pour la production d'œufs",
+                "lohmann": "lignée ponte, excellence en persistance de ponte"
+            },
+            "species": {
+                "broiler": "poulet de chair, objectifs: poids vif, FCR, rendement carcasse",
+                "layer": "poule pondeuse, objectifs: intensité de ponte, qualité œuf, persistance",
+                "breeder": "reproducteur, objectifs: fertilité, éclosabilité, viabilité descendance"
+            },
+            "phase": {
+                "starter": "phase démarrage (0-10j), croissance critique, thermorégulation",
+                "grower": "phase croissance (11-24j), développement squelettique et musculaire", 
+                "finisher": "phase finition (25j+), optimisation du poids final et FCR",
+                "laying": "phase ponte, maintien de la production et qualité œuf",
+                "breeding": "phase reproduction, optimisation fertilité et éclosabilité"
+            }
+        }
     
-    async def _search_v4_async(self, query_vector: List[float], top_k: int, where_filter: Dict) -> List[Document]:
-        """Recherche Weaviate V4 avec métadonnées corrigées"""
+    async def generate_response(self, query: str, context_docs: List[Document], 
+                              conversation_context: str = "", language: str = "fr",
+                              intent_result=None) -> str:
+        """Génère une réponse enrichie avec cache"""
         try:
-            def _sync_search():
-                collection = self.client.collections.get(self.collection_name)
-                
-                # CORRECTION: Demander distance et certainty
-                query_params = {
-                    "vector": query_vector,
-                    "limit": top_k,
-                    "return_metadata": ["distance", "certainty"]  # CORRECTION: Pas "score"
-                }
-                
-                # CORRECTION: Utiliser filter v4 si disponible
-                if where_filter:
-                    v4_filter = _to_v4_filter(where_filter)
-                    if v4_filter:
-                        query_params["where"] = v4_filter
-                
-                return collection.query.near_vector(**query_params)
-            
-            response = await anyio.to_thread.run_sync(_sync_search)
-            
-            documents = []
-            for obj in response.objects:
-                # CORRECTION: Conversion distance/certainty → score
-                distance = getattr(obj.metadata, "distance", None)
-                certainty = getattr(obj.metadata, "certainty", None)
-                
-                if certainty is not None:
-                    score = float(certainty)
-                    original_distance = None
-                elif distance is not None:
-                    # Conversion monotone: distance plus petite => score plus grand
-                    distance_val = float(distance)
-                    score = 1.0 / (1.0 + distance_val)
-                    original_distance = distance_val
-                else:
-                    score = 0.0
-                    original_distance = None
-                
-                doc = Document(
-                    content=obj.properties.get("content", ""),
-                    metadata={
-                        "title": obj.properties.get("title", ""),
-                        "source": obj.properties.get("source", ""),
-                        "geneticLine": obj.properties.get("geneticLine", ""),
-                        "species": obj.properties.get("species", ""),
-                        "phase": obj.properties.get("phase", ""),
-                        "age_band": obj.properties.get("age_band", ""),
-                        "creation_time": obj.metadata.creation_time if obj.metadata else None
-                    },
-                    score=score,
-                    original_distance=original_distance
+            # Vérifier le cache
+            if self.cache_manager:
+                context_hash = self.cache_manager.generate_context_hash(
+                    [self._doc_to_dict(doc) for doc in context_docs]
                 )
-                documents.append(doc)
+                cached_response = await self.cache_manager.get_response(
+                    query, context_hash, language
+                )
+                if cached_response:
+                    METRICS.cache_hit("response")
+                    return cached_response
+                METRICS.cache_miss("response")
             
-            return documents
+            # Construire enrichissement
+            enrichment = self._build_entity_enrichment(intent_result) if intent_result else None
+            
+            # Générer le prompt enrichi
+            system_prompt, user_prompt = self._build_enhanced_prompt(
+                query, context_docs, enrichment, conversation_context, language
+            )
+            
+            # Génération
+            response = await self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.1,
+                max_tokens=900
+            )
+            
+            generated_response = response.choices[0].message.content.strip()
+            
+            # Mettre en cache
+            if self.cache_manager:
+                context_hash = self.cache_manager.generate_context_hash(
+                    [self._doc_to_dict(doc) for doc in context_docs]
+                )
+                await self.cache_manager.set_response(
+                    query, context_hash, generated_response, language
+                )
+            
+            return generated_response
             
         except Exception as e:
-            logger.error(f"Erreur recherche V4: {e}")
-            return []
+            logger.error(f"Erreur génération réponse enrichie: {e}")
+            return "Désolé, je ne peux pas générer une réponse pour cette question."
     
-    async def _search_v3_async(self, query_vector: List[float], top_k: int, where_filter: Dict) -> List[Document]:
-        """Recherche Weaviate V3"""
+    def _doc_to_dict(self, doc: Document) -> Dict:
+        """Convertit Document en dict pour cache"""
+        return {
+            "content": doc.content,
+            "title": doc.metadata.get("title", ""),
+            "source": doc.metadata.get("source", ""),
+            "score": doc.score
+        }
+    
+    def _build_entity_enrichment(self, intent_result):
+        """Construit l'enrichissement basé sur les entités"""
         try:
-            def _sync_search():
-                query_builder = (
-                    self.client.query
-                    .get(self.collection_name, ["content", "title", "source", "geneticLine", "species", "phase", "age_band"])
-                    .with_near_vector({"vector": query_vector})
-                    .with_limit(top_k)
-                    .with_additional(["score", "id", "distance", "certainty"])
-                )
-                
-                if where_filter:
-                    query_builder = query_builder.with_where(where_filter)
-                
-                return query_builder.do()
+            entities = getattr(intent_result, 'detected_entities', {})
+            entity_contexts = []
             
-            result = await anyio.to_thread.run_sync(_sync_search)
+            if "line" in entities:
+                line = entities["line"].lower()
+                if line in self.entity_contexts["line"]:
+                    entity_contexts.append(f"Lignée {entities['line']}: {self.entity_contexts['line'][line]}")
             
-            documents = []
-            objects = result.get("data", {}).get("Get", {}).get(self.collection_name, [])
+            if "species" in entities:
+                species = entities["species"].lower()
+                if species in self.entity_contexts["species"]:
+                    entity_contexts.append(f"Type {entities['species']}: {self.entity_contexts['species'][species]}")
             
-            for obj in objects:
-                additional = obj.get("_additional", {})
-                score = additional.get("score", additional.get("certainty", 0.0))
-                distance = additional.get("distance")
-                
-                doc = Document(
-                    content=obj.get("content", ""),
-                    metadata={
-                        "title": obj.get("title", ""),
-                        "source": obj.get("source", ""),
-                        "geneticLine": obj.get("geneticLine", ""),
-                        "species": obj.get("species", ""),
-                        "phase": obj.get("phase", ""),
-                        "age_band": obj.get("age_band", ""),
-                        "id": additional.get("id")
-                    },
-                    score=float(score) if score else 0.0,
-                    original_distance=float(distance) if distance else None
-                )
-                documents.append(doc)
+            if "phase" in entities:
+                phase = entities["phase"].lower()
+                if phase in self.entity_contexts["phase"]:
+                    entity_contexts.append(f"Phase {entities['phase']}: {self.entity_contexts['phase'][phase]}")
             
-            return documents
+            return "; ".join(entity_contexts) if entity_contexts else ""
             
         except Exception as e:
-            logger.error(f"Erreur recherche V3: {e}")
-            return []
+            logger.warning(f"Erreur construction enrichissement: {e}")
+            return ""
+    
+    def _build_enhanced_prompt(self, query: str, context_docs: List[Document], 
+                              enrichment: str, conversation_context: str, 
+                              language: str) -> Tuple[str, str]:
+        """Construit un prompt enrichi"""
+        
+        context_text = "\n\n".join([
+            f"Document {i+1} ({doc.metadata.get('geneticLine', 'N/A')} - {doc.metadata.get('species', 'N/A')}):\n{doc.content[:1000]}"
+            for i, doc in enumerate(context_docs[:5])
+        ])
+        
+        system_prompt = f"""Tu es un expert en aviculture spécialisé dans l'accompagnement technique des éleveurs.
 
+CONTEXTE MÉTIER DÉTECTÉ:
+{enrichment or 'Contexte général aviculture'}
 
+DIRECTIVES DE RÉPONSE:
+1. Base ta réponse UNIQUEMENT sur les documents fournis
+2. Intègre le contexte métier détecté dans ta réponse
+3. Adapte le niveau technique au contexte (éleveur professionnel)
+4. Fournis des valeurs chiffrées quand disponibles
+5. Mentionne les spécificités de lignée/phase si pertinentes
+
+RÈGLE LINGUISTIQUE: Réponds STRICTEMENT en {language}
+
+Si les documents ne contiennent pas l'information demandée, dis-le clairement."""
+
+        limited_context = conversation_context[:MAX_CONVERSATION_CONTEXT] if conversation_context else ""
+        
+        user_prompt = f"""CONTEXTE CONVERSATIONNEL:
+{limited_context}
+
+DOCUMENTS TECHNIQUES (avec métadonnées):
+{context_text}
+
+QUESTION ORIGINALE:
+{query}
+
+RÉPONSE TECHNIQUE (intégrant le contexte métier détecté):"""
+
+        return system_prompt, user_prompt
+
+# === DÉTECTEUR HORS DOMAINE ===
 class EnhancedOODDetector:
-    """Détecteur hors-domaine amélioré avec normalisation accents"""
+    """Détecteur hors-domaine amélioré"""
     
     def __init__(self, blocked_terms_path: str = None):
         self.blocked_terms = self._load_blocked_terms(blocked_terms_path)
@@ -585,34 +1017,40 @@ class EnhancedOODDetector:
             'chicken', 'poultry', 'broiler', 'layer', 'feed', 'weight', 'growth',
             'température', 'ventilation', 'eau', 'water', 'temperature', 'incubation',
             'couvoir', 'hatchery', 'biosécurité', 'mortalité', 'mortality', 'performance',
-            'ross', 'cobb', 'hubbard', 'isa', 'lohmann', 'ponte', 'eggs', 'laying',
-            'reproduction', 'breeding', 'genetique', 'genetic', 'strain', 'line',
-            'chair', 'meat', 'viande', 'carcasse', 'carcass', 'rendement', 'yield',
-            'sanitaire', 'sanitary', 'veterinaire', 'veterinary', 'prophylaxie',
-            'antibiotique', 'antibiotic', 'vaccin', 'vaccine', 'stress', 'welfare',
-            'bien-être', 'densité', 'density', 'lighting', 'éclairage', 'photopériode'
+            'ross', 'cobb', 'hubbard', 'isa', 'lohmann', 'ponte', 'eggs', 'laying'
         }
         
+
     def _load_blocked_terms(self, path: str = None) -> Dict[str, List[str]]:
-        """Charge les termes bloqués"""
+        """Charge les termes bloqués depuis le fichier configuré"""
         if path is None:
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            path = os.path.join(base_dir, "blocked_terms.json")
+            # CORRECTION: Utiliser la variable d'environnement de Digital Ocean
+            path = os.getenv("BLOCKED_TERMS_FILE", "/app/blocked_terms.json")
+            if not os.path.exists(path):
+                # Fallback pour développement local
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+                path = os.path.join(base_dir, "blocked_terms.json")
         
         try:
             with open(path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                blocked_terms = json.load(f)
+            
+            logger.info(f"Loaded {len(blocked_terms)} blocked term categories from {path}")
+            return blocked_terms
+            
         except Exception as e:
-            logger.warning(f"Erreur chargement blocked_terms.json: {e}")
-            return {}
+            logger.warning(f"Erreur chargement blocked_terms depuis {path}: {e}")
+            # Fallback avec termes de base en cas d'erreur
+            return {
+                "general": ["crypto", "bitcoin", "football", "film", "politique", "news"]
+            }
     
     def calculate_ood_score(self, query: str, intent_result=None) -> Tuple[bool, float, Dict[str, float]]:
-        """Calcul score OOD amélioré avec normalisation"""
-        # NOUVEAU: Normalisation avec unidecode si disponible
+        """Calcul score OOD avec normalisation"""
         query_lower = (unidecode(query).lower() if UNIDECODE_AVAILABLE else query.lower())
         words = query_lower.split()
         
-        # Boost entités métier détectées
+        # Boost entités métier
         entities_boost = 0.0
         if intent_result and hasattr(intent_result, 'detected_entities'):
             business_entities = ['line', 'species', 'age_days', 'weight', 'fcr', 'phase']
@@ -626,38 +1064,20 @@ class EnhancedOODDetector:
         
         # Score termes bloqués
         blocked_score = 0.0
-        blocked_categories = []
-        
         for category, terms in self.blocked_terms.items():
             category_matches = sum(1 for term in terms if term in query_lower)
             if category_matches > 0:
-                blocked_categories.append(category)
-                category_penalty = min(0.7, category_matches / max(2, len(words) // 2))
-                blocked_score = max(blocked_score, category_penalty)
+                blocked_score = max(blocked_score, min(0.7, category_matches / max(2, len(words) // 2)))
         
-        # Score patterns hors-domaine
-        ood_patterns = [
-            r'\b(film|movie|cinema|série|series)\b',
-            r'\b(football|sport|match)\b',
-            r'\b(politique|president|élection)\b',
-            r'\b(crypto|bitcoin|bourse)\b'
-        ]
-        
-        pattern_score = 0.0
-        for pattern in ood_patterns:
-            if re.search(pattern, query_lower):
-                pattern_score = 0.6
-                break
-        
-        # Logique de fusion améliorée
+        # Score final
         if vocab_score > 0.4:
-            final_score = max(0.7, vocab_score - blocked_score * 0.3 - pattern_score * 0.2)
+            final_score = max(0.7, vocab_score - blocked_score * 0.3)
         elif entities_boost > 0:
             final_score = 0.6 + entities_boost - blocked_score * 0.2
         elif blocked_score > 0.6:
             final_score = 0.1
         else:
-            final_score = (vocab_score * 0.8) - (blocked_score * 0.2) - (pattern_score * 0.1)
+            final_score = (vocab_score * 0.8) - (blocked_score * 0.2)
         
         is_in_domain = final_score > 0.2
         
@@ -665,337 +1085,147 @@ class EnhancedOODDetector:
             "vocab_score": vocab_score,
             "entities_boost": entities_boost,
             "blocked_score": blocked_score,
-            "pattern_score": pattern_score,
-            "blocked_categories": blocked_categories,
-            "final_score": final_score,
-            "detected_business_entities": len([e for e in ['line', 'species', 'age_days', 'weight', 'fcr', 'phase'] 
-                                             if intent_result and hasattr(intent_result, 'detected_entities') 
-                                             and e in intent_result.detected_entities]) if intent_result else 0,
-            "unidecode_used": UNIDECODE_AVAILABLE
+            "final_score": final_score
         }
         
         return is_in_domain, final_score, score_details
 
-
-class MultiStageReranker:
-    """Reranking multi-étapes avec lazy init"""
+# === GUARDRAILS AVANCÉS ===
+class AdvancedResponseGuardrails:
+    """Système de guardrails pour vérifier les réponses"""
     
-    def __init__(self):
-        self.voyage_client = None
-        self._local_reranker = None
-        self._local_reranker_initialized = False  # CORRECTION: Flag pour tracking
-        
-        # VoyageAI
-        if VOYAGE_AVAILABLE and VOYAGE_API_KEY:
-            try:
-                self.voyage_client = voyageai.Client(api_key=VOYAGE_API_KEY)
-                logger.info("VoyageAI reranker initialisé")
-            except Exception as e:
-                logger.warning(f"Erreur init VoyageAI: {e}")
-    
-    @property
-    def local_reranker(self):
-        """CORRECTION: Lazy init du reranker local"""
-        if not self._local_reranker_initialized and SENTENCE_TRANSFORMERS_AVAILABLE:
-            try:
-                self._local_reranker = SentenceTransformer('all-MiniLM-L6-v2')
-                logger.info("Reranker local initialisé (lazy)")
-            except Exception as e:
-                logger.warning(f"Erreur init reranker local: {e}")
-            finally:
-                self._local_reranker_initialized = True
-        
-        return self._local_reranker
-    
-    async def rerank(self, query: str, documents: List[Document], intent_result=None, force_rerank: bool = False) -> List[Document]:
-        """Reranking des documents"""
-        if not documents:
-            return documents
-        
-        should_rerank = len(documents) >= 5 or force_rerank
-        
-        try:
-            if should_rerank:
-                # Stage 1: Reranking sémantique
-                if self.voyage_client:
-                    documents = await self._voyage_rerank(query, documents)
-                elif self.local_reranker:  # Utilise le property lazy
-                    documents = await self._local_rerank(query, documents)
-            
-            # Stage 2: Intent-based boosting
-            if intent_result:
-                documents = self._intent_boost(documents, intent_result)
-            
-            # Stage 3: Diversity filtering
-            if len(documents) > 3:
-                documents = self._diversify_results(documents)
-            
-            return documents[:RAG_RERANK_TOP_K]
-            
-        except Exception as e:
-            logger.error(f"Erreur reranking: {e}")
-            return documents[:RAG_RERANK_TOP_K]
-    
-    async def _voyage_rerank(self, query: str, documents: List[Document]) -> List[Document]:
-        """Reranking VoyageAI"""
-        try:
-            doc_texts = [doc.content for doc in documents]
-            
-            def _sync_rerank():
-                return self.voyage_client.rerank(
-                    query=query,
-                    documents=doc_texts,
-                    model="rerank-1",
-                    top_k=min(len(documents), 12)
-                )
-            
-            reranked = await anyio.to_thread.run_sync(_sync_rerank)
-            
-            reranked_docs = []
-            for item in reranked.results:
-                original_doc = documents[item.index]
-                original_doc.score = (original_doc.score * 0.3 + item.relevance_score * 0.7)
-                reranked_docs.append(original_doc)
-            
-            logger.debug(f"VoyageAI reranked {len(documents)} -> {len(reranked_docs)} documents")
-            return reranked_docs
-            
-        except Exception as e:
-            logger.error(f"Erreur VoyageAI reranking: {e}")
-            return documents
-    
-    async def _local_rerank(self, query: str, documents: List[Document]) -> List[Document]:
-        """Reranking local avec sentence-transformers"""
-        try:
-            def _sync_rerank():
-                doc_texts = [doc.content for doc in documents]
-                query_embedding = self.local_reranker.encode(query)
-                doc_embeddings = self.local_reranker.encode(doc_texts)
-                
-                similarities = util.cos_sim(query_embedding, doc_embeddings)[0]
-                return similarities.cpu().numpy()
-            
-            similarities = await anyio.to_thread.run_sync(_sync_rerank)
-            
-            for i, doc in enumerate(documents):
-                doc.score = (doc.score * 0.4 + float(similarities[i]) * 0.6)
-            
-            documents.sort(key=lambda x: x.score, reverse=True)
-            logger.debug(f"Local reranked {len(documents)} documents")
-            return documents
-            
-        except Exception as e:
-            logger.error(f"Erreur local reranking: {e}")
-            return documents
-    
-    def _intent_boost(self, documents: List[Document], intent_result) -> List[Document]:
-        """Boost basé sur l'intention"""
-        for doc in documents:
-            boost_factor = 1.0
-            
-            try:
-                # Boost correspondance lignée
-                if hasattr(intent_result, 'detected_entities') and "line" in intent_result.detected_entities:
-                    target_line = intent_result.detected_entities["line"].lower()
-                    doc_line = doc.metadata.get("geneticLine", "").lower()
-                    if target_line in doc_line or doc_line in target_line:
-                        boost_factor *= 1.4
-                
-                # Boost correspondance espèce
-                if hasattr(intent_result, 'detected_entities') and "species" in intent_result.detected_entities:
-                    target_species = intent_result.detected_entities["species"].lower()
-                    doc_species = doc.metadata.get("species", "").lower()
-                    if target_species in doc_species or doc_species in target_species:
-                        boost_factor *= 1.3
-                
-                # Boost correspondance âge
-                if hasattr(intent_result, 'detected_entities') and "age_days" in intent_result.detected_entities:
-                    doc_age_band = doc.metadata.get("age_band", "")
-                    if doc_age_band:
-                        boost_factor *= 1.25
-                
-                # Boost correspondance phase
-                if hasattr(intent_result, 'detected_entities') and "phase" in intent_result.detected_entities:
-                    target_phase = intent_result.detected_entities["phase"].lower()
-                    doc_phase = doc.metadata.get("phase", "").lower()
-                    if target_phase in doc_phase or doc_phase in target_phase:
-                        boost_factor *= 1.3
-                
-                # Boost queries métriques
-                if (hasattr(intent_result, 'intent_type') and 
-                    intent_result.intent_type == IntentType.METRIC_QUERY):
-                    if any(char.isdigit() for char in doc.content[:200]):
-                        boost_factor *= 1.15
-                
-                doc.score = min(1.0, doc.score * boost_factor)
-                        
-            except Exception as e:
-                logger.warning(f"Erreur intent boost: {e}")
-        
-        return sorted(documents, key=lambda x: x.score, reverse=True)
-    
-    def _diversify_results(self, documents: List[Document]) -> List[Document]:
-        """Filtrage diversité"""
-        if len(documents) <= 3:
-            return documents
-        
-        try:
-            diversified = [documents[0]]
-            
-            for candidate in documents[1:]:
-                is_diverse = True
-                candidate_words = set(candidate.content.lower().split())
-                
-                for selected in diversified:
-                    selected_words = set(selected.content.lower().split())
-                    
-                    if candidate_words and selected_words:
-                        overlap = len(candidate_words.intersection(selected_words))
-                        similarity = overlap / min(len(candidate_words), len(selected_words))
-                        
-                        if similarity > 0.75:
-                            is_diverse = False
-                            break
-                
-                if is_diverse:
-                    diversified.append(candidate)
-            
-            return diversified
-            
-        except Exception as e:
-            logger.warning(f"Erreur diversification: {e}")
-            return documents
-
-
-class ResponseGenerator:
-    """Générateur de réponses avec OpenAI - CORRECTION: Langue forcée"""
-    
-    def __init__(self, client: AsyncOpenAI):
+    def __init__(self, client, verification_level: VerificationLevel = VerificationLevel.STANDARD):
         self.client = client
+        self.verification_level = verification_level
+        
+        self.hallucination_patterns = [
+            r"selon moi|à mon avis|je pense que|il me semble",
+            r"généralement|habituellement|en général",
+            r"il est recommandé|il faut|vous devriez",
+            r"dans la plupart des cas|souvent|parfois"
+        ]
     
-    async def generate_response(self, query: str, context_docs: List[Document], conversation_context: str = "", language: str = "fr") -> str:
-        """Génère une réponse basée sur le contexte"""
+    async def verify_response(self, query: str, response: str, 
+                            context_docs: List[Document],
+                            intent_result=None) -> GuardrailResult:
+        """Vérification complète de la réponse"""
         try:
-            context_text = "\n\n".join([
-                f"Document {i+1}:\n{doc.content[:1000]}"
-                for i, doc in enumerate(context_docs[:5])
-            ])
+            # Vérifications rapides en parallèle
+            evidence_score = await self._check_evidence_support(response, context_docs)
+            hallucination_risk = self._detect_hallucination_risk(response)
             
-            # CORRECTION: Ajout explicite de la règle de langue
-            system_prompt = """Tu es un expert en aviculture spécialisé dans l'aide aux éleveurs de volailles.
-
-INSTRUCTIONS:
-1. Réponds uniquement basé sur les documents fournis
-2. Sois précis et technique quand approprié
-3. Mentionne les lignées génétiques si pertinentes
-4. Fournis des données chiffrées quand disponibles
-5. Si les documents ne contiennent pas l'information, dis-le clairement
-
-RÈGLE DE LANGUE: Réponds STRICTEMENT dans la même langue que la QUESTION.
-
-DOMAINE: Aviculture, élevage de volailles, performance, nutrition, santé"""
-
-            limited_context = conversation_context[:MAX_CONVERSATION_CONTEXT] if conversation_context else ""
+            violations = []
+            warnings = []
             
-            # CORRECTION: Ajout de la langue cible dans le prompt
-            user_prompt = f"""LANGUE_CIBLE: {language}
-
-CONTEXTE CONVERSATIONNEL:
-{limited_context}
-
-DOCUMENTS DE RÉFÉRENCE:
-{context_text}
-
-QUESTION:
-{query}
-
-RÉPONSE (dans la langue demandée, basée UNIQUEMENT sur les documents fournis):"""
-
-            response = await self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.1,
-                max_tokens=800
+            if evidence_score < 0.3:
+                violations.append("Support documentaire insuffisant")
+            elif evidence_score < 0.6:
+                warnings.append("Support documentaire modéré")
+            
+            if hallucination_risk > 0.7:
+                violations.append("Risque élevé d'hallucination")
+            elif hallucination_risk > 0.4:
+                warnings.append("Éléments génériques détectés")
+            
+            confidence = self._calculate_confidence(evidence_score, hallucination_risk)
+            is_valid = self._make_validation_decision(evidence_score, hallucination_risk, 
+                                                    len(violations), len(warnings))
+            
+            return GuardrailResult(
+                is_valid=is_valid,
+                confidence=confidence,
+                violations=violations,
+                warnings=warnings,
+                evidence_support=evidence_score,
+                hallucination_risk=hallucination_risk,
+                correction_suggestions=[],
+                metadata={
+                    "verification_level": self.verification_level.value,
+                    "evidence_score": evidence_score,
+                    "hallucination_risk": hallucination_risk
+                }
             )
             
-            return response.choices[0].message.content.strip()
-            
         except Exception as e:
-            logger.error(f"Erreur génération réponse: {e}")
-            return "Désolé, je ne peux pas générer une réponse pour cette question."
-
-
-class ResponseVerifier:
-    """Vérificateur de réponses avec mode smart"""
-    
-    def __init__(self, client: AsyncOpenAI):
-        self.client = client
-    
-    async def verify_response(self, query: str, response: str, context_docs: List[Document]) -> Dict[str, Any]:
-        """Vérification des réponses"""
-        if not RAG_VERIFICATION_ENABLED or not context_docs:
-            return {"verified": True, "confidence": 0.8, "corrections": []}
-        
-        try:
-            context_text = "\n\n".join([
-                f"Document {i+1}: {doc.content[:500]}"
-                for i, doc in enumerate(context_docs[:3])
-            ])
-            
-            # CORRECTION: Prompt anti-hallucination renforcé
-            verification_prompt = f"""Vérifie si la RÉPONSE est supportée par les DOCUMENTS.
-
-RÉPONSE À VÉRIFIER:
-{response}
-
-DOCUMENTS DE RÉFÉRENCE:
-{context_text}
-
-RAPPEL: Si une partie de la réponse N'EST PAS présente dans les documents, signale-la comme NON_VÉRIFIÉE.
-
-FORMAT:
-- STATUT: [VÉRIFIÉ/PARTIELLEMENT_VÉRIFIÉ/NON_VÉRIFIÉ]
-- CONFIANCE: [0.0-1.0]
-- PROBLÈMES: [liste des problèmes]"""
-
-            verification = await self.client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": verification_prompt}],
-                temperature=0.0,
-                max_tokens=500
+            logger.error(f"Erreur vérification guardrails: {e}")
+            return GuardrailResult(
+                is_valid=True,  # Fail-open
+                confidence=0.5,
+                violations=[],
+                warnings=[f"Erreur vérification: {str(e)}"],
+                evidence_support=0.5,
+                hallucination_risk=0.5,
+                correction_suggestions=[],
+                metadata={"error": str(e)}
             )
+    
+    async def _check_evidence_support(self, response: str, 
+                                    context_docs: List[Document]) -> float:
+        """Vérifie le support documentaire"""
+        try:
+            if not context_docs:
+                return 0.2
             
-            verification_text = verification.choices[0].message.content
+            response_words = set(response.lower().split())
+            total_overlap = 0
             
-            status = "VÉRIFIÉ"
-            confidence = 0.8
+            for doc in context_docs:
+                doc_words = set(doc.content.lower().split())
+                if doc_words:
+                    overlap = len(response_words.intersection(doc_words))
+                    similarity = overlap / min(len(response_words), len(doc_words))
+                    total_overlap += similarity
             
-            if "NON_VÉRIFIÉ" in verification_text:
-                status = "NON_VÉRIFIÉ"
-                confidence = 0.3
-            elif "PARTIELLEMENT_VÉRIFIÉ" in verification_text:
-                status = "PARTIELLEMENT_VÉRIFIÉ"
-                confidence = 0.6
-            
-            return {
-                "verified": status == "VÉRIFIÉ",
-                "status": status,
-                "confidence": confidence,
-                "verification_detail": verification_text
-            }
+            avg_overlap = total_overlap / len(context_docs) if context_docs else 0
+            return min(1.0, avg_overlap * 2)  # Normaliser
             
         except Exception as e:
-            logger.error(f"Erreur vérification: {e}")
-            return {"verified": True, "confidence": 0.7, "error": str(e), "fallback_used": True}
+            logger.warning(f"Erreur vérification evidence: {e}")
+            return 0.5
+    
+    def _detect_hallucination_risk(self, response: str) -> float:
+        """Détecte le risque d'hallucination"""
+        try:
+            risk_score = 0.0
+            
+            for pattern in self.hallucination_patterns:
+                matches = len(re.findall(pattern, response.lower()))
+                risk_score += 0.15 * matches
+            
+            # Vérifier affirmations sans chiffres
+            if "recommandé" in response.lower() and not re.search(r'\d+', response):
+                risk_score += 0.2
+            
+            return min(1.0, risk_score)
+            
+        except Exception as e:
+            logger.warning(f"Erreur détection hallucination: {e}")
+            return 0.5
+    
+    def _calculate_confidence(self, evidence_score: float, hallucination_risk: float) -> float:
+        """Calcule la confiance globale"""
+        return min(0.95, max(0.05, evidence_score * 0.7 + (1 - hallucination_risk) * 0.3))
+    
+    def _make_validation_decision(self, evidence_score: float, hallucination_risk: float,
+                                violation_count: int, warning_count: int) -> bool:
+        """Décision de validation"""
+        if self.verification_level == VerificationLevel.MINIMAL:
+            return violation_count == 0
+        elif self.verification_level == VerificationLevel.STANDARD:
+            return (violation_count == 0 and evidence_score >= 0.4 and hallucination_risk <= 0.7)
+        elif self.verification_level == VerificationLevel.STRICT:
+            return (violation_count == 0 and warning_count <= 2 and 
+                   evidence_score >= 0.6 and hallucination_risk <= 0.5)
+        elif self.verification_level == VerificationLevel.CRITICAL:
+            return (violation_count == 0 and warning_count <= 1 and 
+                   evidence_score >= 0.8 and hallucination_risk <= 0.3)
+        return True
 
-
+# === MÉMOIRE CONVERSATIONNELLE ===
 class ConversationMemory:
-    """Mémoire conversationnelle"""
+    """Mémoire conversationnelle simple"""
     
-    def __init__(self, client: AsyncOpenAI):
+    def __init__(self, client):
         self.client = client
         self.memory_store = {}
         self.max_exchanges = 5
@@ -1009,46 +1239,13 @@ class ConversationMemory:
         if not history:
             return ""
         
-        if len(history) <= 2:
-            context = "\n\n".join([
-                f"Q: {entry['question']}\nR: {entry['answer']}"
-                for entry in history
-            ])
-            return context[:MAX_CONVERSATION_CONTEXT]
-        
+        # Retourner simplement le dernier échange
         try:
-            history_text = "\n\n".join([
-                f"Échange {i+1}:\nQ: {entry['question']}\nR: {entry['answer']}"
-                for i, entry in enumerate(history[-4:])
-            ])
-            
-            summary_prompt = f"""Résume cette conversation avicole en conservant les informations pertinentes pour la nouvelle question.
-
-HISTORIQUE:
-{history_text}
-
-NOUVELLE QUESTION: {current_query}
-
-Résumé contextuel (200 mots max):"""
-
-            summary = await self.client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": summary_prompt}],
-                temperature=0.1,
-                max_tokens=250
-            )
-            
-            result = summary.choices[0].message.content.strip()
-            return result[:MAX_CONVERSATION_CONTEXT]
-            
+            last_exchange = history[-1]
+            return f"Dernier échange - Q: {last_exchange['question'][:100]}... R: {last_exchange['answer'][:200]}..."
         except Exception as e:
-            logger.error(f"Erreur résumé conversation: {e}")
-            try:
-                simple_context = f"Contexte: {history[-1]['question']} -> {history[-1]['answer'][:100]}..."
-                return simple_context[:MAX_CONVERSATION_CONTEXT]
-            except Exception as e2:
-                logger.error(f"Erreur fallback contexte: {e2}")
-                return ""
+            logger.warning(f"Erreur mémoire: {e}")
+            return ""
     
     def add_exchange(self, tenant_id: str, question: str, answer: str):
         """Ajoute un échange"""
@@ -1064,7 +1261,7 @@ Résumé contextuel (200 mots max):"""
         if len(self.memory_store[tenant_id]) > self.max_exchanges:
             self.memory_store[tenant_id] = self.memory_store[tenant_id][-self.max_exchanges:]
 
-
+# === UTILITAIRES ===
 def build_where_filter(intent_result) -> Dict:
     """Construire where filter par entités"""
     if not intent_result or not hasattr(intent_result, 'detected_entities'):
@@ -1073,34 +1270,27 @@ def build_where_filter(intent_result) -> Dict:
     entities = intent_result.detected_entities
     where_conditions = []
     
-    # Filtre par lignée génétique
     if "line" in entities:
-        line_value = entities["line"]
         where_conditions.append({
             "path": ["geneticLine"],
             "operator": "Like",
-            "valueText": f"*{line_value}*"
+            "valueText": f"*{entities['line']}*"
         })
     
-    # Filtre par espèce
     if "species" in entities:
-        species_value = entities["species"] 
         where_conditions.append({
             "path": ["species"],
             "operator": "Like", 
-            "valueText": f"*{species_value}*"
+            "valueText": f"*{entities['species']}*"
         })
     
-    # Filtre par phase
     if "phase" in entities:
-        phase_value = entities["phase"]
         where_conditions.append({
             "path": ["phase"],
             "operator": "Like",
-            "valueText": f"*{phase_value}*"
+            "valueText": f"*{entities['phase']}*"
         })
     
-    # Filtre par tranche d'âge
     if "age_days" in entities:
         age_days = entities["age_days"]
         if isinstance(age_days, (int, float)):
@@ -1130,12 +1320,15 @@ def build_where_filter(intent_result) -> Dict:
             "operands": where_conditions
         }
 
-
+# === RAG ENGINE PRINCIPAL ===
 class InteliaRAGEngine:
-    """RAG Engine principal avec toutes les corrections appliquées"""
+    """RAG Engine principal avec toutes les optimisations intégrées"""
     
     def __init__(self, openai_client: AsyncOpenAI = None):
         self.openai_client = openai_client or self._build_openai_client()
+        
+        # Composants principaux
+        self.cache_manager = None
         self.embedder = None
         self.retriever = None
         self.generator = None
@@ -1143,10 +1336,21 @@ class InteliaRAGEngine:
         self.memory = None
         self.intent_processor = None
         self.ood_detector = None
-        self.reranker = None
+        self.guardrails = None
         self.weaviate_client = None
+        
+        # État
         self.is_initialized = False
         self.degraded_mode = False
+        
+        # Stats optimisation
+        self.optimization_stats = {
+            "cache_hits": 0,
+            "cache_misses": 0,
+            "hybrid_searches": 0,
+            "guardrail_violations": 0,
+            "entity_enrichments": 0
+        }
     
     def _build_openai_client(self) -> AsyncOpenAI:
         """Construit le client OpenAI"""
@@ -1154,81 +1358,99 @@ class InteliaRAGEngine:
             http_client = httpx.AsyncClient(timeout=30.0)
             return AsyncOpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
         except Exception as e:
-            logger.warning(f"Erreur client OpenAI personnalisé: {e}")
+            logger.warning(f"Erreur client OpenAI: {e}")
             return AsyncOpenAI(api_key=OPENAI_API_KEY)
     
     async def initialize(self):
-        """Initialisation"""
+        """Initialisation complète"""
         if self.is_initialized:
             return
             
-        logger.info("Initialisation RAG Engine Direct - Version Finale Complète")
+        logger.info("Initialisation RAG Engine Enhanced")
         
-        if not OPENAI_AVAILABLE:
-            logger.error("OpenAI non disponible")
+        if not OPENAI_AVAILABLE or not WEAVIATE_AVAILABLE:
             self.degraded_mode = True
-            
-        if not WEAVIATE_AVAILABLE:
-            logger.error("Weaviate non disponible")
-            self.degraded_mode = True
-        
-        if self.degraded_mode:
             logger.warning("Mode dégradé activé")
             self.is_initialized = True
             return
         
         try:
-            self.embedder = OpenAIEmbedder(self.openai_client)
-            self.generator = ResponseGenerator(self.openai_client)
-            self.verifier = ResponseVerifier(self.openai_client)
+            # 1. Cache Redis
+            if CACHE_ENABLED and REDIS_AVAILABLE:
+                self.cache_manager = RAGCacheManager()
+                await self.cache_manager.initialize()
+            
+            # 2. Connexion Weaviate
+            await self._connect_weaviate()
+            
+            # 3. Composants de base
+            self.embedder = OpenAIEmbedder(self.openai_client, self.cache_manager)
             self.memory = ConversationMemory(self.openai_client)
             self.ood_detector = EnhancedOODDetector()
-            self.reranker = MultiStageReranker()
             
+            # 4. Retriever hybride
+            if self.weaviate_client:
+                self.retriever = HybridWeaviateRetriever(self.weaviate_client)
+            
+            # 5. Générateur enrichi
+            if ENTITY_ENRICHMENT_ENABLED:
+                self.generator = EnhancedResponseGenerator(self.openai_client, self.cache_manager)
+            
+            # 6. Guardrails
+            verification_level = getattr(VerificationLevel, GUARDRAILS_LEVEL.upper(), VerificationLevel.STANDARD)
+            self.guardrails = AdvancedResponseGuardrails(self.openai_client, verification_level)
+            
+            # 7. Intent processor
             if INTENT_PROCESSOR_AVAILABLE:
                 self.intent_processor = create_intent_processor()
             
-            logger.info("Composants initialisés")
+            self.is_initialized = True
+            logger.info("RAG Engine Enhanced initialisé avec succès")
+            
         except Exception as e:
-            logger.error(f"Erreur init composants: {e}")
+            logger.error(f"Erreur initialisation: {e}")
             self.degraded_mode = True
-        
-        try:
-            await self._connect_weaviate()
-            self.retriever = WeaviateRetriever(self.weaviate_client)
-            logger.info("Weaviate connecté")
-        except Exception as e:
-            logger.error(f"Erreur connexion Weaviate: {e}")
-            self.degraded_mode = True
-        
-        self.is_initialized = True
-        logger.info(f"RAG Engine initialisé (dégradé: {self.degraded_mode})")
+            self.is_initialized = True
     
     async def _connect_weaviate(self):
-        """Connexion Weaviate avec support HTTPS self-hosted"""
+        """Connexion Weaviate"""
         if WEAVIATE_V4:
-            if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
-                auth_credentials = wvc.init.Auth.api_key(WEAVIATE_API_KEY)
-                self.weaviate_client = weaviate.connect_to_weaviate_cloud(
-                    cluster_url=WEAVIATE_URL,
-                    auth_credentials=auth_credentials,
-                    headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
-                )
-            else:
-                # CORRECTION: Support HTTPS self-hosted
-                scheme, host = ("https", WEAVIATE_URL[8:]) if WEAVIATE_URL.startswith("https://") else ("http", WEAVIATE_URL[7:] if WEAVIATE_URL.startswith("http://") else WEAVIATE_URL)
-                port = 8080
-                if ":" in host:
-                    host, port = host.split(":")
-                    port = int(port)
+            try:
+                if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
+                    self.weaviate_client = weaviate.WeaviateClient(
+                        url=WEAVIATE_URL,
+                        auth_client_secret=weaviate.AuthApiKey(WEAVIATE_API_KEY),
+                        additional_headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
+                    )
+                else:
+                    additional_headers = {"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
+                    
+                    if WEAVIATE_API_KEY:
+                        self.weaviate_client = weaviate.WeaviateClient(
+                            url=WEAVIATE_URL,
+                            auth_client_secret=weaviate.AuthApiKey(WEAVIATE_API_KEY),
+                            additional_headers=additional_headers
+                        )
+                    else:
+                        self.weaviate_client = weaviate.WeaviateClient(
+                            url=WEAVIATE_URL,
+                            additional_headers=additional_headers
+                        )
                 
-                self.weaviate_client = weaviate.connect_to_weaviate(
-                    http_host=host,
-                    http_port=port,
-                    http_secure=(scheme == "https"),
-                    headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
-                )
+                def _test_connection():
+                    self.weaviate_client.connect()
+                    return self.weaviate_client.is_ready()
+                
+                is_ready = await anyio.to_thread.run_sync(_test_connection)
+                
+                if not is_ready:
+                    raise Exception("Weaviate not ready")
+                    
+            except Exception as e:
+                logger.error(f"Erreur connexion Weaviate v4: {e}")
+                raise
         else:
+            # Weaviate v3
             if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
                 auth_config = weaviate.AuthApiKey(api_key=WEAVIATE_API_KEY)
                 self.weaviate_client = weaviate.Client(
@@ -1241,20 +1463,17 @@ class InteliaRAGEngine:
                     url=WEAVIATE_URL,
                     additional_headers={"X-OpenAI-Api-Key": OPENAI_API_KEY} if OPENAI_API_KEY else {}
                 )
-        
-        def _check_connection():
-            if hasattr(self.weaviate_client, 'is_ready'):
+            
+            def _check_connection():
                 return self.weaviate_client.is_ready()
-            else:
-                self.weaviate_client.schema.get()
-                return True
-        
-        is_ready = await anyio.to_thread.run_sync(_check_connection)
-        if not is_ready:
-            raise Exception("Weaviate not ready")
+            
+            is_ready = await anyio.to_thread.run_sync(_check_connection)
+            
+            if not is_ready:
+                raise Exception("Weaviate not ready")
     
     async def process_query(self, query: str, language: str = "fr", tenant_id: str = "") -> RAGResult:
-        """Traitement des requêtes avec toutes les corrections + BM25 fallback + améliorations"""
+        """Traitement de requête avec toutes les optimisations"""
         if not RAG_ENABLED:
             return RAGResult(source=RAGSource.FALLBACK_NEEDED, metadata={"reason": "rag_disabled"})
         
@@ -1262,16 +1481,13 @@ class InteliaRAGEngine:
             await self.initialize()
         
         if self.degraded_mode:
-            return RAGResult(
-                source=RAGSource.FALLBACK_NEEDED,
-                metadata={"reason": "degraded_mode"}
-            )
+            return RAGResult(source=RAGSource.FALLBACK_NEEDED, metadata={"reason": "degraded_mode"})
         
         start_time = time.time()
         METRICS.inc("requests_total")
         
         try:
-            # Auto-détection si language non fourni explicitement
+            # Auto-détection langue
             if not language:
                 language = detect_language_light(query, default="fr")
             
@@ -1292,13 +1508,13 @@ class InteliaRAGEngine:
                     METRICS.observe_latency(time.time() - start_time)
                     return RAGResult(
                         source=RAGSource.OOD_FILTERED,
-                        answer="Désolé, cette question sort du domaine avicole traité par ce système. "
-                               "Pose-moi une question sur l'aviculture (ex.: poids cible, FCR, ventilation, biosécurité, etc.).",
+                        answer="Désolé, cette question sort du domaine avicole. Pose-moi une question sur l'aviculture.",
                         confidence=1.0 - domain_score,
                         processing_time=time.time() - start_time,
                         metadata={
                             "domain_score": domain_score,
-                            "score_details": score_details
+                            "score_details": score_details,
+                            "optimization_stats": self.optimization_stats.copy()
                         },
                         intent_result=intent_result
                     )
@@ -1321,112 +1537,153 @@ class InteliaRAGEngine:
                 METRICS.observe_latency(time.time() - start_time)
                 return RAGResult(
                     source=RAGSource.ERROR,
-                    metadata={"error": "embedding_failed"}
+                    metadata={"error": "embedding_failed", "optimization_stats": self.optimization_stats.copy()}
                 )
             
-            # Construire where filter par entités
+            # Construire where filter
             where_filter = build_where_filter(intent_result)
             
-            # Recherche documents (avec retry age_band intégré)
-            METRICS.inc("search_vector_calls")
-            if where_filter: 
-                METRICS.inc("search_with_filter")
-            
-            documents = await self.retriever.search(query_vector, RAG_SIMILARITY_TOP_K, where_filter)
-            
-            # NOUVEAU: BM25 fallback si pas assez de docs ou faible confiance
-            bm25_used = False
-            if not documents or all(doc.score < RAG_CONFIDENCE_THRESHOLD for doc in documents):
-                logger.info("Activation BM25 fallback")
-                METRICS.inc("bm25_fallback_activations")
-                bm25_docs = await self.retriever._bm25_v4(search_query, 8, where_filter)
-                if bm25_docs:
-                    # Fusion simple (vector + bm25), dédupli par titre+source
-                    merged = (documents or []) + bm25_docs
-                    seen = set()
-                    unique = []
-                    for doc in merged:
-                        key = (doc.metadata.get("title", ""), doc.metadata.get("source", ""))
-                        if key not in seen:
-                            seen.add(key)
-                            unique.append(doc)
-                    documents = unique
-                    bm25_used = True
+            # Recherche hybride
+            documents = []
+            if self.retriever:
+                try:
+                    documents = await self.retriever.adaptive_search(
+                        query_vector, search_query, RAG_SIMILARITY_TOP_K, where_filter
+                    )
+                    if any(doc.metadata.get("hybrid_used") for doc in documents):
+                        self.optimization_stats["hybrid_searches"] += 1
+                except Exception as e:
+                    logger.error(f"Erreur recherche hybride: {e}")
             
             if not documents:
                 METRICS.observe_latency(time.time() - start_time)
                 return RAGResult(
                     source=RAGSource.FALLBACK_NEEDED,
-                    metadata={"reason": "no_documents_found", "where_filter_used": where_filter is not None, "bm25_tried": True}
+                    metadata={
+                        "reason": "no_documents_found", 
+                        "where_filter_used": where_filter is not None,
+                        "optimization_stats": self.optimization_stats.copy()
+                    }
                 )
             
-            # Seuil dynamique: remonte si top1 très fort, abaisse si BM25 a aidé
+            # Filtrage par confiance avec seuil dynamique
             effective_threshold = RAG_CONFIDENCE_THRESHOLD
             if documents:
                 top1 = max(d.score for d in documents)
                 if top1 >= 0.85:
                     effective_threshold = max(RAG_CONFIDENCE_THRESHOLD, 0.60)
-                if bm25_used and top1 < 0.70:
+                elif any(d.metadata.get("bm25_used") for d in documents) and top1 < 0.70:
                     effective_threshold = min(effective_threshold, 0.50)
             
-            # Filtrage par confiance (seuil dynamique)
             filtered_docs = [doc for doc in documents if doc.score >= effective_threshold]
             
             if not filtered_docs:
                 METRICS.observe_latency(time.time() - start_time)
                 return RAGResult(
                     source=RAGSource.FALLBACK_NEEDED,
-                    metadata={"reason": "low_confidence_documents", "min_score": min(doc.score for doc in documents) if documents else 0, "bm25_used": bm25_used, "effective_threshold": effective_threshold}
+                    metadata={
+                        "reason": "low_confidence_documents", 
+                        "min_score": min(doc.score for doc in documents) if documents else 0,
+                        "effective_threshold": effective_threshold,
+                        "optimization_stats": self.optimization_stats.copy()
+                    }
                 )
             
-            # Reranking systématique
-            filtered_docs = await self.reranker.rerank(search_query, filtered_docs, intent_result, force_rerank=True)
+            # Génération de réponse enrichie
+            response_text = ""
+            if self.generator and ENTITY_ENRICHMENT_ENABLED:
+                try:
+                    response_text = await self.generator.generate_response(
+                        query, filtered_docs, conversation_context, language, intent_result
+                    )
+                    self.optimization_stats["entity_enrichments"] += 1
+                except Exception as e:
+                    logger.error(f"Erreur génération enrichie: {e}")
             
-            # Génération réponse AVEC langue
-            response_text = await self.generator.generate_response(
-                query, filtered_docs, conversation_context, language
-            )
-            
-            # Normalisation d'unités vers la préférence implicite de la question
-            try:
-                response_text = UnitNormalizer.normalize_text(response_text, query)
-            except Exception as _e:
-                logger.debug(f"Unit normalization skipped: {_e}")
+            # Fallback génération basique
+            if not response_text:
+                try:
+                    context_text = "\n\n".join([
+                        f"Document {i+1}:\n{doc.content[:1000]}"
+                        for i, doc in enumerate(filtered_docs[:5])
+                    ])
+                    
+                    system_prompt = f"""Tu es un expert en aviculture. Réponds UNIQUEMENT basé sur les documents fournis.
+RÈGLE: Réponds strictement en {language}."""
+                    
+                    user_prompt = f"""DOCUMENTS:\n{context_text}\n\nQUESTION:\n{query}\n\nRÉPONSE:"""
+                    
+                    response = await self.openai_client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt}
+                        ],
+                        temperature=0.1,
+                        max_tokens=800
+                    )
+                    
+                    response_text = response.choices[0].message.content.strip()
+                    
+                except Exception as e:
+                    logger.error(f"Erreur génération fallback: {e}")
+                    response_text = "Désolé, je ne peux pas générer une réponse."
             
             if not response_text or "ne peux pas" in response_text.lower():
                 METRICS.observe_latency(time.time() - start_time)
                 return RAGResult(
                     source=RAGSource.FALLBACK_NEEDED,
-                    metadata={"reason": "generation_failed", "bm25_used": bm25_used}
+                    metadata={
+                        "reason": "generation_failed",
+                        "optimization_stats": self.optimization_stats.copy()
+                    }
                 )
             
-            # CORRECTION: Vérification smart
+            # Vérification avec guardrails
             verification_result = None
-            if self.verifier:
-                do_verify = True
-                if RAG_VERIFICATION_SMART:
-                    # Ne vérifie pas si top1 très haut et variance faible
-                    top_scores = [d.score for d in filtered_docs[:3]]
-                    if top_scores and top_scores[0] >= 0.80 and (len(top_scores) <= 1 or np.std(top_scores) <= 0.05):
-                        do_verify = False
-                        logger.debug("Vérification smart: skipped (haute confiance)")
-                
-                if do_verify:
-                    METRICS.inc("verification_calls")
-                    verification_result = await self.verifier.verify_response(
-                        query, response_text, filtered_docs
-                    )
+            if self.guardrails:
+                try:
+                    # Vérification smart: skip si haute confiance
+                    do_verify = True
+                    if RAG_VERIFICATION_SMART:
+                        top_scores = [d.score for d in filtered_docs[:3]]
+                        if top_scores and top_scores[0] >= 0.80 and (len(top_scores) <= 1 or np.std(top_scores) <= 0.05):
+                            do_verify = False
+                    
+                    if do_verify:
+                        verification_result = await self.guardrails.verify_response(
+                            query, response_text, filtered_docs, intent_result
+                        )
+                        
+                        if not verification_result.is_valid:
+                            self.optimization_stats["guardrail_violations"] += 1
+                            logger.warning(f"Violation guardrails: {verification_result.violations}")
+                            
+                            # Si violation critique, retourner fallback
+                            if verification_result.confidence < 0.3:
+                                METRICS.observe_latency(time.time() - start_time)
+                                return RAGResult(
+                                    source=RAGSource.FALLBACK_NEEDED,
+                                    metadata={
+                                        "reason": "guardrail_violation",
+                                        "violations": verification_result.violations,
+                                        "optimization_stats": self.optimization_stats.copy()
+                                    }
+                                )
+                    
+                except Exception as e:
+                    logger.warning(f"Erreur guardrails: {e}")
             
-            # Calcul confiance
+            # Calcul de confiance finale
             confidence = self._calculate_confidence(filtered_docs, verification_result)
             
-            # Source résultat
+            # Source du résultat
             result_source = RAGSource.RAG_KNOWLEDGE
-            if verification_result and verification_result.get("verified", True):
+            if verification_result and verification_result.is_valid:
                 result_source = RAGSource.RAG_VERIFIED
                 confidence = min(confidence * 1.1, 0.95)
             
-            # Context docs pour résultat
+            # Construire context_docs pour le résultat
             context_docs = []
             for doc in filtered_docs:
                 context_docs.append({
@@ -1438,66 +1695,40 @@ class InteliaRAGEngine:
                     "species": doc.metadata.get("species", ""),
                     "phase": doc.metadata.get("phase", ""),
                     "age_band": doc.metadata.get("age_band", ""),
-                    "original_distance": doc.original_distance,
-                    "bm25_used": doc.metadata.get("bm25_used", False)
+                    "hybrid_used": doc.metadata.get("hybrid_used", False),
+                    "bm25_used": doc.metadata.get("bm25_used", False),
+                    "search_type": getattr(doc, 'search_type', 'unknown')
                 })
             
-            # Métadonnées enrichies avec corrections
+            # Métadonnées complètes
             metadata = {
-                "approach": "openai_weaviate_direct_finale_corrected_enhanced_complete",
-                "corrections_applied": [
-                    "weaviate_v4_metadata_fixed",
-                    "weaviate_v4_filters_fixed", 
-                    "confidence_threshold_adjusted",
-                    "age_band_retry_implemented",
-                    "lazy_init_reranker",
-                    "metadata_flags_corrected",
-                    "distance_score_conversion",
-                    "language_forced_in_generation",
-                    "bm25_hybrid_fallback_added",
-                    "verification_smart_implemented",
-                    "https_self_hosted_support",
-                    "unidecode_ood_normalization",
-                    "unit_normalization_added",
-                    "observability_metrics_added",
-                    "language_auto_detection",
-                    "ood_clear_messages",
-                    "dynamic_threshold_implemented"
-                ],
+                "approach": "enhanced_rag_integrated_complete",
+                "optimizations_enabled": {
+                    "redis_cache": self.cache_manager.enabled if self.cache_manager else False,
+                    "hybrid_search": HYBRID_SEARCH_ENABLED,
+                    "entity_enrichment": ENTITY_ENRICHMENT_ENABLED,
+                    "advanced_guardrails": True
+                },
                 "weaviate_version": weaviate_version,
                 "weaviate_v4": WEAVIATE_V4,
                 "documents_found": len(documents) if documents else 0,
                 "documents_used": len(filtered_docs),
+                "effective_threshold": effective_threshold,
                 "query_expanded": search_query != query,
                 "conversation_context_used": bool(conversation_context),
-                "reranking_applied": True,
+                "where_filter_applied": where_filter is not None,
                 "verification_enabled": RAG_VERIFICATION_ENABLED,
                 "verification_smart": RAG_VERIFICATION_SMART,
-                "verification_smart_skipped": (RAG_VERIFICATION_SMART and verification_result is None),
-                "where_filter_applied": where_filter is not None,
-                "age_band_fallback_used": any(doc.metadata.get("age_band_fallback_used", False) for doc in filtered_docs),
-                "bm25_fallback_used": bm25_used,
-                "voyage_reranking": self.reranker.voyage_client is not None,
-                "local_reranking": self.reranker.local_reranker is not None,
-                "score_conversion_applied": any(doc.original_distance is not None for doc in filtered_docs),
                 "language_target": language,
                 "language_detected": detect_language_light(query),
-                "unidecode_available": UNIDECODE_AVAILABLE,
-                "effective_confidence_threshold": effective_threshold,
-                "unit_normalization_available": True
+                "optimization_stats": self.optimization_stats.copy()
             }
             
             if intent_result:
                 metadata.update({
-                    "intent_type": intent_result.intent_type.value if hasattr(intent_result.intent_type, 'value') else str(intent_result.intent_type),
-                    "detected_entities": getattr(intent_result, 'detected_entities', {}),
-                    "business_entities_count": len([e for e in ['line', 'species', 'age_days', 'weight', 'fcr', 'phase'] 
-                                                   if hasattr(intent_result, 'detected_entities') 
-                                                   and e in intent_result.detected_entities])
+                    "intent_type": getattr(intent_result, 'intent_type', 'unknown'),
+                    "detected_entities": getattr(intent_result, 'detected_entities', {})
                 })
-            
-            if where_filter:
-                metadata["where_filter"] = where_filter
             
             # Sauvegarde mémoire
             if tenant_id and self.memory:
@@ -1515,7 +1746,7 @@ class InteliaRAGEngine:
                 context_docs=context_docs,
                 processing_time=time.time() - start_time,
                 metadata=metadata,
-                verification_status=verification_result,
+                verification_status=verification_result.__dict__ if verification_result else None,
                 intent_result=intent_result
             )
             
@@ -1526,12 +1757,15 @@ class InteliaRAGEngine:
                 source=RAGSource.ERROR,
                 confidence=0.0,
                 processing_time=time.time() - start_time,
-                metadata={"error": str(e)},
+                metadata={
+                    "error": str(e),
+                    "optimization_stats": self.optimization_stats.copy()
+                },
                 intent_result=intent_result if 'intent_result' in locals() else None
             )
     
-    def _calculate_confidence(self, documents: List[Document], verification_result: Dict = None) -> float:
-        """Calcul de confiance"""
+    def _calculate_confidence(self, documents: List[Document], verification_result=None) -> float:
+        """Calcul de confiance optimisé"""
         if not documents:
             return 0.0
         
@@ -1549,88 +1783,88 @@ class InteliaRAGEngine:
             distribution_factor = 1.0
         
         verification_factor = 1.0
-        if verification_result and verification_result.get("verified", True):
+        if verification_result and verification_result.is_valid:
             verification_factor = 1.1
         
         final_confidence = avg_score * coherence_factor * distribution_factor * verification_factor
         return min(0.95, max(0.1, final_confidence))
     
     def get_status(self) -> Dict:
-        """Status du système avec corrections appliquées et métriques"""
+        """Status complet du système"""
         try:
-            def _check_weaviate():
-                return (
-                    self.weaviate_client is not None and 
-                    (self.weaviate_client.is_ready() if hasattr(self.weaviate_client, 'is_ready') else True)
-                )
+            weaviate_connected = False
+            if self.weaviate_client:
+                try:
+                    def _check():
+                        return self.weaviate_client.is_ready()
+                    weaviate_connected = _check()
+                except:
+                    weaviate_connected = False
             
-            weaviate_connected = _check_weaviate()
-            
-            return {
+            status = {
                 "rag_enabled": RAG_ENABLED,
                 "initialized": self.is_initialized,
                 "degraded_mode": self.degraded_mode,
-                "approach": "openai_weaviate_direct_finale_enhanced_corrected_complete",
-                "corrections_applied": [
-                    "weaviate_v4_metadata_fixed",
-                    "weaviate_v4_filters_fixed", 
-                    "confidence_threshold_adjusted",
-                    "age_band_retry_implemented",
-                    "lazy_init_reranker",
-                    "metadata_flags_corrected",
-                    "distance_score_conversion",
-                    "language_consistency_added",
-                    "hybrid_retrieval_bm25",
-                    "units_normalization",
-                    "robust_weaviate_https",
-                    "ood_accents_variants",
-                    "observability_enhanced",
-                    "verification_smart_mode",
-                    "dynamic_confidence_threshold",
-                    "language_auto_detection",
-                    "ood_clear_user_messages",
-                    "comprehensive_unit_support"
-                ],
-                "openai_available": OPENAI_AVAILABLE,
-                "weaviate_available": WEAVIATE_AVAILABLE,
-                "weaviate_version": weaviate_version if WEAVIATE_AVAILABLE else "N/A",
-                "weaviate_v4": WEAVIATE_V4,
-                "weaviate_connected": weaviate_connected,
-                "intent_processor_available": INTENT_PROCESSOR_AVAILABLE,
-                "voyage_reranking": VOYAGE_AVAILABLE and VOYAGE_API_KEY is not None,
-                "local_reranking": SENTENCE_TRANSFORMERS_AVAILABLE,
-                "unidecode_available": UNIDECODE_AVAILABLE,
-                "verification_enabled": RAG_VERIFICATION_ENABLED,
-                "verification_smart": RAG_VERIFICATION_SMART,
-                "confidence_threshold": RAG_CONFIDENCE_THRESHOLD,
-                "similarity_top_k": RAG_SIMILARITY_TOP_K,
-                "rerank_top_k": RAG_RERANK_TOP_K,
-                "max_conversation_context": MAX_CONVERSATION_CONTEXT,
-                "features": [
-                    "production_ready_enhanced_complete",
-                    "weaviate_v4_metadata_handling",
-                    "weaviate_v4_filter_conversion",
-                    "age_band_fallback_retry",
-                    "distance_to_score_conversion",
-                    "lazy_reranker_initialization",
-                    "corrected_metadata_flags",
-                    "adjusted_confidence_thresholds",
-                    "language_consistency_fr_en",
-                    "hybrid_retrieval_vector_bm25",
-                    "robust_weaviate_https_support",
-                    "ood_accents_variants_handling",
-                    "verification_smart_mode",
-                    "enhanced_observability_tracking",
-                    "unit_normalization_kg_lb_c_f",
-                    "dynamic_confidence_thresholds",
-                    "language_auto_detection_fr_en",
-                    "metrics_collection_prometheus_ready",
-                    "ood_clear_user_messages",
-                    "comprehensive_unit_conversions",
-                    "smart_threshold_adaptation"
-                ],
+                "approach": "enhanced_rag_integrated_complete",
+                "optimizations": {
+                    "cache_enabled": self.cache_manager.enabled if self.cache_manager else False,
+                    "hybrid_search_enabled": HYBRID_SEARCH_ENABLED,
+                    "entity_enrichment_enabled": ENTITY_ENRICHMENT_ENABLED,
+                    "guardrails_level": GUARDRAILS_LEVEL,
+                    "verification_smart": RAG_VERIFICATION_SMART
+                },
+                "components": {
+                    "openai_available": OPENAI_AVAILABLE,
+                    "weaviate_available": WEAVIATE_AVAILABLE,
+                    "weaviate_version": weaviate_version if WEAVIATE_AVAILABLE else "N/A",
+                    "weaviate_v4": WEAVIATE_V4,
+                    "weaviate_connected": weaviate_connected,
+                    "redis_available": REDIS_AVAILABLE,
+                    "voyage_available": VOYAGE_AVAILABLE,
+                    "sentence_transformers_available": SENTENCE_TRANSFORMERS_AVAILABLE,
+                    "intent_processor_available": INTENT_PROCESSOR_AVAILABLE
+                },
+                "configuration": {
+                    "similarity_top_k": RAG_SIMILARITY_TOP_K,
+                    "confidence_threshold": RAG_CONFIDENCE_THRESHOLD,
+                    "rerank_top_k": RAG_RERANK_TOP_K,
+                    "max_conversation_context": MAX_CONVERSATION_CONTEXT,
+                    "redis_url": REDIS_URL,
+                    "weaviate_url": WEAVIATE_URL
+                },
+                "optimization_stats": self.optimization_stats.copy(),
                 "metrics": METRICS.snapshot()
             }
+            
+            # Ajout stats cache si disponible
+            if self.cache_manager:
+                try:
+                    # Utiliser l'event loop existant ou en créer un nouveau
+                    try:
+                        loop = asyncio.get_running_loop()
+                        # Si on est déjà dans un event loop async, créer une tâche
+                        import concurrent.futures
+                        with concurrent.futures.ThreadPoolExecutor() as executor:
+                            future = executor.submit(
+                                lambda: asyncio.run(self.cache_manager.get_cache_stats())
+                            )
+                            cache_stats = future.result(timeout=5.0)
+                    except RuntimeError:
+                        # Si pas d'event loop actif, utiliser run_until_complete
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        try:
+                            cache_stats = loop.run_until_complete(self.cache_manager.get_cache_stats())
+                        finally:
+                            loop.close()
+                    
+                    status["cache_stats"] = cache_stats
+                except Exception as e:
+                    logger.warning(f"Erreur récupération stats cache: {e}")
+                    status["cache_stats"] = {"error": "unavailable"}
+            
+            return status
+            
         except Exception as e:
             logger.error(f"Erreur get_status: {e}")
             return {
@@ -1641,11 +1875,13 @@ class InteliaRAGEngine:
             }
     
     async def cleanup(self):
-        """Nettoyage des ressources"""
+        """Nettoyage complet des ressources"""
         try:
-            if self.weaviate_client:
-                if hasattr(self.weaviate_client, 'close'):
-                    self.weaviate_client.close()
+            if self.cache_manager:
+                await self.cache_manager.cleanup()
+            
+            if self.weaviate_client and hasattr(self.weaviate_client, 'close'):
+                self.weaviate_client.close()
             
             if self.memory:
                 self.memory.memory_store.clear()
@@ -1653,14 +1889,15 @@ class InteliaRAGEngine:
             if hasattr(self.openai_client, 'http_client'):
                 await self.openai_client.http_client.aclose()
             
-            logger.info("RAG Engine nettoyé")
+            logger.info("Enhanced RAG Engine nettoyé")
+            
         except Exception as e:
             logger.error(f"Erreur nettoyage: {e}")
 
 
-# Fonctions utilitaires pour compatibilité
+# === FONCTIONS UTILITAIRES POUR COMPATIBILITÉ ===
 async def create_rag_engine(openai_client: AsyncOpenAI = None) -> InteliaRAGEngine:
-    """Factory pour créer le RAG engine"""
+    """Factory pour créer le RAG engine enhanced"""
     try:
         engine = InteliaRAGEngine(openai_client)
         await engine.initialize()
@@ -1672,14 +1909,13 @@ async def create_rag_engine(openai_client: AsyncOpenAI = None) -> InteliaRAGEngi
         engine.is_initialized = True
         return engine
 
-
 async def process_question_with_rag(
     rag_engine: InteliaRAGEngine, 
     question: str, 
     language: str = "fr", 
     tenant_id: str = ""
 ) -> RAGResult:
-    """Interface compatible"""
+    """Interface compatible pour traitement des questions"""
     try:
         return await rag_engine.process_query(question, language, tenant_id)
     except Exception as e:
