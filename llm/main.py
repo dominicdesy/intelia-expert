@@ -440,11 +440,14 @@ async def initialize_rag_engines():
             logger.error(f"❌ Erreur initialisation RAG Enhanced: {e}")
             rag_engine_enhanced = None
     
-    # 2. Optionnel: Initialiser Agent RAG
+    # 2. CORRECTION POINT 2 : Référence OpenAI correcte pour Agent RAG
     if USE_AGENT_RAG and AGENT_RAG_AVAILABLE:
         try:
             logger.info("🤖 Initialisation Agent RAG...")
-            agent_rag_engine = await create_agent_rag_engine(openai_client)
+            # CORRECTION : Utiliser async_openai_client au lieu de openai_client
+            from openai import AsyncOpenAI
+            async_openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+            agent_rag_engine = await create_agent_rag_engine(async_openai_client)
             agent_status = agent_rag_engine.get_agent_status()
             logger.info(f"✅ Agent RAG initialisé: {agent_status.get('agent_features', [])}")
         except Exception as e:

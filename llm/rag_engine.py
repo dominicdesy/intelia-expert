@@ -104,6 +104,32 @@ except ImportError as e:
             self.expanded_query = ""
             self.metadata = {}
 
+# CORRECTION POINT 1 : Import des guardrails depuis le module dédié
+try:
+    from advanced_guardrails import create_response_guardrails, VerificationLevel, GuardrailResult
+    GUARDRAILS_AVAILABLE = True
+except ImportError as e:
+    GUARDRAILS_AVAILABLE = False
+    logger.warning(f"Advanced guardrails non disponible: {e}")
+    
+    # Fallback minimal
+    class VerificationLevel:
+        MINIMAL = "minimal"
+        STANDARD = "standard"
+        STRICT = "strict"
+        CRITICAL = "critical"
+    
+    class GuardrailResult:
+        def __init__(self):
+            self.is_valid = True
+            self.confidence = 0.8
+            self.violations = []
+            self.warnings = []
+            self.evidence_support = 0.8
+            self.hallucination_risk = 0.2
+            self.correction_suggestions = []
+            self.metadata = {}
+
 # === CONFIGURATION ===
 RAG_ENABLED = os.getenv("RAG_ENABLED", "true").lower() == "true"
 WEAVIATE_URL = os.getenv("WEAVIATE_URL", "http://localhost:8080")
@@ -119,6 +145,9 @@ RAG_RERANK_TOP_K = int(os.getenv("RAG_RERANK_TOP_K", "8"))
 RAG_VERIFICATION_ENABLED = os.getenv("RAG_VERIFICATION_ENABLED", "true").lower() == "true"
 RAG_VERIFICATION_SMART = os.getenv("RAG_VERIFICATION_SMART", "true").lower() == "true"
 MAX_CONVERSATION_CONTEXT = int(os.getenv("MAX_CONVERSATION_CONTEXT", "1500"))
+
+# CORRECTION POINT 3 : Seuil OOD configurable et plus strict
+OOD_MIN_SCORE = float(os.getenv("OOD_MIN_SCORE", "0.3"))
 
 # Nouvelles configurations
 CACHE_ENABLED = os.getenv("CACHE_ENABLED", "true").lower() == "true"
@@ -185,12 +214,6 @@ class RAGSource(Enum):
     FALLBACK_NEEDED = "fallback_needed"
     ERROR = "error"
 
-class VerificationLevel(Enum):
-    MINIMAL = "minimal"
-    STANDARD = "standard"
-    STRICT = "strict"
-    CRITICAL = "critical"
-
 @dataclass
 class RAGResult:
     source: RAGSource
@@ -219,17 +242,6 @@ class Document:
         if self.metadata is None:
             self.metadata = {}
 
-@dataclass
-class GuardrailResult:
-    is_valid: bool
-    confidence: float
-    violations: List[str]
-    warnings: List[str]
-    evidence_support: float
-    hallucination_risk: float
-    correction_suggestions: List[str]
-    metadata: Dict[str, Any]
-
 # === GESTIONNAIRE DE CACHE REDIS ===
 class RAGCacheManager:
     """Gestionnaire de cache Redis optimisé"""
@@ -239,6 +251,10 @@ class RAGCacheManager:
         self.default_ttl = default_ttl
         self.client = None
         self.enabled = REDIS_AVAILABLE and CACHE_ENABLED
+        
+        # CORRECTION POINT 4 : Protection OOM
+        self.MAX_VALUE_BYTES = int(os.getenv("CACHE_MAX_VALUE_BYTES", "2000000"))  # 2MB
+        self.MAX_KEYS_PER_NAMESPACE = int(os.getenv("CACHE_MAX_KEYS_PER_NS", "1000"))
         
         self.ttl_config = {
             "embeddings": 7200,
@@ -278,6 +294,45 @@ class RAGCacheManager:
         hash_obj = hashlib.md5(content.encode('utf-8'))
         return f"intelia_rag:{prefix}:{hash_obj.hexdigest()}"
     
+    async def _check_size_and_purge(self, namespace: str, data_size: int) -> bool:
+        """CORRECTION POINT 4 : Vérification taille et purge LRU"""
+        if data_size > self.MAX_VALUE_BYTES:
+            logger.warning(f"Valeur trop large pour cache: {data_size} bytes (max: {self.MAX_VALUE_BYTES})")
+            return False
+        
+        # Purge LRU par namespace si nécessaire
+        try:
+            count = 0
+            async for _ in self.client.scan_iter(match=f"intelia_rag:{namespace}:*"):
+                count += 1
+            
+            if count >= self.MAX_KEYS_PER_NAMESPACE:
+                logger.info(f"Purge LRU namespace {namespace}: {count} clés")
+                await self._purge_namespace_lru(namespace, count // 2)  # Supprimer la moitié
+        except Exception as e:
+            logger.warning(f"Erreur purge LRU: {e}")
+        
+        return True
+    
+    async def _purge_namespace_lru(self, namespace: str, to_delete: int):
+        """Purge LRU pour un namespace"""
+        try:
+            keys_with_ttl = []
+            async for key in self.client.scan_iter(match=f"intelia_rag:{namespace}:*"):
+                ttl = await self.client.ttl(key)
+                keys_with_ttl.append((key, ttl))
+            
+            # Trier par TTL (les plus anciens d'abord)
+            keys_with_ttl.sort(key=lambda x: x[1])
+            keys_to_delete = [key for key, _ in keys_with_ttl[:to_delete]]
+            
+            if keys_to_delete:
+                await self.client.delete(*keys_to_delete)
+                logger.info(f"Supprimé {len(keys_to_delete)} clés du namespace {namespace}")
+                
+        except Exception as e:
+            logger.warning(f"Erreur purge LRU détaillée: {e}")
+    
     async def get_embedding(self, text: str) -> Optional[List[float]]:
         if not self.enabled or not self.client:
             return None
@@ -302,9 +357,14 @@ class RAGCacheManager:
             return
         
         try:
-            key = self._generate_key("embedding", text)
             serialized = pickle.dumps(embedding)
             compressed = zlib.compress(serialized)
+            
+            # CORRECTION POINT 4 : Vérification taille
+            if not await self._check_size_and_purge("embedding", len(compressed)):
+                return
+            
+            key = self._generate_key("embedding", text)
             await self.client.setex(key, self.ttl_config["embeddings"], compressed)
         except Exception as e:
             logger.warning(f"Erreur écriture cache embedding: {e}")
@@ -333,9 +393,15 @@ class RAGCacheManager:
             return
         
         try:
+            response_bytes = response.encode('utf-8')
+            
+            # CORRECTION POINT 4 : Vérification taille
+            if not await self._check_size_and_purge("response", len(response_bytes)):
+                return
+            
             cache_data = {"query": query, "context_hash": context_hash, "language": language}
             key = self._generate_key("response", cache_data)
-            await self.client.setex(key, self.ttl_config["responses"], response.encode('utf-8'))
+            await self.client.setex(key, self.ttl_config["responses"], response_bytes)
         except Exception as e:
             logger.warning(f"Erreur écriture cache réponse: {e}")
     
@@ -379,7 +445,9 @@ class RAGCacheManager:
                 "memory_used": info.get("used_memory_human", "N/A"),
                 "total_keys": await self.client.dbsize(),
                 "type_counts": type_counts,
-                "ttl_config": self.ttl_config
+                "ttl_config": self.ttl_config,
+                "max_value_bytes": self.MAX_VALUE_BYTES,
+                "max_keys_per_namespace": self.MAX_KEYS_PER_NAMESPACE
             }
             
         except Exception as e:
@@ -1046,7 +1114,7 @@ class EnhancedOODDetector:
             }
     
     def calculate_ood_score(self, query: str, intent_result=None) -> Tuple[bool, float, Dict[str, float]]:
-        """Calcul score OOD avec normalisation"""
+        """Calcul score OOD avec normalisation - CORRECTION POINT 3: Seuil plus strict"""
         query_lower = (unidecode(query).lower() if UNIDECODE_AVAILABLE else query.lower())
         words = query_lower.split()
         
@@ -1079,147 +1147,18 @@ class EnhancedOODDetector:
         else:
             final_score = (vocab_score * 0.8) - (blocked_score * 0.2)
         
-        is_in_domain = final_score > 0.2
+        # CORRECTION POINT 3 : Seuil plus strict
+        is_in_domain = final_score > OOD_MIN_SCORE
         
         score_details = {
             "vocab_score": vocab_score,
             "entities_boost": entities_boost,
             "blocked_score": blocked_score,
-            "final_score": final_score
+            "final_score": final_score,
+            "threshold_used": OOD_MIN_SCORE
         }
         
         return is_in_domain, final_score, score_details
-
-# === GUARDRAILS AVANCÉS ===
-class AdvancedResponseGuardrails:
-    """Système de guardrails pour vérifier les réponses"""
-    
-    def __init__(self, client, verification_level: VerificationLevel = VerificationLevel.STANDARD):
-        self.client = client
-        self.verification_level = verification_level
-        
-        self.hallucination_patterns = [
-            r"selon moi|à mon avis|je pense que|il me semble",
-            r"généralement|habituellement|en général",
-            r"il est recommandé|il faut|vous devriez",
-            r"dans la plupart des cas|souvent|parfois"
-        ]
-    
-    async def verify_response(self, query: str, response: str, 
-                            context_docs: List[Document],
-                            intent_result=None) -> GuardrailResult:
-        """Vérification complète de la réponse"""
-        try:
-            # Vérifications rapides en parallèle
-            evidence_score = await self._check_evidence_support(response, context_docs)
-            hallucination_risk = self._detect_hallucination_risk(response)
-            
-            violations = []
-            warnings = []
-            
-            if evidence_score < 0.3:
-                violations.append("Support documentaire insuffisant")
-            elif evidence_score < 0.6:
-                warnings.append("Support documentaire modéré")
-            
-            if hallucination_risk > 0.7:
-                violations.append("Risque élevé d'hallucination")
-            elif hallucination_risk > 0.4:
-                warnings.append("Éléments génériques détectés")
-            
-            confidence = self._calculate_confidence(evidence_score, hallucination_risk)
-            is_valid = self._make_validation_decision(evidence_score, hallucination_risk, 
-                                                    len(violations), len(warnings))
-            
-            return GuardrailResult(
-                is_valid=is_valid,
-                confidence=confidence,
-                violations=violations,
-                warnings=warnings,
-                evidence_support=evidence_score,
-                hallucination_risk=hallucination_risk,
-                correction_suggestions=[],
-                metadata={
-                    "verification_level": self.verification_level.value,
-                    "evidence_score": evidence_score,
-                    "hallucination_risk": hallucination_risk
-                }
-            )
-            
-        except Exception as e:
-            logger.error(f"Erreur vérification guardrails: {e}")
-            return GuardrailResult(
-                is_valid=True,  # Fail-open
-                confidence=0.5,
-                violations=[],
-                warnings=[f"Erreur vérification: {str(e)}"],
-                evidence_support=0.5,
-                hallucination_risk=0.5,
-                correction_suggestions=[],
-                metadata={"error": str(e)}
-            )
-    
-    async def _check_evidence_support(self, response: str, 
-                                    context_docs: List[Document]) -> float:
-        """Vérifie le support documentaire"""
-        try:
-            if not context_docs:
-                return 0.2
-            
-            response_words = set(response.lower().split())
-            total_overlap = 0
-            
-            for doc in context_docs:
-                doc_words = set(doc.content.lower().split())
-                if doc_words:
-                    overlap = len(response_words.intersection(doc_words))
-                    similarity = overlap / min(len(response_words), len(doc_words))
-                    total_overlap += similarity
-            
-            avg_overlap = total_overlap / len(context_docs) if context_docs else 0
-            return min(1.0, avg_overlap * 2)  # Normaliser
-            
-        except Exception as e:
-            logger.warning(f"Erreur vérification evidence: {e}")
-            return 0.5
-    
-    def _detect_hallucination_risk(self, response: str) -> float:
-        """Détecte le risque d'hallucination"""
-        try:
-            risk_score = 0.0
-            
-            for pattern in self.hallucination_patterns:
-                matches = len(re.findall(pattern, response.lower()))
-                risk_score += 0.15 * matches
-            
-            # Vérifier affirmations sans chiffres
-            if "recommandé" in response.lower() and not re.search(r'\d+', response):
-                risk_score += 0.2
-            
-            return min(1.0, risk_score)
-            
-        except Exception as e:
-            logger.warning(f"Erreur détection hallucination: {e}")
-            return 0.5
-    
-    def _calculate_confidence(self, evidence_score: float, hallucination_risk: float) -> float:
-        """Calcule la confiance globale"""
-        return min(0.95, max(0.05, evidence_score * 0.7 + (1 - hallucination_risk) * 0.3))
-    
-    def _make_validation_decision(self, evidence_score: float, hallucination_risk: float,
-                                violation_count: int, warning_count: int) -> bool:
-        """Décision de validation"""
-        if self.verification_level == VerificationLevel.MINIMAL:
-            return violation_count == 0
-        elif self.verification_level == VerificationLevel.STANDARD:
-            return (violation_count == 0 and evidence_score >= 0.4 and hallucination_risk <= 0.7)
-        elif self.verification_level == VerificationLevel.STRICT:
-            return (violation_count == 0 and warning_count <= 2 and 
-                   evidence_score >= 0.6 and hallucination_risk <= 0.5)
-        elif self.verification_level == VerificationLevel.CRITICAL:
-            return (violation_count == 0 and warning_count <= 1 and 
-                   evidence_score >= 0.8 and hallucination_risk <= 0.3)
-        return True
 
 # === MÉMOIRE CONVERSATIONNELLE ===
 class ConversationMemory:
@@ -1396,9 +1335,9 @@ class InteliaRAGEngine:
             if ENTITY_ENRICHMENT_ENABLED:
                 self.generator = EnhancedResponseGenerator(self.openai_client, self.cache_manager)
             
-            # 6. Guardrails
-            verification_level = getattr(VerificationLevel, GUARDRAILS_LEVEL.upper(), VerificationLevel.STANDARD)
-            self.guardrails = AdvancedResponseGuardrails(self.openai_client, verification_level)
+            # 6. CORRECTION POINT 1 : Guardrails depuis le module dédié
+            if GUARDRAILS_AVAILABLE:
+                self.guardrails = create_response_guardrails(self.openai_client, GUARDRAILS_LEVEL)
             
             # 7. Intent processor
             if INTENT_PROCESSOR_AVAILABLE:
@@ -1499,7 +1438,7 @@ class InteliaRAGEngine:
                 except Exception as e:
                     logger.warning(f"Erreur intent processor: {e}")
             
-            # OOD detection
+            # OOD detection avec seuil corrigé
             if self.ood_detector:
                 is_in_domain, domain_score, score_details = self.ood_detector.calculate_ood_score(query, intent_result)
                 
@@ -1822,13 +1761,15 @@ RÈGLE: Réponds strictement en {language}."""
                     "redis_available": REDIS_AVAILABLE,
                     "voyage_available": VOYAGE_AVAILABLE,
                     "sentence_transformers_available": SENTENCE_TRANSFORMERS_AVAILABLE,
-                    "intent_processor_available": INTENT_PROCESSOR_AVAILABLE
+                    "intent_processor_available": INTENT_PROCESSOR_AVAILABLE,
+                    "guardrails_available": GUARDRAILS_AVAILABLE
                 },
                 "configuration": {
                     "similarity_top_k": RAG_SIMILARITY_TOP_K,
                     "confidence_threshold": RAG_CONFIDENCE_THRESHOLD,
                     "rerank_top_k": RAG_RERANK_TOP_K,
                     "max_conversation_context": MAX_CONVERSATION_CONTEXT,
+                    "ood_min_score": OOD_MIN_SCORE,
                     "redis_url": REDIS_URL,
                     "weaviate_url": WEAVIATE_URL
                 },
