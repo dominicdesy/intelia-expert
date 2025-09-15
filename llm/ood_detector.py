@@ -40,9 +40,9 @@ class EnhancedOODDetector:
             
         except Exception as e:
             logger.warning(f"Erreur chargement blocked_terms depuis {path}: {e}")
-            return {
-                "general": ["crypto", "bitcoin", "football", "film", "politique", "news"]
-            }
+            fallback = {"general": ["crypto","bitcoin","football","film","politique","news"]}
+            logger.warning("Using fallback blocked_terms: %s", fallback)
+            return fallback
     
     def calculate_ood_score(self, query: str, intent_result=None) -> Tuple[bool, float, Dict[str, float]]:
         """MODIFICATION: Calcul score OOD avec seuil dynamique basé sur l'intent"""
@@ -106,6 +106,8 @@ class EnhancedOODDetector:
             METRICS.ood_stats["strict_threshold_applied"] += 1
         
         is_in_domain = final_score > threshold
+        logger.debug("OOD score detail: vocab=%.3f ent=%.3f intent=%.3f blocked=%.3f final=%.3f thr=%.3f in_domain=%s",
+                     vocab_score, entities_boost, intent_boost, blocked_score, final_score, threshold, is_in_domain)
         
         # MODIFICATION: Tracer les raisons de filtrage
         if not is_in_domain:

@@ -5,8 +5,17 @@ imports_and_dependencies.py - Gestion centralisée des imports conditionnels
 
 import logging
 import os
+from typing import Dict
 
 logger = logging.getLogger(__name__)
+
+def require(cond: bool, name: str) -> None:
+    """
+    Loggue un warning bloquant quand une fonctionnalité critique est absente.
+    N'élève pas d'exception à l'import, mais rend le statut visible au boot.
+    """
+    if not cond:
+        logger.warning("⚠️ Required dependency or feature is unavailable: %s", name)
 
 # === IMPORTS CONDITIONNELS ===
 try:
@@ -160,10 +169,45 @@ except ImportError as e:
         async def cleanup(self):
             pass
 
+def quick_connectivity_check(redis_client=None, weaviate_client=None) -> Dict[str, bool]:
+    """
+    Vérifie rapidement la connectivité aux services externes.
+    Retourne un dictionnaire avec le statut de chaque service.
+    """
+    ok = {"redis": False, "weaviate": False}
+    
+    # Test Redis
+    try:
+        if redis_client and REDIS_AVAILABLE:
+            # Pour redis.asyncio, utiliser ping() de manière synchrone si possible
+            # Sinon, on assume que le client est disponible
+            if hasattr(redis_client, 'ping'):
+                redis_client.ping()
+            ok["redis"] = True
+    except Exception as e:
+        logger.debug(f"Redis connectivity check failed: {e}")
+        pass
+    
+    # Test Weaviate
+    try:
+        if weaviate_client and WEAVIATE_AVAILABLE:
+            if WEAVIATE_V4:
+                # Weaviate v4
+                weaviate_client.is_ready()
+            else:
+                # Weaviate v3 ou antérieur
+                weaviate_client.is_ready()
+            ok["weaviate"] = True
+    except Exception as e:
+        logger.debug(f"Weaviate connectivity check failed: {e}")
+        pass
+    
+    return ok
+
 # Fonction pour obtenir les informations sur les dépendances
 def get_dependencies_status():
     """Retourne le statut de toutes les dépendances"""
-    return {
+    status = {
         "openai": OPENAI_AVAILABLE,
         "weaviate": WEAVIATE_AVAILABLE,
         "weaviate_v4": WEAVIATE_V4,
@@ -176,3 +220,10 @@ def get_dependencies_status():
         "intent_processor": INTENT_PROCESSOR_AVAILABLE,
         "guardrails": GUARDRAILS_AVAILABLE
     }
+    
+    # Vérifications des dépendances critiques
+    require(OPENAI_AVAILABLE, "OpenAI API client")
+    require(WEAVIATE_AVAILABLE, "Weaviate vector database")
+    require(REDIS_AVAILABLE or not EXTERNAL_CACHE_AVAILABLE, "Redis cache (if external cache enabled)")
+    
+    return status

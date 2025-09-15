@@ -89,8 +89,23 @@ class MetricsCollector:
             "samples": len(self.last_100_lat)
         }
 
+    def as_json(self) -> dict:
+        """Export JSON des métriques pour l'app"""
+        return {
+            "cache": self.cache_stats,
+            "ood": self.ood_stats,
+            "guardrails": self.api_corrections,  # Mapping des corrections vers guardrails
+        }
+
 # Instance globale
 METRICS = MetricsCollector()
+
+def get_all_metrics_json(METRICS: MetricsCollector, extra: dict | None = None) -> dict:
+    """Fonction d'export JSON consolidée des métriques avec données supplémentaires"""
+    data = METRICS.as_json()
+    if extra:
+        data.update(extra)
+    return data
 
 def detect_language_enhanced(text: str, default: str = "fr") -> str:
     """Détection de langue optimisée pour requêtes courtes et techniques"""

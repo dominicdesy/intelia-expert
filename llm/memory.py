@@ -5,7 +5,10 @@ memory.py - Mémoire conversationnelle avec plus de contexte
 
 import logging
 import time
-from config import MAX_CONVERSATION_CONTEXT
+import os
+
+# Configuration depuis les variables d'environnement
+MAX_CONVERSATION_CONTEXT = int(os.getenv("MAX_CONVERSATION_CONTEXT", "6"))
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +18,7 @@ class ConversationMemory:
     def __init__(self, client):
         self.client = client
         self.memory_store = {}
-        self.max_exchanges = 8  # MODIFICATION: 3 → 8 tours
+        self.max_exchanges = int(os.getenv("MAX_EXCHANGES", "8"))  # Source unique de vérité depuis env
     
     async def get_contextual_memory(self, tenant_id: str, current_query: str) -> str:
         """Récupère le contexte conversationnel enrichi"""

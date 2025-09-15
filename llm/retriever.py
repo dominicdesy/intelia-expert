@@ -14,6 +14,7 @@ from data_models import Document
 from utilities import METRICS
 from imports_and_dependencies import WEAVIATE_V4, wvc, wvc_query, ENABLE_API_DIAGNOSTICS
 from config import HYBRID_SEARCH_ENABLED
+from .hybrid_retriever import _fuse_results, hybrid_search
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,10 @@ def _to_v4_filter(where_dict):
     except Exception as e:
         logger.warning(f"Erreur conversion filter v4: {e}")
         return None
+
+def retrieve(query: str, limit: int = 8, alpha: float = 0.6, **kwargs):
+    """Façade simple qui utilise la recherche hybride par défaut."""
+    return hybrid_search(query, limit=limit, alpha=alpha, **kwargs)
 
 class HybridWeaviateRetriever:
     """Retriever hybride optimisé avec cache et fallbacks - Version corrigée pour Weaviate 4.16.9"""

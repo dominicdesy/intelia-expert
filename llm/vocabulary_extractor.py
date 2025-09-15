@@ -10,6 +10,18 @@ from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
+def validate_alias_coverage(required_aliases: dict, vocab: dict) -> dict:
+    """
+    Retourne les alias manquants pour aider au debug (clé → [manquants]).
+    """
+    missing = {}
+    for k, expected in required_aliases.items():
+        have = set(map(str.lower, vocab.get(k, [])))
+        miss = [e for e in expected if e.lower() not in have]
+        if miss:
+            missing[k] = miss
+    return missing
+
 class PoultryVocabularyExtractor:
     """Extracteur de vocabulaire spécialisé - Version avec seuils adaptatifs"""
     

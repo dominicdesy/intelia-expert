@@ -4,6 +4,7 @@ hybrid_retriever.py - Retriever hybride optimisé pour Weaviate
 Combine recherche vectorielle et BM25 de façon native et optimisée
 """
 
+import asyncio
 import logging
 import json
 from typing import Dict, List, Optional
@@ -134,13 +135,25 @@ class OptimizedHybridRetriever:
                 logger.warning(f"Erreur recherche BM25: {bm25_results}")
                 bm25_results = []
             
-            # Fusion des résultats
+            # fusion RRF/pondérée (existant)
             fused_results = self._fuse_results(
                 vector_results, bm25_results, alpha, top_k
             )
             
-            logger.debug(f"Recherche hybride v3: {len(fused_results)} documents fusionnés")
-            return fused_results
+            logger.debug("hybrid_retriever: alpha=%.2f bm25=%d vector=%d fused=%d",
+                         alpha, len(bm25_results), len(vector_results), len(fused_results))
+            
+            # Diversité: remove quasi-duplicates (cosine or hash on content)
+            deduped: List[Dict] = []
+            seen: set = set()
+            for it in fused_results:
+                key = (it.get("doc_id") or "")[:64] + "|" + (it.get("title") or "")[:64]
+                if key in seen:
+                    continue
+                seen.add(key)
+                deduped.append(it)
+            
+            return deduped[:top_k]
             
         except Exception as e:
             logger.error(f"Erreur recherche hybride v3: {e}")

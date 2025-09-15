@@ -4,10 +4,33 @@ query_expander.py - Expanseur de requêtes avec synonymes du domaine
 """
 
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple
 from functools import lru_cache
+import re
 
 logger = logging.getLogger(__name__)
+
+# NOTE: garde en sync avec IntentProcessor/Cache
+LINE_ALIASES = {
+    "ross308": ["ross 308", "r308", "ross-308"],
+    "cobb500": ["cobb 500", "c500", "cobb-500"],
+}
+
+def _normalize_line(text: str) -> str:
+    t = re.sub(r"\s+", "", text.lower())
+    for norm, variants in LINE_ALIASES.items():
+        if t == norm or any(re.sub(r"\s+|-", "", v.lower()) == t for v in variants):
+            return norm
+    return t
+
+def _normalize_metric(metric: str) -> str:
+    m = metric.strip().lower()
+    return {"indice conversion":"fcr", "ic":"fcr", "poids":"weight"}.get(m, m)
+
+def _normalize_age(age: str) -> str:
+    a = age.lower().replace("jours","j").replace("jour","j").replace("days","j").replace("d","j")
+    a = re.sub(r"[^0-9j]", "", a)
+    return a
 
 class QueryExpander:
     """Expanseur de requêtes avec synonymes du domaine - Version améliorée avec normalisation"""
@@ -20,16 +43,18 @@ class QueryExpander:
         self.expansion_cache = {}
         self.expansion_patterns = self._build_expansion_patterns()
     
-    def _build_expansion_patterns(self) -> Dict[str, List[str]]:
-        """Construit des patterns d'expansion contextuels"""
+    def _build_expansion_patterns(self) -> Dict[str, Dict[str, List[str]]]:
+        """
+        Retourne un mapping structuré {category: {trigger_terms: [...], expansions: [...]}}
+        """
         return {
-            "weight_terms": {
-                "triggers": ["poids", "weight", "gramme", "kg"],
-                "expansions": ["body weight", "gain", "croissance", "target", "average"]
+            "weight": {
+                "triggers": ["poids", "weight", "g", "kg"],
+                "expansions": ["poids moyen", "poids cible", "croissance", "gain moyen quotidien"]
             },
-            "fcr_terms": {
-                "triggers": ["fcr", "conversion", "indice"],
-                "expansions": ["feed conversion ratio", "efficiency", "performance", "optimal"]
+            "fcr": {
+                "triggers": ["fcr", "indice conversion", "ic"],
+                "expansions": ["conversion alimentaire", "feed conversion ratio"]
             },
             "environment_terms": {
                 "triggers": ["température", "temperature", "ventilation"],
@@ -160,3 +185,70 @@ class QueryExpander:
         """Vérifie si une normalisation a été appliquée"""
         normalization_indicators = ['ross308', 'cobb500', 'r308', 'c500']
         return any(indicator in expanded.lower() for indicator in normalization_indicators)
+
+def get_cache_normalized_expansions(query: str) -> Dict[str, Any]:
+    """
+    Produit des expansions + une clé cache normalisée cohérente avec EntityExtractor/IntentProcessor.
+    """
+    q = query.strip()
+    patterns = _build_expansion_patterns()
+    q_low = q.lower()
+    expansions: List[str] = []
+    categories_hit: List[str] = []
+
+    for cat, obj in patterns.items():
+        if any(t in q_low for t in obj["triggers"]):
+            categories_hit.append(cat)
+            expansions.extend(obj["expansions"])
+
+    # heuristique simple pour extraire (line/metric/age)
+    line = None
+    if "ross" in q_low or "r308" in q_low:
+        line = _normalize_line("ross308")
+    elif "cobb" in q_low or "c500" in q_low:
+        line = _normalize_line("cobb500")
+
+    metric = None
+    if any(t in q_low for t in ["fcr", "indice conversion", "ic"]):
+        metric = _normalize_metric("fcr")
+    elif any(t in q_low for t in ["poids", "weight"]):
+        metric = _normalize_metric("weight")
+
+    # âge (ex: 35j / 35 jours)
+    m = re.search(r"(\d{1,3})\s*(j|jours|jour|d|days?)", q_low)
+    age = _normalize_age(m.group(1) + "j") if m else ""
+
+    cache_key = ":".join([p for p in [line or "", metric or "", age or ""] if p]) or q_low
+
+    return {
+        "expansions": sorted(set(expansions)),
+        "categories": categories_hit,
+        "cache_key_normalized": cache_key,
+    }
+
+def _build_expansion_patterns() -> Dict[str, Dict[str, List[str]]]:
+    """
+    Retourne un mapping structuré {category: {trigger_terms: [...], expansions: [...]}}
+    """
+    return {
+        "weight": {
+            "triggers": ["poids", "weight", "g", "kg"],
+            "expansions": ["poids moyen", "poids cible", "croissance", "gain moyen quotidien"]
+        },
+        "fcr": {
+            "triggers": ["fcr", "indice conversion", "ic"],
+            "expansions": ["conversion alimentaire", "feed conversion ratio"]
+        },
+        "environment": {
+            "triggers": ["température", "temperature", "ventilation"],
+            "expansions": ["ambient", "target", "setting", "optimal", "climate"]
+        },
+        "production": {
+            "triggers": ["production", "ponte", "laying"],
+            "expansions": ["egg production", "rate", "peak", "persistency"]
+        },
+        "health": {
+            "triggers": ["maladie", "disease", "symptom"],
+            "expansions": ["diagnosis", "treatment", "prevention", "pathology"]
+        }
+    }

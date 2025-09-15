@@ -5,6 +5,7 @@ prompt_builder.py - Constructeur de prompts spécialisés
 
 from typing import Dict, Optional, Any
 from .intent_types import IntentType, IntentResult
+from math import isfinite
 
 class PromptBuilder:
     """Constructeur de prompts spécialisés pour les différents types d'intentions"""
@@ -22,7 +23,8 @@ class PromptBuilder:
             IntentType.ENVIRONMENT_SETTING: self._build_environment_prompt(entities, intent_result),
             IntentType.DIAGNOSIS_TRIAGE: self._build_diagnosis_prompt(entities, intent_result),
             IntentType.ECONOMICS_COST: self._build_economics_prompt(entities, intent_result),
-            IntentType.PROTOCOL_QUERY: self._build_protocol_prompt(entities, intent_result)
+            IntentType.PROTOCOL_QUERY: self._build_protocol_prompt(entities, intent_result),
+            IntentType.GENERAL_POULTRY: self._build_general_prompt(entities, intent_result),
         }
         
         base_prompt = prompts.get(intent_type)
@@ -100,7 +102,7 @@ Fournis des données précises avec références aux standards de l'industrie.
 Inclus les valeurs cibles, les plages normales et les facteurs d'influence."""
         
         if "metrics" in entities:
-            metrics_list = entities["metrics"].split(",")
+            metrics_list = [m.strip() for m in entities["metrics"].split(",") if m.strip()]
             base_prompt += f"\nMétriques spécifiques à traiter: {', '.join(metrics_list)}"
         
         # Ajout contexte haute confiance si détecté
@@ -137,3 +139,8 @@ Inclus les facteurs de variation et les optimisations possibles."""
 Fournis des protocoles détaillés, des calendriers de vaccination
 et des mesures de prévention spécifiques.
 Inclus les adaptations selon l'âge et le type d'élevage."""
+
+    def _build_general_prompt(self, entities: Dict[str, str], intent_result: IntentResult) -> str:
+        return """Tu es un expert avicole polyvalent.
+Réponds de manière factuelle et concise, puis propose des pistes de suivi (mesures, documents de référence, contacts).
+Si nécessaire, demande 1-2 précisions pour personnaliser la réponse."""

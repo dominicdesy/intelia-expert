@@ -8,6 +8,7 @@ NOUVELLES FONCTIONNALITÉS:
 - Métriques de performance étendues
 - Harmonisation OpenAI Async/Sync
 - OPTIMISATIONS v2.3: Initialisation Redis asynchrone, détection langue améliorée, monitoring enrichi
+- Chunk size unifié + mode prudent si guardrails absents
 """
 
 import os
@@ -337,8 +338,9 @@ def sse_event(obj: Dict[str, Any]) -> bytes:
         data = json.dumps(error_obj, ensure_ascii=False)
         return f"data: {data}\n\n".encode("utf-8")
 
-def smart_chunk_text(text: str, max_chunk_size: int = 400) -> list:
+def smart_chunk_text(text: str, max_chunk_size: int = None) -> list:
     """Découpe intelligente du texte pour streaming - Version améliorée"""
+    max_chunk_size = max_chunk_size or STREAM_CHUNK_LEN
     if not text or len(text) <= max_chunk_size:
         return [text] if text else []
     
@@ -471,6 +473,15 @@ async def generate_specialized_response(query: str, language: str = "fr", intent
             system_message += " Fournis des analyses de coûts détaillées et des calculs de rentabilité."
     
     try:
+        # si guardrails indisponibles, temp plus prudente
+        temperature = 0.7
+        try:
+            from imports_and_dependencies import GUARDRAILS_AVAILABLE
+            if not GUARDRAILS_AVAILABLE:
+                temperature = 0.2
+        except Exception:
+            pass
+            
         # Utiliser le client async global
         response = await openai_client_async.chat.completions.create(
             model="gpt-4o-mini",
@@ -479,7 +490,7 @@ async def generate_specialized_response(query: str, language: str = "fr", intent
                 {"role": "user", "content": query}
             ],
             max_tokens=600,
-            temperature=0.7
+            temperature=temperature
         )
         return response.choices[0].message.content.strip()
     except Exception as e:

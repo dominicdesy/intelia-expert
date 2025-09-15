@@ -3,7 +3,11 @@
 rag_engine.py - RAG Engine Enhanced avec Cache Redis externe optimisé
 Version Production Intégrée pour Intelia Expert Aviculture
 Version corrigée pour Weaviate 4.16.9 - Septembre 2025
-CORRECTIONS APPLIQUÉES: Optimisations cache sémantique + intent processor + diagnostics enrichis
+CORRECTIONS APPLIQUÉES: 
+- OpenAI init sans proxies
+- Guardrails uniques (suppression doublons)
+- Intégration HybridRetriever paramétrable
+- Optimisations cache sémantique + intent processor + diagnostics enrichis
 """
 
 import os
@@ -25,6 +29,11 @@ from retriever import HybridWeaviateRetriever
 from generators import EnhancedResponseGenerator
 from ood_detector import EnhancedOODDetector
 from memory import ConversationMemory
+
+# MODIFICATION: Import guardrails unique + HybridRetriever paramétrable
+from advanced_guardrails import AdvancedResponseGuardrails  # garder une seule implémentation
+from hybrid_retriever import hybrid_search
+DEFAULT_ALPHA = float(os.getenv("HYBRID_ALPHA", "0.6"))
 
 # Configuration logging
 logger = logging.getLogger(__name__)
@@ -72,12 +81,14 @@ class InteliaRAGEngine:
         }
     
     def _build_openai_client(self) -> AsyncOpenAI:
-        """Construit le client OpenAI"""
+        """MODIFICATION: Construit le client OpenAI sans proxies"""
         try:
             http_client = httpx.AsyncClient(timeout=30.0)
+            # NE PAS passer proxies au client (erreur observée)
             return AsyncOpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
         except Exception as e:
             logger.warning(f"Erreur client OpenAI: {e}")
+            # Fallback sans http_client personnalisé
             return AsyncOpenAI(api_key=OPENAI_API_KEY)
     
     async def initialize(self):
@@ -127,9 +138,9 @@ class InteliaRAGEngine:
             if ENTITY_ENRICHMENT_ENABLED:
                 self.generator = EnhancedResponseGenerator(self.openai_client, self.cache_manager)
             
-            # 6. Guardrails avec explain_score si disponible
+            # 6. MODIFICATION: Guardrails uniques (suppression doublons)
             if GUARDRAILS_AVAILABLE:
-                self.guardrails = create_response_guardrails(self.openai_client, GUARDRAILS_LEVEL)
+                self.guardrails = self._create_response_guardrails(self.openai_client, GUARDRAILS_LEVEL)
             
             # 7. Intent processor
             if INTENT_PROCESSOR_AVAILABLE:
@@ -142,6 +153,14 @@ class InteliaRAGEngine:
             logger.error(f"❌ Erreur initialisation: {e}")
             self.degraded_mode = True
             self.is_initialized = True
+    
+    def _create_response_guardrails(self, openai_client, level: str):
+        """MODIFICATION: Factory pour guardrails uniques"""
+        try:
+            return AdvancedResponseGuardrails(openai_client, level)
+        except Exception as e:
+            logger.warning(f"Erreur création guardrails: {e}")
+            return None
     
     async def _connect_weaviate(self):
         """Connexion Weaviate corrigée pour v4.16.9"""
@@ -228,7 +247,7 @@ class InteliaRAGEngine:
                 raise Exception("Weaviate not ready")
     
     async def process_query(self, query: str, language: str = "fr", tenant_id: str = "") -> RAGResult:
-        """MODIFICATION: Traitement avec toutes les optimisations appliquées"""
+        """MODIFICATION: Traitement avec toutes les optimisations appliquées + HybridRetriever"""
         if not RAG_ENABLED:
             return RAGResult(source=RAGSource.FALLBACK_NEEDED, metadata={"reason": "rag_disabled"})
         
@@ -310,12 +329,15 @@ class InteliaRAGEngine:
             # Construire where filter
             where_filter = build_where_filter(intent_result)
             
-            # Recherche hybride avec instrumentation
+            # MODIFICATION: Recherche hybride paramétrable avec instrumentation
             documents = []
             if self.retriever:
                 try:
+                    # Utiliser alpha paramétrable pour hybrid search
+                    search_alpha = getattr(intent_result, 'preferred_alpha', DEFAULT_ALPHA) if intent_result else DEFAULT_ALPHA
+                    
                     documents = await self.retriever.adaptive_search(
-                        query_vector, search_query, RAG_SIMILARITY_TOP_K, where_filter
+                        query_vector, search_query, RAG_SIMILARITY_TOP_K, where_filter, alpha=search_alpha
                     )
                     if any(doc.metadata.get("hybrid_used") for doc in documents):
                         self.optimization_stats["hybrid_searches"] += 1
@@ -427,7 +449,7 @@ RÈGLE: Réponds strictement en {language}."""
                     }
                 )
             
-            # MODIFICATION: Vérification avec guardrails + explain_score
+            # MODIFICATION: Vérification avec guardrails uniques + explain_score
             verification_result = None
             if self.guardrails:
                 try:
@@ -496,7 +518,8 @@ RÈGLE: Réponds strictement en {language}."""
                     "fallback_search": doc.metadata.get("fallback_search", False),
                     "minimal_api_used": doc.metadata.get("minimal_api_used", False),
                     "runtime_corrections": doc.metadata.get("runtime_corrections", 0),
-                    "search_type": getattr(doc, 'search_type', 'unknown')
+                    "search_type": getattr(doc, 'search_type', 'unknown'),
+                    "hybrid_alpha_used": getattr(doc, 'hybrid_alpha_used', DEFAULT_ALPHA)
                 }
                 
                 if doc.explain_score is not None:
@@ -507,17 +530,20 @@ RÈGLE: Réponds strictement en {language}."""
             # MODIFICATION: Métadonnées complètes avec nouvelles infos
             dependencies_status = get_dependencies_status()
             metadata = {
-                "approach": "enhanced_rag_external_cache_optimized_v4_16_9_corrected",
+                "approach": "enhanced_rag_external_cache_optimized_v4_16_9_corrected_unified",
                 "optimizations_enabled": {
                     "external_redis_cache": self.optimization_stats["external_cache_used"],
                     "semantic_cache": getattr(self.cache_manager, 'ENABLE_SEMANTIC_CACHE', False),
                     "hybrid_search": HYBRID_SEARCH_ENABLED,
+                    "hybrid_search_parameterized": True,
                     "entity_enrichment": ENTITY_ENRICHMENT_ENABLED,
                     "advanced_guardrails": GUARDRAILS_AVAILABLE,
+                    "guardrails_unified": True,
                     "api_diagnostics": ENABLE_API_DIAGNOSTICS,
                     "dynamic_ood_thresholds": True,
                     "enhanced_conversation_memory": True,
-                    "explain_score_extraction": self.optimization_stats["explain_score_extractions"] > 0
+                    "explain_score_extraction": self.optimization_stats["explain_score_extractions"] > 0,
+                    "openai_simplified_init": True
                 },
                 "weaviate_version": dependencies_status.get("weaviate_version", "N/A"),
                 "weaviate_v4": WEAVIATE_V4,
@@ -531,6 +557,7 @@ RÈGLE: Réponds strictement en {language}."""
                 "verification_smart": RAG_VERIFICATION_SMART,
                 "language_target": language,
                 "language_detected": detect_language_enhanced(query),
+                "hybrid_alpha_used": search_alpha if 'search_alpha' in locals() else DEFAULT_ALPHA,
                 "optimization_stats": self.optimization_stats.copy(),
                 "api_capabilities": self.retriever.api_capabilities if self.retriever else {},
                 "api_corrections_applied": self.optimization_stats.get("api_corrections", 0) > 0,
@@ -544,7 +571,8 @@ RÈGLE: Réponds strictement en {language}."""
                 metadata.update({
                     "intent_type": getattr(intent_result, 'intent_type', 'unknown'),
                     "detected_entities": getattr(intent_result, 'detected_entities', {}),
-                    "confidence_breakdown": getattr(intent_result, 'confidence_breakdown', {})
+                    "confidence_breakdown": getattr(intent_result, 'confidence_breakdown', {}),
+                    "preferred_alpha": getattr(intent_result, 'preferred_alpha', None)
                 })
             
             # Sauvegarde mémoire
@@ -629,18 +657,21 @@ RÈGLE: Réponds strictement en {language}."""
                 "rag_enabled": RAG_ENABLED,
                 "initialized": self.is_initialized,
                 "degraded_mode": self.degraded_mode,
-                "approach": "enhanced_rag_external_cache_optimized_v4_16_9_corrected",
+                "approach": "enhanced_rag_external_cache_optimized_v4_16_9_corrected_unified",
                 "optimizations": {
                     "external_cache_enabled": self.cache_manager.enabled if self.cache_manager else False,
                     "hybrid_search_enabled": HYBRID_SEARCH_ENABLED,
+                    "hybrid_search_parameterized": True,
                     "semantic_cache_enabled": getattr(self.cache_manager, 'ENABLE_SEMANTIC_CACHE', False),
                     "entity_enrichment_enabled": ENTITY_ENRICHMENT_ENABLED,
                     "guardrails_level": GUARDRAILS_LEVEL,
+                    "guardrails_unified": True,
                     "verification_smart": RAG_VERIFICATION_SMART,
                     "api_diagnostics_enabled": ENABLE_API_DIAGNOSTICS,
                     "dynamic_ood_thresholds": True,
                     "enhanced_conversation_memory": True,
-                    "explain_score_extraction_enabled": api_capabilities.get("explain_score_available", False)
+                    "explain_score_extraction_enabled": api_capabilities.get("explain_score_available", False),
+                    "openai_simplified_init": True
                 },
                 "components": dependencies_status,
                 "components_extended": {
@@ -655,7 +686,8 @@ RÈGLE: Réponds strictement en {language}."""
                     "ood_strict_score": OOD_STRICT_SCORE,
                     "lang_detection_min_length": LANG_DETECTION_MIN_LENGTH,
                     "redis_url": REDIS_URL,
-                    "weaviate_url": WEAVIATE_URL
+                    "weaviate_url": WEAVIATE_URL,
+                    "hybrid_default_alpha": DEFAULT_ALPHA
                 },
                 "optimization_stats": self.optimization_stats.copy(),
                 "weaviate_capabilities": api_capabilities,

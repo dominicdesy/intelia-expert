@@ -5,16 +5,35 @@ intent_classifier.py - Classificateur d'intentions métier
 
 import re
 import logging
+import os
+import json
 from typing import Dict, Set, Tuple, Optional
-from .intent_types import IntentType
+
+# Toujours depuis le package local pour éviter les doubles définitions
+from .intent_types import IntentType, IntentResult
 
 logger = logging.getLogger(__name__)
 
 class IntentClassifier:
     """Classificateur d'intentions - Version avec scoring optimisé et intégration guardrails"""
     
-    def __init__(self, intents_config: dict):
-        self.intents_config = intents_config
+    def __init__(self, intents_config: dict = None, vocab=None, guardrails=None, weights: dict = None):
+        # Charge des poids configurables (JSON ou env) sinon défauts
+        if weights:
+            self.weights = weights
+        else:
+            cfg_path = os.getenv("INTENT_WEIGHTS_FILE", "")
+            if cfg_path and os.path.exists(cfg_path):
+                try:
+                    self.weights = json.load(open(cfg_path, "r", encoding="utf-8"))
+                except Exception:
+                    self.weights = {"keyword": 1.0, "entity": 5.0, "explain_bonus": 2.0, "regex": 2.5}
+            else:
+                self.weights = {"keyword": 1.0, "entity": 5.0, "explain_bonus": 2.0, "regex": 2.5}
+        
+        self.intents_config = intents_config or {}
+        self.vocab = vocab
+        self.guardrails = guardrails
         self.intent_keywords = self._build_intent_keywords()
         self.intent_patterns = self._build_intent_patterns()
         self.intent_metrics = self._build_intent_metrics()
@@ -78,52 +97,57 @@ class IntentClassifier:
         
         return keywords
     
-    def classify_intent(self, text: str, entities: Dict[str, str], 
+    def classify_intent(self, text: str, entities: Dict[str, str] = None, 
                        explain_score: Optional[float] = None) -> Tuple[IntentType, Dict[str, float]]:
         """Classifie l'intention avec scoring multimodal amélioré et intégration explain_score"""
         text_lower = text.lower()
+        entities = entities or {}
         scores = {}
         score_breakdown = {}
         
         for intent_type, keywords in self.intent_keywords.items():
-            # Score basique par mots-clés
-            keyword_score = sum(1 for keyword in keywords if keyword in text_lower)
+            # Score basique par mots-clés (avec poids configurables)
+            keyword_matches = sum(1 for keyword in keywords if keyword in text_lower)
+            keyword_score = keyword_matches * self.weights.get("keyword", 1.0)
             
-            # Score par patterns regex
+            # Score par patterns regex (avec poids configurables)
             pattern_score = 0
             if intent_type in self.intent_patterns:
-                for pattern in self.intent_patterns[intent_type]:
-                    if re.search(pattern, text_lower):
-                        pattern_score += 2
+                pattern_matches = sum(1 for pattern in self.intent_patterns[intent_type] 
+                                    if re.search(pattern, text_lower))
+                pattern_score = pattern_matches * self.weights.get("regex", 2.5)
             
-            # Score par entités (existant amélioré)
+            # Score par entités (avec poids configurables)
             entity_score = 0
             if intent_type == IntentType.METRIC_QUERY.value:
                 if "metrics" in entities:
-                    entity_score += 5  # Bonus augmenté
+                    entity_score += 1  # Base multiplié par weight plus tard
                 if any(key in entities for key in ["weight_value", "percentage_value", "temperature_value"]):
-                    entity_score += 3
+                    entity_score += 0.6
                 if any(key in entities for key in ["age_days", "age_weeks", "line"]):
-                    entity_score += 2
-                # Nouveau: bonus pour lignée normalisée
+                    entity_score += 0.4
+                # Bonus pour lignée normalisée
                 if "line_normalized" in entities:
-                    entity_score += 1
+                    entity_score += 0.2
             
             elif intent_type == IntentType.ENVIRONMENT_SETTING.value:
                 if "temperature_value" in entities:
-                    entity_score += 4
+                    entity_score += 0.8
                 if "site_type" in entities:
-                    entity_score += 2
+                    entity_score += 0.4
                 if "environment" in entities:
-                    entity_score += 3
+                    entity_score += 0.6
             
             elif intent_type == IntentType.ECONOMICS_COST.value:
                 if any(word in text_lower for word in ['coût', 'cost', 'prix', 'économ']):
-                    entity_score += 3
+                    entity_score += 0.6
                 if "flock_size" in entities:
-                    entity_score += 2
+                    entity_score += 0.4
             
-            # Nouveau: Score par métriques spécialisées
+            # Appliquer le poids des entités
+            entity_score *= self.weights.get("entity", 5.0)
+            
+            # Score par métriques spécialisées
             metrics_score = 0
             if intent_type in self.intent_metrics:
                 intent_specific_metrics = self.intent_metrics[intent_type]
@@ -131,10 +155,10 @@ class IntentClassifier:
                 matching_metrics = [m for m in detected_metrics if m in intent_specific_metrics]
                 metrics_score = len(matching_metrics) * 3
             
-            # Nouveau: Bonus explain_score pour evidence_support (intégration guardrails)
+            # Bonus explain_score pour evidence_support (intégration guardrails)
             explain_bonus = 0
             if explain_score is not None and explain_score > 0.7:
-                explain_bonus = 2  # Bonus si forte évidence retriever
+                explain_bonus = self.weights.get("explain_bonus", 2.0)
             
             total_score = keyword_score + pattern_score + entity_score + metrics_score + explain_bonus
             scores[intent_type] = total_score
@@ -179,3 +203,12 @@ class IntentClassifier:
         ]
         
         return patterns
+    
+    def get_weights_config(self) -> dict:
+        """Retourne la configuration actuelle des poids"""
+        return self.weights.copy()
+    
+    def update_weights(self, new_weights: dict) -> None:
+        """Met à jour les poids de scoring"""
+        self.weights.update(new_weights)
+        logger.info(f"Weights updated: {self.weights}")

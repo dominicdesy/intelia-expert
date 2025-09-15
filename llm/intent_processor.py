@@ -14,7 +14,7 @@ from pathlib import Path
 # Imports des modules internes
 from .intent_types import IntentType, IntentResult
 from .vocabulary_extractor import PoultryVocabularyExtractor
-from .query_expander import QueryExpander
+from .query_expander import QueryExpander, _normalize_line, _normalize_metric, _normalize_age
 from .entity_extractor import EntityExtractor
 from .intent_classifier import IntentClassifier
 
@@ -43,6 +43,7 @@ class IntentProcessor:
             "entity_extraction_avg": 0.0,
             "intent_confidence_avg": 0.0,
             "errors_count": 0,
+            "entity_extractor_errors": 0,
             "adaptive_threshold_usage": {"high_confidence": 0, "normal": 0, "strict": 0},
             "semantic_fallback_attempts": 0,
             "guardrails_evidence_boost": 0,
@@ -166,8 +167,13 @@ class IntentProcessor:
                     expansion_quality={}
                 )
             
-            # 2. Extraction d'entités avec normalisation
-            entities = self.entity_extractor.extract_entities(query)
+            # 2. Extraction d'entités avec normalisation (robuste)
+            try:
+                entities = self.entity_extractor.extract_entities(query)
+            except Exception as e:
+                self.processing_stats["entity_extractor_errors"] = self.processing_stats.get("entity_extractor_errors", 0) + 1
+                logger.warning(f"Erreur extraction entités: {e}")
+                entities = {}
             
             # 3. Expansion de requête avec métriques qualité
             expanded_query = self.query_expander.expand_query(query)
@@ -254,38 +260,22 @@ class IntentProcessor:
                 processing_time=processing_time
             )
     
-    def _generate_cache_key(self, entities: Dict[str, str]) -> str:
-        """Génère une clé de cache normalisée pour Redis"""
-        key_parts = []
+    def _generate_cache_key(self, entities: Dict[str, Any]) -> str:
+        """Génère une clé de cache normalisée avec fonctions communes"""
+        line = entities.get("line_normalized") or entities.get("line") or ""
+        if line:
+            line = _normalize_line(line)
         
-        # Priorité: lignée normalisée > métriques > âge > site
-        if "line_normalized" in entities:
-            key_parts.append(entities["line_normalized"])
-        elif "line" in entities:
-            normalized_line = self.vocabulary_extractor._normalize_for_cache_key(entities["line"])
-            key_parts.append(normalized_line)
+        metric = entities.get("metric") or entities.get("metrics") or ""
+        if metric:
+            metric = _normalize_metric(metric)
         
-        if "metrics" in entities:
-            # Prendre la première métrique principale
-            first_metric = entities["metrics"].split(",")[0]
-            key_parts.append(first_metric.lower().replace("_", ""))
+        age = entities.get("age_days") or entities.get("age") or ""
+        if age:
+            age = _normalize_age(str(age))
         
-        if "age_days" in entities:
-            # Arrondir à la semaine pour améliorer hit-rate
-            age_days = int(entities["age_days"])
-            age_weeks = max(1, age_days // 7)
-            key_parts.append(f"w{age_weeks}")
-        
-        if "site_type" in entities:
-            key_parts.append(entities["site_type"])
-        
-        cache_key = "_".join(key_parts) if key_parts else "general"
-        
-        # Garde-fou: longueur maximum
-        if len(cache_key) > 100:
-            cache_key = cache_key[:100]
-        
-        return cache_key
+        parts = [p for p in [line, metric, age] if p]
+        return ":".join(parts).lower()
     
     def _calculate_confidence(self, vocab_conf: float, entities: Dict, 
                             classification: Dict, expansion: Dict, 
@@ -359,6 +349,10 @@ class IntentProcessor:
         )
     
     def get_processing_stats(self) -> Dict[str, Any]:
+        """Expose les stats pour /metrics"""
+        return dict(self.processing_stats)
+    
+    def get_full_processing_stats(self) -> Dict[str, Any]:
         """Retourne les statistiques complètes - API pour health-check"""
         base_stats = {
             **self.processing_stats,
