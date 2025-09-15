@@ -2,6 +2,7 @@
 """
 rag_engine.py - RAG Engine Enhanced avec Cache Redis, Recherche Hybride et Guardrails
 Version Production Intégrée pour Intelia Expert Aviculture
+Version corrigée pour Weaviate 4.16.9 - Septembre 2025
 """
 
 import os
@@ -32,19 +33,23 @@ try:
     if weaviate_version.startswith('4.'):
         try:
             import weaviate.classes as wvc
+            import weaviate.classes.query as wvc_query
             WEAVIATE_V4 = True
         except ImportError:
             wvc = None
+            wvc_query = None
             WEAVIATE_V4 = False
     else:
         WEAVIATE_V4 = False
         wvc = None
+        wvc_query = None
     WEAVIATE_AVAILABLE = True
     logger.info(f"Weaviate {weaviate_version} détecté (V4: {WEAVIATE_V4})")
 except ImportError as e:
     WEAVIATE_AVAILABLE = False
     WEAVIATE_V4 = False
     wvc = None
+    wvc_query = None
     weaviate = None
     logger.error(f"Weaviate non disponible: {e}")
 
@@ -555,9 +560,9 @@ class OpenAIEmbedder:
 
 # === RETRIEVER HYBRIDE ===
 def _to_v4_filter(where_dict):
-    """Convertit dict where v3 vers Filter v4"""
+    """Convertit dict where v3 vers Filter v4 - Version corrigée pour Weaviate 4.16.9"""
     if not where_dict or not WEAVIATE_V4 or not wvc:
-        return where_dict
+        return None  # Retourner None au lieu du dict original
     
     try:
         if "path" in where_dict:
@@ -574,7 +579,11 @@ def _to_v4_filter(where_dict):
         
         operator = where_dict.get("operator", "And").lower()
         operands = [_to_v4_filter(o) for o in where_dict.get("operands", [])]
+        operands = [op for op in operands if op is not None]  # Filtrer les None
         
+        if not operands:
+            return None
+            
         if operator == "and" and len(operands) >= 2:
             result = operands[0]
             for op in operands[1:]:
@@ -593,7 +602,7 @@ def _to_v4_filter(where_dict):
         return None
 
 class HybridWeaviateRetriever:
-    """Retriever hybride optimisé avec cache et fallbacks"""
+    """Retriever hybride optimisé avec cache et fallbacks - Version corrigée pour Weaviate 4.16.9"""
     
     def __init__(self, client, collection_name: str = "InteliaKnowledge"):
         self.client = client
@@ -610,7 +619,7 @@ class HybridWeaviateRetriever:
         
     async def adaptive_search(self, query_vector: List[float], query_text: str,
                             top_k: int = 15, where_filter: Dict = None) -> List[Document]:
-        """Recherche adaptative qui ajuste alpha selon la requête"""
+        """Recherche adaptative qui ajuste alpha selon la requête - Version corrigée"""
         try:
             alpha = self._analyze_query_for_alpha(query_text)
             
@@ -620,22 +629,33 @@ class HybridWeaviateRetriever:
                 )
                 METRICS.search_stats["hybrid_native"] += 1
             else:
-                # Fallback recherche vectorielle + BM25 manuel
-                documents = await self._hybrid_search_fallback(
-                    query_vector, query_text, top_k, where_filter, alpha
-                )
-                METRICS.search_stats["hybrid_manual"] += 1
+                # Utiliser la recherche vectorielle v4 si disponible
+                if self.is_v4:
+                    documents = await self._vector_search_v4(
+                        query_vector, top_k, where_filter
+                    )
+                else:
+                    documents = await self._vector_search_v3(
+                        query_vector, top_k, where_filter
+                    )
+                METRICS.search_stats["vector_only"] += 1
             
             # Retry sans age_band si nécessaire
             if not documents and where_filter and "age_band" in json.dumps(where_filter):
                 logger.info("Retry recherche sans critère age_band")
                 where_filter_no_age = self._remove_age_band_filter(where_filter)
-                documents = await self._hybrid_search_v4(
-                    query_vector, query_text, top_k, where_filter_no_age, alpha
-                ) if self.is_v4 else await self._vector_search_fallback(
-                    query_vector, top_k, where_filter_no_age
-                )
                 
+                if self.is_v4:
+                    documents = await self._hybrid_search_v4(
+                        query_vector, query_text, top_k, where_filter_no_age, alpha
+                    ) if HYBRID_SEARCH_ENABLED else await self._vector_search_v4(
+                        query_vector, top_k, where_filter_no_age
+                    )
+                else:
+                    documents = await self._vector_search_v3(
+                        query_vector, top_k, where_filter_no_age
+                    )
+                    
                 for doc in documents:
                     doc.metadata["age_band_fallback_used"] = True
             
@@ -643,7 +663,11 @@ class HybridWeaviateRetriever:
             
         except Exception as e:
             logger.error(f"Erreur recherche adaptative: {e}")
-            return await self._vector_search_fallback(query_vector, top_k, where_filter)
+            # Fallback avec la méthode appropriée selon la version
+            if self.is_v4:
+                return await self._vector_search_v4(query_vector, top_k, where_filter)
+            else:
+                return await self._vector_search_v3(query_vector, top_k, where_filter)
     
     def _analyze_query_for_alpha(self, query_text: str) -> float:
         """Analyse la requête pour déterminer l'alpha optimal"""
@@ -672,22 +696,24 @@ class HybridWeaviateRetriever:
     
     async def _hybrid_search_v4(self, query_vector: List[float], query_text: str,
                                top_k: int, where_filter: Dict, alpha: float) -> List[Document]:
-        """Recherche hybride native Weaviate v4"""
+        """Recherche hybride native Weaviate v4 - Version corrigée pour 4.16.9"""
         try:
             def _sync_hybrid_search():
                 collection = self.client.collections.get(self.collection_name)
                 
+                # Préparer les paramètres de base avec MetadataQuery corrigé
                 search_params = {
                     "query": query_text,
                     "vector": query_vector,
                     "alpha": alpha,
                     "limit": top_k,
-                    "return_metadata": ["score"]
+                    "return_metadata": wvc.query.MetadataQuery(score=True)
                 }
                 
+                # Ajouter le filtre seulement s'il est valide
                 if where_filter:
                     v4_filter = _to_v4_filter(where_filter)
-                    if v4_filter:
+                    if v4_filter is not None:
                         search_params["where"] = v4_filter
                 
                 return collection.query.hybrid(**search_params)
@@ -719,6 +745,54 @@ class HybridWeaviateRetriever:
         except Exception as e:
             logger.error(f"Erreur recherche hybride v4: {e}")
             raise
+    
+    async def _vector_search_v4(self, query_vector: List[float], top_k: int, 
+                              where_filter: Dict) -> List[Document]:
+        """Recherche vectorielle Weaviate v4 - Version corrigée"""
+        try:
+            def _sync_search():
+                collection = self.client.collections.get(self.collection_name)
+                
+                params = {
+                    "vector": query_vector,
+                    "limit": top_k,
+                    "return_metadata": wvc.query.MetadataQuery(distance=True, score=True)
+                }
+                
+                if where_filter:
+                    v4_filter = _to_v4_filter(where_filter)
+                    if v4_filter is not None:
+                        params["where"] = v4_filter
+                
+                return collection.query.near_vector(**params)
+            
+            result = await anyio.to_thread.run_sync(_sync_search)
+            
+            documents = []
+            for obj in result.objects:
+                score = float(getattr(obj.metadata, "score", 0.0))
+                distance = float(getattr(obj.metadata, "distance", 1.0))
+                
+                doc = Document(
+                    content=obj.properties.get("content", ""),
+                    metadata={
+                        "title": obj.properties.get("title", ""),
+                        "source": obj.properties.get("source", ""),
+                        "geneticLine": obj.properties.get("geneticLine", ""),
+                        "species": obj.properties.get("species", ""),
+                        "phase": obj.properties.get("phase", ""),
+                        "age_band": obj.properties.get("age_band", ""),
+                    },
+                    score=score,
+                    original_distance=distance
+                )
+                documents.append(doc)
+            
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Erreur recherche vectorielle v4: {e}")
+            return []
     
     async def _hybrid_search_fallback(self, query_vector: List[float], query_text: str,
                                     top_k: int, where_filter: Dict, alpha: float) -> List[Document]:
@@ -843,7 +917,7 @@ class HybridWeaviateRetriever:
     
     async def _bm25_search_fallback(self, query_text: str, top_k: int, 
                                   where_filter: Dict) -> List[Document]:
-        """Recherche BM25 de fallback"""
+        """Recherche BM25 de fallback - Version corrigée pour 4.16.9"""
         if not self.is_v4:
             return []
         
@@ -853,12 +927,14 @@ class HybridWeaviateRetriever:
                 params = {
                     "query": query_text,
                     "limit": top_k,
-                    "return_metadata": ["score"]
+                    "return_metadata": wvc.query.MetadataQuery(score=True)
                 }
+                
                 if where_filter:
                     v4_filter = _to_v4_filter(where_filter)
-                    if v4_filter:
+                    if v4_filter is not None:
                         params["where"] = v4_filter
+                
                 return collection.query.bm25(**params)
             
             response = await anyio.to_thread.run_sync(_sync_bm25)
@@ -891,7 +967,10 @@ class HybridWeaviateRetriever:
     async def _vector_search_fallback(self, query_vector: List[float], top_k: int, 
                                     where_filter: Dict) -> List[Document]:
         """Recherche vectorielle simple de fallback"""
-        return await self._vector_search_v3(query_vector, top_k, where_filter)
+        if self.is_v4:
+            return await self._vector_search_v4(query_vector, top_k, where_filter)
+        else:
+            return await self._vector_search_v3(query_vector, top_k, where_filter)
     
     def _remove_age_band_filter(self, where_filter: Dict) -> Dict:
         """Retire le critère age_band du filtre"""
@@ -1275,7 +1354,7 @@ def build_where_filter(intent_result) -> Dict:
 
 # === RAG ENGINE PRINCIPAL ===
 class InteliaRAGEngine:
-    """RAG Engine principal avec toutes les optimisations intégrées"""
+    """RAG Engine principal avec toutes les optimisations intégrées - Version corrigée pour Weaviate 4.16.9"""
     
     def __init__(self, openai_client: AsyncOpenAI = None):
         self.openai_client = openai_client or self._build_openai_client()
@@ -1366,12 +1445,10 @@ class InteliaRAGEngine:
             self.is_initialized = True
     
     async def _connect_weaviate(self):
-        """Connexion Weaviate corrigée pour v4"""
+        """Connexion Weaviate corrigée pour v4.16.9"""
         if WEAVIATE_V4:
             try:
-                import weaviate.classes as wvc
-                
-                # Nouvelle syntaxe Weaviate v4 - pas de paramètre 'url' dans le constructeur
+                # Nouvelle syntaxe Weaviate v4 - correction pour 4.16.9
                 if WEAVIATE_API_KEY and ".weaviate.cloud" in WEAVIATE_URL:
                     # Pour Weaviate Cloud avec API Key
                     self.weaviate_client = weaviate.connect_to_weaviate_cloud(
@@ -1688,7 +1765,7 @@ RÈGLE: Réponds strictement en {language}."""
             
             # Métadonnées complètes
             metadata = {
-                "approach": "enhanced_rag_integrated_complete",
+                "approach": "enhanced_rag_integrated_complete_v4_16_9",
                 "optimizations_enabled": {
                     "redis_cache": self.cache_manager.enabled if self.cache_manager else False,
                     "hybrid_search": HYBRID_SEARCH_ENABLED,
@@ -1791,7 +1868,7 @@ RÈGLE: Réponds strictement en {language}."""
                 "rag_enabled": RAG_ENABLED,
                 "initialized": self.is_initialized,
                 "degraded_mode": self.degraded_mode,
-                "approach": "enhanced_rag_integrated_complete",
+                "approach": "enhanced_rag_integrated_complete_v4_16_9",
                 "optimizations": {
                     "cache_enabled": self.cache_manager.enabled if self.cache_manager else False,
                     "hybrid_search_enabled": HYBRID_SEARCH_ENABLED,

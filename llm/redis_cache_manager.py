@@ -1,12 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-redis_cache_manager.py - Gestionnaire de cache Redis pour RAG - OPTIMISÉ
-Optimise les performances en cachant embeddings, résultats de recherche et réponses
-CORRECTIONS APPLIQUÉES:
-- Normalisation intelligente des requêtes pour améliorer les cache hits
-- TTL prolongés pour contenu stable avicole
-- Cache sémantique basé sur mots-clés métier
-- Logs détaillés pour monitoring
+redis_cache_manager.py - Gestionnaire de cache Redis pour RAG - VERSION CONFIGURABLE
+Toutes les limites et TTL sont configurables via variables d'environnement
 """
 
 import json
@@ -32,28 +27,44 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 class RAGCacheManager:
-    """Gestionnaire de cache Redis optimisé pour maximiser les hits - Version améliorée"""
+    """Gestionnaire de cache Redis entièrement configurable par variables d'environnement"""
     
-    def __init__(self, redis_url: str = "redis://localhost:6379", 
-                 default_ttl: int = 3600):
-        self.redis_url = redis_url
-        self.default_ttl = default_ttl
+    def __init__(self, redis_url: str = None, default_ttl: int = None):
+        # Configuration Redis
+        self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379")
+        self.default_ttl = default_ttl or int(os.getenv("CACHE_DEFAULT_TTL", "3600"))
         self.client = None
-        self.enabled = REDIS_AVAILABLE
+        self.enabled = REDIS_AVAILABLE and os.getenv("CACHE_ENABLED", "true").lower() == "true"
         
-        # Protection OOM - Limites configurables
-        self.MAX_VALUE_BYTES = int(os.getenv("CACHE_MAX_VALUE_BYTES", "2000000"))  # 2MB
-        self.MAX_KEYS_PER_NAMESPACE = int(os.getenv("CACHE_MAX_KEYS_PER_NS", "1000"))  # 1000 clés
+        # === LIMITES MÉMOIRE CONFIGURABLES ===
+        self.MAX_VALUE_BYTES = int(os.getenv("CACHE_MAX_VALUE_BYTES", "500000"))  # 500 KB par défaut
+        self.MAX_KEYS_PER_NAMESPACE = int(os.getenv("CACHE_MAX_KEYS_PER_NS", "5000"))  # 5000 clés
+        self.TOTAL_MEMORY_LIMIT_MB = int(os.getenv("CACHE_TOTAL_MEMORY_LIMIT_MB", "200"))  # 200 MB
         
-        # TTL optimisés pour contenu avicole stable
+        # === SEUILS D'ALERTE CONFIGURABLES ===
+        self.WARNING_THRESHOLD_MB = int(os.getenv("CACHE_WARNING_THRESHOLD_MB", "180"))  # 180 MB
+        self.PURGE_THRESHOLD_MB = int(os.getenv("CACHE_PURGE_THRESHOLD_MB", "220"))  # 220 MB
+        self.STATS_LOG_INTERVAL = int(os.getenv("CACHE_STATS_LOG_INTERVAL", "300"))  # 5 min
+        
+        # === TTL CONFIGURABLES PAR TYPE ===
         self.ttl_config = {
-            "embeddings": 86400,     # 24h - embeddings très stables
-            "search_results": 7200,   # 2h - résultats recherche
-            "responses": 3600,        # 1h - réponses générées (augmenté de 15min à 1h)
-            "intent_results": 7200,   # 2h - analyses d'intention
-            "verification": 3600,     # 1h - vérifications
-            "normalized": 10800       # 3h - cache normalisé
+            "embeddings": int(os.getenv("CACHE_TTL_EMBEDDINGS", "86400")),      # 24h par défaut
+            "search_results": int(os.getenv("CACHE_TTL_SEARCHES", "7200")),     # 2h par défaut
+            "responses": int(os.getenv("CACHE_TTL_RESPONSES", "3600")),         # 1h par défaut
+            "intent_results": int(os.getenv("CACHE_TTL_INTENTS", "7200")),      # 2h par défaut
+            "verification": int(os.getenv("CACHE_TTL_VERIFICATION", "3600")),   # 1h par défaut
+            "normalized": int(os.getenv("CACHE_TTL_NORMALIZED", "10800"))       # 3h par défaut
         }
+        
+        # === OPTIMISATIONS CONFIGURABLES ===
+        self.ENABLE_COMPRESSION = os.getenv("CACHE_ENABLE_COMPRESSION", "true").lower() == "true"
+        self.ENABLE_SEMANTIC_CACHE = os.getenv("CACHE_ENABLE_SEMANTIC", "true").lower() == "true"
+        self.ENABLE_FALLBACK_KEYS = os.getenv("CACHE_ENABLE_FALLBACK", "true").lower() == "true"
+        self.MAX_SEARCH_CONTENT_LENGTH = int(os.getenv("CACHE_MAX_SEARCH_CONTENT", "500"))
+        
+        # === PURGE CONFIGURABLES ===
+        self.LRU_PURGE_RATIO = float(os.getenv("CACHE_LRU_PURGE_RATIO", "0.3"))  # Purge 30% en LRU
+        self.ENABLE_AUTO_PURGE = os.getenv("CACHE_ENABLE_AUTO_PURGE", "true").lower() == "true"
         
         # Vocabulaire avicole pour normalisation sémantique
         self.poultry_keywords = {
@@ -73,24 +84,36 @@ class RAGCacheManager:
             'quel', 'quelle', 'quels', 'what', 'how', 'comment', 'combien'
         }
         
-        # Statistiques de protection et cache
+        # Statistiques
         self.protection_stats = {
             "oversized_rejects": 0,
             "lru_purges": 0,
-            "namespace_limits_hit": 0
+            "namespace_limits_hit": 0,
+            "memory_warnings": 0,
+            "auto_purges": 0
         }
         
         self.cache_stats = {
             "normalized_hits": 0,
             "semantic_hits": 0,
             "exact_hits": 0,
-            "total_requests": 0
+            "total_requests": 0,
+            "compression_savings_bytes": 0
         }
+        
+        # Dernière vérification mémoire
+        self.last_memory_check = 0
+        self.last_stats_log = 0
     
     async def initialize(self):
-        """Initialise la connexion Redis"""
+        """Initialise la connexion Redis avec configuration complète"""
         if not self.enabled:
+            logger.warning("Cache Redis désactivé via CACHE_ENABLED=false")
+            return
+        
+        if not REDIS_AVAILABLE:
             logger.warning("Redis non disponible - cache désactivé")
+            self.enabled = False
             return
         
         try:
@@ -105,8 +128,17 @@ class RAGCacheManager:
             
             # Test de connexion
             await self.client.ping()
-            logger.info(f"Cache Redis optimisé initialisé - Limites: {self.MAX_VALUE_BYTES/1024/1024:.1f}MB/valeur, {self.MAX_KEYS_PER_NAMESPACE} clés/namespace")
-            logger.info(f"TTL optimisés: réponses {self.ttl_config['responses']}s, recherches {self.ttl_config['search_results']}s")
+            
+            # Log de la configuration
+            logger.info(f"Cache Redis initialisé avec configuration:")
+            logger.info(f"  - Limite valeur: {self.MAX_VALUE_BYTES/1024:.0f} KB")
+            logger.info(f"  - Limite clés/namespace: {self.MAX_KEYS_PER_NAMESPACE}")
+            logger.info(f"  - Limite mémoire totale: {self.TOTAL_MEMORY_LIMIT_MB} MB")
+            logger.info(f"  - TTL embeddings: {self.ttl_config['embeddings']}s ({self.ttl_config['embeddings']//3600}h)")
+            logger.info(f"  - TTL réponses: {self.ttl_config['responses']}s ({self.ttl_config['responses']//60}min)")
+            logger.info(f"  - Compression: {self.ENABLE_COMPRESSION}")
+            logger.info(f"  - Cache sémantique: {self.ENABLE_SEMANTIC_CACHE}")
+            logger.info(f"  - Auto-purge: {self.ENABLE_AUTO_PURGE}")
             
         except Exception as e:
             logger.warning(f"Erreur connexion Redis: {e} - cache désactivé")
@@ -136,6 +168,9 @@ class RAGCacheManager:
     
     def _extract_semantic_keywords(self, text: str) -> Set[str]:
         """Extrait les mots-clés sémantiques pour cache intelligent"""
+        if not self.ENABLE_SEMANTIC_CACHE:
+            return set()
+        
         words = set(re.findall(r'\b\w+\b', text.lower()))
         
         # Filtrer les mots vides
@@ -152,7 +187,7 @@ class RAGCacheManager:
     def _generate_key(self, prefix: str, data: Any, use_semantic: bool = True) -> str:
         """Génère une clé de cache optimisée avec normalisation"""
         if isinstance(data, str):
-            if use_semantic and prefix in ["response", "intent"]:
+            if use_semantic and self.ENABLE_SEMANTIC_CACHE and prefix in ["response", "intent"]:
                 # Cache sémantique pour réponses et intentions
                 keywords = self._extract_semantic_keywords(data)
                 if keywords:
@@ -177,6 +212,9 @@ class RAGCacheManager:
     
     def _generate_fallback_keys(self, primary_key: str, original_data: Any) -> List[str]:
         """Génère des clés de fallback pour améliorer les hits"""
+        if not self.ENABLE_FALLBACK_KEYS:
+            return []
+        
         fallback_keys = []
         
         if isinstance(original_data, str):
@@ -188,17 +226,75 @@ class RAGCacheManager:
         
         return fallback_keys
     
+    async def _get_memory_usage_mb(self) -> float:
+        """Récupère l'usage mémoire Redis en MB"""
+        try:
+            info = await self.client.info("memory")
+            used_memory = info.get("used_memory", 0)
+            return used_memory / (1024 * 1024)  # Convertir en MB
+        except:
+            return 0.0
+    
+    async def _check_memory_limits(self) -> bool:
+        """Vérifie les limites mémoire et déclenche purge si nécessaire"""
+        now = time.time()
+        
+        # Vérifier seulement toutes les 30 secondes pour éviter overhead
+        if now - self.last_memory_check < 30:
+            return True
+        
+        self.last_memory_check = now
+        
+        try:
+            memory_usage_mb = await self._get_memory_usage_mb()
+            
+            # Log périodique des stats
+            if now - self.last_stats_log > self.STATS_LOG_INTERVAL:
+                self.last_stats_log = now
+                logger.info(f"Cache Redis: {memory_usage_mb:.1f}MB utilisés / {self.TOTAL_MEMORY_LIMIT_MB}MB limite")
+            
+            # Alerte si approche de la limite
+            if memory_usage_mb > self.WARNING_THRESHOLD_MB:
+                self.protection_stats["memory_warnings"] += 1
+                logger.warning(f"Cache Redis proche de la limite: {memory_usage_mb:.1f}MB / {self.TOTAL_MEMORY_LIMIT_MB}MB")
+            
+            # Purge forcée si dépassement
+            if memory_usage_mb > self.PURGE_THRESHOLD_MB and self.ENABLE_AUTO_PURGE:
+                self.protection_stats["auto_purges"] += 1
+                logger.warning(f"Purge automatique déclenchée: {memory_usage_mb:.1f}MB > {self.PURGE_THRESHOLD_MB}MB")
+                
+                # Purger tous les namespaces
+                for namespace in ["response", "search", "intent", "embedding"]:
+                    await self._purge_namespace_lru(namespace, int(self.MAX_KEYS_PER_NAMESPACE * self.LRU_PURGE_RATIO))
+                
+                return True
+            
+            # Rejeter si dépassement critique
+            if memory_usage_mb > self.TOTAL_MEMORY_LIMIT_MB:
+                logger.error(f"Cache Redis saturé: {memory_usage_mb:.1f}MB > {self.TOTAL_MEMORY_LIMIT_MB}MB - Rejet de la nouvelle entrée")
+                return False
+            
+            return True
+            
+        except Exception as e:
+            logger.warning(f"Erreur vérification mémoire Redis: {e}")
+            return True  # fail-open
+    
     async def _check_size_and_namespace_quota(self, namespace: str, serialized_data: bytes) -> bool:
-        """Vérification taille + quota namespace avec purge LRU"""
+        """Vérification taille + quota namespace + limites mémoire"""
         data_size = len(serialized_data)
         
-        # 1. Vérification taille maximale
+        # 1. Vérification taille maximale par valeur
         if data_size > self.MAX_VALUE_BYTES:
             self.protection_stats["oversized_rejects"] += 1
-            logger.warning(f"Valeur rejetée (trop large): {data_size} bytes > {self.MAX_VALUE_BYTES} bytes")
+            logger.warning(f"Valeur rejetée (trop large): {data_size/1024:.1f}KB > {self.MAX_VALUE_BYTES/1024:.1f}KB")
             return False
         
-        # 2. Vérification quota namespace avec purge LRU si nécessaire
+        # 2. Vérification limites mémoire globales
+        if not await self._check_memory_limits():
+            return False
+        
+        # 3. Vérification quota namespace avec purge LRU si nécessaire
         try:
             key_count = 0
             pattern = f"intelia_rag:{namespace}:*"
@@ -209,7 +305,8 @@ class RAGCacheManager:
                 self.protection_stats["namespace_limits_hit"] += 1
                 logger.info(f"Quota namespace {namespace} atteint ({key_count}/{self.MAX_KEYS_PER_NAMESPACE}) - Purge LRU")
                 
-                purged_count = await self._purge_namespace_lru(namespace, key_count // 2)
+                purge_count = int(self.MAX_KEYS_PER_NAMESPACE * self.LRU_PURGE_RATIO)
+                purged_count = await self._purge_namespace_lru(namespace, purge_count)
                 self.protection_stats["lru_purges"] += purged_count
                 
                 if purged_count == 0:
@@ -251,6 +348,29 @@ class RAGCacheManager:
             logger.error(f"Erreur purge LRU namespace {namespace}: {e}")
             return 0
     
+    def _compress_data(self, data: bytes) -> bytes:
+        """Compresse les données si activé"""
+        if not self.ENABLE_COMPRESSION:
+            return data
+        
+        try:
+            compressed = zlib.compress(data)
+            savings = len(data) - len(compressed)
+            self.cache_stats["compression_savings_bytes"] += savings
+            return compressed
+        except:
+            return data
+    
+    def _decompress_data(self, data: bytes) -> bytes:
+        """Décompresse les données si nécessaire"""
+        if not self.ENABLE_COMPRESSION:
+            return data
+        
+        try:
+            return zlib.decompress(data)
+        except:
+            return data
+    
     async def get_embedding(self, text: str) -> Optional[List[float]]:
         """Récupère un embedding depuis le cache avec fallback intelligent"""
         if not self.enabled or not self.client:
@@ -264,7 +384,7 @@ class RAGCacheManager:
             cached = await self.client.get(key)
             
             if cached:
-                decompressed = zlib.decompress(cached)
+                decompressed = self._decompress_data(cached)
                 embedding = pickle.loads(decompressed)
                 self.cache_stats["normalized_hits"] += 1
                 logger.debug(f"Cache HIT (normalisé): embedding pour '{text[:30]}...'")
@@ -275,7 +395,7 @@ class RAGCacheManager:
             for fallback_key in fallback_keys:
                 cached = await self.client.get(fallback_key)
                 if cached:
-                    decompressed = zlib.decompress(cached)
+                    decompressed = self._decompress_data(cached)
                     embedding = pickle.loads(decompressed)
                     self.cache_stats["exact_hits"] += 1
                     logger.debug(f"Cache HIT (fallback): embedding pour '{text[:30]}...'")
@@ -295,7 +415,7 @@ class RAGCacheManager:
         
         try:
             serialized = pickle.dumps(embedding)
-            compressed = zlib.compress(serialized)
+            compressed = self._compress_data(serialized)
             
             if not await self._check_size_and_namespace_quota("embedding", compressed):
                 return
@@ -341,14 +461,15 @@ class RAGCacheManager:
             }
             
             # 1. Essayer cache sémantique d'abord
-            semantic_key = self._generate_key("response", query, use_semantic=True)
-            cached = await self.client.get(semantic_key)
-            
-            if cached:
-                response = cached.decode('utf-8')
-                self.cache_stats["semantic_hits"] += 1
-                logger.info(f"Cache HIT (sémantique): '{query[:30]}...'")
-                return response
+            if self.ENABLE_SEMANTIC_CACHE:
+                semantic_key = self._generate_key("response", query, use_semantic=True)
+                cached = await self.client.get(semantic_key)
+                
+                if cached:
+                    response = cached.decode('utf-8')
+                    self.cache_stats["semantic_hits"] += 1
+                    logger.info(f"Cache HIT (sémantique): '{query[:30]}...'")
+                    return response
             
             # 2. Essayer cache normalisé
             normalized_key = self._generate_key("response", cache_data, use_semantic=False)
@@ -370,7 +491,7 @@ class RAGCacheManager:
                     logger.info(f"Cache HIT (fallback): '{query[:30]}...'")
                     return response
             
-            logger.info(f"Cache MISS: '{query[:30]}...' (keywords: {self._extract_semantic_keywords(query)})")
+            logger.info(f"Cache MISS: '{query[:30]}...'")
                 
         except Exception as e:
             logger.warning(f"Erreur lecture cache réponse: {e}")
@@ -396,15 +517,16 @@ class RAGCacheManager:
                 return
             
             # Stocker avec cache sémantique (prioritaire)
-            keywords = self._extract_semantic_keywords(query)
-            if keywords:
-                semantic_key = self._generate_key("response", query, use_semantic=True)
-                await self.client.setex(
-                    semantic_key,
-                    self.ttl_config["responses"],
-                    response_bytes
-                )
-                logger.debug(f"Cache SET (sémantique): '{query[:30]}...' -> keywords: {keywords}")
+            if self.ENABLE_SEMANTIC_CACHE:
+                keywords = self._extract_semantic_keywords(query)
+                if keywords:
+                    semantic_key = self._generate_key("response", query, use_semantic=True)
+                    await self.client.setex(
+                        semantic_key,
+                        self.ttl_config["responses"],
+                        response_bytes
+                    )
+                    logger.debug(f"Cache SET (sémantique): '{query[:30]}...' -> keywords: {keywords}")
             
             # Stocker aussi avec cache normalisé
             normalized_key = self._generate_key("response", cache_data, use_semantic=False)
@@ -439,7 +561,7 @@ class RAGCacheManager:
             cached = await self.client.get(key)
             
             if cached:
-                decompressed = zlib.decompress(cached)
+                decompressed = self._decompress_data(cached)
                 results = pickle.loads(decompressed)
                 logger.debug("Cache HIT: résultats de recherche")
                 return results
@@ -468,7 +590,7 @@ class RAGCacheManager:
             # Limiter la taille pour éviter OOM
             limited_results = [
                 {
-                    "content": r.get("content", "")[:500],
+                    "content": r.get("content", "")[:self.MAX_SEARCH_CONTENT_LENGTH],
                     "metadata": r.get("metadata", {}),
                     "score": r.get("score", 0.0)
                 }
@@ -476,7 +598,7 @@ class RAGCacheManager:
             ]
             
             serialized = pickle.dumps(limited_results)
-            compressed = zlib.compress(serialized)
+            compressed = self._compress_data(serialized)
             
             if not await self._check_size_and_namespace_quota("search", compressed):
                 return
@@ -503,7 +625,7 @@ class RAGCacheManager:
             cached = await self.client.get(key)
             
             if cached:
-                decompressed = zlib.decompress(cached)
+                decompressed = self._decompress_data(cached)
                 intent_result = pickle.loads(decompressed)
                 logger.debug(f"Cache HIT: analyse d'intention pour '{query[:30]}...'")
                 return intent_result
@@ -525,7 +647,7 @@ class RAGCacheManager:
                 data = intent_result
             
             serialized = pickle.dumps(data)
-            compressed = zlib.compress(serialized)
+            compressed = self._compress_data(serialized)
             
             if not await self._check_size_and_namespace_quota("intent", compressed):
                 return
@@ -551,7 +673,7 @@ class RAGCacheManager:
                     "source": doc.get("source", ""),
                     "genetic_line": doc.get("genetic_line", doc.get("geneticLine", "")),
                     "content_words": len(doc.get("content", "").split()),
-                    "score_rounded": round(doc.get("score", 0.0), 1)  # Arrondir à 1 décimale au lieu de 3
+                    "score_rounded": round(doc.get("score", 0.0), 1)  # Arrondir à 1 décimale
                 }
                 content_summary.append(summary)
             
@@ -587,6 +709,7 @@ class RAGCacheManager:
         
         try:
             info = await self.client.info("memory")
+            memory_usage_mb = await self._get_memory_usage_mb()
             
             # Compter les clés par type
             type_counts = {}
@@ -615,10 +738,20 @@ class RAGCacheManager:
             
             return {
                 "enabled": True,
-                "memory_used": info.get("used_memory_human", "N/A"),
-                "total_keys": await self.client.dbsize(),
-                "type_counts": type_counts,
-                "cache_type_distribution": cache_type_counts,
+                "memory": {
+                    "used_mb": round(memory_usage_mb, 2),
+                    "used_human": info.get("used_memory_human", "N/A"),
+                    "limit_mb": self.TOTAL_MEMORY_LIMIT_MB,
+                    "usage_percent": round((memory_usage_mb / self.TOTAL_MEMORY_LIMIT_MB) * 100, 1),
+                    "warning_threshold_mb": self.WARNING_THRESHOLD_MB,
+                    "purge_threshold_mb": self.PURGE_THRESHOLD_MB
+                },
+                "keys": {
+                    "total": await self.client.dbsize(),
+                    "by_type": type_counts,
+                    "cache_type_distribution": cache_type_counts,
+                    "max_per_namespace": self.MAX_KEYS_PER_NAMESPACE
+                },
                 "hit_statistics": {
                     "total_requests": total_requests,
                     "semantic_hits": self.cache_stats["semantic_hits"],
@@ -628,19 +761,21 @@ class RAGCacheManager:
                     "semantic_hit_rate": round(self.cache_stats["semantic_hits"] / total_requests, 3),
                     "normalized_hit_rate": round(self.cache_stats["normalized_hits"] / total_requests, 3)
                 },
-                "ttl_config": self.ttl_config,
-                "optimization_features": {
-                    "semantic_cache": True,
-                    "text_normalization": True,
-                    "fallback_keys": True,
-                    "poultry_keywords": len(self.poultry_keywords),
-                    "stopwords": len(self.stopwords)
+                "configuration": {
+                    "max_value_kb": round(self.MAX_VALUE_BYTES / 1024, 1),
+                    "ttl_config_hours": {k: round(v/3600, 2) for k, v in self.ttl_config.items()},
+                    "compression_enabled": self.ENABLE_COMPRESSION,
+                    "semantic_cache_enabled": self.ENABLE_SEMANTIC_CACHE,
+                    "fallback_keys_enabled": self.ENABLE_FALLBACK_KEYS,
+                    "auto_purge_enabled": self.ENABLE_AUTO_PURGE,
+                    "lru_purge_ratio": self.LRU_PURGE_RATIO
                 },
-                "protection_config": {
-                    "max_value_bytes": self.MAX_VALUE_BYTES,
-                    "max_keys_per_namespace": self.MAX_KEYS_PER_NAMESPACE
-                },
-                "protection_stats": self.protection_stats
+                "protection_stats": self.protection_stats,
+                "performance": {
+                    "compression_savings_mb": round(self.cache_stats["compression_savings_bytes"] / (1024*1024), 2),
+                    "poultry_keywords_count": len(self.poultry_keywords),
+                    "stopwords_count": len(self.stopwords)
+                }
             }
             
         except Exception as e:
@@ -654,7 +789,7 @@ class RAGCacheManager:
         
         try:
             if target_key_count is None:
-                target_key_count = self.MAX_KEYS_PER_NAMESPACE // 2
+                target_key_count = int(self.MAX_KEYS_PER_NAMESPACE * self.LRU_PURGE_RATIO)
             
             purged = await self._purge_namespace_lru(namespace, target_key_count)
             
@@ -681,10 +816,10 @@ class RAGCacheManager:
                 stats = await self.get_cache_stats()
                 if "hit_statistics" in stats:
                     hit_stats = stats["hit_statistics"]
+                    memory_stats = stats.get("memory", {})
                     logger.info(f"Stats cache finales - Hit rate: {hit_stats['hit_rate']:.1%}, "
-                              f"Semantic: {hit_stats['semantic_hits']}, "
-                              f"Normalized: {hit_stats['normalized_hits']}, "
-                              f"Exact: {hit_stats['exact_hits']}")
+                              f"Mémoire: {memory_stats.get('used_mb', 0):.1f}MB, "
+                              f"Compression: {stats['performance']['compression_savings_mb']:.1f}MB économisés")
                 
                 await self.client.close()
                 logger.info("Connexion Redis fermée")
@@ -692,7 +827,7 @@ class RAGCacheManager:
                 logger.warning(f"Erreur fermeture Redis: {e}")
 
 
-# Classe wrapper pour intégration facile dans RAG Engine
+# Classe wrapper pour intégration facile dans RAG Engine (inchangée)
 class CachedOpenAIEmbedder:
     """Wrapper pour OpenAI Embedder avec cache Redis optimisé"""
     
