@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 redis_cache_manager.py - Gestionnaire de cache Redis optimisé pour performance
-Version corrigée avec support complet des variables d'environnement
-CORRECTIONS APPLIQUÉES: Configuration dynamique via variables d'environnement
+Version Enhanced avec intégration des aliases d'intents.json
+NOUVELLES FONCTIONNALITÉS: Cache sémantique intelligent basé sur configuration métier
 """
 
 import json
@@ -28,7 +28,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 class RAGCacheManager:
-    """Gestionnaire de cache Redis optimisé avec configuration via variables d'environnement"""
+    """Gestionnaire de cache Redis optimisé avec cache sémantique intelligent"""
     
     def __init__(self, redis_url: str = None, default_ttl: int = None):
         # Configuration Redis de base
@@ -59,30 +59,26 @@ class RAGCacheManager:
         
         # Fonctionnalités configurables via variables d'environnement
         self.ENABLE_COMPRESSION = os.getenv("CACHE_ENABLE_COMPRESSION", "false").lower() == "true"
-        self.ENABLE_SEMANTIC_CACHE = os.getenv("CACHE_ENABLE_SEMANTIC", "false").lower() == "true"
-        self.ENABLE_FALLBACK_KEYS = os.getenv("CACHE_ENABLE_FALLBACK", "false").lower() == "true"
+        self.ENABLE_SEMANTIC_CACHE = os.getenv("CACHE_ENABLE_SEMANTIC", "true").lower() == "true"  # Activé par défaut
+        self.ENABLE_FALLBACK_KEYS = os.getenv("CACHE_ENABLE_FALLBACK", "true").lower() == "true"   # Activé par défaut
         self.MAX_SEARCH_CONTENT_LENGTH = int(os.getenv("CACHE_MAX_SEARCH_CONTENT", "300"))
         
         # Configuration purge depuis variables d'environnement
         self.LRU_PURGE_RATIO = float(os.getenv("CACHE_LRU_PURGE_RATIO", "0.4"))
         self.ENABLE_AUTO_PURGE = os.getenv("CACHE_ENABLE_AUTO_PURGE", "true").lower() == "true"
         
-        # Vocabulaire avicole (activé seulement si cache sémantique activé)
-        self.poultry_keywords = {
-            'ross', 'cobb', 'hubbard', 'isa', 'lohmann',
-            'fcr', 'poids', 'weight', 'gain', 'croissance',
-            'poulet', 'chicken', 'poule', 'broiler', 'layer',
-            'starter', 'grower', 'finisher', 'ponte',
-            'indice', 'conversion', '308', '500', '35', '21', '7'
-        } if self.ENABLE_SEMANTIC_CACHE else set()
+        # NOUVEAU: Système d'aliases intelligent
+        self.aliases = self._load_intent_aliases()
+        self.poultry_keywords = self._build_semantic_vocabulary()
         
         # Mots vides (activés seulement si fallback activé)
         self.stopwords = {
             'le', 'la', 'les', 'un', 'une', 'et', 'ou', 'que', 'est', 'pour',
-            'the', 'a', 'and', 'or', 'is', 'are', 'for', 'with', 'in', 'on'
+            'the', 'a', 'and', 'or', 'is', 'are', 'for', 'with', 'in', 'on',
+            'quel', 'quelle', 'quels', 'quelles', 'combien', 'comment'
         } if self.ENABLE_FALLBACK_KEYS else set()
         
-        # Statistiques
+        # Statistiques enrichies
         self.protection_stats = {
             "oversized_rejects": 0,
             "lru_purges": 0,
@@ -94,16 +90,110 @@ class RAGCacheManager:
         self.cache_stats = {
             "exact_hits": 0,
             "semantic_hits": 0,
+            "fallback_hits": 0,
             "total_requests": 0,
-            "saved_operations": 0
+            "saved_operations": 0,
+            "alias_normalizations": 0,
+            "keyword_extractions": 0
         }
         
         # Monitoring
         self.last_memory_check = 0
         self.last_stats_log = 0
     
+    def _load_intent_aliases(self) -> Dict:
+        """Charge les aliases depuis intents.json avec fallback robuste"""
+        try:
+            # Chemins possibles pour intents.json
+            possible_paths = [
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), "intents.json"),
+                "/app/intents.json",
+                "./intents.json",
+                os.path.join(os.getcwd(), "intents.json")
+            ]
+            
+            for path in possible_paths:
+                if os.path.exists(path):
+                    with open(path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        aliases = data.get("aliases", {})
+                        logger.info(f"Aliases chargés depuis {path}: {len(aliases)} catégories")
+                        return aliases
+            
+            logger.warning("intents.json non trouvé dans les chemins standards")
+            return self._get_fallback_aliases()
+            
+        except Exception as e:
+            logger.error(f"Erreur chargement intents.json: {e}")
+            return self._get_fallback_aliases()
+    
+    def _get_fallback_aliases(self) -> Dict:
+        """Aliases de base si intents.json indisponible"""
+        return {
+            "line": {
+                "ross 308": ["ross308", "ross-308", "r308", "ross"],
+                "cobb 500": ["cobb500", "cobb-500", "c500", "cobb"],
+                "hubbard classic": ["classic", "hubbard-classic", "hclassic"]
+            },
+            "phase": {
+                "starter": ["démarrage", "demarrage", "start"],
+                "grower": ["croissance", "grow"],
+                "finisher": ["finition", "finish"]
+            }
+        }
+    
+    def _build_semantic_vocabulary(self) -> Set[str]:
+        """Construit le vocabulaire sémantique enrichi depuis les aliases"""
+        vocabulary = set()
+        
+        # Mots-clés de base aviculture
+        base_keywords = {
+            'ross', 'cobb', 'hubbard', 'isa', 'lohmann',
+            'fcr', 'poids', 'weight', 'gain', 'croissance',
+            'poulet', 'chicken', 'poule', 'broiler', 'layer',
+            'starter', 'grower', 'finisher', 'ponte',
+            'indice', 'conversion', 'alimentaire',
+            'performance', 'rendement', 'efficacite',
+            'optimal', 'objectif', 'target'
+        }
+        vocabulary.update(base_keywords)
+        
+        # NOUVEAU: Enrichissement depuis aliases
+        if self.aliases:
+            for category, aliases_dict in self.aliases.items():
+                if category in ['line', 'phase', 'bird_type', 'site_type']:
+                    # Ajouter les clés principales
+                    for main_term in aliases_dict.keys():
+                        vocabulary.add(self._clean_term(main_term))
+                    
+                    # Ajouter tous les aliases
+                    for main_term, alias_list in aliases_dict.items():
+                        for alias in alias_list:
+                            vocabulary.add(self._clean_term(alias))
+        
+        # Mots-clés métriques aviculture
+        metric_keywords = {
+            'mortality', 'mortalite', 'temperature', 'ventilation',
+            'lighting', 'water', 'feed', 'aliment', 'eau',
+            'ambiance', 'environment', 'welfare', 'biosecurity'
+        }
+        vocabulary.update(metric_keywords)
+        
+        logger.info(f"Vocabulaire sémantique construit: {len(vocabulary)} termes")
+        return vocabulary
+    
+    def _clean_term(self, term: str) -> str:
+        """Nettoie un terme pour l'indexation sémantique"""
+        if not term:
+            return ""
+        # Supprimer caractères spéciaux et normaliser
+        cleaned = re.sub(r'[^\w\s]', '', term.lower().strip())
+        # Supprimer espaces multiples
+        cleaned = re.sub(r'\s+', '', cleaned)
+        return cleaned
+    
     async def initialize(self):
-        """Initialise la connexion Redis avec affichage de la configuration réelle"""
+        """Initialise la connexion Redis avec affichage des optimisations"""
         if not self.enabled:
             logger.warning("Cache Redis désactivé via CACHE_ENABLED=false")
             return
@@ -126,56 +216,95 @@ class RAGCacheManager:
             # Test de connexion
             await self.client.ping()
             
-            # Log de la configuration réelle depuis les variables d'environnement
-            logger.info("Cache Redis initialisé avec configuration:")
+            # Log de la configuration avec nouvelles fonctionnalités
+            logger.info("Cache Redis Enhanced initialisé avec optimisations:")
             logger.info(f"  - Limite valeur: {self.MAX_VALUE_BYTES/1024:.0f} KB")
             logger.info(f"  - Limite clés/namespace: {self.MAX_KEYS_PER_NAMESPACE}")
             logger.info(f"  - Limite mémoire totale: {self.TOTAL_MEMORY_LIMIT_MB} MB")
-            logger.info(f"  - TTL embeddings: {self.ttl_config['embeddings']}s ({self.ttl_config['embeddings']//60}min)")
-            logger.info(f"  - TTL réponses: {self.ttl_config['responses']}s ({self.ttl_config['responses']//60}min)")
-            logger.info(f"  - Compression: {self.ENABLE_COMPRESSION}")
             logger.info(f"  - Cache sémantique: {self.ENABLE_SEMANTIC_CACHE}")
+            logger.info(f"  - Aliases chargés: {len(self.aliases)} catégories")
+            logger.info(f"  - Vocabulaire sémantique: {len(self.poultry_keywords)} termes")
             logger.info(f"  - Clés fallback: {self.ENABLE_FALLBACK_KEYS}")
-            logger.info(f"  - Auto-purge: {self.ENABLE_AUTO_PURGE}")
-            logger.info(f"  - Vocabulaire avicole: {len(self.poultry_keywords)} mots-clés")
+            logger.info(f"  - Compression: {self.ENABLE_COMPRESSION}")
             
         except Exception as e:
             logger.warning(f"Erreur connexion Redis: {e} - cache désactivé")
             self.enabled = False
     
     def _normalize_text(self, text: str) -> str:
-        """Normalisation de texte pour maximiser les cache hits"""
+        """Normalisation enrichie avec aliases intelligents"""
         if not text:
             return ""
         
         # Normalisation de base
         normalized = text.lower().strip()
-        
-        # Suppression espaces multiples et ponctuation finale
         normalized = re.sub(r'\s+', ' ', normalized)
         normalized = re.sub(r'[?!.]+$', '', normalized)
         
-        # Normalisation spécifique aviculture
+        # NOUVEAU: Supprimer mots interrogatifs et articles
+        if self.stopwords:
+            words = normalized.split()
+            filtered_words = [w for w in words if w not in self.stopwords]
+            normalized = ' '.join(filtered_words)
+        
+        # NOUVEAU: Appliquer les aliases de normalisation
+        if self.aliases:
+            normalized = self._apply_aliases(normalized)
+            self.cache_stats["alias_normalizations"] += 1
+        
+        # Normalisation spécifique aviculture étendue
         normalized = re.sub(r'\bjours?\b', 'j', normalized)
         normalized = re.sub(r'\bross\s*308\b', 'ross308', normalized)
         normalized = re.sub(r'\bcobb\s*500\b', 'cobb500', normalized)
-        normalized = re.sub(r'\bindice\s+conversion\b', 'fcr', normalized)
+        normalized = re.sub(r'\b(indice\s+conversion|conversion\s+alimentaire)\b', 'fcr', normalized)
         normalized = re.sub(r'\bà\s+(\d+)\s*j\b', r'\1j', normalized)
         
-        return normalized
+        return normalized.strip()
+    
+    def _apply_aliases(self, text: str) -> str:
+        """Applique intelligemment les aliases de normalisation"""
+        if not self.aliases:
+            return text
+        
+        result = text
+        
+        # Appliquer les aliases de lignées avec patterns flexibles
+        if 'line' in self.aliases:
+            for main_line, aliases in self.aliases['line'].items():
+                main_normalized = main_line.replace(' ', '').lower()
+                
+                # Pattern pour la lignée principale
+                main_pattern = re.escape(main_line.lower())
+                result = re.sub(rf'\b{main_pattern}\b', main_normalized, result)
+                
+                # Patterns pour tous les aliases
+                for alias in aliases:
+                    if alias and len(alias) > 1:  # Éviter les aliases trop courts
+                        alias_pattern = re.escape(alias.lower())
+                        result = re.sub(rf'\b{alias_pattern}\b', main_normalized, result)
+        
+        # Appliquer les aliases de phases
+        if 'phase' in self.aliases:
+            for main_phase, aliases in self.aliases['phase'].items():
+                for alias in aliases:
+                    if alias and len(alias) > 2:
+                        alias_pattern = re.escape(alias.lower())
+                        result = re.sub(rf'\b{alias_pattern}\b', main_phase, result)
+        
+        return result
     
     def _generate_key(self, prefix: str, data: Any, use_semantic: bool = False) -> str:
-        """Génère une clé de cache (simple ou sémantique selon configuration)"""
+        """Génère une clé de cache (simple ou sémantique optimisée)"""
         if isinstance(data, str):
             # Essayer d'abord le cache sémantique si activé
-            if use_semantic and self.ENABLE_SEMANTIC_CACHE and prefix in ["response", "intent"]:
+            if use_semantic and self.ENABLE_SEMANTIC_CACHE and prefix in ["response", "intent", "embedding"]:
                 keywords = self._extract_semantic_keywords_fast(data)
-                if keywords:
+                if keywords and len(keywords) >= 2:  # Minimum 2 keywords pour être sémantique
                     semantic_signature = '|'.join(sorted(keywords))
                     hash_obj = hashlib.md5(semantic_signature.encode('utf-8'))
                     return f"intelia_rag:{prefix}:semantic:{hash_obj.hexdigest()}"
             
-            # Cache normalisé standard
+            # Cache normalisé standard amélioré
             content = self._normalize_text(data)
         elif isinstance(data, dict):
             # Normaliser les dictionnaires contenant des requêtes
@@ -190,35 +319,77 @@ class RAGCacheManager:
         return f"intelia_rag:{prefix}:simple:{hash_obj.hexdigest()}"
     
     def _extract_semantic_keywords_fast(self, text: str) -> Set[str]:
-        """Extraction rapide de keywords sémantiques (si activé)"""
-        if not self.ENABLE_SEMANTIC_CACHE or not self.poultry_keywords:
+        """Extraction avancée de keywords sémantiques avec aliases"""
+        if not self.ENABLE_SEMANTIC_CACHE:
             return set()
         
-        words = set(re.findall(r'\b\w+\b', text.lower()))
+        self.cache_stats["keyword_extractions"] += 1
         
-        # Identifier les mots-clés avicoles
-        poultry_words = words & self.poultry_keywords
+        text_lower = text.lower()
+        words = set(re.findall(r'\b\w+\b', text_lower))
         
-        # Ajouter les nombres (âges, poids, etc.)
+        # Keywords directs depuis vocabulaire
+        direct_keywords = words & self.poultry_keywords
+        
+        # NOUVEAU: Keywords intelligents via aliases
+        alias_keywords = set()
+        if self.aliases:
+            # Chercher des patterns de lignées
+            for main_line, aliases in self.aliases.get('line', {}).items():
+                main_clean = self._clean_term(main_line)
+                # Vérifier si la lignée principale ou un alias est mentionné
+                if any(alias.lower() in text_lower for alias in [main_line] + aliases):
+                    alias_keywords.add(main_clean)
+            
+            # Chercher des patterns de phases
+            for main_phase, aliases in self.aliases.get('phase', {}).items():
+                if any(alias.lower() in text_lower for alias in [main_phase] + aliases):
+                    alias_keywords.add(main_phase)
+        
+        # Numbers contextuels (âges, poids, etc.)
         numbers = set(re.findall(r'\b\d+\b', text))
+        contextual_numbers = set()
+        for num in numbers:
+            # Garder seulement les nombres pertinents pour l'aviculture
+            if 1 <= int(num) <= 500:  # Jours d'âge ou poids en kg
+                contextual_numbers.add(num)
         
-        return poultry_words | numbers
+        # Unités et contextes techniques
+        units = {'j', 'jours', 'days', 'kg', 'g', 'gram', 'grammes', 'semaines', 'weeks'}
+        unit_keywords = words & units
+        
+        # Métriques spécifiques
+        metrics = {'fcr', 'poids', 'weight', 'temperature', 'mortalite', 'mortality'}
+        metric_keywords = words & metrics
+        
+        all_keywords = direct_keywords | alias_keywords | contextual_numbers | unit_keywords | metric_keywords
+        
+        # Log pour debug si beaucoup de keywords
+        if len(all_keywords) > 10:
+            logger.debug(f"Keywords extraits: {all_keywords}")
+        
+        return all_keywords
     
     def _generate_fallback_keys(self, primary_key: str, original_data: Any) -> List[str]:
-        """Génère des clés de fallback si activé"""
+        """Génère des clés de fallback intelligentes"""
         if not self.ENABLE_FALLBACK_KEYS:
             return []
         
         fallback_keys = []
         
         if isinstance(original_data, str):
-            # Version simple sans normalisation complète
+            # Version sans normalisation complète
             simple_normalized = re.sub(r'\s+', ' ', original_data.lower().strip())
             if simple_normalized != self._normalize_text(original_data):
                 simple_hash = hashlib.md5(simple_normalized.encode()).hexdigest()
                 fallback_keys.append(f"intelia_rag:response:fallback:{simple_hash}")
+            
+            # Version sans suppression des mots vides
+            no_stopwords = original_data.lower().strip()
+            no_stopwords_hash = hashlib.md5(no_stopwords.encode()).hexdigest()
+            fallback_keys.append(f"intelia_rag:response:nostop:{no_stopwords_hash}")
         
-        return fallback_keys
+        return fallback_keys[:2]  # Limiter à 2 fallbacks max
     
     async def _get_memory_usage_mb(self) -> float:
         """Récupère l'usage mémoire Redis en MB"""
@@ -245,7 +416,8 @@ class RAGCacheManager:
             # Log périodique selon l'intervalle configuré
             if now - self.last_stats_log > self.STATS_LOG_INTERVAL:
                 self.last_stats_log = now
-                logger.info(f"Cache Redis: {memory_usage_mb:.1f}MB utilisés / {self.TOTAL_MEMORY_LIMIT_MB}MB limite")
+                logger.info(f"Cache Redis Enhanced: {memory_usage_mb:.1f}MB utilisés / {self.TOTAL_MEMORY_LIMIT_MB}MB limite")
+                logger.info(f"Stats sémantiques: {self.cache_stats['semantic_hits']} hits, {self.cache_stats['keyword_extractions']} extractions")
             
             # Alertes selon seuils configurés
             if memory_usage_mb > self.WARNING_THRESHOLD_MB:
@@ -383,25 +555,14 @@ class RAGCacheManager:
             return data
     
     async def get_embedding(self, text: str) -> Optional[List[float]]:
-        """Récupère un embedding avec cache sémantique optionnel"""
+        """Récupère un embedding avec cache sémantique intelligent"""
         if not self.enabled or not self.client:
             return None
         
         self.cache_stats["total_requests"] += 1
         
         try:
-            # Essayer d'abord cache simple
-            key = self._generate_key("embedding", text, use_semantic=False)
-            cached = await self.client.get(key)
-            
-            if cached:
-                decompressed = self._decompress_data(cached)
-                embedding = pickle.loads(decompressed)
-                self.cache_stats["exact_hits"] += 1
-                logger.debug(f"Cache HIT: embedding pour '{text[:30]}...'")
-                return embedding
-            
-            # Essayer cache sémantique si activé
+            # Essayer d'abord cache sémantique
             if self.ENABLE_SEMANTIC_CACHE:
                 semantic_key = self._generate_key("embedding", text, use_semantic=True)
                 cached = await self.client.get(semantic_key)
@@ -413,7 +574,18 @@ class RAGCacheManager:
                     logger.debug(f"Cache HIT (sémantique): embedding pour '{text[:30]}...'")
                     return embedding
             
-            # Fallback keys si activé
+            # Essayer cache simple
+            key = self._generate_key("embedding", text, use_semantic=False)
+            cached = await self.client.get(key)
+            
+            if cached:
+                decompressed = self._decompress_data(cached)
+                embedding = pickle.loads(decompressed)
+                self.cache_stats["exact_hits"] += 1
+                logger.debug(f"Cache HIT: embedding pour '{text[:30]}...'")
+                return embedding
+            
+            # Essayer fallback keys si activé
             if self.ENABLE_FALLBACK_KEYS:
                 fallback_keys = self._generate_fallback_keys(key, text)
                 for fallback_key in fallback_keys:
@@ -421,7 +593,7 @@ class RAGCacheManager:
                     if cached:
                         decompressed = self._decompress_data(cached)
                         embedding = pickle.loads(decompressed)
-                        self.cache_stats["exact_hits"] += 1
+                        self.cache_stats["fallback_hits"] += 1
                         logger.debug(f"Cache HIT (fallback): embedding pour '{text[:30]}...'")
                         return embedding
             
@@ -433,7 +605,7 @@ class RAGCacheManager:
         return None
     
     async def set_embedding(self, text: str, embedding: List[float]):
-        """Met en cache un embedding avec stockage sémantique optionnel"""
+        """Met en cache un embedding avec stockage sémantique intelligent"""
         if not self.enabled or not self.client:
             return
         
@@ -452,15 +624,18 @@ class RAGCacheManager:
                 compressed
             )
             
-            # Stocker aussi avec clé sémantique si activé
+            # Stocker aussi avec clé sémantique si activé et pertinent
             if self.ENABLE_SEMANTIC_CACHE:
-                semantic_key = self._generate_key("embedding", text, use_semantic=True)
-                if semantic_key != key:  # Éviter duplication
-                    await self.client.setex(
-                        semantic_key,
-                        self.ttl_config["embeddings"],
-                        compressed
-                    )
+                keywords = self._extract_semantic_keywords_fast(text)
+                if keywords and len(keywords) >= 2:  # Minimum 2 keywords
+                    semantic_key = self._generate_key("embedding", text, use_semantic=True)
+                    if semantic_key != key:  # Éviter duplication
+                        await self.client.setex(
+                            semantic_key,
+                            self.ttl_config["embeddings"],
+                            compressed
+                        )
+                        logger.debug(f"Cache SET (sémantique): embedding '{text[:30]}...' -> keywords: {list(keywords)[:5]}")
             
             logger.debug(f"Cache SET: embedding pour '{text[:30]}...' ({len(compressed)} bytes)")
             
@@ -482,17 +657,7 @@ class RAGCacheManager:
                 "language": language
             }
             
-            # Essayer cache exact
-            key = self._generate_key("response", cache_data, use_semantic=False)
-            cached = await self.client.get(key)
-            
-            if cached:
-                response = cached.decode('utf-8')
-                self.cache_stats["exact_hits"] += 1
-                logger.info(f"Cache HIT: '{query[:30]}...'")
-                return response
-            
-            # Essayer cache sémantique si activé
+            # Essayer cache sémantique en premier si activé
             if self.ENABLE_SEMANTIC_CACHE:
                 semantic_key = self._generate_key("response", query, use_semantic=True)
                 cached = await self.client.get(semantic_key)
@@ -503,6 +668,27 @@ class RAGCacheManager:
                     logger.info(f"Cache HIT (sémantique): '{query[:30]}...'")
                     return response
             
+            # Essayer cache exact
+            key = self._generate_key("response", cache_data, use_semantic=False)
+            cached = await self.client.get(key)
+            
+            if cached:
+                response = cached.decode('utf-8')
+                self.cache_stats["exact_hits"] += 1
+                logger.info(f"Cache HIT: '{query[:30]}...'")
+                return response
+            
+            # Essayer fallback keys
+            if self.ENABLE_FALLBACK_KEYS:
+                fallback_keys = self._generate_fallback_keys(key, query)
+                for fallback_key in fallback_keys:
+                    cached = await self.client.get(fallback_key)
+                    if cached:
+                        response = cached.decode('utf-8')
+                        self.cache_stats["fallback_hits"] += 1
+                        logger.info(f"Cache HIT (fallback): '{query[:30]}...'")
+                        return response
+            
             logger.info(f"Cache MISS: '{query[:30]}...'")
                 
         except Exception as e:
@@ -512,7 +698,7 @@ class RAGCacheManager:
     
     async def set_response(self, query: str, context_hash: str, 
                           response: str, language: str = "fr"):
-        """Met en cache une réponse avec support sémantique"""
+        """Met en cache une réponse avec support sémantique intelligent"""
         if not self.enabled or not self.client:
             return
         
@@ -536,10 +722,10 @@ class RAGCacheManager:
                 response_bytes
             )
             
-            # Stocker aussi avec cache sémantique si activé
+            # Stocker aussi avec cache sémantique si activé et pertinent
             if self.ENABLE_SEMANTIC_CACHE:
                 keywords = self._extract_semantic_keywords_fast(query)
-                if keywords:
+                if keywords and len(keywords) >= 2:
                     semantic_key = self._generate_key("response", query, use_semantic=True)
                     if semantic_key != key:  # Éviter duplication
                         await self.client.setex(
@@ -547,7 +733,7 @@ class RAGCacheManager:
                             self.ttl_config["responses"],
                             response_bytes
                         )
-                        logger.debug(f"Cache SET (sémantique): '{query[:30]}...' -> keywords: {keywords}")
+                        logger.debug(f"Cache SET (sémantique): '{query[:30]}...' -> keywords: {list(keywords)[:5]}")
             
             logger.debug(f"Cache SET: réponse '{query[:30]}...' ({len(response_bytes)} bytes)")
             
@@ -633,17 +819,7 @@ class RAGCacheManager:
             return None
         
         try:
-            # Cache simple
-            key = self._generate_key("intent", query, use_semantic=False)
-            cached = await self.client.get(key)
-            
-            if cached:
-                decompressed = self._decompress_data(cached)
-                intent_result = pickle.loads(decompressed)
-                logger.debug(f"Cache HIT: analyse d'intention pour '{query[:30]}...'")
-                return intent_result
-            
-            # Cache sémantique si activé
+            # Cache sémantique en premier si activé
             if self.ENABLE_SEMANTIC_CACHE:
                 semantic_key = self._generate_key("intent", query, use_semantic=True)
                 cached = await self.client.get(semantic_key)
@@ -651,8 +827,20 @@ class RAGCacheManager:
                 if cached:
                     decompressed = self._decompress_data(cached)
                     intent_result = pickle.loads(decompressed)
+                    self.cache_stats["semantic_hits"] += 1
                     logger.debug(f"Cache HIT (sémantique): intention pour '{query[:30]}...'")
                     return intent_result
+            
+            # Cache simple
+            key = self._generate_key("intent", query, use_semantic=False)
+            cached = await self.client.get(key)
+            
+            if cached:
+                decompressed = self._decompress_data(cached)
+                intent_result = pickle.loads(decompressed)
+                self.cache_stats["exact_hits"] += 1
+                logger.debug(f"Cache HIT: analyse d'intention pour '{query[:30]}...'")
+                return intent_result
                 
         except Exception as e:
             logger.warning(f"Erreur lecture cache intention: {e}")
@@ -689,15 +877,17 @@ class RAGCacheManager:
                 compressed
             )
             
-            # Stocker cache sémantique si activé
+            # Stocker cache sémantique si activé et pertinent
             if self.ENABLE_SEMANTIC_CACHE:
-                semantic_key = self._generate_key("intent", query, use_semantic=True)
-                if semantic_key != key:
-                    await self.client.setex(
-                        semantic_key,
-                        self.ttl_config["intent_results"],
-                        compressed
-                    )
+                keywords = self._extract_semantic_keywords_fast(query)
+                if keywords and len(keywords) >= 2:
+                    semantic_key = self._generate_key("intent", query, use_semantic=True)
+                    if semantic_key != key:
+                        await self.client.setex(
+                            semantic_key,
+                            self.ttl_config["intent_results"],
+                            compressed
+                        )
             
             logger.debug(f"Cache SET: analyse d'intention '{query[:30]}...' ({len(compressed)} bytes)")
             
@@ -753,7 +943,7 @@ class RAGCacheManager:
             logger.warning(f"Erreur invalidation pattern: {e}")
     
     async def get_cache_stats(self) -> Dict[str, Any]:
-        """Récupère les statistiques complètes du cache"""
+        """Récupère les statistiques complètes du cache enrichi"""
         if not self.enabled or not self.client:
             return {"enabled": False}
         
@@ -766,11 +956,12 @@ class RAGCacheManager:
             total_requests = max(1, self.cache_stats["total_requests"])
             exact_hit_rate = self.cache_stats["exact_hits"] / total_requests
             semantic_hit_rate = self.cache_stats["semantic_hits"] / total_requests
-            total_hit_rate = (self.cache_stats["exact_hits"] + self.cache_stats["semantic_hits"]) / total_requests
+            fallback_hit_rate = self.cache_stats["fallback_hits"] / total_requests
+            total_hit_rate = (self.cache_stats["exact_hits"] + self.cache_stats["semantic_hits"] + self.cache_stats["fallback_hits"]) / total_requests
             
             return {
                 "enabled": True,
-                "approach": "configurable_via_environment_variables",
+                "approach": "enhanced_semantic_cache_with_aliases",
                 "memory": {
                     "used_mb": round(memory_usage_mb, 2),
                     "used_human": info.get("used_memory_human", "N/A"),
@@ -785,8 +976,10 @@ class RAGCacheManager:
                     "total_requests": total_requests,
                     "exact_hits": self.cache_stats["exact_hits"],
                     "semantic_hits": self.cache_stats["semantic_hits"],
+                    "fallback_hits": self.cache_stats["fallback_hits"],
                     "exact_hit_rate": round(exact_hit_rate, 3),
                     "semantic_hit_rate": round(semantic_hit_rate, 3),
+                    "fallback_hit_rate": round(fallback_hit_rate, 3),
                     "total_hit_rate": round(total_hit_rate, 3)
                 },
                 "configuration": {
@@ -795,8 +988,14 @@ class RAGCacheManager:
                     "compression_enabled": self.ENABLE_COMPRESSION,
                     "semantic_cache_enabled": self.ENABLE_SEMANTIC_CACHE,
                     "fallback_keys_enabled": self.ENABLE_FALLBACK_KEYS,
-                    "auto_purge_enabled": self.ENABLE_AUTO_PURGE,
-                    "semantic_keywords_count": len(self.poultry_keywords)
+                    "auto_purge_enabled": self.ENABLE_AUTO_PURGE
+                },
+                "semantic_enhancements": {
+                    "aliases_categories": len(self.aliases),
+                    "vocabulary_size": len(self.poultry_keywords),
+                    "alias_normalizations": self.cache_stats["alias_normalizations"],
+                    "keyword_extractions": self.cache_stats["keyword_extractions"],
+                    "stopwords_count": len(self.stopwords)
                 },
                 "protection_stats": self.protection_stats,
                 "performance": {
@@ -804,7 +1003,8 @@ class RAGCacheManager:
                     "features_enabled": {
                         "compression": self.ENABLE_COMPRESSION,
                         "semantic_cache": self.ENABLE_SEMANTIC_CACHE,
-                        "fallback_keys": self.ENABLE_FALLBACK_KEYS
+                        "fallback_keys": self.ENABLE_FALLBACK_KEYS,
+                        "intelligent_aliases": bool(self.aliases)
                     }
                 }
             }
@@ -812,6 +1012,53 @@ class RAGCacheManager:
         except Exception as e:
             logger.warning(f"Erreur stats cache: {e}")
             return {"enabled": True, "error": str(e)}
+    
+    async def debug_semantic_extraction(self, query: str) -> Dict[str, Any]:
+        """Debug de l'extraction sémantique pour une requête"""
+        try:
+            # Normalisation étapes par étapes
+            original = query
+            normalized = self._normalize_text(query)
+            keywords = self._extract_semantic_keywords_fast(query)
+            
+            # Test génération clés
+            semantic_key = self._generate_key("response", query, use_semantic=True)
+            simple_key = self._generate_key("response", query, use_semantic=False)
+            
+            # Test existence cache
+            semantic_exists = False
+            simple_exists = False
+            if self.client:
+                try:
+                    semantic_cached = await self.client.get(semantic_key)
+                    simple_cached = await self.client.get(simple_key)
+                    semantic_exists = semantic_cached is not None
+                    simple_exists = simple_cached is not None
+                except:
+                    pass
+            
+            return {
+                "original_query": original,
+                "normalized_query": normalized,
+                "extracted_keywords": list(keywords),
+                "keyword_count": len(keywords),
+                "vocabulary_size": len(self.poultry_keywords),
+                "aliases_loaded": len(self.aliases),
+                "cache_keys": {
+                    "semantic": semantic_key[-16:],
+                    "simple": simple_key[-16:],
+                    "semantic_exists": semantic_exists,
+                    "simple_exists": simple_exists
+                },
+                "feature_flags": {
+                    "semantic_enabled": self.ENABLE_SEMANTIC_CACHE,
+                    "fallback_enabled": self.ENABLE_FALLBACK_KEYS,
+                    "compression_enabled": self.ENABLE_COMPRESSION
+                }
+            }
+            
+        except Exception as e:
+            return {"error": str(e)}
     
     async def force_namespace_cleanup(self, namespace: str, target_key_count: int = None) -> Dict[str, int]:
         """Force le nettoyage d'un namespace"""
@@ -854,26 +1101,27 @@ class RAGCacheManager:
                 if "hit_statistics" in stats:
                     hit_stats = stats["hit_statistics"]
                     memory_stats = stats.get("memory", {})
-                    logger.info(f"Stats cache finales - Hit rate total: {hit_stats['total_hit_rate']:.1%}, "
-                              f"Sémantique: {hit_stats['semantic_hit_rate']:.1%}, "
-                              f"Mémoire: {memory_stats.get('used_mb', 0):.1f}MB")
+                    logger.info(f"Stats cache Enhanced finales - Hit rate total: {hit_stats['total_hit_rate']:.1%}")
+                    logger.info(f"  - Exact: {hit_stats['exact_hit_rate']:.1%}, Sémantique: {hit_stats['semantic_hit_rate']:.1%}")
+                    logger.info(f"  - Fallback: {hit_stats['fallback_hit_rate']:.1%}")
+                    logger.info(f"  - Mémoire: {memory_stats.get('used_mb', 0):.1f}MB")
                 
                 await self.client.close()
-                logger.info("Connexion Redis fermée")
+                logger.info("Connexion Redis Enhanced fermée")
             except Exception as e:
                 logger.warning(f"Erreur fermeture Redis: {e}")
 
 
-# Classe wrapper pour intégration dans RAG Engine
+# Classe wrapper pour intégration dans RAG Engine (inchangée)
 class CachedOpenAIEmbedder:
-    """Wrapper pour OpenAI Embedder avec cache Redis configuré"""
+    """Wrapper pour OpenAI Embedder avec cache Redis Enhanced"""
     
     def __init__(self, original_embedder, cache_manager: RAGCacheManager):
         self.original_embedder = original_embedder
         self.cache_manager = cache_manager
     
     async def embed_query(self, text: str) -> List[float]:
-        """Embedding avec cache (simple et sémantique selon configuration)"""
+        """Embedding avec cache sémantique intelligent"""
         # Essayer le cache d'abord
         cached_embedding = await self.cache_manager.get_embedding(text)
         if cached_embedding:

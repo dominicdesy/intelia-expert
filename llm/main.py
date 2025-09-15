@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-main.py - Intelia Expert Backend avec RAG Enhanced intégré
-Version optimisée préservant votre intelligence métier avec RAG Enhanced
-CORRECTIONS APPLIQUÉES:
-- Affichage correct du statut rag_enhanced_enabled
-- Calcul corrigé du temps de traitement
+main.py - Intelia Expert Backend avec RAG Enhanced + Cache Sémantique Intelligent
+Version Enhanced intégrant les aliases d'intents.json pour cache sémantique optimisé
+NOUVELLES FONCTIONNALITÉS:
+- Cache sémantique basé sur aliases métier
+- Debug tools intégrés
+- Métriques de performance étendues
 """
 
 import os
@@ -74,11 +75,14 @@ MAX_CONVERSATION_CONTEXT = int(os.getenv("MAX_CONVERSATION_CONTEXT", "3"))
 USE_AGENT_RAG = os.getenv("USE_AGENT_RAG", "false").lower() == "true"  # Désactivé par défaut
 PREFER_ENHANCED_RAG = os.getenv("PREFER_ENHANCED_RAG", "true").lower() == "true"
 
+# NOUVEAU: Paramètres cache sémantique
+ENABLE_SEMANTIC_DEBUG = os.getenv("ENABLE_SEMANTIC_DEBUG", "true").lower() == "true"
+
 # Validation configuration
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY is required")
 
-logger.info(f"Mode RAG Enhanced: Cache Redis + Recherche Hybride + Guardrails")
+logger.info(f"Mode RAG Enhanced: Cache Sémantique Intelligent + Aliases + Debug Tools")
 
 # Chargement des messages multilingues (votre logique préservée)
 def _load_language_messages(path: str) -> Dict[str, str]:
@@ -174,9 +178,9 @@ def add_to_conversation_memory(tenant_id: str, question: str, answer: str, sourc
     conversation_memory.set(tenant_id, history)
     conversation_memory.update_last_query(tenant_id, question)
 
-# Classe de métriques pour monitoring amélioré - ÉTENDUE pour RAG Enhanced
+# Classe de métriques pour monitoring amélioré - ÉTENDUE pour Cache Sémantique
 class MetricsCollector:
-    """Collecteur de métriques pour monitoring des performances - CORRIGÉ"""
+    """Collecteur de métriques pour monitoring des performances - Version Enhanced"""
     
     def __init__(self):
         self.metrics = {
@@ -191,6 +195,8 @@ class MetricsCollector:
             "verified_responses": 0,
             "cache_hits": 0,
             "cache_misses": 0,
+            "semantic_cache_hits": 0,
+            "fallback_cache_hits": 0,
             "hybrid_searches": 0,
             "guardrail_violations": 0,
             "avg_processing_time": 0.0,
@@ -203,7 +209,7 @@ class MetricsCollector:
         self.endpoint_processing_times = []
     
     def record_query(self, result, source_type: str = "unknown", endpoint_time: float = 0.0):
-        """Enregistre les métriques d'une requête - CORRIGÉ avec temps endpoint"""
+        """Enregistre les métriques d'une requête - Version Enhanced avec cache sémantique"""
         if not ENABLE_METRICS_LOGGING:
             return
         
@@ -233,15 +239,17 @@ class MetricsCollector:
             else:
                 self.metrics["fallback_queries"] += 1
         
-        # Métriques des optimisations
+        # NOUVEAU: Métriques cache sémantique depuis RAG Enhanced
         if hasattr(result, 'metadata') and result.metadata:
             opt_stats = result.metadata.get("optimization_stats", {})
             self.metrics["cache_hits"] += opt_stats.get("cache_hits", 0)
             self.metrics["cache_misses"] += opt_stats.get("cache_misses", 0)
+            self.metrics["semantic_cache_hits"] += opt_stats.get("semantic_cache_hits", 0)
+            self.metrics["fallback_cache_hits"] += opt_stats.get("fallback_cache_hits", 0)
             self.metrics["hybrid_searches"] += opt_stats.get("hybrid_searches", 0)
             self.metrics["guardrail_violations"] += opt_stats.get("guardrail_violations", 0)
         
-        # CORRECTION: Utiliser le temps endpoint si fourni, sinon le temps du résultat
+        # Temps de traitement avec temps endpoint
         processing_time = endpoint_time if endpoint_time > 0 else getattr(result, 'processing_time', 0)
         
         if processing_time > 0:
@@ -265,8 +273,9 @@ class MetricsCollector:
             )
     
     def get_metrics(self) -> Dict:
-        """Retourne les métriques actuelles"""
+        """Retourne les métriques actuelles avec cache sémantique"""
         total_queries = max(1, self.metrics["total_queries"])
+        total_cache_requests = max(1, self.metrics["cache_hits"] + self.metrics["cache_misses"])
         
         return {
             **self.metrics,
@@ -275,9 +284,9 @@ class MetricsCollector:
             ),
             "enhanced_rag_usage_rate": self.metrics["rag_enhanced_queries"] / total_queries,
             "agent_usage_rate": self.metrics["agent_queries"] / total_queries,
-            "cache_hit_rate": (
-                self.metrics["cache_hits"] / max(1, self.metrics["cache_hits"] + self.metrics["cache_misses"])
-            ),
+            "cache_hit_rate": self.metrics["cache_hits"] / total_cache_requests,
+            "semantic_cache_hit_rate": self.metrics["semantic_cache_hits"] / total_cache_requests,
+            "fallback_cache_hit_rate": self.metrics["fallback_cache_hits"] / total_cache_requests,
             "hybrid_search_rate": self.metrics["hybrid_searches"] / total_queries,
             "guardrail_violation_rate": self.metrics["guardrail_violations"] / total_queries
         }
@@ -425,7 +434,7 @@ async def initialize_rag_engines():
     # 1. Initialiser RAG Enhanced (prioritaire)
     if PREFER_ENHANCED_RAG:
         try:
-            logger.info("🚀 Initialisation RAG Engine Enhanced...")
+            logger.info("🚀 Initialisation RAG Engine Enhanced avec Cache Sémantique...")
             
             # Créer client OpenAI async pour RAG Enhanced
             from openai import AsyncOpenAI
@@ -437,20 +446,27 @@ async def initialize_rag_engines():
             optimizations = status.get("optimizations", {})
             
             logger.info(f"✅ RAG Enhanced initialisé:")
-            logger.info(f"   - Cache: {optimizations.get('cache_enabled', False)}")
+            logger.info(f"   - Cache Redis: {optimizations.get('external_cache_enabled', False)}")
+            logger.info(f"   - Cache sémantique: {optimizations.get('semantic_cache_enabled', False)}")
             logger.info(f"   - Recherche hybride: {optimizations.get('hybrid_search_enabled', False)}")
             logger.info(f"   - Enrichissement entités: {optimizations.get('entity_enrichment_enabled', False)}")
             logger.info(f"   - Guardrails: {optimizations.get('guardrails_level', 'unknown')}")
+            
+            # NOUVEAU: Log des stats cache sémantique
+            if rag_engine_enhanced.cache_manager:
+                cache_stats = await rag_engine_enhanced.cache_manager.get_cache_stats()
+                semantic_info = cache_stats.get("semantic_enhancements", {})
+                logger.info(f"   - Aliases chargés: {semantic_info.get('aliases_categories', 0)} catégories")
+                logger.info(f"   - Vocabulaire sémantique: {semantic_info.get('vocabulary_size', 0)} termes")
             
         except Exception as e:
             logger.error(f"❌ Erreur initialisation RAG Enhanced: {e}")
             rag_engine_enhanced = None
     
-    # 2. CORRECTION POINT 2 : Référence OpenAI correcte pour Agent RAG
+    # 2. Agent RAG optionnel
     if USE_AGENT_RAG and AGENT_RAG_AVAILABLE:
         try:
             logger.info("🤖 Initialisation Agent RAG...")
-            # CORRECTION : Utiliser async_openai_client au lieu de openai_client
             from openai import AsyncOpenAI
             async_openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
             agent_rag_engine = await create_agent_rag_engine(async_openai_client)
@@ -462,9 +478,9 @@ async def initialize_rag_engines():
     
     return rag_engine_enhanced
 
-# Fonctions de streaming spécialisées - ADAPTÉES pour RAG Enhanced
+# Fonctions de streaming spécialisées - ADAPTÉES pour RAG Enhanced avec Cache Sémantique
 async def _stream_enhanced_rag_response(rag_result: RAGResult, language: str, tenant_id: str):
-    """Streaming pour réponses RAG Enhanced avec métadonnées"""
+    """Streaming pour réponses RAG Enhanced avec métriques cache sémantique"""
     async def generate():
         try:
             # Informations sur les optimisations utilisées
@@ -479,13 +495,15 @@ async def _stream_enhanced_rag_response(rag_result: RAGResult, language: str, te
                 "processing_time": rag_result.processing_time
             })
             
-            # Optionnel: Montrer les optimisations utilisées
-            if optimizations.get("redis_cache") or optimizations.get("hybrid_search"):
+            # NOUVEAU: Afficher les métriques cache sémantique si disponibles
+            if optimizations.get("external_redis_cache") and metadata.get("cache_stats"):
+                cache_stats = metadata["cache_stats"]
                 yield sse_event({
-                    "type": "optimization_info",
-                    "cache_used": optimizations.get("redis_cache", False),
-                    "hybrid_search": optimizations.get("hybrid_search", False),
-                    "entity_enrichment": optimizations.get("entity_enrichment", False)
+                    "type": "cache_info",
+                    "semantic_hits": cache_stats.get("semantic_hits", 0),
+                    "exact_hits": cache_stats.get("exact_hits", 0),
+                    "fallback_hits": cache_stats.get("fallback_hits", 0),
+                    "keywords_extracted": cache_stats.get("keyword_extractions", 0)
                 })
             
             # Stream de la réponse
@@ -501,15 +519,21 @@ async def _stream_enhanced_rag_response(rag_result: RAGResult, language: str, te
                     })
                     await asyncio.sleep(0.01)  # Smooth streaming
             
-            # Informations finales
-            yield sse_event({
+            # Informations finales avec cache sémantique
+            final_data = {
                 "type": "enhanced_end",
                 "total_time": rag_result.processing_time,
                 "confidence": rag_result.confidence,
                 "documents_used": len(rag_result.context_docs),
                 "verification_status": rag_result.verification_status,
                 "source": rag_result.source.value if rag_result.source else "unknown"
-            })
+            }
+            
+            # Ajouter stats sémantiques si disponibles
+            if metadata.get("semantic_keywords_used"):
+                final_data["semantic_keywords"] = metadata["semantic_keywords_used"]
+            
+            yield sse_event(final_data)
             
             # Enregistrer dans la mémoire
             if rag_result.answer:
@@ -574,7 +598,7 @@ async def _stream_agent_response(agent_result, language: str, tenant_id: str):
 # Gestionnaires de cycle de vie - MODIFIÉS
 async def startup_event():
     """Démarrage de l'application amélioré"""
-    logger.info("🚀 Démarrage Intelia Expert - Version RAG Enhanced")
+    logger.info("🚀 Démarrage Intelia Expert - Version RAG Enhanced avec Cache Sémantique")
     await initialize_rag_engines()
 
 async def shutdown_event():
@@ -605,7 +629,7 @@ async def lifespan(app: FastAPI):
     await shutdown_event()
 
 app = FastAPI(
-    title="Intelia Expert - RAG Enhanced Backend", 
+    title="Intelia Expert - RAG Enhanced Backend avec Cache Sémantique", 
     debug=False, 
     lifespan=lifespan
 )
@@ -623,7 +647,7 @@ router = APIRouter()
 # Routes améliorées
 @router.get("/health")
 def health():
-    """Health check avec status RAG Enhanced détaillé - CORRIGÉ"""
+    """Health check avec status RAG Enhanced et Cache Sémantique détaillé"""
     global rag_engine_enhanced, agent_rag_engine
     
     memory_stats = {
@@ -634,30 +658,39 @@ def health():
     
     health_data = {
         "ok": True,
-        "version": "rag_enhanced_v2.0",
+        "version": "rag_enhanced_semantic_v2.1",
         "memory_stats": memory_stats,
         "performance_metrics": metrics_collector.get_metrics()
     }
     
-    # CORRECTION : Status RAG Enhanced avec rag_enhanced_enabled explicite
+    # Status RAG Enhanced avec cache sémantique
     if rag_engine_enhanced:
         try:
             rag_status = rag_engine_enhanced.get_status()
             health_data.update({
-                "rag_enhanced_enabled": True,  # LIGNE AJOUTÉE EXPLICITEMENT
+                "rag_enhanced_enabled": True,
                 "rag_enhanced_status": rag_status,
                 "optimizations": rag_status.get("optimizations", {}),
                 "components": rag_status.get("components", {}),
                 "degraded_mode": rag_status.get("degraded_mode", False)
             })
+            
+            # NOUVEAU: Stats cache sémantique spécifiques
+            if rag_engine_enhanced.cache_manager:
+                try:
+                    cache_stats = rag_engine_enhanced.cache_manager.get_cache_stats()
+                    health_data["semantic_cache_stats"] = cache_stats.get("semantic_enhancements", {})
+                except:
+                    health_data["semantic_cache_stats"] = {"error": "unavailable"}
+                    
         except Exception as e:
             health_data.update({
-                "rag_enhanced_enabled": False,  # LIGNE AJOUTÉE EXPLICITEMENT
+                "rag_enhanced_enabled": False,
                 "rag_enhanced_error": str(e)
             })
     else:
         health_data.update({
-            "rag_enhanced_enabled": False,  # LIGNE AJOUTÉE EXPLICITEMENT
+            "rag_enhanced_enabled": False,
             "rag_enhanced_status": "not_initialized"
         })
     
@@ -679,13 +712,13 @@ def health():
     
     return health_data
 
-# Route CHAT principale - MODIFICATION MAJEURE POUR RAG ENHANCED AVEC MESURE TEMPS
+# Route CHAT principale - MODIFICATION MAJEURE pour Cache Sémantique
 @router.post(f"{BASE_PATH}/chat")
 async def chat(request: Request):
-    """Chat endpoint avec RAG Enhanced intelligent - AVEC MESURE TEMPS CORRIGÉE"""
+    """Chat endpoint avec RAG Enhanced + Cache Sémantique Intelligent"""
     global rag_engine_enhanced, agent_rag_engine
     
-    # CORRECTION : Mesure du temps total endpoint
+    # Mesure du temps total endpoint
     total_start_time = time.time()
     
     if not rag_engine_enhanced:
@@ -720,7 +753,7 @@ async def chat(request: Request):
             try:
                 agent_result = await agent_rag_engine.process_query_agent(message, language, tenant_id)
                 
-                # CORRECTION : Enregistrer avec temps endpoint
+                # Enregistrer avec temps endpoint
                 total_processing_time = time.time() - total_start_time
                 metrics_collector.record_query(agent_result, "agent_rag", total_processing_time)
                 
@@ -728,10 +761,10 @@ async def chat(request: Request):
             except Exception as e:
                 logger.warning(f"Erreur Agent RAG, fallback vers RAG Enhanced: {e}")
         
-        # 2. Utiliser RAG Enhanced (principal)
+        # 2. Utiliser RAG Enhanced avec Cache Sémantique (principal)
         rag_result = await rag_engine_enhanced.process_query(message, language, tenant_id)
         
-        # CORRECTION : Calculer le temps total de l'endpoint
+        # Calculer le temps total de l'endpoint
         total_processing_time = time.time() - total_start_time
         metrics_collector.record_query(rag_result, "rag_enhanced", total_processing_time)
         
@@ -776,7 +809,7 @@ async def chat(request: Request):
             raise HTTPException(status_code=500, detail="Erreur traitement RAG Enhanced")
         
         else:
-            # Réponse RAG Enhanced normale
+            # Réponse RAG Enhanced normale avec cache sémantique
             return await _stream_enhanced_rag_response(rag_result, language, tenant_id)
             
     except Exception as e:
@@ -811,15 +844,25 @@ async def ood_endpoint(request: Request):
         logger.error(f"Erreur OOD endpoint: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
-# Nouvelles routes pour RAG Enhanced
+# Nouvelles routes pour RAG Enhanced avec Cache Sémantique
 @router.get(f"{BASE_PATH}/rag/status")
 async def rag_status():
-    """Status détaillé du RAG Enhanced"""
+    """Status détaillé du RAG Enhanced avec cache sémantique"""
     if not rag_engine_enhanced:
         return {"error": "RAG Engine Enhanced non initialisé"}
     
     try:
-        return rag_engine_enhanced.get_status()
+        status = rag_engine_enhanced.get_status()
+        
+        # Ajouter stats cache sémantique si disponible
+        if rag_engine_enhanced.cache_manager:
+            try:
+                cache_stats = await rag_engine_enhanced.cache_manager.get_cache_stats()
+                status["cache_stats"] = cache_stats
+            except Exception as e:
+                status["cache_stats_error"] = str(e)
+        
+        return status
     except Exception as e:
         return {"error": str(e)}
 
@@ -833,28 +876,167 @@ async def clear_cache():
         cache_manager = rag_engine_enhanced.cache_manager
         if cache_manager and hasattr(cache_manager, 'invalidate_pattern'):
             await cache_manager.invalidate_pattern("*")
-            return {"status": "cache_cleared"}
+            return {"status": "cache_cleared", "timestamp": time.time()}
         else:
             raise HTTPException(status_code=404, detail="Cache manager non configuré")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# NOUVELLE ROUTE: Debug cache sémantique
+@router.post(f"{BASE_PATH}/debug/semantic-cache")
+async def debug_semantic_cache(request: Request):
+    """Debug du cache sémantique pour analyser les keywords extraits"""
+    if not ENABLE_SEMANTIC_DEBUG:
+        raise HTTPException(status_code=403, detail="Debug sémantique désactivé")
+        
+    if not rag_engine_enhanced or not rag_engine_enhanced.cache_manager:
+        raise HTTPException(status_code=404, detail="Cache non disponible")
+    
+    try:
+        body = await request.json()
+        test_query = body.get("query", "")
+        
+        if not test_query:
+            raise HTTPException(status_code=400, detail="Query manquante")
+        
+        cache_manager = rag_engine_enhanced.cache_manager
+        debug_results = await cache_manager.debug_semantic_extraction(test_query)
+        
+        # Ajouter tests de variations
+        variations = [
+            test_query.replace("ross 308", "ross308"),
+            test_query.replace("FCR", "fcr").replace("indice conversion", "fcr"),
+            test_query.replace("35 jours", "35j"),
+            cache_manager._normalize_text(test_query)
+        ]
+        
+        variation_results = []
+        for i, var in enumerate(variations):
+            if var != test_query:  # Éviter duplicatas
+                var_debug = await cache_manager.debug_semantic_extraction(var)
+                variation_results.append({
+                    "variation_index": i,
+                    "variation": var,
+                    "keywords": var_debug.get("extracted_keywords", []),
+                    "same_semantic_key": var_debug.get("cache_keys", {}).get("semantic") == debug_results.get("cache_keys", {}).get("semantic")
+                })
+        
+        return {
+            "debug_results": debug_results,
+            "variation_tests": variation_results,
+            "test_summary": {
+                "total_variations": len(variation_results),
+                "semantic_matches": sum(1 for v in variation_results if v["same_semantic_key"]),
+                "keywords_overlap": len(set(debug_results.get("extracted_keywords", [])) & 
+                                      set().union(*[set(v["keywords"]) for v in variation_results]))
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur debug: {str(e)}")
+
 @router.get(f"{BASE_PATH}/metrics")
 async def get_metrics():
-    """Endpoint pour récupérer les métriques de performance"""
+    """Endpoint pour récupérer les métriques de performance avec cache sémantique"""
     try:
-        return {
+        base_metrics = {
             "application_metrics": metrics_collector.get_metrics(),
             "system_metrics": {
                 "conversation_memory": {
                     "tenants": len(conversation_memory),
                     "total_exchanges": sum(len(v["data"]) for v in conversation_memory.values())
                 }
-            },
-            "rag_enhanced_metrics": rag_engine_enhanced.get_status().get("metrics", {}) if rag_engine_enhanced else {}
+            }
         }
+        
+        # Ajouter métriques cache sémantique
+        if rag_engine_enhanced and rag_engine_enhanced.cache_manager:
+            try:
+                cache_stats = await rag_engine_enhanced.cache_manager.get_cache_stats()
+                base_metrics["semantic_cache_metrics"] = cache_stats
+            except:
+                base_metrics["semantic_cache_metrics"] = {"error": "unavailable"}
+        
+        # Métriques RAG Enhanced
+        if rag_engine_enhanced:
+            try:
+                rag_metrics = rag_engine_enhanced.get_status().get("metrics", {})
+                base_metrics["rag_enhanced_metrics"] = rag_metrics
+            except:
+                base_metrics["rag_enhanced_metrics"] = {"error": "unavailable"}
+        
+        return base_metrics
     except Exception as e:
         return {"error": str(e)}
+
+# NOUVELLE ROUTE: Test performance cache sémantique
+@router.post(f"{BASE_PATH}/test/semantic-performance")
+async def test_semantic_performance(request: Request):
+    """Test de performance du cache sémantique avec variations de requêtes"""
+    if not ENABLE_SEMANTIC_DEBUG:
+        raise HTTPException(status_code=403, detail="Tests de performance désactivés")
+        
+    if not rag_engine_enhanced:
+        raise HTTPException(status_code=404, detail="RAG Enhanced non disponible")
+    
+    try:
+        body = await request.json()
+        base_query = body.get("base_query", "FCR Ross 308 à 35 jours")
+        test_variations = body.get("variations", [
+            "quel fcr pour ross308 35j",
+            "indice conversion ross 308 35 jours", 
+            "fcr optimal ross308 à 35j ?",
+            "conversion alimentaire r308 35j"
+        ])
+        
+        results = []
+        
+        for i, query in enumerate([base_query] + test_variations):
+            start_time = time.time()
+            
+            # Test si la requête est en cache
+            cache_hit = False
+            if rag_engine_enhanced.cache_manager:
+                cached_response = await rag_engine_enhanced.cache_manager.get_response(query, "test_context", "fr")
+                cache_hit = cached_response is not None
+            
+            # Si pas en cache, traiter la requête pour la mettre en cache
+            if not cache_hit:
+                rag_result = await rag_engine_enhanced.process_query(query, "fr", "test_tenant")
+                processing_time = time.time() - start_time
+            else:
+                processing_time = time.time() - start_time
+            
+            results.append({
+                "query_index": i,
+                "query": query,
+                "cache_hit": cache_hit,
+                "processing_time_ms": round(processing_time * 1000, 2),
+                "is_baseline": i == 0
+            })
+        
+        # Calculer statistiques
+        baseline_time = results[0]["processing_time_ms"]
+        cache_hits = sum(1 for r in results if r["cache_hit"])
+        avg_time = sum(r["processing_time_ms"] for r in results) / len(results)
+        
+        return {
+            "performance_test": {
+                "baseline_query": base_query,
+                "baseline_time_ms": baseline_time,
+                "results": results,
+                "summary": {
+                    "total_queries": len(results),
+                    "cache_hits": cache_hits,
+                    "cache_hit_rate": cache_hits / len(results),
+                    "average_time_ms": round(avg_time, 2),
+                    "speedup_factor": round(baseline_time / avg_time, 2) if avg_time > 0 else 0
+                }
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur test performance: {str(e)}")
 
 # Inclure le router
 app.include_router(router)
