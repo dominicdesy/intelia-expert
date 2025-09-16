@@ -33,9 +33,10 @@ unidecode==1.3.8
 sentence-transformers==3.1.1
 voyageai==0.2.3
 
-# === NOUVEAU: LangSmith pour monitoring LLM ===
-langsmith==0.0.69
+# === CORRIGÉ: LangSmith pour monitoring LLM ===
+# Mise à jour vers versions compatibles
 langchain-core==0.1.16
+langsmith>=0.0.83,<0.1.0
 
 # Utilitaires de base - Versions stables
 numpy>=1.24.0,<2.0.0
@@ -96,7 +97,7 @@ psutil>=5.9.0
 # Torch <2.5.0 : Évite les incompatibilités récentes
 # Numpy <2.0.0 : Évite les breaking changes v2
 # Pydantic <3.0.0 : Reste sur v2 pour stabilité
-# LangSmith 0.0.69 : Monitoring LLM et prompt optimization
+# LangSmith >=0.0.83,<0.1.0 : Compatible avec langchain-core 0.1.16
 
 # ===== VARIABLES D'ENVIRONNEMENT DIGITAL OCEAN =====
 
