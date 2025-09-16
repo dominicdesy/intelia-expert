@@ -331,13 +331,13 @@ class AutomatedIngestionPipeline:
         self.intents_config = self._load_intents_config()
         self.classifier = IntentsBasedClassifier(self.intents_config)
         
-        # Configuration des sources - Quotas agressifs pour 30K documents
+        # Configuration des sources - Quotas équilibrés et stables
         self.sources_config = {
-            SourceType.PUBMED: SourceQuota(2.0, 1000, 10000),      # Plus agressif
-            SourceType.CROSSREF: SourceQuota(5.0, 2000, 20000),    # Très agressif
+            SourceType.PUBMED: SourceQuota(1.5, 800, 8000),        # Optimisé
+            SourceType.CROSSREF: SourceQuota(1.0, 600, 6000),      # Plus conservateur 
             SourceType.FAO_AGRIS: SourceQuota(0.5, 200, 2000),     # Désactivé de facto
-            SourceType.EUROPE_PMC: SourceQuota(3.0, 1500, 15000),  # Plus agressif
-            SourceType.ARXIV: SourceQuota(2.0, 1000, 10000)        # Plus agressif
+            SourceType.EUROPE_PMC: SourceQuota(0.8, 400, 4000),    # Plus conservateur
+            SourceType.ARXIV: SourceQuota(0.5, 300, 3000)          # Plus conservateur
         }
         
         # Statistiques
@@ -759,7 +759,8 @@ class AutomatedIngestionPipeline:
                 logger.info(f"CrossRef: +{len(articles)} traités pour '{query[:30]}...'")
                 
             except Exception as e:
-                logger.warning(f"Erreur requête CrossRef '{query[:30]}...': {e}")
+                logger.error(f"Erreur requête CrossRef '{query[:30]}...': {e}")
+                self.stats["errors"] += 1
         
         return collected
     
@@ -959,7 +960,8 @@ class AutomatedIngestionPipeline:
                 logger.info(f"Europe PMC: +{len(results)} traités pour '{query[:30]}...'")
                 
             except Exception as e:
-                logger.warning(f"Erreur requête Europe PMC '{query[:30]}...': {e}")
+                logger.error(f"Erreur requête Europe PMC '{query[:30]}...': {e}")
+                self.stats["errors"] += 1
         
         return collected
     
@@ -1041,7 +1043,8 @@ class AutomatedIngestionPipeline:
                 logger.info(f"arXiv: +{len(entries) if 'entries' in locals() else 0} traités pour '{query[:30]}...'")
                 
             except Exception as e:
-                logger.warning(f"Erreur requête arXiv '{query[:30]}...': {e}")
+                logger.error(f"Erreur requête arXiv '{query[:30]}...': {e}")
+                self.stats["errors"] += 1
         
         return collected
     
@@ -1072,10 +1075,10 @@ class AutomatedIngestionPipeline:
             logger.error(f"Erreur connexion Weaviate: {e}")
             raise
         
-        # Session HTTP avec timeout adaptatif
-        timeout = aiohttp.ClientTimeout(total=60, connect=15)
+        # Session HTTP avec timeout plus long pour stabilité
+        timeout = aiohttp.ClientTimeout(total=120, connect=30)
         self.session = aiohttp.ClientSession(timeout=timeout)
-        logger.info("Session HTTP initialisée")
+        logger.info("Session HTTP initialisée avec timeouts étendus")
     
     async def _load_deduplication_cache(self):
         """Charge les hashes existants pour éviter les doublons"""

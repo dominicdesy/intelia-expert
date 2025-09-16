@@ -147,7 +147,8 @@ class InteliaRAGEngine:
         try:
             # 1. Cache Redis externe
             if CACHE_ENABLED and EXTERNAL_CACHE_AVAILABLE:
-                self.cache_manager = RAGCacheManager()
+                from redis_cache_manager import RedisCacheManager
+                self.cache_manager = RedisCacheManager()
                 await self.cache_manager.initialize()
                 if self.cache_manager.enabled:
                     self.optimization_stats["external_cache_used"] = True

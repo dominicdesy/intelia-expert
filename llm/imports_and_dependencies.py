@@ -3,6 +3,7 @@
 imports_and_dependencies.py - Gestion robuste des dépendances avec validation stricte
 Version corrigée: Élimination des fallbacks silencieux, validation explicite
 CORRIGÉ: Import wvc_query manquant qui causait l'erreur de démarrage
+CORRIGÉ: Détection modules internes rag_engine et cache_manager
 """
 
 import logging
@@ -244,27 +245,46 @@ class DependencyManager:
             )
             globals()['INTENT_PROCESSOR_AVAILABLE'] = False
         
-        # Autres modules internes...
-        internal_modules = ['utilities', 'embedder', 'rag_engine', 'cache_manager']
+        # CORRECTION: Modules internes avec imports spécifiques
+        internal_modules = {
+            'utilities': 'utilities',
+            'embedder': 'embedder', 
+            'rag_engine': 'rag_engine',
+            'cache_manager': 'redis_cache_manager'  # ← Correction du nom du module
+        }
         
-        for module_name in internal_modules:
+        for display_name, module_name in internal_modules.items():
             try:
-                __import__(module_name)
-                self.dependencies[module_name] = DependencyInfo(
-                    name=module_name,
-                    status=DependencyStatus.AVAILABLE,
-                    is_critical=False
-                )
-                globals()[f'{module_name.upper()}_AVAILABLE'] = True
+                # CORRECTION: Import plus robuste
+                if module_name == 'rag_engine':
+                    # Test d'import spécifique pour rag_engine
+                    from rag_engine import InteliaRAGEngine
+                    test_import = True
+                elif module_name == 'redis_cache_manager':
+                    # Test d'import spécifique pour cache manager
+                    from redis_cache_manager import RedisCacheManager
+                    test_import = True
+                else:
+                    # Import standard pour les autres
+                    __import__(module_name)
+                    test_import = True
+                
+                if test_import:
+                    self.dependencies[display_name] = DependencyInfo(
+                        name=display_name,
+                        status=DependencyStatus.AVAILABLE,
+                        is_critical=False
+                    )
+                    globals()[f'{display_name.upper()}_AVAILABLE'] = True
                 
             except ImportError as e:
-                self.dependencies[module_name] = DependencyInfo(
-                    name=module_name,
+                self.dependencies[display_name] = DependencyInfo(
+                    name=display_name,
                     status=DependencyStatus.MISSING,
                     error_message=str(e),
                     is_critical=False
                 )
-                globals()[f'{module_name.upper()}_AVAILABLE'] = False
+                globals()[f'{display_name.upper()}_AVAILABLE'] = False
     
     def get_openai_sync_client(self):
         """Retourne le client OpenAI synchrone"""
