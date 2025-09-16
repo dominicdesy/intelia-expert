@@ -1,0 +1,19 @@
+{
+  "title": "Do machine learning climate models work in changing climate dynamics?",
+  "authors": [
+    "Maria Conchita Agana Navarro",
+    "Geng Li",
+    "Theo Wolf",
+    "María Pérez-Ortiz"
+  ],
+  "abstract": "Climate change is accelerating the frequency and severity of unprecedented\nevents, deviating from established patterns. Predicting these\nout-of-distribution (OOD) events is critical for assessing risks and guiding\nclimate adaptation. While machine learning (ML) models have shown promise in\nproviding precise, high-speed climate predictions, their ability to generalize\nunder distribution shifts remains a significant limitation that has been\nunderexplored in climate contexts. This research systematically evaluates\nstate-of-the-art ML-based climate models in diverse OOD scenarios by adapting\nestablished OOD evaluation methodologies to climate data. Experiments on\nlarge-scale datasets reveal notable performance variability across scenarios,\nshedding light on the strengths and limitations of current models. These\nfindings underscore the importance of robust evaluation frameworks and provide\nactionable insights to guide the reliable application of ML for climate risk\nforecasting.",
+  "pdf_url": "https://arxiv.org/pdf/2509.12147v1.pdf",
+  "doi": "",
+  "pmcid": "",
+  "source": "arxiv",
+  "year": "2025",
+  "journal": "arXiv preprint",
+  "file_path": "downloaded_pdfs\\arxiv\\arxiv_Do_machine_learning_climate_models_work_in_changing_climate_dynamics_b4dcf696.pdf",
+  "file_size": 677105,
+  "download_timestamp": 1757991590.8507292
+}

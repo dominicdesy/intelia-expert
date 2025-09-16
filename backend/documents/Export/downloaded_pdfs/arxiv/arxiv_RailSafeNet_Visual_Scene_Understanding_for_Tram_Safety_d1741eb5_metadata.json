@@ -1,0 +1,17 @@
+{
+  "title": "RailSafeNet: Visual Scene Understanding for Tram Safety",
+  "authors": [
+    "Ing. Ondrej Valach",
+    "Ing. Ivan Gruber"
+  ],
+  "abstract": "Tram-human interaction safety is an important challenge, given that trams\nfrequently operate in densely populated areas, where collisions can range from\nminor injuries to fatal outcomes. This paper addresses the issue from the\nperspective of designing a solution leveraging digital image processing, deep\nlearning, and artificial intelligence to improve the safety of pedestrians,\ndrivers, cyclists, pets, and tram passengers. We present RailSafeNet, a\nreal-time framework that fuses semantic segmentation, object detection and a\nrule-based Distance Assessor to highlight track intrusions. Using only\nmonocular video, the system identifies rails, localises nearby objects and\nclassifies their risk by comparing projected distances with the standard 1435mm\nrail gauge. Experiments on the diverse RailSem19 dataset show that a\nclass-filtered SegFormer B3 model achieves 65% intersection-over-union (IoU),\nwhile a fine-tuned YOLOv8 attains 75.6% mean average precision (mAP) calculated\nat an intersection over union (IoU) threshold of 0.50. RailSafeNet therefore\ndelivers accurate, annotation-light scene understanding that can warn drivers\nbefore dangerous situations escalate. Code available at\nhttps://github.com/oValach/RailSafeNet.",
+  "pdf_url": "https://arxiv.org/pdf/2509.12125v1.pdf",
+  "doi": "",
+  "pmcid": "",
+  "source": "arxiv",
+  "year": "2025",
+  "journal": "arXiv preprint",
+  "file_path": "downloaded_pdfs\\arxiv\\arxiv_RailSafeNet_Visual_Scene_Understanding_for_Tram_Safety_d1741eb5.pdf",
+  "file_size": 15421741,
+  "download_timestamp": 1757991616.9031286
+}

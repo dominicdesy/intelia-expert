@@ -1,0 +1,16 @@
+{
+  "title": "Single-trace current correlators for 2d models of 4d gluon scattering",
+  "authors": [
+    "Sean Seet"
+  ],
+  "abstract": "Correlators of affine Kac-Moody currents evaluate to a sum over\nmulti-color-trace contributions. We present a `single-trace current system'\ndefined on a genus 0 Riemann surface, whose correlators evaluate to precisely\nthe single-trace term in the evaluation of a standard affine Kac-Moody at level\n1. We demonstrate that using the single-trace current system in genus 0\nBerkovits-Witten twistor string correlators gives pure $\\mathcal{N} = 4$ super\nYang-Mills tree amplitudes, and explain how this works both at the level of the\nstring theory correlator and from the perspective of the effective field\ntheory. We explain how using the single-trace current system in genus 0\ncorrelators of the ambitwistor string gives pure Yang-Mills tree amplitudes,\nand briefly discuss a proposal to go to higher loops.",
+  "pdf_url": "https://arxiv.org/pdf/2509.12200v1.pdf",
+  "doi": "",
+  "pmcid": "",
+  "source": "arxiv",
+  "year": "2025",
+  "journal": "arXiv preprint",
+  "file_path": "downloaded_pdfs\\arxiv\\arxiv_Single-trace_current_correlators_for_2d_models_of_4d_gluon_scattering_643c1fc7.pdf",
+  "file_size": 476536,
+  "download_timestamp": 1757991584.9437156
+}

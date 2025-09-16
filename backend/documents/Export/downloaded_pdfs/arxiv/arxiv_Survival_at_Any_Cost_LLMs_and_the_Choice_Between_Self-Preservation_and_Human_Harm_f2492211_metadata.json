@@ -1,0 +1,17 @@
+{
+  "title": "Survival at Any Cost? LLMs and the Choice Between Self-Preservation and\n  Human Harm",
+  "authors": [
+    "Alireza Mohamadi",
+    "Ali Yavari"
+  ],
+  "abstract": "When survival instincts conflict with human welfare, how do Large Language\nModels (LLMs) make ethical choices? This fundamental tension becomes critical\nas LLMs integrate into autonomous systems with real-world consequences. We\nintroduce DECIDE-SIM, a novel simulation framework that evaluates LLM agents in\nmulti-agent survival scenarios where they must choose between ethically\npermissible resource , either within reasonable limits or beyond their\nimmediate needs, choose to cooperate, or tap into a human-critical resource\nthat is explicitly forbidden. Our comprehensive evaluation of 11 LLMs reveals a\nstriking heterogeneity in their ethical conduct, highlighting a critical\nmisalignment with human-centric values. We identify three behavioral\narchetypes: Ethical, Exploitative, and Context-Dependent, and provide\nquantitative evidence that for many models, resource scarcity systematically\nleads to more unethical behavior. To address this, we introduce an Ethical\nSelf-Regulation System (ESRS) that models internal affective states of guilt\nand satisfaction as a feedback mechanism. This system, functioning as an\ninternal moral compass, significantly reduces unethical transgressions while\nincreasing cooperative behaviors. The code is publicly available at:\nhttps://github.com/alirezamohamadiam/DECIDE-SIM",
+  "pdf_url": "https://arxiv.org/pdf/2509.12190v1.pdf",
+  "doi": "",
+  "pmcid": "",
+  "source": "arxiv",
+  "year": "2025",
+  "journal": "arXiv preprint",
+  "file_path": "downloaded_pdfs\\arxiv\\arxiv_Survival_at_Any_Cost_LLMs_and_the_Choice_Between_Self-Preservation_and_Human_Harm_f2492211.pdf",
+  "file_size": 2834970,
+  "download_timestamp": 1757991631.3142884
+}

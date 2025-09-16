@@ -1,0 +1,22 @@
+{
+  "title": "LazyDrag: Enabling Stable Drag-Based Editing on Multi-Modal Diffusion\n  Transformers via Explicit Correspondence",
+  "authors": [
+    "Zixin Yin",
+    "Xili Dai",
+    "Duomin Wang",
+    "Xianfang Zeng",
+    "Lionel M. Ni",
+    "Gang Yu",
+    "Heung-Yeung Shum"
+  ],
+  "abstract": "The reliance on implicit point matching via attention has become a core\nbottleneck in drag-based editing, resulting in a fundamental compromise on\nweakened inversion strength and costly test-time optimization (TTO). This\ncompromise severely limits the generative capabilities of diffusion models,\nsuppressing high-fidelity inpainting and text-guided creation. In this paper,\nwe introduce LazyDrag, the first drag-based image editing method for\nMulti-Modal Diffusion Transformers, which directly eliminates the reliance on\nimplicit point matching. In concrete terms, our method generates an explicit\ncorrespondence map from user drag inputs as a reliable reference to boost the\nattention control. This reliable reference opens the potential for a stable\nfull-strength inversion process, which is the first in the drag-based editing\ntask. It obviates the necessity for TTO and unlocks the generative capability\nof models. Therefore, LazyDrag naturally unifies precise geometric control with\ntext guidance, enabling complex edits that were previously out of reach:\nopening the mouth of a dog and inpainting its interior, generating new objects\nlike a ``tennis ball'', or for ambiguous drags, making context-aware changes\nlike moving a hand into a pocket. Additionally, LazyDrag supports multi-round\nworkflows with simultaneous move and scale operations. Evaluated on the\nDragBench, our method outperforms baselines in drag accuracy and perceptual\nquality, as validated by VIEScore and human evaluation. LazyDrag not only\nestablishes new state-of-the-art performance, but also paves a new way to\nediting paradigms.",
+  "pdf_url": "https://arxiv.org/pdf/2509.12203v1.pdf",
+  "doi": "",
+  "pmcid": "",
+  "source": "arxiv",
+  "year": "2025",
+  "journal": "arXiv preprint",
+  "file_path": "downloaded_pdfs\\arxiv\\arxiv_LazyDrag_Enabling_Stable_Drag-Based_Editing_on_Multi-Modal_Diffusion_Transformers_via_Explicit_Corre_f5d03c89.pdf",
+  "file_size": 12887277,
+  "download_timestamp": 1757991588.3300073
+}

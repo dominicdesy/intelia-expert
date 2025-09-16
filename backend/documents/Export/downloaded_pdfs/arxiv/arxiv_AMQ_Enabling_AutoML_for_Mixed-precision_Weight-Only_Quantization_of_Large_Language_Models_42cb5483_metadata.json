@@ -1,0 +1,20 @@
+{
+  "title": "AMQ: Enabling AutoML for Mixed-precision Weight-Only Quantization of\n  Large Language Models",
+  "authors": [
+    "Sangjun Lee",
+    "Seung-taek Woo",
+    "Jungyu Jin",
+    "Changhun Lee",
+    "Eunhyeok Park"
+  ],
+  "abstract": "To enable broader deployment of Large Language Models (LLMs), it is essential\nto identify the best-performing model under strict memory constraints. We\npresent AMQ, Automated Mixed-Precision Weight-Only Quantization, a framework\nthat assigns layer-wise quantization bit-widths to optimally balance model\nquality and memory usage. However, the combinatorial search space, with over\n10^{100} possible configurations, makes conventional black-box optimization\ninfeasible. AMQ overcomes this challenge through four key innovations:(1)\nsearch space pruning using prior knowledge to exclude unpromising\nconfigurations, (2) quantization proxy to bypass costly format conversions\nduring search, (3) quality predictor to minimize evaluation overhead, and (4)\niterative search-and-update strategy for fast and stable convergence. By\nintegrating these components, AMQ efficiently explores the quality-efficiency\nlandscape, reaching the Pareto frontier and yielding LLMs that are both compact\nand high-performing. Our code is available at https://github.com/dlwns147/amq.",
+  "pdf_url": "https://arxiv.org/pdf/2509.12019v1.pdf",
+  "doi": "",
+  "pmcid": "",
+  "source": "arxiv",
+  "year": "2025",
+  "journal": "arXiv preprint",
+  "file_path": "downloaded_pdfs\\arxiv\\arxiv_AMQ_Enabling_AutoML_for_Mixed-precision_Weight-Only_Quantization_of_Large_Language_Models_42cb5483.pdf",
+  "file_size": 1271400,
+  "download_timestamp": 1757991621.9193509
+}

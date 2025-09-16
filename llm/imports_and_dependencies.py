@@ -250,7 +250,7 @@ class DependencyManager:
             'utilities': 'utilities',
             'embedder': 'embedder', 
             'rag_engine': 'rag_engine',
-            'cache_manager': 'redis_cache_manager'  # ← Correction du nom du module
+            'cache_manager': 'cache_core'
         }
         
         for display_name, module_name in internal_modules.items():

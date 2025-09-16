@@ -1,0 +1,22 @@
+{
+  "title": "Deriving accurate galaxy cluster masses using X-ray thermodynamic\n  profiles and graph neural networks",
+  "authors": [
+    "Asif Iqbal",
+    "Subhabrata Majumdar",
+    "Elena Rasia",
+    "Gabriel W. Pratt",
+    "Daniel de Andres",
+    "Jean-Baptiste Melin",
+    "Weiguang Cui"
+  ],
+  "abstract": "Precise determination of galaxy cluster masses is crucial for establishing\nreliable mass-observable scaling relations in cluster cosmology. We employ\ngraph neural networks (GNNs) to estimate galaxy cluster masses from radially\nsampled profiles of the intra-cluster medium (ICM) inferred from X-ray\nobservations. GNNs naturally handle inputs of variable length and resolution by\nrepresenting each ICM profile as a graph, enabling accurate and flexible\nmodeling across diverse observational conditions. We trained and tested GNN\nmodel using state-of-the-art hydrodynamical simulations of galaxy clusters from\nThe Three Hundred Project. The mass estimates using our method exhibit no\nsystematic bias compared to the true cluster masses in the simulations.\nAdditionally, we achieve a scatter in recovered mass versus true mass of about\n6\\%, which is a factor of six smaller than obtained from a standard hydrostatic\nequilibrium approach. Our algorithm is robust to both data quality and cluster\nmorphology and it is capable of incorporating model uncertainties alongside\nobservational uncertainties. Finally, we apply our technique to XMM-Newton\nobserved galaxy cluster samples and compare the GNN derived mass estimates with\nthose obtained with $Y_{\\rm SZ}$-M$_{500}$ scaling relations. Our results\nprovide strong evidence, at 5$\\sigma$ level, for a mass-dependent bias in SZ\nderived masses, with higher mass clusters exhibiting a greater degree of\ndeviation. Furthermore, we find the median bias to be $(1-b)=0.85_{-14}^{+34}$,\nalbeit with significant dispersion due to its mass dependence. This work takes\na significant step towards establishing unbiased observable mass scaling\nrelations by integrating X-ray, SZ and optical datasets using deep learning\ntechniques, thereby enhancing the role of galaxy clusters in precision\ncosmology.",
+  "pdf_url": "https://arxiv.org/pdf/2509.12199v1.pdf",
+  "doi": "",
+  "pmcid": "",
+  "source": "arxiv",
+  "year": "2025",
+  "journal": "arXiv preprint",
+  "file_path": "downloaded_pdfs\\arxiv\\arxiv_Deriving_accurate_galaxy_cluster_masses_using_X-ray_thermodynamic_profiles_and_graph_neural_networks_f8b1077a.pdf",
+  "file_size": 2012436,
+  "download_timestamp": 1757991585.5717874
+}

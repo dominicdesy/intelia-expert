@@ -1,0 +1,18 @@
+{
+  "title": "3DViT-GAT: A Unified Atlas-Based 3D Vision Transformer and Graph\n  Learning Framework for Major Depressive Disorder Detection Using Structural\n  MRI Data",
+  "authors": [
+    "Nojod M. Alotaibi",
+    "Areej M. Alhothali",
+    "Manar S. Ali"
+  ],
+  "abstract": "Major depressive disorder (MDD) is a prevalent mental health condition that\nnegatively impacts both individual well-being and global public health.\nAutomated detection of MDD using structural magnetic resonance imaging (sMRI)\nand deep learning (DL) methods holds increasing promise for improving\ndiagnostic accuracy and enabling early intervention. Most existing methods\nemploy either voxel-level features or handcrafted regional representations\nbuilt from predefined brain atlases, limiting their ability to capture complex\nbrain patterns. This paper develops a unified pipeline that utilizes Vision\nTransformers (ViTs) for extracting 3D region embeddings from sMRI data and\nGraph Neural Network (GNN) for classification. We explore two strategies for\ndefining regions: (1) an atlas-based approach using predefined structural and\nfunctional brain atlases, and (2) an cube-based method by which ViTs are\ntrained directly to identify regions from uniformly extracted 3D patches.\nFurther, cosine similarity graphs are generated to model interregional\nrelationships, and guide GNN-based classification. Extensive experiments were\nconducted using the REST-meta-MDD dataset to demonstrate the effectiveness of\nour model. With stratified 10-fold cross-validation, the best model obtained\n78.98% accuracy, 76.54% sensitivity, 81.58% specificity, 81.58% precision, and\n78.98% F1-score. Further, atlas-based models consistently outperformed the\ncube-based approach, highlighting the importance of using domain-specific\nanatomical priors for MDD detection.",
+  "pdf_url": "https://arxiv.org/pdf/2509.12143v1.pdf",
+  "doi": "",
+  "pmcid": "",
+  "source": "arxiv",
+  "year": "2025",
+  "journal": "arXiv preprint",
+  "file_path": "downloaded_pdfs\\arxiv\\arxiv_3DViT-GAT_A_Unified_Atlas-Based_3D_Vision_Transformer_and_Graph_Learning_Framework_for_Major_Depress_c6691d88.pdf",
+  "file_size": 1514390,
+  "download_timestamp": 1757991590.6703477
+}

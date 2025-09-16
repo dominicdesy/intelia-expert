@@ -1,0 +1,19 @@
+{
+  "title": "HoloGarment: 360° Novel View Synthesis of In-the-Wild Garments",
+  "authors": [
+    "Johanna Karras",
+    "Yingwei Li",
+    "Yasamin Jafarian",
+    "Ira Kemelmacher-Shlizerman"
+  ],
+  "abstract": "Novel view synthesis (NVS) of in-the-wild garments is a challenging task due\nsignificant occlusions, complex human poses, and cloth deformations. Prior\nmethods rely on synthetic 3D training data consisting of mostly unoccluded and\nstatic objects, leading to poor generalization on real-world clothing. In this\npaper, we propose HoloGarment (Hologram-Garment), a method that takes 1-3\nimages or a continuous video of a person wearing a garment and generates\n360{\\deg} novel views of the garment in a canonical pose. Our key insight is to\nbridge the domain gap between real and synthetic data with a novel implicit\ntraining paradigm leveraging a combination of large-scale real video data and\nsmall-scale synthetic 3D data to optimize a shared garment embedding space.\nDuring inference, the shared embedding space further enables dynamic\nvideo-to-360{\\deg} NVS through the construction of a garment \"atlas\"\nrepresentation by finetuning a garment embedding on a specific real-world\nvideo. The atlas captures garment-specific geometry and texture across all\nviewpoints, independent of body pose or motion. Extensive experiments show that\nHoloGarment achieves state-of-the-art performance on NVS of in-the-wild\ngarments from images and videos. Notably, our method robustly handles\nchallenging real-world artifacts -- such as wrinkling, pose variation, and\nocclusion -- while maintaining photorealism, view consistency, fine texture\ndetails, and accurate geometry. Visit our project page for additional results:\nhttps://johannakarras.github.io/HoloGarment",
+  "pdf_url": "https://arxiv.org/pdf/2509.12187v1.pdf",
+  "doi": "",
+  "pmcid": "",
+  "source": "arxiv",
+  "year": "2025",
+  "journal": "arXiv preprint",
+  "file_path": "downloaded_pdfs\\arxiv\\arxiv_HoloGarment_360_Novel_View_Synthesis_of_In-the-Wild_Garments_ee68dc67.pdf",
+  "file_size": 14036232,
+  "download_timestamp": 1757991641.1516242
+}

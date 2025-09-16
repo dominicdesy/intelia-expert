@@ -1,0 +1,26 @@
+{
+  "title": "Atacama Cosmology Telescope: Constraints on the Millimetre Flux of the\n  Crab Pulsar",
+  "authors": [
+    "Yilun Guan",
+    "Sigurd Naess",
+    "Ian Niebres",
+    "Louis Branch",
+    "Adam D. Hincks",
+    "Hongbo Cai",
+    "Allen Foster",
+    "Carlos Hervías-Caimapo",
+    "John P. Hughes",
+    "Cristóbal Sifón",
+    "Edward J. Wollack"
+  ],
+  "abstract": "Millimeter-wave observations of pulsars, while crucial for understanding\ntheir emission mechanisms, remain scarce. We demonstrate that high-precision\ncosmic microwave background (CMB) experiments like the Atacama Cosmology\nTelescope (ACT), though designed for cosmology, offer a unique capability for\nsuch time-domain science due to their high cadence and broad sky coverage in\nmillimeter bands. While previous ACT searches have focused on transients\nlasting minutes or longer, we develop and validate analysis methods to search\nfor periodic, millisecond-scale transients, a capability not typically\nassociated with CMB experiments. We describe a phase-resolved mapmaking\napproach, which leverages the known periodicity of the signal to enhance\nsensitivity and offers advantages in diagnosing systematic errors. We also\nintroduce a template-based fit to the raw data timestreams that independently\nvalidate our results. Applying these methods to estimate the millimeter flux of\nthe Crab Pulsar (PSR B0531+21), we derive 95% confidence upper limits of 4.6\nmJy, 4.4 mJy, and 20.7 mJy on the pulsar's period-averaged flux density at 96\nGHz, 148 GHz, and 225 GHz, respectively. These constraints fill a gap in our\nknowledge of the Crab Pulsar's spectral energy distribution, suggesting that it\ndoes not significantly flatten or invert at millimeter wavelengths. This work\ndemonstrates the potential for future searches of short-timescale astrophysical\nphenomena with the next-generation CMB experiments like the Simons Observatory.",
+  "pdf_url": "https://arxiv.org/pdf/2509.11960v1.pdf",
+  "doi": "",
+  "pmcid": "",
+  "source": "arxiv",
+  "year": "2025",
+  "journal": "arXiv preprint",
+  "file_path": "downloaded_pdfs\\arxiv\\arxiv_Atacama_Cosmology_Telescope_Constraints_on_the_Millimetre_Flux_of_the_Crab_Pulsar_bd19418a.pdf",
+  "file_size": 1246526,
+  "download_timestamp": 1757991625.1696062
+}
