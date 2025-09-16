@@ -338,25 +338,17 @@ class InteliaRAGEngine:
     
     # === CORRECTION: CONNEXION WEAVIATE POUR CLOUD ===
     
-
     async def _connect_weaviate(self):
-        """Connexion Weaviate corrigée avec authentification et configuration OpenAI"""
+        """Connexion Weaviate corrigée avec authentification cloud complète"""
         try:
             import weaviate
             
             # Variables d'environnement Weaviate
             weaviate_url = os.getenv("WEAVIATE_URL", "https://xmlc4jvtu6hfw9zrrmnw.c0.us-east1.gcp.weaviate.cloud")
             weaviate_api_key = os.getenv("WEAVIATE_API_KEY", "")
-            openai_api_key = os.getenv("OPENAI_API_KEY", "")
             
             logger.info(f"Tentative de connexion Weaviate: {weaviate_url}")
-            logger.debug(f"Weaviate API Key configurée: {'Oui' if weaviate_api_key else 'Non'}")
-            logger.debug(f"OpenAI API Key configurée: {'Oui' if openai_api_key else 'Non'}")
-            
-            # CORRECTION CRITIQUE: Définir OPENAI_APIKEY pour Weaviate si pas déjà définie
-            if openai_api_key and 'OPENAI_APIKEY' not in os.environ:
-                os.environ['OPENAI_APIKEY'] = openai_api_key
-                logger.debug("Variable OPENAI_APIKEY définie pour compatibilité Weaviate")
+            logger.debug(f"API Key configurée: {'Oui' if weaviate_api_key else 'Non'}")
             
             # Pour une URL cloud Weaviate, utiliser connect_to_weaviate_cloud avec authentification
             if "weaviate.cloud" in weaviate_url:
@@ -364,18 +356,12 @@ class InteliaRAGEngine:
                 
                 if weaviate_api_key:
                     try:
-                        # NOUVEAU: Client v4 avec API Key et headers OpenAI
+                        # NOUVEAU: Client v4 avec API Key
                         import weaviate.classes as wvc
-                        
-                        # Headers personnalisés pour OpenAI
-                        headers = {}
-                        if openai_api_key:
-                            headers['X-OpenAI-Api-Key'] = openai_api_key
-                        
                         self.weaviate_client = weaviate.connect_to_weaviate_cloud(
                             cluster_url=weaviate_url,
                             auth_credentials=wvc.init.Auth.api_key(weaviate_api_key),
-                            headers=headers
+                            headers={}
                         )
                         logger.info("Connexion Weaviate v4 avec API Key réussie")
                         
@@ -384,8 +370,7 @@ class InteliaRAGEngine:
                         # Fallback vers client v3 avec authentification
                         self.weaviate_client = weaviate.Client(
                             url=weaviate_url,
-                            auth_client_secret=weaviate.AuthApiKey(api_key=weaviate_api_key),
-                            additional_headers={'X-OpenAI-Api-Key': openai_api_key} if openai_api_key else {}
+                            auth_client_secret=weaviate.AuthApiKey(api_key=weaviate_api_key)
                         )
                         logger.info("Connexion Weaviate v3 avec API Key réussie")
                         
@@ -395,8 +380,7 @@ class InteliaRAGEngine:
                         try:
                             self.weaviate_client = weaviate.Client(
                                 url=weaviate_url,
-                                auth_client_secret=weaviate.AuthApiKey(api_key=weaviate_api_key),
-                                additional_headers={'X-OpenAI-Api-Key': openai_api_key} if openai_api_key else {}
+                                auth_client_secret=weaviate.AuthApiKey(api_key=weaviate_api_key)
                             )
                             logger.info("Fallback Weaviate v3 avec API Key réussi")
                         except Exception as fallback_error:
@@ -425,17 +409,11 @@ class InteliaRAGEngine:
                     if ready:
                         logger.info(f"Connexion Weaviate opérationnelle: {weaviate_url}")
                         
-                        # CORRECTION: Test de capacités v4 compatible
+                        # Test de capacités supplémentaires
                         try:
-                            # Pour client v4, utiliser .collections au lieu de .schema
-                            if hasattr(self.weaviate_client, 'collections'):
-                                await asyncio.to_thread(lambda: list(self.weaviate_client.collections.list_all()))
-                                logger.info("Permissions Weaviate vérifiées - accès collections OK")
-                            else:
-                                # Fallback pour client v3
-                                await asyncio.to_thread(lambda: self.weaviate_client.schema.get())
-                                logger.info("Permissions Weaviate vérifiées - accès schéma OK")
-                                
+                            # Tester une requête simple pour vérifier les permissions
+                            await asyncio.to_thread(lambda: self.weaviate_client.schema.get())
+                            logger.info("Permissions Weaviate vérifiées - accès schéma OK")
                         except Exception as perm_error:
                             logger.warning(f"Permissions limitées Weaviate: {perm_error}")
                             # Continue quand même, certaines opérations peuvent fonctionner
@@ -454,7 +432,6 @@ class InteliaRAGEngine:
         except Exception as e:
             logger.error(f"Erreur générale connexion Weaviate: {e}")
             self.weaviate_client = None
-
     
     # === MÉTHODES PRINCIPALES AVEC LANGSMITH ===
     
