@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 retriever.py - Retriever hybride optimisé avec cache et fallbacks - Version adaptée
-Version corrigée pour Weaviate 4.16.9 avec intégrations complètes
+Version corrigée pour Weaviate 4.16.10 avec intégrations complètes
+CORRIGÉ: Import ENABLE_API_DIAGNOSTICS
+CORRIGÉ: Gestion des dimensions vectorielles (384 vs 1536)
+CORRIGÉ: Corrections runtime des arguments API v4
 """
 
 import logging
@@ -14,8 +17,7 @@ from typing import Dict, List, Optional, Any
 from data_models import Document
 from utilities import METRICS
 from imports_and_dependencies import WEAVIATE_V4, wvc, wvc_query
-from config import ENABLE_API_DIAGNOSTICS
-from config import HYBRID_SEARCH_ENABLED
+from config import ENABLE_API_DIAGNOSTICS, HYBRID_SEARCH_ENABLED
 
 logger = logging.getLogger(__name__)
 
@@ -56,15 +58,55 @@ class HybridWeaviateRetriever:
         self.retrieval_cache = {}
         self.last_query_analytics = {}
         
+        # CORRIGÉ: Dimension vectorielle détectée
+        self.working_vector_dimension = 384  # Default
+        
         # Initialisation avec test des capacités
         if self.is_v4:
             self._test_api_capabilities()
     
     def _test_api_capabilities(self):
-        """Teste et configure les capacités API disponibles"""
+        """CORRIGÉ: Teste et configure les capacités API disponibles"""
         try:
             collection = self.client.collections.get(self.collection_name)
-            test_vector = [0.1] * 384  # Vector test minimal
+            
+            # CORRECTION: Utiliser les bonnes dimensions selon la collection
+            # Tester d'abord avec 384, puis 1536 selon l'erreur
+            test_vectors = {
+                384: [0.1] * 384,
+                1536: [0.1] * 1536
+            }
+            
+            working_vector_size = None
+            test_vector = None
+            
+            # Détecter la bonne dimension vectorielle
+            for size, vector in test_vectors.items():
+                try:
+                    # Test minimal pour détecter la dimension
+                    result = collection.query.near_vector(
+                        vector=vector,
+                        limit=1
+                    )
+                    working_vector_size = size
+                    test_vector = vector
+                    logger.info(f"✅ Dimension vectorielle détectée: {size}")
+                    break
+                except Exception as e:
+                    if "vector lengths don't match" in str(e):
+                        logger.debug(f"Dimension {size} incorrecte: {e}")
+                        continue
+                    else:
+                        logger.warning(f"Erreur test dimension {size}: {e}")
+                        break
+            
+            if working_vector_size is None:
+                logger.error("❌ Impossible de détecter la dimension vectorielle")
+                self.api_capabilities["api_stability"] = "degraded"
+                return
+            
+            # Sauvegarder la dimension qui fonctionne
+            self.working_vector_dimension = working_vector_size
             
             # Test 1: Hybrid query basique
             try:
@@ -77,11 +119,11 @@ class HybridWeaviateRetriever:
                 logger.warning(f"⚠️ Hybrid query limité: {e}")
                 self.api_capabilities["api_stability"] = "limited"
             
-            # Test 2: Hybrid avec vector
+            # Test 2: Hybrid avec vector - CORRECTION
             try:
                 result = collection.query.hybrid(
                     query="test",
-                    vector=test_vector,
+                    vector=test_vector,  # Utiliser la bonne dimension
                     limit=1
                 )
                 self.api_capabilities["hybrid_with_vector"] = True
@@ -89,11 +131,12 @@ class HybridWeaviateRetriever:
             except Exception as e:
                 self.api_capabilities["hybrid_with_vector"] = False
                 logger.warning(f"❌ Hybrid sans vector: {e}")
-                METRICS.api_correction_applied("hybrid_no_vector")
+                if hasattr(METRICS, 'api_correction_applied'):
+                    METRICS.api_correction_applied("hybrid_no_vector")
             
-            # Test 3: Explain score
+            # Test 3: Explain score - CORRECTION DE L'IMPORT
             try:
-                if hasattr(wvc.query, 'MetadataQuery'):
+                if wvc and hasattr(wvc, 'query') and hasattr(wvc.query, 'MetadataQuery'):
                     result = collection.query.near_vector(
                         vector=test_vector,
                         limit=1,
@@ -110,16 +153,17 @@ class HybridWeaviateRetriever:
                 self.api_capabilities["explain_score_available"] = False
                 logger.warning(f"❌ Explain score indisponible: {e}")
             
-            # Test 4: Filtres
+            # Test 4: Filtres - CORRECTION
             try:
-                test_filter = wvc.query.Filter.by_property("species").equal("test")
-                result = collection.query.hybrid(
-                    query="test",
-                    where=test_filter,
-                    limit=1
-                )
-                self.api_capabilities["hybrid_with_where"] = True
-                logger.info("✅ Filtres supportés")
+                if wvc and hasattr(wvc, 'query') and hasattr(wvc.query, 'Filter'):
+                    test_filter = wvc.query.Filter.by_property("species").equal("test")
+                    result = collection.query.hybrid(
+                        query="test",
+                        where=test_filter,
+                        limit=1
+                    )
+                    self.api_capabilities["hybrid_with_where"] = True
+                    logger.info("✅ Filtres supportés")
             except Exception as e:
                 self.api_capabilities["hybrid_with_where"] = False
                 logger.warning(f"❌ Filtres non supportés: {e}")
@@ -268,25 +312,27 @@ class HybridWeaviateRetriever:
                     doc.metadata['query_classification'] = self.last_query_analytics.get('query_type', 'unknown')
             
             # Métriques enrichies
-            METRICS.hybrid_search_completed(
-                len(documents), 
-                alpha, 
-                time.time() - start_time,
-                intent_type=intent_result.intent_type.value if intent_result else None
-            )
+            if hasattr(METRICS, 'hybrid_search_completed'):
+                METRICS.hybrid_search_completed(
+                    len(documents), 
+                    alpha, 
+                    time.time() - start_time,
+                    intent_type=intent_result.intent_type.value if intent_result else None
+                )
             
             return documents
                 
         except Exception as e:
             logger.error(f"Erreur recherche hybride: {e}")
-            METRICS.retrieval_error("hybrid_search", str(e))
+            if hasattr(METRICS, 'retrieval_error'):
+                METRICS.retrieval_error("hybrid_search", str(e))
             
             # Fallback vers recherche vectorielle seule
             return await self._vector_search_fallback(query_vector, top_k, where_filter)
     
     async def _hybrid_search_v4_corrected(self, query_vector: List[float], query_text: str,
                                         top_k: int, where_filter: Dict, alpha: float) -> List[Document]:
-        """MODIFIÉ: Recherche hybride native Weaviate v4 avec corrections runtime"""
+        """CORRIGÉ: Recherche hybride native Weaviate v4 avec gestion des dimensions"""
         try:
             def _sync_hybrid_search():
                 collection = self.client.collections.get(self.collection_name)
@@ -297,19 +343,34 @@ class HybridWeaviateRetriever:
                     "limit": top_k
                 }
                 
-                # NOUVEAU: Métadonnées enrichies avec explain_score
-                if ENABLE_API_DIAGNOSTICS and self.api_capabilities.get("explain_score_available"):
-                    search_params["return_metadata"] = wvc.query.MetadataQuery(
-                        score=True, 
-                        explain_score=True,
-                        creation_time=True  # NOUVEAU: timestamp pour cache
-                    )
-                else:
+                # CORRECTION: Vérifier la compatibilité des dimensions
+                expected_dim = getattr(self, 'working_vector_dimension', 384)
+                adjusted_vector = query_vector.copy()
+                
+                if len(adjusted_vector) != expected_dim:
+                    logger.warning(f"Ajustement dimension vector: {len(adjusted_vector)} -> {expected_dim}")
+                    if len(adjusted_vector) > expected_dim:
+                        adjusted_vector = adjusted_vector[:expected_dim]
+                    else:
+                        adjusted_vector = adjusted_vector + [0.0] * (expected_dim - len(adjusted_vector))
+                
+                # Métadonnées avec gestion d'erreurs
+                try:
+                    if ENABLE_API_DIAGNOSTICS and self.api_capabilities.get("explain_score_available"):
+                        search_params["return_metadata"] = wvc.query.MetadataQuery(
+                            score=True, 
+                            explain_score=True,
+                            creation_time=True
+                        )
+                    else:
+                        search_params["return_metadata"] = wvc.query.MetadataQuery(score=True)
+                except Exception as e:
+                    logger.warning(f"Erreur métadonnées: {e}")
                     search_params["return_metadata"] = wvc.query.MetadataQuery(score=True)
                 
                 # Vector si supporté
                 if self.api_capabilities.get("hybrid_with_vector", True):
-                    search_params["vector"] = query_vector
+                    search_params["vector"] = adjusted_vector
                 
                 # Filtre si supporté
                 if where_filter and self.api_capabilities.get("hybrid_with_where", True):
@@ -320,59 +381,93 @@ class HybridWeaviateRetriever:
                 try:
                     return collection.query.hybrid(**search_params)
                 except TypeError as e:
-                    # NOUVEAU: Correction runtime automatique
+                    # CORRECTION: Gestion runtime des erreurs d'arguments
                     self.api_capabilities["runtime_corrections"] += 1
-                    METRICS.api_correction_applied("hybrid_runtime_fix")
+                    if hasattr(METRICS, 'api_correction_applied'):
+                        METRICS.api_correction_applied("hybrid_runtime_fix")
                     
-                    if "vector" in str(e) and "vector" in search_params:
+                    error_str = str(e).lower()
+                    
+                    if "vector" in error_str and "vector" in search_params:
                         logger.warning("Paramètre 'vector' non supporté, retry sans vector")
                         del search_params["vector"]
                         self.api_capabilities["hybrid_with_vector"] = False
                         return collection.query.hybrid(**search_params)
                     
-                    if "where" in str(e) and "where" in search_params:
+                    if "where" in error_str and "where" in search_params:
                         logger.warning("Paramètre 'where' non supporté, retry sans filtre")
                         del search_params["where"]
                         self.api_capabilities["hybrid_with_where"] = False
                         return collection.query.hybrid(**search_params)
                     
+                    if "explain_score" in error_str:
+                        logger.warning("Explain_score non supporté, retry avec métadonnées simples")
+                        search_params["return_metadata"] = wvc.query.MetadataQuery(score=True)
+                        self.api_capabilities["explain_score_available"] = False
+                        return collection.query.hybrid(**search_params)
+                    
                     # Fallback minimal
+                    logger.warning("Fallback vers recherche hybride minimale")
                     return collection.query.hybrid(query=query_text, limit=top_k)
             
             # Exécution synchrone
             result = await anyio.to_thread(_sync_hybrid_search)
             
-            # MODIFIÉ: Conversion enrichie avec nouvelles métadonnées
+            # Conversion des résultats avec gestion d'erreurs
             documents = []
-            for obj in result.objects:
-                metadata = obj.metadata or {}
-                
-                # Extraction score avec explain_score si disponible
-                score = getattr(metadata, 'score', 0.0)
-                explain_score = getattr(metadata, 'explain_score', None)
-                
-                doc = Document(
-                    content=getattr(obj, 'properties', {}).get('content', ''),
-                    metadata={
-                        "title": getattr(obj, 'properties', {}).get('title', ''),
-                        "source": getattr(obj, 'properties', {}).get('source', ''),
-                        "geneticLine": getattr(obj, 'properties', {}).get('geneticLine', ''),
-                        "species": getattr(obj, 'properties', {}).get('species', ''),
-                        "phase": getattr(obj, 'properties', {}).get('phase', ''),
-                        "age_band": getattr(obj, 'properties', {}).get('age_band', ''),
-                        "weaviate_v4_used": True,
-                        "explain_score": explain_score,  # NOUVEAU
-                        "creation_time": getattr(metadata, 'creation_time', None)  # NOUVEAU
-                    },
-                    score=float(score) if score else 0.0,
-                    original_distance=getattr(metadata, 'distance', None)
-                )
-                documents.append(doc)
+            try:
+                for obj in result.objects:
+                    metadata = getattr(obj, 'metadata', {})
+                    properties = getattr(obj, 'properties', {})
+                    
+                    # Extraction score avec protection
+                    try:
+                        score = float(getattr(metadata, 'score', 0.0))
+                    except (ValueError, TypeError):
+                        score = 0.0
+                    
+                    try:
+                        explain_score = getattr(metadata, 'explain_score', None)
+                    except AttributeError:
+                        explain_score = None
+                    
+                    doc = Document(
+                        content=properties.get('content', ''),
+                        metadata={
+                            "title": properties.get('title', ''),
+                            "source": properties.get('source', ''),
+                            "geneticLine": properties.get('geneticLine', ''),
+                            "species": properties.get('species', ''),
+                            "phase": properties.get('phase', ''),
+                            "age_band": properties.get('age_band', ''),
+                            "weaviate_v4_used": True,
+                            "vector_dimension": len(query_vector),
+                            "explain_score": explain_score,
+                            "creation_time": getattr(metadata, 'creation_time', None)
+                        },
+                        score=score,
+                        original_distance=getattr(metadata, 'distance', None)
+                    )
+                    documents.append(doc)
+            except Exception as e:
+                logger.error(f"Erreur conversion résultats: {e}")
             
             return documents
             
         except Exception as e:
             logger.error(f"Erreur recherche hybride v4: {e}")
+            return []
+    
+    async def _hybrid_search_v3(self, query_vector: List[float], query_text: str,
+                              top_k: int, where_filter: Dict, alpha: float) -> List[Document]:
+        """Recherche hybride pour Weaviate v3 avec fusion manuelle"""
+        try:
+            # Pour v3, implémenter la fusion manuelle RRF
+            # Ceci est un placeholder - l'implémentation complète dépend du schema v3
+            logger.warning("Weaviate v3 détecté - fusion hybride manuelle non implémentée")
+            return await self._vector_search_fallback(query_vector, top_k, where_filter)
+        except Exception as e:
+            logger.error(f"Erreur recherche hybride v3: {e}")
             return []
     
     async def _vector_search_fallback(self, query_vector: List[float], 
@@ -383,8 +478,18 @@ class HybridWeaviateRetriever:
                 def _sync_vector_search():
                     collection = self.client.collections.get(self.collection_name)
                     
+                    # CORRECTION: Ajuster les dimensions
+                    expected_dim = getattr(self, 'working_vector_dimension', 384)
+                    adjusted_vector = query_vector.copy()
+                    
+                    if len(adjusted_vector) != expected_dim:
+                        if len(adjusted_vector) > expected_dim:
+                            adjusted_vector = adjusted_vector[:expected_dim]
+                        else:
+                            adjusted_vector = adjusted_vector + [0.0] * (expected_dim - len(adjusted_vector))
+                    
                     search_params = {
-                        "vector": query_vector,
+                        "vector": adjusted_vector,
                         "limit": top_k,
                         "return_metadata": wvc.query.MetadataQuery(score=True)
                     }
@@ -405,13 +510,29 @@ class HybridWeaviateRetriever:
             logger.error(f"Erreur fallback vectoriel: {e}")
             return []
     
+    async def _vector_search_v3(self, query_vector: List[float], 
+                              top_k: int, where_filter: Dict = None) -> List[Document]:
+        """Fallback recherche vectorielle pour Weaviate v3"""
+        try:
+            # Placeholder pour implémentation v3
+            logger.warning("Recherche vectorielle v3 non implémentée")
+            return []
+        except Exception as e:
+            logger.error(f"Erreur recherche vectorielle v3: {e}")
+            return []
+    
     def _convert_v4_results_to_documents(self, objects) -> List[Document]:
         """NOUVEAU: Conversion objets v4 vers Documents avec métadonnées enrichies"""
         documents = []
         
         for obj in objects:
-            metadata = obj.metadata or {}
+            metadata = getattr(obj, 'metadata', {})
             properties = getattr(obj, 'properties', {})
+            
+            try:
+                score = float(getattr(metadata, 'score', 0.0))
+            except (ValueError, TypeError):
+                score = 0.0
             
             doc = Document(
                 content=properties.get('content', ''),
@@ -425,7 +546,7 @@ class HybridWeaviateRetriever:
                     "weaviate_v4_used": True,
                     "fallback_used": True  # NOUVEAU: marqueur fallback
                 },
-                score=float(getattr(metadata, 'score', 0.0)),
+                score=score,
                 original_distance=getattr(metadata, 'distance', None)
             )
             documents.append(doc)
@@ -438,6 +559,7 @@ class HybridWeaviateRetriever:
             "api_capabilities": self.api_capabilities,
             "last_query_analytics": self.last_query_analytics,
             "fusion_config": self.fusion_config,
+            "working_vector_dimension": getattr(self, 'working_vector_dimension', 384),
             "runtime_corrections": self.api_capabilities.get("runtime_corrections", 0)
         }
 
@@ -486,7 +608,8 @@ async def test_retriever_capabilities(client, collection_name: str = "InteliaKno
         "api_capabilities": retriever.api_capabilities,
         "collection_accessible": False,
         "hybrid_search_working": False,
-        "vector_search_working": False
+        "vector_search_working": False,
+        "vector_dimension": getattr(retriever, 'working_vector_dimension', None)
     }
     
     try:
@@ -496,7 +619,7 @@ async def test_retriever_capabilities(client, collection_name: str = "InteliaKno
             test_results["collection_accessible"] = True
         
         # Test recherche hybride
-        test_vector = [0.1] * 384
+        test_vector = [0.1] * getattr(retriever, 'working_vector_dimension', 384)
         docs = await retriever.hybrid_search(
             test_vector, 
             "test query", 

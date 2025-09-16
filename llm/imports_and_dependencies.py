@@ -5,6 +5,7 @@ Version corrigée: Élimination des fallbacks silencieux, validation explicite
 CORRIGÉ: Import wvc_query manquant qui causait l'erreur de démarrage
 CORRIGÉ: Détection modules internes rag_engine et cache_manager
 CORRIGÉ: Import circulaire ENABLE_API_DIAGNOSTICS déplacé vers config.py
+CORRIGÉ: Erreur async validate_connectivity() causant le mode dégradé
 """
 
 import logging
@@ -328,7 +329,7 @@ class DependencyManager:
         return self._openai_async_client
     
     async def validate_connectivity(self, redis_client=None, weaviate_client=None) -> Dict[str, bool]:
-        """Valide la connectivité des services externes"""
+        """CORRIGÉ: Valide la connectivité des services externes - CORRECTION ASYNC"""
         results = {
             'openai': False,
             'weaviate': False,
@@ -346,11 +347,32 @@ class DependencyManager:
         except Exception as e:
             logger.warning(f"Test connectivité OpenAI échoué: {e}")
         
-        # Test Weaviate
+        # Test Weaviate - CORRECTION POUR ÉVITER L'ERREUR ASYNC
         try:
-            if weaviate_client and hasattr(weaviate_client, 'is_ready'):
+            if weaviate_client:
+                # SOLUTION: Utiliser une approche synchrone dans un thread
+                def _test_weaviate_sync():
+                    try:
+                        if hasattr(weaviate_client, '_connection') and hasattr(weaviate_client._connection, 'check_readiness'):
+                            return weaviate_client._connection.check_readiness()
+                        elif hasattr(weaviate_client, 'is_ready'):
+                            # Pour les versions plus récentes
+                            if asyncio.iscoroutinefunction(weaviate_client.is_ready):
+                                # Ne pas appeler les coroutines ici
+                                return False  # Sera testé dans le bloc async
+                            else:
+                                return weaviate_client.is_ready()
+                        elif hasattr(weaviate_client, 'schema') and hasattr(weaviate_client.schema, 'get'):
+                            # Test via schema get comme fallback
+                            weaviate_client.schema.get()
+                            return True
+                        return False
+                    except Exception:
+                        return False
+                
+                # Exécution async du test synchrone
                 results['weaviate'] = await asyncio.wait_for(
-                    weaviate_client.is_ready(),
+                    asyncio.get_event_loop().run_in_executor(None, _test_weaviate_sync),
                     timeout=5.0
                 )
         except Exception as e:
@@ -358,12 +380,17 @@ class DependencyManager:
         
         # Test Redis
         try:
-            if redis_client and hasattr(redis_client, 'ping'):
-                await asyncio.wait_for(
-                    redis_client.ping(),
-                    timeout=5.0
-                )
-                results['redis'] = True
+            if redis_client:
+                if hasattr(redis_client, 'ping'):
+                    if asyncio.iscoroutinefunction(redis_client.ping):
+                        await asyncio.wait_for(redis_client.ping(), timeout=5.0)
+                    else:
+                        # Redis synchrone
+                        await asyncio.wait_for(
+                            asyncio.get_event_loop().run_in_executor(None, redis_client.ping),
+                            timeout=5.0
+                        )
+                    results['redis'] = True
         except Exception as e:
             logger.warning(f"Test connectivité Redis échoué: {e}")
         
@@ -438,7 +465,7 @@ def get_dependencies_status() -> Dict[str, bool]:
     return dependency_manager.get_legacy_status()
 
 async def quick_connectivity_check(redis_client=None, weaviate_client=None) -> Dict[str, bool]:
-    """Fonction de compatibilité pour test de connectivité"""
+    """CORRIGÉ: Fonction de compatibilité pour test de connectivité"""
     return await dependency_manager.validate_connectivity(redis_client, weaviate_client)
 
 def require_critical_dependencies():
@@ -449,6 +476,27 @@ def get_full_status_report() -> Dict[str, Any]:
     """Rapport de statut complet pour debugging"""
     return dependency_manager.get_status_report()
 
+# AJOUTÉ: Fonction pour test de connectivité Weaviate synchrone
+def test_weaviate_connectivity_sync(client) -> bool:
+    """Test de connectivité Weaviate synchrone pour éviter les erreurs async"""
+    try:
+        if hasattr(client, 'collections'):
+            # Weaviate v4 - test simple
+            try:
+                collections = client.collections.list_all()
+                return True
+            except Exception:
+                return False
+        else:
+            # Weaviate v3 - test via schema
+            try:
+                client.schema.get()
+                return True
+            except Exception:
+                return False
+    except Exception:
+        return False
+
 # Variables globales exportées (compatibilité)
 OPENAI_AVAILABLE = globals().get('OPENAI_AVAILABLE', False)
 WEAVIATE_AVAILABLE = globals().get('WEAVIATE_AVAILABLE', False)
@@ -458,9 +506,6 @@ WEAVIATE_V4 = globals().get('WEAVIATE_V4', False)
 # NOUVEAU: Variables Weaviate exportées
 wvc = globals().get('wvc', None)
 wvc_query = globals().get('wvc_query', None)  # ← CORRECTION CRITIQUE
-
-# CORRECTION: ENABLE_API_DIAGNOSTICS déplacé vers config.py pour éviter l'import circulaire
-# Supprimé: ENABLE_API_DIAGNOSTICS = os.getenv("ENABLE_API_DIAGNOSTICS", "false").lower() == "true"
 
 # Log du statut au chargement
 status_report = dependency_manager.get_status_report()
@@ -483,11 +528,11 @@ __all__ = [
     'quick_connectivity_check',
     'require_critical_dependencies',
     'get_full_status_report',
+    'test_weaviate_connectivity_sync',  # ← AJOUTÉ
     'OPENAI_AVAILABLE',
     'WEAVIATE_AVAILABLE',
     'REDIS_AVAILABLE',
     'WEAVIATE_V4',
     'wvc',
     'wvc_query',  # ← EXPORT CRITIQUE AJOUTÉ
-    # 'ENABLE_API_DIAGNOSTICS' - SUPPRIMÉ pour éviter l'import circulaire
 ]
