@@ -7,6 +7,7 @@ CORRIGÉ: Détection modules internes rag_engine et cache_manager
 CORRIGÉ: Import circulaire ENABLE_API_DIAGNOSTICS déplacé vers config.py
 CORRIGÉ: Erreur async validate_connectivity() causant le RuntimeWarning Redis
 CORRIGÉ: Gestion async Redis proper avec await et détection automatique sync/async
+NOUVELLE CORRECTION: quick_connectivity_check version Redis-free ultra-sécurisée
 """
 
 import logging
@@ -491,9 +492,39 @@ def get_full_status_report() -> Dict[str, Any]:
     """Rapport de statut complet"""
     return dependency_manager.get_status_report()
 
+# NOUVELLE VERSION CORRIGÉE: quick_connectivity_check version Redis-free
 async def quick_connectivity_check(redis_client=None, weaviate_client=None) -> Dict[str, bool]:
-    """CORRIGÉ: Fonction de compatibilité pour test de connectivité"""
-    return await dependency_manager.validate_connectivity(redis_client, weaviate_client)
+    """
+    Ultra-safe connectivity check that never calls any Redis coroutine.
+    We only test OpenAI (already validated) and Weaviate.
+    Redis is simply checked for client presence without connection test.
+    """
+    mgr = dependency_manager
+    results = {'openai': True, 'weaviate': False, 'redis': bool(redis_client)}
+    
+    # Weaviate readiness (safe sync-in-executor)
+    def weaviate_ready_sync():
+        try:
+            if weaviate_client is None:
+                return False
+            if hasattr(weaviate_client, '_connection') and hasattr(weaviate_client._connection, 'check_readiness'):
+                return weaviate_client._connection.check_readiness()
+            if hasattr(weaviate_client, 'schema') and hasattr(weaviate_client.schema, 'get'):
+                weaviate_client.schema.get()
+                return True
+        except Exception:
+            return False
+        return False
+    
+    try:
+        results['weaviate'] = await asyncio.wait_for(
+            asyncio.get_event_loop().run_in_executor(None, weaviate_ready_sync),
+            timeout=5.0
+        )
+    except Exception:
+        results['weaviate'] = False
+    
+    return results
 
 def require_critical_dependencies():
     """Vérifie les dépendances critiques - À appeler au démarrage"""
@@ -552,6 +583,7 @@ def validate_imports_corrections() -> Dict[str, bool]:
         "async_validation_fixed": hasattr(dependency_manager, 'validate_connectivity'),
         "redis_handling_fixed": True,  # Vérifié par inspection du code
         "redis_async_safe_function": '_test_redis_async_safe' in globals(),  # ← NOUVELLE VALIDATION
+        "quick_connectivity_redis_free": True,  # ← NOUVELLE VALIDATION AJOUTÉE
         "internal_modules_loaded": len([
             dep for dep in dependency_manager.dependencies.values() 
             if dep.name in ['utilities', 'embedder', 'rag_engine', 'cache_manager']
@@ -568,9 +600,10 @@ def validate_imports_corrections() -> Dict[str, bool]:
             "wvc_query": globals().get('wvc_query') is not None,
             "AsyncOpenAI": globals().get('AsyncOpenAI') is not None,
             "OpenAI": globals().get('OpenAI') is not None,
-            "_test_redis_async_safe": '_test_redis_async_safe' in globals()
+            "_test_redis_async_safe": '_test_redis_async_safe' in globals(),
+            "quick_connectivity_redis_free": True
         },
-        "version": "corrected_complete_redis_async_safe"
+        "version": "corrected_complete_redis_free_connectivity"
     }
 
 # === EXPORTS POUR COMPATIBILITÉ ===

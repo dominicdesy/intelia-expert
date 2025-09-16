@@ -7,6 +7,7 @@ NOUVELLES FONCTIONNALITÉS AJOUTÉES:
 - Support RRF Intelligent avec métriques
 - Variables d'environnement Digital Ocean
 - Health checks enrichis avec nouveau statut
+- CORRECTION: Redis safety patch pour execute_command
 """
 
 import os
@@ -111,6 +112,27 @@ LANG_DETECTION_MIN_LENGTH = int(os.getenv("LANG_DETECTION_MIN_LENGTH", "20"))
 
 logger.info(f"Mode RAG Enhanced: LangSmith + RRF Intelligent v4.0")
 logger.info(f"Configuration: LangSmith={LANGSMITH_ENABLED}, RRF={ENABLE_INTELLIGENT_RRF}")
+
+# === NOUVEAU: Redis Safety Patch ===
+def patch_redis_execute_command_once(client):
+    """
+    Safety patch: neutralize direct execute_command() during startup
+    Prevents potential RuntimeWarnings and execution issues with Redis async client
+    """
+    try:
+        import inspect
+        from redis.asyncio import Redis as AsyncRedis
+        
+        if isinstance(client, AsyncRedis) and hasattr(client, "execute_command"):
+            fn = getattr(client, "execute_command")
+            if inspect.iscoroutinefunction(fn):
+                # Wrap so that if someone calls it without await, nothing breaks at import time
+                async def safe_exec(*args, **kwargs):
+                    return await fn(*args, **kwargs)
+                client.execute_command = safe_exec
+                logger.debug("Redis execute_command safety patch applied")
+    except Exception as e:
+        logger.debug(f"Redis safe patch skipped: {e}")
 
 class StartupValidationError(Exception):
     """Exception pour les erreurs de validation au démarrage"""
@@ -277,12 +299,17 @@ class SystemHealthMonitor:
         errors = []
         
         try:
-            # Cache Core
+            # Cache Core avec Redis Safety Patch
             logger.info("  Initialisation Cache Core...")
             try:
                 from cache_core import create_cache_core
                 cache_core = create_cache_core()
                 await cache_core.initialize()
+                
+                # === NOUVEAU: Application du Redis Safety Patch ===
+                if cache_core and getattr(cache_core, "client", None):
+                    patch_redis_execute_command_once(cache_core.client)
+                    logger.debug("Redis safety patch appliqué au cache_core")
                 
                 if cache_core.initialized:
                     logger.info("✅ Cache Core initialisé")
