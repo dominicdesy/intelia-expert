@@ -2,7 +2,7 @@
 """
 config.py - Configuration centralisée avec support LangSmith et RRF Intelligent
 Optimisé pour Digital Ocean App Platform
-Version corrigée: Ajout des variables manquantes pour la détection de langue
+Version corrigée: Ajout ENTITY_CONTEXTS manquant pour le système RAG
 """
 
 import os
@@ -69,6 +69,58 @@ OOD_STRICT_SCORE = float(os.getenv("OOD_STRICT_SCORE", "0.7"))
 # ===== ENRICHISSEMENTS ET FONCTIONNALITÉS =====
 ENTITY_ENRICHMENT_ENABLED = os.getenv("ENTITY_ENRICHMENT_ENABLED", "true").lower() == "true"
 ENABLE_API_DIAGNOSTICS = os.getenv("ENABLE_API_DIAGNOSTICS", "true").lower() == "true"
+
+# ===== ENTITY_CONTEXTS - CONFIGURATION MANQUANTE CRITIQUE =====
+ENTITY_CONTEXTS = {
+    "line": {
+        "ross 308": "lignée à croissance rapide, optimisée pour le rendement carcasse et FCR",
+        "ross 708": "lignée à croissance très rapide, développée pour l'efficacité maximale",
+        "ross": "lignée à croissance rapide, optimisée pour le rendement carcasse",
+        "cobb 500": "lignée équilibrée performance/robustesse, bonne conversion alimentaire",
+        "cobb 700": "lignée haute performance, optimisée pour les conditions difficiles",
+        "cobb 400": "lignée rustique, adaptée aux conditions d'élevage extensives",
+        "cobb": "lignée équilibrée performance/robustesse, bonne conversion alimentaire", 
+        "hubbard classic": "lignée rustique, adaptée à l'élevage extensif et labels qualité",
+        "hubbard flex": "lignée polyvalente, bon compromis croissance/robustesse",
+        "hubbard": "lignée rustique, adaptée à l'élevage extensif et labels qualité",
+        "isa brown": "lignée ponte brune, excellente production d'œufs colorés",
+        "isa white": "lignée ponte blanche, optimisée pour l'efficacité alimentaire",
+        "isa": "lignée ponte, optimisée pour la production d'œufs",
+        "lohmann brown": "lignée ponte brune, excellence en persistance de ponte",
+        "lohmann white": "lignée ponte blanche, très bonne conversion alimentaire",
+        "lohmann": "lignée ponte, excellence en persistance de ponte",
+        "hy-line brown": "lignée ponte brune, robustesse et adaptabilité",
+        "hy-line white": "lignée ponte blanche, production intensive",
+        "hy-line": "lignée ponte polyvalente, bonne adaptabilité"
+    },
+    "species": {
+        "broiler": "poulet de chair, objectifs: poids vif, FCR, rendement carcasse",
+        "layer": "poule pondeuse, objectifs: intensité de ponte, qualité œuf, persistance",
+        "breeder": "reproducteur, objectifs: fertilité, éclosabilité, viabilité descendance",
+        "pullet": "poulette, phase d'élevage avant la ponte",
+        "chick": "poussin, phase critique des premiers jours"
+    },
+    "phase": {
+        "starter": "phase démarrage (0-10j), croissance critique, thermorégulation",
+        "grower": "phase croissance (11-24j), développement squelettique et musculaire", 
+        "finisher": "phase finition (25j+), optimisation du poids final et FCR",
+        "laying": "phase ponte, maintien de la production et qualité œuf",
+        "breeding": "phase reproduction, optimisation fertilité et éclosabilité"
+    },
+    "site_type": {
+        "broiler_farm": "élevage poulets de chair, focus performance et conversion",
+        "layer_farm": "élevage pondeuses, focus production œufs",
+        "rearing_farm": "élevage poulettes, préparation à la ponte",
+        "breeding_farm": "élevage reproducteurs, focus fertilité",
+        "hatchery": "couvoir, incubation et éclosion",
+        "feed_mill": "usine d'aliments, nutrition animale"
+    },
+    "environment": {
+        "tunnel": "ventilation tunnel, contrôle précis température et humidité",
+        "natural": "ventilation naturelle, dépendante des conditions extérieures",
+        "mechanical": "ventilation mécanique, contrôle intermédiaire"
+    }
+}
 
 # ===== DÉTECTION DE LANGUE - VARIABLES MANQUANTES AJOUTÉES =====
 LANG_DETECTION_MIN_LENGTH = int(os.getenv("LANG_DETECTION_MIN_LENGTH", "20"))
@@ -185,7 +237,7 @@ def validate_config() -> tuple[bool, list[str]]:
     if not (0.0 <= SEMANTIC_CACHE_SIMILARITY_THRESHOLD <= 1.0):
         errors.append("SEMANTIC_CACHE_SIMILARITY_THRESHOLD doit être entre 0.0 et 1.0")
     
-    # Validation guardrails
+    # Validation guardrails - CORRECTION PRINCIPALE
     if GUARDRAILS_LEVEL not in ["strict", "moderate", "permissive"]:
         errors.append("GUARDRAILS_LEVEL doit être: strict, moderate, ou permissive")
     
@@ -209,6 +261,13 @@ def get_config_status() -> dict:
             "learning_mode": RRF_LEARNING_MODE,
             "genetic_boost": RRF_GENETIC_BOOST,
             "debug_mode": RRF_DEBUG_MODE
+        },
+        "entity_contexts": {
+            "lines_count": len(ENTITY_CONTEXTS["line"]),
+            "species_count": len(ENTITY_CONTEXTS["species"]),
+            "phases_count": len(ENTITY_CONTEXTS["phase"]),
+            "site_types_count": len(ENTITY_CONTEXTS["site_type"]),
+            "environments_count": len(ENTITY_CONTEXTS["environment"])
         },
         "language_detection": {
             "min_length": LANG_DETECTION_MIN_LENGTH,
@@ -246,7 +305,9 @@ __all__ = [
     "GUARDRAILS_LEVEL", "GUARDRAILS_AVAILABLE", "OOD_MIN_SCORE", "OOD_STRICT_SCORE",
     # Features
     "ENTITY_ENRICHMENT_ENABLED", "ENABLE_API_DIAGNOSTICS",
-    # Language Detection - VARIABLES MANQUANTES AJOUTÉES
+    # ENTITY_CONTEXTS - AJOUT CRITIQUE
+    "ENTITY_CONTEXTS",
+    # Language Detection
     "LANG_DETECTION_MIN_LENGTH", "FRENCH_HINTS", "ENGLISH_HINTS", "FRENCH_CHARS",
     "AVICULTURE_FRENCH_TERMS", "DOMAIN_KEYWORDS",
     # Performance
