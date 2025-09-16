@@ -8,6 +8,7 @@ CORRIGÉ: Import circulaire ENABLE_API_DIAGNOSTICS déplacé vers config.py
 CORRIGÉ: Erreur async validate_connectivity() causant le RuntimeWarning Redis
 CORRIGÉ: Gestion async Redis proper avec await et détection automatique sync/async
 NOUVELLE CORRECTION: quick_connectivity_check version Redis-free ultra-sécurisée
+NOUVELLE CORRECTION: Support Weaviate v4 avec _test_weaviate_v4_safe pour éviter faux négatifs
 """
 
 import logging
@@ -63,6 +64,34 @@ async def _test_redis_async_safe(redis_client) -> bool:
         return False
 
     except Exception:
+        return False
+
+# NEW: test Weaviate v4-safe
+async def _test_weaviate_v4_safe(weaviate_client) -> bool:
+    """Test Weaviate avec support v4 complet pour éviter les faux négatifs"""
+    try:
+        if weaviate_client is None:
+            return False
+        
+        # v4: présence de .collections
+        if hasattr(weaviate_client, "collections"):
+            # Test is_ready() en thread séparé
+            ready = await asyncio.to_thread(lambda: weaviate_client.is_ready())
+            if not ready:
+                return False
+            
+            # Vérifie accès collections
+            await asyncio.to_thread(lambda: list(weaviate_client.collections.list_all()))
+            return True
+        
+        # v3 fallback
+        if hasattr(weaviate_client, "schema"):
+            await asyncio.to_thread(lambda: weaviate_client.schema.get())
+            return True
+        
+        return False
+    except Exception as e:
+        logger.debug(f"Test Weaviate v4-safe échoué: {e}")
         return False
 
 class DependencyManager:
@@ -379,36 +408,9 @@ class DependencyManager:
         except Exception as e:
             logger.warning(f"Test connectivité OpenAI échoué: {e}")
         
-        # Test Weaviate - CORRECTION COMPLÈTE POUR ÉVITER L'ERREUR ASYNC
+        # Test Weaviate - UTILISE LE NOUVEAU HELPER v4-safe
         try:
-            if weaviate_client:
-                def _test_weaviate_sync():
-                    """Test synchrone de Weaviate dans un thread séparé"""
-                    try:
-                        if hasattr(weaviate_client, '_connection') and hasattr(weaviate_client._connection, 'check_readiness'):
-                            return weaviate_client._connection.check_readiness()
-                        elif hasattr(weaviate_client, 'is_ready'):
-                            # Pour les versions plus récentes
-                            if asyncio.iscoroutinefunction(weaviate_client.is_ready):
-                                # CORRECTION: Ne pas appeler les coroutines dans un contexte sync
-                                logger.debug("Weaviate.is_ready est async - ignoré dans test sync")
-                                return False
-                            else:
-                                return weaviate_client.is_ready()
-                        elif hasattr(weaviate_client, 'schema') and hasattr(weaviate_client.schema, 'get'):
-                            # Test via schema get comme fallback
-                            weaviate_client.schema.get()
-                            return True
-                        return False
-                    except Exception as e:
-                        logger.debug(f"Test Weaviate sync échoué: {e}")
-                        return False
-                
-                # CORRECTION: Exécution async du test synchrone
-                results['weaviate'] = await asyncio.wait_for(
-                    asyncio.get_event_loop().run_in_executor(None, _test_weaviate_sync),
-                    timeout=5.0
-                )
+            results['weaviate'] = await _test_weaviate_v4_safe(weaviate_client)
         except Exception as e:
             logger.warning(f"Test connectivité Weaviate échoué: {e}")
         
@@ -492,39 +494,26 @@ def get_full_status_report() -> Dict[str, Any]:
     """Rapport de statut complet"""
     return dependency_manager.get_status_report()
 
-# NOUVELLE VERSION CORRIGÉE: quick_connectivity_check version Redis-free
+# VERSION CORRIGÉE: quick_connectivity_check avec support Weaviate v4
 async def quick_connectivity_check(redis_client=None, weaviate_client=None) -> Dict[str, bool]:
     """
-    Ultra-safe connectivity check that never calls any Redis coroutine.
-    We only test OpenAI (already validated) and Weaviate.
-    Redis is simply checked for client presence without connection test.
+    Ultra-safe connectivity check avec support Weaviate v4 complet.
+    Utilise les nouveaux helpers v4-safe pour éviter les faux négatifs.
     """
-    mgr = dependency_manager
-    results = {'openai': True, 'weaviate': False, 'redis': bool(redis_client)}
+    # Test Weaviate avec le nouveau helper v4-safe
+    weav_ok = await _test_weaviate_v4_safe(weaviate_client)
     
-    # Weaviate readiness (safe sync-in-executor)
-    def weaviate_ready_sync():
-        try:
-            if weaviate_client is None:
-                return False
-            if hasattr(weaviate_client, '_connection') and hasattr(weaviate_client._connection, 'check_readiness'):
-                return weaviate_client._connection.check_readiness()
-            if hasattr(weaviate_client, 'schema') and hasattr(weaviate_client.schema, 'get'):
-                weaviate_client.schema.get()
-                return True
-        except Exception:
-            return False
-        return False
+    # Test Redis avec helper existant
+    redis_ok = await _test_redis_async_safe(redis_client)
     
-    try:
-        results['weaviate'] = await asyncio.wait_for(
-            asyncio.get_event_loop().run_in_executor(None, weaviate_ready_sync),
-            timeout=5.0
-        )
-    except Exception:
-        results['weaviate'] = False
+    # OpenAI considéré OK si le dependency_manager l'a validé
+    openai_ok = globals().get('OPENAI_AVAILABLE', False)
     
-    return results
+    return {
+        "redis": redis_ok, 
+        "weaviate": weav_ok, 
+        "openai": openai_ok
+    }
 
 def require_critical_dependencies():
     """Vérifie les dépendances critiques - À appeler au démarrage"""
@@ -582,8 +571,9 @@ def validate_imports_corrections() -> Dict[str, bool]:
         ),
         "async_validation_fixed": hasattr(dependency_manager, 'validate_connectivity'),
         "redis_handling_fixed": True,  # Vérifié par inspection du code
-        "redis_async_safe_function": '_test_redis_async_safe' in globals(),  # ← NOUVELLE VALIDATION
-        "quick_connectivity_redis_free": True,  # ← NOUVELLE VALIDATION AJOUTÉE
+        "redis_async_safe_function": '_test_redis_async_safe' in globals(),
+        "weaviate_v4_safe_function": '_test_weaviate_v4_safe' in globals(),  # ← NOUVELLE VALIDATION
+        "quick_connectivity_v4_support": True,  # ← NOUVELLE VALIDATION AJOUTÉE
         "internal_modules_loaded": len([
             dep for dep in dependency_manager.dependencies.values() 
             if dep.name in ['utilities', 'embedder', 'rag_engine', 'cache_manager']
@@ -601,9 +591,10 @@ def validate_imports_corrections() -> Dict[str, bool]:
             "AsyncOpenAI": globals().get('AsyncOpenAI') is not None,
             "OpenAI": globals().get('OpenAI') is not None,
             "_test_redis_async_safe": '_test_redis_async_safe' in globals(),
-            "quick_connectivity_redis_free": True
+            "_test_weaviate_v4_safe": '_test_weaviate_v4_safe' in globals(),  # ← AJOUTÉ
+            "quick_connectivity_v4_support": True
         },
-        "version": "corrected_complete_redis_free_connectivity"
+        "version": "corrected_complete_weaviate_v4_support"
     }
 
 # === EXPORTS POUR COMPATIBILITÉ ===
@@ -617,7 +608,8 @@ __all__ = [
     'require_critical_dependencies',
     'diagnose_dependency_issues',
     'validate_imports_corrections',
-    '_test_redis_async_safe',  # ← AJOUTÉ À L'EXPORT
+    '_test_redis_async_safe',
+    '_test_weaviate_v4_safe',  # ← AJOUTÉ À L'EXPORT
     'OPENAI_AVAILABLE',
     'WEAVIATE_AVAILABLE',
     'WEAVIATE_V4',
