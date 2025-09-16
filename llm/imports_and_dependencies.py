@@ -4,6 +4,7 @@ imports_and_dependencies.py - Gestion robuste des dépendances avec validation s
 Version corrigée: Élimination des fallbacks silencieux, validation explicite
 CORRIGÉ: Import wvc_query manquant qui causait l'erreur de démarrage
 CORRIGÉ: Détection modules internes rag_engine et cache_manager
+CORRIGÉ: Import circulaire ENABLE_API_DIAGNOSTICS déplacé vers config.py
 """
 
 import logging
@@ -458,8 +459,8 @@ WEAVIATE_V4 = globals().get('WEAVIATE_V4', False)
 wvc = globals().get('wvc', None)
 wvc_query = globals().get('wvc_query', None)  # ← CORRECTION CRITIQUE
 
-# Ajout pour debug et diagnostics
-ENABLE_API_DIAGNOSTICS = os.getenv("ENABLE_API_DIAGNOSTICS", "false").lower() == "true"
+# CORRECTION: ENABLE_API_DIAGNOSTICS déplacé vers config.py pour éviter l'import circulaire
+# Supprimé: ENABLE_API_DIAGNOSTICS = os.getenv("ENABLE_API_DIAGNOSTICS", "false").lower() == "true"
 
 # Log du statut au chargement
 status_report = dependency_manager.get_status_report()
@@ -473,7 +474,7 @@ if status_report['optional_missing']:
 
 logger.info(f"Dépendances chargées: {status_report['available_count']}/{status_report['total_dependencies']}")
 
-# Export pour le module - CORRIGÉ avec wvc_query
+# Export pour le module - CORRIGÉ avec wvc_query, SANS ENABLE_API_DIAGNOSTICS
 __all__ = [
     'dependency_manager',
     'get_openai_sync',
@@ -488,5 +489,5 @@ __all__ = [
     'WEAVIATE_V4',
     'wvc',
     'wvc_query',  # ← EXPORT CRITIQUE AJOUTÉ
-    'ENABLE_API_DIAGNOSTICS'
+    # 'ENABLE_API_DIAGNOSTICS' - SUPPRIMÉ pour éviter l'import circulaire
 ]

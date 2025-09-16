@@ -13,6 +13,7 @@ import numpy as np
 import httpx
 from typing import Dict, List, Optional, Any
 from collections import defaultdict
+from config import ENABLE_API_DIAGNOSTICS
 
 # CORRECTION CRITIQUE: Définir logger AVANT toute utilisation
 logger = logging.getLogger(__name__)

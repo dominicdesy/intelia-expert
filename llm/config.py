@@ -3,6 +3,7 @@
 config.py - Configuration centralisée avec support LangSmith et RRF Intelligent
 Optimisé pour Digital Ocean App Platform
 Version corrigée: Ajout ENTITY_CONTEXTS manquant pour le système RAG
+CORRIGÉ: Suppression du doublon ENABLE_API_DIAGNOSTICS
 """
 
 import os
@@ -43,6 +44,7 @@ RRF_BASE_K = int(os.getenv("RRF_BASE_K", "60"))
 RAG_SIMILARITY_TOP_K = int(os.getenv("RAG_SIMILARITY_TOP_K", "15"))
 RAG_CONFIDENCE_THRESHOLD = float(os.getenv("RAG_CONFIDENCE_THRESHOLD", "0.55"))
 RAG_VERIFICATION_ENABLED = os.getenv("RAG_VERIFICATION_ENABLED", "true").lower() == "true"
+RAG_VERIFICATION_SMART = os.getenv("RAG_VERIFICATION_SMART", "true").lower() == "true"
 MAX_CONVERSATION_CONTEXT = int(os.getenv("MAX_CONVERSATION_CONTEXT", "8"))
 
 # Recherche hybride
@@ -68,7 +70,8 @@ OOD_STRICT_SCORE = float(os.getenv("OOD_STRICT_SCORE", "0.7"))
 
 # ===== ENRICHISSEMENTS ET FONCTIONNALITÉS =====
 ENTITY_ENRICHMENT_ENABLED = os.getenv("ENTITY_ENRICHMENT_ENABLED", "true").lower() == "true"
-ENABLE_API_DIAGNOSTICS = os.getenv("ENABLE_API_DIAGNOSTICS", "true").lower() == "true"
+# CORRECTION: Une seule définition de ENABLE_API_DIAGNOSTICS
+ENABLE_API_DIAGNOSTICS = os.getenv("ENABLE_API_DIAGNOSTICS", "false").lower() == "true"
 
 # ===== ENTITY_CONTEXTS - CONFIGURATION MANQUANTE CRITIQUE =====
 ENTITY_CONTEXTS = {
@@ -297,7 +300,7 @@ __all__ = [
     "RRF_CACHE_SIZE", "RRF_BASE_K",
     # RAG Config
     "RAG_SIMILARITY_TOP_K", "RAG_CONFIDENCE_THRESHOLD", "RAG_VERIFICATION_ENABLED",
-    "HYBRID_SEARCH_ENABLED", "DEFAULT_ALPHA", "MAX_CONVERSATION_CONTEXT",
+    "RAG_VERIFICATION_SMART", "HYBRID_SEARCH_ENABLED", "DEFAULT_ALPHA", "MAX_CONVERSATION_CONTEXT",
     # Cache
     "CACHE_TOTAL_MEMORY_LIMIT_MB", "CACHE_VALUE_MAX_SIZE_KB", "CACHE_ENABLE_COMPRESSION",
     "ENABLE_SEMANTIC_CACHE", "SEMANTIC_CACHE_SIMILARITY_THRESHOLD",

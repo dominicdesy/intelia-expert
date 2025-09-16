@@ -13,7 +13,8 @@ import anyio
 from typing import Dict, List, Optional, Any
 from data_models import Document
 from utilities import METRICS
-from imports_and_dependencies import WEAVIATE_V4, wvc, wvc_query, ENABLE_API_DIAGNOSTICS
+from imports_and_dependencies import WEAVIATE_V4, wvc, wvc_query
+from config import ENABLE_API_DIAGNOSTICS
 from config import HYBRID_SEARCH_ENABLED
 
 logger = logging.getLogger(__name__)
