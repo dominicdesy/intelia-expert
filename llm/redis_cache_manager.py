@@ -2,8 +2,8 @@
 """
 redis_cache_manager.py - Gestionnaire de cache Redis principal (refactorisé)
 Point d'entrée principal pour le cache Redis avec fonctionnalités modulaires
-CORRIGÉ: Imports relatifs remplacés par imports absolus
-CORRIGÉ: Gestion d'erreurs robuste pour modules manquants
+CORRIGÉ: Arguments constructeur RedisCacheCore selon signature réelle
+CORRIGÉ: Utilisation des variables d'environnement correctes
 """
 
 import logging
@@ -11,47 +11,94 @@ from typing import Dict, List, Optional, Any
 
 logger = logging.getLogger(__name__)
 
-# CORRECTION: Imports absolus au lieu d'imports relatifs pour éviter l'erreur
-# "attempted relative import with no known parent package"
+# CORRECTION: Imports absolus avec fallbacks robustes
 try:
-    from cache_core import RedisCacheCore
+    from cache_core import RedisCacheCore, CacheConfig
+    CACHE_CORE_AVAILABLE = True
 except ImportError as e:
     logger.error(f"Impossible d'importer cache_core: {e}")
-    raise ImportError("Module cache_core requis non trouvé")
+    CACHE_CORE_AVAILABLE = False
+    # Stub pour éviter les crashes
+    class RedisCacheCore:
+        def __init__(self, *args, **kwargs):
+            self.enabled = False
+            self.initialized = False
+            self.client = None
+    class CacheConfig:
+        @classmethod
+        def from_env(cls):
+            return cls()
 
 try:
     from cache_semantic import SemanticCacheManager
+    SEMANTIC_AVAILABLE = True
 except ImportError as e:
-    logger.error(f"Impossible d'importer cache_semantic: {e}")
-    raise ImportError("Module cache_semantic requis non trouvé")
+    logger.warning(f"Module cache_semantic non disponible: {e}")
+    SEMANTIC_AVAILABLE = False
+    class SemanticCacheManager:
+        def __init__(self, *args, **kwargs):
+            pass
 
 try:
     from cache_stats import CacheStatsManager
+    STATS_AVAILABLE = True
 except ImportError as e:
-    logger.error(f"Impossible d'importer cache_stats: {e}")
-    raise ImportError("Module cache_stats requis non trouvé")
+    logger.warning(f"Module cache_stats non disponible: {e}")
+    STATS_AVAILABLE = False
+    class CacheStatsManager:
+        def __init__(self, *args, **kwargs):
+            pass
 
 class RAGCacheManager:
     """
     Gestionnaire de cache Redis principal - Interface unifiée
     Délègue les fonctionnalités aux modules spécialisés
-    CORRIGÉ: Gestion d'erreurs robuste pour l'initialisation
+    CORRIGÉ: Constructeur compatible avec RedisCacheCore(config: Optional[CacheConfig])
     """
     
     def __init__(self, redis_url: str = None, default_ttl: int = None):
-        """Initialise le gestionnaire de cache avec modules spécialisés"""
+        """
+        Initialise le gestionnaire de cache avec modules spécialisés
+        
+        CORRECTION MAJEURE: RedisCacheCore ne prend qu'un seul argument (config)
+        selon la signature: __init__(self, config: Optional[CacheConfig] = None)
+        """
         try:
-            # Initialiser les modules
-            self.core = RedisCacheCore(redis_url, default_ttl)
-            self.semantic = SemanticCacheManager(self.core)
-            self.stats = CacheStatsManager(self.core)
+            # CORRECTION: Utiliser la configuration depuis les variables d'environnement
+            # Au lieu de passer redis_url et default_ttl directement
+            
+            if CACHE_CORE_AVAILABLE:
+                # Créer la configuration depuis l'environnement
+                config = CacheConfig.from_env()
+                
+                # Optionnellement override avec les paramètres fournis
+                if redis_url:
+                    config.redis_url = redis_url
+                if default_ttl:
+                    config.default_ttl = default_ttl
+                
+                # CORRECTION: Un seul argument au lieu de deux
+                self.core = RedisCacheCore(config)
+            else:
+                self.core = RedisCacheCore()  # Version stub
+            
+            # Modules optionnels
+            if SEMANTIC_AVAILABLE:
+                self.semantic = SemanticCacheManager(self.core)
+            else:
+                self.semantic = SemanticCacheManager()  # Stub
+                
+            if STATS_AVAILABLE:
+                self.stats = CacheStatsManager(self.core)
+            else:
+                self.stats = CacheStatsManager()  # Stub
             
             # Exposer les propriétés importantes pour compatibilité
-            self.enabled = self.core.enabled
+            self.enabled = getattr(self.core, 'enabled', False)
             self.client = None  # Sera défini lors de l'initialisation
             self.initialized = False
             
-            logger.info("RAGCacheManager modules initialises avec succes")
+            logger.info("RAGCacheManager modules initialisés avec succès")
             
         except Exception as e:
             logger.error(f"Erreur initialisation RAGCacheManager: {e}")
@@ -67,7 +114,7 @@ class RAGCacheManager:
     async def initialize(self):
         """Initialise la connexion Redis"""
         if not self.core:
-            logger.warning("RAGCacheManager en mode degrade - initialisation impossible")
+            logger.warning("RAGCacheManager en mode dégradé - initialisation impossible")
             return False
             
         try:
@@ -75,9 +122,9 @@ class RAGCacheManager:
             if success:
                 self.client = self.core.client
                 self.initialized = self.core.initialized
-                logger.info("RAGCacheManager connexion Redis etablie")
+                logger.info("RAGCacheManager connexion Redis établie")
             else:
-                logger.warning("RAGCacheManager connexion Redis echouee")
+                logger.warning("RAGCacheManager connexion Redis échouée")
             return success
             
         except Exception as e:
@@ -88,12 +135,12 @@ class RAGCacheManager:
         """Vérifie l'état d'initialisation"""
         if not self.core:
             return False
-        return self.core._is_initialized()
+        return getattr(self.core, '_is_initialized', lambda: False)()
     
     # ===== MÉTHODES EMBEDDINGS =====
     async def get_embedding(self, text: str) -> Optional[List[float]]:
         """Récupère un embedding avec cache sémantique intelligent"""
-        if not self.semantic:
+        if not self.semantic or not SEMANTIC_AVAILABLE:
             return None
         try:
             return await self.semantic.get_embedding(text)
@@ -103,7 +150,7 @@ class RAGCacheManager:
     
     async def set_embedding(self, text: str, embedding: List[float]):
         """Met en cache un embedding"""
-        if not self.semantic:
+        if not self.semantic or not SEMANTIC_AVAILABLE:
             return
         try:
             await self.semantic.set_embedding(text, embedding)
@@ -114,7 +161,7 @@ class RAGCacheManager:
     async def get_response(self, query: str, context_hash: str, 
                           language: str = "fr") -> Optional[str]:
         """Récupère une réponse avec cascade strict → fallback → simple"""
-        if not self.semantic:
+        if not self.semantic or not SEMANTIC_AVAILABLE:
             return None
         try:
             return await self.semantic.get_response(query, context_hash, language)
@@ -125,7 +172,7 @@ class RAGCacheManager:
     async def set_response(self, query: str, context_hash: str, 
                           response: str, language: str = "fr"):
         """Met en cache une réponse"""
-        if not self.semantic:
+        if not self.semantic or not SEMANTIC_AVAILABLE:
             return
         try:
             await self.semantic.set_response(query, context_hash, response, language)
@@ -137,7 +184,7 @@ class RAGCacheManager:
                                where_filter: Dict = None, 
                                top_k: int = 10) -> Optional[List[Dict]]:
         """Récupère des résultats de recherche depuis le cache"""
-        if not self.core:
+        if not self.core or not CACHE_CORE_AVAILABLE:
             return None
         try:
             return await self.core.get_search_results(query_vector, where_filter, top_k)
@@ -149,7 +196,7 @@ class RAGCacheManager:
                                where_filter: Dict, top_k: int, 
                                results: List[Dict]):
         """Met en cache des résultats de recherche"""
-        if not self.core:
+        if not self.core or not CACHE_CORE_AVAILABLE:
             return
         try:
             await self.core.set_search_results(query_vector, where_filter, top_k, results)
@@ -159,7 +206,7 @@ class RAGCacheManager:
     # ===== MÉTHODES INTENTIONS =====
     async def get_intent_result(self, query: str) -> Optional[Dict]:
         """Récupère un résultat d'analyse d'intention"""
-        if not self.semantic:
+        if not self.semantic or not SEMANTIC_AVAILABLE:
             return None
         try:
             return await self.semantic.get_intent_result(query)
@@ -169,7 +216,7 @@ class RAGCacheManager:
     
     async def set_intent_result(self, query: str, intent_result: Any):
         """Met en cache un résultat d'analyse d'intention"""
-        if not self.semantic:
+        if not self.semantic or not SEMANTIC_AVAILABLE:
             return
         try:
             await self.semantic.set_intent_result(query, intent_result)
@@ -179,26 +226,25 @@ class RAGCacheManager:
     # ===== MÉTHODES UTILITAIRES =====
     def generate_context_hash(self, documents: List[Dict]) -> str:
         """Génère un hash du contexte pour le cache"""
-        if not self.core:
-            # Fallback simple si core non disponible
-            import hashlib
-            import json
-            content = json.dumps([doc.get('content', '')[:100] for doc in documents], sort_keys=True)
-            return hashlib.md5(content.encode()).hexdigest()[:16]
+        if self.core and CACHE_CORE_AVAILABLE:
+            try:
+                return self.core.generate_context_hash(documents)
+            except Exception as e:
+                logger.warning(f"Erreur generate_context_hash: {e}")
         
+        # Fallback simple
+        import hashlib
+        import json
         try:
-            return self.core.generate_context_hash(documents)
-        except Exception as e:
-            logger.warning(f"Erreur generate_context_hash: {e}")
-            # Fallback
-            import hashlib
-            import json
             content = json.dumps([doc.get('content', '')[:100] for doc in documents], sort_keys=True)
             return hashlib.md5(content.encode()).hexdigest()[:16]
+        except Exception as e:
+            logger.warning(f"Erreur fallback hash: {e}")
+            return hashlib.md5(str(len(documents)).encode()).hexdigest()[:16]
     
     async def invalidate_pattern(self, pattern: str):
         """Invalide les clés correspondant à un pattern"""
-        if not self.core:
+        if not self.core or not CACHE_CORE_AVAILABLE:
             return
         try:
             await self.core.invalidate_pattern(pattern)
@@ -208,11 +254,14 @@ class RAGCacheManager:
     # ===== STATISTIQUES =====
     async def get_cache_stats(self) -> Dict[str, Any]:
         """Récupère les statistiques complètes"""
-        if not self.stats:
+        if not self.stats or not STATS_AVAILABLE:
             return {
-                "enabled": False,
-                "initialized": False,
-                "error": "Module stats non disponible"
+                "enabled": self.enabled,
+                "initialized": self.initialized,
+                "error": "Module stats non disponible",
+                "core_available": CACHE_CORE_AVAILABLE,
+                "semantic_available": SEMANTIC_AVAILABLE,
+                "stats_available": STATS_AVAILABLE
             }
         try:
             return await self.stats.get_cache_stats()
@@ -221,13 +270,19 @@ class RAGCacheManager:
             return {
                 "enabled": self.enabled,
                 "initialized": self.initialized,
-                "error": str(e)
+                "error": str(e),
+                "core_available": CACHE_CORE_AVAILABLE,
+                "semantic_available": SEMANTIC_AVAILABLE,
+                "stats_available": STATS_AVAILABLE
             }
     
     async def debug_semantic_extraction(self, query: str) -> Dict[str, Any]:
         """Debug de l'extraction sémantique"""
-        if not self.semantic:
-            return {"error": "Module semantic non disponible"}
+        if not self.semantic or not SEMANTIC_AVAILABLE:
+            return {
+                "error": "Module semantic non disponible",
+                "semantic_available": SEMANTIC_AVAILABLE
+            }
         try:
             return await self.semantic.debug_semantic_extraction(query)
         except Exception as e:
@@ -237,24 +292,24 @@ class RAGCacheManager:
     # ===== FERMETURE =====
     async def close(self):
         """Ferme la connexion Redis proprement"""
-        if self.core:
+        if self.core and CACHE_CORE_AVAILABLE:
             try:
                 await self.core.close()
-                logger.info("RAGCacheManager connexion fermee")
+                logger.info("RAGCacheManager connexion fermée")
             except Exception as e:
                 logger.warning(f"Erreur fermeture cache: {e}")
         
         self.client = None
         self.initialized = False
 
-# CORRECTION: Factory function avec gestion d'erreurs robuste
+# Factory function avec gestion d'erreurs robuste
 def create_rag_cache_manager(redis_url: str = None, default_ttl: int = None) -> Optional[RAGCacheManager]:
     """
     Factory pour créer une instance RAGCacheManager avec gestion d'erreurs
     
     Args:
-        redis_url: URL Redis (optionnel)
-        default_ttl: TTL par défaut (optionnel)
+        redis_url: URL Redis (optionnel, utilise REDIS_URL par défaut)
+        default_ttl: TTL par défaut (optionnel, utilise CACHE_DEFAULT_TTL par défaut)
     
     Returns:
         RAGCacheManager ou None si échec
@@ -262,7 +317,7 @@ def create_rag_cache_manager(redis_url: str = None, default_ttl: int = None) -> 
     try:
         return RAGCacheManager(redis_url, default_ttl)
     except Exception as e:
-        logger.error(f"Impossible de creer RAGCacheManager: {e}")
+        logger.error(f"Impossible de créer RAGCacheManager: {e}")
         return None
 
 # Export pour compatibilité
