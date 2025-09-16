@@ -2,6 +2,7 @@
 """
 imports_and_dependencies.py - Gestion robuste des dépendances avec validation stricte
 Version corrigée: Élimination des fallbacks silencieux, validation explicite
+AJOUTÉ: Fonctions get_openai_sync et get_openai_async manquantes
 """
 
 import logging
@@ -34,6 +35,8 @@ class DependencyManager:
     
     def __init__(self):
         self.dependencies: Dict[str, DependencyInfo] = {}
+        self._openai_sync_client = None
+        self._openai_async_client = None
         self._initialize_dependencies()
     
     def _initialize_dependencies(self):
@@ -53,6 +56,10 @@ class DependencyManager:
             globals()['OPENAI_AVAILABLE'] = True
             globals()['AsyncOpenAI'] = AsyncOpenAI
             globals()['OpenAI'] = OpenAI
+            
+            # Initialiser les clients OpenAI
+            self._initialize_openai_clients()
+            
         except ImportError as e:
             self.dependencies['openai'] = DependencyInfo(
                 name='openai',
@@ -73,18 +80,6 @@ class DependencyManager:
             
             weaviate_v4 = weaviate_version.startswith('4.')
             
-            if weaviate_v4:
-                try:
-                    import weaviate.classes as wvc
-                    import weaviate.classes.query as wvc_query
-                    globals()['wvc'] = wvc
-                    globals()['wvc_query'] = wvc_query
-                except ImportError:
-                    raise ImportError("Impossible d'importer les classes Weaviate v4")
-            else:
-                globals()['wvc'] = None
-                globals()['wvc_query'] = None
-            
             self.dependencies['weaviate'] = DependencyInfo(
                 name='weaviate',
                 status=DependencyStatus.AVAILABLE,
@@ -94,9 +89,8 @@ class DependencyManager:
             
             # Export global pour compatibilité
             globals()['WEAVIATE_AVAILABLE'] = True
-            globals()['WEAVIATE_V4'] = weaviate_v4
             globals()['weaviate'] = weaviate
-            globals()['weaviate_version'] = weaviate_version
+            globals()['WEAVIATE_V4'] = weaviate_v4
             
         except ImportError as e:
             self.dependencies['weaviate'] = DependencyInfo(
@@ -107,23 +101,23 @@ class DependencyManager:
             )
             globals()['WEAVIATE_AVAILABLE'] = False
             globals()['WEAVIATE_V4'] = False
-            globals()['weaviate'] = None
-            globals()['weaviate_version'] = 'N/A'
         
-        # Redis - Important pour cache
+        # Redis - CRITIQUE pour cache
         try:
-            import redis.asyncio as redis
-            import hiredis
+            import redis
             redis_version = getattr(redis, '__version__', 'unknown')
             
             self.dependencies['redis'] = DependencyInfo(
                 name='redis',
                 status=DependencyStatus.AVAILABLE,
                 version=redis_version,
-                is_critical=False
+                is_critical=False  # Cache est optionnel
             )
+            
+            # Export global pour compatibilité
             globals()['REDIS_AVAILABLE'] = True
             globals()['redis'] = redis
+            
         except ImportError as e:
             self.dependencies['redis'] = DependencyInfo(
                 name='redis',
@@ -137,6 +131,37 @@ class DependencyManager:
         # Dépendances optionnelles
         self._load_optional_dependencies()
     
+    def _initialize_openai_clients(self):
+        """Initialise les clients OpenAI avec la configuration depuis les variables d'environnement"""
+        try:
+            # Récupérer la clé API depuis les variables d'environnement
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                logger.warning("OPENAI_API_KEY non trouvée dans les variables d'environnement")
+                return
+            
+            from openai import OpenAI, AsyncOpenAI
+            
+            # Configuration commune
+            client_config = {
+                "api_key": api_key,
+                "timeout": 30.0,
+                "max_retries": 3
+            }
+            
+            # Client synchrone
+            self._openai_sync_client = OpenAI(**client_config)
+            
+            # Client asynchrone
+            self._openai_async_client = AsyncOpenAI(**client_config)
+            
+            logger.info("✅ Clients OpenAI (sync + async) initialisés avec succès")
+            
+        except Exception as e:
+            logger.error(f"Erreur initialisation clients OpenAI: {e}")
+            self._openai_sync_client = None
+            self._openai_async_client = None
+    
     def _load_optional_dependencies(self):
         """Charge les dépendances optionnelles"""
         optional_deps = {
@@ -144,7 +169,8 @@ class DependencyManager:
             'sentence_transformers': {'import_name': 'sentence_transformers'},
             'unidecode': {'import_name': 'unidecode'},
             'transformers': {'import_name': 'transformers'},
-            'langdetect': {'import_name': 'langdetect'}
+            'langdetect': {'import_name': 'langdetect'},
+            'langsmith': {'import_name': 'langsmith'}
         }
         
         for dep_name, config in optional_deps.items():
@@ -179,15 +205,14 @@ class DependencyManager:
         
         # Intent Processor
         try:
-            from intent_processor import create_intent_processor, IntentType, IntentResult
+            from intent_processor import create_intent_processor
             self.dependencies['intent_processor'] = DependencyInfo(
                 name='intent_processor',
                 status=DependencyStatus.AVAILABLE,
                 is_critical=False
             )
             globals()['INTENT_PROCESSOR_AVAILABLE'] = True
-            globals()['IntentType'] = IntentType
-            globals()['IntentResult'] = IntentResult
+            
         except ImportError as e:
             self.dependencies['intent_processor'] = DependencyInfo(
                 name='intent_processor',
@@ -196,130 +221,120 @@ class DependencyManager:
                 is_critical=False
             )
             globals()['INTENT_PROCESSOR_AVAILABLE'] = False
-            # PAS de fallback - le code doit gérer l'absence explicitement
         
-        # Advanced Guardrails
-        try:
-            from advanced_guardrails import create_response_guardrails, VerificationLevel, GuardrailResult
-            self.dependencies['guardrails'] = DependencyInfo(
-                name='guardrails',
-                status=DependencyStatus.AVAILABLE,
-                is_critical=False
-            )
-            globals()['GUARDRAILS_AVAILABLE'] = True
-            globals()['VerificationLevel'] = VerificationLevel
-            globals()['GuardrailResult'] = GuardrailResult
-        except ImportError as e:
-            self.dependencies['guardrails'] = DependencyInfo(
-                name='guardrails',
-                status=DependencyStatus.MISSING,
-                error_message=str(e),
-                is_critical=False
-            )
-            globals()['GUARDRAILS_AVAILABLE'] = False
+        # Autres modules internes...
+        internal_modules = ['utilities', 'embedder', 'rag_engine', 'cache_manager']
         
-        # Cache externe
-        try:
-            from redis_cache_manager import RAGCacheManager
-            self.dependencies['external_cache'] = DependencyInfo(
-                name='external_cache',
-                status=DependencyStatus.AVAILABLE,
-                is_critical=False
-            )
-            globals()['EXTERNAL_CACHE_AVAILABLE'] = True
-            globals()['RAGCacheManager'] = RAGCacheManager
-        except ImportError as e:
-            self.dependencies['external_cache'] = DependencyInfo(
-                name='external_cache',
-                status=DependencyStatus.MISSING,
-                error_message=str(e),
-                is_critical=False
-            )
-            globals()['EXTERNAL_CACHE_AVAILABLE'] = False
+        for module_name in internal_modules:
+            try:
+                __import__(module_name)
+                self.dependencies[module_name] = DependencyInfo(
+                    name=module_name,
+                    status=DependencyStatus.AVAILABLE,
+                    is_critical=False
+                )
+                globals()[f'{module_name.upper()}_AVAILABLE'] = True
+                
+            except ImportError as e:
+                self.dependencies[module_name] = DependencyInfo(
+                    name=module_name,
+                    status=DependencyStatus.MISSING,
+                    error_message=str(e),
+                    is_critical=False
+                )
+                globals()[f'{module_name.upper()}_AVAILABLE'] = False
+    
+    def get_openai_sync_client(self):
+        """Retourne le client OpenAI synchrone"""
+        if self._openai_sync_client is None:
+            self._initialize_openai_clients()
+        
+        if self._openai_sync_client is None:
+            raise RuntimeError("Client OpenAI synchrone non disponible")
+        
+        return self._openai_sync_client
+    
+    def get_openai_async_client(self):
+        """Retourne le client OpenAI asynchrone"""
+        if self._openai_async_client is None:
+            self._initialize_openai_clients()
+        
+        if self._openai_async_client is None:
+            raise RuntimeError("Client OpenAI asynchrone non disponible")
+        
+        return self._openai_async_client
     
     async def validate_connectivity(self, redis_client=None, weaviate_client=None) -> Dict[str, bool]:
-        """
-        Validation de connectivité asynchrone robuste
-        """
-        connectivity = {}
+        """Valide la connectivité des services externes"""
+        results = {
+            'openai': False,
+            'weaviate': False,
+            'redis': False
+        }
         
-        # Test Redis (async)
-        if redis_client and self.dependencies['redis'].status == DependencyStatus.AVAILABLE:
-            try:
-                await asyncio.wait_for(redis_client.ping(), timeout=3.0)
-                connectivity['redis'] = True
-                self.dependencies['redis'].status = DependencyStatus.AVAILABLE
-            except Exception as e:
-                connectivity['redis'] = False
-                self.dependencies['redis'].status = DependencyStatus.CONNECTION_FAILED
-                self.dependencies['redis'].error_message = f"Connexion échouée: {e}"
-                logger.warning(f"Redis connexion échouée: {e}")
-        else:
-            connectivity['redis'] = False
-        
-        # Test Weaviate
-        if weaviate_client and self.dependencies['weaviate'].status == DependencyStatus.AVAILABLE:
-            try:
-                # Test asynchrone pour Weaviate
-                def _test_weaviate():
-                    return weaviate_client.is_ready()
-                
-                # Exécuter le test dans un thread pour éviter les blocages
-                loop = asyncio.get_event_loop()
-                is_ready = await asyncio.wait_for(
-                    loop.run_in_executor(None, _test_weaviate),
+        # Test OpenAI
+        try:
+            if self._openai_async_client:
+                await asyncio.wait_for(
+                    self._openai_async_client.models.list(),
                     timeout=5.0
                 )
-                
-                connectivity['weaviate'] = is_ready
-                if not is_ready:
-                    self.dependencies['weaviate'].status = DependencyStatus.CONNECTION_FAILED
-                    self.dependencies['weaviate'].error_message = "Service non prêt"
-                    
-            except Exception as e:
-                connectivity['weaviate'] = False
-                self.dependencies['weaviate'].status = DependencyStatus.CONNECTION_FAILED
-                self.dependencies['weaviate'].error_message = f"Connexion échouée: {e}"
-                logger.warning(f"Weaviate connexion échouée: {e}")
-        else:
-            connectivity['weaviate'] = False
+                results['openai'] = True
+        except Exception as e:
+            logger.warning(f"Test connectivité OpenAI échoué: {e}")
         
-        return connectivity
+        # Test Weaviate
+        try:
+            if weaviate_client and hasattr(weaviate_client, 'is_ready'):
+                results['weaviate'] = await asyncio.wait_for(
+                    weaviate_client.is_ready(),
+                    timeout=5.0
+                )
+        except Exception as e:
+            logger.warning(f"Test connectivité Weaviate échoué: {e}")
+        
+        # Test Redis
+        try:
+            if redis_client and hasattr(redis_client, 'ping'):
+                await asyncio.wait_for(
+                    redis_client.ping(),
+                    timeout=5.0
+                )
+                results['redis'] = True
+        except Exception as e:
+            logger.warning(f"Test connectivité Redis échoué: {e}")
+        
+        return results
     
     def get_status_report(self) -> Dict[str, Any]:
-        """Rapport de statut complet"""
-        critical_missing = [
-            dep.name for dep in self.dependencies.values()
-            if dep.is_critical and dep.status != DependencyStatus.AVAILABLE
-        ]
+        """Génère un rapport de statut complet"""
+        critical_deps = [dep for dep in self.dependencies.values() if dep.is_critical]
+        critical_missing = [dep for dep in critical_deps if dep.status != DependencyStatus.AVAILABLE]
         
-        optional_missing = [
-            dep.name for dep in self.dependencies.values()
-            if not dep.is_critical and dep.status != DependencyStatus.AVAILABLE
-        ]
+        optional_deps = [dep for dep in self.dependencies.values() if not dep.is_critical]
+        optional_missing = [dep.name for dep in optional_deps if dep.status != DependencyStatus.AVAILABLE]
         
         return {
-            'critical_dependencies_ok': len(critical_missing) == 0,
-            'critical_missing': critical_missing,
-            'optional_missing': optional_missing,
             'total_dependencies': len(self.dependencies),
-            'available_count': len([d for d in self.dependencies.values() 
-                                  if d.status == DependencyStatus.AVAILABLE]),
+            'available_count': len([d for d in self.dependencies.values() if d.status == DependencyStatus.AVAILABLE]),
+            'critical_dependencies_ok': len(critical_missing) == 0,
+            'critical_missing': [dep.name for dep in critical_missing],
+            'optional_missing': optional_missing,
             'details': {
-                name: {
+                dep_name: {
                     'status': dep.status.value,
                     'version': dep.version,
-                    'error': dep.error_message,
-                    'critical': dep.is_critical
+                    'is_critical': dep.is_critical,
+                    'error': dep.error_message
                 }
-                for name, dep in self.dependencies.items()
+                for dep_name, dep in self.dependencies.items()
             }
         }
     
     def require_critical_dependencies(self):
         """Vérifie que toutes les dépendances critiques sont disponibles"""
         critical_missing = [
-            dep for dep in self.dependencies.values()
+            dep for dep in self.dependencies.values() 
             if dep.is_critical and dep.status != DependencyStatus.AVAILABLE
         ]
         
@@ -345,6 +360,15 @@ class DependencyManager:
 # Instance globale
 dependency_manager = DependencyManager()
 
+# === FONCTIONS MANQUANTES CRITIQUES ===
+def get_openai_sync():
+    """Retourne le client OpenAI synchrone - FONCTION MANQUANTE CORRIGÉE"""
+    return dependency_manager.get_openai_sync_client()
+
+def get_openai_async():
+    """Retourne le client OpenAI asynchrone - FONCTION MANQUANTE CORRIGÉE"""
+    return dependency_manager.get_openai_async_client()
+
 # Fonctions pour compatibilité avec l'ancien code
 def get_dependencies_status() -> Dict[str, bool]:
     """Fonction de compatibilité"""
@@ -355,12 +379,18 @@ async def quick_connectivity_check(redis_client=None, weaviate_client=None) -> D
     return await dependency_manager.validate_connectivity(redis_client, weaviate_client)
 
 def require_critical_dependencies():
-    """Vérifie les dépendances critiques - à appeler au démarrage"""
+    """Vérifie les dépendances critiques - À appeler au démarrage"""
     dependency_manager.require_critical_dependencies()
 
 def get_full_status_report() -> Dict[str, Any]:
     """Rapport de statut complet pour debugging"""
     return dependency_manager.get_status_report()
+
+# Variables globales exportées (compatibilité)
+OPENAI_AVAILABLE = globals().get('OPENAI_AVAILABLE', False)
+WEAVIATE_AVAILABLE = globals().get('WEAVIATE_AVAILABLE', False)
+REDIS_AVAILABLE = globals().get('REDIS_AVAILABLE', False)
+WEAVIATE_V4 = globals().get('WEAVIATE_V4', False)
 
 # Log du statut au chargement
 status_report = dependency_manager.get_status_report()
@@ -373,3 +403,18 @@ if status_report['optional_missing']:
     logger.warning(f"⚠️ Dépendances optionnelles manquantes: {status_report['optional_missing']}")
 
 logger.info(f"Dépendances chargées: {status_report['available_count']}/{status_report['total_dependencies']}")
+
+# Export pour le module
+__all__ = [
+    'dependency_manager',
+    'get_openai_sync',
+    'get_openai_async', 
+    'get_dependencies_status',
+    'quick_connectivity_check',
+    'require_critical_dependencies',
+    'get_full_status_report',
+    'OPENAI_AVAILABLE',
+    'WEAVIATE_AVAILABLE',
+    'REDIS_AVAILABLE',
+    'WEAVIATE_V4'
+]
