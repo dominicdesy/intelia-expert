@@ -26,6 +26,9 @@ from memory import ConversationMemory
 from advanced_guardrails import AdvancedResponseGuardrails
 from hybrid_retriever import hybrid_search
 
+# CORRECTION: Import explicite d'AsyncOpenAI
+from imports_and_dependencies import AsyncOpenAI
+
 # CORRECTION CRITIQUE: Définir logger AVANT toute utilisation
 logger = logging.getLogger(__name__)
 

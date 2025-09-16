@@ -331,13 +331,13 @@ class AutomatedIngestionPipeline:
         self.intents_config = self._load_intents_config()
         self.classifier = IntentsBasedClassifier(self.intents_config)
         
-        # Configuration des sources - Quotas optimisés
+        # Configuration des sources - Quotas agressifs pour 30K documents
         self.sources_config = {
-            SourceType.PUBMED: SourceQuota(0.33, 100, 1000),
-            SourceType.CROSSREF: SourceQuota(1.0, 500, 5000),
-            SourceType.FAO_AGRIS: SourceQuota(0.5, 200, 2000),
-            SourceType.EUROPE_PMC: SourceQuota(1.0, 500, 5000),
-            SourceType.ARXIV: SourceQuota(0.5, 200, 2000)
+            SourceType.PUBMED: SourceQuota(2.0, 1000, 10000),      # Plus agressif
+            SourceType.CROSSREF: SourceQuota(5.0, 2000, 20000),    # Très agressif
+            SourceType.FAO_AGRIS: SourceQuota(0.5, 200, 2000),     # Désactivé de facto
+            SourceType.EUROPE_PMC: SourceQuota(3.0, 1500, 15000),  # Plus agressif
+            SourceType.ARXIV: SourceQuota(2.0, 1000, 10000)        # Plus agressif
         }
         
         # Statistiques
@@ -627,17 +627,22 @@ class AutomatedIngestionPipeline:
         genetic_lines = list(self.intents_config.get("aliases", {}).get("line", {}).keys())
 
         queries = [
-            # Requêtes ultra-simples avec 1-2 mots-clés
-            "broiler performance 2020:2025[dp]",
-            "broiler nutrition 2020:2025[dp]",
-            "broiler welfare 2020:2025[dp]",
-            "layer production 2020:2025[dp]",
-            "layer nutrition 2020:2025[dp]",
-            "poultry health 2020:2025[dp]",
-            "poultry management 2020:2025[dp]",
-            "chicken growth 2020:2025[dp]",
-            "poultry feed 2020:2025[dp]",
-            "broiler FCR 2020:2025[dp]"
+            # Requêtes optimisées avec termes plus larges
+            "poultry 2020:2025[dp]",
+            "chicken 2020:2025[dp]", 
+            "broiler 2020:2025[dp]",
+            "layer 2020:2025[dp]",
+            "avian 2020:2025[dp]",
+            "fowl 2020:2025[dp]",
+            "gallus 2020:2025[dp]",
+            "egg production 2020:2025[dp]",
+            "meat quality 2020:2025[dp]",
+            "feed conversion 2020:2025[dp]",
+            "animal welfare 2020:2025[dp]",
+            "livestock 2020:2025[dp]",
+            "animal nutrition 2020:2025[dp]",
+            "veterinary 2020:2025[dp]",
+            "animal health 2020:2025[dp]"
         ]
         
         for query in queries:
