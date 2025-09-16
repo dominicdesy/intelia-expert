@@ -2,6 +2,7 @@
 """
 rag_engine.py - RAG Engine Enhanced avec LangSmith et RRF Intelligent
 Version avec intégration LangSmith pour monitoring LLM aviculture
+CORRIGÉ: Gestion d'erreurs robuste pour éliminer "attempted relative import"
 """
 
 import os
@@ -13,24 +14,94 @@ import httpx
 from typing import Dict, List, Optional, Any
 from collections import defaultdict
 
-# Imports existants
-from config import *
-from imports_and_dependencies import *
-from data_models import RAGResult, RAGSource, Document
-from utilities import METRICS, detect_language_enhanced, build_where_filter
-from embedder import OpenAIEmbedder
-from retriever import HybridWeaviateRetriever
-from generators import EnhancedResponseGenerator
-from ood_detector import EnhancedOODDetector
-from memory import ConversationMemory
-from advanced_guardrails import AdvancedResponseGuardrails
-from hybrid_retriever import hybrid_search
-
-# CORRECTION: Import explicite d'AsyncOpenAI
-from imports_and_dependencies import AsyncOpenAI
-
 # CORRECTION CRITIQUE: Définir logger AVANT toute utilisation
 logger = logging.getLogger(__name__)
+
+# CORRECTION: Imports avec gestion d'erreurs détaillée
+try:
+    from config import *
+    logger.debug("Config importé avec succès")
+except Exception as e:
+    logger.error(f"Erreur import config: {e}")
+    raise
+
+try:
+    from imports_and_dependencies import *
+    logger.debug("Imports_and_dependencies importé avec succès")
+except Exception as e:
+    logger.error(f"Erreur import imports_and_dependencies: {e}")
+    raise
+
+try:
+    from data_models import RAGResult, RAGSource, Document
+    logger.debug("Data_models importé avec succès")
+except Exception as e:
+    logger.error(f"Erreur import data_models: {e}")
+    raise
+
+try:
+    from utilities import METRICS, detect_language_enhanced, build_where_filter
+    logger.debug("Utilities importé avec succès")
+except Exception as e:
+    logger.error(f"Erreur import utilities: {e}")
+    raise
+
+try:
+    from embedder import OpenAIEmbedder
+    logger.debug("Embedder importé avec succès")
+except Exception as e:
+    logger.error(f"Erreur import embedder: {e}")
+    raise
+
+try:
+    from retriever import HybridWeaviateRetriever
+    logger.debug("Retriever importé avec succès")
+except Exception as e:
+    logger.error(f"Erreur import retriever: {e}")
+    raise
+
+try:
+    from generators import EnhancedResponseGenerator
+    logger.debug("Generators importé avec succès")
+except Exception as e:
+    logger.error(f"Erreur import generators: {e}")
+    raise
+
+try:
+    from ood_detector import EnhancedOODDetector
+    logger.debug("OOD_detector importé avec succès")
+except Exception as e:
+    logger.error(f"Erreur import ood_detector: {e}")
+    raise
+
+try:
+    from memory import ConversationMemory
+    logger.debug("Memory importé avec succès")
+except Exception as e:
+    logger.error(f"Erreur import memory: {e}")
+    raise
+
+try:
+    from advanced_guardrails import AdvancedResponseGuardrails
+    logger.debug("Advanced_guardrails importé avec succès")
+except Exception as e:
+    logger.error(f"Erreur import advanced_guardrails: {e}")
+    raise
+
+try:
+    from hybrid_retriever import hybrid_search
+    logger.debug("Hybrid_retriever importé avec succès")
+except Exception as e:
+    logger.error(f"Erreur import hybrid_retriever: {e}")
+    raise
+
+# CORRECTION: Import explicite d'AsyncOpenAI
+try:
+    from imports_and_dependencies import AsyncOpenAI
+    logger.debug("AsyncOpenAI importé avec succès")
+except Exception as e:
+    logger.error(f"Erreur import AsyncOpenAI: {e}")
+    raise
 
 # === NOUVEAU: IMPORTS LANGSMITH ===
 if LANGSMITH_ENABLED:
@@ -41,7 +112,7 @@ if LANGSMITH_ENABLED:
         logger.info("✅ LangSmith importé avec succès")
     except ImportError as e:
         LANGSMITH_AVAILABLE = False
-        logger.warning(f"❌ LangSmith non disponible: {e}")
+        logger.warning(f"⚠️ LangSmith non disponible: {e}")
 else:
     LANGSMITH_AVAILABLE = False
 
@@ -52,7 +123,7 @@ try:
     logger.info("✅ RRF Intelligent importé avec succès")
 except ImportError as e:
     INTELLIGENT_RRF_AVAILABLE = False
-    logger.warning(f"❌ RRF Intelligent non disponible: {e}")
+    logger.warning(f"⚠️ RRF Intelligent non disponible: {e}")
 
 DEFAULT_ALPHA = float(os.getenv("HYBRID_ALPHA", "0.6"))
 
@@ -145,46 +216,83 @@ class InteliaRAGEngine:
             return
         
         try:
+            # CORRECTION: Gestion d'erreurs détaillée pour chaque étape
+            logger.debug("Étape 1: Initialisation Cache Redis externe...")
+            
             # 1. Cache Redis externe
             if CACHE_ENABLED and EXTERNAL_CACHE_AVAILABLE:
-                from redis_cache_manager import RedisCacheManager
-                self.cache_manager = RedisCacheManager()
-                await self.cache_manager.initialize()
-                if self.cache_manager.enabled:
-                    self.optimization_stats["external_cache_used"] = True
-                    logger.info("✅ Cache Redis externe activé")
+                try:
+                    # CORRECTION: Import direct au lieu d'import relatif potentiel
+                    from redis_cache_manager import RedisCacheManager
+                    self.cache_manager = RedisCacheManager()
+                    await self.cache_manager.initialize()
+                    if self.cache_manager.enabled:
+                        self.optimization_stats["external_cache_used"] = True
+                        logger.info("✅ Cache Redis externe activé")
+                except Exception as e:
+                    logger.warning(f"Cache Redis externe échoué: {e}")
+                    self.cache_manager = None
+            
+            logger.debug("Étape 2: Connexion Weaviate...")
             
             # 2. Connexion Weaviate
-            await self._connect_weaviate()
+            try:
+                await self._connect_weaviate()
+            except Exception as e:
+                logger.warning(f"Connexion Weaviate échouée: {e}")
+            
+            logger.debug("Étape 3: Composants de base...")
             
             # 3. Composants de base
-            self.embedder = OpenAIEmbedder(self.openai_client, self.cache_manager)
-            self.memory = ConversationMemory(self.openai_client)
-            self.ood_detector = EnhancedOODDetector()
+            try:
+                self.embedder = OpenAIEmbedder(self.openai_client, self.cache_manager)
+                self.memory = ConversationMemory(self.openai_client)
+                self.ood_detector = EnhancedOODDetector()
+                logger.debug("Composants de base initialisés")
+            except Exception as e:
+                logger.error(f"Erreur composants de base: {e}")
+                raise
+            
+            logger.debug("Étape 4: Retriever hybride...")
             
             # 4. Retriever hybride avec RRF intelligent
             if self.weaviate_client:
-                self.retriever = HybridWeaviateRetriever(self.weaviate_client)
-                
-                # === NOUVEAU: Initialisation RRF Intelligent ===
-                if (INTELLIGENT_RRF_AVAILABLE and ENABLE_INTELLIGENT_RRF and 
-                    self.cache_manager and self.cache_manager.enabled):
-                    try:
-                        self.intelligent_rrf = IntelligentRRFFusion(
-                            redis_client=self.cache_manager.client,
-                            intent_processor=None  # Sera défini plus tard
-                        )
-                        logger.info("✅ RRF Intelligent initialisé")
-                    except Exception as e:
-                        logger.error(f"❌ Erreur RRF Intelligent: {e}")
-                
-                # Diagnostic API Weaviate
-                if ENABLE_API_DIAGNOSTICS:
-                    await self.retriever.diagnose_weaviate_api()
-                    self.optimization_stats["weaviate_capabilities"] = self.retriever.api_capabilities.copy()
+                try:
+                    self.retriever = HybridWeaviateRetriever(self.weaviate_client)
+                    
+                    # === NOUVEAU: Initialisation RRF Intelligent ===
+                    if (INTELLIGENT_RRF_AVAILABLE and ENABLE_INTELLIGENT_RRF and 
+                        self.cache_manager and self.cache_manager.enabled):
+                        try:
+                            self.intelligent_rrf = IntelligentRRFFusion(
+                                redis_client=self.cache_manager.client,
+                                intent_processor=None  # Sera défini plus tard
+                            )
+                            logger.info("✅ RRF Intelligent initialisé")
+                        except Exception as e:
+                            logger.error(f"❌ Erreur RRF Intelligent: {e}")
+                    
+                    # Diagnostic API Weaviate
+                    if ENABLE_API_DIAGNOSTICS:
+                        try:
+                            await self.retriever.diagnose_weaviate_api()
+                            self.optimization_stats["weaviate_capabilities"] = self.retriever.api_capabilities.copy()
+                        except Exception as e:
+                            logger.warning(f"Diagnostic Weaviate échoué: {e}")
+                            
+                except Exception as e:
+                    logger.warning(f"Retriever hybride échoué: {e}")
+            
+            logger.debug("Étape 5: Générateur de réponses...")
             
             # 5. Générateur de réponses
-            self.generator = EnhancedResponseGenerator(self.openai_client, self.cache_manager)
+            try:
+                self.generator = EnhancedResponseGenerator(self.openai_client, self.cache_manager)
+            except Exception as e:
+                logger.error(f"Erreur générateur: {e}")
+                raise
+            
+            logger.debug("Étape 6: Intent processor...")
             
             # 6. Intent processor
             try:
@@ -198,16 +306,24 @@ class InteliaRAGEngine:
             except Exception as e:
                 logger.warning(f"Intent processor non disponible: {e}")
             
+            logger.debug("Étape 7: Guardrails...")
+            
             # 7. Guardrails
             if GUARDRAILS_AVAILABLE:
-                from advanced_guardrails import create_response_guardrails
-                self.guardrails = create_response_guardrails(self.openai_client, GUARDRAILS_LEVEL)
+                try:
+                    from advanced_guardrails import create_response_guardrails
+                    self.guardrails = create_response_guardrails(self.openai_client, GUARDRAILS_LEVEL)
+                except Exception as e:
+                    logger.warning(f"Guardrails échoué: {e}")
             
             self.is_initialized = True
             logger.info("✅ RAG Engine Enhanced initialisé avec succès")
             
         except Exception as e:
             logger.error(f"❌ Erreur initialisation RAG Engine: {e}")
+            logger.error(f"Type d'erreur: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             self.degraded_mode = True
             self.is_initialized = True
     

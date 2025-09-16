@@ -250,24 +250,36 @@ class DependencyManager:
             'utilities': 'utilities',
             'embedder': 'embedder', 
             'rag_engine': 'rag_engine',
-            'cache_manager': 'cache_core'
+            'cache_manager': 'cache_core'  # ← CORRECTION APPLIQUÉE
         }
         
         for display_name, module_name in internal_modules.items():
             try:
-                # CORRECTION: Import plus robuste
+                # CORRECTION: Import plus robuste avec gestion d'erreurs
                 if module_name == 'rag_engine':
-                    # Test d'import spécifique pour rag_engine
-                    from rag_engine import InteliaRAGEngine
-                    test_import = True
-                elif module_name == 'redis_cache_manager':
-                    # Test d'import spécifique pour cache manager
-                    from redis_cache_manager import RedisCacheManager
-                    test_import = True
+                    # Test d'import spécifique pour rag_engine avec gestion d'erreurs
+                    try:
+                        from rag_engine import InteliaRAGEngine
+                        test_import = True
+                    except Exception as e:
+                        logger.warning(f"Erreur import rag_engine: {e}")
+                        test_import = False
+                elif module_name == 'cache_core':  # ← CORRECTION DU NOM
+                    # Test d'import spécifique pour cache_core
+                    try:
+                        from cache_core import create_cache_core
+                        test_import = True
+                    except Exception as e:
+                        logger.warning(f"Erreur import cache_core: {e}")
+                        test_import = False
                 else:
                     # Import standard pour les autres
-                    __import__(module_name)
-                    test_import = True
+                    try:
+                        __import__(module_name)
+                        test_import = True
+                    except Exception as e:
+                        logger.warning(f"Erreur import {module_name}: {e}")
+                        test_import = False
                 
                 if test_import:
                     self.dependencies[display_name] = DependencyInfo(
@@ -276,6 +288,14 @@ class DependencyManager:
                         is_critical=False
                     )
                     globals()[f'{display_name.upper()}_AVAILABLE'] = True
+                else:
+                    self.dependencies[display_name] = DependencyInfo(
+                        name=display_name,
+                        status=DependencyStatus.MISSING,
+                        error_message=f"Import {module_name} échoué",
+                        is_critical=False
+                    )
+                    globals()[f'{display_name.upper()}_AVAILABLE'] = False
                 
             except ImportError as e:
                 self.dependencies[display_name] = DependencyInfo(

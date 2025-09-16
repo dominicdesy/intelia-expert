@@ -42,9 +42,12 @@ class PDFDocument:
 class PDFDownloader:
     """Téléchargeur de PDFs depuis sources open access"""
     
-    def __init__(self, download_dir: str = "./downloaded_pdfs"):
+    def __init__(self, download_dir: str = "./downloaded_pdfs", intents_config_path: str = "intents.json"):
         self.download_dir = Path(download_dir)
         self.download_dir.mkdir(exist_ok=True)
+        
+        # Charger la configuration intents.json pour définir les requêtes
+        self.intents_config = self._load_intents_config(intents_config_path)
         
         # Créer sous-dossiers par source
         (self.download_dir / "pmc").mkdir(exist_ok=True)
@@ -52,30 +55,237 @@ class PDFDownloader:
         (self.download_dir / "doaj").mkdir(exist_ok=True)
         (self.download_dir / "hal").mkdir(exist_ok=True)
         
+        # Cache de déduplication avancé
+        self.downloaded_hashes = self._load_existing_hashes()
+        self.downloaded_titles = self._load_existing_titles()
+        self.downloaded_dois = self._load_existing_dois()
+        
         # Statistiques
         self.stats = {
             "total_found": 0,
             "total_downloaded": 0,
+            "duplicates_skipped": 0,
             "by_source": {},
             "errors": 0,
             "start_time": time.time()
         }
         
-        # Cache des PDFs déjà téléchargés
-        self.existing_files = self._load_existing_files()
-        
         # Session HTTP
         self.session = None
     
-    def _load_existing_files(self) -> Set[str]:
-        """Charge la liste des fichiers déjà téléchargés"""
-        existing = set()
-        for pdf_file in self.download_dir.rglob("*.pdf"):
-            existing.add(pdf_file.stem)  # Nom sans extension
-        logger.info(f"Fichiers PDF existants: {len(existing)}")
-        return existing
+    def _load_intents_config(self, config_path: str) -> Dict:
+        """Charge la configuration intents.json pour définir les requêtes spécialisées"""
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                logger.info(f"Configuration intents.json chargée: {config.get('version', 'unknown')}")
+                return config
+        except FileNotFoundError:
+            logger.warning(f"Fichier intents.json non trouvé à {config_path}, utilisation requêtes par défaut")
+            return {}
+        except Exception as e:
+            logger.error(f"Erreur chargement intents.json: {e}")
+            return {}
     
-    async def start_download_session(self, target_pdfs: int = 1000):
+    def _load_existing_hashes(self) -> Set[str]:
+        """Charge les hashes des PDFs existants"""
+        hashes = set()
+        for metadata_file in self.download_dir.rglob("*_metadata.json"):
+            try:
+                with open(metadata_file, 'r', encoding='utf-8') as f:
+                    metadata = json.load(f)
+                    content_hash = self._calculate_content_hash(
+                        metadata.get('title', ''),
+                        metadata.get('abstract', ''),
+                        metadata.get('doi', '')
+                    )
+                    hashes.add(content_hash)
+            except:
+                continue
+        logger.info(f"Hashes PDFs existants: {len(hashes)}")
+        return hashes
+    
+    def _load_existing_titles(self) -> Set[str]:
+        """Charge les titres normalisés des PDFs existants"""
+        titles = set()
+        for metadata_file in self.download_dir.rglob("*_metadata.json"):
+            try:
+                with open(metadata_file, 'r', encoding='utf-8') as f:
+                    metadata = json.load(f)
+                    normalized_title = self._normalize_title(metadata.get('title', ''))
+                    if normalized_title:
+                        titles.add(normalized_title)
+            except:
+                continue
+        logger.info(f"Titres PDFs existants: {len(titles)}")
+        return titles
+    
+    def _load_existing_dois(self) -> Set[str]:
+        """Charge les DOIs des PDFs existants"""
+        dois = set()
+        for metadata_file in self.download_dir.rglob("*_metadata.json"):
+            try:
+                with open(metadata_file, 'r', encoding='utf-8') as f:
+                    metadata = json.load(f)
+                    doi = metadata.get('doi', '').strip()
+                    if doi:
+                        dois.add(doi.lower())
+            except:
+                continue
+        logger.info(f"DOIs PDFs existants: {len(dois)}")
+        return dois
+    
+    def _calculate_content_hash(self, title: str, abstract: str, doi: str) -> str:
+        """Calcule un hash de contenu pour détecter les doublons"""
+        content = f"{title.lower().strip()}{abstract.lower().strip()}{doi.lower().strip()}"
+        return hashlib.md5(content.encode()).hexdigest()
+    
+    def _normalize_title(self, title: str) -> str:
+        """Normalise un titre pour la détection de doublons"""
+        if not title:
+            return ""
+        # Supprimer ponctuation, espaces multiples, mettre en minuscules
+        normalized = re.sub(r'[^\w\s]', '', title.lower())
+        normalized = re.sub(r'\s+', ' ', normalized).strip()
+        return normalized
+    
+    def _is_duplicate(self, doc: PDFDocument) -> bool:
+        """Vérifie si un document est un doublon"""
+        # Vérification par DOI
+        if doc.doi and doc.doi.lower() in self.downloaded_dois:
+            return True
+        
+        # Vérification par titre normalisé
+        normalized_title = self._normalize_title(doc.title)
+        if normalized_title and normalized_title in self.downloaded_titles:
+            return True
+        
+        # Vérification par hash de contenu
+        content_hash = self._calculate_content_hash(doc.title, doc.abstract, doc.doi)
+        if content_hash in self.downloaded_hashes:
+            return True
+        
+        return False
+    
+    def _generate_targeted_queries(self) -> List[str]:
+        """Génère des requêtes ultra-ciblées basées sur intents.json avec terminologie scientifique"""
+        queries = []
+        
+        if not self.intents_config:
+            # Requêtes par défaut si pas d'intents.json
+            return [
+                "broiler performance feed conversion",
+                "layer egg production housing",
+                "poultry nutrition requirements",
+                "chicken welfare management"
+            ]
+        
+        # Extraire les métriques depuis intents.json
+        all_metrics = set()
+        for intent_name, intent_config in self.intents_config.get("intents", {}).items():
+            metrics = intent_config.get("metrics", {})
+            all_metrics.update(metrics.keys())
+        
+        # Requêtes basées sur types d'oiseaux (scientifiquement correct)
+        broiler_queries = [
+            "broiler performance growth rate",
+            "broiler feed conversion efficiency",
+            "broiler body weight development",
+            "broiler nutrition amino acids",
+            "broiler welfare housing density",
+            "broiler meat quality carcass",
+            "broiler heat stress management",
+            "broiler lighting program welfare",
+            "broiler ventilation air quality",
+            "broiler slaughter processing"
+        ]
+        
+        layer_queries = [
+            "layer hen egg production rate",
+            "layer nutrition calcium phosphorus",
+            "layer housing enrichment welfare", 
+            "layer lighting photoperiod",
+            "layer feed intake energy",
+            "layer egg quality shell strength",
+            "layer bone health osteoporosis",
+            "layer feather pecking behavior",
+            "layer aviary systems welfare",
+            "layer pullet rearing management"
+        ]
+        
+        queries.extend(broiler_queries)
+        queries.extend(layer_queries)
+        
+        # Requêtes basées sur métriques métier (sans noms de lignées)
+        priority_metrics = [
+            "body_weight_target", "fcr_target", "daily_gain", "uniformity_pct",
+            "water_intake_daily", "feed_intake_daily", "egg_production_pct",
+            "ambient_temp_target", "lighting_hours", "stocking_density_kgm2"
+        ]
+        
+        for metric in priority_metrics:
+            if metric in all_metrics:
+                readable_query = self._metric_to_search_query(metric)
+                if readable_query:
+                    queries.append(readable_query)
+        
+        # Requêtes par site_type (terminologie scientifique)
+        site_queries = [
+            "poultry farm management practices",
+            "commercial broiler production systems",
+            "layer housing welfare standards", 
+            "hatchery biosecurity protocols",
+            "broiler processing plant hygiene",
+            "poultry breeding farm management"
+        ]
+        queries.extend(site_queries)
+        
+        # Requêtes par phase d'élevage (sans lignées)
+        phase_queries = [
+            "broiler starter phase nutrition",
+            "broiler grower phase management", 
+            "broiler finisher phase performance",
+            "layer pullet rearing nutrition",
+            "layer production phase feeding",
+            "poultry pre-starter feeding program"
+        ]
+        queries.extend(phase_queries)
+        
+        # Requêtes spécialisées aviculture
+        specialized_queries = [
+            "poultry gut microbiome probiotics",
+            "avian influenza vaccination protocols",
+            "poultry antimicrobial resistance",
+            "chicken behavior welfare assessment",
+            "poultry precision livestock farming",
+            "broiler ascites syndrome prevention",
+            "layer keel bone fractures welfare",
+            "poultry heat stress mitigation",
+            "chicken slaughter stunning welfare",
+            "poultry environmental sustainability"
+        ]
+        queries.extend(specialized_queries)
+        
+        logger.info(f"Requêtes scientifiques générées: {len(queries)}")
+        return queries[:60]  # Limiter pour éviter surcharge
+    
+    def _metric_to_search_query(self, metric: str) -> str:
+        """Convertit une métrique métier en requête de recherche"""
+        metric_mapping = {
+            "body_weight_target": "broiler body weight target performance",
+            "fcr_target": "feed conversion ratio broiler efficiency",
+            "daily_gain": "daily weight gain poultry performance",
+            "uniformity_pct": "flock uniformity poultry management",
+            "water_intake_daily": "water consumption poultry drinking",
+            "feed_intake_daily": "feed intake poultry nutrition",
+            "egg_production_pct": "egg production rate layer performance",
+            "ambient_temp_target": "broiler house temperature management",
+            "lighting_hours": "lighting program poultry welfare",
+            "stocking_density_kgm2": "stocking density broiler welfare"
+        }
+        return metric_mapping.get(metric, "")
+    
+    async def start_download_session(self, target_pdfs: int = 100):
         """Démarre une session de téléchargement"""
         logger.info(f"DÉMARRAGE TÉLÉCHARGEMENT - Objectif: {target_pdfs} PDFs")
         
@@ -90,12 +300,8 @@ class PDFDownloader:
             logger.info("Phase 2: arXiv")
             arxiv_docs = await self._collect_arxiv_pdfs(target_pdfs // 4)
             
-            # Phase 3: DOAJ
-            logger.info("Phase 3: DOAJ")
-            doaj_docs = await self._collect_doaj_pdfs(target_pdfs // 4)
-            
             # Combinaison et téléchargement
-            all_docs = pmc_docs + arxiv_docs + doaj_docs
+            all_docs = pmc_docs + arxiv_docs
             logger.info(f"Total documents trouvés: {len(all_docs)}")
             
             # Téléchargement parallèle
@@ -121,27 +327,23 @@ class PDFDownloader:
         logger.info("Session HTTP initialisée pour téléchargement PDFs")
     
     async def _collect_pmc_open_access(self, target: int) -> List[PDFDocument]:
-        """Collecte PMC Open Access avec URLs PDF"""
+        """Collecte PMC Open Access avec requêtes ciblées depuis intents.json"""
         docs = []
         
-        poultry_queries = [
-            "poultry", "chicken", "broiler", "layer", "avian", "gallus",
-            "egg production", "feed conversion", "broiler performance",
-            "poultry nutrition", "chicken welfare", "avian health",
-            "poultry management", "livestock", "animal nutrition"
-        ]
+        # Utiliser les requêtes générées depuis intents.json
+        targeted_queries = self._generate_targeted_queries()
         
-        for query in poultry_queries[:5]:  # Limiter pour test
+        for query in targeted_queries:
             if len(docs) >= target:
                 break
             
             try:
-                # Recherche PMC Open Access
+                # Recherche PMC Open Access avec filtres stricts
                 search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
                 params = {
                     "db": "pmc",
-                    "term": f"{query} AND open access[filter]",
-                    "retmax": min(50, target - len(docs)),
+                    "term": f"({query}) AND open access[filter] AND 2015:2025[pdat]",
+                    "retmax": min(20, target - len(docs)),
                     "retmode": "json"
                 }
                 
@@ -152,13 +354,21 @@ class PDFDownloader:
                         
                         if pmcids:
                             batch_docs = await self._process_pmc_batch(pmcids)
-                            docs.extend(batch_docs)
-                            logger.info(f"PMC: +{len(batch_docs)} PDFs pour '{query}'")
+                            # Filtrer les doublons
+                            new_docs = [doc for doc in batch_docs if not self._is_duplicate(doc)]
+                            skipped = len(batch_docs) - len(new_docs)
+                            
+                            docs.extend(new_docs)
+                            if skipped > 0:
+                                self.stats["duplicates_skipped"] += skipped
+                                logger.info(f"PMC: +{len(new_docs)} nouveaux, {skipped} doublons évités pour '{query[:30]}...'")
+                            else:
+                                logger.info(f"PMC: +{len(new_docs)} PDFs pour '{query[:30]}...'")
                 
                 await asyncio.sleep(0.5)  # Rate limiting
                 
             except Exception as e:
-                logger.warning(f"Erreur requête PMC '{query}': {e}")
+                logger.warning(f"Erreur requête PMC '{query[:30]}...': {e}")
         
         self.stats["by_source"]["pmc"] = len(docs)
         return docs
@@ -351,28 +561,23 @@ class PDFDownloader:
         
         return docs
     
-    async def _collect_doaj_pdfs(self, target: int) -> List[PDFDocument]:
-        """Collecte DOAJ (Directory of Open Access Journals)"""
-        docs = []
-        # Implémentation simplifiée pour test
-        logger.info(f"DOAJ: Collecte à implémenter (objectif: {target})")
-        self.stats["by_source"]["doaj"] = len(docs)
-        return docs
-    
     async def _download_pdfs_parallel(self, documents: List[PDFDocument]) -> int:
         """Télécharge les PDFs en parallèle"""
         logger.info(f"Téléchargement de {len(documents)} PDFs...")
         
-        # Filtrer les documents déjà téléchargés
+        # Filtrer les documents déjà téléchargés avec détection avancée de doublons
         to_download = []
-        for doc in documents:
-            safe_filename = self._make_safe_filename(doc.title, doc.source)
-            if safe_filename not in self.existing_files:
-                to_download.append(doc)
-            else:
-                logger.info(f"Déjà téléchargé: {safe_filename}")
+        duplicates_found = 0
         
-        logger.info(f"Nouveaux téléchargements: {len(to_download)}")
+        for doc in documents:
+            if self._is_duplicate(doc):
+                duplicates_found += 1
+                logger.info(f"Doublon détecté: {doc.title[:50]}...")
+            else:
+                to_download.append(doc)
+        
+        self.stats["duplicates_skipped"] += duplicates_found
+        logger.info(f"Documents à télécharger: {len(to_download)}, doublons évités: {duplicates_found}")
         
         # Téléchargement par petits lots pour éviter la surcharge
         downloaded_count = 0
@@ -477,6 +682,7 @@ RAPPORT TÉLÉCHARGEMENT PDFs
 ===========================
 Durée: {duration:.0f}s ({duration/60:.1f}min)
 PDFs téléchargés: {downloaded_count}
+Doublons évités: {self.stats['duplicates_skipped']}
 Erreurs: {self.stats['errors']}
 
 PAR SOURCE:
@@ -513,7 +719,7 @@ async def main():
     """Lance le téléchargeur de PDFs"""
     try:
         downloader = PDFDownloader(download_dir="./downloaded_pdfs")
-        await downloader.start_download_session(target_pdfs=100)  # Test avec 100 PDFs
+        await downloader.start_download_session(target_pdfs=50)  # Test avec 50 PDFs
         logger.info("TÉLÉCHARGEMENT TERMINÉ AVEC SUCCÈS!")
     except Exception as e:
         logger.error(f"ÉCHEC TÉLÉCHARGEMENT: {e}")
