@@ -6,12 +6,13 @@ CORRIGÉ: Import wvc_query manquant qui causait l'erreur de démarrage
 CORRIGÉ: Détection modules internes rag_engine et cache_manager
 CORRIGÉ: Import circulaire ENABLE_API_DIAGNOSTICS déplacé vers config.py
 CORRIGÉ: Erreur async validate_connectivity() causant le RuntimeWarning Redis
-CORRIGÉ: Gestion async Redis proper avec await
+CORRIGÉ: Gestion async Redis proper avec await et détection automatique sync/async
 """
 
 import logging
 import os
 import asyncio
+import inspect
 from typing import Dict, Optional, List, Any
 from dataclasses import dataclass
 from enum import Enum
@@ -33,6 +34,35 @@ class DependencyInfo:
     version: Optional[str] = None
     error_message: Optional[str] = None
     is_critical: bool = False
+
+async def _test_redis_async_safe(redis_client) -> bool:
+    """Test Redis avec détection automatique sync/async - CORRECTION APPLIQUÉE"""
+    try:
+        if redis_client is None:
+            return False
+
+        # Essayer ping() d'abord
+        if hasattr(redis_client, "ping"):
+            ping_fn = getattr(redis_client, "ping")
+            if inspect.iscoroutinefunction(ping_fn):
+                return bool(await asyncio.wait_for(ping_fn(), timeout=3.0))
+            else:
+                # client sync (rare dans ton cas) → thread
+                return bool(await asyncio.get_event_loop().run_in_executor(None, ping_fn))
+
+        # Fallback: execute_command("PING")
+        if hasattr(redis_client, "execute_command"):
+            exec_fn = getattr(redis_client, "execute_command")
+            if inspect.iscoroutinefunction(exec_fn):
+                return bool(await asyncio.wait_for(exec_fn("PING"), timeout=3.0))
+            else:
+                return bool(await asyncio.get_event_loop().run_in_executor(None, exec_fn, "PING"))
+
+        # Si aucune des deux API n'existe, considérer non disponible
+        return False
+
+    except Exception:
+        return False
 
 class DependencyManager:
     """Gestionnaire centralisé des dépendances avec validation stricte - VERSION CORRIGÉE"""
@@ -330,7 +360,7 @@ class DependencyManager:
         return self._openai_async_client
     
     async def validate_connectivity(self, redis_client=None, weaviate_client=None) -> Dict[str, bool]:
-        """CORRIGÉ: Valide la connectivité des services externes - CORRECTION ASYNC COMPLÈTE"""
+        """CORRIGÉ: Valide la connectivité des services externes - CORRECTION REDIS COMPLÈTE"""
         results = {
             'openai': False,
             'weaviate': False,
@@ -381,16 +411,13 @@ class DependencyManager:
         except Exception as e:
             logger.warning(f"Test connectivité Weaviate échoué: {e}")
         
-
-        # Test Redis - CORRECTION RADICALE
+        # Test Redis - VERSION SÛRE AVEC DÉTECTION AUTO SYNC/ASYNC
         try:
-            if redis_client:
-                # Éviter complètement execute_command qui cause le RuntimeWarning
-                results['redis'] = True  # Supposer que Redis fonctionne si le client existe
-                logger.debug("Redis considéré comme fonctionnel (test simplifié)")
+            results['redis'] = await _test_redis_async_safe(redis_client)
         except Exception as e:
             logger.warning(f"Test connectivité Redis échoué: {e}")
-
+        
+        return results
     
     def get_status_report(self) -> Dict[str, Any]:
         """Génère un rapport de statut complet"""
@@ -524,6 +551,7 @@ def validate_imports_corrections() -> Dict[str, bool]:
         ),
         "async_validation_fixed": hasattr(dependency_manager, 'validate_connectivity'),
         "redis_handling_fixed": True,  # Vérifié par inspection du code
+        "redis_async_safe_function": '_test_redis_async_safe' in globals(),  # ← NOUVELLE VALIDATION
         "internal_modules_loaded": len([
             dep for dep in dependency_manager.dependencies.values() 
             if dep.name in ['utilities', 'embedder', 'rag_engine', 'cache_manager']
@@ -539,9 +567,10 @@ def validate_imports_corrections() -> Dict[str, bool]:
             "wvc": globals().get('wvc') is not None,
             "wvc_query": globals().get('wvc_query') is not None,
             "AsyncOpenAI": globals().get('AsyncOpenAI') is not None,
-            "OpenAI": globals().get('OpenAI') is not None
+            "OpenAI": globals().get('OpenAI') is not None,
+            "_test_redis_async_safe": '_test_redis_async_safe' in globals()
         },
-        "version": "corrected_complete"
+        "version": "corrected_complete_redis_async_safe"
     }
 
 # === EXPORTS POUR COMPATIBILITÉ ===
@@ -555,6 +584,7 @@ __all__ = [
     'require_critical_dependencies',
     'diagnose_dependency_issues',
     'validate_imports_corrections',
+    '_test_redis_async_safe',  # ← AJOUTÉ À L'EXPORT
     'OPENAI_AVAILABLE',
     'WEAVIATE_AVAILABLE',
     'WEAVIATE_V4',
