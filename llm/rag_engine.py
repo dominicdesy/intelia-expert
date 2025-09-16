@@ -5,6 +5,7 @@ Version avec intégration LangSmith pour monitoring LLM aviculture
 CORRIGÉ: Élimination des imports circulaires
 CORRIGÉ: Import redis_cache_manager via import relatif
 CORRIGÉ: Suppression import explicite get_dependencies_status redondant
+CORRIGÉ: Indentation et structure complète
 """
 
 import os
@@ -30,7 +31,6 @@ except Exception as e:
 try:
     # CORRECTION: Import depuis imports_and_dependencies SANS get_dependencies_status explicite
     from imports_and_dependencies import *
-    # SUPPRIMÉ: from imports_and_dependencies import get_dependencies_status  # ← LIGNE SUPPRIMÉE
     logger.debug("Imports_and_dependencies importé avec succès")
 except Exception as e:
     logger.error(f"Erreur import imports_and_dependencies: {e}")
@@ -113,7 +113,7 @@ if LANGSMITH_ENABLED:
         from langsmith import Client
         from langsmith.run_helpers import traceable
         LANGSMITH_AVAILABLE = True
-                        logger.info("LangSmith importé avec succès")
+        logger.info("LangSmith importé avec succès")
     except ImportError as e:
         LANGSMITH_AVAILABLE = False
         logger.warning(f"LangSmith non disponible: {e}")
@@ -124,12 +124,13 @@ else:
 try:
     from enhanced_rrf_fusion import IntelligentRRFFusion
     INTELLIGENT_RRF_AVAILABLE = True
-                    logger.info("RRF Intelligent importe avec succes")
+    logger.info("RRF Intelligent importé avec succès")
 except ImportError as e:
     INTELLIGENT_RRF_AVAILABLE = False
     logger.warning(f"RRF Intelligent non disponible: {e}")
 
 DEFAULT_ALPHA = float(os.getenv("HYBRID_ALPHA", "0.6"))
+
 
 class InteliaRAGEngine:
     """RAG Engine principal avec LangSmith et RRF Intelligent"""
@@ -157,7 +158,7 @@ class InteliaRAGEngine:
                     api_key=LANGSMITH_API_KEY,
                     api_url="https://api.smith.langchain.com"
                 )
-                logger.info(f"LangSmith initialise - Projet: {LANGSMITH_PROJECT}")
+                logger.info(f"LangSmith initialisé - Projet: {LANGSMITH_PROJECT}")
             except Exception as e:
                 logger.error(f"Erreur initialisation LangSmith: {e}")
                 self.langsmith_client = None
@@ -329,7 +330,7 @@ class InteliaRAGEngine:
                     logger.warning(f"Guardrails échoué: {e}")
             
             self.is_initialized = True
-            logger.info("RAG Engine Enhanced initialise avec succes")
+            logger.info("RAG Engine Enhanced initialisé avec succès")
             
         except Exception as e:
             logger.error(f"Erreur initialisation RAG Engine: {e}")
@@ -358,7 +359,6 @@ class InteliaRAGEngine:
                 query, tenant_id, conversation_context, language, explain_score
             )
     
-    @traceable(name="aviculture_rag_query") if LANGSMITH_AVAILABLE else lambda f: f
     async def _generate_response_with_langsmith(self, query: str, tenant_id: str,
                                               conversation_context: List[Dict],
                                               language: Optional[str],
@@ -408,7 +408,7 @@ class InteliaRAGEngine:
                     # Trace run avec métadonnées enrichies
                     run_data = {
                         "inputs": {"query": query},
-                        "outputs": {"answer": result.answer[:500]},  # Limiter taille
+                        "outputs": {"answer": result.answer[:500] if result.answer else ""},  # Limiter taille
                         "metadata": langsmith_metadata
                     }
                     
@@ -434,6 +434,9 @@ class InteliaRAGEngine:
         
         alerts = []
         
+        if not result.answer:
+            return
+            
         # Détection valeurs aberrantes aviculture
         answer_lower = result.answer.lower()
         
