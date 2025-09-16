@@ -116,7 +116,7 @@ if LANGSMITH_ENABLED:
         logger.info("✅ LangSmith importé avec succès")
     except ImportError as e:
         LANGSMITH_AVAILABLE = False
-        logger.warning(f"⚠️ LangSmith non disponible: {e}")
+        logger.warning(f⚠️ LangSmith non disponible: {e}")
 else:
     LANGSMITH_AVAILABLE = False
 
@@ -226,9 +226,9 @@ class InteliaRAGEngine:
             # 1. Cache Redis externe avec protection renforcée
             if CACHE_ENABLED and EXTERNAL_CACHE_AVAILABLE:
                 try:
-                    # CORRECTION: Import relatif au lieu d'import absolu
+                    # CORRECTION: Import absolu pour éviter l'erreur de package
                     try:
-                        from .redis_cache_manager import RAGCacheManager
+                        from redis_cache_manager import RAGCacheManager
                         self.cache_manager = RAGCacheManager()
                         await self.cache_manager.initialize()
                         if self.cache_manager.enabled:
@@ -837,7 +837,8 @@ class InteliaRAGEngine:
             if self.retriever and hasattr(self.retriever, 'api_capabilities'):
                 api_capabilities = self.retriever.api_capabilities
             
-            # CORRECTION: Utilisation correcte de dependency_manager
+            # CORRECTION: Import local de dependency_manager pour éviter NameError
+            from imports_and_dependencies import dependency_manager
             dependencies_status = dependency_manager.get_legacy_status()
             
             status = {
