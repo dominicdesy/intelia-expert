@@ -3,6 +3,8 @@
 rag_engine.py - RAG Engine Enhanced avec LangSmith et RRF Intelligent
 Version avec intégration LangSmith pour monitoring LLM aviculture
 CORRIGÉ: Gestion d'erreurs robuste pour éliminer "attempted relative import"
+CORRIGÉ: Import get_dependencies_status manquant
+CORRIGÉ: Protection import redis_cache_manager
 """
 
 import os
@@ -13,7 +15,6 @@ import numpy as np
 import httpx
 from typing import Dict, List, Optional, Any
 from collections import defaultdict
-from config import ENABLE_API_DIAGNOSTICS
 
 # CORRECTION CRITIQUE: Définir logger AVANT toute utilisation
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ except Exception as e:
 
 try:
     from imports_and_dependencies import *
+    from imports_and_dependencies import get_dependencies_status  # Import explicite
     logger.debug("Imports_and_dependencies importé avec succès")
 except Exception as e:
     logger.error(f"Erreur import imports_and_dependencies: {e}")
@@ -220,18 +222,26 @@ class InteliaRAGEngine:
             # CORRECTION: Gestion d'erreurs détaillée pour chaque étape
             logger.debug("Étape 1: Initialisation Cache Redis externe...")
             
-            # 1. Cache Redis externe
+            # 1. Cache Redis externe avec protection renforcée
             if CACHE_ENABLED and EXTERNAL_CACHE_AVAILABLE:
                 try:
-                    # CORRECTION: Import direct au lieu d'import relatif potentiel
-                    from redis_cache_manager import RedisCacheManager
-                    self.cache_manager = RedisCacheManager()
-                    await self.cache_manager.initialize()
-                    if self.cache_manager.enabled:
-                        self.optimization_stats["external_cache_used"] = True
-                        logger.info("✅ Cache Redis externe activé")
+                    # CORRECTION: Protection contre l'import relatif
+                    try:
+                        from redis_cache_manager import RedisCacheManager
+                        self.cache_manager = RedisCacheManager()
+                        await self.cache_manager.initialize()
+                        if self.cache_manager.enabled:
+                            self.optimization_stats["external_cache_used"] = True
+                            logger.info("✅ Cache Redis externe activé")
+                    except ImportError as e:
+                        logger.warning(f"RedisCacheManager non disponible: {e}")
+                        self.cache_manager = None
+                    except Exception as e:
+                        logger.warning(f"Cache Redis externe échoué: {e}")
+                        self.cache_manager = None
+                        
                 except Exception as e:
-                    logger.warning(f"Cache Redis externe échoué: {e}")
+                    logger.warning(f"Erreur générale cache: {e}")
                     self.cache_manager = None
             
             logger.debug("Étape 2: Connexion Weaviate...")
@@ -634,7 +644,7 @@ class InteliaRAGEngine:
                 
                 context_docs.append(doc_dict)
             
-            # Métadonnées enrichies
+            # Métadonnées enrichies avec CORRECTION get_dependencies_status
             dependencies_status = get_dependencies_status()
             metadata = {
                 "approach": "enhanced_rag_langsmith_intelligent_rrf",
@@ -826,6 +836,7 @@ class InteliaRAGEngine:
             if self.retriever and hasattr(self.retriever, 'api_capabilities'):
                 api_capabilities = self.retriever.api_capabilities
             
+            # CORRECTION: Utilisation correcte de get_dependencies_status
             dependencies_status = get_dependencies_status()
             
             status = {
