@@ -8,6 +8,7 @@ NOUVELLES FONCTIONNALITÉS AJOUTÉES:
 - Variables d'environnement Digital Ocean
 - Health checks enrichis avec nouveau statut
 - CORRECTION: Redis safety patch pour execute_command
+- AJOUT: Endpoint /chat complet
 """
 
 import os
@@ -767,7 +768,7 @@ class MetricsCollector:
 
 metrics_collector = MetricsCollector()
 
-# Helpers de streaming et fonctions utilitaires (inchangées)
+# Helpers de streaming et fonctions utilitaires
 def sse_event(obj: Dict[str, Any]) -> bytes:
     """Formatage SSE avec gestion d'erreurs robuste"""
     try:
@@ -894,7 +895,7 @@ def detect_language(text: str, min_length: int = None) -> str:
         logger.warning(f"Erreur détection langue pour '{text[:50]}...': {e}")
         return 'fr'  # Défaut français en cas d'erreur
 
-# Gestion du cycle de vie de l'application (mise à jour avec nouveau monitoring)
+# Gestion du cycle de vie de l'application
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Gestion du cycle de vie avec validation stricte et monitoring enrichi"""
@@ -1094,7 +1095,6 @@ async def get_metrics():
         logger.error(f"Erreur récupération métriques: {e}")
         return {"error": str(e), "timestamp": time.time()}
 
-# === NOUVEAU: Endpoint configuration ===
 @router.get(f"{BASE_PATH}/status/configuration")
 async def configuration_status():
     """Statut détaillé de la configuration"""
@@ -1120,6 +1120,144 @@ async def configuration_status():
         
     except Exception as e:
         return {"error": str(e)}
+
+# === NOUVEAU: ENDPOINT CHAT COMPLET ===
+@router.post(f"{BASE_PATH}/chat")
+async def chat(request: Request):
+    """Chat endpoint avec validation stricte et gestion d'erreurs robuste"""
+    total_start_time = time.time()
+    
+    if not rag_engine_enhanced:
+        metrics_collector.record_query({"source": "error"}, "error", time.time() - total_start_time)
+        raise HTTPException(status_code=503, detail="RAG Engine Enhanced non disponible")
+    
+    try:
+        # Validation de la requête
+        try:
+            body = await request.json()
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"JSON invalide: {e}")
+        
+        message = body.get("message", "").strip()
+        language = body.get("language", "").strip()
+        tenant_id = body.get("tenant_id", str(uuid.uuid4())[:8])
+        
+        # Validations
+        if not message:
+            raise HTTPException(status_code=400, detail="Message vide")
+        
+        if len(message) > MAX_REQUEST_SIZE:
+            raise HTTPException(status_code=413, detail=f"Message trop long (max {MAX_REQUEST_SIZE})")
+        
+        # Détection de langue si non fournie
+        if not language:
+            language = detect_language(message)
+        
+        # Validation tenant_id
+        if not tenant_id or len(tenant_id) > 50:
+            tenant_id = str(uuid.uuid4())[:8]
+        
+        # Messages trop courts -> réponse OOD
+        if len(message.split()) < 3:
+            out_of_domain_msg = get_out_of_domain_message(language)
+            
+            async def simple_response():
+                yield sse_event({"type": "start", "reason": "too_short"})
+                yield sse_event({"type": "chunk", "content": out_of_domain_msg})
+                yield sse_event({"type": "end", "confidence": 0.9})
+            
+            metrics_collector.record_query({"source": "ood"}, "ood", time.time() - total_start_time)
+            return StreamingResponse(simple_response(), media_type="text/plain")
+        
+        # Traitement principal avec RAG Enhanced
+        try:
+            rag_result = await rag_engine_enhanced.process_query(message, language, tenant_id)
+        except Exception as e:
+            logger.error(f"Erreur traitement RAG: {e}")
+            metrics_collector.record_query({"source": "error"}, "error", time.time() - total_start_time)
+            raise HTTPException(status_code=500, detail=f"Erreur traitement: {str(e)}")
+        
+        # Enregistrer métriques
+        total_processing_time = time.time() - total_start_time
+        metrics_collector.record_query(rag_result, "rag_enhanced", total_processing_time)
+        
+        # Streaming de la réponse
+        async def generate_response():
+            try:
+                # Informations de début
+                metadata = getattr(rag_result, 'metadata', {}) or {}
+                yield sse_event({
+                    "type": "start", 
+                    "source": getattr(rag_result, 'source', 'unknown'),
+                    "confidence": getattr(rag_result, 'confidence', 0.5),
+                    "processing_time": getattr(rag_result, 'processing_time', 0)
+                })
+                
+                # Contenu de la réponse
+                answer = getattr(rag_result, 'answer', '')
+                if answer:
+                    chunks = smart_chunk_text(answer, STREAM_CHUNK_LEN)
+                    
+                    for i, chunk in enumerate(chunks):
+                        yield sse_event({
+                            "type": "chunk", 
+                            "content": chunk,
+                            "chunk_index": i
+                        })
+                        await asyncio.sleep(0.01)  # Streaming fluide
+                
+                # Informations finales
+                yield sse_event({
+                    "type": "end",
+                    "total_time": total_processing_time,
+                    "confidence": getattr(rag_result, 'confidence', 0.5),
+                    "documents_used": len(getattr(rag_result, 'context_docs', []))
+                })
+                
+                # Enregistrer en mémoire
+                if answer and hasattr(rag_result, 'source'):
+                    add_to_conversation_memory(tenant_id, message, answer, "rag_enhanced")
+                
+            except Exception as e:
+                logger.error(f"Erreur streaming: {e}")
+                yield sse_event({"type": "error", "message": str(e)})
+        
+        return StreamingResponse(generate_response(), media_type="text/plain")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur chat endpoint: {e}")
+        metrics_collector.record_query({"source": "error"}, "error", time.time() - total_start_time)
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Erreur traitement: {str(e)}"}
+        )
+
+# Route OOD pour compatibilité
+@router.post(f"{BASE_PATH}/ood")
+async def ood_endpoint(request: Request):
+    """Point de terminaison pour messages hors domaine"""
+    try:
+        body = await request.json()
+        language = body.get("language", "fr")
+        message = get_out_of_domain_message(language)
+        
+        async def ood_response():
+            yield sse_event({"type": "start", "reason": "out_of_domain"})
+            
+            chunks = smart_chunk_text(message, STREAM_CHUNK_LEN)
+            for chunk in chunks:
+                yield sse_event({"type": "chunk", "content": chunk})
+                await asyncio.sleep(0.05)
+            
+            yield sse_event({"type": "end", "confidence": 1.0})
+        
+        return StreamingResponse(ood_response(), media_type="text/plain")
+        
+    except Exception as e:
+        logger.error(f"Erreur OOD endpoint: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 # Inclusion du router dans l'app
 app.include_router(router)
