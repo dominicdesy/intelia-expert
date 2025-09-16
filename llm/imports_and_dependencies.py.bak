@@ -399,40 +399,26 @@ class DependencyManager:
                             timeout=5.0
                         )
                     results['redis'] = True
-
+                    
                 elif hasattr(redis_client, 'execute_command'):
                     # CORRECTION: Gestion proper de execute_command async vs sync
                     if asyncio.iscoroutinefunction(redis_client.execute_command):
-                        # Client Redis async - CORRIGÉ
-                        try:
-                            await asyncio.wait_for(
-                                redis_client.execute_command('PING'), 
-                                timeout=5.0
-                            )
-                            results['redis'] = True
-                        except Exception as redis_error:
-                            logger.debug(f"Redis async execute_command échoué: {redis_error}")
-                            # Fallback vers ping() si disponible
-                            if hasattr(redis_client, 'ping') and asyncio.iscoroutinefunction(redis_client.ping):
-                                try:
-                                    await asyncio.wait_for(redis_client.ping(), timeout=5.0)
-                                    results['redis'] = True
-                                except Exception:
-                                    pass
+                        # Client Redis async
+                        await asyncio.wait_for(
+                            redis_client.execute_command('PING'), 
+                            timeout=5.0
+                        )
                     else:
                         # Client Redis synchrone
                         def _execute_sync():
                             return redis_client.execute_command('PING')
                         
-                        try:
-                            await asyncio.wait_for(
-                                asyncio.get_event_loop().run_in_executor(None, _execute_sync),
-                                timeout=5.0
-                            )
-                            results['redis'] = True
-                        except Exception as redis_error:
-                            logger.debug(f"Redis sync execute_command échoué: {redis_error}")
-
+                        await asyncio.wait_for(
+                            asyncio.get_event_loop().run_in_executor(None, _execute_sync),
+                            timeout=5.0
+                        )
+                    results['redis'] = True
+                    
         except Exception as e:
             logger.warning(f"Test connectivité Redis échoué: {e}")
         
