@@ -2,6 +2,7 @@
 """
 config.py - Configuration centralisée avec support LangSmith et RRF Intelligent
 Optimisé pour Digital Ocean App Platform
+Version corrigée: Ajout des variables manquantes pour la détection de langue
 """
 
 import os
@@ -34,42 +35,106 @@ RRF_LEARNING_MODE = os.getenv("RRF_LEARNING_MODE", "true").lower() == "true"
 RRF_GENETIC_BOOST = os.getenv("RRF_GENETIC_BOOST", "true").lower() == "true"
 RRF_DEBUG_MODE = os.getenv("RRF_DEBUG_MODE", "false").lower() == "true"
 
-# Paramètres RRF tunables
-RRF_BASE_K = int(os.getenv("RRF_BASE_K", "60"))
-RRF_GENETIC_BOOST_FACTOR = float(os.getenv("RRF_GENETIC_BOOST_FACTOR", "1.3"))
-RRF_LEARNING_DECAY = float(os.getenv("RRF_LEARNING_DECAY", "0.95"))
+# Paramètres RRF
 RRF_CACHE_SIZE = int(os.getenv("RRF_CACHE_SIZE", "1000"))
+RRF_BASE_K = int(os.getenv("RRF_BASE_K", "60"))
 
-# ===== CONFIGURATION RAG =====
+# ===== RAG CONFIGURATION =====
 RAG_SIMILARITY_TOP_K = int(os.getenv("RAG_SIMILARITY_TOP_K", "15"))
-RAG_CONFIDENCE_THRESHOLD = float(os.getenv("RAG_CONFIDENCE_THRESHOLD", "0.1"))
-RAG_RERANK_TOP_K = int(os.getenv("RAG_RERANK_TOP_K", "8"))
+RAG_CONFIDENCE_THRESHOLD = float(os.getenv("RAG_CONFIDENCE_THRESHOLD", "0.55"))
 RAG_VERIFICATION_ENABLED = os.getenv("RAG_VERIFICATION_ENABLED", "true").lower() == "true"
-RAG_VERIFICATION_SMART = os.getenv("RAG_VERIFICATION_SMART", "true").lower() == "true"
+MAX_CONVERSATION_CONTEXT = int(os.getenv("MAX_CONVERSATION_CONTEXT", "8"))
 
-# ===== HYBRID SEARCH =====
+# Recherche hybride
 HYBRID_SEARCH_ENABLED = os.getenv("HYBRID_SEARCH_ENABLED", "true").lower() == "true"
 DEFAULT_ALPHA = float(os.getenv("HYBRID_ALPHA", "0.6"))
 
-# ===== OOD DETECTION =====
-OOD_MIN_SCORE = float(os.getenv("OOD_MIN_SCORE", "0.3"))
-OOD_STRICT_SCORE = float(os.getenv("OOD_STRICT_SCORE", "0.6"))
+# ===== CACHE CONFIGURATION =====
+CACHE_TOTAL_MEMORY_LIMIT_MB = int(os.getenv("CACHE_TOTAL_MEMORY_LIMIT_MB", "150"))
+CACHE_VALUE_MAX_SIZE_KB = int(os.getenv("CACHE_VALUE_MAX_SIZE_KB", "200"))
+CACHE_ENABLE_COMPRESSION = os.getenv("CACHE_ENABLE_COMPRESSION", "true").lower() == "true"
 
-# ===== GUARDRAILS =====
-GUARDRAILS_AVAILABLE = os.getenv("GUARDRAILS_AVAILABLE", "true").lower() == "true"
-GUARDRAILS_LEVEL = os.getenv("GUARDRAILS_LEVEL", "standard")
+# Cache sémantique
+ENABLE_SEMANTIC_CACHE = os.getenv("ENABLE_SEMANTIC_CACHE", "true").lower() == "true"
+SEMANTIC_CACHE_SIMILARITY_THRESHOLD = float(os.getenv("SEMANTIC_CACHE_SIMILARITY_THRESHOLD", "0.92"))
 
-# ===== ENTITY ENRICHMENT =====
+# ===== GUARDRAILS ET SÉCURITÉ =====
+GUARDRAILS_LEVEL = os.getenv("GUARDRAILS_LEVEL", "strict")
+GUARDRAILS_AVAILABLE = True  # Toujours disponible en mode basique
+
+# OOD Detection
+OOD_MIN_SCORE = float(os.getenv("OOD_MIN_SCORE", "0.4"))
+OOD_STRICT_SCORE = float(os.getenv("OOD_STRICT_SCORE", "0.7"))
+
+# ===== ENRICHISSEMENTS ET FONCTIONNALITÉS =====
 ENTITY_ENRICHMENT_ENABLED = os.getenv("ENTITY_ENRICHMENT_ENABLED", "true").lower() == "true"
-
-# ===== API DIAGNOSTICS =====
 ENABLE_API_DIAGNOSTICS = os.getenv("ENABLE_API_DIAGNOSTICS", "true").lower() == "true"
 
-# ===== CONVERSATION MEMORY =====
-MAX_CONVERSATION_CONTEXT = int(os.getenv("MAX_CONVERSATION_CONTEXT", "6"))
-
-# ===== LANGUAGE DETECTION =====
+# ===== DÉTECTION DE LANGUE - VARIABLES MANQUANTES AJOUTÉES =====
 LANG_DETECTION_MIN_LENGTH = int(os.getenv("LANG_DETECTION_MIN_LENGTH", "20"))
+
+# Mots indicateurs français
+FRENCH_HINTS = [
+    "est", "sont", "était", "sera", "avec", "dans", "pour", "que", "qui", "quoi", 
+    "comment", "pourquoi", "quand", "où", "combien", "quelle", "quel", "quels", 
+    "quelles", "celui", "celle", "ceux", "celles", "cette", "ces", "mon", "ma", 
+    "mes", "ton", "ta", "tes", "son", "sa", "ses", "notre", "nos", "votre", 
+    "vos", "leur", "leurs", "le", "la", "les", "un", "une", "des", "du", "de",
+    "au", "aux", "sur", "sous", "entre", "vers", "pendant", "depuis", "avant",
+    "après", "chez", "sans", "très", "plus", "moins", "aussi", "encore", "déjà",
+    "jamais", "toujours", "souvent", "parfois", "hier", "aujourd", "demain",
+    "matin", "soir", "nuit", "jour", "semaine", "mois", "année", "temps"
+]
+
+# Mots indicateurs anglais
+ENGLISH_HINTS = [
+    "the", "and", "that", "have", "for", "not", "with", "you", "this", "but",
+    "his", "from", "they", "she", "her", "been", "than", "its", "who", "did",
+    "what", "when", "where", "why", "how", "which", "would", "could", "should",
+    "will", "can", "may", "might", "must", "shall", "about", "into", "through",
+    "during", "before", "after", "above", "below", "between", "among", "under",
+    "over", "very", "more", "most", "less", "much", "many", "some", "any",
+    "all", "both", "each", "every", "other", "another", "such", "only", "own",
+    "same", "few", "little", "long", "good", "new", "first", "last", "next",
+    "old", "great", "small", "large", "right", "left", "high", "low", "here",
+    "there", "now", "then", "today", "tomorrow", "yesterday", "morning", "evening"
+]
+
+# Caractères spéciaux français
+FRENCH_CHARS = ["à", "â", "ä", "ç", "é", "è", "ê", "ë", "î", "ï", "ô", "ö", "ù", "û", "ü", "ÿ", "ñ"]
+
+# Mots techniques aviculture (français)
+AVICULTURE_FRENCH_TERMS = [
+    "poule", "poulet", "poussin", "coq", "volaille", "ponte", "œuf", "œufs",
+    "alimentation", "mangeoire", "abreuvoir", "poulailler", "perchoir", "pondoir",
+    "poussinière", "élevage", "couveuse", "incubation", "éclosion", "vaccin",
+    "vermifuge", "parasites", "maladies", "aviaires", "stress", "picage",
+    "plumage", "mue", "croissance", "reproduction", "fertilité", "ponte",
+    "coquille", "blanc", "jaune", "vitellus", "albumen", "chalaze"
+]
+
+# ===== DOMAINES KEYWORDS POUR OOD =====
+DOMAIN_KEYWORDS = [
+    # Aviculture core
+    "poule", "poulet", "poussin", "coq", "volaille", "ponte", "œuf", "œufs",
+    "chicken", "hen", "rooster", "chick", "poultry", "egg", "eggs", "laying",
+    
+    # Élevage et soins
+    "alimentation", "mangeoire", "abreuvoir", "poulailler", "perchoir", "pondoir",
+    "feeding", "feeder", "waterer", "coop", "roost", "nest", "housing",
+    
+    # Santé et maladies
+    "maladie", "vaccin", "vermifuge", "parasites", "stress", "picage", "plumage",
+    "disease", "vaccine", "dewormer", "parasites", "stress", "pecking", "feather",
+    
+    # Production
+    "ponte", "production", "œufs", "incubation", "éclosion", "couveuse",
+    "laying", "production", "eggs", "incubation", "hatching", "incubator",
+    
+    # Nutrition
+    "protéine", "calcium", "grain", "maïs", "blé", "soja", "vitamines",
+    "protein", "calcium", "grain", "corn", "wheat", "soy", "vitamins"
+]
 
 # ===== LOGGING =====
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
@@ -114,6 +179,16 @@ def validate_config() -> tuple[bool, list[str]]:
     if not (0.0 <= DEFAULT_ALPHA <= 1.0):
         errors.append("HYBRID_ALPHA doit être entre 0.0 et 1.0")
     
+    if not (0.0 <= RAG_CONFIDENCE_THRESHOLD <= 1.0):
+        errors.append("RAG_CONFIDENCE_THRESHOLD doit être entre 0.0 et 1.0")
+    
+    if not (0.0 <= SEMANTIC_CACHE_SIMILARITY_THRESHOLD <= 1.0):
+        errors.append("SEMANTIC_CACHE_SIMILARITY_THRESHOLD doit être entre 0.0 et 1.0")
+    
+    # Validation guardrails
+    if GUARDRAILS_LEVEL not in ["strict", "moderate", "permissive"]:
+        errors.append("GUARDRAILS_LEVEL doit être: strict, moderate, ou permissive")
+    
     return len(errors) == 0, errors
 
 # ===== STATUS REPORTING =====
@@ -135,6 +210,13 @@ def get_config_status() -> dict:
             "genetic_boost": RRF_GENETIC_BOOST,
             "debug_mode": RRF_DEBUG_MODE
         },
+        "language_detection": {
+            "min_length": LANG_DETECTION_MIN_LENGTH,
+            "french_hints_count": len(FRENCH_HINTS),
+            "english_hints_count": len(ENGLISH_HINTS),
+            "french_chars_count": len(FRENCH_CHARS),
+            "aviculture_terms_count": len(AVICULTURE_FRENCH_TERMS)
+        },
         "environment": {
             "do_app_name": DO_APP_NAME,
             "do_app_tier": DO_APP_TIER,
@@ -150,11 +232,27 @@ __all__ = [
     # API Keys
     "OPENAI_API_KEY", "WEAVIATE_URL", "REDIS_URL",
     # LangSmith
-    "LANGSMITH_ENABLED", "LANGSMITH_API_KEY", "LANGSMITH_PROJECT",
+    "LANGSMITH_ENABLED", "LANGSMITH_API_KEY", "LANGSMITH_PROJECT", "LANGSMITH_ENVIRONMENT",
     # RRF Intelligent
-    "ENABLE_INTELLIGENT_RRF", "RRF_LEARNING_MODE", "RRF_GENETIC_BOOST",
+    "ENABLE_INTELLIGENT_RRF", "RRF_LEARNING_MODE", "RRF_GENETIC_BOOST", "RRF_DEBUG_MODE",
+    "RRF_CACHE_SIZE", "RRF_BASE_K",
     # RAG Config
-    "RAG_SIMILARITY_TOP_K", "RAG_CONFIDENCE_THRESHOLD", "HYBRID_SEARCH_ENABLED",
+    "RAG_SIMILARITY_TOP_K", "RAG_CONFIDENCE_THRESHOLD", "RAG_VERIFICATION_ENABLED",
+    "HYBRID_SEARCH_ENABLED", "DEFAULT_ALPHA", "MAX_CONVERSATION_CONTEXT",
+    # Cache
+    "CACHE_TOTAL_MEMORY_LIMIT_MB", "CACHE_VALUE_MAX_SIZE_KB", "CACHE_ENABLE_COMPRESSION",
+    "ENABLE_SEMANTIC_CACHE", "SEMANTIC_CACHE_SIMILARITY_THRESHOLD",
+    # Guardrails
+    "GUARDRAILS_LEVEL", "GUARDRAILS_AVAILABLE", "OOD_MIN_SCORE", "OOD_STRICT_SCORE",
+    # Features
+    "ENTITY_ENRICHMENT_ENABLED", "ENABLE_API_DIAGNOSTICS",
+    # Language Detection - VARIABLES MANQUANTES AJOUTÉES
+    "LANG_DETECTION_MIN_LENGTH", "FRENCH_HINTS", "ENGLISH_HINTS", "FRENCH_CHARS",
+    "AVICULTURE_FRENCH_TERMS", "DOMAIN_KEYWORDS",
+    # Performance
+    "ENABLE_PERFORMANCE_MONITORING", "METRICS_EXPORT_INTERVAL",
+    # Digital Ocean
+    "DO_APP_NAME", "DO_APP_TIER",
     # Fonctions
     "validate_config", "get_config_status"
 ]
