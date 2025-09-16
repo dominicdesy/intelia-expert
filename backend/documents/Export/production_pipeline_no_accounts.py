@@ -443,7 +443,7 @@ class AutomatedIngestionPipeline:
     async def start_automated_collection(self, target_documents: int = 30000):
         """Démarre la collecte automatisée sur les 5 sources"""
         
-        logger.info(f"🚀 DÉMARRAGE COLLECTE AUTOMATISÉE - Objectif: {target_documents} documents")
+        logger.info(f"DEMARRAGE COLLECTE AUTOMATISEE - Objectif: {target_documents} documents")
         
         try:
             # Connexions
@@ -465,16 +465,16 @@ class AutomatedIngestionPipeline:
             for i, result in enumerate(results):
                 source = list(SourceType)[i]
                 if isinstance(result, Exception):
-                    logger.error(f"❌ Erreur source {source.value}: {result}")
+                    logger.error(f"Erreur source {source.value}: {result}")
                     self.stats["errors"] += 1
                 else:
-                    logger.info(f"✅ Source {source.value} terminée: {result} documents")
+                    logger.info(f"Source {source.value} terminee: {result} documents")
             
             # Rapport final
             await self._generate_final_report()
             
         except Exception as e:
-            logger.error(f"❌ Erreur critique pipeline: {e}")
+            logger.error(f"Erreur critique pipeline: {e}")
             raise
         finally:
             await self._cleanup_connections()
@@ -496,18 +496,18 @@ class AutomatedIngestionPipeline:
             )
             
             if not self.weaviate_client.is_ready():
-                raise RuntimeError("Weaviate non prêt")
+                raise RuntimeError("Weaviate non pret")
             
-            logger.info("✅ Connexion Weaviate établie")
+            logger.info("Connexion Weaviate etablie")
             
         except Exception as e:
-            logger.error(f"❌ Erreur connexion Weaviate: {e}")
+            logger.error(f"Erreur connexion Weaviate: {e}")
             raise
         
         # Session HTTP
         timeout = aiohttp.ClientTimeout(total=30, connect=10)
         self.session = aiohttp.ClientSession(timeout=timeout)
-        logger.info("✅ Session HTTP initialisée")
+        logger.info("Session HTTP initialisee")
     
     async def _load_deduplication_cache(self):
         """Charge les hashes existants pour éviter les doublons"""
@@ -525,15 +525,15 @@ class AutomatedIngestionPipeline:
                 if file_hash:
                     self.existing_hashes.add(file_hash)
             
-            logger.info(f"📋 Cache déduplication: {len(self.existing_hashes)} documents existants")
+            logger.info(f"Cache deduplication: {len(self.existing_hashes)} documents existants")
             
         except Exception as e:
-            logger.warning(f"⚠️ Cache déduplication désactivé: {e}")
+            logger.warning(f"Cache deduplication desactive: {e}")
     
     async def _collect_from_source(self, source: SourceType, target_docs: int) -> int:
         """Collecte depuis une source spécifique avec respect des quotas"""
         
-        logger.info(f"📡 Collecte {source.value} - Objectif: {target_docs} documents")
+        logger.info(f"Collecte {source.value} - Objectif: {target_docs} documents")
         
         collected = 0
         quota = self.sources_config[source]
@@ -813,7 +813,7 @@ class AutomatedIngestionPipeline:
     def _validate_intents_rules(self, classification: DocumentClassification) -> bool:
         """Valide selon les règles strictes d'intents.json"""
         
-        intent_config = self.intents.get(classification.intent_type, {})
+        intent_config = self.classifier.intents.get(classification.intent_type, {})
         required_fields = intent_config.get("required", [])
         
         # Vérification des champs requis selon intents.json

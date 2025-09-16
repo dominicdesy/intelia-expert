@@ -2,7 +2,7 @@
 """
 imports_and_dependencies.py - Gestion robuste des dépendances avec validation stricte
 Version corrigée: Élimination des fallbacks silencieux, validation explicite
-AJOUTÉ: Fonctions get_openai_sync et get_openai_async manquantes
+CORRIGÉ: Import wvc_query manquant qui causait l'erreur de démarrage
 """
 
 import logging
@@ -69,7 +69,7 @@ class DependencyManager:
             )
             globals()['OPENAI_AVAILABLE'] = False
         
-        # Weaviate - CRITIQUE
+        # Weaviate - CRITIQUE - CORRIGÉ POUR INCLURE wvc_query
         try:
             import weaviate
             weaviate_version = getattr(weaviate, '__version__', '4.0.0')
@@ -92,16 +92,25 @@ class DependencyManager:
             globals()['weaviate'] = weaviate
             globals()['WEAVIATE_V4'] = weaviate_v4
             
-            # Import wvc pour Weaviate v4
+            # CORRECTION CRITIQUE: Import wvc ET wvc_query pour Weaviate v4
             if weaviate_v4:
                 try:
                     import weaviate.classes as wvc
+                    import weaviate.classes.query as wvc_query  # ← IMPORT MANQUANT AJOUTÉ
+                    
                     globals()['wvc'] = wvc
-                except ImportError:
-                    logger.warning("wvc classes non disponibles")
+                    globals()['wvc_query'] = wvc_query  # ← EXPORT GLOBAL AJOUTÉ
+                    
+                    logger.info("✅ Weaviate v4 avec wvc et wvc_query importés avec succès")
+                    
+                except ImportError as e:
+                    logger.error(f"Erreur import wvc classes: {e}")
                     globals()['wvc'] = None
+                    globals()['wvc_query'] = None
+                    raise ImportError(f"Impossible d'importer les classes Weaviate v4: {e}")
             else:
                 globals()['wvc'] = None
+                globals()['wvc_query'] = None
             
         except ImportError as e:
             self.dependencies['weaviate'] = DependencyInfo(
@@ -113,6 +122,7 @@ class DependencyManager:
             globals()['WEAVIATE_AVAILABLE'] = False
             globals()['WEAVIATE_V4'] = False
             globals()['wvc'] = None
+            globals()['wvc_query'] = None  # ← AJOUTÉ
         
         # Redis - CRITIQUE pour cache
         try:
@@ -404,6 +414,13 @@ WEAVIATE_AVAILABLE = globals().get('WEAVIATE_AVAILABLE', False)
 REDIS_AVAILABLE = globals().get('REDIS_AVAILABLE', False)
 WEAVIATE_V4 = globals().get('WEAVIATE_V4', False)
 
+# NOUVEAU: Variables Weaviate exportées
+wvc = globals().get('wvc', None)
+wvc_query = globals().get('wvc_query', None)  # ← CORRECTION CRITIQUE
+
+# Ajout pour debug et diagnostics
+ENABLE_API_DIAGNOSTICS = os.getenv("ENABLE_API_DIAGNOSTICS", "false").lower() == "true"
+
 # Log du statut au chargement
 status_report = dependency_manager.get_status_report()
 if status_report['critical_dependencies_ok']:
@@ -416,7 +433,7 @@ if status_report['optional_missing']:
 
 logger.info(f"Dépendances chargées: {status_report['available_count']}/{status_report['total_dependencies']}")
 
-# Export pour le module
+# Export pour le module - CORRIGÉ avec wvc_query
 __all__ = [
     'dependency_manager',
     'get_openai_sync',
@@ -429,5 +446,7 @@ __all__ = [
     'WEAVIATE_AVAILABLE',
     'REDIS_AVAILABLE',
     'WEAVIATE_V4',
-    'wvc'  # Ajouté pour Weaviate v4
+    'wvc',
+    'wvc_query',  # ← EXPORT CRITIQUE AJOUTÉ
+    'ENABLE_API_DIAGNOSTICS'
 ]
