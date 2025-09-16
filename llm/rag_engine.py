@@ -339,52 +339,95 @@ class InteliaRAGEngine:
     # === CORRECTION: CONNEXION WEAVIATE POUR CLOUD ===
     
     async def _connect_weaviate(self):
-        """Connexion Weaviate corrigée pour cloud"""
+        """Connexion Weaviate corrigée avec authentification cloud complète"""
         try:
             import weaviate
             
-            # CORRECTION: Utiliser l'URL depuis les variables d'environnement
+            # Variables d'environnement Weaviate
             weaviate_url = os.getenv("WEAVIATE_URL", "https://xmlc4jvtu6hfw9zrrmnw.c0.us-east1.gcp.weaviate.cloud")
-            logger.info(f"Tentative de connexion Weaviate: {weaviate_url}")
+            weaviate_api_key = os.getenv("WEAVIATE_API_KEY", "")
             
-            # Pour une URL cloud Weaviate, utiliser connect_to_wcs
+            logger.info(f"Tentative de connexion Weaviate: {weaviate_url}")
+            logger.debug(f"API Key configurée: {'Oui' if weaviate_api_key else 'Non'}")
+            
+            # Pour une URL cloud Weaviate, utiliser connect_to_weaviate_cloud avec authentification
             if "weaviate.cloud" in weaviate_url:
-                logger.debug("Utilisation connexion cloud Weaviate")
-                try:
-                    # Connexion cloud sans authentification (pour test)
-                    self.weaviate_client = weaviate.connect_to_wcs(
-                        cluster_url=weaviate_url,
-                        auth_credentials=None,
-                        headers={}
-                    )
-                except Exception as wcs_error:
-                    logger.warning(f"Connexion WCS échouée: {wcs_error}")
-                    # Fallback vers connexion générique
-                    self.weaviate_client = weaviate.Client(url=weaviate_url)
+                logger.debug("Utilisation connexion cloud Weaviate avec authentification")
+                
+                if weaviate_api_key:
+                    try:
+                        # NOUVEAU: Client v4 avec API Key
+                        import weaviate.classes as wvc
+                        self.weaviate_client = weaviate.connect_to_weaviate_cloud(
+                            cluster_url=weaviate_url,
+                            auth_credentials=wvc.init.Auth.api_key(weaviate_api_key),
+                            headers={}
+                        )
+                        logger.info("Connexion Weaviate v4 avec API Key réussie")
+                        
+                    except ImportError:
+                        logger.warning("Weaviate v4 non disponible, utilisation v3")
+                        # Fallback vers client v3 avec authentification
+                        self.weaviate_client = weaviate.Client(
+                            url=weaviate_url,
+                            auth_client_secret=weaviate.AuthApiKey(api_key=weaviate_api_key)
+                        )
+                        logger.info("Connexion Weaviate v3 avec API Key réussie")
+                        
+                    except Exception as auth_error:
+                        logger.error(f"Erreur authentification Weaviate: {auth_error}")
+                        # Tentative fallback v3
+                        try:
+                            self.weaviate_client = weaviate.Client(
+                                url=weaviate_url,
+                                auth_client_secret=weaviate.AuthApiKey(api_key=weaviate_api_key)
+                            )
+                            logger.info("Fallback Weaviate v3 avec API Key réussi")
+                        except Exception as fallback_error:
+                            logger.error(f"Fallback v3 également échoué: {fallback_error}")
+                            self.weaviate_client = None
+                            return
+                else:
+                    logger.error("WEAVIATE_API_KEY non configurée pour l'instance cloud")
+                    self.weaviate_client = None
+                    return
             else:
-                # Connexion locale fallback
+                # Connexion locale sans authentification
                 host = weaviate_url.replace("http://", "").replace("https://", "")
                 self.weaviate_client = weaviate.connect_to_local(host=host)
+                logger.info("Connexion Weaviate locale configurée")
             
             # Test de connexion avec timeout
-            try:
-                ready = await asyncio.wait_for(
-                    asyncio.to_thread(lambda: self.weaviate_client.is_ready()),
-                    timeout=10.0
-                )
-                
-                if ready:
-                    logger.info(f"Connexion Weaviate établie: {weaviate_url}")
-                else:
-                    logger.error("Weaviate connecté mais pas prêt")
-                    self.weaviate_client = None
+            if self.weaviate_client:
+                try:
+                    # Test asynchrone de la connexion
+                    ready = await asyncio.wait_for(
+                        asyncio.to_thread(lambda: self.weaviate_client.is_ready()),
+                        timeout=15.0
+                    )
                     
-            except asyncio.TimeoutError:
-                logger.error("Timeout lors du test de connexion Weaviate")
-                self.weaviate_client = None
-            except Exception as test_error:
-                logger.error(f"Erreur test connexion Weaviate: {test_error}")
-                self.weaviate_client = None
+                    if ready:
+                        logger.info(f"Connexion Weaviate opérationnelle: {weaviate_url}")
+                        
+                        # Test de capacités supplémentaires
+                        try:
+                            # Tester une requête simple pour vérifier les permissions
+                            await asyncio.to_thread(lambda: self.weaviate_client.schema.get())
+                            logger.info("Permissions Weaviate vérifiées - accès schéma OK")
+                        except Exception as perm_error:
+                            logger.warning(f"Permissions limitées Weaviate: {perm_error}")
+                            # Continue quand même, certaines opérations peuvent fonctionner
+                            
+                    else:
+                        logger.error("Weaviate connecté mais pas prêt")
+                        self.weaviate_client = None
+                        
+                except asyncio.TimeoutError:
+                    logger.error("Timeout lors du test de connexion Weaviate (15s)")
+                    self.weaviate_client = None
+                except Exception as test_error:
+                    logger.error(f"Erreur test connexion Weaviate: {test_error}")
+                    self.weaviate_client = None
                 
         except Exception as e:
             logger.error(f"Erreur générale connexion Weaviate: {e}")
