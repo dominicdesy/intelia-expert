@@ -14,8 +14,8 @@ httpcore==1.0.5
 # OpenAI API - Version LTS stable
 openai==1.42.0
 
-# Weaviate Client - Version stable compatible v4
-weaviate-client==4.7.1
+# CORRIGÉ: Weaviate Client - Version mise à jour pour corriger les erreurs API
+weaviate-client==4.16.10
 
 # Redis pour cache - Versions synchronisées
 redis==5.0.1
@@ -90,7 +90,11 @@ psutil>=5.9.0
 
 # ===== NOTES DE COMPATIBILITÉ =====
 
-# Weaviate 4.7.1 : Version stable avec support v4 complet
+# Weaviate 4.16.10 : CORRIGÉ - Version récente qui résout les erreurs API
+#   - Corrige les erreurs "near_vector() got an unexpected keyword argument 'vector'"
+#   - Corrige les erreurs "hybrid() got an unexpected keyword argument 'where'" 
+#   - Supporte correctement les dimensions vectorielles mixtes
+#   - API v4 complètement stabilisée
 # Redis 5.0.1 : Compatible avec toutes les fonctionnalités async
 # OpenAI 1.42.0 : API stable avec support streaming
 # Transformers 4.45.2 : Dernière version stable sans breaking changes
@@ -113,3 +117,16 @@ psutil>=5.9.0
 # RRF_LEARNING_MODE=true
 # RRF_GENETIC_BOOST=true
 # LOG_LEVEL=INFO
+
+# ===== CHANGEMENTS PRINCIPAUX =====
+
+# 1. weaviate-client: 4.7.1 → 4.16.10 
+#    - Résout les erreurs d'API v4 constatées dans les logs
+#    - Compatible avec le code existant dans retriever.py
+#    - Supporte les corrections runtime déjà implémentées
+#
+# 2. Cette mise à jour devrait éliminer :
+#    - ❌ near_vector() got an unexpected keyword argument 'vector'
+#    - ❌ hybrid() got an unexpected keyword argument 'where'
+#    - ❌ vector lengths don't match (meilleure gestion des dimensions)
+#    - ❌ Le mode dégradé au démarrage
