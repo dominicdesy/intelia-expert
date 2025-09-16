@@ -26,6 +26,9 @@ from memory import ConversationMemory
 from advanced_guardrails import AdvancedResponseGuardrails
 from hybrid_retriever import hybrid_search
 
+# CORRECTION CRITIQUE: Définir logger AVANT toute utilisation
+logger = logging.getLogger(__name__)
+
 # === NOUVEAU: IMPORTS LANGSMITH ===
 if LANGSMITH_ENABLED:
     try:
@@ -49,8 +52,6 @@ except ImportError as e:
     logger.warning(f"❌ RRF Intelligent non disponible: {e}")
 
 DEFAULT_ALPHA = float(os.getenv("HYBRID_ALPHA", "0.6"))
-
-logger = logging.getLogger(__name__)
 
 class InteliaRAGEngine:
     """RAG Engine principal avec LangSmith et RRF Intelligent"""
@@ -757,3 +758,9 @@ class InteliaRAGEngine:
         except Exception as e:
             logger.error(f"Erreur get_status: {e}")
             return {"error": str(e), "initialized": self.is_initialized}
+
+
+# Factory function pour compatibilité
+def create_rag_engine(openai_client=None) -> InteliaRAGEngine:
+    """Factory pour créer une instance RAG Engine"""
+    return InteliaRAGEngine(openai_client)
