@@ -1,7 +1,3 @@
-# APPROCHE DIRECTE : OpenAI + Weaviate + Redis - Version stabilisée
-# Version corrigée pour compatibilité et stabilité maximale
-# Septembre 2025 - Production ready
-
 # Core FastAPI - Versions stables
 fastapi==0.112.2
 uvicorn[standard]==0.30.6
