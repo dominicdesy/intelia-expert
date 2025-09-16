@@ -92,6 +92,17 @@ class DependencyManager:
             globals()['weaviate'] = weaviate
             globals()['WEAVIATE_V4'] = weaviate_v4
             
+            # Import wvc pour Weaviate v4
+            if weaviate_v4:
+                try:
+                    import weaviate.classes as wvc
+                    globals()['wvc'] = wvc
+                except ImportError:
+                    logger.warning("wvc classes non disponibles")
+                    globals()['wvc'] = None
+            else:
+                globals()['wvc'] = None
+            
         except ImportError as e:
             self.dependencies['weaviate'] = DependencyInfo(
                 name='weaviate',
@@ -101,6 +112,7 @@ class DependencyManager:
             )
             globals()['WEAVIATE_AVAILABLE'] = False
             globals()['WEAVIATE_V4'] = False
+            globals()['wvc'] = None
         
         # Redis - CRITIQUE pour cache
         try:
@@ -416,5 +428,6 @@ __all__ = [
     'OPENAI_AVAILABLE',
     'WEAVIATE_AVAILABLE',
     'REDIS_AVAILABLE',
-    'WEAVIATE_V4'
+    'WEAVIATE_V4',
+    'wvc'  # Ajouté pour Weaviate v4
 ]

@@ -20,9 +20,19 @@ import weaviate
 import os
 from dotenv import load_dotenv
 
-# Import de votre infrastructure existante
-from intent_processor import IntentProcessor, ConfigurationError
-from intent_types import IntentType, IntentResult
+# Classes intégrées pour éviter les dépendances externes
+class ConfigurationError(Exception):
+    """Exception pour les erreurs de configuration"""
+    pass
+
+class IntentType:
+    """Types d'intentions supportés"""
+    METRIC_QUERY = "metric_query"
+    ENVIRONMENT_SETTING = "environment_setting"
+    PROTOCOL_QUERY = "protocol_query"
+    DIAGNOSIS_TRIAGE = "diagnosis_triage"
+    ECONOMICS_COST = "economics_cost"
+    OUT_OF_DOMAIN = "out_of_domain"
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -192,7 +202,7 @@ class IntentsBasedClassifier:
         return None
     
     def _classify_intent(self, text: str) -> Tuple[str, float, List[str]]:
-        """Classifie l'intention selon les métriques détectées"""
+        """Classifie l'intention selon les métriques détectées - VERSION STRICTE"""
         
         intent_scores = {}
         detected_metrics = []
@@ -215,35 +225,104 @@ class IntentsBasedClassifier:
                 intent_scores[intent_name] = score
                 detected_metrics.extend(intent_metrics)
         
-        # Sélection de la meilleure intention
+        # Sélection de la meilleure intention AVEC SEUIL STRICT
         if intent_scores:
             best_intent = max(intent_scores.items(), key=lambda x: x[1])
-            confidence = min(0.95, best_intent[1] / 10)  # Normalisation
+            # Calcul de confiance plus strict : besoin d'au moins 3 métriques pour confiance élevée
+            confidence = min(0.95, best_intent[1] / 5)  # Normalisation sur 5 au lieu de 10
+            
+            # REJET SI CONFIANCE INSUFFISANTE
+            if confidence < 0.4:  # Minimum 40% de confiance
+                return None, 0.0, []
+            
             return best_intent[0], confidence, detected_metrics
         
-        # Fallback vers classification générale
-        return "metric_query", 0.3, []
+        # PLUS DE FALLBACK - Rejet total si aucune métrique détectée
+        return None, 0.0, []
     
     def _metric_to_keywords(self, metric: str) -> List[str]:
-        """Convertit une métrique en mots-clés de recherche"""
+        """Convertit une métrique en mots-clés de recherche - VERSION ÉTENDUE"""
         metric_mapping = {
-            "body_weight_target": ["weight", "poids", "body weight", "live weight"],
-            "fcr_target": ["fcr", "feed conversion", "conversion alimentaire"],
-            "daily_gain": ["gain", "growth", "croissance", "daily gain"],
-            "mortality_expected_pct": ["mortality", "mortalité", "death", "mort"],
-            "water_intake_daily": ["water", "eau", "drinking", "consumption"],
-            "feed_intake_daily": ["feed", "aliment", "feeding", "intake"],
-            "ambient_temp_target": ["temperature", "température", "temp", "ambient"],
-            "humidity_target": ["humidity", "humidité", "moisture"],
-            "lighting_hours": ["light", "lighting", "éclairage", "hours"],
-            "egg_production_pct": ["egg", "oeuf", "production", "laying"],
-            # Ajout de toutes les autres métriques...
+            # Métriques de performance (core)
+            "body_weight_target": ["body weight", "live weight", "weight gain", "bw", "lw"],
+            "fcr_target": ["fcr", "feed conversion", "feed conversion ratio", "conversion alimentaire"],
+            "daily_gain": ["daily gain", "weight gain", "growth rate", "adg", "croissance"],
+            "uniformity_pct": ["uniformity", "coefficient of variation", "cv", "uniformité"],
+            "production_index_epef": ["epef", "production index", "efficiency factor", "index"],
+            "mortality_expected_pct": ["mortality", "death rate", "survival", "mortalité"],
+            
+            # Métriques d'eau et alimentation
+            "water_intake_daily": ["water intake", "water consumption", "drinking", "eau"],
+            "water_feed_ratio": ["water feed ratio", "water to feed", "w:f ratio"],
+            "feed_intake_daily": ["feed intake", "feed consumption", "feeding", "aliment"],
+            "feed_intake_cumulative": ["cumulative feed", "total feed", "feed consumed"],
+            
+            # Métriques de densité et équipement
+            "stocking_density_kgm2": ["stocking density", "density", "kg/m2", "kg per m2"],
+            "stocking_density_birdsm2": ["birds per m2", "bird density", "birds/m2"],
+            "feeder_space_cm": ["feeder space", "feeding space", "cm per bird"],
+            "birds_per_nipple": ["birds per nipple", "nipple ratio", "drinking points"],
+            "water_flow_ml_min": ["water flow", "flow rate", "ml/min", "pressure"],
+            "nipple_pressure_kpa": ["nipple pressure", "water pressure", "kpa"],
+            "nipple_height_cm": ["nipple height", "drinker height", "height"],
+            
+            # Métriques environnementales
+            "ambient_temp_target": ["temperature", "ambient temperature", "temp", "température"],
+            "litter_temp_target": ["litter temperature", "floor temperature", "litière"],
+            "humidity_target": ["humidity", "relative humidity", "rh", "humidité"],
+            "co2_max_ppm": ["co2", "carbon dioxide", "co2 level", "ppm"],
+            "co_max_ppm": ["co", "carbon monoxide", "co level"],
+            "nh3_max_ppm": ["nh3", "ammonia", "nh3 level", "ammoniac"],
+            "dust_max_mg_m3": ["dust", "particulate matter", "mg/m3"],
+            "air_speed_tunnel": ["air speed", "velocity", "m/s", "wind speed"],
+            "static_pressure_pa": ["static pressure", "pressure", "pa", "pascal"],
+            "min_ventilation_rate_m3hkg": ["ventilation rate", "air exchange", "m3/h/kg"],
+            
+            # Métriques d'éclairage
+            "lighting_hours": ["lighting", "photoperiod", "light hours", "éclairage"],
+            "light_intensity_lux": ["light intensity", "lux", "illumination", "luminosité"],
+            "light_color_temp_k": ["color temperature", "kelvin", "light spectrum"],
+            
+            # Métriques pondeuses
+            "egg_production_pct": ["egg production", "laying rate", "hen housed", "ponte"],
+            "hen_daily_feed": ["hen feed", "layer feed", "g/hen/day"],
+            "pullet_weight_target": ["pullet weight", "point of lay", "pol weight"],
+            "egg_weight_target": ["egg weight", "average egg weight", "g/egg"],
+            "nest_boxes_per_hen": ["nest boxes", "nesting", "boxes per hen"],
+            "perch_length_cm_per_hen": ["perch length", "perching space", "cm/hen"],
+            
+            # Métriques nutritionnelles
+            "me_kcalkg": ["metabolizable energy", "me", "kcal/kg", "energy"],
+            "cp_pct": ["crude protein", "cp", "protein", "protéine"],
+            "lys_digestible_pct": ["lysine", "digestible lysine", "lys"],
+            "met_cys_pct": ["methionine", "cysteine", "met+cys", "sulfur amino acids"],
+            "thr_pct": ["threonine", "thr", "thréonine"],
+            "tsaa_pct": ["total sulfur amino acids", "tsaa", "met+cys"],
+            "ca_pct": ["calcium", "ca", "calcium level"],
+            "av_p_pct": ["available phosphorus", "av p", "phosphore"],
+            "dig_p_pct": ["digestible phosphorus", "dig p"],
+            "na_pct": ["sodium", "na", "salt"],
+            "cl_pct": ["chloride", "cl", "chlorure"],
+            "k_pct": ["potassium", "k", "potassium level"],
+            "deb_meqkg": ["dietary electrolyte balance", "deb", "meq/kg"],
+            "fiber_crude_pct": ["crude fiber", "fiber", "fibre"],
+            "ndf_pct": ["neutral detergent fiber", "ndf"],
+            "starch_pct": ["starch", "amidon", "starch level"],
+            "oil_fat_pct": ["oil", "fat", "crude fat", "lipids"],
+            
+            # Métriques économiques
+            "feed_cost_per_bird": ["feed cost", "cost per bird", "economic", "coût"],
+            "heating_cost_start": ["heating cost", "energy cost", "chauffage"],
+            "total_feed_cost_to_slaughter": ["total cost", "cost to slaughter"],
+            "cost_per_kg_gain": ["cost per kg", "cost efficiency"],
+            "water_cost_per_bird": ["water cost", "cost water"],
+            "electricity_cost_per_bird": ["electricity cost", "energy cost"]
         }
         
         return metric_mapping.get(metric, [metric.replace("_", " ")])
     
     def _apply_default_rules(self, classification: DocumentClassification, text: str):
-        """Applique les règles par défaut depuis intents.json"""
+        """Applique les règles par défaut depuis intents.json - VERSION STRICTE"""
         
         defaults_by_topic = self.intents_config.get("defaults_by_topic", {})
         
@@ -254,21 +333,51 @@ class IntentsBasedClassifier:
                     classification.site_type = default_site
                     break
         
-        # Règles de cohérence
+        # Règles de cohérence strictes
         if classification.genetic_line:
-            # Ross/Cobb = broiler
+            # Ross/Cobb/Hubbard = broiler
             if any(x in classification.genetic_line.lower() for x in ["ross", "cobb", "hubbard"]):
                 if not classification.bird_type:
                     classification.bird_type = "broiler"
                 if not classification.site_type:
                     classification.site_type = "broiler_farm"
             
-            # ISA/Lohmann = layer
+            # ISA/Lohmann/Hy-line = layer
             elif any(x in classification.genetic_line.lower() for x in ["isa", "lohmann", "hy-line"]):
                 if not classification.bird_type:
                     classification.bird_type = "layer"
                 if not classification.site_type:
                     classification.site_type = "layer_farm"
+        
+        # VALIDATION FINALE STRICTE
+        self._validate_classification_strict(classification)
+    
+    def _validate_classification_strict(self, classification: DocumentClassification):
+        """Validation stricte finale - REJETTE si pas assez d'entités métier"""
+        
+        entities_count = sum(1 for attr in [
+            classification.genetic_line,
+            classification.bird_type, 
+            classification.site_type,
+            classification.phase
+        ] if attr and attr != "unknown")
+        
+        # CRITÈRES STRICTS POUR ACCEPTATION
+        strict_criteria = [
+            # Critère 1: Au moins 2 entités métier détectées
+            entities_count >= 2,
+            
+            # Critère 2: Au moins 1 métrique détectée OU lignée génétique identifiée
+            len(classification.metrics_detected) > 0 or classification.genetic_line,
+            
+            # Critère 3: Confiance minimale 40%
+            classification.confidence >= 0.4
+        ]
+        
+        # Si ne respecte pas TOUS les critères → REJET
+        if not all(strict_criteria):
+            classification.confidence = 0.0  # Force le rejet
+            classification.intent_type = "rejected"
 
 class AutomatedIngestionPipeline:
     """Pipeline d'ingestion automatisé avec classification intents.json"""
@@ -588,7 +697,7 @@ class AutomatedIngestionPipeline:
         return documents
     
     async def _process_and_upload_document(self, document: Dict, source: str) -> bool:
-        """Traite et upload un document avec classification intents.json"""
+        """Traite et upload un document avec classification intents.json - VERSION STRICTE"""
         
         try:
             # Hash pour déduplication
@@ -604,8 +713,40 @@ class AutomatedIngestionPipeline:
                 source
             )
             
-            # Filtrage qualité (seulement documents pertinents)
-            if classification.confidence < 0.2:
+            # FILTRES STRICTS MULTIPLES
+            
+            # Filtre 1: Confiance minimale 60% (augmenté de 20% à 60%)
+            if classification.confidence < 0.6:
+                logger.debug(f"REJETÉ (confiance {classification.confidence:.2f}): {document['title'][:50]}...")
+                return False
+            
+            # Filtre 2: Intent valide (pas de rejet)
+            if classification.intent_type == "rejected" or not classification.intent_type:
+                logger.debug(f"REJETÉ (intent invalide): {document['title'][:50]}...")
+                return False
+            
+            # Filtre 3: Au moins une entité métier détectée
+            entities_detected = sum(1 for attr in [
+                classification.genetic_line,
+                classification.bird_type,
+                classification.site_type
+            ] if attr and attr not in ["unknown", None])
+            
+            if entities_detected == 0:
+                logger.debug(f"REJETÉ (aucune entité métier): {document['title'][:50]}...")
+                return False
+            
+            # Filtre 4: Métriques OU lignée génétique obligatoire
+            has_metrics = len(classification.metrics_detected) > 0
+            has_genetic_line = classification.genetic_line and classification.genetic_line != "unknown"
+            
+            if not (has_metrics or has_genetic_line):
+                logger.debug(f"REJETÉ (pas de métriques ni lignée): {document['title'][:50]}...")
+                return False
+            
+            # Filtre 5: Validation selon les règles intents.json
+            if not self._validate_intents_rules(classification):
+                logger.debug(f"REJETÉ (règles intents.json): {document['title'][:50]}...")
                 return False
             
             # Construction document Weaviate compatible avec votre schéma
@@ -619,11 +760,11 @@ class AutomatedIngestionPipeline:
                 "category": classification.intent_type,
                 "language": "en",  # Documents majoritairement anglais
                 
-                # Entités métier extraites
-                "geneticLine": classification.genetic_line or "unknown",
-                "birdType": classification.bird_type or "unknown", 
-                "siteType": classification.site_type or "unknown",
-                "phase": classification.phase or "unknown",
+                # Entités métier extraites (GARANTIES NON-VIDES)
+                "geneticLine": classification.genetic_line if classification.genetic_line else "general",
+                "birdType": classification.bird_type if classification.bird_type else "general", 
+                "siteType": classification.site_type if classification.site_type else "general",
+                "phase": classification.phase if classification.phase else "general",
                 
                 # Métadonnées techniques
                 "originalFile": f"{source}_ingestion",
@@ -633,9 +774,11 @@ class AutomatedIngestionPipeline:
                 "totalChunks": 1,
                 "isComplete": True,
                 
-                # Métadonnées de classification
+                # Métadonnées de classification (qualité élevée)
                 "classificationConfidence": classification.confidence,
                 "detectedMetrics": classification.metrics_detected,
+                "entitiesCount": entities_detected,
+                "qualityScore": self._calculate_quality_score(classification),
                 "sourceMetadata": {
                     "journal": document.get("journal", ""),
                     "year": document.get("year", ""),
@@ -656,7 +799,8 @@ class AutomatedIngestionPipeline:
                 intent = classification.intent_type
                 self.stats["by_intent"][intent] = self.stats["by_intent"].get(intent, 0) + 1
                 
-                logger.info(f"✅ Uploadé: {classification.intent_type} - {classification.genetic_line} - {document['title'][:50]}...")
+                logger.info(f"✅ ACCEPTÉ (conf:{classification.confidence:.2f}, ent:{entities_detected}): "
+                           f"{classification.intent_type} - {classification.genetic_line} - {document['title'][:50]}...")
                 return True
             
             return False
@@ -665,6 +809,48 @@ class AutomatedIngestionPipeline:
             logger.error(f"Erreur traitement document: {e}")
             self.stats["errors"] += 1
             return False
+    
+    def _validate_intents_rules(self, classification: DocumentClassification) -> bool:
+        """Valide selon les règles strictes d'intents.json"""
+        
+        intent_config = self.intents.get(classification.intent_type, {})
+        required_fields = intent_config.get("required", [])
+        
+        # Vérification des champs requis selon intents.json
+        classification_dict = {
+            "site_type": classification.site_type,
+            "bird_type": classification.bird_type,
+            "line": classification.genetic_line,
+            "metric": len(classification.metrics_detected) > 0,
+            "phase": classification.phase,
+            "age_range": classification.age_range
+        }
+        
+        # Au moins 70% des champs requis doivent être présents
+        required_present = sum(1 for field in required_fields 
+                             if classification_dict.get(field))
+        required_ratio = required_present / max(1, len(required_fields))
+        
+        return required_ratio >= 0.7  # 70% minimum
+    
+    def _calculate_quality_score(self, classification: DocumentClassification) -> float:
+        """Calcule un score de qualité du document"""
+        
+        score = 0.0
+        
+        # Bonus confiance
+        score += classification.confidence * 40  # Max 40 points
+        
+        # Bonus entités détectées
+        entities = [classification.genetic_line, classification.bird_type, 
+                   classification.site_type, classification.phase]
+        detected_entities = sum(1 for e in entities if e and e != "unknown")
+        score += detected_entities * 15  # Max 60 points (4 * 15)
+        
+        # Bonus métriques
+        score += min(len(classification.metrics_detected) * 5, 20)  # Max 20 points
+        
+        return min(score, 100.0)  # Normalisation sur 100
     
     async def _upload_to_weaviate(self, document: Dict) -> bool:
         """Upload sécurisé vers Weaviate"""
