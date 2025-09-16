@@ -2,12 +2,13 @@
 """
 hybrid_retriever.py - Retriever hybride optimisé avec RRF Intelligent
 Combine recherche vectorielle et BM25 avec fusion intelligente
+CORRIGÉ: Ajout fonction hybrid_search globale pour import depuis rag_engine.py
 """
 
 import asyncio
 import logging
 import json
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 import numpy as np
 import anyio
 
@@ -522,3 +523,53 @@ class OptimizedHybridRetriever:
         """Recherche BM25 Weaviate v3"""
         # Implémentation legacy pour v3 (simplifiée)
         return []
+
+
+# ============================================================================
+# FONCTIONS GLOBALES POUR COMPATIBILITÉ - CORRECTION CRITIQUE
+# ============================================================================
+
+async def hybrid_search(query_vector: List[float], query_text: str, 
+                       client, collection_name: str = "InteliaKnowledge",
+                       top_k: int = 15, where_filter: Dict = None,
+                       alpha: float = 0.7, query_context: Dict = None,
+                       intent_result = None) -> List[Dict]:
+    """
+    FONCTION GLOBALE HYBRID_SEARCH - CORRECTION POUR RAG_ENGINE.PY
+    
+    Cette fonction wrapper permet l'import depuis rag_engine.py:
+    from hybrid_retriever import hybrid_search
+    """
+    if not client:
+        raise ValueError("Client Weaviate requis pour hybrid_search")
+    
+    # Créer une instance du retriever
+    retriever = OptimizedHybridRetriever(client, collection_name)
+    
+    # Appeler la méthode de la classe
+    return await retriever.hybrid_search(
+        query_vector=query_vector,
+        query_text=query_text,
+        top_k=top_k,
+        where_filter=where_filter,
+        alpha=alpha,
+        query_context=query_context,
+        intent_result=intent_result
+    )
+
+
+def create_hybrid_retriever(client, collection_name: str = "InteliaKnowledge") -> OptimizedHybridRetriever:
+    """Factory pour créer un retriever hybride configuré"""
+    return OptimizedHybridRetriever(client, collection_name)
+
+
+# ============================================================================
+# EXPORTS POUR COMPATIBILITÉ
+# ============================================================================
+
+__all__ = [
+    "OptimizedHybridRetriever",
+    "hybrid_search",  # ← EXPORT CRITIQUE AJOUTÉ
+    "create_hybrid_retriever",
+    "INTELLIGENT_RRF_AVAILABLE"
+]

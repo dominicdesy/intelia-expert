@@ -555,18 +555,21 @@ class AutomatedIngestionPipeline:
         genetic_lines = list(self.intents_config.get("aliases", {}).get("line", {}).keys())
 
         queries = [
-            # Requêtes ultra-simples avec 1-2 mots-clés
-            "broiler performance 2020:2025[dp]",
-            "broiler nutrition 2020:2025[dp]",
-            "broiler welfare 2020:2025[dp]",
-            "layer production 2020:2025[dp]",
-            "layer nutrition 2020:2025[dp]",
-            "poultry health 2020:2025[dp]",
-            "poultry management 2020:2025[dp]",
-            "chicken growth 2020:2025[dp]",
-            "poultry feed 2020:2025[dp]",
-            "broiler FCR 2020:2025[dp]"
+            # Requêtes génériques sans noms de lignées spécifiques
+            "broiler performance FCR 2020:2025[dp]",
+            "broiler weight gain growth 2020:2025[dp]", 
+            "broiler feed conversion efficiency 2020:2025[dp]",
+            "commercial broiler performance 2020:2025[dp]",
+            "meat chicken production 2020:2025[dp]",
+            
+            # Requêtes existantes (qui sont mieux formulées)
+            "broiler performance water intake temperature 2020:2025[dp]",
+            "layer production egg weight nutrition 2020:2025[dp]",
+            "poultry vaccination biosecurity protocol 2020:2025[dp]",
+            "broiler lighting program welfare density 2020:2025[dp]",
+            "poultry ventilation climate environment 2020:2025[dp]"
         ]
+
         
         for query in queries:
             if collected >= target_docs:
