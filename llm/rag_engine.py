@@ -113,10 +113,10 @@ if LANGSMITH_ENABLED:
         from langsmith import Client
         from langsmith.run_helpers import traceable
         LANGSMITH_AVAILABLE = True
-        logger.info("✅ LangSmith importé avec succès")
+                        logger.info("LangSmith importé avec succès")
     except ImportError as e:
         LANGSMITH_AVAILABLE = False
-        logger.warning(f⚠️ LangSmith non disponible: {e}")
+        logger.warning(f"LangSmith non disponible: {e}")
 else:
     LANGSMITH_AVAILABLE = False
 
@@ -124,10 +124,10 @@ else:
 try:
     from enhanced_rrf_fusion import IntelligentRRFFusion
     INTELLIGENT_RRF_AVAILABLE = True
-    logger.info("✅ RRF Intelligent importé avec succès")
+                    logger.info("RRF Intelligent importe avec succes")
 except ImportError as e:
     INTELLIGENT_RRF_AVAILABLE = False
-    logger.warning(f"⚠️ RRF Intelligent non disponible: {e}")
+    logger.warning(f"RRF Intelligent non disponible: {e}")
 
 DEFAULT_ALPHA = float(os.getenv("HYBRID_ALPHA", "0.6"))
 
@@ -157,9 +157,9 @@ class InteliaRAGEngine:
                     api_key=LANGSMITH_API_KEY,
                     api_url="https://api.smith.langchain.com"
                 )
-                logger.info(f"✅ LangSmith initialisé - Projet: {LANGSMITH_PROJECT}")
+                logger.info(f"LangSmith initialise - Projet: {LANGSMITH_PROJECT}")
             except Exception as e:
-                logger.error(f"❌ Erreur initialisation LangSmith: {e}")
+                logger.error(f"Erreur initialisation LangSmith: {e}")
                 self.langsmith_client = None
         
         # === NOUVEAU: RRF INTELLIGENT ===
@@ -280,9 +280,9 @@ class InteliaRAGEngine:
                                 redis_client=self.cache_manager.client,
                                 intent_processor=None  # Sera défini plus tard
                             )
-                            logger.info("✅ RRF Intelligent initialisé")
+                            logger.info("RRF Intelligent initialise")
                         except Exception as e:
-                            logger.error(f"❌ Erreur RRF Intelligent: {e}")
+                            logger.error(f"Erreur RRF Intelligent: {e}")
                     
                     # Diagnostic API Weaviate
                     if ENABLE_API_DIAGNOSTICS:
@@ -329,10 +329,10 @@ class InteliaRAGEngine:
                     logger.warning(f"Guardrails échoué: {e}")
             
             self.is_initialized = True
-            logger.info("✅ RAG Engine Enhanced initialisé avec succès")
+            logger.info("RAG Engine Enhanced initialise avec succes")
             
         except Exception as e:
-            logger.error(f"❌ Erreur initialisation RAG Engine: {e}")
+            logger.error(f"Erreur initialisation RAG Engine: {e}")
             logger.error(f"Type d'erreur: {type(e).__name__}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
@@ -792,9 +792,9 @@ class InteliaRAGEngine:
             self.weaviate_client = weaviate.connect_to_local(
                 host=WEAVIATE_URL.replace("http://", "").replace("https://", "")
             )
-            logger.info("✅ Connexion Weaviate établie")
+            logger.info("Connexion Weaviate etablie")
         except Exception as e:
-            logger.error(f"❌ Erreur connexion Weaviate: {e}")
+            logger.error(f"Erreur connexion Weaviate: {e}")
             self.weaviate_client = None
     
     def _calculate_confidence(self, documents: List[Document], verification_result=None) -> float:

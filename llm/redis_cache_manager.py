@@ -51,10 +51,10 @@ class RAGCacheManager:
             self.client = None  # Sera défini lors de l'initialisation
             self.initialized = False
             
-            logger.info("✅ RAGCacheManager modules initialisés avec succès")
+            logger.info("RAGCacheManager modules initialises avec succes")
             
         except Exception as e:
-            logger.error(f"❌ Erreur initialisation RAGCacheManager: {e}")
+            logger.error(f"Erreur initialisation RAGCacheManager: {e}")
             # Mode dégradé : créer des stubs pour éviter les crashes
             self.core = None
             self.semantic = None
@@ -67,7 +67,7 @@ class RAGCacheManager:
     async def initialize(self):
         """Initialise la connexion Redis"""
         if not self.core:
-            logger.warning("⚠️ RAGCacheManager en mode dégradé - initialisation impossible")
+            logger.warning("RAGCacheManager en mode degrade - initialisation impossible")
             return False
             
         try:
@@ -75,13 +75,13 @@ class RAGCacheManager:
             if success:
                 self.client = self.core.client
                 self.initialized = self.core.initialized
-                logger.info("✅ RAGCacheManager connexion Redis établie")
+                logger.info("RAGCacheManager connexion Redis etablie")
             else:
-                logger.warning("⚠️ RAGCacheManager connexion Redis échouée")
+                logger.warning("RAGCacheManager connexion Redis echouee")
             return success
             
         except Exception as e:
-            logger.error(f"❌ Erreur initialisation connexion Redis: {e}")
+            logger.error(f"Erreur initialisation connexion Redis: {e}")
             return False
     
     def _is_initialized(self) -> bool:
@@ -240,7 +240,7 @@ class RAGCacheManager:
         if self.core:
             try:
                 await self.core.close()
-                logger.info("✅ RAGCacheManager connexion fermée")
+                logger.info("RAGCacheManager connexion fermee")
             except Exception as e:
                 logger.warning(f"Erreur fermeture cache: {e}")
         
@@ -262,7 +262,7 @@ def create_rag_cache_manager(redis_url: str = None, default_ttl: int = None) -> 
     try:
         return RAGCacheManager(redis_url, default_ttl)
     except Exception as e:
-        logger.error(f"❌ Impossible de créer RAGCacheManager: {e}")
+        logger.error(f"Impossible de creer RAGCacheManager: {e}")
         return None
 
 # Export pour compatibilité
