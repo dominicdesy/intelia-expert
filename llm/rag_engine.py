@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """
+
 rag_engine.py - RAG Engine Enhanced avec LangSmith et RRF Intelligent
 Version avec intégration LangSmith pour monitoring LLM aviculture
-CORRIGÉ: Élimination des imports circulaires
-CORRIGÉ: Connexion Weaviate cloud
-CORRIGÉ: Gestion robuste des erreurs d'initialisation
+
 """
 
 import os
