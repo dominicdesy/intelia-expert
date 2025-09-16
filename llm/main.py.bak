@@ -350,38 +350,26 @@ class SystemHealthMonitor:
         return errors
     
     async def _test_service_connectivity(self) -> Dict[str, bool]:
-        """Teste la connectivité aux services externes avec timeout - VERSION CORRIGÉE"""
+        """Teste la connectivité aux services externes avec timeout"""
         
         # Clients pour tests
         redis_client = cache_core.client if cache_core and getattr(cache_core, 'initialized', False) else None
         weaviate_client = getattr(rag_engine_enhanced, 'weaviate_client', None) if rag_engine_enhanced else None
         
         try:
-            # CORRECTION: Gestion d'erreur pour éviter le RuntimeWarning Redis
-            try:
-                connectivity = await asyncio.wait_for(
-                    quick_connectivity_check(redis_client, weaviate_client),
-                    timeout=10.0
-                )
-                return connectivity
-            except Exception as connectivity_error:
-                # Log l'erreur sans la propager pour éviter le RuntimeWarning
-                logger.debug(f"Test connectivité Redis échoué (ignoré): {connectivity_error}")
-                
-                # Retourner un statut par défaut au lieu de faire échouer
-                return {
-                    "redis": cache_core.initialized if cache_core else False,
-                    "weaviate": rag_engine_enhanced.is_initialized if rag_engine_enhanced else False,
-                    "openai": True  # Supposé fonctionnel si on arrive ici
-                }
-                
+            connectivity = await asyncio.wait_for(
+                quick_connectivity_check(redis_client, weaviate_client),
+                timeout=10.0
+            )
+            return connectivity
+            
         except asyncio.TimeoutError:
             logger.warning("Timeout test connectivité")
             return {"redis": False, "weaviate": False, "timeout": True}
         except Exception as e:
             logger.error(f"Erreur test connectivité: {e}")
             return {"redis": False, "weaviate": False, "error": str(e)}
-
+    
     async def get_health_status(self) -> Dict[str, Any]:
         """Health check enrichi avec LangSmith et RRF"""
         current_time = time.time()
