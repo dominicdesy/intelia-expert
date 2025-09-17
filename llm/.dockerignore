@@ -1,3 +1,4 @@
+# Fichiers existants
 __pycache__/
 *.pyc
 *.pyo
@@ -7,3 +8,74 @@ __pycache__/
 .gitignore
 .DS_Store
 mypy.ini
+
+# Documentation et README
+README.md
+*.md
+docs/
+*.pdf
+*.txt
+
+# Cache et build Python
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+.Python
+*.so
+
+# Environnements virtuels
+venv/
+env/
+ENV/
+.venv/
+
+# IDE et éditeurs
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+
+# Logs et fichiers temporaires
+*.log
+logs/
+*.tmp
+*.temp
+Thumbs.db
+
+# Modèles et données volumineuses (IMPORTANT!)
+*.model
+*.bin
+*.safetensors
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+*.onnx
+*.pt
+*.pth
+models/
+checkpoints/
+cache/
+data/
+datasets/
+weights/
+
+# Fichiers de configuration locaux
+.env.*
+!.env.example
+
+# Tests
+tests/
+test_*
+*_test.py
+.coverage
+.tox/
+
+# Backup et fichiers temporaires système
+*.bak
+*.backup
+*.orig
+*.rej
+*~
