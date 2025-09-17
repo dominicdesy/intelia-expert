@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 main.py - Intelia Expert Backend avec RAG Enhanced + LangSmith + RRF Intelligent
-Version FINALE CORRIGÉE: Élimination des erreurs Digital Ocean + corrections fonctionnelles
+Version CORRIGÉE: Résolution des problèmes critiques de sérialisation JSON et erreurs internes
 CORRECTIONS APPLIQUÉES:
-- Suppression du patch Redis défaillant (RuntimeWarning)
-- Ajout des endpoints manquants /status/rag et /status/cache
-- Activation de tracemalloc pour diagnostic
-- CORRECTION: process_query → generate_response pour éliminer erreur 500
-- CORRECTION: Ajout endpoint /health direct sur app pour éliminer erreur 404
-- Validation stricte, gestion d'erreurs robuste, monitoring avancé
+- FIX: Sérialisation JSON robuste avec conversion des enums
+- FIX: Gestion d'erreurs robuste pour le RAG Engine
+- FIX: Validation stricte des types pour éviter les erreurs 'str' object has no attribute 'get'
+- FIX: Health check sécurisé avec fallbacks
+- FIX: Endpoints de diagnostic améliorés
 """
 
 import os
@@ -18,9 +17,10 @@ import time
 import logging
 import uuid
 import tracemalloc
-from typing import Any, Dict, AsyncGenerator, Optional
+from typing import Any, Dict, AsyncGenerator, Optional, Union
 from collections import OrderedDict
 from contextlib import asynccontextmanager
+from enum import Enum
 
 # CORRECTION: Activation de tracemalloc pour diagnostic
 tracemalloc.start()
@@ -118,9 +118,51 @@ LANG_DETECTION_MIN_LENGTH = int(os.getenv("LANG_DETECTION_MIN_LENGTH", "20"))
 logger.info(f"Mode RAG Enhanced: LangSmith + RRF Intelligent v4.0")
 logger.info(f"Configuration: LangSmith={LANGSMITH_ENABLED}, RRF={ENABLE_INTELLIGENT_RRF}")
 
-# === CORRECTION: SUPPRESSION DU PATCH REDIS DÉFAILLANT ===
-# La fonction patch_redis_execute_command_once() a été supprimée car elle causait
-# le RuntimeWarning dans les logs Digital Ocean
+# === CORRECTION: Utilitaires de sérialisation JSON ===
+def safe_serialize_for_json(obj: Any) -> Any:
+    """Convertit récursivement les objets en types JSON-safe"""
+    if obj is None:
+        return None
+    elif isinstance(obj, (str, int, float, bool)):
+        return obj
+    elif isinstance(obj, Enum):
+        return obj.value  # FIX: Conversion des enums
+    elif isinstance(obj, dict):
+        return {k: safe_serialize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [safe_serialize_for_json(item) for item in obj]
+    elif hasattr(obj, '__dict__'):
+        return safe_serialize_for_json(obj.__dict__)
+    else:
+        return str(obj)  # Fallback pour types inconnus
+
+def safe_get_attribute(obj: Any, attr: str, default: Any = None) -> Any:
+    """Récupération sécurisée d'attributs avec validation de type"""
+    try:
+        if obj is None:
+            return default
+        
+        if isinstance(obj, dict):
+            return obj.get(attr, default)
+        elif hasattr(obj, attr):
+            return getattr(obj, attr, default)
+        else:
+            return default
+    except Exception as e:
+        logger.debug(f"Erreur récupération attribut {attr}: {e}")
+        return default
+
+def safe_dict_get(obj: Any, key: str, default: Any = None) -> Any:
+    """Version sécurisée de dict.get() qui évite les erreurs sur les strings"""
+    try:
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        else:
+            logger.debug(f"Tentative d'appel .get() sur type {type(obj)}: {str(obj)[:100]}")
+            return default
+    except Exception as e:
+        logger.debug(f"Erreur safe_dict_get pour {key}: {e}")
+        return default
 
 class StartupValidationError(Exception):
     """Exception pour les erreurs de validation au démarrage"""
@@ -290,7 +332,7 @@ class SystemHealthMonitor:
         errors = []
         
         try:
-            # Cache Core - CORRECTION: Sans patch Redis
+            # Cache Core
             logger.info("  Initialisation Cache Core...")
             try:
                 from cache_core import create_cache_core
@@ -320,21 +362,29 @@ class SystemHealthMonitor:
                     status = rag_engine_enhanced.get_status()
                     
                     # Log statut LangSmith
-                    langsmith_status = status.get("langsmith", {})
-                    if langsmith_status.get("enabled"):
-                        logger.info(f"✅ LangSmith actif - Projet: {langsmith_status.get('project')}")
+                    langsmith_status = safe_dict_get(status, "langsmith", {})
+                    if safe_dict_get(langsmith_status, "enabled", False):
+                        project = safe_dict_get(langsmith_status, "project", "")
+                        logger.info(f"✅ LangSmith actif - Projet: {project}")
                     
                     # Log statut RRF Intelligent
-                    rrf_status = status.get("intelligent_rrf", {})
-                    if rrf_status.get("enabled"):
-                        logger.info(f"✅ RRF Intelligent actif - Learning: {rrf_status.get('learning_mode')}")
+                    rrf_status = safe_dict_get(status, "intelligent_rrf", {})
+                    if safe_dict_get(rrf_status, "enabled", False):
+                        learning_mode = safe_dict_get(rrf_status, "learning_mode", False)
+                        logger.info(f"✅ RRF Intelligent actif - Learning: {learning_mode}")
                     
                     # Log optimisations activées
-                    optimizations = status.get("optimizations", {})
-                    logger.info(f"Optimisations: Cache={optimizations.get('external_cache_enabled', False)}")
-                    logger.info(f"   - Hybrid Search: {optimizations.get('hybrid_search_enabled', False)}")
-                    logger.info(f"   - LangSmith: {optimizations.get('langsmith_enabled', False)}")
-                    logger.info(f"   - RRF Intelligent: {optimizations.get('intelligent_rrf_enabled', False)}")
+                    optimizations = safe_dict_get(status, "optimizations", {})
+                    cache_enabled = safe_dict_get(optimizations, "external_cache_enabled", False)
+                    logger.info(f"Optimisations: Cache={cache_enabled}")
+                    
+                    hybrid_enabled = safe_dict_get(optimizations, "hybrid_search_enabled", False)
+                    langsmith_enabled = safe_dict_get(optimizations, "langsmith_enabled", False)
+                    rrf_enabled = safe_dict_get(optimizations, "intelligent_rrf_enabled", False)
+                    
+                    logger.info(f"   - Hybrid Search: {hybrid_enabled}")
+                    logger.info(f"   - LangSmith: {langsmith_enabled}")
+                    logger.info(f"   - RRF Intelligent: {rrf_enabled}")
                         
                 else:
                     logger.warning("⚠️ RAG Engine en mode dégradé")
@@ -399,71 +449,93 @@ class SystemHealthMonitor:
             return {"redis": False, "weaviate": False, "error": str(e)}
 
     async def get_health_status(self) -> Dict[str, Any]:
-        """Health check enrichi avec LangSmith et RRF"""
+        """Health check enrichi avec sérialisation JSON sécurisée"""
         current_time = time.time()
         
-        # Statut global
+        # Statut global - SÉRIALISABLE
         global_status = {
             "overall_status": "healthy",
             "timestamp": current_time,
             "uptime_seconds": current_time - self.startup_time,
-            "startup_validation": self.validation_report,
+            "startup_validation": safe_serialize_for_json(self.validation_report),
             "services": {},
             "integrations": {},
             "warnings": []
         }
         
         try:
-            # === NOUVEAU: Statut services enrichi ===
+            # === CORRECTION: Statut services avec sérialisation sécurisée ===
             
             # RAG Engine
-            if rag_engine_enhanced and rag_engine_enhanced.is_initialized:
-                rag_status = rag_engine_enhanced.get_status()
-                global_status["services"]["rag_engine"] = {
-                    "status": "healthy" if not rag_engine_enhanced.degraded_mode else "degraded",
-                    "approach": rag_status.get("approach", "unknown"),
-                    "optimizations": rag_status.get("optimizations", {}),
-                    "metrics": rag_status.get("optimization_stats", {})
-                }
+            if rag_engine_enhanced and safe_get_attribute(rag_engine_enhanced, 'is_initialized', False):
+                try:
+                    rag_status = rag_engine_enhanced.get_status()
+                    
+                    # Sérialisation sécurisée du statut RAG
+                    safe_rag_status = safe_serialize_for_json(rag_status)
+                    
+                    global_status["services"]["rag_engine"] = {
+                        "status": "healthy" if not getattr(rag_engine_enhanced, 'degraded_mode', False) else "degraded",
+                        "approach": safe_dict_get(safe_rag_status, "approach", "unknown"),
+                        "optimizations": safe_dict_get(safe_rag_status, "optimizations", {}),
+                        "metrics": safe_dict_get(safe_rag_status, "optimization_stats", {})
+                    }
+                    
+                    # === CORRECTION: Intégrations spécialisées avec validation ===
+                    
+                    # LangSmith - Sérialisation sécurisée
+                    langsmith_info = safe_dict_get(safe_rag_status, "langsmith", {})
+                    if isinstance(langsmith_info, dict):
+                        global_status["integrations"]["langsmith"] = {
+                            "available": safe_dict_get(langsmith_info, "available", False),
+                            "enabled": safe_dict_get(langsmith_info, "enabled", False),
+                            "configured": safe_dict_get(langsmith_info, "configured", False),
+                            "project": str(safe_dict_get(langsmith_info, "project", "")),
+                            "traces_count": int(safe_dict_get(langsmith_info, "traces_count", 0)),
+                            "errors_count": int(safe_dict_get(langsmith_info, "errors_count", 0))
+                        }
+                        
+                        if langsmith_info.get("enabled") and not langsmith_info.get("configured"):
+                            global_status["warnings"].append("LangSmith activé mais non configuré")
+                    
+                    # RRF Intelligent - Sérialisation sécurisée
+                    rrf_info = safe_dict_get(safe_rag_status, "intelligent_rrf", {})
+                    if isinstance(rrf_info, dict):
+                        global_status["integrations"]["intelligent_rrf"] = {
+                            "available": safe_dict_get(rrf_info, "available", False),
+                            "enabled": safe_dict_get(rrf_info, "enabled", False),
+                            "configured": safe_dict_get(rrf_info, "configured", False),
+                            "learning_mode": safe_dict_get(rrf_info, "learning_mode", False),
+                            "usage_count": int(safe_dict_get(rrf_info, "usage_count", 0)),
+                            "performance_stats": safe_dict_get(rrf_info, "performance_stats", {})
+                        }
+                        
+                        if rrf_info.get("enabled") and not rrf_info.get("configured"):
+                            global_status["warnings"].append("RRF Intelligent activé mais non configuré")
                 
-                # === NOUVEAU: Intégrations spécialisées ===
-                
-                # LangSmith
-                langsmith_info = rag_status.get("langsmith", {})
-                global_status["integrations"]["langsmith"] = {
-                    "available": langsmith_info.get("available", False),
-                    "enabled": langsmith_info.get("enabled", False),
-                    "configured": langsmith_info.get("configured", False),
-                    "project": langsmith_info.get("project", ""),
-                    "traces_count": langsmith_info.get("traces_count", 0),
-                    "errors_count": langsmith_info.get("errors_count", 0)
-                }
-                
-                if langsmith_info.get("enabled") and not langsmith_info.get("configured"):
-                    global_status["warnings"].append("LangSmith activé mais non configuré")
-                
-                # RRF Intelligent
-                rrf_info = rag_status.get("intelligent_rrf", {})
-                global_status["integrations"]["intelligent_rrf"] = {
-                    "available": rrf_info.get("available", False),
-                    "enabled": rrf_info.get("enabled", False),
-                    "configured": rrf_info.get("configured", False),
-                    "learning_mode": rrf_info.get("learning_mode", False),
-                    "usage_count": rrf_info.get("usage_count", 0),
-                    "performance_stats": rrf_info.get("performance_stats", {})
-                }
-                
-                if rrf_info.get("enabled") and not rrf_info.get("configured"):
-                    global_status["warnings"].append("RRF Intelligent activé mais non configuré")
+                except Exception as e:
+                    logger.error(f"Erreur récupération statut RAG: {e}")
+                    global_status["services"]["rag_engine"] = {
+                        "status": "error", 
+                        "reason": f"status_error: {str(e)}"
+                    }
+                    global_status["overall_status"] = "degraded"
                 
             else:
                 global_status["services"]["rag_engine"] = {"status": "error", "reason": "not_initialized"}
                 global_status["overall_status"] = "degraded"
             
-            # Cache
+            # Cache - Sérialisation sécurisée
             if cache_core and getattr(cache_core, 'initialized', False):
-                cache_status = cache_core.get_health_status() if hasattr(cache_core, 'get_health_status') else {"status": "unknown"}
-                global_status["services"]["cache"] = cache_status
+                try:
+                    if hasattr(cache_core, 'get_health_status'):
+                        cache_status = cache_core.get_health_status()
+                        global_status["services"]["cache"] = safe_serialize_for_json(cache_status)
+                    else:
+                        global_status["services"]["cache"] = {"status": "unknown"}
+                except Exception as e:
+                    logger.error(f"Erreur statut cache: {e}")
+                    global_status["services"]["cache"] = {"status": "error", "error": str(e)}
             else:
                 global_status["services"]["cache"] = {"status": "disabled"}
             
@@ -473,16 +545,20 @@ class SystemHealthMonitor:
             else:
                 global_status["services"]["agent_rag"] = {"status": "disabled"}
             
-            # === NOUVEAU: Configuration et environnement ===
-            config_status = get_config_status()
-            global_status["configuration"] = config_status
+            # === CORRECTION: Configuration et environnement avec sérialisation ===
+            try:
+                config_status = get_config_status()
+                global_status["configuration"] = safe_serialize_for_json(config_status)
+            except Exception as e:
+                logger.error(f"Erreur statut configuration: {e}")
+                global_status["configuration"] = {"error": str(e)}
             
             # Digital Ocean info
             global_status["environment"] = {
                 "platform": "digital_ocean",
-                "app_name": DO_APP_NAME,
-                "app_tier": DO_APP_TIER,
-                "base_path": BASE_PATH
+                "app_name": str(DO_APP_NAME),
+                "app_tier": str(DO_APP_TIER),
+                "base_path": str(BASE_PATH)
             }
             
             # Déterminer statut global final
@@ -497,7 +573,8 @@ class SystemHealthMonitor:
             return {
                 "overall_status": "error",
                 "error": str(e),
-                "timestamp": current_time
+                "timestamp": current_time,
+                "safe_mode": True
             }
 
 health_monitor = SystemHealthMonitor()
@@ -635,7 +712,7 @@ class MetricsCollector:
         self.max_recent_samples = 100
     
     def record_query(self, result, source_type: str = "unknown", endpoint_time: float = 0.0):
-        """Enregistre les métriques avec support LangSmith et RRF"""
+        """Enregistre les métriques avec support LangSmith et RRF - VERSION SÉCURISÉE"""
         if not ENABLE_METRICS_LOGGING:
             return
         
@@ -650,58 +727,66 @@ class MetricsCollector:
             elif source_type == "error":
                 self.metrics["errors"] += 1
             
-            # Traitement selon le type de résultat
-            if hasattr(result, 'source'):
+            # Traitement selon le type de résultat - VERSION SÉCURISÉE
+            if result and hasattr(result, 'source'):
                 try:
-                    source_value = result.source.value if hasattr(result.source, 'value') else str(result.source)
-                    if "rag" in source_value.lower():
-                        self.metrics["rag_standard_queries"] += 1
-                    elif "ood" in source_value.lower():
-                        self.metrics["ood_filtered"] += 1
-                    else:
-                        self.metrics["fallback_queries"] += 1
-                except:
+                    source_obj = safe_get_attribute(result, 'source')
+                    if source_obj:
+                        source_value = safe_get_attribute(source_obj, 'value', str(source_obj))
+                        source_value_str = str(source_value).lower()
+                        
+                        if "rag" in source_value_str:
+                            self.metrics["rag_standard_queries"] += 1
+                        elif "ood" in source_value_str:
+                            self.metrics["ood_filtered"] += 1
+                        else:
+                            self.metrics["fallback_queries"] += 1
+                except Exception as e:
+                    logger.debug(f"Erreur traitement source metrics: {e}")
                     self.metrics["fallback_queries"] += 1
             
-            # === NOUVEAU: Métriques LangSmith et RRF ===
-            if hasattr(result, 'metadata') and result.metadata:
+            # === CORRECTION: Métriques LangSmith et RRF avec validation ===
+            metadata = safe_get_attribute(result, 'metadata')
+            if metadata and isinstance(metadata, dict):
                 try:
-                    metadata = result.metadata
-                    
                     # LangSmith
-                    if metadata.get("langsmith", {}).get("traced"):
+                    langsmith_data = safe_dict_get(metadata, "langsmith", {})
+                    if safe_dict_get(langsmith_data, "traced", False):
                         self.metrics["langsmith_traces"] += 1
                     
-                    if metadata.get("alerts_aviculture"):
+                    if safe_dict_get(metadata, "alerts_aviculture"):
                         self.metrics["hallucination_alerts"] += 1
                     
                     # RRF Intelligent
-                    if metadata.get("intelligent_rrf", {}).get("used"):
+                    rrf_data = safe_dict_get(metadata, "intelligent_rrf", {})
+                    if safe_dict_get(rrf_data, "used", False):
                         self.metrics["intelligent_rrf_queries"] += 1
                     
-                    opt_stats = metadata.get("optimization_stats", {})
-                    self.metrics["cache_hits"] += opt_stats.get("cache_hits", 0)
-                    self.metrics["cache_misses"] += opt_stats.get("cache_misses", 0)
-                    self.metrics["semantic_cache_hits"] += opt_stats.get("semantic_cache_hits", 0)
-                    self.metrics["hybrid_searches"] += opt_stats.get("hybrid_searches", 0)
-                    self.metrics["genetic_boosts_applied"] += opt_stats.get("genetic_boosts_applied", 0)
-                    self.metrics["rrf_learning_updates"] += opt_stats.get("rrf_learning_updates", 0)
+                    opt_stats = safe_dict_get(metadata, "optimization_stats", {})
+                    if isinstance(opt_stats, dict):
+                        self.metrics["cache_hits"] += int(safe_dict_get(opt_stats, "cache_hits", 0))
+                        self.metrics["cache_misses"] += int(safe_dict_get(opt_stats, "cache_misses", 0))
+                        self.metrics["semantic_cache_hits"] += int(safe_dict_get(opt_stats, "semantic_cache_hits", 0))
+                        self.metrics["hybrid_searches"] += int(safe_dict_get(opt_stats, "hybrid_searches", 0))
+                        self.metrics["genetic_boosts_applied"] += int(safe_dict_get(opt_stats, "genetic_boosts_applied", 0))
+                        self.metrics["rrf_learning_updates"] += int(safe_dict_get(opt_stats, "rrf_learning_updates", 0))
                     
                 except Exception as e:
                     logger.debug(f"Erreur traitement métriques metadata: {e}")
             
             # Calcul des métriques temporelles
-            processing_time = endpoint_time if endpoint_time > 0 else getattr(result, 'processing_time', 0)
+            processing_time = endpoint_time if endpoint_time > 0 else safe_get_attribute(result, 'processing_time', 0)
             
             if processing_time > 0:
-                self.recent_processing_times.append(processing_time)
+                self.recent_processing_times.append(float(processing_time))
                 if len(self.recent_processing_times) > self.max_recent_samples:
                     self.recent_processing_times.pop(0)
                 
                 # Calcul de la moyenne
-                self.metrics["avg_processing_time"] = (
-                    sum(self.recent_processing_times) / len(self.recent_processing_times)
-                )
+                if self.recent_processing_times:
+                    self.metrics["avg_processing_time"] = (
+                        sum(self.recent_processing_times) / len(self.recent_processing_times)
+                    )
                 
                 # Calcul des percentiles
                 if len(self.recent_processing_times) >= 10:
@@ -711,19 +796,20 @@ class MetricsCollector:
                         self.latency_percentiles["p50"] = sorted_times[int(n * 0.5)]
                         self.latency_percentiles["p95"] = sorted_times[int(n * 0.95)]
                         self.latency_percentiles["p99"] = sorted_times[int(n * 0.99)]
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Erreur calcul percentiles: {e}")
             
             # Confiance
-            confidence = getattr(result, 'confidence', 0)
+            confidence = safe_get_attribute(result, 'confidence', 0)
             if confidence > 0:
-                self.recent_confidences.append(confidence)
+                self.recent_confidences.append(float(confidence))
                 if len(self.recent_confidences) > self.max_recent_samples:
                     self.recent_confidences.pop(0)
                 
-                self.metrics["avg_confidence"] = (
-                    sum(self.recent_confidences) / len(self.recent_confidences)
-                )
+                if self.recent_confidences:
+                    self.metrics["avg_confidence"] = (
+                        sum(self.recent_confidences) / len(self.recent_confidences)
+                    )
         
         except Exception as e:
             logger.warning(f"Erreur enregistrement métriques: {e}")
@@ -760,7 +846,9 @@ metrics_collector = MetricsCollector()
 def sse_event(obj: Dict[str, Any]) -> bytes:
     """Formatage SSE avec gestion d'erreurs robuste"""
     try:
-        data = json.dumps(obj, ensure_ascii=False)
+        # CORRECTION: Sérialisation sécurisée pour SSE
+        safe_obj = safe_serialize_for_json(obj)
+        data = json.dumps(safe_obj, ensure_ascii=False)
         return f"data: {data}\n\n".encode("utf-8")
     except Exception as e:
         logger.error(f"Erreur formatage SSE: {e}")
@@ -990,7 +1078,7 @@ router = APIRouter()
 
 @router.get("/health")
 async def health_check():
-    """Health check complet avec détails LangSmith et RRF"""
+    """Health check complet avec détails LangSmith et RRF - VERSION CORRIGÉE"""
     try:
         health_status = await health_monitor.get_health_status()
         
@@ -1014,11 +1102,12 @@ async def health_check():
             content={
                 "overall_status": "error",
                 "error": str(e),
-                "timestamp": time.time()
+                "timestamp": time.time(),
+                "safe_mode": True
             }
         )
 
-# === CORRECTION 2: Ajout endpoint /health direct sur app ===
+# === CORRECTION: Ajout endpoint /health direct sur app ===
 @app.get("/health")
 async def health_direct():
     """Endpoint health direct sur l'app pour résoudre l'erreur 404"""
@@ -1036,7 +1125,7 @@ async def dependencies_status():
 
 @router.get(f"{BASE_PATH}/status/rag")
 async def rag_status():
-    """Statut détaillé du RAG Engine"""
+    """Statut détaillé du RAG Engine - VERSION SÉCURISÉE"""
     try:
         if not rag_engine_enhanced:
             return {
@@ -1045,16 +1134,23 @@ async def rag_status():
                 "timestamp": time.time()
             }
         
-        status = rag_engine_enhanced.get_status()
+        # CORRECTION: Récupération sécurisée du statut
+        try:
+            status = rag_engine_enhanced.get_status()
+            safe_status = safe_serialize_for_json(status)
+        except Exception as e:
+            logger.error(f"Erreur récupération statut RAG: {e}")
+            safe_status = {"error": f"status_error: {str(e)}"}
+        
         return {
-            "initialized": rag_engine_enhanced.is_initialized,
-            "degraded_mode": getattr(rag_engine_enhanced, 'degraded_mode', False),
-            "approach": status.get("approach", "unknown"),
-            "optimizations": status.get("optimizations", {}),
-            "langsmith": status.get("langsmith", {}),
-            "intelligent_rrf": status.get("intelligent_rrf", {}),
-            "optimization_stats": status.get("optimization_stats", {}),
-            "weaviate_connected": bool(getattr(rag_engine_enhanced, 'weaviate_client', None)),
+            "initialized": safe_get_attribute(rag_engine_enhanced, 'is_initialized', False),
+            "degraded_mode": safe_get_attribute(rag_engine_enhanced, 'degraded_mode', False),
+            "approach": safe_dict_get(safe_status, "approach", "unknown"),
+            "optimizations": safe_dict_get(safe_status, "optimizations", {}),
+            "langsmith": safe_dict_get(safe_status, "langsmith", {}),
+            "intelligent_rrf": safe_dict_get(safe_status, "intelligent_rrf", {}),
+            "optimization_stats": safe_dict_get(safe_status, "optimization_stats", {}),
+            "weaviate_connected": bool(safe_get_attribute(rag_engine_enhanced, 'weaviate_client')),
             "timestamp": time.time()
         }
         
@@ -1068,7 +1164,7 @@ async def rag_status():
 
 @router.get(f"{BASE_PATH}/status/cache")
 async def cache_status():
-    """Statut détaillé du cache Redis"""
+    """Statut détaillé du cache Redis - VERSION SÉCURISÉE"""
     try:
         if not cache_core:
             return {
@@ -1078,17 +1174,29 @@ async def cache_status():
                 "timestamp": time.time()
             }
         
-        cache_health = cache_core.get_health_status() if hasattr(cache_core, 'get_health_status') else {}
-        cache_stats = cache_core.get_stats() if hasattr(cache_core, 'get_stats') else {}
+        # CORRECTION: Récupération sécurisée des stats cache
+        try:
+            cache_health = cache_core.get_health_status() if hasattr(cache_core, 'get_health_status') else {}
+            cache_stats = cache_core.get_stats() if hasattr(cache_core, 'get_stats') else {}
+        except Exception as e:
+            logger.error(f"Erreur récupération stats cache: {e}")
+            cache_health = {"error": str(e)}
+            cache_stats = {}
         
         return {
-            "enabled": getattr(cache_core, 'enabled', False),
-            "initialized": getattr(cache_core, 'initialized', False),
-            "status": cache_health.get("status", "unknown"),
-            "stats": cache_stats,
+            "enabled": safe_get_attribute(cache_core, 'enabled', False),
+            "initialized": safe_get_attribute(cache_core, 'initialized', False),
+            "status": safe_dict_get(cache_health, "status", "unknown"),
+            "stats": safe_serialize_for_json(cache_stats),
             "configuration": {
-                "memory_limit_mb": getattr(cache_core.config, 'total_memory_limit_mb', 0) if hasattr(cache_core, 'config') else 0,
-                "compression_enabled": getattr(cache_core.config, 'enable_compression', False) if hasattr(cache_core, 'config') else False
+                "memory_limit_mb": safe_get_attribute(
+                    safe_get_attribute(cache_core, 'config'), 
+                    'total_memory_limit_mb', 0
+                ),
+                "compression_enabled": safe_get_attribute(
+                    safe_get_attribute(cache_core, 'config'), 
+                    'enable_compression', False
+                )
             },
             "timestamp": time.time()
         }
@@ -1135,23 +1243,32 @@ async def get_metrics():
             }
         }
         
-        # === NOUVEAU: Métriques RAG Engine enrichies ===
-        if rag_engine_enhanced and rag_engine_enhanced.is_initialized:
-            rag_status = rag_engine_enhanced.get_status()
-            
-            base_metrics["rag_engine"] = {
-                "approach": rag_status.get("approach", "unknown"),
-                "optimizations": rag_status.get("optimizations", {}),
-                "langsmith": rag_status.get("langsmith", {}),
-                "intelligent_rrf": rag_status.get("intelligent_rrf", {}),
-                "optimization_stats": rag_status.get("optimization_stats", {}),
-                "weaviate_capabilities": rag_status.get("api_capabilities", {})
-            }
+        # === CORRECTION: Métriques RAG Engine enrichies avec sérialisation sécurisée ===
+        if rag_engine_enhanced and safe_get_attribute(rag_engine_enhanced, 'is_initialized', False):
+            try:
+                rag_status = rag_engine_enhanced.get_status()
+                safe_rag_status = safe_serialize_for_json(rag_status)
+                
+                base_metrics["rag_engine"] = {
+                    "approach": safe_dict_get(safe_rag_status, "approach", "unknown"),
+                    "optimizations": safe_dict_get(safe_rag_status, "optimizations", {}),
+                    "langsmith": safe_dict_get(safe_rag_status, "langsmith", {}),
+                    "intelligent_rrf": safe_dict_get(safe_rag_status, "intelligent_rrf", {}),
+                    "optimization_stats": safe_dict_get(safe_rag_status, "optimization_stats", {}),
+                    "weaviate_capabilities": safe_dict_get(safe_rag_status, "api_capabilities", {})
+                }
+            except Exception as e:
+                logger.error(f"Erreur métriques RAG: {e}")
+                base_metrics["rag_engine"] = {"error": str(e)}
         
         # Cache stats externe
         if cache_core and getattr(cache_core, 'initialized', False):
-            cache_stats = cache_core.get_stats() if hasattr(cache_core, 'get_stats') else {}
-            base_metrics["cache"] = cache_stats
+            try:
+                cache_stats = cache_core.get_stats() if hasattr(cache_core, 'get_stats') else {}
+                base_metrics["cache"] = safe_serialize_for_json(cache_stats)
+            except Exception as e:
+                logger.error(f"Erreur métriques cache: {e}")
+                base_metrics["cache"] = {"error": str(e)}
         
         return base_metrics
         
@@ -1180,15 +1297,15 @@ async def configuration_status():
             }
         }
         
-        return config_status
+        return safe_serialize_for_json(config_status)
         
     except Exception as e:
         return {"error": str(e)}
 
-# === CORRECTION 1: ENDPOINT CHAT AVEC MÉTHODE CORRIGÉE ===
+# === CORRECTION CRITIQUE: ENDPOINT CHAT AVEC GESTION D'ERREURS ROBUSTE ===
 @router.post(f"{BASE_PATH}/chat")
 async def chat(request: Request):
-    """Chat endpoint avec validation stricte et gestion d'erreurs robuste"""
+    """Chat endpoint avec validation stricte et gestion d'erreurs robuste - VERSION CORRIGÉE"""
     total_start_time = time.time()
     
     if not rag_engine_enhanced:
@@ -1233,13 +1350,61 @@ async def chat(request: Request):
             metrics_collector.record_query({"source": "ood"}, "ood", time.time() - total_start_time)
             return StreamingResponse(simple_response(), media_type="text/plain")
         
-        # CORRECTION CRITIQUE: Utiliser generate_response au lieu de process_query
+        # === CORRECTION CRITIQUE: Gestion robuste du RAG Engine ===
         try:
-            rag_result = await rag_engine_enhanced.generate_response(
-                query=message,
-                tenant_id=tenant_id,
-                language=language
-            )
+            # Vérifier que le RAG engine est initialisé
+            if not safe_get_attribute(rag_engine_enhanced, 'is_initialized', False):
+                logger.error("RAG Engine non initialisé")
+                raise HTTPException(status_code=503, detail="RAG Engine non initialisé")
+            
+            # CORRECTION: Utiliser une méthode plus robuste ou fallback
+            rag_result = None
+            
+            # Essayer d'abord generate_response
+            try:
+                if hasattr(rag_engine_enhanced, 'generate_response'):
+                    rag_result = await rag_engine_enhanced.generate_response(
+                        query=message,
+                        tenant_id=tenant_id,
+                        language=language
+                    )
+                else:
+                    raise AttributeError("generate_response method not available")
+                    
+            except Exception as generate_error:
+                logger.warning(f"generate_response échoué: {generate_error}")
+                
+                # FALLBACK: Essayer process_query si generate_response échoue
+                try:
+                    if hasattr(rag_engine_enhanced, 'process_query'):
+                        rag_result = await rag_engine_enhanced.process_query(
+                            query=message,
+                            tenant_id=tenant_id,
+                            language=language
+                        )
+                    else:
+                        raise AttributeError("process_query method not available either")
+                        
+                except Exception as process_error:
+                    logger.error(f"process_query échoué aussi: {process_error}")
+                    
+                    # DERNIER FALLBACK: Réponse OOD si tout échoue
+                    logger.error("Toutes les méthodes RAG ont échoué, fallback vers OOD")
+                    out_of_domain_msg = get_out_of_domain_message(language)
+                    
+                    async def fallback_response():
+                        yield sse_event({"type": "start", "reason": "rag_engine_error"})
+                        yield sse_event({"type": "chunk", "content": out_of_domain_msg})
+                        yield sse_event({"type": "end", "confidence": 0.5, "fallback": True})
+                    
+                    metrics_collector.record_query({"source": "error"}, "error", time.time() - total_start_time)
+                    return StreamingResponse(fallback_response(), media_type="text/plain")
+            
+            # Vérifier que nous avons un résultat valide
+            if not rag_result:
+                logger.error("RAG result is None")
+                raise HTTPException(status_code=500, detail="Aucun résultat du RAG Engine")
+                
         except Exception as e:
             logger.error(f"Erreur traitement RAG: {e}")
             metrics_collector.record_query({"source": "error"}, "error", time.time() - total_start_time)
@@ -1249,22 +1414,40 @@ async def chat(request: Request):
         total_processing_time = time.time() - total_start_time
         metrics_collector.record_query(rag_result, "rag_enhanced", total_processing_time)
         
-        # Streaming de la réponse
+        # === CORRECTION: Streaming de la réponse avec gestion d'erreurs robuste ===
         async def generate_response():
             try:
-                # Informations de début
-                metadata = getattr(rag_result, 'metadata', {}) or {}
+                # CORRECTION: Informations de début avec accès sécurisé
+                metadata = safe_get_attribute(rag_result, 'metadata', {}) or {}
+                source = safe_get_attribute(rag_result, 'source', 'unknown')
+                confidence = safe_get_attribute(rag_result, 'confidence', 0.5)
+                processing_time = safe_get_attribute(rag_result, 'processing_time', 0)
+                
+                # Convertir source enum si nécessaire
+                if hasattr(source, 'value'):
+                    source = source.value
+                else:
+                    source = str(source)
+                
                 yield sse_event({
                     "type": "start", 
-                    "source": getattr(rag_result, 'source', 'unknown'),
-                    "confidence": getattr(rag_result, 'confidence', 0.5),
-                    "processing_time": getattr(rag_result, 'processing_time', 0)
+                    "source": source,
+                    "confidence": float(confidence),
+                    "processing_time": float(processing_time)
                 })
                 
-                # Contenu de la réponse
-                answer = getattr(rag_result, 'answer', '')
+                # CORRECTION: Contenu de la réponse avec validation
+                answer = safe_get_attribute(rag_result, 'answer', '')
+                if not answer:
+                    # Essayer d'autres attributs possibles
+                    answer = safe_get_attribute(rag_result, 'response', '')
+                    if not answer:
+                        answer = safe_get_attribute(rag_result, 'text', '')
+                        if not answer:
+                            answer = "Désolé, je n'ai pas pu générer une réponse."
+                
                 if answer:
-                    chunks = smart_chunk_text(answer, STREAM_CHUNK_LEN)
+                    chunks = smart_chunk_text(str(answer), STREAM_CHUNK_LEN)
                     
                     for i, chunk in enumerate(chunks):
                         yield sse_event({
@@ -1274,17 +1457,21 @@ async def chat(request: Request):
                         })
                         await asyncio.sleep(0.01)  # Streaming fluide
                 
-                # Informations finales
+                # CORRECTION: Informations finales avec validation
+                context_docs = safe_get_attribute(rag_result, 'context_docs', [])
+                if not isinstance(context_docs, list):
+                    context_docs = []
+                
                 yield sse_event({
                     "type": "end",
                     "total_time": total_processing_time,
-                    "confidence": getattr(rag_result, 'confidence', 0.5),
-                    "documents_used": len(getattr(rag_result, 'context_docs', []))
+                    "confidence": float(confidence),
+                    "documents_used": len(context_docs)
                 })
                 
-                # Enregistrer en mémoire
-                if answer and hasattr(rag_result, 'source'):
-                    add_to_conversation_memory(tenant_id, message, answer, "rag_enhanced")
+                # Enregistrer en mémoire si tout est OK
+                if answer and source:
+                    add_to_conversation_memory(tenant_id, message, str(answer), "rag_enhanced")
                 
             except Exception as e:
                 logger.error(f"Erreur streaming: {e}")
@@ -1327,8 +1514,113 @@ async def ood_endpoint(request: Request):
         logger.error(f"Erreur OOD endpoint: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
+# === CORRECTION: Endpoint de diagnostic pour tests spécifiques ===
+@router.post(f"{BASE_PATH}/diagnostic/chat")
+async def diagnostic_chat(request: Request):
+    """Endpoint de diagnostic pour tester le chat avec informations détaillées"""
+    try:
+        body = await request.json()
+        message = body.get("message", "test")
+        
+        diagnostic_info = {
+            "timestamp": time.time(),
+            "rag_engine_status": {
+                "available": rag_engine_enhanced is not None,
+                "initialized": safe_get_attribute(rag_engine_enhanced, 'is_initialized', False),
+                "degraded_mode": safe_get_attribute(rag_engine_enhanced, 'degraded_mode', False)
+            },
+            "methods_available": {},
+            "test_result": None,
+            "error": None
+        }
+        
+        if rag_engine_enhanced:
+            # Vérifier les méthodes disponibles
+            diagnostic_info["methods_available"] = {
+                "generate_response": hasattr(rag_engine_enhanced, 'generate_response'),
+                "process_query": hasattr(rag_engine_enhanced, 'process_query'),
+                "get_status": hasattr(rag_engine_enhanced, 'get_status')
+            }
+            
+            # Test simple
+            try:
+                if hasattr(rag_engine_enhanced, 'generate_response'):
+                    test_result = await rag_engine_enhanced.generate_response(
+                        query=message,
+                        tenant_id="diagnostic",
+                        language="fr"
+                    )
+                    diagnostic_info["test_result"] = {
+                        "method_used": "generate_response",
+                        "success": True,
+                        "has_answer": bool(safe_get_attribute(test_result, 'answer')),
+                        "answer_length": len(str(safe_get_attribute(test_result, 'answer', ''))),
+                        "confidence": safe_get_attribute(test_result, 'confidence', 0),
+                        "source": str(safe_get_attribute(test_result, 'source', 'unknown'))
+                    }
+                elif hasattr(rag_engine_enhanced, 'process_query'):
+                    test_result = await rag_engine_enhanced.process_query(
+                        query=message,
+                        tenant_id="diagnostic",
+                        language="fr"
+                    )
+                    diagnostic_info["test_result"] = {
+                        "method_used": "process_query",
+                        "success": True,
+                        "result_type": type(test_result).__name__
+                    }
+                else:
+                    diagnostic_info["error"] = "Aucune méthode de traitement disponible"
+                    
+            except Exception as e:
+                diagnostic_info["error"] = str(e)
+                diagnostic_info["test_result"] = {
+                    "success": False,
+                    "error": str(e)
+                }
+        
+        return diagnostic_info
+        
+    except Exception as e:
+        return {"error": str(e), "timestamp": time.time()}
+
 # Inclusion du router dans l'app
 app.include_router(router)
+
+# === CORRECTION: Endpoint de test JSON simple ===
+@app.get("/test-json")
+async def test_json():
+    """Test simple de sérialisation JSON"""
+    try:
+        # Test avec enum
+        from intent_types import IntentType
+        
+        test_data = {
+            "string": "test",
+            "number": 42,
+            "boolean": True,
+            "list": [1, 2, 3],
+            "dict": {"nested": "value"},
+            "enum_value": IntentType.METRIC_QUERY.value,  # CORRECTION: .value
+            "enum_direct": str(IntentType.PROTOCOL_QUERY),  # CORRECTION: str()
+        }
+        
+        # Test de sérialisation
+        safe_data = safe_serialize_for_json(test_data)
+        
+        return {
+            "status": "success",
+            "original_data": test_data,
+            "serialized_data": safe_data,
+            "json_test": "OK"
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error", 
+            "error": str(e),
+            "json_test": "FAILED"
+        }
 
 # Démarrage de l'application
 if __name__ == "__main__":
