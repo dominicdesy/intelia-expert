@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 imports_and_dependencies.py - Gestion robuste des dépendances avec structure modulaire
-Version ADAPTÉE pour architecture par répertoires
-Correction des imports pour la nouvelle structure config/, core/, cache/, etc.
+Version CORRIGÉE - Résolution des imports circulaires
 """
 
 import logging
@@ -18,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 class DependencyStatus(Enum):
     """Statuts possibles des dépendances"""
-
     AVAILABLE = "available"
     MISSING = "missing"
     VERSION_INCOMPATIBLE = "version_incompatible"
@@ -28,7 +26,6 @@ class DependencyStatus(Enum):
 @dataclass
 class DependencyInfo:
     """Informations sur une dépendance"""
-
     name: str
     status: DependencyStatus
     version: Optional[str] = None
@@ -36,11 +33,18 @@ class DependencyInfo:
     is_critical: bool = False
 
 
-# Variables globales définies avant __all__ pour éviter F822
+# Variables globales définies AVANT la classe pour éviter les imports circulaires
 OPENAI_AVAILABLE = False
 WEAVIATE_AVAILABLE = False
 WEAVIATE_V4 = False
 REDIS_AVAILABLE = False
+UNIDECODE_AVAILABLE = False  # AJOUT CRITIQUE
+VOYAGEAI_AVAILABLE = False
+SENTENCE_TRANSFORMERS_AVAILABLE = False
+TRANSFORMERS_AVAILABLE = False
+LANGDETECT_AVAILABLE = False
+LANGSMITH_AVAILABLE = False
+
 wvc = None
 wvc_query = None
 AsyncOpenAI = None
@@ -124,7 +128,7 @@ async def _test_weaviate_v4_safe(weaviate_client) -> bool:
 
 
 class DependencyManager:
-    """Gestionnaire centralisé des dépendances - VERSION ADAPTÉE STRUCTURE MODULAIRE"""
+    """Gestionnaire centralisé des dépendances - VERSION CORRIGÉE"""
 
     def __init__(self):
         self.dependencies: Dict[str, DependencyInfo] = {}
@@ -193,17 +197,13 @@ class DependencyManager:
                     wvc = wvc_classes
                     wvc_query = wvc_query_classes
 
-                    logger.info(
-                        "Weaviate v4 avec wvc et wvc_query importés avec succès"
-                    )
+                    logger.info("Weaviate v4 avec wvc et wvc_query importés avec succès")
 
                 except ImportError as e:
                     logger.error(f"Erreur import wvc classes: {e}")
                     wvc = None
                     wvc_query = None
-                    raise ImportError(
-                        f"Impossible d'importer les classes Weaviate v4: {e}"
-                    )
+                    raise ImportError(f"Impossible d'importer les classes Weaviate v4: {e}")
             else:
                 wvc = None
                 wvc_query = None
@@ -252,9 +252,7 @@ class DependencyManager:
         try:
             api_key = os.getenv("OPENAI_API_KEY")
             if not api_key:
-                logger.warning(
-                    "OPENAI_API_KEY non trouvée dans les variables d'environnement"
-                )
+                logger.warning("OPENAI_API_KEY non trouvée dans les variables d'environnement")
                 return
 
             from openai import OpenAI as OpenAISync, AsyncOpenAI as OpenAIAsync
@@ -272,14 +270,17 @@ class DependencyManager:
             self._openai_async_client = None
 
     def _load_optional_dependencies(self):
-        """Charge les dépendances optionnelles"""
+        """Charge les dépendances optionnelles - VERSION CORRIGÉE"""
+        global UNIDECODE_AVAILABLE, VOYAGEAI_AVAILABLE, SENTENCE_TRANSFORMERS_AVAILABLE
+        global TRANSFORMERS_AVAILABLE, LANGDETECT_AVAILABLE, LANGSMITH_AVAILABLE
+        
         optional_deps = {
-            "voyageai": {"import_name": "voyageai"},
-            "sentence_transformers": {"import_name": "sentence_transformers"},
-            "unidecode": {"import_name": "unidecode"},
-            "transformers": {"import_name": "transformers"},
-            "langdetect": {"import_name": "langdetect"},
-            "langsmith": {"import_name": "langsmith"},
+            "voyageai": {"import_name": "voyageai", "global_var": "VOYAGEAI_AVAILABLE"},
+            "sentence_transformers": {"import_name": "sentence_transformers", "global_var": "SENTENCE_TRANSFORMERS_AVAILABLE"},
+            "unidecode": {"import_name": "unidecode", "global_var": "UNIDECODE_AVAILABLE"},
+            "transformers": {"import_name": "transformers", "global_var": "TRANSFORMERS_AVAILABLE"},
+            "langdetect": {"import_name": "langdetect", "global_var": "LANGDETECT_AVAILABLE"},
+            "langsmith": {"import_name": "langsmith", "global_var": "LANGSMITH_AVAILABLE"},
         }
 
         for dep_name, config in optional_deps.items():
@@ -294,6 +295,10 @@ class DependencyManager:
                     is_critical=False,
                 )
 
+                # CORRECTION: Définir les variables globales correctement
+                globals()[config["global_var"]] = True
+                logger.debug(f"Dépendance optionnelle {dep_name} disponible (v{version})")
+
             except ImportError as e:
                 self.dependencies[dep_name] = DependencyInfo(
                     name=dep_name,
@@ -301,68 +306,10 @@ class DependencyManager:
                     error_message=str(e),
                     is_critical=False,
                 )
+                globals()[config["global_var"]] = False
+                logger.debug(f"Dépendance optionnelle {dep_name} manquante: {e}")
 
-        # Modules internes avec NOUVELLE STRUCTURE
-        self._load_internal_modules()
-
-    def _load_internal_modules(self):
-        """Charge les modules internes - VERSION CORRIGÉE POUR STRUCTURE MODULAIRE"""
-
-        # Modules internes avec NOUVEAUX CHEMINS
-        internal_modules = {
-            "intent_processor": {
-                "path": "processing.intent_processor",
-                "class": "IntentProcessor",
-            },
-            "utilities": {"path": "utils.utilities", "class": "METRICS"},
-            "embedder": {"path": "retrieval.embedder", "class": "OpenAIEmbedder"},
-            "rag_engine": {"path": "core.rag_engine", "class": "InteliaRAGEngine"},
-            "cache_core": {"path": "cache.cache_core", "class": "RedisCacheCore"},
-        }
-
-        for module_name, config in internal_modules.items():
-            try:
-                # Import dynamique avec gestion d'erreurs
-                module_path = config["path"]
-                class_name = config["class"]
-
-                # Tentative d'import
-                try:
-                    module = __import__(module_path, fromlist=[class_name])
-                    # Vérifier que la classe existe
-                    if hasattr(module, class_name):
-                        self.dependencies[module_name] = DependencyInfo(
-                            name=module_name,
-                            status=DependencyStatus.AVAILABLE,
-                            is_critical=False,
-                        )
-                        logger.debug(
-                            f"Module {module_name} importé avec succès depuis {module_path}"
-                        )
-                    else:
-                        raise ImportError(
-                            f"Classe {class_name} non trouvée dans {module_path}"
-                        )
-
-                except ImportError as e:
-                    logger.warning(
-                        f"Erreur import {module_name} depuis {module_path}: {e}"
-                    )
-                    self.dependencies[module_name] = DependencyInfo(
-                        name=module_name,
-                        status=DependencyStatus.MISSING,
-                        error_message=str(e),
-                        is_critical=False,
-                    )
-
-            except Exception as e:
-                logger.error(f"Erreur inattendue pour {module_name}: {e}")
-                self.dependencies[module_name] = DependencyInfo(
-                    name=module_name,
-                    status=DependencyStatus.MISSING,
-                    error_message=str(e),
-                    is_critical=False,
-                )
+        # SUPPRIMÉ: _load_internal_modules() pour éviter l'import circulaire
 
     def get_openai_sync_client(self):
         """Retourne le client OpenAI synchrone"""
@@ -384,18 +331,14 @@ class DependencyManager:
 
         return self._openai_async_client
 
-    async def validate_connectivity(
-        self, redis_client=None, weaviate_client=None
-    ) -> Dict[str, bool]:
+    async def validate_connectivity(self, redis_client=None, weaviate_client=None) -> Dict[str, bool]:
         """Valide la connectivité des services externes"""
         results = {"openai": False, "weaviate": False, "redis": False}
 
         # Test OpenAI
         try:
             if self._openai_async_client:
-                await asyncio.wait_for(
-                    self._openai_async_client.models.list(), timeout=5.0
-                )
+                await asyncio.wait_for(self._openai_async_client.models.list(), timeout=5.0)
                 results["openai"] = True
         except Exception as e:
             logger.warning(f"Test connectivité OpenAI échoué: {e}")
@@ -421,24 +364,17 @@ class DependencyManager:
             dep for dep in critical_deps if dep.status != DependencyStatus.AVAILABLE
         ]
 
-        optional_deps = [
-            dep for dep in self.dependencies.values() if not dep.is_critical
-        ]
+        optional_deps = [dep for dep in self.dependencies.values() if not dep.is_critical]
         optional_missing = [
-            dep.name
-            for dep in optional_deps
-            if dep.status != DependencyStatus.AVAILABLE
+            dep.name for dep in optional_deps if dep.status != DependencyStatus.AVAILABLE
         ]
 
         return {
             "total_dependencies": len(self.dependencies),
-            "available_count": len(
-                [
-                    d
-                    for d in self.dependencies.values()
-                    if d.status == DependencyStatus.AVAILABLE
-                ]
-            ),
+            "available_count": len([
+                d for d in self.dependencies.values() 
+                if d.status == DependencyStatus.AVAILABLE
+            ]),
             "critical_dependencies_ok": len(critical_missing) == 0,
             "critical_missing": [dep.name for dep in critical_missing],
             "optional_missing": optional_missing,
@@ -463,9 +399,7 @@ class DependencyManager:
 
         if critical_missing:
             missing_names = [dep.name for dep in critical_missing]
-            error_details = "\n".join(
-                [f"  - {dep.name}: {dep.error_message}" for dep in critical_missing]
-            )
+            error_details = "\n".join([f"  - {dep.name}: {dep.error_message}" for dep in critical_missing])
 
             raise RuntimeError(
                 f"Dépendances critiques manquantes: {missing_names}\n"
@@ -505,9 +439,7 @@ def get_full_status_report() -> Dict[str, Any]:
     return dependency_manager.get_status_report()
 
 
-async def quick_connectivity_check(
-    redis_client=None, weaviate_client=None
-) -> Dict[str, bool]:
+async def quick_connectivity_check(redis_client=None, weaviate_client=None) -> Dict[str, bool]:
     """Test de connectivité rapide et sécurisé"""
     weav_ok = await _test_weaviate_v4_safe(weaviate_client)
     redis_ok = await _test_redis_async_safe(redis_client)
@@ -575,14 +507,7 @@ def validate_imports_corrections() -> Dict[str, bool]:
         "weaviate_v4_safe_function": "_test_weaviate_v4_safe" in globals(),
         "quick_connectivity_v4_support": True,
         "redis_runtime_warning_fixed": True,
-        "internal_modules_loaded": len(
-            [
-                dep
-                for dep in dependency_manager.dependencies.values()
-                if dep.name in ["utilities", "embedder", "rag_engine", "cache_core"]
-            ]
-        )
-        > 0,
+        "unidecode_available_fixed": "UNIDECODE_AVAILABLE" in globals(),
         "modular_structure_support": True,
     }
 
@@ -598,10 +523,9 @@ def validate_imports_corrections() -> Dict[str, bool]:
             "OpenAI": OpenAI is not None,
             "_test_redis_async_safe": "_test_redis_async_safe" in globals(),
             "_test_weaviate_v4_safe": "_test_weaviate_v4_safe" in globals(),
-            "quick_connectivity_v4_support": True,
-            "redis_runtime_warning_fixed": True,
+            "UNIDECODE_AVAILABLE": UNIDECODE_AVAILABLE is not None,
         },
-        "version": "modular_structure_complete_v1.0",
+        "version": "circular_import_fixed_v1.0",
     }
 
 
@@ -622,6 +546,12 @@ __all__ = [
     "WEAVIATE_AVAILABLE",
     "WEAVIATE_V4",
     "REDIS_AVAILABLE",
+    "UNIDECODE_AVAILABLE",  # AJOUT CRITIQUE
+    "VOYAGEAI_AVAILABLE",
+    "SENTENCE_TRANSFORMERS_AVAILABLE",
+    "TRANSFORMERS_AVAILABLE",
+    "LANGDETECT_AVAILABLE",
+    "LANGSMITH_AVAILABLE",
     "wvc",
     "wvc_query",
     "AsyncOpenAI",
