@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
+
 """
+
 ood_detector.py - Détecteur hors-domaine avec seuil dynamique basé sur l'intent
+
 """
 
 import logging
