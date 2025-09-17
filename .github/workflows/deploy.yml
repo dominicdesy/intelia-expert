@@ -14,6 +14,7 @@ jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
+      frontend-changed: ${{ steps.changes.outputs.frontend }}
       backend-changed: ${{ steps.changes.outputs.backend }}
       llm-changed: ${{ steps.changes.outputs.llm }}
     steps:
@@ -25,10 +26,44 @@ jobs:
         id: changes
         with:
           filters: |
+            frontend:
+              - 'frontend/**'
             backend:
               - 'backend/**'
             llm:
               - 'llm/**'
+
+  # Build Frontend
+  build-frontend:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend-changed == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DOCR
+        uses: docker/login-action@v3
+        with:
+          registry: registry.digitalocean.com
+          username: doctl
+          password: ${{ secrets.DOCR_ACCESS_TOKEN }}
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:latest
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:${{ github.sha }}
+          cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache
+          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache,mode=max
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
   # Build Backend
   build-backend:
@@ -91,8 +126,8 @@ jobs:
   # Nettoyage optionnel
   cleanup:
     runs-on: ubuntu-latest
-    needs: [build-backend, build-llm]
-    if: always() && (needs.build-backend.result == 'success' || needs.build-llm.result == 'success')
+    needs: [build-frontend, build-backend, build-llm]
+    if: always() && (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success' || needs.build-llm.result == 'success')
     steps:
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
@@ -102,6 +137,12 @@ jobs:
       - name: Cleanup old images
         run: |
           echo "Nettoyage des anciennes images..."
+          
+          # Nettoyage frontend
+          if doctl registry repository list | grep -q "intelia-frontend"; then
+            echo "Nettoyage frontend..."
+            doctl registry repository list-manifests intelia-frontend --format Digest | head -n -5 | xargs -I {} doctl registry repository delete-manifest intelia-frontend {} --force || true
+          fi
           
           # Nettoyage backend
           if doctl registry repository list | grep -q "intelia-backend"; then
@@ -121,13 +162,19 @@ jobs:
   # Résumé
   summary:
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-backend, build-llm, cleanup]
+    needs: [detect-changes, build-frontend, build-backend, build-llm, cleanup]
     if: always()
     steps:
       - name: Deployment Summary
         run: |
           echo "🚀 DÉPLOIEMENT TERMINÉ"
           echo "===================="
+          
+          if [[ "${{ needs.detect-changes.outputs.frontend-changed }}" == "true" ]]; then
+            echo "Frontend: ${{ needs.build-frontend.result == 'success' && '✅ DÉPLOYÉ' || '❌ ÉCHEC' }}"
+          else
+            echo "Frontend: ⏸️ INCHANGÉ"
+          fi
           
           if [[ "${{ needs.detect-changes.outputs.backend-changed }}" == "true" ]]; then
             echo "Backend: ${{ needs.build-backend.result == 'success' && '✅ DÉPLOYÉ' || '❌ ÉCHEC' }}"

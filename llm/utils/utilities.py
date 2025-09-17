@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
+
 """
+
 utilities.py - Fonctions utilitaires unifiées COMPLÈTES
 Version modulaire avec toutes les fonctions nécessaires - CORRIGÉE
+
 """
 
 import os
