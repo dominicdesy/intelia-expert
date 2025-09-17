@@ -52,16 +52,17 @@ jobs:
           password: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
       - name: Build and push frontend
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./frontend
           push: true
           tags: |
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:${{ github.sha }}
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:latest
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache,mode=max
           platforms: linux/amd64
+          provenance: false
           build-args: |
             NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -87,16 +88,17 @@ jobs:
           password: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
       - name: Build and push backend
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./backend
           push: true
           tags: |
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:${{ github.sha }}
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:latest
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache,mode=max
           platforms: linux/amd64
+          provenance: false
 
   # Build LLM
   build-llm:
@@ -117,16 +119,17 @@ jobs:
           password: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
       - name: Build and push LLM
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./llm
           push: true
           tags: |
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:${{ github.sha }}
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:latest
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache,mode=max
           platforms: linux/amd64
+          provenance: false
 
   # Nettoyage optionnel
   cleanup:
