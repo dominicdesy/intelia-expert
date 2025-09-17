@@ -1,40 +1,30 @@
-# syntax=docker/dockerfile:1.7
-
 FROM python:3.11-slim
 
-# Répertoire de travail
+# Variables d'environnement
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
-# Variables d'env
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=on
+# Installation des dépendances système
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
-# Dépendances système
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      gcc g++ build-essential wget \
- && rm -rf /var/lib/apt/lists/*
+# Installation des dépendances Python
+COPY requirements.txt .
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Copier requirements
-COPY backend/requirements.txt /app/requirements.txt
+# Copie du code source
+COPY . .
 
-# Installer requirements
-RUN python -m pip install --upgrade pip
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r /app/requirements.txt
-
-# Copier le code
-COPY backend/ /app/
-
-# Créer dossiers nécessaires (si utilisés par ton code)
-RUN mkdir -p /app/rag_index/global /app/rag_index/broiler /app/rag_index/layer /app/logs /app/data
-
-# Exposer le port attendu
+# Port d'exposition
 EXPOSE 8080
 
-# Healthcheck → teste que le serveur FastAPI répond bien
-HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 CMD \
-  wget -qO- http://127.0.0.1:8080/health || exit 1
+# Healthcheck simple - utilise la route health de votre API
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/v1/health', timeout=5)" || exit 1
 
-# Commande de démarrage
+# Commande de démarrage - pointe vers app.main:app
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

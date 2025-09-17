@@ -1,36 +1,33 @@
 FROM python:3.11-slim
 
+# Variables d'environnement
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_NO_CACHE_DIR=1 \
-    LANG=C.UTF-8
+    PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
 
-# Installation des dépendances système pour compiler langdetect
+# Installation des dépendances système
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --upgrade pip setuptools wheel
-
+# Installation des dépendances Python
 COPY requirements.txt .
+RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
+# Copie du code source
 COPY . .
 
-ENV BASE_PATH=/llm \
-    LANGUAGE_FILE=/app/config/languages.json \
-    INTENTS_FILE=/app/config/intents.json \
-    BLOCKED_TERMS_FILE=/app/config/blocked_terms.json
-
+# Port d'exposition
 EXPOSE 8080
 
-# Healthcheck en one-liner Python - CORRIGÉ
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD ["python","-c","import socket,sys; s=socket.socket(); s.settimeout(2); sys.exit(0 if s.connect_ex(('127.0.0.1',8080))==0 else 1)"]
+# Healthcheck simple
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8080/health', timeout=5)" || exit 1
 
-# SSE/streaming: 1 worker + keep-alive un peu plus long
-CMD ["uvicorn","main:app","--host","0.0.0.0","--port","8080","--timeout-keep-alive","30","--proxy-headers"]
+# Commande de démarrage
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
