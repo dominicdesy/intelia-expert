@@ -6,37 +6,41 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Installation optimisée en une seule couche + nettoyage immédiat
+# Installation système optimisée
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     build-essential \
-    && pip install --no-cache-dir --upgrade pip \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    && rm -rf /var/lib/apt/lists/*
 
-# Installation des dépendances Python sans cache
+# Installation des dépendances Python
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt \
-    && pip cache purge \
-    && rm -rf /root/.cache /root/.local
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt \
+    && rm -rf /root/.cache /root/.local /tmp/* /var/tmp/*
 
-# Copie SÉLECTIVE du code source - STRUCTURE BACKEND
+# Copie du code source selon structure LLM
 COPY *.py ./
-COPY app/ ./app/
+COPY config/ ./config/
+COPY core/ ./core/
+COPY api/ ./api/
+COPY cache/ ./cache/
+COPY generation/ ./generation/
+COPY processing/ ./processing/
+COPY retrieval/ ./retrieval/
+COPY security/ ./security/
+COPY utils/ ./utils/
 
-# Nettoyage agressif de tous les fichiers temporaires
+# Nettoyage final
 RUN find . -name "*.pyc" -delete \
     && find . -name "__pycache__" -type d -exec rm -rf {} + \
     && find . -name "*.pyo" -delete \
-    && find . -name "*.dist-info" -type d -exec rm -rf {} + \
-    && find . -name "test*" -type d -exec rm -rf {} + \
-    && rm -rf /tmp/* /var/tmp/* requirements.txt
+    && rm -f requirements.txt
 
 EXPOSE 8080
 
-# Healthcheck ultra-léger sans imports lourds
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import socket; s=socket.socket(); s.settimeout(5); exit(0 if s.connect_ex(('127.0.0.1', 8080))==0 else 1)"
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
