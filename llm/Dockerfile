@@ -23,7 +23,8 @@ COPY . .
 
 ENV BASE_PATH=/llm \
     LANGUAGE_FILE=/app/config/languages.json \
-    INTENTS_FILE=/app/config/intents.json
+    INTENTS_FILE=/app/config/intents.json \
+    BLOCKED_TERMS_FILE=/app/config/blocked_terms.json
 
 EXPOSE 8080
 

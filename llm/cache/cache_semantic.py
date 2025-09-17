@@ -114,12 +114,18 @@ class SemanticCacheManager:
         """Charge les aliases depuis intents.json avec fallback robuste"""
         try:
             possible_paths = [
+                os.getenv(
+                    "INTENTS_FILE", "/app/config/intents.json"
+                ),  # Variable d'environnement en premier
                 os.path.join(
-                    os.path.dirname(os.path.abspath(__file__)), "intents.json"
+                    os.path.dirname(os.path.abspath(__file__)),
+                    "..",
+                    "config",
+                    "intents.json",
                 ),
-                "/app/intents.json",
-                "./intents.json",
-                os.path.join(os.getcwd(), "intents.json"),
+                "/app/config/intents.json",
+                "./config/intents.json",
+                os.path.join(os.getcwd(), "config", "intents.json"),
             ]
 
             for path in possible_paths:

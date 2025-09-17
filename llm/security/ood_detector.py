@@ -27,10 +27,10 @@ class EnhancedOODDetector:
     def _load_blocked_terms(self, path: str = None) -> Dict[str, List[str]]:
         """Charge les termes bloqués depuis le fichier configuré"""
         if path is None:
-            path = os.getenv("BLOCKED_TERMS_FILE", "/app/blocked_terms.json")
+            path = os.getenv("BLOCKED_TERMS_FILE", "/app/config/blocked_terms.json")
             if not os.path.exists(path):
                 base_dir = os.path.dirname(os.path.abspath(__file__))
-                path = os.path.join(base_dir, "blocked_terms.json")
+                path = os.path.join(base_dir, "..", "config", "blocked_terms.json")
 
         try:
             with open(path, "r", encoding="utf-8") as f:
