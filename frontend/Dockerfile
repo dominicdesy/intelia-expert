@@ -1,22 +1,23 @@
-# ---------- Stage 1: deps ----------
-FROM node:20-bullseye-slim AS deps
+# Stage 1: Dependencies
+FROM node:20-alpine AS deps
 WORKDIR /app
 
 # Build arguments
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ARG NEXT_PUBLIC_API_BASE_URL
+ARG NEXT_PUBLIC_API_URL
 
-# Configuration npm plus conservative
+# Configuration npm optimisée
 RUN npm config set fetch-retries 3 \
- && npm config set fetch-retry-maxtimeout 60000
+    && npm config set fetch-retry-maxtimeout 60000
 
-# Installation des dépendances
+# Installation des dépendances seulement
 COPY package.json package-lock.json* ./
-RUN npm ci --include=dev --silent
+RUN npm ci --only=production --silent
 
-# ---------- Stage 2: builder ----------
-FROM node:20-bullseye-slim AS builder
+# Stage 2: Builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Variables d'environnement pour build
@@ -24,38 +25,48 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_OPTIONS="--max_old_space_size=1024"
 
-# Arguments de build (essentiels uniquement)
+# Arguments de build
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ARG NEXT_PUBLIC_API_BASE_URL
+ARG NEXT_PUBLIC_API_URL
+
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
-ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
-# Copier les dépendances installées
+# Copier les dépendances du stage précédent
 COPY --from=deps /app/node_modules ./node_modules
 
 # Copier le code source
 COPY . .
 
-# Build Next.js avec gestion d'erreur
-RUN npm run build 2>&1 | tee build.log || (echo "Build failed:" && cat build.log && exit 1)
+# Build avec nettoyage immédiat
+RUN npm run build \
+    && rm -rf /app/.next/cache \
+    && rm -rf /app/node_modules/.cache \
+    && npm prune --production
 
-# ---------- Stage 3: runtime ----------
-FROM node:20-bullseye-slim AS runner
+# Stage 3: Runtime (ultra-léger)
+FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=8080
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Copier seulement ce qui est nécessaire
-COPY --from=builder /app/package.json ./
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=builder /app/.next ./.next
+# Créer utilisateur non-root
+RUN addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 nextjs
+
+# Copier seulement les fichiers nécessaires
 COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
 
 EXPOSE 8080
 
-CMD ["npm", "run", "start", "--", "-p", "8080"]
+CMD ["node", "server.js"]
