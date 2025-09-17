@@ -1,33 +1,47 @@
 FROM python:3.11-slim
 
-# Variables d'environnement
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
 
-# Installation des dépendances système
+# Installation système optimisée
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     build-essential \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Installation des dépendances Python
 COPY requirements.txt .
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt \
+    && pip cache purge \
+    && rm -rf /root/.cache /root/.local /tmp/* /var/tmp/*
 
-# Copie du code source
-COPY . .
+# Copie du code source selon structure LLM
+COPY *.py ./
+COPY config/ ./config/
+COPY core/ ./core/
+COPY api/ ./api/
+COPY cache/ ./cache/
+COPY generation/ ./generation/
+COPY processing/ ./processing/
+COPY retrieval/ ./retrieval/
+COPY security/ ./security/
+COPY utils/ ./utils/
 
-# Port d'exposition
+# Nettoyage final
+RUN find . -name "*.pyc" -delete \
+    && find . -name "__pycache__" -type d -exec rm -rf {} + \
+    && find . -name "*.pyo" -delete \
+    && rm -f requirements.txt
+
 EXPOSE 8080
 
-# Healthcheck simple
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8080/health', timeout=5)" || exit 1
+    CMD python -c "import socket; s=socket.socket(); s.settimeout(5); exit(0 if s.connect_ex(('127.0.0.1', 8080))==0 else 1)"
 
-# Commande de démarrage
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
