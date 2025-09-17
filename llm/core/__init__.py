@@ -9,8 +9,8 @@ from .memory import ConversationMemory
 
 __all__ = [
     "InteliaRAGEngine",
-    "RAGResult", 
+    "RAGResult",
     "RAGSource",
     "Document",
-    "ConversationMemory"
+    "ConversationMemory",
 ]

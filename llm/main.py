@@ -15,8 +15,10 @@ from dotenv import load_dotenv
 
 # === IMPORTS MODULAIRES ===
 from .config.config import validate_config, BASE_PATH, ALLOWED_ORIGINS, STARTUP_TIMEOUT
-from .utils.imports_and_dependencies import require_critical_dependencies  # ✅ CORRECTION LIGNE 18
-from .utils.monitoring import SystemHealthMonitor, create_health_monitor
+from .utils.imports_and_dependencies import (
+    require_critical_dependencies,
+)  # ✅ CORRECTION LIGNE 18
+from .utils.monitoring import create_health_monitor
 from .utils.utilities import setup_logging
 from .api.endpoints import create_router
 
@@ -32,12 +34,13 @@ services = {}
 # GESTION DU CYCLE DE VIE
 # ============================================================================
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Gestion du cycle de vie avec architecture modulaire"""
-    
+
     logger.info("🚀 Démarrage Intelia Expert Backend - Architecture Modulaire")
-    
+
     try:
         # 1. Validation configuration
         config_valid, config_errors = validate_config()
@@ -45,93 +48,99 @@ async def lifespan(app: FastAPI):
             logger.error(f"Configuration invalide: {config_errors}")
             for error in config_errors:
                 logger.warning(f"Config: {error}")
-        
+
         # 2. Vérifier dépendances critiques
         logger.info("Validation des dépendances critiques...")
         require_critical_dependencies()
         logger.info("✅ Dépendances critiques validées")
-        
+
         # 3. Créer health monitor
         logger.info("Initialisation SystemHealthMonitor...")
         health_monitor = await create_health_monitor()
-        services['health_monitor'] = health_monitor
-        
+        services["health_monitor"] = health_monitor
+
         # 4. Validation startup complète
         logger.info("Validation startup requirements...")
         validation_result = await asyncio.wait_for(
-            health_monitor.validate_startup_requirements(),
-            timeout=STARTUP_TIMEOUT
+            health_monitor.validate_startup_requirements(), timeout=STARTUP_TIMEOUT
         )
-        
+
         if validation_result["overall_status"] == "failed":
             logger.error("❌ Validation startup échouée - Arrêt de l'application")
-            raise RuntimeError(f"Startup validation failed: {validation_result['errors']}")
-        
+            raise RuntimeError(
+                f"Startup validation failed: {validation_result['errors']}"
+            )
+
         elif validation_result["overall_status"] == "degraded":
             logger.warning("⚠️ Application démarrée en mode dégradé")
-            for warning in validation_result.get('warnings', []):
+            for warning in validation_result.get("warnings", []):
                 logger.warning(f"  - {warning}")
-        
+
         else:
             logger.info("✅ Application démarrée avec succès")
-            
+
             # Log statut des intégrations
             langsmith_status = validation_result.get("langsmith_validation", {})
             if langsmith_status.get("status") == "configured":
-                logger.info(f"🧠 LangSmith actif - Projet: {langsmith_status.get('project')}")
-            
+                logger.info(
+                    f"🧠 LangSmith actif - Projet: {langsmith_status.get('project')}"
+                )
+
             rrf_status = validation_result.get("rrf_validation", {})
             if rrf_status.get("status") == "configured":
-                logger.info(f"⚡ RRF Intelligent actif - Learning: {rrf_status.get('learning_mode')}")
-        
+                logger.info(
+                    f"⚡ RRF Intelligent actif - Learning: {rrf_status.get('learning_mode')}"
+                )
+
         # 5. Application prête
         logger.info(f"🌐 API disponible sur {BASE_PATH}")
         logger.info("📊 Services initialisés:")
         for service_name, service in services.items():
             logger.info(f"  - {service_name}: {type(service).__name__}")
-        
+
         yield
-        
+
     except asyncio.TimeoutError:
         logger.error(f"❌ Timeout startup après {STARTUP_TIMEOUT}s")
         raise RuntimeError("Startup timeout")
-    
+
     except Exception as e:
         logger.error(f"❌ Erreur critique au démarrage: {e}")
         raise
-    
+
     finally:
         # Nettoyage
         logger.info("🧹 Nettoyage des ressources...")
-        
+
         try:
             # Cleanup des services via health monitor
-            health_monitor = services.get('health_monitor')
+            health_monitor = services.get("health_monitor")
             if health_monitor:
                 all_services = health_monitor.get_all_services()
-                
+
                 # Cleanup cache
-                cache_core = all_services.get('cache_core')
-                if cache_core and hasattr(cache_core, 'cleanup'):
+                cache_core = all_services.get("cache_core")
+                if cache_core and hasattr(cache_core, "cleanup"):
                     await cache_core.cleanup()
-                
+
                 # Cleanup RAG engine
-                rag_engine = all_services.get('rag_engine_enhanced')
-                if rag_engine and hasattr(rag_engine, 'cleanup'):
+                rag_engine = all_services.get("rag_engine_enhanced")
+                if rag_engine and hasattr(rag_engine, "cleanup"):
                     await rag_engine.cleanup()
-                
+
                 # Cleanup agent RAG
-                agent_rag = all_services.get('agent_rag_engine')
-                if agent_rag and hasattr(agent_rag, 'cleanup'):
+                agent_rag = all_services.get("agent_rag_engine")
+                if agent_rag and hasattr(agent_rag, "cleanup"):
                     await agent_rag.cleanup()
-            
+
             # Nettoyer les services globaux
             services.clear()
-            
+
         except Exception as e:
             logger.error(f"Erreur nettoyage: {e}")
-        
+
         logger.info("✅ Application arrêtée")
+
 
 # ============================================================================
 # CRÉATION DE L'APPLICATION
@@ -142,7 +151,7 @@ app = FastAPI(
     title="Intelia Expert Backend",
     description="API RAG Enhanced avec LangSmith et RRF Intelligent - Architecture Modulaire",
     version="4.0.0-modular",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Configuration CORS
@@ -164,11 +173,12 @@ app.include_router(router)
 
 # ❌ SECTION SUPPRIMÉE - doublon de route /health retiré
 
+
 @app.get("/test-json")
 async def test_json_direct():
     """Test simple de sérialisation JSON"""
     from utils.utilities import safe_serialize_for_json
-    
+
     try:
         test_data = {
             "string": "test",
@@ -176,26 +186,23 @@ async def test_json_direct():
             "boolean": True,
             "list": [1, 2, 3],
             "dict": {"nested": "value"},
-            "timestamp": __import__('time').time()
+            "timestamp": __import__("time").time(),
         }
-        
+
         # Test de sérialisation
         safe_data = safe_serialize_for_json(test_data)
-        
+
         return {
             "status": "success",
             "original_data": test_data,
             "serialized_data": safe_data,
             "json_test": "OK",
-            "architecture": "modular"
+            "architecture": "modular",
         }
-        
+
     except Exception as e:
-        return {
-            "status": "error", 
-            "error": str(e),
-            "json_test": "FAILED"
-        }
+        return {"status": "error", "error": str(e), "json_test": "FAILED"}
+
 
 # ============================================================================
 # POINT D'ENTRÉE
@@ -203,17 +210,11 @@ async def test_json_direct():
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     port = int(os.getenv("PORT", "8000"))
     host = os.getenv("HOST", "0.0.0.0")
-    
+
     logger.info(f"🚀 Démarrage serveur sur {host}:{port}")
     logger.info("🔧 Architecture modulaire activée")
-    
-    uvicorn.run(
-        "main:app",
-        host=host,
-        port=port,
-        reload=False,
-        log_level="info"
-    )
+
+    uvicorn.run("main:app", host=host, port=port, reload=False, log_level="info")

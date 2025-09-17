@@ -10,6 +10,7 @@ from .hybrid_retriever import OptimizedHybridRetriever, hybrid_search
 
 try:
     from .enhanced_rrf_fusion import IntelligentRRFFusion
+
     RRF_AVAILABLE = True
 except ImportError:
     IntelligentRRFFusion = None
@@ -17,9 +18,9 @@ except ImportError:
 
 __all__ = [
     "OpenAIEmbedder",
-    "HybridWeaviateRetriever", 
+    "HybridWeaviateRetriever",
     "OptimizedHybridRetriever",
     "hybrid_search",
     "IntelligentRRFFusion",
-    "RRF_AVAILABLE"
+    "RRF_AVAILABLE",
 ]

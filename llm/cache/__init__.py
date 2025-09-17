@@ -3,7 +3,13 @@
 Cache module - Système de cache Redis avec gestion sémantique
 """
 
-from .cache_core import RedisCacheCore, CacheConfig, CacheStats, CacheStatus, create_cache_core
+from .cache_core import (
+    RedisCacheCore,
+    CacheConfig,
+    CacheStats,
+    CacheStatus,
+    create_cache_core,
+)
 from .redis_cache_manager import RAGCacheManager
 
 try:
@@ -18,11 +24,11 @@ except ImportError:
 
 __all__ = [
     "RedisCacheCore",
-    "CacheConfig", 
+    "CacheConfig",
     "CacheStats",
     "CacheStatus",
     "create_cache_core",
     "RAGCacheManager",
     "SemanticCacheManager",
-    "CacheStatsManager"
+    "CacheStatsManager",
 ]

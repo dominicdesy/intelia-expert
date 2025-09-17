@@ -10,8 +10,4 @@ from .prompt_builder import PromptBuilder
 # Note: enhanced_response_generator.py supprimé (doublon)
 # Toutes les fonctionnalités sont maintenant dans generators.py
 
-__all__ = [
-    "EnhancedResponseGenerator",
-    "create_enhanced_generator",
-    "PromptBuilder"
-]
+__all__ = ["EnhancedResponseGenerator", "create_enhanced_generator", "PromptBuilder"]

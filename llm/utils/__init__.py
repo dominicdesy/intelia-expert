@@ -10,7 +10,7 @@ from .utilities import (
     build_where_filter,
     create_intent_processor,
     process_query_with_intents,
-    validate_intents_config
+    validate_intents_config,
 )
 
 try:
@@ -25,8 +25,9 @@ try:
         require_critical_dependencies,
         OPENAI_AVAILABLE,
         WEAVIATE_AVAILABLE,
-        REDIS_AVAILABLE
+        REDIS_AVAILABLE,
     )
+
     DEPENDENCIES_MANAGER_AVAILABLE = True
 except ImportError:
     DEPENDENCIES_MANAGER_AVAILABLE = False
@@ -35,7 +36,7 @@ except ImportError:
 __all__ = [
     "METRICS",
     "detect_language_enhanced",
-    "build_where_filter", 
+    "build_where_filter",
     "create_intent_processor",
     "process_query_with_intents",
     "validate_intents_config",
@@ -47,7 +48,7 @@ __all__ = [
     "quick_connectivity_check",
     "require_critical_dependencies",
     "OPENAI_AVAILABLE",
-    "WEAVIATE_AVAILABLE", 
+    "WEAVIATE_AVAILABLE",
     "REDIS_AVAILABLE",
-    "DEPENDENCIES_MANAGER_AVAILABLE"
+    "DEPENDENCIES_MANAGER_AVAILABLE",
 ]
