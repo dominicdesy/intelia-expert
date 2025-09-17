@@ -138,16 +138,16 @@ const nextConfig = {
     return []
   },
 
-  // Rewrites - version simplifiée qui fonctionne
+  // Rewrites - URLs corrigées vers expert.intelia.com
   async rewrites() {
     return [
       {
         source: '/api/expert/:path*',
-        destination: 'https://expert-app-cngws.ondigitalocean.app/api/expert/:path*'
+        destination: 'https://expert.intelia.com/api/expert/:path*'
       },
       {
         source: '/api/:path*',
-        destination: 'https://expert-app-cngws.ondigitalocean.app/api/:path*'
+        destination: 'https://expert.intelia.com/api/:path*'
       }
     ]
   },

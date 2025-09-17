@@ -79,7 +79,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           
           if (token) {
             // CORRECTION: Utiliser l'endpoint logout au lieu de heartbeat
-			const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert.intelia.com/api'
+            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
             const logoutUrl = `${baseUrl}/v1/auth/logout`
             
             fetch(logoutUrl, {

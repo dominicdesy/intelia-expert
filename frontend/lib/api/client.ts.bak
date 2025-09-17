@@ -16,7 +16,7 @@ export class APIClient {
 
   constructor() {
     // Correction: Utiliser la variable d'environnement DigitalOcean sans ajouter /api
-	this.baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert.intelia.com/api'
+    this.baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
     
     this.headers = {
       'Content-Type': 'application/json',
