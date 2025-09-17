@@ -322,11 +322,41 @@ class InteliaRAGEngine:
 
             logger.debug("Étape 6: Intent processor...")
 
-            # 6. Intent processor avec gestion d'erreurs améliorée
+            # 6. Intent processor avec gestion d'erreurs améliorée et résolution de chemin
             try:
                 from processing.intent_processor import create_intent_processor
+                import os
+                from pathlib import Path
 
-                self.intent_processor = create_intent_processor()
+                # Tentative de résolution du chemin de configuration
+                config_paths = [
+                    "config/intents.json",
+                    Path(__file__).parent.parent / "config" / "intents.json",
+                    Path.cwd() / "config" / "intents.json",
+                    os.path.join(
+                        os.path.dirname(__file__), "..", "config", "intents.json"
+                    ),
+                ]
+
+                config_found = None
+                for path in config_paths:
+                    path_obj = Path(path)
+                    if path_obj.exists():
+                        config_found = str(path_obj.resolve())
+                        logger.debug(f"Configuration intents trouvée: {config_found}")
+                        break
+
+                if config_found:
+                    self.intent_processor = create_intent_processor(config_found)
+                    logger.info(
+                        f"Intent processor initialisé avec configuration: {config_found}"
+                    )
+                else:
+                    logger.warning(
+                        f"Aucun fichier intents.json trouvé dans {[str(p) for p in config_paths]}"
+                    )
+                    logger.info("Utilisation de la configuration par défaut intégrée")
+                    self.intent_processor = create_intent_processor()
 
                 # Connecter RRF Intelligent à Intent Processor
                 if self.intelligent_rrf:
@@ -338,8 +368,6 @@ class InteliaRAGEngine:
                 logger.warning(f"Intent processor non disponible: {e}")
                 # Continuer sans intent processor
                 self.intent_processor = None
-
-            logger.debug("Étape 7: Guardrails...")
 
             # 7. Guardrails
             if GUARDRAILS_AVAILABLE:
