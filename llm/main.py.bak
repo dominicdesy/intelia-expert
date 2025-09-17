@@ -1587,15 +1587,6 @@ async def diagnostic_chat(request: Request):
 # Inclusion du router dans l'app
 app.include_router(router)
 
-# Ajout des endpoints manquants au niveau racine
-@app.get("/health") 
-async def health_root():
-    return await health_check()
-
-@app.get("/test-json")
-async def test_json_root():
-    return await test_json()
-
 # === CORRECTION: Endpoint de test JSON simple ===
 @app.get("/test-json")
 async def test_json():
