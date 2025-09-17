@@ -37,3 +37,33 @@ class IntentResult:
     semantic_fallback_candidates: List[str] = field(
         default_factory=list
     )  # Nouveau: fallback sémantique
+
+
+# CORRECTION CRITIQUE: Ajout de la classe manquante IntentValidationResult
+@dataclass
+class IntentValidationResult:
+    """Résultat de validation d'intention pour les générateurs"""
+
+    is_valid: bool
+    errors: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+    stats: Dict[str, Any] = field(default_factory=dict)
+    validation_metadata: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def has_errors(self) -> bool:
+        """True si des erreurs sont présentes"""
+        return len(self.errors) > 0
+
+    @property
+    def has_warnings(self) -> bool:
+        """True si des avertissements sont présents"""
+        return len(self.warnings) > 0
+
+    @property
+    def summary(self) -> str:
+        """Résumé textuel du résultat de validation"""
+        if self.is_valid:
+            return f"Validation réussie ({len(self.warnings)} avertissements)"
+        else:
+            return f"Validation échouée ({len(self.errors)} erreurs, {len(self.warnings)} avertissements)"

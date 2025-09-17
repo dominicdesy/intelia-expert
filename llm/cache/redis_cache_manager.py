@@ -2,10 +2,7 @@
 """
 redis_cache_manager.py - Gestionnaire de cache Redis principal (refactorisé)
 Point d'entrée principal pour le cache Redis avec fonctionnalités modulaires
-CORRIGÉ: Erreurs explicites au lieu de stubs silencieux
-CORRIGÉ: Arguments constructeur RedisCacheCore selon signature réelle
-CORRIGÉ: Utilisation des variables d'environnement correctes
-CORRIGÉ: Méthode _is_initialized → _is_operational
+CORRIGÉ: Import relatif au lieu d'import absolu
 """
 
 import logging
@@ -13,26 +10,28 @@ from typing import Dict, List, Optional, Any
 
 logger = logging.getLogger(__name__)
 
-# CORRECTION MAJEURE: Erreurs explicites au lieu de stubs silencieux
+# CORRECTION CRITIQUE: Imports relatifs pour modules du package cache
 try:
-    from cache_core import RedisCacheCore, CacheConfig
+    from .cache_core import RedisCacheCore, CacheConfig
 
     CACHE_CORE_AVAILABLE = True
+    logger.debug("Cache core importé avec succès")
 except ImportError as e:
-    logger.error(f"Redis dependencies not available: {e}")
+    logger.error(f"Cache core module not available: {e}")
     CACHE_CORE_AVAILABLE = False
-    # REMPLACER les stubs silencieux par des erreurs explicites
-    raise ImportError("Redis cache requires redis package") from e
+    # Lever l'erreur explicite au lieu d'un stub silencieux
+    raise ImportError("Cache core requires redis package and proper setup") from e
 
 try:
-    from cache_semantic import SemanticCacheManager
+    from .cache_semantic import SemanticCacheManager
 
     SEMANTIC_AVAILABLE = True
+    logger.debug("Semantic cache importé avec succès")
 except ImportError as e:
-    logger.error(f"Semantic cache module not available: {e}")
+    logger.warning(f"Semantic cache module not available: {e}")
     SEMANTIC_AVAILABLE = False
 
-    # Créer une classe qui lève des erreurs explicites
+    # Classe stub qui lève des erreurs explicites
     class SemanticCacheManager:
         def __init__(self, *args, **kwargs):
             raise NotImplementedError(
@@ -41,14 +40,15 @@ except ImportError as e:
 
 
 try:
-    from cache_stats import CacheStatsManager
+    from .cache_stats import CacheStatsManager
 
     STATS_AVAILABLE = True
+    logger.debug("Cache stats importé avec succès")
 except ImportError as e:
-    logger.error(f"Cache stats module not available: {e}")
+    logger.warning(f"Cache stats module not available: {e}")
     STATS_AVAILABLE = False
 
-    # Créer une classe qui lève des erreurs explicites
+    # Classe stub qui lève des erreurs explicites
     class CacheStatsManager:
         def __init__(self, *args, **kwargs):
             raise NotImplementedError(
@@ -60,15 +60,11 @@ class RAGCacheManager:
     """
     Gestionnaire de cache Redis principal - Interface unifiée
     Délègue les fonctionnalités aux modules spécialisés
-    CORRIGÉ: Constructeur compatible avec RedisCacheCore(config: Optional[CacheConfig])
     """
 
     def __init__(self, redis_url: str = None, default_ttl: int = None):
         """
         Initialise le gestionnaire de cache avec modules spécialisés
-
-        CORRECTION MAJEURE: RedisCacheCore ne prend qu'un seul argument (config)
-        selon la signature: __init__(self, config: Optional[CacheConfig] = None)
         """
         if not CACHE_CORE_AVAILABLE:
             raise ImportError(
@@ -76,9 +72,6 @@ class RAGCacheManager:
             )
 
         try:
-            # CORRECTION: Utiliser la configuration depuis les variables d'environnement
-            # Au lieu de passer redis_url et default_ttl directement
-
             # Créer la configuration depuis l'environnement
             config = CacheConfig.from_env()
 
@@ -88,7 +81,7 @@ class RAGCacheManager:
             if default_ttl:
                 config.default_ttl = default_ttl
 
-            # CORRECTION: Un seul argument au lieu de deux
+            # Initialiser le core avec la configuration
             self.core = RedisCacheCore(config)
 
             # Modules optionnels - avec gestion d'erreurs explicites
@@ -125,7 +118,6 @@ class RAGCacheManager:
 
         except Exception as e:
             logger.error(f"Erreur initialisation RAGCacheManager: {e}")
-            # Au lieu de créer des stubs, lever l'erreur explicitement
             raise RuntimeError(f"Failed to initialize RAGCacheManager: {e}") from e
 
     async def initialize(self):
@@ -141,16 +133,16 @@ class RAGCacheManager:
             if success:
                 self.client = self.core.client
                 self.initialized = self.core.initialized
+                self.enabled = self.core.enabled
                 logger.info("RAGCacheManager connexion Redis établie")
             else:
-                logger.error("RAGCacheManager connexion Redis échouée")
+                logger.warning("RAGCacheManager connexion Redis échouée")
             return success
 
         except Exception as e:
             logger.error(f"Erreur initialisation connexion Redis: {e}")
             return False
 
-    # CORRECTION: Utiliser _is_operational au lieu de _is_initialized
     def _is_operational(self) -> bool:
         """Vérifie l'état opérationnel"""
         if not self.core:
@@ -162,6 +154,7 @@ class RAGCacheManager:
         return (
             getattr(self.core, "initialized", False)
             and getattr(self.core, "client", None) is not None
+            and getattr(self.core, "enabled", False)
         )
 
     # ===== MÉTHODES EMBEDDINGS =====
@@ -221,8 +214,6 @@ class RAGCacheManager:
             logger.debug("Core cache not available for get_search_results")
             return None
         try:
-            # CORRECTION: Pour l'instant, retourner None car la méthode n'existe pas encore dans core
-            # Cette méthode devra être implémentée dans cache_core.py si nécessaire
             logger.debug(
                 "get_search_results: Méthode non encore implémentée dans cache_core"
             )
@@ -243,8 +234,6 @@ class RAGCacheManager:
             logger.debug("Core cache not available for set_search_results")
             return
         try:
-            # CORRECTION: Pour l'instant, ne rien faire car la méthode n'existe pas encore dans core
-            # Cette méthode devra être implémentée dans cache_core.py si nécessaire
             logger.debug(
                 "set_search_results: Méthode non encore implémentée dans cache_core"
             )
@@ -277,7 +266,6 @@ class RAGCacheManager:
     # ===== MÉTHODES UTILITAIRES =====
     def generate_context_hash(self, documents: List[Dict]) -> str:
         """Génère un hash du contexte pour le cache"""
-        # CORRECTION: Implémentation directe car la méthode n'existe pas dans core
         import hashlib
         import json
 
@@ -340,7 +328,7 @@ class RAGCacheManager:
         """Ferme la connexion Redis proprement"""
         if self.core:
             try:
-                await self.core.cleanup()  # CORRECTION: Utiliser cleanup au lieu de close
+                await self.core.cleanup()
                 logger.info("RAGCacheManager connexion fermée")
             except Exception as e:
                 logger.warning(f"Erreur fermeture cache: {e}")
