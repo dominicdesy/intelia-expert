@@ -66,6 +66,24 @@
       "breeder": ["reproducteur","breeders","parents"],
       "pullet": ["poulette","rearing"],
       "chick": ["poussin","day-old","d0"]
+    },
+    "protocol_type": {
+      "vaccination": ["vaccin","vaccine","immunization","inoculation"],
+      "biosecurity": ["biosécurité","disinfection","cleaning","quarantine"],
+      "treatment": ["traitement","medication","therapy","cure"],
+      "lab_diagnostics": ["diagnostic","test","analyse","laboratory","lab"]
+    },
+    "signs": {
+      "respiratory": ["toux","dyspnée","râles","nasal discharge"],
+      "digestive": ["diarrhée","vomissement","anorexie","perte appétit"],
+      "nervous": ["ataxie","paralysie","convulsions","tremblements"],
+      "general": ["léthargie","fièvre","mortalité","weakness"]
+    },
+    "metric": {
+      "performance": ["poids","fcr","gain","croissance","production"],
+      "consumption": ["eau","aliment","feed","water"],
+      "environment": ["température","humidité","ventilation","lighting"],
+      "economics": ["coût","prix","rentabilité","economics"]
     }
   },
 
@@ -97,7 +115,10 @@
     "flock_size":   { "type": "int", "min": 1, "optional": true },
     "region":       { "type": "string", "optional": true },
     "feed_price":   { "type": "number", "optional": true },
-    "energy_price": { "type": "number", "optional": true }
+    "energy_price": { "type": "number", "optional": true },
+    "protocol_type": { "enum": ["vaccination","biosecurity","treatment","lab_diagnostics"] },
+    "signs":        { "enum": ["respiratory","digestive","nervous","general"] },
+    "metric":       { "enum": ["performance","consumption","environment","economics"] }
   },
 
   "intents": {
@@ -196,20 +217,33 @@
       "description": "Protocoles (vaccination, biosécurité, traitements, diagnostics labo)",
       "required": ["site_type","bird_type","line","protocol_type"],
       "optional": ["pathogen","age_weeks","age_days","weight_kg","drug"],
-      "protocol_type": ["vaccination","biosecurity","treatment","lab_diagnostics"],
-      "followup_themes": ["monitoring_schedule","sampling_plan"]
+      "followup_themes": ["monitoring_schedule","sampling_plan"],
+      "metrics": {
+        "vaccination_schedule": { "requires_one_of": [["age_days","age_weeks"]], "unit": "" },
+        "biosecurity_checklist": { "unit": "" },
+        "treatment_dosage": { "requires_one_of": [["weight_kg","age_days"]], "unit": "mg/kg" },
+        "lab_sampling_frequency": { "unit": "samples/week" }
+      }
     },
 
     "diagnosis_triage": {
       "description": "Triage diagnostic (signes, mortalité, début, etc.)",
-      "required": ["site_type","bird_type","line","age_days|age_weeks","signs"],
+      "required": ["site_type","bird_type","line","signs"],
+      "at_least_one_of": [["age_days","age_weeks"]],
       "optional": ["onset","morbid_rate","mortality_rate","environment","season","recent_changes"],
-      "followup_themes": ["lab_tests","biosecurity_review","management_checklist"]
+      "followup_themes": ["lab_tests","biosecurity_review","management_checklist"],
+      "metrics": {
+        "differential_diagnosis": { "requires_one_of": [["age_days","age_weeks"]], "unit": "" },
+        "mortality_pattern": { "requires_one_of": [["age_days","age_weeks"]], "unit": "%" },
+        "treatment_priority": { "unit": "" },
+        "lab_tests_recommended": { "unit": "" }
+      }
     },
 
     "economics_cost": {
       "description": "Calculs économiques/coûts",
-      "required": ["site_type","bird_type","line","metric","age_days|age_weeks"],
+      "required": ["site_type","bird_type","line","metric"],
+      "at_least_one_of": [["age_days","age_weeks"]],
       "optional": ["region","feed_price","energy_price","flock_size"],
       "followup_themes": ["sensitivity_analysis","feed_strategy","marketing_weight"],
       "metrics": {
@@ -227,6 +261,8 @@
     "Compatibilité main.py: compute_missing utilise required, at_least_one_of et metrics.requires(_one_of).",
     "Le slot 'sex' reste optionnel (ex. broiler_weight).",
     "Alias étendus pour couvrir slow-growing (Ranger/Sasso/Freedom), lignées pondeuses majeures, et PS.",
-    "defaults_by_topic propose un site_type par défaut si absent."
+    "defaults_by_topic propose un site_type par défaut si absent.",
+    "Slots manquants ajoutés: protocol_type, signs, metric avec aliases appropriés.",
+    "Champs metrics ajoutés pour protocol_query et diagnosis_triage."
   ]
 }
