@@ -26,8 +26,8 @@ RUN pip install --no-cache-dir --upgrade pip \
     && find /usr/local -name "__pycache__" -type d -exec rm -rf {} + \
     && rm requirements.txt
 
-# Copie sélective du code source (éviter les gros fichiers)
-COPY --exclude=*.log --exclude=*.tmp --exclude=__pycache__ --exclude=*.pyc . .
+# Copie du code source (les exclusions sont gérées par .dockerignore)
+COPY . .
 
 # Nettoyage final agressif
 RUN find . -name "*.pyc" -delete \
