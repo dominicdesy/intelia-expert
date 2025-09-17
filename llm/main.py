@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
+
 """
+
 main.py - Intelia Expert Backend - ARCHITECTURE MODULAIRE PURE
 Point d'entrée minimaliste avec délégation complète aux modules
+
 """
 
 import os
@@ -13,14 +16,20 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-# === IMPORTS MODULAIRES ===
-from .config.config import validate_config, BASE_PATH, ALLOWED_ORIGINS, STARTUP_TIMEOUT
-from .utils.imports_and_dependencies import (
-    require_critical_dependencies,
-)  # ✅ CORRECTION LIGNE 18
-from .utils.monitoring import create_health_monitor
-from .utils.utilities import setup_logging
-from .api.endpoints import create_router
+# === IMPORTS MODULAIRES - CORRECTIONS ===
+# AVANT (avec erreur):
+# from .config.config import validate_config, BASE_PATH, ALLOWED_ORIGINS, STARTUP_TIMEOUT
+# from .utils.imports_and_dependencies import require_critical_dependencies
+# from .utils.monitoring import create_health_monitor
+# from .utils.utilities import setup_logging
+# from .api.endpoints import create_router
+
+# APRÈS (corrigé):
+from config.config import validate_config, BASE_PATH, ALLOWED_ORIGINS, STARTUP_TIMEOUT
+from utils.imports_and_dependencies import require_critical_dependencies
+from utils.monitoring import create_health_monitor
+from utils.utilities import setup_logging
+from api.endpoints import create_router
 
 # Configuration
 load_dotenv()
