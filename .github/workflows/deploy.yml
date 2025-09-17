@@ -14,25 +14,21 @@ concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  REGISTRY: registry.digitalocean.com/${{ secrets.DOCR_NAME }}
-  KEEP_IMAGES: "6"  # combien d'images à conserver par repo
-
 jobs:
-  # ──────────────────────────────────────────────────────────────────────────────
-  # 1) Détection des changements
-  # ──────────────────────────────────────────────────────────────────────────────
+  # 🔍 Détecter les changements
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
       frontend-changed: ${{ steps.changes.outputs.frontend }}
-      backend-changed:  ${{ steps.changes.outputs.backend }}
-      llm-changed:      ${{ steps.changes.outputs.llm }}
+      backend-changed: ${{ steps.changes.outputs.backend }}
+      llm-changed: ${{ steps.changes.outputs.llm }}
     steps:
       - uses: actions/checkout@v4
-      - name: Paths filter
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
         id: changes
-        uses: dorny/paths-filter@v3
         with:
           filters: |
             frontend:
@@ -42,9 +38,7 @@ jobs:
             llm:
               - 'llm/**'
 
-  # ──────────────────────────────────────────────────────────────────────────────
-  # 2) Builds parallèles (sans nettoyage local par repo)
-  # ──────────────────────────────────────────────────────────────────────────────
+  # 🔥 BUILDS PARALLÈLES + NETTOYAGE INTÉGRÉ
   build-frontend:
     runs-on: ubuntu-latest
     needs: detect-changes
@@ -52,38 +46,112 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install doctl
+      - name: Install doctl + Cleanup AVANT build
         uses: digitalocean/action-doctl@v2
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Docker login to DOCR
-        run: doctl registry login --expiry-seconds 600
+      - name: ⚡ Nettoyage INTELLIGENT Frontend
+        run: |
+          echo "🔥 Nettoyage intelligent intelia-frontend..."
+          
+          # Vérification préliminaire du repository
+          if ! doctl registry repository list | grep -q "intelia-frontend"; then
+            echo "ℹ️ Repository intelia-frontend n'existe pas encore"
+            exit 0
+          fi
+          
+          # Récupération des manifests avec retry
+          max_retries=3
+          retry_count=0
+          manifests=""
+          
+          while [ $retry_count -lt $max_retries ]; do
+            if manifests=$(doctl registry repository list-manifests intelia-frontend --format Digest,UpdatedAt,Tags --no-header 2>/dev/null); then
+              break
+            fi
+            retry_count=$((retry_count + 1))
+            echo "⏳ Tentative $retry_count/$max_retries..."
+            sleep 2
+          done
+          
+          if [ -z "$manifests" ]; then
+            echo "ℹ️ Aucune image trouvée ou repository vide"
+            exit 0
+          fi
+          
+          total=$(echo "$manifests" | wc -l)
+          echo "📊 Images trouvées: $total"
+          
+          if [ "$total" -le 8 ]; then
+            echo "✅ Nettoyage non nécessaire ($total <= 8 images)"
+            exit 0
+          fi
+          
+          # Stratégie de nettoyage intelligente
+          to_delete=$((total - 6))  # Garder 6 images au lieu de 8 pour plus de marge
+          echo "🎯 Suppression de $to_delete anciennes images (garde les 6 plus récentes)..."
+          
+          # Tri par date et suppression avec vérification
+          deleted_count=0
+          failed_count=0
+          
+          echo "$manifests" | sort -k2,2 | head -n "$to_delete" | while read digest date tags; do
+            if [ -n "$digest" ] && [[ "$digest" == sha256:* ]]; then
+              echo "🗑️ Tentative suppression: ${digest:0:20}... (${date})"
+              
+              # Vérification que l'image existe encore avant suppression
+              if doctl registry repository list-manifests intelia-frontend --format Digest --no-header 2>/dev/null | grep -q "$digest"; then
+                if doctl registry repository delete-manifest intelia-frontend "$digest" --force 2>/dev/null; then
+                  echo "✅ Supprimé: ${digest:0:20}..."
+                  deleted_count=$((deleted_count + 1))
+                else
+                  echo "⚠️ Échec: ${digest:0:20}... (en cours d'utilisation ou verrouillé)"
+                  failed_count=$((failed_count + 1))
+                fi
+              else
+                echo "ℹ️ Déjà supprimé: ${digest:0:20}..."
+              fi
+              
+              # Délai progressif pour éviter le rate limiting
+              sleep 1
+            fi
+          done
+          
+          echo "📈 Résumé: $deleted_count supprimés, $failed_count échecs"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build & Push Frontend
+      - name: Login to DOCR
+        uses: docker/login-action@v3
+        with:
+          registry: registry.digitalocean.com
+          username: doctl
+          password: ${{ secrets.DOCR_ACCESS_TOKEN }}
+
+      - name: 🚀 Build & push frontend (OPTIMISÉ)
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
-          file: ./frontend/Dockerfile
-          platforms: linux/amd64
           push: true
-          provenance: false
-          sbom: false
           tags: |
-            ${{ env.REGISTRY }}/intelia-frontend:latest
-            ${{ env.REGISTRY }}/intelia-frontend:sha-${{ github.sha }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/intelia-frontend:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/intelia-frontend:buildcache,mode=max
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }}
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
+          cache-from: |
+            type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache
+            type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
+          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache,mode=max
           build-args: |
             NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
             LLM_BACKEND_URL=${{ secrets.LLM_BACKEND_URL }}
+            BUILDKIT_INLINE_CACHE=1
+          # OPTIMISATIONS SPEED
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
+          outputs: type=registry,compression=zstd,compression-level=3
 
   build-backend:
     runs-on: ubuntu-latest
@@ -92,38 +160,112 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install doctl
+      - name: Install doctl + Cleanup AVANT build
         uses: digitalocean/action-doctl@v2
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Docker login to DOCR
-        run: doctl registry login --expiry-seconds 600
+      - name: ⚡ Nettoyage INTELLIGENT Backend
+        run: |
+          echo "🔥 Nettoyage intelligent intelia-backend..."
+          
+          if ! doctl registry repository list | grep -q "intelia-backend"; then
+            echo "ℹ️ Repository intelia-backend n'existe pas encore"
+            exit 0
+          fi
+          
+          max_retries=3
+          retry_count=0
+          manifests=""
+          
+          while [ $retry_count -lt $max_retries ]; do
+            if manifests=$(doctl registry repository list-manifests intelia-backend --format Digest,UpdatedAt,Tags --no-header 2>/dev/null); then
+              break
+            fi
+            retry_count=$((retry_count + 1))
+            echo "⏳ Tentative $retry_count/$max_retries..."
+            sleep 2
+          done
+          
+          if [ -z "$manifests" ]; then
+            echo "ℹ️ Aucune image trouvée ou repository vide"
+            exit 0
+          fi
+          
+          total=$(echo "$manifests" | wc -l)
+          echo "📊 Images trouvées: $total"
+          
+          if [ "$total" -le 8 ]; then
+            echo "✅ Nettoyage non nécessaire ($total <= 8 images)"
+            exit 0
+          fi
+          
+          to_delete=$((total - 6))
+          echo "🎯 Suppression de $to_delete anciennes images (garde les 6 plus récentes)..."
+          
+          deleted_count=0
+          failed_count=0
+          
+          echo "$manifests" | sort -k2,2 | head -n "$to_delete" | while read digest date tags; do
+            if [ -n "$digest" ] && [[ "$digest" == sha256:* ]]; then
+              echo "🗑️ Tentative suppression: ${digest:0:20}... (${date})"
+              
+              if doctl registry repository list-manifests intelia-backend --format Digest --no-header 2>/dev/null | grep -q "$digest"; then
+                if doctl registry repository delete-manifest intelia-backend "$digest" --force 2>/dev/null; then
+                  echo "✅ Supprimé: ${digest:0:20}..."
+                  deleted_count=$((deleted_count + 1))
+                else
+                  echo "⚠️ Échec: ${digest:0:20}... (en cours d'utilisation ou verrouillé)"
+                  failed_count=$((failed_count + 1))
+                fi
+              else
+                echo "ℹ️ Déjà supprimé: ${digest:0:20}..."
+              fi
+              
+              sleep 1
+            fi
+          done
+          
+          echo "📈 Résumé: $deleted_count supprimés, $failed_count échecs"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:master
+            network=host
 
-      - name: Build & Push Backend
+      - name: Login to DOCR
+        uses: docker/login-action@v3
+        with:
+          registry: registry.digitalocean.com
+          username: doctl
+          password: ${{ secrets.DOCR_ACCESS_TOKEN }}
+
+      - name: 🚀 Build & push backend (ULTRA OPTIMISÉ)
         uses: docker/build-push-action@v6
         with:
           context: ./backend
-          file: ./backend/Dockerfile
-          platforms: linux/amd64
           push: true
+          tags: |
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }}
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
+          cache-from: |
+            type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache
+            type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
+          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+            PIP_CACHE_DIR=/tmp/pip-cache
+            PYTHONDONTWRITEBYTECODE=1
+          # OPTIMISATIONS EXTRÊMES
+          platforms: linux/amd64
           provenance: false
           sbom: false
-          tags: |
-            ${{ env.REGISTRY }}/intelia-backend:latest
-            ${{ env.REGISTRY }}/intelia-backend:sha-${{ github.sha }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/intelia-backend:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/intelia-backend:buildcache,mode=max
-          build-args: |
-            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-            SUPABASE_URL=${{ secrets.SUPABASE_URL }}
-            SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          outputs: type=registry,compression=zstd,compression-level=1
+          # Accélération BuildKit
+          secret: |
+            id=pip,src=/dev/null
 
   build-llm:
     runs-on: ubuntu-latest
@@ -132,141 +274,193 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install doctl
+      - name: Install doctl + Cleanup AVANT build
         uses: digitalocean/action-doctl@v2
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Docker login to DOCR
-        run: doctl registry login --expiry-seconds 600
+      - name: ⚡ Nettoyage INTELLIGENT LLM
+        run: |
+          echo "🔥 Nettoyage intelligent intelia-llm..."
+          
+          if ! doctl registry repository list | grep -q "intelia-llm"; then
+            echo "ℹ️ Repository intelia-llm n'existe pas encore"
+            exit 0
+          fi
+          
+          max_retries=3
+          retry_count=0
+          manifests=""
+          
+          while [ $retry_count -lt $max_retries ]; do
+            if manifests=$(doctl registry repository list-manifests intelia-llm --format Digest,UpdatedAt,Tags --no-header 2>/dev/null); then
+              break
+            fi
+            retry_count=$((retry_count + 1))
+            echo "⏳ Tentative $retry_count/$max_retries..."
+            sleep 2
+          done
+          
+          if [ -z "$manifests" ]; then
+            echo "ℹ️ Aucune image trouvée ou repository vide"
+            exit 0
+          fi
+          
+          total=$(echo "$manifests" | wc -l)
+          echo "📊 Images trouvées: $total"
+          
+          if [ "$total" -le 8 ]; then
+            echo "✅ Nettoyage non nécessaire ($total <= 8 images)"
+            exit 0
+          fi
+          
+          to_delete=$((total - 6))
+          echo "🎯 Suppression de $to_delete anciennes images (garde les 6 plus récentes)..."
+          
+          deleted_count=0
+          failed_count=0
+          
+          echo "$manifests" | sort -k2,2 | head -n "$to_delete" | while read digest date tags; do
+            if [ -n "$digest" ] && [[ "$digest" == sha256:* ]]; then
+              echo "🗑️ Tentative suppression: ${digest:0:20}... (${date})"
+              
+              if doctl registry repository list-manifests intelia-llm --format Digest --no-header 2>/dev/null | grep -q "$digest"; then
+                if doctl registry repository delete-manifest intelia-llm "$digest" --force 2>/dev/null; then
+                  echo "✅ Supprimé: ${digest:0:20}..."
+                  deleted_count=$((deleted_count + 1))
+                else
+                  echo "⚠️ Échec: ${digest:0:20}... (en cours d'utilisation ou verrouillé)"
+                  failed_count=$((failed_count + 1))
+                fi
+              else
+                echo "ℹ️ Déjà supprimé: ${digest:0:20}..."
+              fi
+              
+              sleep 1
+            fi
+          done
+          
+          echo "📈 Résumé: $deleted_count supprimés, $failed_count échecs"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build & Push LLM
+      - name: Login to DOCR
+        uses: docker/login-action@v3
+        with:
+          registry: registry.digitalocean.com
+          username: doctl
+          password: ${{ secrets.DOCR_ACCESS_TOKEN }}
+
+      - name: 🚀 Build & push LLM (RAPIDE)
         uses: docker/build-push-action@v6
         with:
           context: ./llm
-          file: ./llm/Dockerfile
-          platforms: linux/amd64
           push: true
+          tags: |
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main-${{ github.sha }}
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main
+          cache-from: |
+            type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache
+            type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main
+          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache,mode=max
+          build-args: BUILDKIT_INLINE_CACHE=1
+          platforms: linux/amd64
           provenance: false
           sbom: false
-          tags: |
-            ${{ env.REGISTRY }}/intelia-llm:latest
-            ${{ env.REGISTRY }}/intelia-llm:sha-${{ github.sha }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/intelia-llm:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/intelia-llm:buildcache,mode=max
 
-  # ──────────────────────────────────────────────────────────────────────────────
-  # 3) PRUNE centralisé (idempotent, re-vérifie la présence des digests)
-  # ──────────────────────────────────────────────────────────────────────────────
-  prune-docr:
+  # ⚡ NETTOYAGE FINAL ULTRA RAPIDE
+  final-cleanup:
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-frontend, build-backend, build-llm]
-    if: always()  # on nettoie même si un build a échoué ou a été ignoré
+    needs: [build-frontend, build-backend, build-llm]
+    if: always() && (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success' || needs.build-llm.result == 'success')
     steps:
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Docker login to DOCR
-        run: doctl registry login --expiry-seconds 600
-
-      - name: 🧹 Prune DOCR (centralisé & idempotent)
-        shell: bash
+      - name: ⚡ Vérification finale + Garbage collection
         run: |
-          set -euo pipefail
-
-          prune_repo() {
-            local repo="$1"
-            local keep="$2"
-
-            echo "🔎 Prune ${repo} (garder ${keep} images)..."
-
-            # Si le repo n'existe pas, on sort calmement
-            if ! doctl registry repository list --no-header 2>/dev/null | awk '{print $1}' | grep -qx "${repo}"; then
-              echo "ℹ️ Repo ${repo} inexistant — skip"
-              return 0
-            fi
-
-            # Récupère: Digest,UpdatedAt,Tags ; tri décroissant date ; ignore lignes vides
-            mapfile -t all_lines < <(
-              doctl registry repository list-manifests "${repo}" \
-                --format Digest,UpdatedAt,Tags --no-header 2>/dev/null \
-              | awk 'NF>=2 {print $1"\t"$2"\t"$3}' \
-              | sort -rk2,2
-            )
-
-            local total="${#all_lines[@]}"
-            if (( total == 0 )); then
-              echo "✅ Rien à supprimer pour ${repo} (aucune image)"
-              return 0
-            fi
-
-            if (( total <= keep )); then
-              echo "✅ ${repo}: ${total} images (≤ ${keep}) — rien à faire"
-              return 0
-            fi
-
-            # On garde les "keep" plus récentes ; le reste est à supprimer
-            mapfile -t old_digests < <(
-              printf "%s\n" "${all_lines[@]}" \
-              | tail -n +$((keep+1)) \
-              | awk '{print $1}' \
-              | sed -n 's/^sha256:[0-9a-f]\{64\}$/&/p' \
-              | uniq
-            )
-
-            if (( ${#old_digests[@]} == 0 )); then
-              echo "✅ ${repo}: rien à supprimer après filtrage"
-              return 0
-            fi
-
-            local deleted=0 failed=0
-            for dg in "${old_digests[@]}"; do
-              # Re-vérifie l'existence juste avant suppression (évite "déjà supprimé")
-              if doctl registry repository list-manifests "${repo}" --format Digest --no-header 2>/dev/null | grep -qx "${dg}"; then
-                echo "🗑️ Suppression: ${dg}"
-                # petit retry pour robustesse
-                if doctl registry repository delete-manifest "${repo}" "${dg}" --force 2>/dev/null \
-                   || (sleep 2 && doctl registry repository delete-manifest "${repo}" "${dg}" --force 2>/dev/null); then
-                  ((deleted++))
-                else
-                  ((failed++))
-                  echo "ℹ️ Non supprimé (concurrence/absent/verrou): ${dg} — on continue"
+          echo "⚡ NETTOYAGE FINAL ULTRA RAPIDE"
+          
+          # Vérification rapide de chaque repo avec gestion d'erreur
+          for repo in intelia-frontend intelia-backend intelia-llm; do
+            echo "Vérification $repo..."
+            
+            if manifests=$(doctl registry repository list-manifests "$repo" --format Digest,UpdatedAt --no-header 2>/dev/null); then
+              if [ -n "$manifests" ]; then
+                count=$(echo "$manifests" | wc -l)
+                echo "$repo: $count images"
+                
+                if [ "$count" -gt 8 ]; then
+                  echo "⚠️ $repo dépasse 8 images - nettoyage d'urgence"
+                  excess=$((count - 8))
+                  
+                  echo "$manifests" | sort -k2,2 | head -n "$excess" | awk '{print $1}' | while read digest; do
+                    if [ -n "$digest" ]; then
+                      echo "Suppression d'urgence: $digest"
+                      doctl registry repository delete-manifest "$repo" "$digest" --force 2>/dev/null || {
+                        echo "⚠️ Échec suppression d'urgence $digest"
+                      }
+                      sleep 0.3
+                    fi
+                  done
                 fi
               else
-                echo "ℹ️ Déjà supprimé (ou concurrent): ${dg}"
+                echo "$repo: aucune image"
               fi
-            done
-
-            echo "📈 ${repo} — supprimés: ${deleted} | non supprimés (non bloquants): ${failed}"
-          }
-
-          # Liste des dépôts à nettoyer
-          for r in intelia-frontend intelia-backend intelia-llm; do
-            prune_repo "$r" "${KEEP_IMAGES}"
+            else
+              echo "⚠️ $repo: impossible de lister les manifests"
+            fi
           done
+          
+          # Garbage collection avec gestion d'erreur
+          echo "🗑️ Lancement garbage collection..."
+          if doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force 2>/dev/null; then
+            echo "✅ Garbage collection lancée"
+          else
+            echo "⚠️ Garbage collection échouée (possiblement déjà en cours)"
+          fi
+          
+          echo "✅ Nettoyage final terminé"
 
-  # ──────────────────────────────────────────────────────────────────────────────
-  # 4) (Optionnel) Récapitulatif
-  # ──────────────────────────────────────────────────────────────────────────────
+  # 📊 Résumé INSTANTANÉ
   summary:
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-frontend, build-backend, build-llm, prune-docr]
+    needs: [detect-changes, build-frontend, build-backend, build-llm, final-cleanup]
     if: always()
     steps:
-      - name: Résumé déploiement
+      - name: ⚡ RAPPORT ULTRA RAPIDE
         run: |
+          echo "🚀 DÉPLOIEMENT ULTRA RAPIDE TERMINÉ"
+          echo "==================================="
+          
+          # Statuts
+          if [[ "${{ needs.detect-changes.outputs.frontend-changed }}" == "true" ]]; then
+            echo "Frontend: ${{ needs.build-frontend.result == 'success' && '✅ DÉPLOYÉ' || '❌ ÉCHEC' }}"
+          else
+            echo "Frontend: ⏸️ INCHANGÉ"
+          fi
+          
+          if [[ "${{ needs.detect-changes.outputs.backend-changed }}" == "true" ]]; then
+            echo "Backend: ${{ needs.build-backend.result == 'success' && '✅ DÉPLOYÉ' || '❌ ÉCHEC' }}"
+          else
+            echo "Backend: ⏸️ INCHANGÉ"
+          fi
+          
+          if [[ "${{ needs.detect-changes.outputs.llm-changed }}" == "true" ]]; then
+            echo "LLM: ${{ needs.build-llm.result == 'success' && '✅ DÉPLOYÉ' || '❌ ÉCHEC' }}"
+          else
+            echo "LLM: ⏸️ INCHANGÉ"
+          fi
+          
           echo ""
-          echo "🚀 Résumé:"
-          echo "FRONTEND:  ${{ needs.detect-changes.outputs.frontend-changed == 'true' && (needs.build-frontend.result == 'success' && '✅ DÉPLOYÉ' || '❌ ÉCHEC') || '⏸️ INCHANGÉ' }}"
-          echo "BACKEND:   ${{ needs.detect-changes.outputs.backend-changed == 'true'  && (needs.build-backend.result  == 'success' && '✅ DÉPLOYÉ' || '❌ ÉCHEC') || '⏸️ INCHANGÉ' }}"
-          echo "LLM:       ${{ needs.detect-changes.outputs.llm-changed == 'true'      && (needs.build-llm.result      == 'success' && '✅ DÉPLOYÉ' || '❌ ÉCHEC') || '⏸️ INCHANGÉ' }}"
-          echo ""
-          echo "🧹 PRUNE:   ${{ needs.prune-docr.result == 'success' && '✅ OK' || '⚠️ AVERTISSEMENTS (non bloquant)' }}"
+          echo "⚡ OPTIMISATIONS APPLIQUÉES:"
+          echo "• Builds 100% parallèles"
+          echo "• Nettoyage intégré robuste avec gestion d'erreur"
+          echo "• Cache optimisé + compression zstd"
+          echo "• Métadonnées désactivées (provenance/sbom)"
+          echo "• BuildKit master + optimisations"
+          echo "• Délais anti-rate-limiting"
+          echo "• Cible: 6-8 minutes total"

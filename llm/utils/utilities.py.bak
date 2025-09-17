@@ -29,20 +29,16 @@ try:
     from utils.imports_and_dependencies import UNIDECODE_AVAILABLE
 
     if UNIDECODE_AVAILABLE:
-        from unidecode import (
-            unidecode,
-        )  # noqa: F401  # Import nécessaire pour export global
+        from unidecode import unidecode
 except ImportError:
     # Fallback si imports_and_dependencies n'est pas encore disponible
     UNIDECODE_AVAILABLE = False
     try:
-        from unidecode import (
-            unidecode,
-        )  # noqa: F401  # Import nécessaire pour export global
+        from unidecode import unidecode
 
         UNIDECODE_AVAILABLE = True
     except ImportError:
-        unidecode = None  # Définir comme None si pas disponible
+        pass
 
 logger = logging.getLogger(__name__)
 
