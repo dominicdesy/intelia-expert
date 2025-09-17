@@ -22,14 +22,14 @@ RUN pip install -r requirements.txt
 COPY . .
 
 ENV BASE_PATH=/llm \
-    LANGUAGE_FILE=/app/languages.json \
-    INTENTS_FILE=/app/intents.json
+    LANGUAGE_FILE=/app/config/languages.json \
+    INTENTS_FILE=/app/config/intents.json
 
 EXPOSE 8080
 
-# Healthcheck en one-liner Python
+# Healthcheck en one-liner Python - CORRIGÉ
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD ["python","-c","import socket,sys; s=socket.socket(); s.settimeout(2); sys.exit(0) if s.connect_ex(('127.0.0.1',8080))==0 else sys.exit(1)"]
+  CMD ["python","-c","import socket,sys; s=socket.socket(); s.settimeout(2); sys.exit(0 if s.connect_ex(('127.0.0.1',8080))==0 else 1)"]
 
 # SSE/streaming: 1 worker + keep-alive un peu plus long
 CMD ["uvicorn","main:app","--host","0.0.0.0","--port","8080","--timeout-keep-alive","30","--proxy-headers"]
