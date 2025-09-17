@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
+
 """
+
 advanced_guardrails.py - Système de guardrails avancé pour la vérification RAG
 Vérifie que les réponses sont basées sur les documents et détecte les hallucinations
+
 """
 
 import logging
