@@ -34,10 +34,11 @@ const nextConfig = {
     unoptimized: false
   },
 
-  // Variables d'environnement - seulement les essentielles
+  // Variables d'environnement - AJOUT de la variable manquante
   env: {
     NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
     NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
+    NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert.intelia.com/api',
   },
 
   // TypeScript et ESLint - garder strict pour détecter les erreurs
