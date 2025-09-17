@@ -41,7 +41,6 @@ pandas>=2.0.0,<3.0.0
 
 # Sécurité et validation - Pydantic v2 stable
 pydantic>=2.8.0,<3.0.0
-email-validator==2.1.0
 
 # Monitoring et logging
 prometheus-client==0.20.0
