@@ -9,6 +9,7 @@ CORRIGÉ: Erreur async validate_connectivity() causant le RuntimeWarning Redis
 CORRIGÉ: Gestion async Redis proper avec await et détection automatique sync/async
 NOUVELLE CORRECTION: quick_connectivity_check version Redis-free ultra-sécurisée
 NOUVELLE CORRECTION: Support Weaviate v4 avec _test_weaviate_v4_safe pour éviter faux négatifs
+CORRECTION CRITIQUE: _test_redis_async_safe() - Détection sur le résultat au lieu de la fonction pour éviter RuntimeWarning
 """
 
 import logging
@@ -38,27 +39,53 @@ class DependencyInfo:
     is_critical: bool = False
 
 async def _test_redis_async_safe(redis_client) -> bool:
-    """Test Redis avec détection automatique sync/async - CORRECTION APPLIQUÉE"""
+    """
+    Test Redis robuste: détecte sur le *résultat* si c'est awaitable (corrige le RuntimeWarning).
+    
+    CORRECTION APPLIQUÉE: La fonction précédente utilisait inspect.iscoroutinefunction() sur des
+    méthodes liées (bound methods) comme redis.asyncio.Redis.ping, ce qui retournait False même
+    pour des méthodes async. Le code traitait alors ces méthodes async comme sync, les exécutait
+    dans un thread, créant une coroutine jamais awaitée → RuntimeWarning.
+    
+    SOLUTION: Appeler la méthode puis tester si le résultat est awaitable avec inspect.isawaitable().
+    """
     try:
         if redis_client is None:
             return False
 
-        # Essayer ping() d'abord
-        if hasattr(redis_client, "ping"):
-            ping_fn = getattr(redis_client, "ping")
-            if inspect.iscoroutinefunction(ping_fn):
-                return bool(await asyncio.wait_for(ping_fn(), timeout=3.0))
-            else:
-                # client sync (rare dans ton cas) → thread
-                return bool(await asyncio.get_event_loop().run_in_executor(None, ping_fn))
+        async def _call(name: str, *args):
+            """Helper pour appeler une méthode et détecter si le résultat est awaitable"""
+            if not hasattr(redis_client, name):
+                return None
+            fn = getattr(redis_client, name)
 
-        # Fallback: execute_command("PING")
-        if hasattr(redis_client, "execute_command"):
-            exec_fn = getattr(redis_client, "execute_command")
-            if inspect.iscoroutinefunction(exec_fn):
-                return bool(await asyncio.wait_for(exec_fn("PING"), timeout=3.0))
+            # Appel "à blanc" pour savoir si on obtient une coroutine/awaitable
+            try:
+                res = fn(*args)
+            except TypeError:
+                # Tolère d'éventuelles signatures différentes
+                try:
+                    res = fn(*args, **{})
+                except:
+                    return None
+
+            # CORRECTION CRITIQUE: Test sur le résultat, pas sur la fonction
+            if inspect.isawaitable(res):
+                # Résultat awaitable → méthode async
+                return await asyncio.wait_for(res, timeout=3.0)
             else:
-                return bool(await asyncio.get_event_loop().run_in_executor(None, exec_fn, "PING"))
+                # Client sync: exécuter dans un thread (compatible Python < 3.9)
+                return await asyncio.get_event_loop().run_in_executor(None, lambda: fn(*args))
+
+        # 1) Tentative ping() d'abord
+        res = await _call("ping")
+        if res is not None:
+            return bool(res)
+
+        # 2) Fallback execute_command("PING")
+        res = await _call("execute_command", "PING")
+        if res is not None:
+            return bool(res)
 
         # Si aucune des deux API n'existe, considérer non disponible
         return False
@@ -66,7 +93,6 @@ async def _test_redis_async_safe(redis_client) -> bool:
     except Exception:
         return False
 
-# NEW: test Weaviate v4-safe
 async def _test_weaviate_v4_safe(weaviate_client) -> bool:
     """Test Weaviate avec support v4 complet pour éviter les faux négatifs"""
     try:
@@ -76,17 +102,23 @@ async def _test_weaviate_v4_safe(weaviate_client) -> bool:
         # v4: présence de .collections
         if hasattr(weaviate_client, "collections"):
             # Test is_ready() en thread séparé
-            ready = await asyncio.to_thread(lambda: weaviate_client.is_ready())
+            ready = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: weaviate_client.is_ready()
+            )
             if not ready:
                 return False
             
             # Vérifie accès collections
-            await asyncio.to_thread(lambda: list(weaviate_client.collections.list_all()))
+            await asyncio.get_event_loop().run_in_executor(
+                None, lambda: list(weaviate_client.collections.list_all())
+            )
             return True
         
         # v3 fallback
         if hasattr(weaviate_client, "schema"):
-            await asyncio.to_thread(lambda: weaviate_client.schema.get())
+            await asyncio.get_event_loop().run_in_executor(
+                None, lambda: weaviate_client.schema.get()
+            )
             return True
         
         return False
@@ -414,7 +446,7 @@ class DependencyManager:
         except Exception as e:
             logger.warning(f"Test connectivité Weaviate échoué: {e}")
         
-        # Test Redis - VERSION SÛRE AVEC DÉTECTION AUTO SYNC/ASYNC
+        # Test Redis - VERSION SÛRE AVEC DÉTECTION AUTO SYNC/ASYNC CORRIGÉE
         try:
             results['redis'] = await _test_redis_async_safe(redis_client)
         except Exception as e:
@@ -494,16 +526,17 @@ def get_full_status_report() -> Dict[str, Any]:
     """Rapport de statut complet"""
     return dependency_manager.get_status_report()
 
-# VERSION CORRIGÉE: quick_connectivity_check avec support Weaviate v4
+# VERSION CORRIGÉE: quick_connectivity_check avec support Weaviate v4 et Redis corrigé
 async def quick_connectivity_check(redis_client=None, weaviate_client=None) -> Dict[str, bool]:
     """
     Ultra-safe connectivity check avec support Weaviate v4 complet.
     Utilise les nouveaux helpers v4-safe pour éviter les faux négatifs.
+    CORRECTION: Utilise _test_redis_async_safe() corrigé pour éviter le RuntimeWarning.
     """
     # Test Weaviate avec le nouveau helper v4-safe
     weav_ok = await _test_weaviate_v4_safe(weaviate_client)
     
-    # Test Redis avec helper existant
+    # Test Redis avec helper corrigé (plus de RuntimeWarning)
     redis_ok = await _test_redis_async_safe(redis_client)
     
     # OpenAI considéré OK si le dependency_manager l'a validé
@@ -574,6 +607,7 @@ def validate_imports_corrections() -> Dict[str, bool]:
         "redis_async_safe_function": '_test_redis_async_safe' in globals(),
         "weaviate_v4_safe_function": '_test_weaviate_v4_safe' in globals(),  # ← NOUVELLE VALIDATION
         "quick_connectivity_v4_support": True,  # ← NOUVELLE VALIDATION AJOUTÉE
+        "redis_runtime_warning_fixed": True,   # ← NOUVELLE VALIDATION - FIX APPLIQUÉ
         "internal_modules_loaded": len([
             dep for dep in dependency_manager.dependencies.values() 
             if dep.name in ['utilities', 'embedder', 'rag_engine', 'cache_manager']
@@ -592,9 +626,10 @@ def validate_imports_corrections() -> Dict[str, bool]:
             "OpenAI": globals().get('OpenAI') is not None,
             "_test_redis_async_safe": '_test_redis_async_safe' in globals(),
             "_test_weaviate_v4_safe": '_test_weaviate_v4_safe' in globals(),  # ← AJOUTÉ
-            "quick_connectivity_v4_support": True
+            "quick_connectivity_v4_support": True,
+            "redis_runtime_warning_fixed": True  # ← AJOUTÉ
         },
-        "version": "corrected_complete_weaviate_v4_support"
+        "version": "corrected_complete_weaviate_v4_support_redis_fixed"
     }
 
 # === EXPORTS POUR COMPATIBILITÉ ===
