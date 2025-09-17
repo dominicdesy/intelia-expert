@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
+
 """
+
 intent_processor.py - Processeur d'intentions robuste avec validation stricte
-Version corrigée: Élimination des fallbacks silencieux, validation explicite des configurations
-CORRIGÉ: Configuration par défaut intégrée pour éviter les erreurs de fichier manquant
-CORRIGÉ: Imports modulaires selon nouvelle architecture
+
 """
 
 import os

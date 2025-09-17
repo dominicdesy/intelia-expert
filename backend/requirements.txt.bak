@@ -10,9 +10,15 @@ psycopg2-binary>=2.9
 asyncpg>=0.29.0
 supabase==2.9.1
 
-# Data Processing (requis par le code)
+# DATA PROCESSING - CRITICAL FIX
 pandas==2.2.2
 numpy==1.26.4
+
+# ML/RAG
+torch==2.2.2
+transformers==4.40.0
+sentence-transformers==2.7.0
+faiss-cpu==1.8.0
 
 # Auth/Security  
 PyJWT==2.8.0
@@ -27,9 +33,10 @@ aiohttp>=3.8.0
 
 # Utils
 python-dotenv==1.0.0
+aiofiles==23.2.1
 psutil==5.9.5
 
-# System monitoring
+# System monitoring and additional dependencies
 typing-extensions>=4.8.0
 tenacity>=8.2.2
 toml==0.10.2
