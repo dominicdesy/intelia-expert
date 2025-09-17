@@ -1,62 +1,83 @@
-# ========== Git et développement ==========
-**/.git
-**/.github
-.gitignore
-README.md
-
-# ========== Python cache et environnements ==========
-**/__pycache__
-**/*.pyc
-**/*.pyo
-**/*.pyd
-.Python
-**/.venv
-**/venv
-**/env
-**/.pytest_cache
-**/.coverage
-**/.mypy_cache
-
-# ========== Models et données lourdes ==========
-**/*.pt
-**/*.pth
-**/*.ckpt
-**/*.bin
-**/*.safetensors
-**/models/
-**/checkpoints/
-
-# ========== Tests et documentation ==========
-tests/
-test_*.py
-*_test.py
+# Documentation
+*.md
+README*
 docs/
-**/*.md
+*.txt
+!requirements.txt
 
-# ========== Logs et temporaires ==========
-**/*.log
-**/logs/*.log
-**/.DS_Store
-**/Thumbs.db
-**/.tmp
-**/tmp
-**/*.bak
-**/*.backup
-**/*.old
+# Git
+.git
+.gitignore
 
-# ========== IDE et éditeurs ==========
-**/.vscode
-**/.idea
-**/*.swp
-**/*.swo
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# ========== Node.js (au cas où) ==========
-node_modules/
-npm-debug.log
-yarn-error.log
+# Virtual environments
+venv/
+env/
+ENV/
 
-# ========== Spécifique à votre projet ==========
-# Gardez rag_index/ car probablement nécessaire au runtime
-# Si rag_index/ contient des gros fichiers de dev, décommentez :
-# rag_index/dev/
-# rag_index/test/
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env*
+!.env.example
+
+# Cache
+.cache/
+*.cache
+
+# Backup files
+*.bak
+*.backup
+
+# Test files
+tests/
+test_*
+*_test.py
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Development scripts
+start_*.bat
+start_dev*
+trigger.txt
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
