@@ -34,13 +34,15 @@ try:
         LANGDETECT_AVAILABLE,
         LANGSMITH_AVAILABLE,
     )
+
     DEPENDENCIES_MANAGER_AVAILABLE = True
 except ImportError as e:
     # Log l'erreur pour debugging
     import logging
+
     logger = logging.getLogger(__name__)
     logger.warning(f"Erreur import imports_and_dependencies: {e}")
-    
+
     DEPENDENCIES_MANAGER_AVAILABLE = False
     dependency_manager = None
     # Définir les fallbacks
@@ -62,7 +64,6 @@ __all__ = [
     "create_intent_processor",
     "process_query_with_intents",
     "validate_intents_config",
-    
     # Dependencies manager - peut être None
     "dependency_manager",
     "get_openai_sync",
@@ -71,14 +72,13 @@ __all__ = [
     "get_full_status_report",
     "quick_connectivity_check",
     "require_critical_dependencies",
-    
     # Variables de statut
     "OPENAI_AVAILABLE",
     "WEAVIATE_AVAILABLE",
     "REDIS_AVAILABLE",
     "UNIDECODE_AVAILABLE",  # AJOUT CRITIQUE
     "VOYAGEAI_AVAILABLE",
-    "SENTENCE_TRANSFORMERS_AVAILABLE", 
+    "SENTENCE_TRANSFORMERS_AVAILABLE",
     "TRANSFORMERS_AVAILABLE",
     "LANGDETECT_AVAILABLE",
     "LANGSMITH_AVAILABLE",

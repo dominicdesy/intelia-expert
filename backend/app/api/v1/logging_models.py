@@ -41,21 +41,18 @@ class Permission(str, Enum):
 
 # 🔐 SYSTÈME DE PERMISSIONS PAR RÔLE
 ROLE_PERMISSIONS: Dict[UserRole, List[Permission]] = {
-    UserRole.USER: [
-        Permission.VIEW_OWN_ANALYTICS,
-        Permission.VIEW_OPENAI_COSTS
-    ],
+    UserRole.USER: [Permission.VIEW_OWN_ANALYTICS, Permission.VIEW_OPENAI_COSTS],
     UserRole.MODERATOR: [
         Permission.VIEW_OWN_ANALYTICS,
         Permission.VIEW_OPENAI_COSTS,
-        Permission.VIEW_ALL_ANALYTICS
+        Permission.VIEW_ALL_ANALYTICS,
     ],
     UserRole.ADMIN: [
         Permission.VIEW_OWN_ANALYTICS,
         Permission.VIEW_ALL_ANALYTICS,
         Permission.VIEW_OPENAI_COSTS,
         Permission.VIEW_SERVER_PERFORMANCE,
-        Permission.ADMIN_DASHBOARD
+        Permission.ADMIN_DASHBOARD,
     ],
     UserRole.SUPER_ADMIN: [
         Permission.VIEW_OWN_ANALYTICS,
@@ -63,6 +60,6 @@ ROLE_PERMISSIONS: Dict[UserRole, List[Permission]] = {
         Permission.VIEW_OPENAI_COSTS,
         Permission.VIEW_SERVER_PERFORMANCE,
         Permission.ADMIN_DASHBOARD,
-        Permission.MANAGE_SYSTEM
-    ]
+        Permission.MANAGE_SYSTEM,
+    ],
 }

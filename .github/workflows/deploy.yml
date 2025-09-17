@@ -54,16 +54,36 @@ jobs:
       - name: ⚡ Nettoyage RAPIDE Frontend
         run: |
           echo "🔥 Nettoyage rapide intelia-frontend..."
-          manifests=$(doctl registry repository list-manifests intelia-frontend --format Digest,UpdatedAt --no-header 2>/dev/null || true)
-          if [ -n "$manifests" ]; then
-            total=$(echo "$manifests" | wc -l)
-            if [ "$total" -gt 8 ]; then
-              to_delete=$((total - 8))
-              echo "Suppression $to_delete anciennes images..."
-              echo "$manifests" | sort -k2,2 | head -n "$to_delete" | awk '{print $1}' | while read digest; do
-                doctl registry repository delete-manifest intelia-frontend "$digest" --force || true
-              done
+          
+          # Récupération des manifests avec gestion d'erreur
+          if manifests=$(doctl registry repository list-manifests intelia-frontend --format Digest,UpdatedAt --no-header 2>/dev/null); then
+            if [ -n "$manifests" ]; then
+              total=$(echo "$manifests" | wc -l)
+              echo "Images trouvées: $total"
+              
+              if [ "$total" -gt 8 ]; then
+                to_delete=$((total - 8))
+                echo "Suppression de $to_delete anciennes images..."
+                
+                # Suppression par lot avec gestion d'erreur améliorée
+                echo "$manifests" | sort -k2,2 | head -n "$to_delete" | awk '{print $1}' | while read digest; do
+                  if [ -n "$digest" ]; then
+                    echo "Suppression: $digest"
+                    doctl registry repository delete-manifest intelia-frontend "$digest" --force 2>/dev/null || {
+                      echo "⚠️ Échec suppression $digest (possiblement déjà supprimé)"
+                    }
+                    # Petit délai pour éviter le rate limiting
+                    sleep 0.5
+                  fi
+                done
+              else
+                echo "✅ Nettoyage non nécessaire ($total <= 8 images)"
+              fi
+            else
+              echo "ℹ️ Aucune image trouvée"
             fi
+          else
+            echo "⚠️ Impossible de lister les manifests (repository vide ou erreur de connexion)"
           fi
 
       - name: Set up Docker Buildx
@@ -114,16 +134,33 @@ jobs:
       - name: ⚡ Nettoyage RAPIDE Backend
         run: |
           echo "🔥 Nettoyage rapide intelia-backend..."
-          manifests=$(doctl registry repository list-manifests intelia-backend --format Digest,UpdatedAt --no-header 2>/dev/null || true)
-          if [ -n "$manifests" ]; then
-            total=$(echo "$manifests" | wc -l)
-            if [ "$total" -gt 8 ]; then
-              to_delete=$((total - 8))
-              echo "Suppression $to_delete anciennes images..."
-              echo "$manifests" | sort -k2,2 | head -n "$to_delete" | awk '{print $1}' | while read digest; do
-                doctl registry repository delete-manifest intelia-backend "$digest" --force || true
-              done
+          
+          if manifests=$(doctl registry repository list-manifests intelia-backend --format Digest,UpdatedAt --no-header 2>/dev/null); then
+            if [ -n "$manifests" ]; then
+              total=$(echo "$manifests" | wc -l)
+              echo "Images trouvées: $total"
+              
+              if [ "$total" -gt 8 ]; then
+                to_delete=$((total - 8))
+                echo "Suppression de $to_delete anciennes images..."
+                
+                echo "$manifests" | sort -k2,2 | head -n "$to_delete" | awk '{print $1}' | while read digest; do
+                  if [ -n "$digest" ]; then
+                    echo "Suppression: $digest"
+                    doctl registry repository delete-manifest intelia-backend "$digest" --force 2>/dev/null || {
+                      echo "⚠️ Échec suppression $digest (possiblement déjà supprimé)"
+                    }
+                    sleep 0.5
+                  fi
+                done
+              else
+                echo "✅ Nettoyage non nécessaire ($total <= 8 images)"
+              fi
+            else
+              echo "ℹ️ Aucune image trouvée"
             fi
+          else
+            echo "⚠️ Impossible de lister les manifests (repository vide ou erreur de connexion)"
           fi
 
       - name: Set up Docker Buildx
@@ -180,16 +217,33 @@ jobs:
       - name: ⚡ Nettoyage RAPIDE LLM
         run: |
           echo "🔥 Nettoyage rapide intelia-llm..."
-          manifests=$(doctl registry repository list-manifests intelia-llm --format Digest,UpdatedAt --no-header 2>/dev/null || true)
-          if [ -n "$manifests" ]; then
-            total=$(echo "$manifests" | wc -l)
-            if [ "$total" -gt 8 ]; then
-              to_delete=$((total - 8))
-              echo "Suppression $to_delete anciennes images..."
-              echo "$manifests" | sort -k2,2 | head -n "$to_delete" | awk '{print $1}' | while read digest; do
-                doctl registry repository delete-manifest intelia-llm "$digest" --force || true
-              done
+          
+          if manifests=$(doctl registry repository list-manifests intelia-llm --format Digest,UpdatedAt --no-header 2>/dev/null); then
+            if [ -n "$manifests" ]; then
+              total=$(echo "$manifests" | wc -l)
+              echo "Images trouvées: $total"
+              
+              if [ "$total" -gt 8 ]; then
+                to_delete=$((total - 8))
+                echo "Suppression de $to_delete anciennes images..."
+                
+                echo "$manifests" | sort -k2,2 | head -n "$to_delete" | awk '{print $1}' | while read digest; do
+                  if [ -n "$digest" ]; then
+                    echo "Suppression: $digest"
+                    doctl registry repository delete-manifest intelia-llm "$digest" --force 2>/dev/null || {
+                      echo "⚠️ Échec suppression $digest (possiblement déjà supprimé)"
+                    }
+                    sleep 0.5
+                  fi
+                done
+              else
+                echo "✅ Nettoyage non nécessaire ($total <= 8 images)"
+              fi
+            else
+              echo "ℹ️ Aucune image trouvée"
             fi
+          else
+            echo "⚠️ Impossible de lister les manifests (repository vide ou erreur de connexion)"
           fi
 
       - name: Set up Docker Buildx
@@ -234,23 +288,45 @@ jobs:
         run: |
           echo "⚡ NETTOYAGE FINAL ULTRA RAPIDE"
           
-          # Vérification rapide de chaque repo
+          # Vérification rapide de chaque repo avec gestion d'erreur
           for repo in intelia-frontend intelia-backend intelia-llm; do
-            count=$(doctl registry repository list-manifests "$repo" --format Digest --no-header 2>/dev/null | wc -l || echo "0")
-            echo "$repo: $count images"
+            echo "Vérification $repo..."
             
-            if [ "$count" -gt 8 ]; then
-              echo "⚠️  $repo dépasse 8 images - nettoyage d'urgence"
-              manifests=$(doctl registry repository list-manifests "$repo" --format Digest,UpdatedAt --no-header 2>/dev/null || true)
-              excess=$((count - 8))
-              echo "$manifests" | sort -k2,2 | head -n "$excess" | awk '{print $1}' | while read digest; do
-                doctl registry repository delete-manifest "$repo" "$digest" --force || true
-              done
+            if manifests=$(doctl registry repository list-manifests "$repo" --format Digest,UpdatedAt --no-header 2>/dev/null); then
+              if [ -n "$manifests" ]; then
+                count=$(echo "$manifests" | wc -l)
+                echo "$repo: $count images"
+                
+                if [ "$count" -gt 8 ]; then
+                  echo "⚠️ $repo dépasse 8 images - nettoyage d'urgence"
+                  excess=$((count - 8))
+                  
+                  echo "$manifests" | sort -k2,2 | head -n "$excess" | awk '{print $1}' | while read digest; do
+                    if [ -n "$digest" ]; then
+                      echo "Suppression d'urgence: $digest"
+                      doctl registry repository delete-manifest "$repo" "$digest" --force 2>/dev/null || {
+                        echo "⚠️ Échec suppression d'urgence $digest"
+                      }
+                      sleep 0.3
+                    fi
+                  done
+                fi
+              else
+                echo "$repo: aucune image"
+              fi
+            else
+              echo "⚠️ $repo: impossible de lister les manifests"
             fi
           done
           
-          # Garbage collection
-          doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force || true
+          # Garbage collection avec gestion d'erreur
+          echo "🗑️ Lancement garbage collection..."
+          if doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force 2>/dev/null; then
+            echo "✅ Garbage collection lancée"
+          else
+            echo "⚠️ Garbage collection échouée (possiblement déjà en cours)"
+          fi
+          
           echo "✅ Nettoyage final terminé"
 
   # 📊 Résumé INSTANTANÉ
@@ -286,8 +362,9 @@ jobs:
           echo ""
           echo "⚡ OPTIMISATIONS APPLIQUÉES:"
           echo "• Builds 100% parallèles"
-          echo "• Nettoyage intégré aux builds"
+          echo "• Nettoyage intégré robuste avec gestion d'erreur"
           echo "• Cache optimisé + compression zstd"
           echo "• Métadonnées désactivées (provenance/sbom)"
           echo "• BuildKit master + optimisations"
+          echo "• Délais anti-rate-limiting"
           echo "• Cible: 6-8 minutes total"

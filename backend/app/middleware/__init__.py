@@ -8,12 +8,12 @@ from .auth_middleware import (
     verify_supabase_token,
     optional_auth,
     auth_middleware,
-    PUBLIC_ENDPOINTS
+    PUBLIC_ENDPOINTS,
 )
 
 __all__ = [
     "verify_supabase_token",
-    "optional_auth", 
+    "optional_auth",
     "auth_middleware",
-    "PUBLIC_ENDPOINTS"
+    "PUBLIC_ENDPOINTS",
 ]

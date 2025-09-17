@@ -4,7 +4,7 @@ Router Invitations pour Intelia Expert - VERSION SUPABASE NATIVE
 Utilise les invitations intégrées de Supabase Auth avec détection d'utilisateurs existants
 CORRIGÉ : Authentification unifiée avec auth.py
 """
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, validator
 from typing import List, Optional, Dict, Any
@@ -17,6 +17,7 @@ import time
 # Imports Supabase
 try:
     from supabase import create_client, Client
+
     SUPABASE_AVAILABLE = True
 except ImportError:
     SUPABASE_AVAILABLE = False
@@ -28,6 +29,7 @@ router = APIRouter(prefix="/invitations", tags=["invitations"])
 # Import du système d'auth centralisé avec fallback
 try:
     from app.api.v1.auth import get_current_user as auth_get_current_user
+
     AUTH_CENTRALIZED = True
     logger.info("Système d'auth centralisé disponible")
 except ImportError:
@@ -38,100 +40,119 @@ except ImportError:
 # Security scheme for HTTPBearer
 security = HTTPBearer()
 
+
 # ==================== CONFIGURATION SUPABASE ====================
 def get_supabase_client() -> Client:
     """Initialise le client Supabase avec Service Role pour les invitations"""
     if not SUPABASE_AVAILABLE:
         raise HTTPException(status_code=500, detail="Supabase non disponible")
-    
+
     url = os.getenv("SUPABASE_URL")
     service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-    
+
     if not url:
         raise HTTPException(status_code=500, detail="SUPABASE_URL manquante")
-    
+
     if not service_key:
         raise HTTPException(
-            status_code=500, 
-            detail="SUPABASE_SERVICE_ROLE_KEY manquante - nécessaire pour les invitations"
+            status_code=500,
+            detail="SUPABASE_SERVICE_ROLE_KEY manquante - nécessaire pour les invitations",
         )
-    
+
     return create_client(url, service_key)
+
 
 def get_supabase_anon_client() -> Client:
     """Client Supabase avec clé anonyme pour les opérations standard"""
     if not SUPABASE_AVAILABLE:
         raise HTTPException(status_code=500, detail="Supabase non disponible")
-    
+
     url = os.getenv("SUPABASE_URL")
     anon_key = os.getenv("SUPABASE_ANON_KEY")
-    
+
     if not url or not anon_key:
-        raise HTTPException(status_code=500, detail="Configuration Supabase de base manquante")
-    
+        raise HTTPException(
+            status_code=500, detail="Configuration Supabase de base manquante"
+        )
+
     return create_client(url, anon_key)
+
 
 # ==================== AUTH HELPER UNIFIÉ ====================
 def get_current_user_from_token_fallback(credentials: HTTPAuthorizationCredentials):
     """Version fallback de l'authentification locale - Compatible avec auth.py"""
     token = credentials.credentials
-    
+
     if not token or not isinstance(token, str):
         logger.warning("Token vide ou invalide")
         raise HTTPException(
-            status_code=401, 
+            status_code=401,
             detail="Authentication failed",
-            headers={"error": "internal_auth_error", "path": "/api/v1/invitations/send"}
+            headers={
+                "error": "internal_auth_error",
+                "path": "/api/v1/invitations/send",
+            },
         )
-    
+
     # Utiliser la même logique multi-secrets que auth.py
     jwt_secrets = []
-    
+
     # 1. Secret auth-temp (utilisé par vos endpoints /auth-temp/*)
     auth_temp_secret = os.getenv("SUPABASE_JWT_SECRET") or os.getenv("JWT_SECRET")
     if auth_temp_secret:
         jwt_secrets.append(("AUTH_TEMP", auth_temp_secret))
-    
+
     # 2. Secrets Supabase traditionnels
     supabase_jwt_secret = os.getenv("SUPABASE_JWT_SECRET")
     if supabase_jwt_secret and supabase_jwt_secret != auth_temp_secret:
         jwt_secrets.append(("SUPABASE_JWT_SECRET", supabase_jwt_secret))
-    
+
     supabase_anon = os.getenv("SUPABASE_ANON_KEY")
     if supabase_anon and supabase_anon not in [s[1] for s in jwt_secrets]:
         jwt_secrets.append(("SUPABASE_ANON_KEY", supabase_anon))
-    
+
     service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
     if service_role_key and service_role_key not in [s[1] for s in jwt_secrets]:
         jwt_secrets.append(("SUPABASE_SERVICE_ROLE_KEY", service_role_key))
-    
+
     # Fallback
     if not jwt_secrets:
-        jwt_secrets.append(("FALLBACK", "development-secret-change-in-production-12345"))
+        jwt_secrets.append(
+            ("FALLBACK", "development-secret-change-in-production-12345")
+        )
         logger.error("Aucun JWT secret configuré - utilisation fallback")
-    
+
     # Essayer tous les secrets comme dans auth.py
     for secret_name, secret_value in jwt_secrets:
         if not secret_value:
             continue
-            
+
         try:
             logger.debug(f"Tentative décodage avec {secret_name}")
-            
+
             # Essayer différentes options de décodage comme dans auth.py
             decode_options = [
-                {"options": {"verify_aud": False}},  # Sans vérifier audience (auth-temp)
-                {"audience": "authenticated"},       # Standard Supabase
-                {}                                  # Sans options spéciales
+                {
+                    "options": {"verify_aud": False}
+                },  # Sans vérifier audience (auth-temp)
+                {"audience": "authenticated"},  # Standard Supabase
+                {},  # Sans options spéciales
             ]
-            
+
             payload = None
             for option_set in decode_options:
                 try:
                     if "options" in option_set:
-                        payload = jwt.decode(token, secret_value, algorithms=["HS256"], **option_set)
+                        payload = jwt.decode(
+                            token, secret_value, algorithms=["HS256"], **option_set
+                        )
                     elif "audience" in option_set:
-                        payload = jwt.decode(token, secret_value, algorithms=["HS256"], audience=option_set["audience"])
+                        payload = jwt.decode(
+                            token,
+                            secret_value,
+                            algorithms=["HS256"],
+                            audience=option_set["audience"],
+                        )
                     else:
                         payload = jwt.decode(token, secret_value, algorithms=["HS256"])
                     break
@@ -139,48 +160,64 @@ def get_current_user_from_token_fallback(credentials: HTTPAuthorizationCredentia
                     continue
                 except Exception:
                     continue
-            
+
             if not payload:
                 continue
-                
+
             logger.info(f"Token décodé avec succès avec {secret_name}")
-            
+
             # Extraction des données utilisateur
-            user_email = payload.get('email')
-            user_id = payload.get('sub') or payload.get('user_id')
-            user_metadata = payload.get('user_metadata', {})
-            user_name = user_metadata.get('name') or payload.get('name') or payload.get('full_name')
-            
+            user_email = payload.get("email")
+            user_id = payload.get("sub") or payload.get("user_id")
+            user_metadata = payload.get("user_metadata", {})
+            user_name = (
+                user_metadata.get("name")
+                or payload.get("name")
+                or payload.get("full_name")
+            )
+
             # Validation des données critiques
             if not user_email or not user_id:
                 continue
-            
+
             # Validation expiration
-            exp = payload.get('exp')
+            exp = payload.get("exp")
             if exp and time.time() > exp:
                 raise HTTPException(
-                    status_code=401, 
+                    status_code=401,
                     detail="Authentication failed",
-                    headers={"error": "internal_auth_error", "path": "/api/v1/invitations/send"}
+                    headers={
+                        "error": "internal_auth_error",
+                        "path": "/api/v1/invitations/send",
+                    },
                 )
-            
-            logger.info(f"Utilisateur authentifié: {user_email} (secret: {secret_name})")
-            
+
+            logger.info(
+                f"Utilisateur authentifié: {user_email} (secret: {secret_name})"
+            )
+
             # Créer l'objet utilisateur compatible
-            return type('User', (), {
-                'email': user_email,
-                'id': user_id,
-                'name': user_name or user_email.split('@')[0],
-                'metadata': user_metadata,
-                'token_exp': exp
-            })()
-            
+            return type(
+                "User",
+                (),
+                {
+                    "email": user_email,
+                    "id": user_id,
+                    "name": user_name or user_email.split("@")[0],
+                    "metadata": user_metadata,
+                    "token_exp": exp,
+                },
+            )()
+
         except jwt.ExpiredSignatureError:
             logger.warning(f"Token expiré (testé avec {secret_name})")
             raise HTTPException(
-                status_code=401, 
+                status_code=401,
                 detail="Authentication failed",
-                headers={"error": "internal_auth_error", "path": "/api/v1/invitations/send"}
+                headers={
+                    "error": "internal_auth_error",
+                    "path": "/api/v1/invitations/send",
+                },
             )
         except jwt.InvalidSignatureError:
             logger.debug(f"Signature invalide avec {secret_name}")
@@ -191,40 +228,49 @@ def get_current_user_from_token_fallback(credentials: HTTPAuthorizationCredentia
         except Exception as e:
             logger.debug(f"Erreur inattendue avec {secret_name}: {e}")
             continue
-    
+
     # Si aucun secret n'a fonctionné
     logger.error("Impossible de décoder le token avec tous les secrets disponibles")
     logger.error(f"Secrets essayés: {[s[0] for s in jwt_secrets]}")
-    
+
     raise HTTPException(
-        status_code=401, 
+        status_code=401,
         detail="Authentication failed",
-        headers={"error": "internal_auth_error", "path": "/api/v1/invitations/send"}
+        headers={"error": "internal_auth_error", "path": "/api/v1/invitations/send"},
     )
 
+
 # Dependency principale pour les endpoints - VERSION CORRIGÉE
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
     """Dependency unifiée pour récupérer l'utilisateur connecté - VERSION CORRIGÉE"""
     if AUTH_CENTRALIZED and auth_get_current_user:
         # Utiliser le système centralisé correctement
         try:
             user_data = await auth_get_current_user(credentials)
             # Convertir en objet compatible avec le service d'invitation
-            return type('User', (), {
-                'email': user_data.get('email'),
-                'id': user_data.get('user_id'),
-                'name': user_data.get('full_name') or user_data.get('email', '').split('@')[0],
-                'metadata': user_data.get('preferences', {}),
-                'token_exp': user_data.get('exp'),
-                'user_type': user_data.get('user_type', 'user')
-            })()
+            return type(
+                "User",
+                (),
+                {
+                    "email": user_data.get("email"),
+                    "id": user_data.get("user_id"),
+                    "name": user_data.get("full_name")
+                    or user_data.get("email", "").split("@")[0],
+                    "metadata": user_data.get("preferences", {}),
+                    "token_exp": user_data.get("exp"),
+                    "user_type": user_data.get("user_type", "user"),
+                },
+            )()
         except Exception as e:
             logger.error(f"Erreur système d'auth centralisé: {e}")
             # Fallback sur l'auth local en cas d'erreur
             pass
-    
+
     # Fallback sur l'auth local si centralisé non disponible
     return get_current_user_from_token_fallback(credentials)
+
 
 # ==================== MODÈLES PYDANTIC ====================
 class InvitationRequest(BaseModel):
@@ -234,14 +280,15 @@ class InvitationRequest(BaseModel):
     inviter_email: EmailStr
     language: str = "fr"
     force_send: bool = False
-    
-    @validator('emails')
+
+    @validator("emails")
     def validate_emails_count(cls, v):
         if len(v) == 0:
-            raise ValueError('Au moins une adresse email est requise')
+            raise ValueError("Au moins une adresse email est requise")
         if len(v) > 10:
-            raise ValueError('Maximum 10 invitations à la fois')
+            raise ValueError("Maximum 10 invitations à la fois")
         return v
+
 
 class InvitationResult(BaseModel):
     email: str
@@ -250,6 +297,7 @@ class InvitationResult(BaseModel):
     reason: Optional[str] = None
     message: str
     details: Dict[str, Any] = {}
+
 
 class InvitationResponse(BaseModel):
     success: bool
@@ -260,12 +308,14 @@ class InvitationResponse(BaseModel):
     message: str
     results: List[InvitationResult] = []
 
+
 class InvitationStatus(BaseModel):
     email: str
     status: str  # 'pending', 'accepted', 'expired'
     invited_at: datetime
     accepted_at: Optional[datetime] = None
     invited_by: str
+
 
 # ==================== SERVICE SUPABASE INVITATIONS ====================
 class SupabaseInvitationService:
@@ -274,17 +324,14 @@ class SupabaseInvitationService:
         self.anon_client = get_supabase_anon_client()
         self.frontend_url = os.getenv("FRONTEND_URL", "https://expert.intelia.com")
         self.min_resend_delay_hours = int(os.getenv("MIN_RESEND_DELAY_HOURS", "24"))
-    
+
     async def check_user_exists(self, email: str) -> Dict[str, Any]:
         """Vérifie si un utilisateur existe déjà dans Supabase Auth"""
         try:
-            response = self.admin_client.auth.admin.list_users(
-                page=1,
-                per_page=1000
-            )
-            
-            existing_users = response.data if hasattr(response, 'data') else []
-            
+            response = self.admin_client.auth.admin.list_users(page=1, per_page=1000)
+
+            existing_users = response.data if hasattr(response, "data") else []
+
             for user in existing_users:
                 if user.email and user.email.lower() == email.lower():
                     return {
@@ -293,69 +340,85 @@ class SupabaseInvitationService:
                         "email": user.email,
                         "created_at": user.created_at,
                         "last_sign_in": user.last_sign_in_at,
-                        "email_confirmed": user.email_confirmed_at is not None
+                        "email_confirmed": user.email_confirmed_at is not None,
                     }
-            
+
             return {"exists": False}
-            
+
         except Exception as e:
             logger.error(f"Erreur vérification utilisateur {email}: {str(e)}")
             return {"exists": False, "error": str(e)}
-    
-    async def check_invitation_status(self, email: str, inviter_email: str) -> Dict[str, Any]:
+
+    async def check_invitation_status(
+        self, email: str, inviter_email: str
+    ) -> Dict[str, Any]:
         """Vérifie le statut des invitations pour cet email"""
         try:
-            result = self.anon_client.table("invitations").select("*").eq("email", email).order("invited_at", desc=True).execute()
-            
+            result = (
+                self.anon_client.table("invitations")
+                .select("*")
+                .eq("email", email)
+                .order("invited_at", desc=True)
+                .execute()
+            )
+
             if not result.data:
                 return {
                     "has_invitations": False,
                     "can_invite": True,
-                    "reason": "no_previous_invitation"
+                    "reason": "no_previous_invitation",
                 }
-            
+
             # Vérifier s'il y a une invitation acceptée
-            accepted_invitations = [inv for inv in result.data if inv.get("status") == "accepted"]
+            accepted_invitations = [
+                inv for inv in result.data if inv.get("status") == "accepted"
+            ]
             if accepted_invitations:
                 return {
                     "has_invitations": True,
                     "can_invite": False,
                     "reason": "invitation_already_accepted",
                     "accepted_at": accepted_invitations[0]["accepted_at"],
-                    "accepted_invitation": accepted_invitations[0]
+                    "accepted_invitation": accepted_invitations[0],
                 }
-            
+
             # Chercher les invitations en cours (pending)
-            pending_invitations = [inv for inv in result.data if inv.get("status") == "pending"]
-            
+            pending_invitations = [
+                inv for inv in result.data if inv.get("status") == "pending"
+            ]
+
             if not pending_invitations:
                 return {
                     "has_invitations": True,
                     "can_invite": True,
-                    "reason": "no_pending_invitation"
+                    "reason": "no_pending_invitation",
                 }
-            
+
             # Il y a des invitations pending - vérifier si on peut renvoyer
             latest_invitation = pending_invitations[0]
-            invited_at = datetime.fromisoformat(latest_invitation["invited_at"].replace('Z', '+00:00'))
+            invited_at = datetime.fromisoformat(
+                latest_invitation["invited_at"].replace("Z", "+00:00")
+            )
             now = datetime.now(invited_at.tzinfo)
             time_since_last = now - invited_at
-            
+
             # Vérifier si le délai minimum est respecté
             min_delay = timedelta(hours=self.min_resend_delay_hours)
             can_resend = time_since_last >= min_delay
-            
+
             if not can_resend:
-                remaining_hours = int((min_delay - time_since_last).total_seconds() / 3600)
+                remaining_hours = int(
+                    (min_delay - time_since_last).total_seconds() / 3600
+                )
                 return {
                     "has_invitations": True,
                     "can_invite": False,
                     "reason": "too_recent",
                     "message": f"Dernière invitation envoyée il y a {int(time_since_last.total_seconds() / 3600)}h. Attendez encore {remaining_hours}h.",
                     "latest_invitation": latest_invitation,
-                    "hours_remaining": remaining_hours
+                    "hours_remaining": remaining_hours,
                 }
-            
+
             # Peut renvoyer l'invitation
             return {
                 "has_invitations": True,
@@ -363,20 +426,23 @@ class SupabaseInvitationService:
                 "can_resend": True,
                 "reason": "can_resend_invitation",
                 "latest_invitation": latest_invitation,
-                "is_same_inviter": latest_invitation["inviter_email"].lower() == inviter_email.lower(),
-                "hours_since_last": int(time_since_last.total_seconds() / 3600)
+                "is_same_inviter": latest_invitation["inviter_email"].lower()
+                == inviter_email.lower(),
+                "hours_since_last": int(time_since_last.total_seconds() / 3600),
             }
-            
+
         except Exception as e:
             logger.error(f"Erreur vérification statut invitation {email}: {str(e)}")
             return {"has_invitations": False, "can_invite": True, "error": str(e)}
-    
-    async def validate_email_before_invitation(self, email: str, inviter_email: str) -> Dict[str, Any]:
+
+    async def validate_email_before_invitation(
+        self, email: str, inviter_email: str
+    ) -> Dict[str, Any]:
         """Validation complète avant d'envoyer une invitation"""
-        
-        # 1. Vérifier si l'utilisateur existe déjà   
+
+        # 1. Vérifier si l'utilisateur existe déjà
         user_check = await self.check_user_exists(email)
-        
+
         if user_check["exists"]:
             return {
                 "can_invite": False,
@@ -385,21 +451,23 @@ class SupabaseInvitationService:
                 "details": {
                     "registered_since": user_check.get("created_at"),
                     "last_login": user_check.get("last_sign_in"),
-                    "email_confirmed": user_check.get("email_confirmed", False)
-                }
+                    "email_confirmed": user_check.get("email_confirmed", False),
+                },
             }
-        
+
         # 2. Vérifier le statut des invitations
         invitation_status = await self.check_invitation_status(email, inviter_email)
-        
+
         if not invitation_status["can_invite"]:
             return {
                 "can_invite": False,
                 "reason": invitation_status["reason"],
-                "message": invitation_status.get("message", f"Impossible d'inviter {email}"),
-                "details": invitation_status
+                "message": invitation_status.get(
+                    "message", f"Impossible d'inviter {email}"
+                ),
+                "details": invitation_status,
             }
-        
+
         # 3. Cas spécial : peut renvoyer une invitation
         if invitation_status.get("can_resend"):
             return {
@@ -407,96 +475,112 @@ class SupabaseInvitationService:
                 "reason": "can_resend",
                 "is_resend": True,
                 "message": f"Renvoi d'invitation possible pour {email}",
-                "details": invitation_status
+                "details": invitation_status,
             }
-        
+
         # 4. Validation OK pour nouvelle invitation
         return {
             "can_invite": True,
             "reason": "valid",
             "is_resend": False,
-            "message": f"Invitation possible pour {email}"
+            "message": f"Invitation possible pour {email}",
         }
-    
-    def get_invitation_template_data(self, language: str, inviter_name: str, personal_message: str = "", is_resend: bool = False) -> Dict[str, str]:
+
+    def get_invitation_template_data(
+        self,
+        language: str,
+        inviter_name: str,
+        personal_message: str = "",
+        is_resend: bool = False,
+    ) -> Dict[str, str]:
         """Prépare les données pour le template d'email"""
-        
+
         templates = {
-            'fr': {
-                'subject': f"{inviter_name} vous invite à découvrir Intelia Expert" + (" (Rappel)" if is_resend else ""),
-                'title': "Invitation Intelia Expert" + (" - Rappel" if is_resend else ""),
-                'greeting': f"Bonjour ! {inviter_name} vous invite à découvrir Intelia Expert",
-                'description': "Le premier assistant IA spécialisé en santé et nutrition animale",
-                'cta_text': "Créer mon compte gratuitement",
-                'features_title': "Avec Intelia Expert, vous pouvez :",
-                'features': [
+            "fr": {
+                "subject": f"{inviter_name} vous invite à découvrir Intelia Expert"
+                + (" (Rappel)" if is_resend else ""),
+                "title": "Invitation Intelia Expert"
+                + (" - Rappel" if is_resend else ""),
+                "greeting": f"Bonjour ! {inviter_name} vous invite à découvrir Intelia Expert",
+                "description": "Le premier assistant IA spécialisé en santé et nutrition animale",
+                "cta_text": "Créer mon compte gratuitement",
+                "features_title": "Avec Intelia Expert, vous pouvez :",
+                "features": [
                     "Poser des questions d'expert en santé animale 24/7",
                     "Accéder à une base de connaissances spécialisée",
                     "Obtenir des réponses en français, anglais ou espagnol",
-                    "Utiliser l'interface sur mobile, tablette et ordinateur"
-                ]
+                    "Utiliser l'interface sur mobile, tablette et ordinateur",
+                ],
             },
-            'en': {
-                'subject': f"{inviter_name} invites you to discover Intelia Expert" + (" (Reminder)" if is_resend else ""),
-                'title': "Intelia Expert Invitation" + (" - Reminder" if is_resend else ""),
-                'greeting': f"Hello! {inviter_name} invites you to discover Intelia Expert",
-                'description': "The first AI assistant specialized in animal health and nutrition",
-                'cta_text': "Create my free account",
-                'features_title': "With Intelia Expert, you can:",
-                'features': [
+            "en": {
+                "subject": f"{inviter_name} invites you to discover Intelia Expert"
+                + (" (Reminder)" if is_resend else ""),
+                "title": "Intelia Expert Invitation"
+                + (" - Reminder" if is_resend else ""),
+                "greeting": f"Hello! {inviter_name} invites you to discover Intelia Expert",
+                "description": "The first AI assistant specialized in animal health and nutrition",
+                "cta_text": "Create my free account",
+                "features_title": "With Intelia Expert, you can:",
+                "features": [
                     "Ask expert questions about animal health 24/7",
                     "Access a specialized knowledge base",
                     "Get answers in French, English, or Spanish",
-                    "Use on mobile, tablet, and computer"
-                ]
+                    "Use on mobile, tablet, and computer",
+                ],
             },
-            'es': {
-                'subject': f"{inviter_name} te invita a descubrir Intelia Expert" + (" (Recordatorio)" if is_resend else ""),
-                'title': "Invitación Intelia Expert" + (" - Recordatorio" if is_resend else ""),
-                'greeting': f"¡Hola! {inviter_name} te invita a descubrir Intelia Expert",
-                'description': "El primer asistente IA especializado en salud y nutrición animal",
-                'cta_text': "Crear mi cuenta gratuita",
-                'features_title': "Con Intelia Expert, puedes:",
-                'features': [
+            "es": {
+                "subject": f"{inviter_name} te invita a descubrir Intelia Expert"
+                + (" (Recordatorio)" if is_resend else ""),
+                "title": "Invitación Intelia Expert"
+                + (" - Recordatorio" if is_resend else ""),
+                "greeting": f"¡Hola! {inviter_name} te invita a descubrir Intelia Expert",
+                "description": "El primer asistente IA especializado en salud y nutrición animal",
+                "cta_text": "Crear mi cuenta gratuita",
+                "features_title": "Con Intelia Expert, puedes:",
+                "features": [
                     "Hacer preguntas expertas sobre salud animal 24/7",
                     "Acceder a una base de conocimiento especializada",
                     "Obtener respuestas en francés, inglés o español",
-                    "Usar en móvil, tableta y computadora"
-                ]
-            }
+                    "Usar en móvil, tableta y computadora",
+                ],
+            },
         }
-        
-        template_data = templates.get(language, templates['fr'])
-        
+
+        template_data = templates.get(language, templates["fr"])
+
         # Ajouter le message personnel si présent
         if personal_message.strip():
-            template_data['personal_message'] = personal_message
-            template_data['personal_message_title'] = {
-                'fr': f"Message personnel de {inviter_name} :",
-                'en': f"Personal message from {inviter_name}:",
-                'es': f"Mensaje personal de {inviter_name}:"
+            template_data["personal_message"] = personal_message
+            template_data["personal_message_title"] = {
+                "fr": f"Message personnel de {inviter_name} :",
+                "en": f"Personal message from {inviter_name}:",
+                "es": f"Mensaje personal de {inviter_name}:",
             }.get(language, f"Message personnel de {inviter_name} :")
-        
+
         # Ajouter un message de rappel si c'est un renvoi
         if is_resend:
-            template_data['resend_note'] = {
-                'fr': "Il s'agit d'un rappel de votre invitation précédente.",
-                'en': "This is a reminder of your previous invitation.",
-                'es': "Este es un recordatorio de tu invitación anterior."
+            template_data["resend_note"] = {
+                "fr": "Il s'agit d'un rappel de votre invitation précédente.",
+                "en": "This is a reminder of your previous invitation.",
+                "es": "Este es un recordatorio de tu invitación anterior.",
             }.get(language, "Il s'agit d'un rappel de votre invitation précédente.")
-        
+
         return template_data
-    
-    async def send_invitation(self, email: str, inviter_name: str, inviter_email: str, 
-                            personal_message: str = "", language: str = "fr", is_resend: bool = False) -> Dict[str, Any]:
+
+    async def send_invitation(
+        self,
+        email: str,
+        inviter_name: str,
+        inviter_email: str,
+        personal_message: str = "",
+        language: str = "fr",
+        is_resend: bool = False,
+    ) -> Dict[str, Any]:
         """Envoie une invitation via Supabase Auth"""
         try:
-            # Préparer les données du template
-            template_data = self.get_invitation_template_data(language, inviter_name, personal_message, is_resend)
-            
             # URL de redirection après inscription
             redirect_to = f"{self.frontend_url}/auth/invitation"
-            
+
             # Envoyer l'invitation via Supabase Auth
             response = self.admin_client.auth.admin.invite_user_by_email(
                 email=email,
@@ -508,25 +592,34 @@ class SupabaseInvitationService:
                         "personal_message": personal_message,
                         "language": language,
                         "invitation_date": datetime.now().isoformat(),
-                        "is_resend": is_resend
-                    }
-                }
+                        "is_resend": is_resend,
+                    },
+                },
             )
-            
+
             action_type = "renvoyée" if is_resend else "envoyée"
-            logger.info(f"Invitation Supabase {action_type} à {email} de la part de {inviter_name}")
-            
+            logger.info(
+                f"Invitation Supabase {action_type} à {email} de la part de {inviter_name}"
+            )
+
             # Enregistrer l'invitation dans une table personnalisée pour le tracking
-            await self.log_invitation(email, inviter_email, inviter_name, personal_message, language, is_resend)
-            
+            await self.log_invitation(
+                email,
+                inviter_email,
+                inviter_name,
+                personal_message,
+                language,
+                is_resend,
+            )
+
             return {
                 "success": True,
                 "email": email,
                 "invitation_id": response.user.id if response.user else None,
                 "status": "resent" if is_resend else "sent",
-                "message": f"Invitation {action_type} avec succès"
+                "message": f"Invitation {action_type} avec succès",
             }
-            
+
         except Exception as e:
             logger.error(f"Erreur envoi invitation Supabase à {email}: {str(e)}")
             return {
@@ -534,18 +627,26 @@ class SupabaseInvitationService:
                 "email": email,
                 "error": str(e),
                 "status": "failed",
-                "message": f"Échec de l'envoi: {str(e)}"
+                "message": f"Échec de l'envoi: {str(e)}",
             }
-    
-    async def send_invitation_with_validation(self, email: str, inviter_name: str, inviter_email: str, 
-                                            personal_message: str = "", language: str = "fr", 
-                                            force: bool = False) -> Dict[str, Any]:
+
+    async def send_invitation_with_validation(
+        self,
+        email: str,
+        inviter_name: str,
+        inviter_email: str,
+        personal_message: str = "",
+        language: str = "fr",
+        force: bool = False,
+    ) -> Dict[str, Any]:
         """Envoie une invitation avec validation préalable"""
-        
+
         # Validation préalable (sauf si force=True)
         if not force:
-            validation = await self.validate_email_before_invitation(email, inviter_email)
-            
+            validation = await self.validate_email_before_invitation(
+                email, inviter_email
+            )
+
             if not validation["can_invite"]:
                 return {
                     "success": False,
@@ -553,25 +654,34 @@ class SupabaseInvitationService:
                     "status": "skipped",
                     "reason": validation["reason"],
                     "message": validation["message"],
-                    "details": validation.get("details", {})
+                    "details": validation.get("details", {}),
                 }
-            
+
             # Déterminer si c'est un renvoi
             is_resend = validation.get("is_resend", False)
         else:
             is_resend = False
-        
+
         # Si validation OK ou force=True, envoyer l'invitation
-        return await self.send_invitation(email, inviter_name, inviter_email, personal_message, language, is_resend)
-    
-    async def log_invitation(self, email: str, inviter_email: str, inviter_name: str, 
-                           personal_message: str, language: str, is_resend: bool = False):
+        return await self.send_invitation(
+            email, inviter_name, inviter_email, personal_message, language, is_resend
+        )
+
+    async def log_invitation(
+        self,
+        email: str,
+        inviter_email: str,
+        inviter_name: str,
+        personal_message: str,
+        language: str,
+        is_resend: bool = False,
+    ):
         """Enregistre l'invitation dans une table de tracking"""
         try:
             # Si c'est un renvoi, marquer l'ancienne invitation comme superseded
             if is_resend:
                 await self.mark_previous_invitations_superseded(email, inviter_email)
-            
+
             # Données à insérer
             invitation_data = {
                 "email": email,
@@ -581,153 +691,244 @@ class SupabaseInvitationService:
                 "language": language,
                 "status": "pending",
                 "invited_at": datetime.now().isoformat(),
-                "is_resend": is_resend
+                "is_resend": is_resend,
             }
-            
+
             # Insertion avec gestion d'erreur détaillée
-            result = self.anon_client.table("invitations").insert(invitation_data).execute()
-            
+            result = (
+                self.anon_client.table("invitations").insert(invitation_data).execute()
+            )
+
             action_type = "renvoi" if is_resend else "nouvelle invitation"
             logger.info(f"{action_type.capitalize()} loggée avec succès: {email}")
             return result.data[0] if result.data else None
-            
+
         except Exception as e:
             logger.error(f"Erreur enregistrement invitation: {email} - {str(e)}")
             if "404" in str(e) or "not found" in str(e).lower():
-                logger.error("Table 'invitations' n'existe pas. Créez-la avec le script SQL fourni.")
+                logger.error(
+                    "Table 'invitations' n'existe pas. Créez-la avec le script SQL fourni."
+                )
             return None
-    
-    async def mark_previous_invitations_superseded(self, email: str, inviter_email: str):
+
+    async def mark_previous_invitations_superseded(
+        self, email: str, inviter_email: str
+    ):
         """Marque les invitations précédentes comme superseded"""
         try:
-            result = self.anon_client.table("invitations").update({
-                "status": "superseded",
-                "superseded_at": datetime.now().isoformat()
-            }).eq("email", email).eq("inviter_email", inviter_email).eq("status", "pending").execute()
-            
+            result = (
+                self.anon_client.table("invitations")
+                .update(
+                    {
+                        "status": "superseded",
+                        "superseded_at": datetime.now().isoformat(),
+                    }
+                )
+                .eq("email", email)
+                .eq("inviter_email", inviter_email)
+                .eq("status", "pending")
+                .execute()
+            )
+
             if result.data:
-                logger.info(f"{len(result.data)} invitation(s) précédente(s) marquée(s) comme superseded pour {email}")
-        
+                logger.info(
+                    f"{len(result.data)} invitation(s) précédente(s) marquée(s) comme superseded pour {email}"
+                )
+
         except Exception as e:
-            logger.error(f"Erreur marquage invitations superseded pour {email}: {str(e)}")
-    
+            logger.error(
+                f"Erreur marquage invitations superseded pour {email}: {str(e)}"
+            )
+
     async def mark_invitation_accepted(self, email: str, user_id: str = None):
         """Marque une invitation comme acceptée quand l'utilisateur s'inscrit"""
         try:
-            pending_invitations = self.anon_client.table("invitations").select("*").eq("email", email).eq("status", "pending").order("invited_at", desc=True).execute()
-            
+            pending_invitations = (
+                self.anon_client.table("invitations")
+                .select("*")
+                .eq("email", email)
+                .eq("status", "pending")
+                .order("invited_at", desc=True)
+                .execute()
+            )
+
             if pending_invitations.data:
                 latest_invitation = pending_invitations.data[0]
-                
+
                 update_data = {
                     "status": "accepted",
-                    "accepted_at": datetime.now().isoformat()
+                    "accepted_at": datetime.now().isoformat(),
                 }
-                
+
                 if user_id:
                     update_data["accepted_user_id"] = user_id
-                
-                result = self.anon_client.table("invitations").update(update_data).eq("id", latest_invitation["id"]).execute()
-                
+
+                result = (
+                    self.anon_client.table("invitations")
+                    .update(update_data)
+                    .eq("id", latest_invitation["id"])
+                    .execute()
+                )
+
                 logger.info(f"Invitation marquée comme acceptée pour {email}")
                 return result.data[0] if result.data else None
             else:
                 logger.warning(f"Aucune invitation pending trouvée pour {email}")
                 return None
-                
+
         except Exception as e:
             logger.error(f"Erreur marquage invitation acceptée pour {email}: {str(e)}")
             return None
-    
+
     def get_user_by_id(self, user_id: str) -> Dict[str, Any]:
         """Récupère un utilisateur Supabase par son ID"""
         try:
             response = self.admin_client.auth.admin.get_user_by_id(user_id)
-            
+
             if response.user:
                 return {"success": True, "user": response.user}
             else:
                 return {"success": False, "error": "Utilisateur non trouvé"}
-                
+
         except Exception as e:
             logger.error(f"Erreur récupération utilisateur {user_id}: {str(e)}")
             return {"success": False, "error": str(e)}
-    
-    def update_user_by_id(self, user_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
+
+    def update_user_by_id(
+        self, user_id: str, update_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Met à jour un utilisateur Supabase par son ID"""
         try:
-            response = self.admin_client.auth.admin.update_user_by_id(user_id, update_data)
-            
+            response = self.admin_client.auth.admin.update_user_by_id(
+                user_id, update_data
+            )
+
             if response.user:
                 return {"success": True, "user": response.user}
             else:
                 return {"success": False, "error": "Échec mise à jour utilisateur"}
-                
+
         except Exception as e:
             logger.error(f"Erreur mise à jour utilisateur {user_id}: {str(e)}")
             return {"success": False, "error": str(e)}
-    
+
     async def get_invitation_stats(self, user_email: str) -> Dict[str, Any]:
         """Récupère les statistiques d'invitations d'un utilisateur"""
         try:
-            sent_invitations = self.anon_client.table("invitations").select("*").eq("inviter_email", user_email).execute()
-            
+            sent_invitations = (
+                self.anon_client.table("invitations")
+                .select("*")
+                .eq("inviter_email", user_email)
+                .execute()
+            )
+
             total_sent = len(sent_invitations.data)
-            
+
             # Statistiques par statut
-            accepted_invitations = [inv for inv in sent_invitations.data if inv.get("status") == "accepted"]
-            pending_invitations = [inv for inv in sent_invitations.data if inv.get("status") == "pending"]
-            superseded_invitations = [inv for inv in sent_invitations.data if inv.get("status") == "superseded"]
-            
+            accepted_invitations = [
+                inv for inv in sent_invitations.data if inv.get("status") == "accepted"
+            ]
+            pending_invitations = [
+                inv for inv in sent_invitations.data if inv.get("status") == "pending"
+            ]
+            superseded_invitations = [
+                inv
+                for inv in sent_invitations.data
+                if inv.get("status") == "superseded"
+            ]
+
             accepted_count = len(accepted_invitations)
             pending_count = len(pending_invitations)
             superseded_count = len(superseded_invitations)
-            
+
             # Calcul du taux d'acceptation
             effective_invitations = total_sent - superseded_count
-            acceptance_rate = (accepted_count / effective_invitations * 100) if effective_invitations > 0 else 0
-            
+            acceptance_rate = (
+                (accepted_count / effective_invitations * 100)
+                if effective_invitations > 0
+                else 0
+            )
+
             # Renvois
-            resent_count = len([inv for inv in sent_invitations.data if inv.get("is_resend", False)])
-            
+            resent_count = len(
+                [inv for inv in sent_invitations.data if inv.get("is_resend", False)]
+            )
+
             # Invitations ce mois-ci
             current_month = datetime.now().strftime("%Y-%m")
-            this_month_sent = len([inv for inv in sent_invitations.data 
-                                 if inv["invited_at"].startswith(current_month)])
-            this_month_accepted = len([inv for inv in accepted_invitations 
-                                     if inv.get("accepted_at", "").startswith(current_month)])
-            
+            this_month_sent = len(
+                [
+                    inv
+                    for inv in sent_invitations.data
+                    if inv["invited_at"].startswith(current_month)
+                ]
+            )
+            this_month_accepted = len(
+                [
+                    inv
+                    for inv in accepted_invitations
+                    if inv.get("accepted_at", "").startswith(current_month)
+                ]
+            )
+
             # Invitations cette semaine
             week_ago = (datetime.now() - timedelta(days=7)).isoformat()
-            this_week_sent = len([inv for inv in sent_invitations.data 
-                                if inv["invited_at"] >= week_ago])
-            this_week_accepted = len([inv for inv in accepted_invitations 
-                                    if inv.get("accepted_at", "") >= week_ago])
-            
+            this_week_sent = len(
+                [inv for inv in sent_invitations.data if inv["invited_at"] >= week_ago]
+            )
+            this_week_accepted = len(
+                [
+                    inv
+                    for inv in accepted_invitations
+                    if inv.get("accepted_at", "") >= week_ago
+                ]
+            )
+
             # Dernière invitation envoyée et acceptée
             last_sent = None
             last_accepted = None
-            
+
             if sent_invitations.data:
-                last_sent = max(sent_invitations.data, key=lambda x: x["invited_at"])["invited_at"]
-            
+                last_sent = max(sent_invitations.data, key=lambda x: x["invited_at"])[
+                    "invited_at"
+                ]
+
             if accepted_invitations:
-                last_accepted = max(accepted_invitations, key=lambda x: x.get("accepted_at", ""))["accepted_at"]
-            
+                last_accepted = max(
+                    accepted_invitations, key=lambda x: x.get("accepted_at", "")
+                )["accepted_at"]
+
             # Top 10 des invitations récentes avec leur statut
-            recent_invitations = sorted(sent_invitations.data, key=lambda x: x["invited_at"], reverse=True)[:10]
-            
+            recent_invitations = sorted(
+                sent_invitations.data, key=lambda x: x["invited_at"], reverse=True
+            )[:10]
+
             # Statistiques par email unique (dédoublonnage)
             unique_emails = {}
             for inv in sent_invitations.data:
                 email = inv["email"]
-                if email not in unique_emails or inv["invited_at"] > unique_emails[email]["invited_at"]:
+                if (
+                    email not in unique_emails
+                    or inv["invited_at"] > unique_emails[email]["invited_at"]
+                ):
                     unique_emails[email] = inv
-            
+
             unique_sent = len(unique_emails)
-            unique_accepted = len([inv for inv in unique_emails.values() if inv.get("status") == "accepted"])
-            unique_pending = len([inv for inv in unique_emails.values() if inv.get("status") == "pending"])
-            
+            unique_accepted = len(
+                [
+                    inv
+                    for inv in unique_emails.values()
+                    if inv.get("status") == "accepted"
+                ]
+            )
+            unique_pending = len(
+                [
+                    inv
+                    for inv in unique_emails.values()
+                    if inv.get("status") == "pending"
+                ]
+            )
+
             return {
                 "total_sent": total_sent,
                 "total_accepted": accepted_count,
@@ -737,7 +938,9 @@ class SupabaseInvitationService:
                 "unique_emails_invited": unique_sent,
                 "unique_emails_accepted": unique_accepted,
                 "unique_emails_pending": unique_pending,
-                "unique_acceptance_rate": round((unique_accepted / unique_sent * 100) if unique_sent > 0 else 0, 1),
+                "unique_acceptance_rate": round(
+                    (unique_accepted / unique_sent * 100) if unique_sent > 0 else 0, 1
+                ),
                 "resent_count": resent_count,
                 "this_month_sent": this_month_sent,
                 "this_month_accepted": this_month_accepted,
@@ -746,53 +949,69 @@ class SupabaseInvitationService:
                 "last_sent": last_sent,
                 "last_accepted": last_accepted,
                 "recent_invitations": recent_invitations,
-                "accepted_invitations": accepted_invitations[-5:] if accepted_invitations else [],
-                "min_resend_delay_hours": self.min_resend_delay_hours
+                "accepted_invitations": (
+                    accepted_invitations[-5:] if accepted_invitations else []
+                ),
+                "min_resend_delay_hours": self.min_resend_delay_hours,
             }
-            
+
         except Exception as e:
             logger.error(f"Erreur récupération stats: {e}")
             return {
-                "total_sent": 0, "total_accepted": 0, "total_pending": 0, "total_superseded": 0,
-                "acceptance_rate": 0, "unique_emails_invited": 0, "unique_emails_accepted": 0,
-                "unique_emails_pending": 0, "unique_acceptance_rate": 0, "resent_count": 0,
-                "this_month_sent": 0, "this_month_accepted": 0, "this_week_sent": 0,
-                "this_week_accepted": 0, "last_sent": None, "last_accepted": None,
-                "recent_invitations": [], "accepted_invitations": [],
-                "min_resend_delay_hours": self.min_resend_delay_hours
+                "total_sent": 0,
+                "total_accepted": 0,
+                "total_pending": 0,
+                "total_superseded": 0,
+                "acceptance_rate": 0,
+                "unique_emails_invited": 0,
+                "unique_emails_accepted": 0,
+                "unique_emails_pending": 0,
+                "unique_acceptance_rate": 0,
+                "resent_count": 0,
+                "this_month_sent": 0,
+                "this_month_accepted": 0,
+                "this_week_sent": 0,
+                "this_week_accepted": 0,
+                "last_sent": None,
+                "last_accepted": None,
+                "recent_invitations": [],
+                "accepted_invitations": [],
+                "min_resend_delay_hours": self.min_resend_delay_hours,
             }
+
 
 # ==================== ENDPOINTS ====================
 @router.post("/send", response_model=InvitationResponse)
 async def send_invitations(
-    request: InvitationRequest,
-    current_user = Depends(get_current_user)
+    request: InvitationRequest, current_user=Depends(get_current_user)
 ):
     """Envoie des invitations avec vérification d'utilisateurs existants et possibilité de renvoi"""
-    
-    logger.info(f"Demande d'invitation de {request.inviter_email} pour {len(request.emails)} destinataires")
-    
+
+    logger.info(
+        f"Demande d'invitation de {request.inviter_email} pour {len(request.emails)} destinataires"
+    )
+
     # Vérification et ajustement automatique de l'email inviteur
     if current_user.email.lower() != request.inviter_email.lower():
         request.inviter_email = current_user.email
         if not request.inviter_name or request.inviter_name == request.inviter_email:
-            request.inviter_name = current_user.name or current_user.email.split('@')[0]
-    
+            request.inviter_name = current_user.name or current_user.email.split("@")[0]
+
     # Initialiser le service Supabase
     invitation_service = SupabaseInvitationService()
-    
+
     # Compteurs et résultats détaillés
     sent_count = 0
     resent_count = 0
     skipped_count = 0
     failed_count = 0
     results = []
-    
+
     # Traiter chaque email individuellement
     for email in request.emails:
         try:
             logger.info(f"Traitement de {email}")
-            
+
             # Envoyer l'invitation avec validation
             result = await invitation_service.send_invitation_with_validation(
                 email=email,
@@ -800,9 +1019,9 @@ async def send_invitations(
                 inviter_email=request.inviter_email,
                 personal_message=request.personal_message,
                 language=request.language,
-                force=request.force_send
+                force=request.force_send,
             )
-            
+
             # Convertir le résultat en format standardisé
             invitation_result = InvitationResult(
                 email=email,
@@ -810,11 +1029,11 @@ async def send_invitations(
                 status=result.get("status", "failed"),
                 reason=result.get("reason"),
                 message=result.get("message", ""),
-                details=result.get("details", {})
+                details=result.get("details", {}),
             )
-            
+
             results.append(invitation_result)
-            
+
             # Mettre à jour les compteurs
             if result["success"]:
                 if result.get("status") == "resent":
@@ -829,42 +1048,53 @@ async def send_invitations(
             else:
                 failed_count += 1
                 logger.error(f"Échec invitation: {email}")
-                
+
         except Exception as e:
             logger.error(f"Erreur inattendue pour {email}: {str(e)}")
-            
-            results.append(InvitationResult(
-                email=email,
-                success=False,
-                status="failed",
-                reason="unexpected_error",
-                message=f"Erreur inattendue: {str(e)}",
-                details={}
-            ))
+
+            results.append(
+                InvitationResult(
+                    email=email,
+                    success=False,
+                    status="failed",
+                    reason="unexpected_error",
+                    message=f"Erreur inattendue: {str(e)}",
+                    details={},
+                )
+            )
             failed_count += 1
-    
+
     # Construire le message de résumé
     messages = []
-    
+
     if sent_count > 0:
-        messages.append(f"{sent_count} invitation{'s' if sent_count > 1 else ''} envoyée{'s' if sent_count > 1 else ''}")
-    
+        messages.append(
+            f"{sent_count} invitation{'s' if sent_count > 1 else ''} envoyée{'s' if sent_count > 1 else ''}"
+        )
+
     if resent_count > 0:
         messages.append(f"{resent_count} renvoyée{'s' if resent_count > 1 else ''}")
-    
+
     if skipped_count > 0:
         messages.append(f"{skipped_count} ignorée{'s' if skipped_count > 1 else ''}")
-    
+
     if failed_count > 0:
         messages.append(f"{failed_count} échec{'s' if failed_count > 1 else ''}")
-    
+
     summary_message = " • ".join(messages) if messages else "Aucune invitation traitée"
-    
+
     # Déterminer le succès global
-    overall_success = (sent_count + resent_count) > 0 or (sent_count == 0 and resent_count == 0 and skipped_count > 0 and failed_count == 0)
-    
-    logger.info(f"Résultat final: {sent_count} envoyées, {resent_count} renvoyées, {skipped_count} ignorées, {failed_count} échecs")
-    
+    overall_success = (sent_count + resent_count) > 0 or (
+        sent_count == 0
+        and resent_count == 0
+        and skipped_count > 0
+        and failed_count == 0
+    )
+
+    logger.info(
+        f"Résultat final: {sent_count} envoyées, {resent_count} renvoyées, {skipped_count} ignorées, {failed_count} échecs"
+    )
+
     return InvitationResponse(
         success=overall_success,
         sent_count=sent_count,
@@ -872,62 +1102,61 @@ async def send_invitations(
         skipped_count=skipped_count,
         failed_count=failed_count,
         message=summary_message,
-        results=results
+        results=results,
     )
+
 
 @router.post("/mark-accepted")
 async def mark_invitation_accepted(
     email: EmailStr,
     user_id: Optional[str] = None,
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     """Marque une invitation comme acceptée"""
-    
+
     logger.info(f"Marquage acceptation pour {email}")
-    
+
     invitation_service = SupabaseInvitationService()
     result = await invitation_service.mark_invitation_accepted(email, user_id)
-    
+
     if result:
         return {
             "success": True,
             "message": f"Invitation marquée comme acceptée pour {email}",
-            "invitation": result
+            "invitation": result,
         }
     else:
         return {
             "success": False,
-            "message": f"Aucune invitation pending trouvée pour {email}"
+            "message": f"Aucune invitation pending trouvée pour {email}",
         }
 
+
 @router.get("/stats/detailed")
-async def get_detailed_stats(
-    current_user = Depends(get_current_user)
-):
+async def get_detailed_stats(current_user=Depends(get_current_user)):
     """Obtient des statistiques détaillées incluant les acceptations"""
     logger.info(f"Demande stats détaillées pour {current_user.email}")
-    
+
     invitation_service = SupabaseInvitationService()
     stats = await invitation_service.get_invitation_stats(current_user.email)
-    
+
     return {
         "user_email": current_user.email,
         "user_name": current_user.name,
         "supabase_enabled": True,
         "max_per_batch": 10,
-        **stats
+        **stats,
     }
 
+
 @router.get("/stats/summary")
-async def get_stats_summary(
-    current_user = Depends(get_current_user)
-):
+async def get_stats_summary(current_user=Depends(get_current_user)):
     """Obtient un résumé des statistiques d'invitations"""
     logger.info(f"Demande résumé stats pour {current_user.email}")
-    
+
     invitation_service = SupabaseInvitationService()
     stats = await invitation_service.get_invitation_stats(current_user.email)
-    
+
     return {
         "user_email": current_user.email,
         "total_invitations_sent": stats["total_sent"],
@@ -939,20 +1168,19 @@ async def get_stats_summary(
         "this_month_sent": stats["this_month_sent"],
         "this_month_accepted": stats["this_month_accepted"],
         "this_week_sent": stats["this_week_sent"],
-        "this_week_accepted": stats["this_week_accepted"]
+        "this_week_accepted": stats["this_week_accepted"],
     }
 
+
 @router.get("/stats/global")
-async def get_global_stats(
-    current_user = Depends(get_current_user)
-):
+async def get_global_stats(current_user=Depends(get_current_user)):
     """Obtient les statistiques globales de la plateforme"""
-    
+
     try:
         client = get_supabase_anon_client()
-        
+
         all_invitations = client.table("invitations").select("*").execute()
-        
+
         if not all_invitations.data:
             return {
                 "total_invitations": 0,
@@ -960,25 +1188,32 @@ async def get_global_stats(
                 "total_pending": 0,
                 "global_acceptance_rate": 0,
                 "active_inviters": 0,
-                "top_inviters": []
+                "top_inviters": [],
             }
-        
+
         total_invitations = len(all_invitations.data)
-        accepted_count = len([inv for inv in all_invitations.data if inv.get("status") == "accepted"])
-        pending_count = len([inv for inv in all_invitations.data if inv.get("status") == "pending"])
-        
-        global_acceptance_rate = (accepted_count / total_invitations * 100) if total_invitations > 0 else 0
-        
+        accepted_count = len(
+            [inv for inv in all_invitations.data if inv.get("status") == "accepted"]
+        )
+        pending_count = len(
+            [inv for inv in all_invitations.data if inv.get("status") == "pending"]
+        )
+
+        global_acceptance_rate = (
+            (accepted_count / total_invitations * 100) if total_invitations > 0 else 0
+        )
+
         # Top des inviteurs
         from collections import defaultdict
+
         inviter_stats = defaultdict(lambda: {"sent": 0, "accepted": 0})
-        
+
         for inv in all_invitations.data:
             inviter_email = inv["inviter_email"]
             inviter_stats[inviter_email]["sent"] += 1
             if inv.get("status") == "accepted":
                 inviter_stats[inviter_email]["accepted"] += 1
-        
+
         # Tri par nombre d'acceptations
         top_inviters = sorted(
             [
@@ -986,96 +1221,110 @@ async def get_global_stats(
                     "inviter_email": email,
                     "invitations_sent": stats["sent"],
                     "invitations_accepted": stats["accepted"],
-                    "acceptance_rate": round((stats["accepted"] / stats["sent"] * 100) if stats["sent"] > 0 else 0, 1)
+                    "acceptance_rate": round(
+                        (
+                            (stats["accepted"] / stats["sent"] * 100)
+                            if stats["sent"] > 0
+                            else 0
+                        ),
+                        1,
+                    ),
                 }
                 for email, stats in inviter_stats.items()
             ],
             key=lambda x: x["invitations_accepted"],
-            reverse=True
+            reverse=True,
         )[:10]
-        
+
         active_inviters = len(inviter_stats)
-        
+
         return {
             "total_invitations": total_invitations,
             "total_accepted": accepted_count,
             "total_pending": pending_count,
             "global_acceptance_rate": round(global_acceptance_rate, 1),
             "active_inviters": active_inviters,
-            "top_inviters": top_inviters
+            "top_inviters": top_inviters,
         }
-        
+
     except Exception as e:
         logger.error(f"Erreur récupération stats globales: {e}")
-        raise HTTPException(status_code=500, detail="Erreur récupération statistiques globales")
+        raise HTTPException(
+            status_code=500, detail="Erreur récupération statistiques globales"
+        )
+
 
 @router.post("/validate")
 async def validate_invitations(
-    emails: List[EmailStr],
-    current_user = Depends(get_current_user)
+    emails: List[EmailStr], current_user=Depends(get_current_user)
 ):
     """Valide une liste d'emails avant envoi d'invitations"""
-    
+
     logger.info(f"Validation de {len(emails)} emails par {current_user.email}")
-    
+
     invitation_service = SupabaseInvitationService()
     validations = []
-    
+
     for email in emails:
-        validation = await invitation_service.validate_email_before_invitation(email, current_user.email)
-        validations.append({
-            "email": email,
-            "can_invite": validation["can_invite"],
-            "reason": validation["reason"],
-            "message": validation["message"],
-            "is_resend": validation.get("is_resend", False),
-            "details": validation.get("details", {})
-        })
-    
+        validation = await invitation_service.validate_email_before_invitation(
+            email, current_user.email
+        )
+        validations.append(
+            {
+                "email": email,
+                "can_invite": validation["can_invite"],
+                "reason": validation["reason"],
+                "message": validation["message"],
+                "is_resend": validation.get("is_resend", False),
+                "details": validation.get("details", {}),
+            }
+        )
+
     # Statistiques
     can_invite_count = sum(1 for v in validations if v["can_invite"])
     cannot_invite_count = len(validations) - can_invite_count
     can_resend_count = sum(1 for v in validations if v.get("is_resend", False))
-    
+
     return {
         "total_emails": len(emails),
         "can_invite": can_invite_count,
         "cannot_invite": cannot_invite_count,
         "can_resend": can_resend_count,
         "min_resend_delay_hours": invitation_service.min_resend_delay_hours,
-        "validations": validations
+        "validations": validations,
     }
 
+
 @router.get("/stats")
-async def get_invitation_stats(
-    current_user = Depends(get_current_user)
-):
+async def get_invitation_stats(current_user=Depends(get_current_user)):
     """Obtient les statistiques d'invitations de l'utilisateur (endpoint de compatibilité)"""
     return await get_stats_summary(current_user)
 
+
 @router.get("/status")
-async def get_invitations_status(
-    current_user = Depends(get_current_user)
-):
+async def get_invitations_status(current_user=Depends(get_current_user)):
     """Récupère le statut des invitations envoyées"""
     try:
         client = get_supabase_anon_client()
-        
-        invitations = client.table("invitations").select("*").eq("inviter_email", current_user.email).order("invited_at", desc=True).limit(20).execute()
-        
-        return {
-            "invitations": invitations.data,
-            "total_count": len(invitations.data)
-        }
-        
+
+        invitations = (
+            client.table("invitations")
+            .select("*")
+            .eq("inviter_email", current_user.email)
+            .order("invited_at", desc=True)
+            .limit(20)
+            .execute()
+        )
+
+        return {"invitations": invitations.data, "total_count": len(invitations.data)}
+
     except Exception as e:
         logger.error(f"Erreur récupération statut invitations: {e}")
         return {"invitations": [], "total_count": 0}
 
+
 @router.get("/debug/auth")
-async def debug_auth(
-    current_user = Depends(get_current_user)
-):
+async def debug_auth(current_user=Depends(get_current_user)):
     """Debug endpoint pour vérifier l'authentification et Supabase"""
     return {
         "authenticated": True,
@@ -1087,20 +1336,19 @@ async def debug_auth(
         "service_role_configured": bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY")),
         "frontend_url": os.getenv("FRONTEND_URL"),
         "min_resend_delay_hours": int(os.getenv("MIN_RESEND_DELAY_HOURS", "24")),
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
 
+
 @router.get("/stats/global-enhanced")
-async def get_enhanced_global_stats(
-    current_user = Depends(get_current_user)
-):
+async def get_enhanced_global_stats(current_user=Depends(get_current_user)):
     """Obtient les statistiques globales enrichies avec top inviters par acceptations"""
-    
+
     try:
         client = get_supabase_anon_client()
-        
+
         all_invitations = client.table("invitations").select("*").execute()
-        
+
         if not all_invitations.data:
             return {
                 "total_invitations": 0,
@@ -1110,38 +1358,53 @@ async def get_enhanced_global_stats(
                 "active_inviters": 0,
                 "unique_inviters": 0,
                 "top_inviters_by_sent": [],
-                "top_inviters_by_accepted": []
+                "top_inviters_by_accepted": [],
             }
-        
+
         total_invitations = len(all_invitations.data)
-        accepted_count = len([inv for inv in all_invitations.data if inv.get("status") == "accepted"])
-        pending_count = len([inv for inv in all_invitations.data if inv.get("status") == "pending"])
-        
-        global_acceptance_rate = (accepted_count / total_invitations * 100) if total_invitations > 0 else 0
-        
+        accepted_count = len(
+            [inv for inv in all_invitations.data if inv.get("status") == "accepted"]
+        )
+        pending_count = len(
+            [inv for inv in all_invitations.data if inv.get("status") == "pending"]
+        )
+
+        global_acceptance_rate = (
+            (accepted_count / total_invitations * 100) if total_invitations > 0 else 0
+        )
+
         # Statistiques par inviteur
         from collections import defaultdict
-        inviter_stats = defaultdict(lambda: {
-            "sent": 0, 
-            "accepted": 0, 
-            "pending": 0,
-            "inviter_name": "",
-            "latest_invitation": None
-        })
-        
+
+        inviter_stats = defaultdict(
+            lambda: {
+                "sent": 0,
+                "accepted": 0,
+                "pending": 0,
+                "inviter_name": "",
+                "latest_invitation": None,
+            }
+        )
+
         for inv in all_invitations.data:
             inviter_email = inv["inviter_email"]
             inviter_stats[inviter_email]["sent"] += 1
-            inviter_stats[inviter_email]["inviter_name"] = inv.get("inviter_name", inviter_email.split('@')[0])
-            
+            inviter_stats[inviter_email]["inviter_name"] = inv.get(
+                "inviter_name", inviter_email.split("@")[0]
+            )
+
             if inv.get("status") == "accepted":
                 inviter_stats[inviter_email]["accepted"] += 1
             elif inv.get("status") == "pending":
                 inviter_stats[inviter_email]["pending"] += 1
-            
-            if not inviter_stats[inviter_email]["latest_invitation"] or inv["invited_at"] > inviter_stats[inviter_email]["latest_invitation"]["invited_at"]:
+
+            if (
+                not inviter_stats[inviter_email]["latest_invitation"]
+                or inv["invited_at"]
+                > inviter_stats[inviter_email]["latest_invitation"]["invited_at"]
+            ):
                 inviter_stats[inviter_email]["latest_invitation"] = inv
-        
+
         # Top inviters par nombre d'invitations envoyées
         top_inviters_by_sent = sorted(
             [
@@ -1151,14 +1414,21 @@ async def get_enhanced_global_stats(
                     "invitations_sent": stats["sent"],
                     "invitations_accepted": stats["accepted"],
                     "invitations_pending": stats["pending"],
-                    "acceptance_rate": round((stats["accepted"] / stats["sent"] * 100) if stats["sent"] > 0 else 0, 1)
+                    "acceptance_rate": round(
+                        (
+                            (stats["accepted"] / stats["sent"] * 100)
+                            if stats["sent"] > 0
+                            else 0
+                        ),
+                        1,
+                    ),
                 }
                 for email, stats in inviter_stats.items()
             ],
             key=lambda x: x["invitations_sent"],
-            reverse=True
+            reverse=True,
         )[:10]
-        
+
         # Top inviters par nombre d'invitations acceptées
         top_inviters_by_accepted = sorted(
             [
@@ -1168,30 +1438,57 @@ async def get_enhanced_global_stats(
                     "invitations_sent": stats["sent"],
                     "invitations_accepted": stats["accepted"],
                     "invitations_pending": stats["pending"],
-                    "acceptance_rate": round((stats["accepted"] / stats["sent"] * 100) if stats["sent"] > 0 else 0, 1)
+                    "acceptance_rate": round(
+                        (
+                            (stats["accepted"] / stats["sent"] * 100)
+                            if stats["sent"] > 0
+                            else 0
+                        ),
+                        1,
+                    ),
                 }
                 for email, stats in inviter_stats.items()
                 if stats["accepted"] > 0
             ],
             key=lambda x: x["invitations_accepted"],
-            reverse=True
+            reverse=True,
         )[:10]
-        
+
         active_inviters = len(inviter_stats)
         unique_inviters = len(set(inv["inviter_email"] for inv in all_invitations.data))
-        
+
         # Statistiques temporelles
         now = datetime.now()
         week_ago = (now - timedelta(days=7)).isoformat()
         month_ago = (now - timedelta(days=30)).isoformat()
-        
-        invitations_this_week = len([inv for inv in all_invitations.data if inv["invited_at"] >= week_ago])
-        invitations_this_month = len([inv for inv in all_invitations.data if inv["invited_at"] >= month_ago])
-        accepted_this_week = len([inv for inv in all_invitations.data if inv.get("status") == "accepted" and inv.get("accepted_at", "") >= week_ago])
-        accepted_this_month = len([inv for inv in all_invitations.data if inv.get("status") == "accepted" and inv.get("accepted_at", "") >= month_ago])
-        
-        logger.info(f"Statistiques globales enrichies calculées: {total_invitations} invitations, {accepted_count} acceptées, {active_inviters} inviteurs")
-        
+
+        invitations_this_week = len(
+            [inv for inv in all_invitations.data if inv["invited_at"] >= week_ago]
+        )
+        invitations_this_month = len(
+            [inv for inv in all_invitations.data if inv["invited_at"] >= month_ago]
+        )
+        accepted_this_week = len(
+            [
+                inv
+                for inv in all_invitations.data
+                if inv.get("status") == "accepted"
+                and inv.get("accepted_at", "") >= week_ago
+            ]
+        )
+        accepted_this_month = len(
+            [
+                inv
+                for inv in all_invitations.data
+                if inv.get("status") == "accepted"
+                and inv.get("accepted_at", "") >= month_ago
+            ]
+        )
+
+        logger.info(
+            f"Statistiques globales enrichies calculées: {total_invitations} invitations, {accepted_count} acceptées, {active_inviters} inviteurs"
+        )
+
         return {
             "total_invitations": total_invitations,
             "total_accepted": accepted_count,
@@ -1204,88 +1501,112 @@ async def get_enhanced_global_stats(
             "this_week": {
                 "invitations_sent": invitations_this_week,
                 "invitations_accepted": accepted_this_week,
-                "acceptance_rate": round((accepted_this_week / invitations_this_week * 100) if invitations_this_week > 0 else 0, 1)
+                "acceptance_rate": round(
+                    (
+                        (accepted_this_week / invitations_this_week * 100)
+                        if invitations_this_week > 0
+                        else 0
+                    ),
+                    1,
+                ),
             },
             "this_month": {
                 "invitations_sent": invitations_this_month,
                 "invitations_accepted": accepted_this_month,
-                "acceptance_rate": round((accepted_this_month / invitations_this_month * 100) if invitations_this_month > 0 else 0, 1)
+                "acceptance_rate": round(
+                    (
+                        (accepted_this_month / invitations_this_month * 100)
+                        if invitations_this_month > 0
+                        else 0
+                    ),
+                    1,
+                ),
             },
             "generated_at": datetime.now().isoformat(),
             "data_source": "supabase",
-            "calculation_method": "real_time"
+            "calculation_method": "real_time",
         }
-        
+
     except Exception as e:
         logger.error(f"Erreur récupération stats globales enrichies: {e}")
-        raise HTTPException(status_code=500, detail="Erreur récupération statistiques globales enrichies")
+        raise HTTPException(
+            status_code=500,
+            detail="Erreur récupération statistiques globales enrichies",
+        )
+
 
 @router.get("/stats/summary-all")
 async def get_all_invitation_summary():
     """Résumé rapide des invitations (endpoint public pour les stats générales)"""
     try:
         client = get_supabase_anon_client()
-        
-        invitations = client.table("invitations").select("status,invited_at,accepted_at").execute()
-        
+
+        invitations = (
+            client.table("invitations")
+            .select("status,invited_at,accepted_at")
+            .execute()
+        )
+
         if not invitations.data:
-            return {
-                "total": 0,
-                "accepted": 0,
-                "pending": 0,
-                "acceptance_rate": 0
-            }
-        
+            return {"total": 0, "accepted": 0, "pending": 0, "acceptance_rate": 0}
+
         total = len(invitations.data)
-        accepted = len([inv for inv in invitations.data if inv.get("status") == "accepted"])
-        pending = len([inv for inv in invitations.data if inv.get("status") == "pending"])
-        
+        accepted = len(
+            [inv for inv in invitations.data if inv.get("status") == "accepted"]
+        )
+        pending = len(
+            [inv for inv in invitations.data if inv.get("status") == "pending"]
+        )
+
         return {
             "total": total,
             "accepted": accepted,
             "pending": pending,
-            "acceptance_rate": round((accepted / total * 100) if total > 0 else 0, 1)
+            "acceptance_rate": round((accepted / total * 100) if total > 0 else 0, 1),
         }
-        
+
     except Exception as e:
         logger.error(f"Erreur résumé invitations: {e}")
-        return {
-            "total": 0,
-            "accepted": 0,
-            "pending": 0,
-            "acceptance_rate": 0
-        }
+        return {"total": 0, "accepted": 0, "pending": 0, "acceptance_rate": 0}
+
 
 @router.get("/stats/leaderboard")
 async def get_invitation_leaderboard(
     limit: int = 10,
     sort_by: str = "sent",  # "sent" ou "accepted"
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     """Obtient le leaderboard des inviteurs"""
-    
+
     if sort_by not in ["sent", "accepted"]:
-        raise HTTPException(status_code=400, detail="sort_by doit être 'sent' ou 'accepted'")
-    
+        raise HTTPException(
+            status_code=400, detail="sort_by doit être 'sent' ou 'accepted'"
+        )
+
     try:
         client = get_supabase_anon_client()
-        
-        invitations = client.table("invitations").select("inviter_email,inviter_name,status").execute()
-        
+
+        invitations = (
+            client.table("invitations")
+            .select("inviter_email,inviter_name,status")
+            .execute()
+        )
+
         if not invitations.data:
             return {"leaderboard": [], "total_inviters": 0}
-        
+
         # Grouper par inviteur
         from collections import defaultdict
+
         inviter_stats = defaultdict(lambda: {"sent": 0, "accepted": 0, "name": ""})
-        
+
         for inv in invitations.data:
             email = inv["inviter_email"]
             inviter_stats[email]["sent"] += 1
-            inviter_stats[email]["name"] = inv.get("inviter_name", email.split('@')[0])
+            inviter_stats[email]["name"] = inv.get("inviter_name", email.split("@")[0])
             if inv.get("status") == "accepted":
                 inviter_stats[email]["accepted"] += 1
-        
+
         # Trier selon le critère demandé
         sort_key = "sent" if sort_by == "sent" else "accepted"
         leaderboard = sorted(
@@ -1295,21 +1616,28 @@ async def get_invitation_leaderboard(
                     "inviter_name": stats["name"],
                     "invitations_sent": stats["sent"],
                     "invitations_accepted": stats["accepted"],
-                    "acceptance_rate": round((stats["accepted"] / stats["sent"] * 100) if stats["sent"] > 0 else 0, 1)
+                    "acceptance_rate": round(
+                        (
+                            (stats["accepted"] / stats["sent"] * 100)
+                            if stats["sent"] > 0
+                            else 0
+                        ),
+                        1,
+                    ),
                 }
                 for email, stats in inviter_stats.items()
             ],
             key=lambda x: x[f"invitations_{sort_key}"],
-            reverse=True
+            reverse=True,
         )[:limit]
-        
+
         return {
             "leaderboard": leaderboard,
             "total_inviters": len(inviter_stats),
             "sorted_by": sort_by,
-            "limit": limit
+            "limit": limit,
         }
-        
+
     except Exception as e:
         logger.error(f"Erreur leaderboard invitations: {e}")
         raise HTTPException(status_code=500, detail="Erreur récupération leaderboard")

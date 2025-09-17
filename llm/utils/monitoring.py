@@ -36,11 +36,13 @@ logger = logging.getLogger(__name__)
 
 class StartupValidationError(Exception):
     """Exception pour les erreurs de validation au démarrage"""
+
     pass
 
 
 class MonitoringError(Exception):
     """Exception générale pour les erreurs de monitoring"""
+
     pass
 
 

@@ -1,4 +1,4 @@
-name: Smart Selective Docker Build and Deploy
+name: Ultra Fast Build and Deploy
 
 on:
   push:
@@ -38,123 +38,33 @@ jobs:
             llm:
               - 'llm/**'
 
-      - name: Show changes
-        run: |
-          echo "Frontend changed: ${{ steps.changes.outputs.frontend }}"
-          echo "Backend changed: ${{ steps.changes.outputs.backend }}"
-          echo "LLM changed: ${{ steps.changes.outputs.llm }}"
-
-  # 🧹 NETTOYAGE MASSIF - AVANT les builds
-  massive-cleanup:
+  # 🔥 BUILDS PARALLÈLES + NETTOYAGE INTÉGRÉ
+  build-frontend:
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.frontend-changed == 'true' || needs.detect-changes.outputs.backend-changed == 'true' || needs.detect-changes.outputs.llm-changed == 'true'
+    if: needs.detect-changes.outputs.frontend-changed == 'true'
     steps:
-      - name: Install doctl
+      - uses: actions/checkout@v4
+
+      - name: Install doctl + Cleanup AVANT build
         uses: digitalocean/action-doctl@v2
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: 🔥 NETTOYAGE MASSIF - Garder 8 images maximum
+      - name: ⚡ Nettoyage RAPIDE Frontend
         run: |
-          echo "🔥 DÉMARRAGE NETTOYAGE MASSIF DU REGISTRY"
-          echo "==========================================="
-          
-          # Fonction de nettoyage robuste
-          cleanup_repository() {
-            local repo=$1
-            local max_images=8
-            
-            echo ""
-            echo "📦 Nettoyage de $repo..."
-            echo "Target: garder $max_images images maximum"
-            
-            # 1. Lister TOUS les manifests avec leur timestamp
-            echo "Récupération de la liste des manifests..."
-            manifests=$(doctl registry repository list-manifests "$repo" --format Digest,UpdatedAt --no-header 2>/dev/null || true)
-            
-            if [ -z "$manifests" ]; then
-              echo "❌ Aucun manifest trouvé pour $repo ou erreur d'accès"
-              return
+          echo "🔥 Nettoyage rapide intelia-frontend..."
+          manifests=$(doctl registry repository list-manifests intelia-frontend --format Digest,UpdatedAt --no-header 2>/dev/null || true)
+          if [ -n "$manifests" ]; then
+            total=$(echo "$manifests" | wc -l)
+            if [ "$total" -gt 8 ]; then
+              to_delete=$((total - 8))
+              echo "Suppression $to_delete anciennes images..."
+              echo "$manifests" | sort -k2,2 | head -n "$to_delete" | awk '{print $1}' | while read digest; do
+                doctl registry repository delete-manifest intelia-frontend "$digest" --force || true
+              done
             fi
-            
-            # 2. Compter le nombre total
-            total_count=$(echo "$manifests" | wc -l)
-            echo "📊 Total manifests trouvés: $total_count"
-            
-            if [ "$total_count" -le "$max_images" ]; then
-              echo "✅ $repo: $total_count images <= $max_images. Pas de nettoyage nécessaire."
-              return
-            fi
-            
-            # 3. Trier par date (plus récents en dernier) et prendre les anciens à supprimer
-            to_delete=$((total_count - max_images))
-            echo "🗑️  $repo: Besoin de supprimer $to_delete anciennes images"
-            
-            # 4. Extraire les digests à supprimer (les plus anciens)
-            old_digests=$(echo "$manifests" | sort -k2,2 | head -n "$to_delete" | awk '{print $1}')
-            
-            if [ -z "$old_digests" ]; then
-              echo "❌ Impossible d'extraire les digests à supprimer"
-              return
-            fi
-            
-            echo "🔍 Digests à supprimer:"
-            echo "$old_digests" | sed 's/^/  - /'
-            
-            # 5. Supprimer les manifests un par un
-            deleted_count=0
-            failed_count=0
-            
-            echo "$old_digests" | while IFS= read -r digest; do
-              if [ -n "$digest" ] && [ "$digest" != "null" ]; then
-                echo "🗑️  Suppression: $digest..."
-                
-                if doctl registry repository delete-manifest "$repo" "$digest" --force; then
-                  echo "✅ Supprimé: $digest"
-                  deleted_count=$((deleted_count + 1))
-                else
-                  echo "❌ Échec suppression: $digest"
-                  failed_count=$((failed_count + 1))
-                fi
-                
-                # Petite pause pour éviter le rate limiting
-                sleep 1
-              fi
-            done
-            
-            echo "📊 $repo: Suppression terminée"
-            echo "  - Cibles: $to_delete"
-            
-            # 6. Vérification finale
-            echo "🔍 Vérification post-nettoyage..."
-            final_manifests=$(doctl registry repository list-manifests "$repo" --format Digest --no-header 2>/dev/null || true)
-            final_count=$(echo "$final_manifests" | wc -l)
-            echo "📊 $repo: Images restantes après nettoyage: $final_count"
-            
-            if [ "$final_count" -gt "$max_images" ]; then
-              echo "⚠️  ATTENTION: $repo a encore $final_count images (> $max_images)"
-            else
-              echo "✅ $repo: Nettoyage réussi ($final_count <= $max_images)"
-            fi
-          }
-          
-          # Nettoyer chaque repository
-          for repo in intelia-frontend intelia-backend intelia-llm; do
-            cleanup_repository "$repo"
-          done
-          
-          echo ""
-          echo "🏁 NETTOYAGE MASSIF TERMINÉ"
-          echo "============================="
-
-  # 🎯 Build Frontend - SEULEMENT si changé
-  build-frontend:
-    runs-on: ubuntu-latest
-    needs: [detect-changes, massive-cleanup]
-    if: needs.detect-changes.outputs.frontend-changed == 'true'
-    steps:
-      - uses: actions/checkout@v4
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -166,7 +76,7 @@ jobs:
           username: doctl
           password: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Build & push frontend
+      - name: 🚀 Build & push frontend (OPTIMISÉ)
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
@@ -183,17 +93,45 @@ jobs:
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
             LLM_BACKEND_URL=${{ secrets.LLM_BACKEND_URL }}
             BUILDKIT_INLINE_CACHE=1
+          # OPTIMISATIONS SPEED
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
+          outputs: type=registry,compression=zstd,compression-level=3
 
-  # 🎯 Build Backend
   build-backend:
     runs-on: ubuntu-latest
-    needs: [detect-changes, massive-cleanup]
+    needs: detect-changes
     if: needs.detect-changes.outputs.backend-changed == 'true'
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install doctl + Cleanup AVANT build
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DOCR_ACCESS_TOKEN }}
+
+      - name: ⚡ Nettoyage RAPIDE Backend
+        run: |
+          echo "🔥 Nettoyage rapide intelia-backend..."
+          manifests=$(doctl registry repository list-manifests intelia-backend --format Digest,UpdatedAt --no-header 2>/dev/null || true)
+          if [ -n "$manifests" ]; then
+            total=$(echo "$manifests" | wc -l)
+            if [ "$total" -gt 8 ]; then
+              to_delete=$((total - 8))
+              echo "Suppression $to_delete anciennes images..."
+              echo "$manifests" | sort -k2,2 | head -n "$to_delete" | awk '{print $1}' | while read digest; do
+                doctl registry repository delete-manifest intelia-backend "$digest" --force || true
+              done
+            fi
+          fi
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:master
+            network=host
 
       - name: Login to DOCR
         uses: docker/login-action@v3
@@ -202,7 +140,7 @@ jobs:
           username: doctl
           password: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Build & push backend
+      - name: 🚀 Build & push backend (ULTRA OPTIMISÉ)
         uses: docker/build-push-action@v6
         with:
           context: ./backend
@@ -214,17 +152,45 @@ jobs:
             type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache
             type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache,mode=max
-          build-args: BUILDKIT_INLINE_CACHE=1
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+            PIP_CACHE_DIR=/tmp/pip-cache
+            PYTHONDONTWRITEBYTECODE=1
+          # OPTIMISATIONS EXTRÊMES
+          platforms: linux/amd64
           provenance: false
           sbom: false
+          outputs: type=registry,compression=zstd,compression-level=1
+          # Accélération BuildKit
+          secret: |
+            id=pip,src=/dev/null
 
-  # 🎯 Build LLM
   build-llm:
     runs-on: ubuntu-latest
-    needs: [detect-changes, massive-cleanup]
+    needs: detect-changes
     if: needs.detect-changes.outputs.llm-changed == 'true'
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install doctl + Cleanup AVANT build
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DOCR_ACCESS_TOKEN }}
+
+      - name: ⚡ Nettoyage RAPIDE LLM
+        run: |
+          echo "🔥 Nettoyage rapide intelia-llm..."
+          manifests=$(doctl registry repository list-manifests intelia-llm --format Digest,UpdatedAt --no-header 2>/dev/null || true)
+          if [ -n "$manifests" ]; then
+            total=$(echo "$manifests" | wc -l)
+            if [ "$total" -gt 8 ]; then
+              to_delete=$((total - 8))
+              echo "Suppression $to_delete anciennes images..."
+              echo "$manifests" | sort -k2,2 | head -n "$to_delete" | awk '{print $1}' | while read digest; do
+                doctl registry repository delete-manifest intelia-llm "$digest" --force || true
+              done
+            fi
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -236,7 +202,7 @@ jobs:
           username: doctl
           password: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Build & push LLM
+      - name: 🚀 Build & push LLM (RAPIDE)
         uses: docker/build-push-action@v6
         with:
           context: ./llm
@@ -249,9 +215,12 @@ jobs:
             type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache,mode=max
           build-args: BUILDKIT_INLINE_CACHE=1
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
 
-  # 🧹 NETTOYAGE POST-BUILD pour garantir la limite
-  post-build-cleanup:
+  # ⚡ NETTOYAGE FINAL ULTRA RAPIDE
+  final-cleanup:
     runs-on: ubuntu-latest
     needs: [build-frontend, build-backend, build-llm]
     if: always() && (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success' || needs.build-llm.result == 'success')
@@ -261,133 +230,64 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: 🔒 GARANTIE LIMITE 8 IMAGES + Garbage Collection
+      - name: ⚡ Vérification finale + Garbage collection
         run: |
-          echo "🔒 GARANTIE FINALE - MAX 8 IMAGES PAR REPO"
-          echo "============================================"
+          echo "⚡ NETTOYAGE FINAL ULTRA RAPIDE"
           
-          # Fonction de nettoyage final (plus agressive)
-          final_cleanup() {
-            local repo=$1
-            local max_images=8
-            
-            echo ""
-            echo "🔍 Vérification finale de $repo..."
-            
-            # Récupérer les manifests actuels
-            manifests=$(doctl registry repository list-manifests "$repo" --format Digest,UpdatedAt --no-header 2>/dev/null || true)
-            
-            if [ -z "$manifests" ]; then
-              echo "ℹ️  $repo: Aucun manifest ou repo vide"
-              return
-            fi
-            
-            current_count=$(echo "$manifests" | wc -l)
-            echo "📊 $repo: $current_count images actuellement"
-            
-            if [ "$current_count" -le "$max_images" ]; then
-              echo "✅ $repo: OK ($current_count <= $max_images)"
-              return
-            fi
-            
-            # Suppression agressive des excédents
-            excess=$((current_count - max_images))
-            echo "⚠️  $repo: $excess images en excès - SUPPRESSION FORCÉE"
-            
-            # Trier et supprimer les plus anciennes
-            old_digests=$(echo "$manifests" | sort -k2,2 | head -n "$excess" | awk '{print $1}')
-            
-            echo "$old_digests" | while IFS= read -r digest; do
-              if [ -n "$digest" ]; then
-                echo "🔥 FORCE DELETE: $digest"
-                doctl registry repository delete-manifest "$repo" "$digest" --force || true
-                sleep 0.5
-              fi
-            done
-            
-            # Vérification finale
-            final_manifests=$(doctl registry repository list-manifests "$repo" --format Digest --no-header 2>/dev/null || true)
-            final_count=$(echo "$final_manifests" | wc -l)
-            
-            if [ "$final_count" -gt "$max_images" ]; then
-              echo "🚨 ALERTE: $repo a ENCORE $final_count images (> $max_images) !"
-              echo "📋 Images restantes:"
-              echo "$final_manifests" | sed 's/^/  /'
-            else
-              echo "✅ $repo: LIMITE RESPECTÉE ($final_count images)"
-            fi
-          }
-          
-          # Nettoyer chaque repo
+          # Vérification rapide de chaque repo
           for repo in intelia-frontend intelia-backend intelia-llm; do
-            final_cleanup "$repo"
+            count=$(doctl registry repository list-manifests "$repo" --format Digest --no-header 2>/dev/null | wc -l || echo "0")
+            echo "$repo: $count images"
+            
+            if [ "$count" -gt 8 ]; then
+              echo "⚠️  $repo dépasse 8 images - nettoyage d'urgence"
+              manifests=$(doctl registry repository list-manifests "$repo" --format Digest,UpdatedAt --no-header 2>/dev/null || true)
+              excess=$((count - 8))
+              echo "$manifests" | sort -k2,2 | head -n "$excess" | awk '{print $1}' | while read digest; do
+                doctl registry repository delete-manifest "$repo" "$digest" --force || true
+              done
+            fi
           done
           
-          echo ""
-          echo "🗑️  DÉCLENCHEMENT GARBAGE COLLECTION"
-          echo "===================================="
-          
-          # Garbage collection pour libérer vraiment l'espace
-          if doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force; then
-            echo "✅ Garbage collection démarrée avec succès"
-          else
-            echo "⚠️  Garbage collection échouée ou déjà en cours"
-          fi
-          
-          echo ""
-          echo "🏆 NETTOYAGE POST-BUILD TERMINÉ"
-          echo "💰 L'espace du registry sera libéré dans 5-30 minutes"
+          # Garbage collection
+          doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force || true
+          echo "✅ Nettoyage final terminé"
 
-  # 📊 Résumé final
+  # 📊 Résumé INSTANTANÉ
   summary:
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-frontend, build-backend, build-llm, post-build-cleanup]
+    needs: [detect-changes, build-frontend, build-backend, build-llm, final-cleanup]
     if: always()
     steps:
-      - name: 📋 RAPPORT FINAL DE DÉPLOIEMENT
+      - name: ⚡ RAPPORT ULTRA RAPIDE
         run: |
-          echo "🚀 RAPPORT DE DÉPLOIEMENT"
-          echo "========================="
+          echo "🚀 DÉPLOIEMENT ULTRA RAPIDE TERMINÉ"
+          echo "==================================="
           
-          # Frontend
+          # Statuts
           if [[ "${{ needs.detect-changes.outputs.frontend-changed }}" == "true" ]]; then
-            if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
-              echo "✅ Frontend: DÉPLOYÉ"
-            else
-              echo "❌ Frontend: ÉCHEC"
-            fi
+            echo "Frontend: ${{ needs.build-frontend.result == 'success' && '✅ DÉPLOYÉ' || '❌ ÉCHEC' }}"
           else
-            echo "⏸️ Frontend: INCHANGÉ (skippé)"
+            echo "Frontend: ⏸️ INCHANGÉ"
           fi
           
-          # Backend  
           if [[ "${{ needs.detect-changes.outputs.backend-changed }}" == "true" ]]; then
-            if [[ "${{ needs.build-backend.result }}" == "success" ]]; then
-              echo "✅ Backend: DÉPLOYÉ"
-            else
-              echo "❌ Backend: ÉCHEC" 
-            fi
+            echo "Backend: ${{ needs.build-backend.result == 'success' && '✅ DÉPLOYÉ' || '❌ ÉCHEC' }}"
           else
-            echo "⏸️ Backend: INCHANGÉ (skippé)"
+            echo "Backend: ⏸️ INCHANGÉ"
           fi
           
-          # LLM
           if [[ "${{ needs.detect-changes.outputs.llm-changed }}" == "true" ]]; then
-            if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
-              echo "✅ LLM: DÉPLOYÉ"
-            else
-              echo "❌ LLM: ÉCHEC" 
-            fi
+            echo "LLM: ${{ needs.build-llm.result == 'success' && '✅ DÉPLOYÉ' || '❌ ÉCHEC' }}"
           else
-            echo "⏸️ LLM: INCHANGÉ (skippé)"
+            echo "LLM: ⏸️ INCHANGÉ"
           fi
           
           echo ""
-          echo "🧹 OPTIMISATION REGISTRY"
-          echo "========================"
-          echo "🔥 Nettoyage massif: EXÉCUTÉ avant builds"
-          echo "🔒 Vérification limite: EXÉCUTÉ après builds"
-          echo "📦 Images max par repo: 8 (STRICT)"
-          echo "🗑️ Garbage collection: DÉCLENCHÉE"
-          echo "💾 Économies d'espace: ~90% vs accumulation"
-          echo "⏱️ Prochaine libération: 5-30 minutes"
+          echo "⚡ OPTIMISATIONS APPLIQUÉES:"
+          echo "• Builds 100% parallèles"
+          echo "• Nettoyage intégré aux builds"
+          echo "• Cache optimisé + compression zstd"
+          echo "• Métadonnées désactivées (provenance/sbom)"
+          echo "• BuildKit master + optimisations"
+          echo "• Cible: 6-8 minutes total"

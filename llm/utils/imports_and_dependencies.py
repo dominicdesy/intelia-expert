@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 class DependencyStatus(Enum):
     """Statuts possibles des dépendances"""
+
     AVAILABLE = "available"
     MISSING = "missing"
     VERSION_INCOMPATIBLE = "version_incompatible"
@@ -26,6 +27,7 @@ class DependencyStatus(Enum):
 @dataclass
 class DependencyInfo:
     """Informations sur une dépendance"""
+
     name: str
     status: DependencyStatus
     version: Optional[str] = None
@@ -197,13 +199,17 @@ class DependencyManager:
                     wvc = wvc_classes
                     wvc_query = wvc_query_classes
 
-                    logger.info("Weaviate v4 avec wvc et wvc_query importés avec succès")
+                    logger.info(
+                        "Weaviate v4 avec wvc et wvc_query importés avec succès"
+                    )
 
                 except ImportError as e:
                     logger.error(f"Erreur import wvc classes: {e}")
                     wvc = None
                     wvc_query = None
-                    raise ImportError(f"Impossible d'importer les classes Weaviate v4: {e}")
+                    raise ImportError(
+                        f"Impossible d'importer les classes Weaviate v4: {e}"
+                    )
             else:
                 wvc = None
                 wvc_query = None
@@ -252,7 +258,9 @@ class DependencyManager:
         try:
             api_key = os.getenv("OPENAI_API_KEY")
             if not api_key:
-                logger.warning("OPENAI_API_KEY non trouvée dans les variables d'environnement")
+                logger.warning(
+                    "OPENAI_API_KEY non trouvée dans les variables d'environnement"
+                )
                 return
 
             from openai import OpenAI as OpenAISync, AsyncOpenAI as OpenAIAsync
@@ -273,14 +281,29 @@ class DependencyManager:
         """Charge les dépendances optionnelles - VERSION CORRIGÉE"""
         global UNIDECODE_AVAILABLE, VOYAGEAI_AVAILABLE, SENTENCE_TRANSFORMERS_AVAILABLE
         global TRANSFORMERS_AVAILABLE, LANGDETECT_AVAILABLE, LANGSMITH_AVAILABLE
-        
+
         optional_deps = {
             "voyageai": {"import_name": "voyageai", "global_var": "VOYAGEAI_AVAILABLE"},
-            "sentence_transformers": {"import_name": "sentence_transformers", "global_var": "SENTENCE_TRANSFORMERS_AVAILABLE"},
-            "unidecode": {"import_name": "unidecode", "global_var": "UNIDECODE_AVAILABLE"},
-            "transformers": {"import_name": "transformers", "global_var": "TRANSFORMERS_AVAILABLE"},
-            "langdetect": {"import_name": "langdetect", "global_var": "LANGDETECT_AVAILABLE"},
-            "langsmith": {"import_name": "langsmith", "global_var": "LANGSMITH_AVAILABLE"},
+            "sentence_transformers": {
+                "import_name": "sentence_transformers",
+                "global_var": "SENTENCE_TRANSFORMERS_AVAILABLE",
+            },
+            "unidecode": {
+                "import_name": "unidecode",
+                "global_var": "UNIDECODE_AVAILABLE",
+            },
+            "transformers": {
+                "import_name": "transformers",
+                "global_var": "TRANSFORMERS_AVAILABLE",
+            },
+            "langdetect": {
+                "import_name": "langdetect",
+                "global_var": "LANGDETECT_AVAILABLE",
+            },
+            "langsmith": {
+                "import_name": "langsmith",
+                "global_var": "LANGSMITH_AVAILABLE",
+            },
         }
 
         for dep_name, config in optional_deps.items():
@@ -297,7 +320,9 @@ class DependencyManager:
 
                 # CORRECTION: Définir les variables globales correctement
                 globals()[config["global_var"]] = True
-                logger.debug(f"Dépendance optionnelle {dep_name} disponible (v{version})")
+                logger.debug(
+                    f"Dépendance optionnelle {dep_name} disponible (v{version})"
+                )
 
             except ImportError as e:
                 self.dependencies[dep_name] = DependencyInfo(
@@ -331,14 +356,18 @@ class DependencyManager:
 
         return self._openai_async_client
 
-    async def validate_connectivity(self, redis_client=None, weaviate_client=None) -> Dict[str, bool]:
+    async def validate_connectivity(
+        self, redis_client=None, weaviate_client=None
+    ) -> Dict[str, bool]:
         """Valide la connectivité des services externes"""
         results = {"openai": False, "weaviate": False, "redis": False}
 
         # Test OpenAI
         try:
             if self._openai_async_client:
-                await asyncio.wait_for(self._openai_async_client.models.list(), timeout=5.0)
+                await asyncio.wait_for(
+                    self._openai_async_client.models.list(), timeout=5.0
+                )
                 results["openai"] = True
         except Exception as e:
             logger.warning(f"Test connectivité OpenAI échoué: {e}")
@@ -364,17 +393,24 @@ class DependencyManager:
             dep for dep in critical_deps if dep.status != DependencyStatus.AVAILABLE
         ]
 
-        optional_deps = [dep for dep in self.dependencies.values() if not dep.is_critical]
+        optional_deps = [
+            dep for dep in self.dependencies.values() if not dep.is_critical
+        ]
         optional_missing = [
-            dep.name for dep in optional_deps if dep.status != DependencyStatus.AVAILABLE
+            dep.name
+            for dep in optional_deps
+            if dep.status != DependencyStatus.AVAILABLE
         ]
 
         return {
             "total_dependencies": len(self.dependencies),
-            "available_count": len([
-                d for d in self.dependencies.values() 
-                if d.status == DependencyStatus.AVAILABLE
-            ]),
+            "available_count": len(
+                [
+                    d
+                    for d in self.dependencies.values()
+                    if d.status == DependencyStatus.AVAILABLE
+                ]
+            ),
             "critical_dependencies_ok": len(critical_missing) == 0,
             "critical_missing": [dep.name for dep in critical_missing],
             "optional_missing": optional_missing,
@@ -399,7 +435,9 @@ class DependencyManager:
 
         if critical_missing:
             missing_names = [dep.name for dep in critical_missing]
-            error_details = "\n".join([f"  - {dep.name}: {dep.error_message}" for dep in critical_missing])
+            error_details = "\n".join(
+                [f"  - {dep.name}: {dep.error_message}" for dep in critical_missing]
+            )
 
             raise RuntimeError(
                 f"Dépendances critiques manquantes: {missing_names}\n"
@@ -439,7 +477,9 @@ def get_full_status_report() -> Dict[str, Any]:
     return dependency_manager.get_status_report()
 
 
-async def quick_connectivity_check(redis_client=None, weaviate_client=None) -> Dict[str, bool]:
+async def quick_connectivity_check(
+    redis_client=None, weaviate_client=None
+) -> Dict[str, bool]:
     """Test de connectivité rapide et sécurisé"""
     weav_ok = await _test_weaviate_v4_safe(weaviate_client)
     redis_ok = await _test_redis_async_safe(redis_client)

@@ -5,10 +5,12 @@ import os
 
 router = APIRouter(prefix="/health", tags=["health"])
 
+
 class HealthResponse(BaseModel):
     status: str
     version: str
     timestamp: str
+
 
 class DetailedHealthResponse(BaseModel):
     api_status: str
@@ -19,6 +21,7 @@ class DetailedHealthResponse(BaseModel):
     rag_configured: bool
     timestamp: str
 
+
 @router.get("/", response_model=HealthResponse)
 async def health():
     """
@@ -27,8 +30,9 @@ async def health():
     return HealthResponse(
         status="running",
         version=os.getenv("API_VERSION", "1.0"),
-        timestamp=datetime.utcnow().isoformat()
+        timestamp=datetime.utcnow().isoformat(),
     )
+
 
 @router.get("/detailed", response_model=DetailedHealthResponse)
 async def detailed_health():
@@ -44,5 +48,5 @@ async def detailed_health():
         disk_space="unknown",
         openai_configured=bool(os.getenv("OPENAI_API_KEY")),
         rag_configured=bool(vector_url and vector_key and os.getenv("OPENAI_API_KEY")),
-        timestamp=datetime.utcnow().isoformat()
+        timestamp=datetime.utcnow().isoformat(),
     )

@@ -27,6 +27,7 @@ from config.config import (
 # CORRECTION: Éviter l'import circulaire - importer seulement si nécessaire
 try:
     from utils.imports_and_dependencies import UNIDECODE_AVAILABLE
+
     if UNIDECODE_AVAILABLE:
         from unidecode import unidecode
 except ImportError:
@@ -34,6 +35,7 @@ except ImportError:
     UNIDECODE_AVAILABLE = False
     try:
         from unidecode import unidecode
+
         UNIDECODE_AVAILABLE = True
     except ImportError:
         pass
@@ -48,6 +50,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ValidationReport:
     """Rapport de validation détaillé"""
+
     is_valid: bool
     errors: List[str]
     warnings: List[str]
@@ -58,6 +61,7 @@ class ValidationReport:
 @dataclass
 class ProcessingResult:
     """Résultat de traitement d'une requête"""
+
     success: bool
     result: Optional[Any] = None
     error_message: Optional[str] = None
@@ -442,7 +446,9 @@ Posez-moi une question précise sur l'un de ces domaines !"""
 # ============================================================================
 
 
-def get_all_metrics_json(metrics_instance: MetricsCollector, extra: dict = None) -> dict:
+def get_all_metrics_json(
+    metrics_instance: MetricsCollector, extra: dict = None
+) -> dict:
     """Fonction d'export JSON consolidée des métriques avec données supplémentaires"""
     data = metrics_instance.as_json()
     if extra:
