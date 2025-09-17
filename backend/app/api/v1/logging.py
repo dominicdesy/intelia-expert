@@ -1,7 +1,8 @@
 # app/api/v1/logging.py
 """
+
 SYSTÈME DE LOGGING - POINT D'ENTRÉE PRINCIPAL
-Version corrigée sans création de tables + TRACKING SESSIONS UTILISATEUR
+
 """
 import os
 import logging

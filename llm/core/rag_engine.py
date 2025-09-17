@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
+
 rag_engine.py - RAG Engine Enhanced avec LangSmith et RRF Intelligent
-Version corrigée pour architecture modulaire
+
 """
 
 import os
