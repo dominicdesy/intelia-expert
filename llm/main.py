@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 main.py - Intelia Expert Backend avec RAG Enhanced + LangSmith + RRF Intelligent
-Version CORRIGÉE: Élimination des erreurs Digital Ocean
+Version FINALE CORRIGÉE: Élimination des erreurs Digital Ocean + corrections fonctionnelles
 CORRECTIONS APPLIQUÉES:
 - Suppression du patch Redis défaillant (RuntimeWarning)
 - Ajout des endpoints manquants /status/rag et /status/cache
 - Activation de tracemalloc pour diagnostic
+- CORRECTION: process_query → generate_response pour éliminer erreur 500
+- CORRECTION: Ajout endpoint /health direct sur app pour éliminer erreur 404
 - Validation stricte, gestion d'erreurs robuste, monitoring avancé
 """
 
@@ -1016,6 +1018,12 @@ async def health_check():
             }
         )
 
+# === CORRECTION 2: Ajout endpoint /health direct sur app ===
+@app.get("/health")
+async def health_direct():
+    """Endpoint health direct sur l'app pour résoudre l'erreur 404"""
+    return await health_check()
+
 @router.get(f"{BASE_PATH}/status/dependencies")
 async def dependencies_status():
     """Statut détaillé des dépendances"""
@@ -1177,7 +1185,7 @@ async def configuration_status():
     except Exception as e:
         return {"error": str(e)}
 
-# === NOUVEAU: ENDPOINT CHAT COMPLET ===
+# === CORRECTION 1: ENDPOINT CHAT AVEC MÉTHODE CORRIGÉE ===
 @router.post(f"{BASE_PATH}/chat")
 async def chat(request: Request):
     """Chat endpoint avec validation stricte et gestion d'erreurs robuste"""
@@ -1225,9 +1233,13 @@ async def chat(request: Request):
             metrics_collector.record_query({"source": "ood"}, "ood", time.time() - total_start_time)
             return StreamingResponse(simple_response(), media_type="text/plain")
         
-        # Traitement principal avec RAG Enhanced
+        # CORRECTION CRITIQUE: Utiliser generate_response au lieu de process_query
         try:
-            rag_result = await rag_engine_enhanced.process_query(message, language, tenant_id)
+            rag_result = await rag_engine_enhanced.generate_response(
+                query=message,
+                tenant_id=tenant_id,
+                language=language
+            )
         except Exception as e:
             logger.error(f"Erreur traitement RAG: {e}")
             metrics_collector.record_query({"source": "error"}, "error", time.time() - total_start_time)
