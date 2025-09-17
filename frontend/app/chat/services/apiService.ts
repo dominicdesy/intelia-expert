@@ -1,5 +1,5 @@
 // app/chat/services/apiService.ts - VERSION AGENT: Streaming LLM + Agent Callbacks
-// 🤖 NOUVELLE VERSION: Support complet des événements Agent avec callbacks enrichis
+//
 
 import { getSupabaseClient } from '@/lib/supabase/singleton'
 

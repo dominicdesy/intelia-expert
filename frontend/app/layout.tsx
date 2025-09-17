@@ -1,4 +1,5 @@
-// app/layout.tsx - VERSION AVEC ANTI-FLASH INTÉGRÉ ET EVENT LISTENERS CORRIGÉS + AD SYSTEM
+// app/layout.tsx
+
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
