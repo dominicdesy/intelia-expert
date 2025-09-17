@@ -1,47 +1,46 @@
-# Utiliser une image plus légère
-FROM python:3.11-slim
+# Stage 1: Builder
+FROM python:3.11-slim as builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
-WORKDIR /app
+WORKDIR /build
 
-# Installation système optimisée en une seule couche
+# Installation des outils de build
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     build-essential \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get autoremove -y \
-    && apt-get autoclean
+    && rm -rf /var/lib/apt/lists/*
 
-# Installation des dépendances Python avec nettoyage agressif
+# Installation des dépendances dans un répertoire isolé
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt \
-    && rm -rf /root/.cache /root/.local /tmp/* /var/tmp/* \
-    && find /usr/local -name "*.pyc" -delete \
-    && find /usr/local -name "__pycache__" -type d -exec rm -rf {} + \
-    && rm requirements.txt
+    && pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --no-cache-dir --target=/opt/venv -r requirements.txt
 
-# Copie du code source (les exclusions sont gérées par .dockerignore)
+# Stage 2: Runtime minimal
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/opt/venv \
+    PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /app
+
+# Copie seulement les dépendances installées (pas les outils de build)
+COPY --from=builder /opt/venv /opt/venv
+
+# Copie du code source
 COPY . .
 
-# Nettoyage final agressif
+# Nettoyage final
 RUN find . -name "*.pyc" -delete \
-    && find . -name "__pycache__" -type d -exec rm -rf {} + \
-    && find . -name "*.pyo" -delete \
-    && find . -name "*.log" -delete \
-    && find . -name "*.tmp" -delete \
-    && find . -name ".git" -type d -exec rm -rf {} + 2>/dev/null || true \
-    && find . -name ".pytest_cache" -type d -exec rm -rf {} + 2>/dev/null || true \
-    && find . -name "*.egg-info" -type d -exec rm -rf {} + 2>/dev/null || true
+    && find . -name "__pycache__" -type d -exec rm -rf {} +
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import socket; s=socket.socket(); s.settimeout(5); exit(0 if s.connect_ex(('127.0.0.1', 8080))==0 else 1)"
-
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
