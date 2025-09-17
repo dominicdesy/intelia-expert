@@ -2,19 +2,13 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Build arguments
-ARG NEXT_PUBLIC_SUPABASE_URL
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
-ARG NEXT_PUBLIC_API_BASE_URL
-ARG NEXT_PUBLIC_API_URL
-
 # Configuration npm optimisée
 RUN npm config set fetch-retries 3 \
     && npm config set fetch-retry-maxtimeout 60000
 
-# Installation des dépendances seulement
+# Installation de TOUTES les dépendances (dev incluses pour le build)
 COPY package.json package-lock.json* ./
-RUN npm ci --only=production --silent
+RUN npm ci --silent
 
 # Stage 2: Builder
 FROM node:20-alpine AS builder
@@ -42,11 +36,8 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copier le code source
 COPY . .
 
-# Build avec nettoyage immédiat
-RUN npm run build \
-    && rm -rf /app/.next/cache \
-    && rm -rf /app/node_modules/.cache \
-    && npm prune --production
+# Build Next.js
+RUN npm run build
 
 # Stage 3: Runtime (ultra-léger)
 FROM node:20-alpine AS runner
