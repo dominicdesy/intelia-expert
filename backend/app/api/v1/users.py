@@ -1,8 +1,11 @@
 # app/api/v1/users.py - CORRECTIONS DES ERREURS RUFF
+
 """
+
 Endpoints pour la gestion des profils utilisateur
 Résout le problème UserInfoModal qui contourne l'API backend
 VERSION CORRIGÉE: F401, F821, F841
+
 """
 
 from fastapi import APIRouter, HTTPException, Depends
