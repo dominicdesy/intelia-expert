@@ -1,15 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 main.py - Intelia Expert Backend avec RAG Enhanced + LangSmith + RRF Intelligent
-Version corrigée: Validation stricte, gestion d'erreurs robuste, monitoring avancé
-NOUVELLES FONCTIONNALITÉS AJOUTÉES:
-- Intégration LangSmith pour monitoring LLM
-- Support RRF Intelligent avec métriques
-- Variables d'environnement Digital Ocean
-- Health checks enrichis avec nouveau statut
-- CORRECTION: Redis safety patch pour execute_command
-- AJOUT: Endpoint /chat complet
-- CORRECTION: Cohérence connectivité Weaviate avec état d'initialisation
+Version CORRIGÉE: Élimination des erreurs Digital Ocean
+CORRECTIONS APPLIQUÉES:
+- Suppression du patch Redis défaillant (RuntimeWarning)
+- Ajout des endpoints manquants /status/rag et /status/cache
+- Activation de tracemalloc pour diagnostic
+- Validation stricte, gestion d'erreurs robuste, monitoring avancé
 """
 
 import os
@@ -18,9 +15,13 @@ import asyncio
 import time
 import logging
 import uuid
+import tracemalloc
 from typing import Any, Dict, AsyncGenerator, Optional
 from collections import OrderedDict
 from contextlib import asynccontextmanager
+
+# CORRECTION: Activation de tracemalloc pour diagnostic
+tracemalloc.start()
 
 from fastapi import FastAPI, APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -115,26 +116,9 @@ LANG_DETECTION_MIN_LENGTH = int(os.getenv("LANG_DETECTION_MIN_LENGTH", "20"))
 logger.info(f"Mode RAG Enhanced: LangSmith + RRF Intelligent v4.0")
 logger.info(f"Configuration: LangSmith={LANGSMITH_ENABLED}, RRF={ENABLE_INTELLIGENT_RRF}")
 
-# === NOUVEAU: Redis Safety Patch ===
-def patch_redis_execute_command_once(client):
-    """
-    Safety patch: neutralize direct execute_command() during startup
-    Prevents potential RuntimeWarnings and execution issues with Redis async client
-    """
-    try:
-        import inspect
-        from redis.asyncio import Redis as AsyncRedis
-        
-        if isinstance(client, AsyncRedis) and hasattr(client, "execute_command"):
-            fn = getattr(client, "execute_command")
-            if inspect.iscoroutinefunction(fn):
-                # Wrap so that if someone calls it without await, nothing breaks at import time
-                async def safe_exec(*args, **kwargs):
-                    return await fn(*args, **kwargs)
-                client.execute_command = safe_exec
-                logger.debug("Redis execute_command safety patch applied")
-    except Exception as e:
-        logger.debug(f"Redis safe patch skipped: {e}")
+# === CORRECTION: SUPPRESSION DU PATCH REDIS DÉFAILLANT ===
+# La fonction patch_redis_execute_command_once() a été supprimée car elle causait
+# le RuntimeWarning dans les logs Digital Ocean
 
 class StartupValidationError(Exception):
     """Exception pour les erreurs de validation au démarrage"""
@@ -304,17 +288,12 @@ class SystemHealthMonitor:
         errors = []
         
         try:
-            # Cache Core avec Redis Safety Patch
+            # Cache Core - CORRECTION: Sans patch Redis
             logger.info("  Initialisation Cache Core...")
             try:
                 from cache_core import create_cache_core
                 cache_core = create_cache_core()
                 await cache_core.initialize()
-                
-                # === NOUVEAU: Application du Redis Safety Patch ===
-                if cache_core and getattr(cache_core, "client", None):
-                    patch_redis_execute_command_once(cache_core.client)
-                    logger.debug("cache_core: Redis safety patch appliqué")
                 
                 if cache_core.initialized:
                     logger.info("✅ cache_core: Cache Core initialisé")
@@ -1044,6 +1023,76 @@ async def dependencies_status():
         return get_full_status_report()
     except Exception as e:
         return {"error": str(e)}
+
+# === CORRECTION: AJOUT DES ENDPOINTS MANQUANTS ===
+
+@router.get(f"{BASE_PATH}/status/rag")
+async def rag_status():
+    """Statut détaillé du RAG Engine"""
+    try:
+        if not rag_engine_enhanced:
+            return {
+                "initialized": False,
+                "error": "RAG Engine non disponible",
+                "timestamp": time.time()
+            }
+        
+        status = rag_engine_enhanced.get_status()
+        return {
+            "initialized": rag_engine_enhanced.is_initialized,
+            "degraded_mode": getattr(rag_engine_enhanced, 'degraded_mode', False),
+            "approach": status.get("approach", "unknown"),
+            "optimizations": status.get("optimizations", {}),
+            "langsmith": status.get("langsmith", {}),
+            "intelligent_rrf": status.get("intelligent_rrf", {}),
+            "optimization_stats": status.get("optimization_stats", {}),
+            "weaviate_connected": bool(getattr(rag_engine_enhanced, 'weaviate_client', None)),
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur RAG status: {e}")
+        return {
+            "initialized": False,
+            "error": str(e),
+            "timestamp": time.time()
+        }
+
+@router.get(f"{BASE_PATH}/status/cache")
+async def cache_status():
+    """Statut détaillé du cache Redis"""
+    try:
+        if not cache_core:
+            return {
+                "enabled": False,
+                "initialized": False,
+                "error": "Cache Core non disponible",
+                "timestamp": time.time()
+            }
+        
+        cache_health = cache_core.get_health_status() if hasattr(cache_core, 'get_health_status') else {}
+        cache_stats = cache_core.get_stats() if hasattr(cache_core, 'get_stats') else {}
+        
+        return {
+            "enabled": getattr(cache_core, 'enabled', False),
+            "initialized": getattr(cache_core, 'initialized', False),
+            "status": cache_health.get("status", "unknown"),
+            "stats": cache_stats,
+            "configuration": {
+                "memory_limit_mb": getattr(cache_core.config, 'total_memory_limit_mb', 0) if hasattr(cache_core, 'config') else 0,
+                "compression_enabled": getattr(cache_core.config, 'enable_compression', False) if hasattr(cache_core, 'config') else False
+            },
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur cache status: {e}")
+        return {
+            "enabled": False,
+            "initialized": False,
+            "error": str(e),
+            "timestamp": time.time()
+        }
 
 @router.get(f"{BASE_PATH}/status/connectivity")
 async def connectivity_status():
