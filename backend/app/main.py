@@ -1,11 +1,5 @@
 # -*- coding: utf-8 -*-
-#
 # app/main.py - VERSION 4.1 NETTOYEE - ENDPOINTS SELECTIONNES UNIQUEMENT
-# GARDE: Admin, Auth, Billing, Health, Invitations, Logging, Stats, System, User
-# RETIRE: Expert, Conversations, Debug RAG, Metrics non-admin
-# CONSERVE: CORS, monitoring, cache statistiques, detection RAG amelioree
-# CORRIGE: Imports non utilisés (F401), bare except (E722), variables non utilisées (F841)
-#
 
 from __future__ import annotations
 

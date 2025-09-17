@@ -264,7 +264,7 @@ jobs:
           sbom: false
           outputs: type=registry,compression=zstd,compression-level=1
           # Accélération BuildKit
-          secret: |
+          secrets: |
             id=pip,src=/dev/null
 
   build-llm:
