@@ -9,8 +9,8 @@ import asyncio
 import logging
 from typing import Dict, Any
 
-# Imports modulaires
-from ..config.config import (
+# CORRECTION: Imports modulaires absolus au lieu d'imports relatifs
+from config.config import (
     OPENAI_API_KEY,
     LANGSMITH_ENABLED,
     LANGSMITH_API_KEY,
@@ -20,12 +20,12 @@ from ..config.config import (
     RRF_GENETIC_BOOST,
     get_config_status,
 )
-from .imports_and_dependencies import (
+from utils.imports_and_dependencies import (
     require_critical_dependencies,
     get_full_status_report,
     quick_connectivity_check,
 )
-from .utilities import safe_serialize_for_json, safe_get_attribute, safe_dict_get
+from utils.utilities import safe_serialize_for_json, safe_get_attribute, safe_dict_get
 
 logger = logging.getLogger(__name__)
 
@@ -36,13 +36,11 @@ logger = logging.getLogger(__name__)
 
 class StartupValidationError(Exception):
     """Exception pour les erreurs de validation au démarrage"""
-
     pass
 
 
 class MonitoringError(Exception):
     """Exception générale pour les erreurs de monitoring"""
-
     pass
 
 
