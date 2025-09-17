@@ -15,14 +15,14 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 
 # ✅ CORRECTION: Suppression de BASE_PATH et MAX_REQUEST_SIZE des imports config
-from ..config.config import (
+from config.config import (
     MAX_CONVERSATION_CONTEXT,
     TENANT_TTL,
     MAX_TENANTS,
     STREAM_CHUNK_LEN,
     ENABLE_METRICS_LOGGING,
 )
-from ..utils.utilities import (
+from utils.utilities import (
     safe_serialize_for_json,
     safe_get_attribute,
     safe_dict_get,
@@ -35,7 +35,7 @@ from ..utils.utilities import (
 )
 
 # ✅ CORRECTION: Import depuis utils au lieu de core
-from ..utils.imports_and_dependencies import get_full_status_report
+from utils.imports_and_dependencies import get_full_status_report
 
 # ✅ CORRECTION: Définir les constantes manquantes
 MAX_REQUEST_SIZE = 8000

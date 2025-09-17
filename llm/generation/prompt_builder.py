@@ -4,7 +4,7 @@ prompt_builder.py - Constructeur de prompts spécialisés
 """
 
 from typing import Dict, Optional, Any
-from ..processing.intent_types import IntentType, IntentResult
+from processing.intent_types import IntentType, IntentResult
 
 
 class PromptBuilder:

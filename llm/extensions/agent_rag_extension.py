@@ -13,8 +13,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 # Imports de votre système existant - CORRIGÉS
-from ..core.rag_engine import InteliaRAGEngine, RAGResult, RAGSource
-from ..processing.intent_processor import IntentProcessor, IntentResult, IntentType
+from core.rag_engine import InteliaRAGEngine, RAGResult, RAGSource
+from processing.intent_processor import IntentProcessor, IntentResult, IntentType
 
 logger = logging.getLogger(__name__)
 

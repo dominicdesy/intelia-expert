@@ -11,7 +11,7 @@ import json
 from typing import Dict, Set, Tuple, Optional
 
 # Imports modulaires corrigés - toujours depuis le package local pour éviter les doubles définitions
-from .intent_types import IntentType
+from processing.intent_types import IntentType
 
 # Note: INTENT_WEIGHTS_FILE supprimé car inexistant dans config.py - utilisation directe de os.getenv()
 

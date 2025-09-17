@@ -15,7 +15,7 @@ from pathlib import Path
 from dataclasses import dataclass
 
 # Imports modulaires corrigés pour la nouvelle architecture
-from .intent_types import IntentType, IntentResult
+from processing.intent_types import IntentType, IntentResult
 
 logger = logging.getLogger(__name__)
 

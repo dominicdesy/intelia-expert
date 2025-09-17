@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # CORRECTION: Imports explicites au lieu des star imports dangereux
 try:
-    from ..config.config import (
+    from config.config import (
         # Core config
         RAG_ENABLED,
         CACHE_ENABLED,
@@ -51,7 +51,7 @@ except Exception as e:
     raise
 
 try:
-    from ..utils.imports_and_dependencies import (
+    from utils.imports_and_dependencies import (
         # Availability flags
         OPENAI_AVAILABLE,
         WEAVIATE_AVAILABLE,
@@ -72,7 +72,7 @@ except Exception as e:
     raise
 
 try:
-    from ..utils.utilities import METRICS, detect_language_enhanced, build_where_filter
+    from utils.utilities import METRICS, detect_language_enhanced, build_where_filter
 
     logger.debug("Utilities importé avec succès")
 except Exception as e:
@@ -80,7 +80,7 @@ except Exception as e:
     raise
 
 try:
-    from ..retrieval.embedder import OpenAIEmbedder
+    from retrieval.embedder import OpenAIEmbedder
 
     logger.debug("Embedder importé avec succès")
 except Exception as e:
@@ -88,7 +88,7 @@ except Exception as e:
     raise
 
 try:
-    from ..retrieval.retriever import HybridWeaviateRetriever
+    from retrieval.retriever import HybridWeaviateRetriever
 
     logger.debug("Retriever importé avec succès")
 except Exception as e:
@@ -96,7 +96,7 @@ except Exception as e:
     raise
 
 try:
-    from ..generation.generators import EnhancedResponseGenerator
+    from generation.generators import EnhancedResponseGenerator
 
     logger.debug("Generators importé avec succès")
 except Exception as e:
@@ -104,7 +104,7 @@ except Exception as e:
     raise
 
 try:
-    from ..security.ood_detector import EnhancedOODDetector
+    from security.ood_detector import EnhancedOODDetector
 
     logger.debug("OOD_detector importé avec succès")
 except Exception as e:
@@ -134,7 +134,7 @@ else:
 
 # === NOUVEAU: IMPORT RRF INTELLIGENT ===
 try:
-    from ..retrieval.enhanced_rrf_fusion import IntelligentRRFFusion
+    from retrieval.enhanced_rrf_fusion import IntelligentRRFFusion
 
     INTELLIGENT_RRF_AVAILABLE = True
     logger.info("RRF Intelligent importé avec succès")
@@ -324,7 +324,7 @@ class InteliaRAGEngine:
 
             # 6. Intent processor avec gestion d'erreurs améliorée
             try:
-                from ..processing.intent_processor import create_intent_processor
+                from processing.intent_processor import create_intent_processor
 
                 self.intent_processor = create_intent_processor()
 
@@ -344,7 +344,7 @@ class InteliaRAGEngine:
             # 7. Guardrails
             if GUARDRAILS_AVAILABLE:
                 try:
-                    from ..security.advanced_guardrails import (
+                    from security.advanced_guardrails import (
                         create_response_guardrails,
                     )
 
@@ -741,7 +741,7 @@ class InteliaRAGEngine:
 
             # Construction métadonnées complètes
             try:
-                from ..utils.imports_and_dependencies import dependency_manager
+                from utils.imports_and_dependencies import dependency_manager
 
                 dependencies_status = dependency_manager.get_legacy_status()
             except Exception:

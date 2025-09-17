@@ -12,10 +12,10 @@ import anyio
 
 # === NOUVEAU: Import RRF Intelligent ===
 try:
-    from .enhanced_rrf_fusion import IntelligentRRFFusion
+    from retrieval.enhanced_rrf_fusion import IntelligentRRFFusion
 
     # CORRECTION: Suppression de l'import RRF_LEARNING_MODE non utilisé
-    from ..config.config import ENABLE_INTELLIGENT_RRF
+    from config.config import ENABLE_INTELLIGENT_RRF
 
     INTELLIGENT_RRF_AVAILABLE = True
 except ImportError:

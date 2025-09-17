@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 # CORRECTION MAJEURE: Erreurs explicites au lieu de stubs silencieux
 try:
-    from .cache_core import RedisCacheCore, CacheConfig
+    from cache_core import RedisCacheCore, CacheConfig
 
     CACHE_CORE_AVAILABLE = True
 except ImportError as e:
@@ -25,7 +25,7 @@ except ImportError as e:
     raise ImportError("Redis cache requires redis package") from e
 
 try:
-    from .cache_semantic import SemanticCacheManager
+    from cache_semantic import SemanticCacheManager
 
     SEMANTIC_AVAILABLE = True
 except ImportError as e:
@@ -41,7 +41,7 @@ except ImportError as e:
 
 
 try:
-    from .cache_stats import CacheStatsManager
+    from cache_stats import CacheStatsManager
 
     STATS_AVAILABLE = True
 except ImportError as e:
