@@ -1,14 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 retriever.py - Retriever hybride optimisé avec cache et fallbacks - VERSION COMPLÈTEMENT CORRIGÉE
-Version corrigée pour Weaviate 4.16.10 avec intégrations complètes
-CORRIGÉ: Syntaxe API v4 pour near_vector() et hybrid()
-CORRIGÉ: Gestion des dimensions vectorielles (384 vs 1536)
-CORRIGÉ: Corrections runtime des arguments API v4
-CORRIGÉ: Gestion async Redis
-CORRIGÉ: Initialisation non-bloquante
-CORRIGÉ: Imports selon l'arborescence du projet
-CORRIGÉ: Variables non utilisées supprimées
 """
 
 import logging
