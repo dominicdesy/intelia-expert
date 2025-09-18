@@ -207,56 +207,78 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Cleanup old image tags (safe & robust)
-        shell: bash
+      - name: Fixed tag parsing and cleanup
         run: |
-          set -euo pipefail
-
-          cleanup_repo() {
-            local repo="$1"
-            local max_delete="${2:-25}"   # limite de sécurité
-
+          echo "🧹 NETTOYAGE CORRIGÉ - PARSING DES TAGS"
+          echo "======================================="
+          
+          cleanup_fixed() {
+            local repo=$1
             echo ""
-            echo "🏷️ Nettoyage par tags de ${repo}..."
-            echo "  📋 Récupération des tags (sans en-tête)…"
-
-            # On ne récupère QUE la colonne Tag, sans en-tête ; pagination large pour éviter les manques
-            mapfile -t TAGS < <(
-              doctl registry repository list-tags "${repo}" \
-                --format Tag \
-                --no-header \
-                --page 1 --page-size 200 \
-              | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
-              | grep -v -E '^(latest|main|prod|stable|buildcache)$' \
-              | grep -v '^$'
-            )
-
-            local total="${#TAGS[@]}"
-            echo "  📊 Tags supprimables: ${total}"
-            if (( total == 0 )); then
-              echo "  ✅ Rien à supprimer"
+            echo "🏷️ Nettoyage corrigé de $repo..."
+            
+            # Diagnostic du format de sortie d'abord
+            echo "  🔍 Diagnostic du format des tags..."
+            doctl registry repository list-tags $repo --format Tag --no-header 2>/dev/null | head -5
+            
+            # Récupérer seulement les tags réels (format Tag uniquement)
+            local real_tags=$(doctl registry repository list-tags $repo --format Tag --no-header 2>/dev/null | grep -v -E "^(buildcache|latest|main|Tag)$" | grep -v "^$")
+            
+            if [ -z "$real_tags" ]; then
+              echo "  ✅ Aucun tag supprimable trouvé"
               return 0
             fi
-
+            
+            local tag_count=$(echo "$real_tags" | wc -l)
+            echo "  📊 Tags supprimables trouvés: $tag_count"
+            echo "  📋 Premiers tags: $(echo "$real_tags" | head -3 | tr '\n' ' ')"
+            
+            # Limiter à 15 suppressions pour éviter les problèmes
+            local max_delete=15
+            if [ "$repo" = "intelia-llm" ]; then
+              max_delete=20
+            fi
+            
             local deleted=0
-            for tag in "${TAGS[@]}"; do
-              (( deleted >= max_delete )) && break
-              echo "    🗑️ Suppression tag: ${tag}"
-              if doctl registry repository delete-tag -f "${repo}" "${tag}" >/dev/null 2>&1; then
-                echo "      ✅ OK"
-                ((deleted++))
-              else
-                echo "      ❌ Échec suppression tag"
+            echo "$real_tags" | head -n $max_delete | while read tag_name; do
+              if [ -n "$tag_name" ] && [ "$deleted" -lt "$max_delete" ]; then
+                echo "    🗑️ Suppression: $tag_name"
+                
+                if doctl registry repository delete-tag --force $repo "$tag_name" 2>/dev/null; then
+                  echo "      ✅ Succès"
+                  deleted=$((deleted + 1))
+                else
+                  echo "      ❌ Échec"
+                fi
+                
+                sleep 1
               fi
             done
-            echo "  📊 Tags supprimés: ${deleted}"
+            
+            echo "  📊 Tentatives de suppression effectuées"
           }
-
-          # Exécuter sur tes 3 dépôts
-          cleanup_repo "intelia-llm"  30
-          cleanup_repo "intelia-backend" 25
-          cleanup_repo "intelia-frontend" 25
-
+          
+          # Si les tags ne marchent pas, utiliser une approche manuelle simple
+          manual_cleanup() {
+            local repo=$1
+            echo ""
+            echo "🔧 Nettoyage manuel alternatif de $repo..."
+            
+            # Utiliser l'interface web DigitalOcean ou attendre le garbage collection
+            echo "  💡 Alternative: Nettoyage manuel via interface web DO"
+            echo "  🔗 https://cloud.digitalocean.com/images/container-registry"
+            echo "  ⏳ Ou attendre le garbage collection automatique (30min-2h)"
+          }
+          
+          echo "🚀 Tentative de nettoyage corrigé..."
+          
+          # Nettoyer avec la méthode corrigée
+          cleanup_fixed "intelia-llm"
+          cleanup_fixed "intelia-backend"
+          cleanup_fixed "intelia-frontend"
+          
+          # Alternatives si le nettoyage automatique échoue
+          manual_cleanup "intelia-llm"
           
           echo ""
           echo "🗑️ Garbage collection final..."
