@@ -267,54 +267,26 @@ class HybridWeaviateRetriever:
             return None
 
     def _calculate_dynamic_alpha(self, query: str, intent_result=None) -> float:
-        """NOUVEAU: Calcule alpha dynamiquement selon le contexte de la requête - VERSION CORRIGÉE"""
+        """NOUVEAU: Calcule alpha dynamiquement selon le contexte de la requête"""
         query_lower = query.lower()
 
-        # Boost basé sur l'intention détectée - CORRECTION CRITIQUE gestion des types
+        # Boost basé sur l'intention détectée - CORRECTION gestion des types
         intent_boost = 1.0
-        intent_value = "general_poultry"  # Valeur par défaut
-
         if intent_result:
-            try:
-                # CAS 1: Objet IntentResult standard
-                if hasattr(intent_result, "intent_type"):
-                    intent_type_attr = intent_result.intent_type
-                    if hasattr(intent_type_attr, "value"):
-                        intent_value = intent_type_attr.value
-                    else:
-                        intent_value = str(intent_type_attr)
-
-                # CAS 2: Dictionnaire (erreur upstream)
-                elif isinstance(intent_result, dict):
-                    logger.warning(
-                        "⚠️ intent_result reçu comme dict au lieu d'objet IntentResult"
-                    )
-                    intent_type = intent_result.get("intent_type")
-                    if intent_type:
-                        if hasattr(intent_type, "value"):
-                            intent_value = intent_type.value
-                        else:
-                            intent_value = str(intent_type)
-                    else:
-                        logger.warning("Dict intent_result sans intent_type")
-
-                # CAS 3: Type inattendu
-                else:
-                    logger.error(
-                        f"🚨 Type intent_result inattendu: {type(intent_result)}"
-                    )
-                    intent_value = "general_poultry"
-
-            except Exception as e:
-                logger.error(f"🚨 Erreur traitement intent_result: {e}")
-                intent_value = "general_poultry"
-
-        # Application du boost selon l'intention
-        intent_boost = self.fusion_config.get("intent_boost_factors", {}).get(
-            intent_value, 1.0
-        )
-
-        logger.debug(f"Alpha calculation: intent={intent_value}, boost={intent_boost}")
+            if hasattr(intent_result, "intent_type"):
+                intent_value = (
+                    intent_result.intent_type.value
+                    if hasattr(intent_result.intent_type, "value")
+                    else str(intent_result.intent_type)
+                )
+                intent_boost = self.fusion_config["intent_boost_factors"].get(
+                    intent_value, 1.0
+                )
+            elif isinstance(intent_result, dict) and "intent_type" in intent_result:
+                intent_value = intent_result["intent_type"]
+                intent_boost = self.fusion_config["intent_boost_factors"].get(
+                    intent_value, 1.0
+                )
 
         # Requêtes factuelles -> favoriser BM25
         if any(
@@ -325,10 +297,10 @@ class HybridWeaviateRetriever:
                 "quelle",
                 "nombre",
                 "prix",
-                "cout",
-                "temperature",
-                "duree",
-                "age",
+                "coût",
+                "température",
+                "durée",
+                "âge",
                 "poids",
                 "taille",
             ]
@@ -337,7 +309,7 @@ class HybridWeaviateRetriever:
 
         # Requêtes temporelles -> BM25
         elif re.search(
-            r"\b(jour|semaine|mois|an|annee|h|heure|min|minute)\b", query_lower
+            r"\b(jour|semaine|mois|an|année|h|heure|min|minute)\b", query_lower
         ):
             base_alpha = 0.4
 
@@ -348,10 +320,10 @@ class HybridWeaviateRetriever:
                 "comment",
                 "pourquoi",
                 "expliquer",
-                "difference",
-                "ameliorer",
+                "différence",
+                "améliorer",
                 "optimiser",
-                "probleme",
+                "problème",
                 "solution",
                 "recommandation",
                 "conseil",
@@ -363,13 +335,13 @@ class HybridWeaviateRetriever:
         elif any(
             diag in query_lower
             for diag in [
-                "symptome",
+                "symptôme",
                 "maladie",
                 "diagnostic",
                 "traitement",
                 "infection",
                 "virus",
-                "bacterie",
+                "bactérie",
                 "parasite",
             ]
         ):
@@ -382,9 +354,6 @@ class HybridWeaviateRetriever:
         # Application du boost d'intention
         final_alpha = min(0.95, max(0.05, base_alpha * intent_boost))
 
-        logger.debug(
-            f"Dynamic alpha: {final_alpha} (base={base_alpha}, boost={intent_boost})"
-        )
         return final_alpha
 
     # ✅ NOUVEAU: Méthode manquante adaptive_search() - SIGNATURE CORRIGÉE

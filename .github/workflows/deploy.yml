@@ -319,14 +319,14 @@ jobs:
                   continue
                 fi
 
-                if doctl_run registry repository delete-tag -f "${repo}" "${tag}" "${REGISTRY_OPT[@]}"; then
+                if doctl_run registry repository delete-tag -force "${repo}" "${tag}" "${REGISTRY_OPT[@]}"; then
                   echo "      ✅ OK (tag)"
                   ((deleted++))
                 else
                   # Fallback: on peut supprimer le manifest si et seulement si il ne porte AUCUN tag protégé
                   if [[ -n "${digest}" && "$(has_protected_tag_for_digest "${digest}")" -eq 0 ]]; then
                     echo "      ↪️ Fallback: delete-manifest ${digest} (aucun tag protégé lié)"
-                    if doctl_run registry repository delete-manifest -f "${repo}" "${digest}" "${REGISTRY_OPT[@]}"; then
+                    if doctl_run registry repository delete-manifest -force "${repo}" "${digest}" "${REGISTRY_OPT[@]}"; then
                       echo "        ✅ OK (manifest) — toutes les étiquettes sur ce digest disparaissent"
                       ((deleted++))
                     else
@@ -361,7 +361,7 @@ jobs:
                   continue
                 fi
 
-                if doctl_run registry repository delete-manifest -f "${repo}" "${digest}" "${REGISTRY_OPT[@]}"; then
+                if doctl_run registry repository delete-manifest -force "${repo}" "${digest}" "${REGISTRY_OPT[@]}"; then
                   echo "      ✅ OK (manifest)"
                   ((deleted++))
                 else

@@ -13,7 +13,7 @@ import numpy as np
 import httpx
 from typing import Dict, List, Optional
 from collections import defaultdict
-from utils.utilities import validate_intent_result
+from utils.utilities import validate_intent_result, safe_get_intent_attribute
 
 # CORRECTION CRITIQUE: Définir logger AVANT toute utilisation
 logger = logging.getLogger(__name__)
@@ -1094,6 +1094,7 @@ class InteliaRAGEngine:
         if result.confidence < 0.3:
             alerts.append(f"CONFIANCE_FAIBLE: {result.confidence:.2f}")
 
+
     async def _enhanced_hybrid_search_with_rrf(
         self,
         query_vector: List[float],
@@ -1109,10 +1110,10 @@ class InteliaRAGEngine:
         try:
             # VALIDATION CRITIQUE: S'assurer qu'intent_result est utilisable
             validated_intent = validate_intent_result(intent_result)
-
+            
             if not validated_intent["is_valid"] and intent_result is not None:
                 logger.warning(f"Intent_result invalide détecté: {type(intent_result)}")
-
+            
             # Recherche vectorielle et BM25 séparément pour RRF intelligent
             vector_results = await self.retriever._vector_search_v4_corrected(
                 query_vector, top_k * 2, where_filter
@@ -1129,10 +1130,10 @@ class InteliaRAGEngine:
 
             # Contexte pour RRF intelligent
             query_context = {
-                "query": original_query,
-                "alpha": alpha,
+                "query": original_query, 
+                "alpha": alpha, 
                 "top_k": top_k,
-                "intent_validated": validated_intent["is_valid"],
+                "intent_validated": validated_intent["is_valid"]
             }
 
             # PASSAGE SÉCURISÉ: Passer intent_result original mais avec validation
@@ -1180,13 +1181,13 @@ class InteliaRAGEngine:
     def _validate_intent_before_retrieval(self, intent_result) -> tuple[bool, any]:
         """
         Valide intent_result avant passage aux retrievers
-
+        
         Returns:
             tuple: (is_safe_to_use, cleaned_intent_or_none)
         """
         if not intent_result:
             return True, None
-
+            
         # Test basique de sécurité
         try:
             # Essayer d'accéder aux attributs critiques
@@ -1195,18 +1196,80 @@ class InteliaRAGEngine:
                 return True, intent_result
             elif isinstance(intent_result, dict):
                 # Dict détecté - ne pas passer aux retrievers
-                logger.warning(
-                    "Dict intent_result détecté - passage None aux retrievers"
-                )
+                logger.warning("Dict intent_result détecté - passage None aux retrievers")
                 return False, None
             else:
                 # Type inattendu
                 logger.error(f"Type intent_result inattendu: {type(intent_result)}")
                 return False, None
-
+                
         except Exception as e:
             logger.error(f"Erreur validation intent_result: {e}")
             return False, None
+
+
+
+    async def _enhanced_hybrid_search_with_rrf(
+        self,
+        query_vector: List[float],
+        query_text: str,
+        top_k: int,
+        where_filter: Dict,
+        alpha: float,
+        original_query: str,
+        intent_result,
+    ) -> List[Document]:
+        """Recherche hybride utilisant le RRF intelligent"""
+
+        try:
+            # Recherche vectorielle et BM25 séparément pour RRF intelligent
+            vector_results = await self.retriever._vector_search_v4_corrected(
+                query_vector, top_k * 2, where_filter
+            )
+
+            # Pour BM25, recherche hybride avec alpha=0 (BM25 pur)
+            bm25_results = await self.retriever._hybrid_search_v4_corrected(
+                query_vector, query_text, top_k * 2, where_filter, alpha=0.0
+            )
+
+            # Conversion en format Dict pour RRF intelligent
+            vector_dicts = [self._document_to_dict(doc) for doc in vector_results]
+            bm25_dicts = [self._document_to_dict(doc) for doc in bm25_results]
+
+            # Contexte pour RRF intelligent
+            query_context = {"query": original_query, "alpha": alpha, "top_k": top_k}
+
+            # Fusion RRF intelligente
+            fused_results = await self.intelligent_rrf.enhanced_fusion(
+                vector_dicts, bm25_dicts, alpha, top_k, query_context, intent_result
+            )
+
+            # Reconversion en Documents
+            final_documents = []
+            for result_dict in fused_results:
+                doc = Document(
+                    content=result_dict.get("content", ""),
+                    metadata=result_dict.get("metadata", {}),
+                    score=result_dict.get("final_score", 0.0),
+                    explain_score=result_dict.get("explain_score"),
+                )
+
+                # Ajout métadonnées RRF intelligent
+                doc.metadata["intelligent_rrf_used"] = True
+                doc.metadata["rrf_method"] = result_dict.get("metadata", {}).get(
+                    "rrf_method", "intelligent"
+                )
+
+                final_documents.append(doc)
+
+            return final_documents
+
+        except Exception as e:
+            logger.error(f"Erreur RRF intelligent: {e}")
+            # Fallback vers recherche classique
+            return await self.retriever.adaptive_search(
+                query_vector, query_text, top_k, where_filter, alpha=alpha
+            )
 
     def _document_to_dict(self, doc: Document) -> Dict:
         """Convertit un Document en dictionnaire pour RRF intelligent"""
