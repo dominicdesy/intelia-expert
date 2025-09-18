@@ -2,6 +2,7 @@
 """
 enhanced_rrf_fusion.py - RRF Intelligent avec apprentissage contextuel pour l'aviculture
 Optimisé pour Digital Ocean App Platform avec Redis externe
+VERSION CORRIGÉE - Gestion robuste des types intent_result
 """
 
 import os
@@ -200,41 +201,81 @@ class IntelligentRRFFusion:
             )
 
     async def _analyze_query_context(self, query_context: Dict, intent_result) -> Dict:
-        """Analyse contextuelle approfondie de la requête - VERSION CORRIGÉE"""
+        """CORRECTION CRITIQUE: Analyse contextuelle avec gestion robuste des types intent_result"""
 
         query = query_context.get("query", "")
         query_lower = query.lower()
 
-        # CORRECTION: Extraction entités depuis intent_result avec gestion des types
+        # CORRECTION: Extraction entités depuis intent_result avec gestion complète des types
         entities = {}
         intent_confidence = 0.0
+        intent_type_value = "general_poultry"  # Valeur par défaut
 
         if intent_result:
             try:
-                # CAS 1: Objet IntentResult standard
-                if hasattr(intent_result, "detected_entities"):
+                # CAS 1: Objet IntentResult standard avec attributs
+                if hasattr(intent_result, "detected_entities") and hasattr(
+                    intent_result, "intent_type"
+                ):
                     entities = intent_result.detected_entities or {}
                     intent_confidence = getattr(intent_result, "confidence", 0.0)
 
-                # CAS 2: Dictionnaire (fallback)
+                    # Extraction sécurisée du type d'intention
+                    intent_type_attr = intent_result.intent_type
+                    if hasattr(intent_type_attr, "value"):
+                        intent_type_value = intent_type_attr.value
+                    else:
+                        intent_type_value = str(intent_type_attr)
+
+                    logger.debug(
+                        f"IntentResult objet traité - type: {intent_type_value}, entities: {len(entities)}"
+                    )
+
+                # CAS 2: Dictionnaire (fallback de l'intent processor)
                 elif isinstance(intent_result, dict):
                     logger.warning(
-                        "intent_result reçu comme dict au lieu d'objet IntentResult"
+                        "intent_result reçu comme dict - extraction via clés dict"
                     )
                     entities = intent_result.get("detected_entities", {})
                     intent_confidence = intent_result.get("confidence", 0.0)
 
+                    # Extraction du type depuis le dict
+                    intent_type = intent_result.get("intent_type")
+                    if intent_type:
+                        if hasattr(intent_type, "value"):
+                            intent_type_value = intent_type.value
+                        elif isinstance(intent_type, str):
+                            intent_type_value = intent_type
+                        else:
+                            intent_type_value = str(intent_type)
+
+                    logger.debug(
+                        f"Dict intent_result traité - type: {intent_type_value}, entities: {len(entities)}"
+                    )
+
+                # CAS 3: String directement (cas edge)
+                elif isinstance(intent_result, str):
+                    logger.debug(f"intent_result string direct: {intent_result}")
+                    intent_type_value = intent_result
+                    entities = {}
+                    intent_confidence = 0.5
+
+                # CAS 4: Type complètement inattendu
                 else:
-                    logger.warning(
-                        f"Type intent_result inattendu: {type(intent_result)}"
+                    logger.error(f"Type intent_result non géré: {type(intent_result)}")
+                    logger.error(
+                        f"Contenu intent_result: {str(intent_result)[:200]}..."
                     )
                     entities = {}
                     intent_confidence = 0.0
 
             except Exception as e:
-                logger.error(f"Erreur extraction entités: {e}")
+                logger.error(f"Erreur critique extraction intent_result: {e}")
+                logger.error(f"Type problématique: {type(intent_result)}")
+                logger.error(f"Contenu: {str(intent_result)[:200]}...")
                 entities = {}
                 intent_confidence = 0.0
+                intent_type_value = "general_poultry"
 
         # Detection lignée génétique
         genetic_line = entities.get("line", "") or self._detect_genetic_line(
@@ -263,7 +304,8 @@ class IntelligentRRFFusion:
             "performance_metrics": performance_metrics,
             "query_type": query_type,
             "urgency_level": urgency_level,
-            "intent_confidence": intent_confidence,  # CORRIGÉ
+            "intent_confidence": intent_confidence,
+            "intent_type_detected": intent_type_value,  # AJOUT: Pour debug
             "has_age_metric": bool(age_days or age_weeks),
             "has_performance_metric": bool(performance_metrics),
             "is_comparative": any(
@@ -273,6 +315,7 @@ class IntelligentRRFFusion:
             "seasonal_context": self._detect_seasonal_context(query_lower),
             "timestamp": time.time(),
             "intent_result_type": str(type(intent_result)),  # DEBUG INFO
+            "intent_extraction_success": len(entities) > 0,  # AJOUT: Indicateur succès
         }
 
         return context
