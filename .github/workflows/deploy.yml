@@ -225,9 +225,24 @@ jobs:
           echo "🔍 DIAGNOSTIC COMPLET DU REGISTRY"
           echo "================================="
           
-          # 1. Lister TOUS les repositories disponibles
+          # 1. Lister TOUS les repositories avec comptage réel
           echo "📋 Repositories disponibles dans le registry:"
           doctl registry repository list --format Name,TagCount,UpdatedAt || echo "Erreur listing repositories"
+          
+          echo ""
+          echo "🔍 Test détaillé de récupération des manifests..."
+          
+          # Test sur intelia-llm qui a 16 images
+          echo "📊 Test sur intelia-llm (16 images attendues):"
+          echo "  Format basique:"
+          doctl registry repository list-manifests intelia-llm --no-header | head -5 || echo "  ❌ Échec format basique"
+          
+          echo "  Format avec limit 50:"
+          doctl registry repository list-manifests intelia-llm --no-header --limit 50 | head -5 || echo "  ❌ Échec avec limite"
+          
+          echo "  Comptage total:"
+          local total_manifests=$(doctl registry repository list-manifests intelia-llm --no-header 2>/dev/null | wc -l || echo "0")
+          echo "  Total manifests trouvés: $total_manifests"
           
           echo ""
           echo "🔍 Recherche des repositories intelia..."
@@ -262,12 +277,31 @@ jobs:
               if [ -n "$actual_repo" ]; then
                 echo "  🧹 Nettoyage de: $actual_repo"
                 
-                local manifests=$(doctl registry repository list-manifests "$actual_repo" --format Digest,Updated --no-header 2>/dev/null || echo "")
+                # CORRECTION CRITIQUE: Forcer l'affichage de TOUS les manifests (pas de limite)
+                echo "    🔍 Récupération de tous les manifests pour $actual_repo..."
+                local manifests=$(doctl registry repository list-manifests "$actual_repo" --format Digest,Updated,Tags,Size --no-header --limit 100 2>/dev/null || echo "")
+                
+                # Si ça ne marche pas, essayer sans format spécifique
+                if [ -z "$manifests" ]; then
+                  echo "    ⚠️  Tentative alternative sans format..."
+                  manifests=$(doctl registry repository list-manifests "$actual_repo" --no-header 2>/dev/null || echo "")
+                fi
                 
                 if [ -z "$manifests" ]; then
                   echo "    📭 Repository vide"
                   continue
                 fi
+                
+                # Debug: afficher les premiers manifests pour diagnostic  
+                echo "    🔍 Aperçu des images ($total total):"
+                echo "$manifests" | head -5 | while read -r digest updated tags size; do
+                  local short_digest="${digest:0:20}..."
+                  echo "      $short_digest | $tags | $size | $updated"
+                done
+                if [ "$total" -gt 5 ]; then
+                  echo "      ... (et $((total - 5)) autres images)"
+                fi
+                echo ""
                 
                 local total=$(echo "$manifests" | wc -l)
                 echo "    📊 Images actuelles: $total"
@@ -278,17 +312,28 @@ jobs:
                 fi
                 
                 local to_delete=$((total - 6))
-                echo "    🗑️  Suppression de $to_delete images anciennes..."
+                echo "    🗑️  Suppression de $to_delete images anciennes (garde 6 + buildcache)..."
                 
-                # Supprimer les plus anciennes
-                echo "$manifests" | sort -k2 | head -n "$to_delete" | while read -r digest updated; do
+                # STRATÉGIE: Supprimer les images orphelines (👻 none) et les plus anciennes
+                # 1. D'abord les images orphelines
+                local orphan_count=$(echo "$manifests" | grep -c "none" || echo "0")
+                if [ "$orphan_count" -gt 0 ]; then
+                  echo "      🕳️  Trouvé $orphan_count images orphelines (👻 none)"
+                fi
+                
+                # Supprimer les plus anciennes (exclure buildcache et latest/main)
+                echo "$manifests" | grep -v -E "(buildcache|latest|main$)" | sort -k2 | head -n "$to_delete" | while read -r digest updated tags size; do
                   if [ -n "$digest" ] && [[ "$digest" =~ ^sha256: ]]; then
-                    echo "      🔥 Suppression: $digest ($updated)"
+                    echo "      🔥 Suppression: ${digest:0:20}..."
+                    echo "         📅 Date: $updated"  
+                    echo "         🏷️  Tags: $tags"
+                    echo "         📦 Taille: $size"
                     if doctl registry repository delete-manifest --force "$actual_repo" "$digest" 2>/dev/null; then
-                      echo "      ✅ Supprimé"
+                      echo "         ✅ Supprimé avec succès"
                     else
-                      echo "      ❌ Échec"
+                      echo "         ❌ Échec de suppression"
                     fi
+                    echo ""
                   fi
                 done
                 
@@ -368,11 +413,17 @@ jobs:
           echo "📋 Déploiement: ${{ needs.deploy.result == 'success' && '✅ RÉUSSI' || '❌ ÉCHEC' }}"
           echo "🧹 Nettoyage: ${{ needs.cleanup.result == 'success' && '✅ TERMINÉ' || '⚠️ VÉRIFIÉ' }}"
           
-          # Compter les services déployés
+          # Compter les services déployés (correction exit code)
           deployed=0
-          if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then ((deployed++)); fi
-          if [[ "${{ needs.build-backend.result }}" == "success" ]]; then ((deployed++)); fi
-          if [[ "${{ needs.build-llm.result }}" == "success" ]]; then ((deployed++)); fi
+          if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then 
+            deployed=$((deployed + 1))
+          fi
+          if [[ "${{ needs.build-backend.result }}" == "success" ]]; then 
+            deployed=$((deployed + 1))
+          fi
+          if [[ "${{ needs.build-llm.result }}" == "success" ]]; then 
+            deployed=$((deployed + 1))
+          fi
           
           echo ""
           echo "📊 Services déployés: $deployed/3"

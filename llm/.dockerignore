@@ -56,7 +56,6 @@ Thumbs.db
 *.pth
 models/
 checkpoints/
-cache/
 data/
 datasets/
 weights/
