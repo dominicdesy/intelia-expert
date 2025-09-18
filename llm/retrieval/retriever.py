@@ -92,15 +92,15 @@ class HybridWeaviateRetriever:
                 for size, vector in test_vectors.items():
                     try:
                         # CORRIGÉ: Syntaxe v4 - paramètre positionnel
-                        _ = collection.query.near_vector(  # ✅ CORRIGÉ: Utilisation explicite de _
-                            vector,  # ✅ CORRIGÉ: Paramètre positionnel au lieu de vector=
+                        collection.query.near_vector(
+                            vector,  # Paramètre positionnel
                             limit=1,
                         )
 
                         # Si aucune exception, cette dimension fonctionne
                         self.working_vector_dimension = size
                         self.dimension_detection_success = True
-                        logger.info(f"✅ Dimension vectorielle détectée: {size}")
+                        logger.info(f"Dimension vectorielle détectée: {size}")
                         return size
 
                     except Exception as e:
@@ -124,17 +124,15 @@ class HybridWeaviateRetriever:
                             break
 
                 # Aucune dimension détectée avec succès
-                logger.warning(
-                    "⚠️ Aucune dimension détectée, utilisation 384 par défaut"
-                )
+                logger.warning("Aucune dimension détectée, utilisation 384 par défaut")
                 self.working_vector_dimension = 384
                 return 384
 
-            # Exécution dans un thread pour éviter le blocage
+            # Exécution dans un thread pour éviter le blocage - CORRECTION Import
             dimension = await anyio.to_thread(_sync_detect_dimension)
 
             if dimension is None:
-                logger.error("❌ Impossible de détecter la dimension vectorielle")
+                logger.error("Impossible de détecter la dimension vectorielle")
                 self.api_capabilities["api_stability"] = "degraded"
                 self.working_vector_dimension = 384  # Fallback sécurisé
 
@@ -302,13 +300,23 @@ class HybridWeaviateRetriever:
         """NOUVEAU: Calcule alpha dynamiquement selon le contexte de la requête"""
         query_lower = query.lower()
 
-        # Boost basé sur l'intention détectée
-        if intent_result and hasattr(intent_result, "intent_type"):
-            intent_boost = self.fusion_config["intent_boost_factors"].get(
-                intent_result.intent_type.value, 1.0
-            )
-        else:
-            intent_boost = 1.0
+        # Boost basé sur l'intention détectée - CORRECTION gestion des types
+        intent_boost = 1.0
+        if intent_result:
+            if hasattr(intent_result, "intent_type"):
+                intent_value = (
+                    intent_result.intent_type.value
+                    if hasattr(intent_result.intent_type, "value")
+                    else str(intent_result.intent_type)
+                )
+                intent_boost = self.fusion_config["intent_boost_factors"].get(
+                    intent_value, 1.0
+                )
+            elif isinstance(intent_result, dict) and "intent_type" in intent_result:
+                intent_value = intent_result["intent_type"]
+                intent_boost = self.fusion_config["intent_boost_factors"].get(
+                    intent_value, 1.0
+                )
 
         # Requêtes factuelles -> favoriser BM25
         if any(
