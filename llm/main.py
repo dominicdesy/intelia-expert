@@ -3,7 +3,7 @@
 """
 main.py - Intelia Expert Backend - ARCHITECTURE MODULAIRE PURE
 Point d'entrée minimaliste avec délégation complète aux modules
-VERSION CORRIGÉE: Gestion robuste du cache avec mode dégradé
+VERSION CORRIGÉE: Injection des services réparée pour le cache
 """
 
 import os
@@ -31,13 +31,13 @@ logger = logging.getLogger(__name__)
 services = {}
 
 # ============================================================================
-# GESTION DU CYCLE DE VIE - VERSION CORRIGÉE
+# GESTION DU CYCLE DE VIE - VERSION CORRIGÉE INJECTION SERVICES
 # ============================================================================
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Gestion du cycle de vie avec gestion robuste du cache"""
+    """Gestion du cycle de vie avec injection correcte des services"""
 
     logger.info("🚀 Démarrage Intelia Expert Backend - Architecture Modulaire")
 
@@ -134,7 +134,19 @@ async def lifespan(app: FastAPI):
                 f"⚡ RRF Intelligent actif - Learning: {rrf_status.get('learning_mode')}"
             )
 
-        # 6. Application prête
+        # 6. CORRECTION CRITIQUE : Re-créer le router avec les services initialisés
+        logger.info("Mise à jour du router avec services initialisés...")
+
+        # Créer le nouveau router avec les services maintenant disponibles
+        updated_router = create_router(services)
+
+        # Remplacer les routes existantes
+        app.router.routes.clear()
+        app.include_router(updated_router)
+
+        logger.info("✅ Router mis à jour avec services injectés")
+
+        # 7. Application prête
         logger.info(f"🌐 API disponible sur {BASE_PATH}")
         logger.info("📊 Services initialisés:")
         for service_name, service in services.items():
@@ -248,9 +260,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Inclusion du router avec services injectés
-router = create_router(services)
-app.include_router(router)
+# CORRECTION CRITIQUE: Créer un router initial vide, il sera mis à jour dans lifespan
+# Le vrai router avec services sera créé dans la fonction lifespan
+initial_router = create_router({})  # Router vide au démarrage
+app.include_router(initial_router)
 
 # ============================================================================
 # ENDPOINTS DIRECTS (pour compatibilité et debug)
@@ -325,31 +338,32 @@ async def startup_info():
 async def version_info():
     """Endpoint de version pour vérifier les déploiements"""
     import time
-    
+    import importlib.util
+
     # Test d'import du cache pour diagnostic
     cache_import_status = "unknown"
     try:
-        from cache.cache_core import create_cache_core
-        cache_import_status = "success"
-    except ImportError as e:
-        cache_import_status = f"failed: {str(e)}"
+        spec = importlib.util.find_spec("cache.cache_core")
+        if spec is not None:
+            cache_import_status = "success"
+        else:
+            cache_import_status = "failed: module not found"
     except Exception as e:
         cache_import_status = f"error: {str(e)}"
-    
+
     return {
-        "version": "4.0.1-cache-debug",
+        "version": "4.0.2-services-injection-fixed",
         "timestamp": time.time(),
-        "build_time": "2024-09-18-14:15",
+        "build_time": "2024-09-18-15:00",
         "corrections_deployed": True,
         "cache_import_test": cache_import_status,
         "health_monitor_available": "health_monitor" in services,
         "services_count": len(services),
+        "services_list": list(services.keys()),
         "python_working_dir": os.getcwd(),
-        "app_status": "running"
+        "app_status": "running",
+        "router_injection": "fixed",
     }
-
-
-
 
 
 # ============================================================================
@@ -365,5 +379,6 @@ if __name__ == "__main__":
     logger.info(f"🚀 Démarrage serveur sur {host}:{port}")
     logger.info("🔧 Architecture modulaire robuste activée")
     logger.info("🛡️ Mode dégradé supporté pour cache/Redis")
+    logger.info("🔧 Injection des services corrigée")
 
     uvicorn.run("main:app", host=host, port=port, reload=False, log_level="info")

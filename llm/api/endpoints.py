@@ -466,7 +466,7 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
         """Statut détaillé du cache Redis - VERSION CORRIGÉE"""
         try:
             health_monitor = get_service("health_monitor")
-            
+
             # NOUVELLE LOGIQUE: Plus de "Health monitor non disponible"
             if not health_monitor:
                 return {
@@ -485,8 +485,12 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             cache_core = health_monitor.get_service("cache_core")
             if not cache_core:
                 # Diagnostic détaillé si cache_core absent
-                all_services = health_monitor.get_all_services() if hasattr(health_monitor, "get_all_services") else {}
-                
+                all_services = (
+                    health_monitor.get_all_services()
+                    if hasattr(health_monitor, "get_all_services")
+                    else {}
+                )
+
                 return {
                     "enabled": False,
                     "initialized": False,
@@ -503,11 +507,11 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             # Cache_core trouvé - analyser son état
             cache_enabled = safe_get_attribute(cache_core, "enabled", False)
             cache_initialized = safe_get_attribute(cache_core, "initialized", False)
-            
+
             # Récupération sécurisée des statistiques
             cache_stats = {}
             cache_health = {}
-            
+
             try:
                 if hasattr(cache_core, "get_cache_stats"):
                     cache_stats = await cache_core.get_cache_stats()
@@ -515,7 +519,7 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                     cache_stats = cache_core.get_stats()
             except Exception as stats_e:
                 cache_stats = {"stats_error": str(stats_e)}
-            
+
             try:
                 if hasattr(cache_core, "get_health_status"):
                     cache_health = cache_core.get_health_status()
@@ -532,9 +536,13 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                 "debug_info": {
                     "cache_core_type": type(cache_core).__name__,
                     "cache_core_methods": [
-                        method for method in dir(cache_core) 
-                        if not method.startswith('_') and callable(getattr(cache_core, method))
-                    ][:10],  # Limiter à 10 méthodes pour lisibilité
+                        method
+                        for method in dir(cache_core)
+                        if not method.startswith("_")
+                        and callable(getattr(cache_core, method))
+                    ][
+                        :10
+                    ],  # Limiter à 10 méthodes pour lisibilité
                     "has_client": hasattr(cache_core, "client"),
                     "client_available": getattr(cache_core, "client", None) is not None,
                     "has_config": hasattr(cache_core, "config"),
@@ -617,10 +625,12 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                         else:
                             cache_stats = {
                                 "enabled": getattr(cache_core, "enabled", False),
-                                "initialized": getattr(cache_core, "initialized", False),
-                                "no_stats_method": True
+                                "initialized": getattr(
+                                    cache_core, "initialized", False
+                                ),
+                                "no_stats_method": True,
                             }
-                        
+
                         base_metrics["cache"] = safe_serialize_for_json(cache_stats)
                     except Exception as e:
                         logger.error(f"Erreur métriques cache: {e}")
