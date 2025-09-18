@@ -3,8 +3,6 @@
 """
 main.py - Intelia Expert Backend - ARCHITECTURE MODULAIRE PURE
 Point d'entrée minimaliste avec délégation complète aux modules
-VERSION CORRIGÉE: Injection des services réparée pour le cache
-DEBUG: Messages visibles pour tracer le déploiement
 """
 
 # === DEBUG DEPLOYMENT - MESSAGES VISIBLES ===
