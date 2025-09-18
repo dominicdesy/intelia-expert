@@ -59,7 +59,7 @@ jobs:
           tags: |
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:latest
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:${{ github.sha }}com/${{ secrets.DOCR_NAME }}/intelia-frontend:${{ github.sha }}
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache,mode=max
           platforms: linux/amd64
@@ -161,45 +161,21 @@ jobs:
             fi
           done
 
-      # Option A: Déploiement simple avec force rebuild
-      - name: Trigger redeploy (use current app sources)
+      # Déploiement avec le tag 'main' que cherche App Platform
+      - name: Trigger redeploy
         run: |
           echo "🚀 Déclenchement du redéploiement..."
           echo "App ID: ${{ secrets.DO_APP_ID }}"
           if [ -z "${{ secrets.DO_APP_ID }}" ]; then
             echo "❌ Erreur: DO_APP_ID secret n'est pas configuré"
             echo "👉 Ajoutez le secret DO_APP_ID dans GitHub Settings > Secrets"
-            echo "💡 Pour trouver votre App ID:"
-            echo "   doctl apps list --format ID,Spec.Name"
             exit 1
           fi
           
-          # Attendre un peu pour la propagation du registry
           echo "⏳ Attente de 30s pour la propagation du registry..."
           sleep 30
           
           doctl apps create-deployment ${{ secrets.DO_APP_ID }} --force-rebuild --wait
-
-      # Option B: Déploiement avec tags immuables (recommandé & idempotent)
-      # Décommentez si vous préférez piloter par tag SHA plutôt que latest
-      # - name: Update spec with immutable image tags and deploy
-      #   env:
-      #     DO_APP_ID: ${{ secrets.DO_APP_ID }}
-      #     GITHUB_SHA: ${{ github.sha }}
-      #   run: |
-      #     echo "📦 Récupération de la spec..."
-      #     doctl apps spec get "$DO_APP_ID" > app.yaml
-      #
-      #     # Remplacez par les noms EXACTS de vos services dans App Platform:
-      #     # ex: backend, frontend, llm
-      #     yq -i '(.spec.services[] | select(.name=="backend").image.tag) = env(GITHUB_SHA)' app.yaml
-      #     yq -i '(.spec.services[] | select(.name=="frontend").image.tag) = env(GITHUB_SHA)' app.yaml
-      #     yq -i '(.spec.services[] | select(.name=="llm").image.tag) = env(GITHUB_SHA)' app.yaml
-      #
-      #     echo "📝 Mise à jour de l'app spec..."
-      #     doctl apps update "$DO_APP_ID" --spec app.yaml
-      #     echo "🚀 Déploiement..."
-      #     doctl apps create-deployment "$DO_APP_ID" --wait
 
       - name: Deployment status
         run: |
