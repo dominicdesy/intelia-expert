@@ -300,7 +300,7 @@ logger.critical("🔗 ROUTER INITIAL AJOUTÉ - SERA MIS À JOUR DANS LIFESPAN �
 # ============================================================================
 
 
-@app.get("/test-json")
+@app.get("/llm/test-json")
 async def test_json_direct():
     """Test simple de sérialisation JSON"""
     from utils.utilities import safe_serialize_for_json
@@ -331,7 +331,7 @@ async def test_json_direct():
         return {"status": "error", "error": str(e), "json_test": "FAILED"}
 
 
-@app.get("/startup-info")
+@app.get("/llm/startup-info")
 async def startup_info():
     """Informations sur le démarrage et les services"""
     try:
@@ -366,7 +366,7 @@ async def startup_info():
         return {"error": str(e), "timestamp": time.time(), "debug_version": "4.0.2-debug-deployment-test"}
 
 
-@app.get("/version")
+@app.get("/llm/version")
 async def version_info():
     """Endpoint de version pour vérifier les déploiements"""
     import importlib.util
@@ -399,7 +399,7 @@ async def version_info():
     }
 
 
-@app.get("/deployment-test")
+@app.get("/llm/deployment-test")
 async def deployment_test():
     """Endpoint de test simple pour confirmer le déploiement"""
     return {
