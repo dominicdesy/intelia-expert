@@ -139,15 +139,9 @@ jobs:
     if: ${{ always() && (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success' || needs.build-llm.result == 'success') }}
     steps:
       - name: Install doctl
-        run: |
-          curl -sL https://github.com/digitalocean/doctl/releases/latest/download/doctl-$(uname -s | tr '[:upper:]' '[:lower:]')-amd64.tar.gz \
-          | tar -xz
-          sudo mv doctl /usr/local/bin/doctl
-
-      - name: Auth doctl
-        env:
-          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-        run: doctl auth init -t "$DIGITALOCEAN_ACCESS_TOKEN"
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
       # Option A: Déploiement simple avec les tags latest
       - name: Trigger redeploy (use current app sources)
