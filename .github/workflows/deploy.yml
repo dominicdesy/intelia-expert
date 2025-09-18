@@ -143,34 +143,53 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
+      # Diagnostic complet avant déploiement
+      - name: Debug App Platform configuration
+        run: |
+          echo "🔍 Diagnostic de la configuration App Platform..."
+          
+          # Récupérer la spec actuelle de l'app
+          echo "📋 Récupération de la spec actuelle..."
+          doctl apps spec get ${{ secrets.DO_APP_ID }} > current-app-spec.yaml
+          
+          echo "📝 Configuration actuelle de l'app:"
+          cat current-app-spec.yaml
+          
+          echo ""
+          echo "🔍 Images configurées dans App Platform:"
+          # Extraire les images de la spec
+          grep -A 2 -B 2 "image:" current-app-spec.yaml || echo "Aucune image trouvée dans la spec"
+          
+          echo ""
+          echo "📦 Images disponibles dans le registry:"
+          
+          # Lister toutes les images du registry
+          echo "Backend images:"
+          doctl registry repository list-manifests intelia-backend --format Tag,Digest | head -5
+          echo ""
+          echo "Frontend images:"
+          doctl registry repository list-manifests intelia-frontend --format Tag,Digest | head -5
+          echo ""
+          echo "LLM images:"
+          doctl registry repository list-manifests intelia-llm --format Tag,Digest | head -5
+
       # Vérification de la disponibilité des images avant déploiement
       - name: Verify images availability
         run: |
           echo "🔍 Vérification des images dans le registry..."
           
-          # Vérifier quelles images ont été buildées dans ce workflow
-          IMAGES_TO_CHECK=""
-          if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
-            IMAGES_TO_CHECK="$IMAGES_TO_CHECK intelia-frontend"
-          fi
-          if [[ "${{ needs.build-backend.result }}" == "success" ]]; then
-            IMAGES_TO_CHECK="$IMAGES_TO_CHECK intelia-backend"
-          fi
-          if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
-            IMAGES_TO_CHECK="$IMAGES_TO_CHECK intelia-llm"
-          fi
-          
-          echo "Images à vérifier: $IMAGES_TO_CHECK"
-          
-          # Vérifier chaque image
-          for image in $IMAGES_TO_CHECK; do
-            echo "Vérification de $image:latest..."
-            if doctl registry repository list-manifests $image --format Tag | grep -q "latest"; then
-              echo "✅ $image:latest trouvée"
+          # Vérifier les tags latest spécifiquement
+          for repo in intelia-backend intelia-frontend intelia-llm; do
+            echo "Vérification de $repo..."
+            if doctl registry repository list-manifests $repo --format Tag | grep -q "latest"; then
+              echo "✅ $repo:latest trouvée"
+              # Obtenir le digest de l'image latest
+              digest=$(doctl registry repository list-manifests $repo --format Tag,Digest | grep "latest" | awk '{print $2}' | head -1)
+              echo "   Digest: $digest"
             else
-              echo "❌ $image:latest introuvable"
-              echo "📋 Tags disponibles pour $image:"
-              doctl registry repository list-manifests $image --format Tag || echo "Aucun tag trouvé"
+              echo "❌ $repo:latest introuvable"
+              echo "📋 Tags disponibles pour $repo:"
+              doctl registry repository list-manifests $repo --format Tag | head -5
             fi
           done
 
