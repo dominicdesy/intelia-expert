@@ -77,7 +77,7 @@ class ProcessingResult:
 
 
 # ============================================================================
-# COLLECTEUR DE MÉTRIQUES (Version complète)
+# COLLECTEUR DE MÉTRIQUES (Version complète avec méthodes manquantes)
 # ============================================================================
 
 
@@ -130,6 +130,48 @@ class MetricsCollector:
             self.ood_stats.get("avg_ood_score", 0.0) * (self.ood_stats["ood_total"] - 1)
             + score
         ) / self.ood_stats["ood_total"]
+
+    # ✅ NOUVEAU: Méthode manquante ood_accepted()
+    def ood_accepted(self, score: float, reason: str = "accepted"):
+        """Trace les requêtes acceptées après validation OOD"""
+        self.ood_stats[f"ood_{reason}"] += 1
+        self.ood_stats["ood_accepted_total"] += 1
+
+        # Mise à jour du score moyen pour les acceptées
+        current_avg = self.ood_stats.get("avg_accepted_score", 0.0)
+        total_accepted = self.ood_stats["ood_accepted_total"]
+        if total_accepted > 0:
+            self.ood_stats["avg_accepted_score"] = (
+                current_avg * (total_accepted - 1) + score
+            ) / total_accepted
+
+    # ✅ NOUVEAU: Méthode manquante hybrid_search_completed()
+    def hybrid_search_completed(
+        self, results_count: int, alpha: float, duration: float, intent_type: str = None
+    ):
+        """Trace les recherches hybrides complétées"""
+        self.search_stats["hybrid_searches"] += 1
+        self.search_stats["total_results"] += results_count
+        self.search_stats["total_duration"] += duration
+
+        if intent_type:
+            self.search_stats[f"intent_{intent_type}_searches"] += 1
+
+        # Moyenne glissante des performances
+        searches = self.search_stats["hybrid_searches"]
+        if searches > 0:
+            self.search_stats["avg_results_per_search"] = (
+                self.search_stats["total_results"] / searches
+            )
+            self.search_stats["avg_duration_per_search"] = (
+                self.search_stats["total_duration"] / searches
+            )
+
+    # ✅ NOUVEAU: Méthodes additionnelles pour completeness
+    def retrieval_error(self, error_type: str, error_msg: str):
+        """Trace les erreurs de récupération"""
+        self.search_stats[f"error_{error_type}"] += 1
+        self.search_stats["total_errors"] += 1
 
     def api_correction_applied(self, correction_type: str):
         self.api_corrections[correction_type] += 1

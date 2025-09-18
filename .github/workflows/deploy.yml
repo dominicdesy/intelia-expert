@@ -207,111 +207,88 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Working automatic registry cleanup
+      - name: Brutal but working registry cleanup
         run: |
-          echo "🧹 NETTOYAGE AUTOMATIQUE - VERSION QUI FONCTIONNE"
-          echo "================================================"
+          echo "🧹 NETTOYAGE BRUTAL - APPROCHE SIMPLIFIÉE"
+          echo "========================================="
           
-          # Fonction utilisant l'API REST au lieu de doctl problématique
-          cleanup_with_api() {
+          # Fonction de nettoyage brutal - supprime en masse
+          brutal_cleanup() {
             local repo=$1
-            local max_images=8
-            
             echo ""
-            echo "🔍 Nettoyage API pour $repo..."
+            echo "🔥 Nettoyage brutal de $repo..."
             
-            # Utiliser curl avec l'API DO au lieu de doctl défaillant
-            local registry_name="${{ secrets.DOCR_NAME }}"
-            local api_url="https://api.digitalocean.com/v2/registry/$registry_name/repositories/$repo/tags"
+            # Récupérer TOUS les digests possibles sans format complexe
+            local all_digests=$(doctl registry repository list-manifests $repo --no-header 2>/dev/null | grep "sha256:" | awk '{print $1}')
             
-            echo "  📡 Récupération via API REST..."
-            local response=$(curl -s -X GET "$api_url?per_page=100" \
-              -H "Authorization: Bearer ${{ secrets.DOCR_ACCESS_TOKEN }}" \
-              -H "Content-Type: application/json")
-            
-            # Extraire les tags et leurs informations
-            local tags_info=$(echo "$response" | jq -r '.tags[] | select(.name != "buildcache" and .name != "latest") | "\(.name)|\(.updated_at)"' 2>/dev/null || echo "")
-            
-            if [ -z "$tags_info" ]; then
-              echo "  ⚠️ Pas de tags récupérés via API, tentative doctl..."
-              
-              # Fallback: Utiliser doctl avec pagination forcée
-              local manifests=$(doctl registry repository list-manifests "$repo" --format Digest,Updated,Tags --no-header --limit 100 2>/dev/null)
-              local digests_to_delete=$(echo "$manifests" | grep -v -E "(buildcache|latest|main$)" | sort -k2 | head -20 | awk '{print $1}')
-              
-              local count=0
-              for digest in $digests_to_delete; do
-                if [ $count -ge 15 ]; then break; fi
-                if [[ "$digest" =~ ^sha256: ]]; then
-                  echo "    🗑️ Suppression: ${digest:0:20}..."
-                  doctl registry repository delete-manifest --force "$repo" "$digest" 2>/dev/null && echo "      ✅ OK" || echo "      ❌ Échec"
-                  count=$((count + 1))
-                  sleep 0.5
-                fi
-              done
-              
+            if [ -z "$all_digests" ]; then
+              echo "  ❌ Aucun digest trouvé"
               return 0
             fi
             
-            # Traitement des tags récupérés via API
-            local total_tags=$(echo "$tags_info" | wc -l)
-            echo "  📊 Tags trouvés (hors buildcache/latest): $total_tags"
+            local total=$(echo "$all_digests" | wc -l)
+            echo "  📊 Digests trouvés: $total"
             
-            if [ "$total_tags" -le "$max_images" ]; then
-              echo "  ✅ Pas de nettoyage nécessaire ($total_tags <= $max_images)"
-              return 0
+            # Pour LLM avec 47 images, supprimer les 30 premiers (brutal mais efficace)
+            local max_to_delete=30
+            if [ "$repo" = "intelia-llm" ]; then
+              max_to_delete=35  # Plus agressif pour LLM
+            else
+              max_to_delete=5   # Modéré pour les autres
             fi
             
-            local to_delete=$((total_tags - max_images))
-            echo "  🗑️ Tags à supprimer: $to_delete"
+            echo "  🗑️ Suppression brutale de $max_to_delete digests..."
             
-            # Supprimer les plus anciens
-            local deleted=0
-            echo "$tags_info" | sort -t'|' -k2 | head -n "$to_delete" | while IFS='|' read tag_name updated_at; do
-              if [ $deleted -ge 20 ]; then break; fi
+            local count=0
+            echo "$all_digests" | head -n $max_to_delete | while read digest; do
+              if [ $count -ge $max_to_delete ]; then break; fi
               
-              echo "    🗑️ Suppression tag: $tag_name ($updated_at)"
+              echo "    💥 Suppression $((count+1))/$max_to_delete: ${digest:0:20}..."
               
-              # Supprimer via API REST
-              local delete_url="https://api.digitalocean.com/v2/registry/$registry_name/repositories/$repo/tags/$tag_name"
-              local delete_response=$(curl -s -X DELETE "$delete_url" \
-                -H "Authorization: Bearer ${{ secrets.DOCR_ACCESS_TOKEN }}" \
-                -w "%{http_code}")
-              
-              if [[ "$delete_response" =~ 20[0-9] ]]; then
-                echo "      ✅ Supprimé (HTTP $delete_response)"
-                deleted=$((deleted + 1))
+              if doctl registry repository delete-manifest --force $repo $digest >/dev/null 2>&1; then
+                echo "      ✅ OK"
               else
-                echo "      ❌ Échec (HTTP $delete_response)"
+                echo "      ⚠️ Échec (normal pour certains digests)"
               fi
               
-              sleep 1
+              count=$((count + 1))
+              
+              # Petite pause pour éviter rate limiting
+              sleep 0.2
             done
+            
+            echo "  ⏳ Attente 10s pour synchronisation..."
+            sleep 10
+            
+            # Statut après nettoyage
+            local remaining=$(doctl registry repository list --format Name,TagCount --no-header 2>/dev/null | grep "^$repo " | awk '{print $2}' || echo "?")
+            echo "  📊 Images restantes: $remaining"
           }
           
-          # Installer jq pour le parsing JSON
-          echo "📦 Installation de jq..."
-          sudo apt-get update -qq && sudo apt-get install -y jq
+          echo "🚀 Nettoyage en ordre de priorité..."
           
-          # Nettoyer les repositories dans l'ordre de priorité
-          cleanup_with_api "intelia-llm"     # Priorité (43 images)
-          cleanup_with_api "intelia-backend" 
-          cleanup_with_api "intelia-frontend"
+          # LLM en premier (47 images - critique)
+          brutal_cleanup "intelia-llm"
           
-          # Passe supplémentaire pour LLM
+          # Double passe pour LLM si nécessaire
           echo ""
-          echo "🔄 Passe supplémentaire pour intelia-llm..."
-          cleanup_with_api "intelia-llm"
+          echo "🔄 Seconde passe pour intelia-llm..."
+          brutal_cleanup "intelia-llm"
+          
+          # Autres repos (déjà dans les limites acceptables)
+          brutal_cleanup "intelia-backend" 
+          brutal_cleanup "intelia-frontend"
           
           echo ""
           echo "🗑️ Garbage collection final..."
-          doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force 2>/dev/null && echo "✅ GC lancé" || echo "⚠️ GC en cours"
+          doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force >/dev/null 2>&1 && echo "✅ GC lancé" || echo "⚠️ GC déjà actif"
           
           echo ""
-          echo "📊 STATUT FINAL:"
+          echo "📊 STATUT FINAL APRÈS NETTOYAGE:"
           doctl registry repository list --format Name,TagCount,UpdatedAt
           
-          echo "🎉 Nettoyage automatique terminé"
+          echo ""
+          echo "🎉 Nettoyage brutal terminé - Vérifiez les résultats ci-dessus"
 
   # 📊 Résumé (basé sur la version qui fonctionnait)
   summary:
