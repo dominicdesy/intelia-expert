@@ -225,30 +225,47 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Cleanup old images
+      - name: Cleanup old images (keep only 8 per repo)
         run: |
-          echo "🧹 Nettoyage des anciennes images..."
+          echo "🧹 Nettoyage agressif des anciennes images..."
           
-          # Nettoyage frontend
-          if doctl registry repository list | grep -q "intelia-frontend"; then
-            echo "Nettoyage frontend..."
-            doctl registry repository list-manifests intelia-frontend --format Digest | head -n -5 | xargs -I {} doctl registry repository delete-manifest intelia-frontend {} --force || true
-          fi
+          # Fonction pour nettoyer un repository
+          cleanup_repo() {
+            local repo=$1
+            echo "Nettoyage de $repo..."
+            
+            # Obtenir tous les manifests triés par date (plus récent en premier)
+            local manifests=$(doctl registry repository list-manifests $repo --format Digest --no-header | head -n +100)
+            local count=$(echo "$manifests" | wc -l)
+            
+            echo "  Images actuelles: $count"
+            
+            if [ $count -gt 8 ]; then
+              local to_delete=$((count - 8))
+              echo "  À supprimer: $to_delete images"
+              
+              # Supprimer les plus anciennes (garder les 8 plus récentes)
+              echo "$manifests" | tail -n +9 | while read digest; do
+                if [ ! -z "$digest" ]; then
+                  echo "  Suppression: $digest"
+                  doctl registry repository delete-manifest $repo $digest --force || echo "    Échec suppression $digest"
+                fi
+              done
+            else
+              echo "  Aucun nettoyage nécessaire (≤8 images)"
+            fi
+          }
           
-          # Nettoyage backend
-          if doctl registry repository list | grep -q "intelia-backend"; then
-            echo "Nettoyage backend..."
-            doctl registry repository list-manifests intelia-backend --format Digest | head -n -5 | xargs -I {} doctl registry repository delete-manifest intelia-backend {} --force || true
-          fi
+          # Nettoyer chaque repository
+          cleanup_repo "intelia-backend"
+          cleanup_repo "intelia-frontend"  
+          cleanup_repo "intelia-llm"
           
-          # Nettoyage LLM  
-          if doctl registry repository list | grep -q "intelia-llm"; then
-            echo "Nettoyage LLM..."
-            doctl registry repository list-manifests intelia-llm --format Digest | head -n -5 | xargs -I {} doctl registry repository delete-manifest intelia-llm {} --force || true
-          fi
-          
-          # Garbage collection
+          # Garbage collection pour libérer l'espace
+          echo "🗑️ Lancement du garbage collection..."
           doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force || echo "Garbage collection déjà en cours"
+          
+          echo "✅ Nettoyage terminé"
 
   # Résumé
   summary:
