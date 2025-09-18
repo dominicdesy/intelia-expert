@@ -422,7 +422,6 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
     # ========================================================================
     # ENDPOINTS HEALTH CHECK
     # ========================================================================
-
     @router.get(f"{BASE_PATH}/health")
     async def health_check():
         """Health check principal"""
@@ -442,7 +441,9 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                 else:
                     status_code = 503
 
-                return JSONResponse(status_code=status_code, content=health_status)
+                # AJOUT: Sérialisation sécurisée avant retour JSON
+                safe_health_status = safe_serialize_for_json(health_status)
+                return JSONResponse(status_code=status_code, content=safe_health_status)
             else:
                 return JSONResponse(
                     status_code=200,

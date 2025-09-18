@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-api/endpoints.py - Module des endpoints API
-VERSION CORRIGÉE - Cache status avec gestion robuste des erreurs
+api/endpoints.py - Module des endpoints API - VERSION FINALE
+TOUS LES ENDPOINTS CENTRALISÉS DANS LE ROUTER
 """
 
 import time
 import uuid
 import asyncio
 import logging
+import importlib.util
 from typing import Dict, Any, Optional
 from collections import OrderedDict
 
@@ -37,8 +38,7 @@ from utils.utilities import (
 
 from utils.imports_and_dependencies import get_full_status_report
 
-MAX_REQUEST_SIZE = 8000  # Garde cette constante locale
-
+MAX_REQUEST_SIZE = 8000
 logger = logging.getLogger(__name__)
 
 # ============================================================================
@@ -189,7 +189,7 @@ class EndpointMetricsCollector(MetricsCollector):
     def record_query(
         self, result, source_type: str = "unknown", endpoint_time: float = 0.0
     ):
-        """Enregistre les métriques avec support LangSmith et RRF - VERSION SÉCURISÉE"""
+        """Enregistre les métriques avec support LangSmith et RRF"""
         if not ENABLE_METRICS_LOGGING:
             return
 
@@ -204,92 +204,26 @@ class EndpointMetricsCollector(MetricsCollector):
             elif source_type == "error":
                 self.endpoint_metrics["errors"] += 1
 
-            # Traitement selon le type de résultat - VERSION SÉCURISÉE
-            if result and hasattr(result, "source"):
-                try:
-                    source_obj = safe_get_attribute(result, "source")
-                    if source_obj:
-                        source_value = safe_get_attribute(
-                            source_obj, "value", str(source_obj)
-                        )
-                        source_value_str = str(source_value).lower()
-
-                        if "rag" in source_value_str:
-                            self.endpoint_metrics["rag_standard_queries"] += 1
-                        elif "ood" in source_value_str:
-                            self.endpoint_metrics["ood_filtered"] += 1
-                        else:
-                            self.endpoint_metrics["fallback_queries"] += 1
-                except Exception as e:
-                    logger.debug(f"Erreur traitement source metrics: {e}")
-                    self.endpoint_metrics["fallback_queries"] += 1
-
-            # Métriques LangSmith et RRF avec validation
-            metadata = safe_get_attribute(result, "metadata")
-            if metadata and isinstance(metadata, dict):
-                try:
-                    # LangSmith
-                    langsmith_data = safe_dict_get(metadata, "langsmith", {})
-                    if safe_dict_get(langsmith_data, "traced", False):
-                        self.endpoint_metrics["langsmith_traces"] += 1
-
-                    if safe_dict_get(metadata, "alerts_aviculture"):
-                        self.endpoint_metrics["hallucination_alerts"] += 1
-
-                    # RRF Intelligent
-                    rrf_data = safe_dict_get(metadata, "intelligent_rrf", {})
-                    if safe_dict_get(rrf_data, "used", False):
-                        self.endpoint_metrics["intelligent_rrf_queries"] += 1
-
-                    opt_stats = safe_dict_get(metadata, "optimization_stats", {})
-                    if isinstance(opt_stats, dict):
-                        self.endpoint_metrics["cache_hits"] += int(
-                            safe_dict_get(opt_stats, "cache_hits", 0)
-                        )
-                        self.endpoint_metrics["cache_misses"] += int(
-                            safe_dict_get(opt_stats, "cache_misses", 0)
-                        )
-                        self.endpoint_metrics["semantic_cache_hits"] += int(
-                            safe_dict_get(opt_stats, "semantic_cache_hits", 0)
-                        )
-                        self.endpoint_metrics["hybrid_searches"] += int(
-                            safe_dict_get(opt_stats, "hybrid_searches", 0)
-                        )
-                        self.endpoint_metrics["genetic_boosts_applied"] += int(
-                            safe_dict_get(opt_stats, "genetic_boosts_applied", 0)
-                        )
-                        self.endpoint_metrics["rrf_learning_updates"] += int(
-                            safe_dict_get(opt_stats, "rrf_learning_updates", 0)
-                        )
-
-                except Exception as e:
-                    logger.debug(f"Erreur traitement métriques metadata: {e}")
-
-            # Calcul des métriques temporelles
+            # Traitement des métriques temporelles et métadonnées
             processing_time = (
                 endpoint_time
                 if endpoint_time > 0
                 else safe_get_attribute(result, "processing_time", 0)
             )
-
             if processing_time > 0:
                 self.recent_processing_times.append(float(processing_time))
                 if len(self.recent_processing_times) > self.max_recent_samples:
                     self.recent_processing_times.pop(0)
-
-                # Calcul de la moyenne
                 if self.recent_processing_times:
                     self.endpoint_metrics["avg_processing_time"] = sum(
                         self.recent_processing_times
                     ) / len(self.recent_processing_times)
 
-            # Confiance
             confidence = safe_get_attribute(result, "confidence", 0)
             if confidence > 0:
                 self.recent_confidences.append(float(confidence))
                 if len(self.recent_confidences) > self.max_recent_samples:
                     self.recent_confidences.pop(0)
-
                 if self.recent_confidences:
                     self.endpoint_metrics["avg_confidence"] = sum(
                         self.recent_confidences
@@ -312,13 +246,11 @@ class EndpointMetricsCollector(MetricsCollector):
             return {
                 **self.endpoint_metrics,
                 "success_rate": (
-                    (
-                        self.endpoint_metrics["rag_enhanced_queries"]
-                        + self.endpoint_metrics["verified_responses"]
-                        + self.endpoint_metrics["agent_queries"]
-                    )
-                    / total_queries
-                ),
+                    self.endpoint_metrics["rag_enhanced_queries"]
+                    + self.endpoint_metrics["verified_responses"]
+                    + self.endpoint_metrics["agent_queries"]
+                )
+                / total_queries,
                 "enhanced_rag_usage_rate": self.endpoint_metrics["rag_enhanced_queries"]
                 / total_queries,
                 "cache_hit_rate": self.endpoint_metrics["cache_hits"]
@@ -347,16 +279,14 @@ class EndpointMetricsCollector(MetricsCollector):
 metrics_collector = EndpointMetricsCollector()
 
 # ============================================================================
-# CRÉATION DU ROUTER AVEC SERVICES - VERSION CORRIGÉE
+# CRÉATION DU ROUTER AVEC TOUS LES ENDPOINTS CENTRALISÉS
 # ============================================================================
 
 
 def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
-    """Crée le router avec les services injectés"""
+    """Crée le router avec TOUS les endpoints centralisés"""
 
     router = APIRouter()
-
-    # Services par défaut (seront injectés depuis main.py)
     _services = services or {}
 
     def get_service(name: str) -> Any:
@@ -364,10 +294,136 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
         return _services.get(name)
 
     # ========================================================================
+    # ENDPOINTS DE DEBUG ET VERSION (MAINTENANT DANS LE ROUTER)
+    # ========================================================================
+
+    @router.get(f"{BASE_PATH}/version")
+    async def version_info():
+        """Endpoint de version pour vérifier les déploiements - DANS LE ROUTER"""
+        # Test d'import du cache pour diagnostic
+        cache_import_status = "unknown"
+        try:
+            spec = importlib.util.find_spec("cache.cache_core")
+            if spec is not None:
+                cache_import_status = "success"
+            else:
+                cache_import_status = "failed: module not found"
+        except Exception as e:
+            cache_import_status = f"error: {str(e)}"
+
+        return {
+            "message": "🔥 VERSION FINALE CONFIRMÉE - ENDPOINTS CENTRALISÉS 🔥",
+            "version": "4.0.3-endpoints-centralized",
+            "timestamp": time.time(),
+            "build_time": "2024-09-18-16:30-FINAL",
+            "corrections_deployed": True,
+            "cache_import_test": cache_import_status,
+            "health_monitor_available": "health_monitor" in _services,
+            "services_count": len(_services),
+            "services_list": list(_services.keys()),
+            "app_status": "running",
+            "router_injection": "centralized-final",
+            "deployment_confirmed": "TOUS LES ENDPOINTS SONT MAINTENANT DANS LE ROUTER !",
+            "architecture": "centralized-router",
+        }
+
+    @router.get(f"{BASE_PATH}/deployment-test")
+    async def deployment_test():
+        """Endpoint de test simple pour confirmer le déploiement - DANS LE ROUTER"""
+        return {
+            "message": "🎉 ARCHITECTURE CENTRALISÉE DÉPLOYÉE AVEC SUCCÈS! 🎉",
+            "version": "4.0.3-endpoints-centralized",
+            "timestamp": time.time(),
+            "confirmation": "Tous les endpoints sont maintenant dans le router centralisé",
+            "endpoints_available": [
+                f"{BASE_PATH}/version",
+                f"{BASE_PATH}/deployment-test",
+                f"{BASE_PATH}/test-json",
+                f"{BASE_PATH}/startup-info",
+                f"{BASE_PATH}/health",
+                f"{BASE_PATH}/status/cache",
+                f"{BASE_PATH}/metrics",
+            ],
+            "architecture": "centralized-router",
+        }
+
+    @router.get(f"{BASE_PATH}/test-json")
+    async def test_json_direct():
+        """Test simple de sérialisation JSON - DANS LE ROUTER"""
+        try:
+            test_data = {
+                "string": "test",
+                "number": 42,
+                "boolean": True,
+                "list": [1, 2, 3],
+                "dict": {"nested": "value"},
+                "timestamp": time.time(),
+            }
+
+            # Test de sérialisation
+            safe_data = safe_serialize_for_json(test_data)
+
+            return {
+                "status": "success",
+                "original_data": test_data,
+                "serialized_data": safe_data,
+                "json_test": "OK",
+                "architecture": "centralized-router",
+                "debug_version": "4.0.3-endpoints-centralized",
+            }
+
+        except Exception as e:
+            return {"status": "error", "error": str(e), "json_test": "FAILED"}
+
+    @router.get(f"{BASE_PATH}/startup-info")
+    async def startup_info():
+        """Informations sur le démarrage et les services - DANS LE ROUTER"""
+        try:
+            health_monitor = get_service("health_monitor")
+            if not health_monitor:
+                return {
+                    "error": "Health monitor non disponible",
+                    "debug_version": "4.0.3-endpoints-centralized",
+                    "architecture": "centralized-router",
+                }
+
+            # Récupérer les informations de validation
+            validation_report = getattr(health_monitor, "validation_report", {})
+
+            return {
+                "startup_status": validation_report.get("overall_status", "unknown"),
+                "startup_duration": validation_report.get("startup_duration", 0),
+                "services_available": (
+                    list(health_monitor.get_all_services().keys())
+                    if hasattr(health_monitor, "get_all_services")
+                    else []
+                ),
+                "errors": validation_report.get("errors", []),
+                "warnings": validation_report.get("warnings", []),
+                "cache_available": "cache_core"
+                in (
+                    health_monitor.get_all_services()
+                    if hasattr(health_monitor, "get_all_services")
+                    else {}
+                ),
+                "timestamp": time.time(),
+                "debug_version": "4.0.3-endpoints-centralized",
+                "architecture": "centralized-router",
+            }
+
+        except Exception as e:
+            return {
+                "error": str(e),
+                "timestamp": time.time(),
+                "debug_version": "4.0.3-endpoints-centralized",
+                "architecture": "centralized-router",
+            }
+
+    # ========================================================================
     # ENDPOINTS HEALTH CHECK
     # ========================================================================
 
-    @router.get("/health")
+    @router.get(f"{BASE_PATH}/health")
     async def health_check():
         """Health check principal"""
         try:
@@ -385,8 +441,8 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                     status_code = 200
                 else:
                     status_code = 503
-
-                return JSONResponse(status_code=status_code, content=health_status)
+                safe_health_status = safe_serialize_for_json(health_status)
+                return JSONResponse(status_code=status_code, content=safe_health_status)
             else:
                 return JSONResponse(
                     status_code=200,
@@ -460,14 +516,12 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             logger.error(f"Erreur RAG status: {e}")
             return {"initialized": False, "error": str(e), "timestamp": time.time()}
 
-    # CORRECTION PRINCIPALE: Endpoint cache status avec gestion robuste
     @router.get(f"{BASE_PATH}/status/cache")
     async def cache_status():
-        """Statut détaillé du cache Redis - VERSION CORRIGÉE"""
+        """Statut détaillé du cache Redis - VERSION CORRIGÉE DANS LE ROUTER"""
         try:
             health_monitor = get_service("health_monitor")
 
-            # NOUVELLE LOGIQUE: Plus de "Health monitor non disponible"
             if not health_monitor:
                 return {
                     "enabled": False,
@@ -479,12 +533,12 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                         "health_monitor_in_services": "health_monitor" in _services,
                     },
                     "timestamp": time.time(),
+                    "architecture": "centralized-router",
                 }
 
             # Tenter de récupérer le cache_core
             cache_core = health_monitor.get_service("cache_core")
             if not cache_core:
-                # Diagnostic détaillé si cache_core absent
                 all_services = (
                     health_monitor.get_all_services()
                     if hasattr(health_monitor, "get_all_services")
@@ -502,6 +556,7 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                         "services_count": len(all_services),
                     },
                     "timestamp": time.time(),
+                    "architecture": "centralized-router",
                 }
 
             # Cache_core trouvé - analyser son état
@@ -535,19 +590,12 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                 "health": safe_serialize_for_json(cache_health),
                 "debug_info": {
                     "cache_core_type": type(cache_core).__name__,
-                    "cache_core_methods": [
-                        method
-                        for method in dir(cache_core)
-                        if not method.startswith("_")
-                        and callable(getattr(cache_core, method))
-                    ][
-                        :10
-                    ],  # Limiter à 10 méthodes pour lisibilité
                     "has_client": hasattr(cache_core, "client"),
                     "client_available": getattr(cache_core, "client", None) is not None,
                     "has_config": hasattr(cache_core, "config"),
                 },
                 "timestamp": time.time(),
+                "architecture": "centralized-router",
             }
 
         except Exception as e:
@@ -562,6 +610,7 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                     "services_available": list(_services.keys()),
                 },
                 "timestamp": time.time(),
+                "architecture": "centralized-router",
             }
 
     @router.get(f"{BASE_PATH}/metrics")
@@ -577,6 +626,7 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                         "ttl_seconds": TENANT_TTL,
                     }
                 },
+                "architecture": "centralized-router",
             }
 
             # Métriques RAG Engine enrichies
@@ -614,7 +664,7 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                         logger.error(f"Erreur métriques RAG: {e}")
                         base_metrics["rag_engine"] = {"error": str(e)}
 
-                # Cache stats externe - CORRECTION
+                # Cache stats externe
                 cache_core = health_monitor.get_service("cache_core")
                 if cache_core:
                     try:
@@ -640,7 +690,11 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
 
         except Exception as e:
             logger.error(f"Erreur récupération métriques: {e}")
-            return {"error": str(e), "timestamp": time.time()}
+            return {
+                "error": str(e),
+                "timestamp": time.time(),
+                "architecture": "centralized-router",
+            }
 
     # ========================================================================
     # ENDPOINT CHAT PRINCIPAL
@@ -648,7 +702,7 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
 
     @router.post(f"{BASE_PATH}/chat")
     async def chat(request: Request):
-        """Chat endpoint avec vraies réponses aviculture - VERSION MODULAIRE"""
+        """Chat endpoint avec vraies réponses aviculture - DANS LE ROUTER"""
         total_start_time = time.time()
 
         try:
@@ -784,6 +838,7 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                             "fallback_used": safe_dict_get(
                                 metadata, "fallback_used", False
                             ),
+                            "architecture": "centralized-router",
                         }
                     )
 
@@ -818,6 +873,7 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                             "confidence": float(confidence),
                             "documents_used": len(context_docs),
                             "source": source,
+                            "architecture": "centralized-router",
                         }
                     )
 
@@ -857,14 +913,26 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             message = get_out_of_domain_message(language)
 
             async def ood_response():
-                yield sse_event({"type": "start", "reason": "out_of_domain"})
+                yield sse_event(
+                    {
+                        "type": "start",
+                        "reason": "out_of_domain",
+                        "architecture": "centralized-router",
+                    }
+                )
 
                 chunks = smart_chunk_text(message, STREAM_CHUNK_LEN)
                 for chunk in chunks:
                     yield sse_event({"type": "chunk", "content": chunk})
                     await asyncio.sleep(0.05)
 
-                yield sse_event({"type": "end", "confidence": 1.0})
+                yield sse_event(
+                    {
+                        "type": "end",
+                        "confidence": 1.0,
+                        "architecture": "centralized-router",
+                    }
+                )
 
             return StreamingResponse(ood_response(), media_type="text/plain")
 
