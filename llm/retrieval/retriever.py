@@ -82,7 +82,7 @@ class HybridWeaviateRetriever:
             # Test avec différentes dimensions courantes
             test_vectors = {
                 384: [0.1] * 384,
-                1536: [0.1] * 1536,
+                1536: [0.1] * 1536, 
                 3072: [0.1] * 3072,
             }
 
@@ -185,7 +185,9 @@ class HybridWeaviateRetriever:
             try:
                 if wvc and hasattr(wvc, "query") and hasattr(wvc.query, "Filter"):
                     test_filter = wvc.query.Filter.by_property("species").equal("test")
-                    collection.query.hybrid(query="test", where=test_filter, limit=1)
+                    collection.query.hybrid(
+                        query="test", where=test_filter, limit=1
+                    )
                     self.api_capabilities["hybrid_with_where"] = True
                     logger.info("Filtres supportés")
             except Exception as e:
@@ -274,19 +276,11 @@ class HybridWeaviateRetriever:
         intent_boost = 1.0
         if intent_result:
             if hasattr(intent_result, "intent_type"):
-                intent_value = (
-                    intent_result.intent_type.value
-                    if hasattr(intent_result.intent_type, "value")
-                    else str(intent_result.intent_type)
-                )
-                intent_boost = self.fusion_config["intent_boost_factors"].get(
-                    intent_value, 1.0
-                )
+                intent_value = intent_result.intent_type.value if hasattr(intent_result.intent_type, "value") else str(intent_result.intent_type)
+                intent_boost = self.fusion_config["intent_boost_factors"].get(intent_value, 1.0)
             elif isinstance(intent_result, dict) and "intent_type" in intent_result:
                 intent_value = intent_result["intent_type"]
-                intent_boost = self.fusion_config["intent_boost_factors"].get(
-                    intent_value, 1.0
-                )
+                intent_boost = self.fusion_config["intent_boost_factors"].get(intent_value, 1.0)
 
         # Requêtes factuelles -> favoriser BM25
         if any(
@@ -365,33 +359,30 @@ class HybridWeaviateRetriever:
         intent_result=None,
         context: Dict = None,
         alpha: float = None,  # ✅ AJOUT: Paramètre alpha manquant
-        where_filter: Dict = None,  # ✅ AJOUT: Paramètre where_filter manquant
-        **kwargs,  # ✅ AJOUT: Pour compatibilité avec autres paramètres
+        where_filter: Dict = None,  # ✅ AJOUT: Paramètre where_filter manquant 
+        **kwargs  # ✅ AJOUT: Pour compatibilité avec autres paramètres
     ) -> List[Document]:
         """
         Recherche adaptative qui ajuste automatiquement les paramètres selon le contexte
         """
         start_time = time.time()
-
+        
         # Assurer la détection des dimensions
         await self._ensure_dimension_detected()
-
+        
         # Analyser le contexte pour adapter la stratégie
-        search_strategy = self._analyze_search_context(
-            query_text, intent_result, context
-        )
-
+        search_strategy = self._analyze_search_context(query_text, intent_result, context)
+        
         try:
             # Ajuster les paramètres selon la stratégie
             adjusted_params = self._adjust_search_parameters(search_strategy, top_k)
-
+            
             # Construire le filtre where si des entités sont détectées
             where_filter = None
             if intent_result and hasattr(intent_result, "detected_entities"):
                 from utils.utilities import build_where_filter
-
                 where_filter = build_where_filter(intent_result)
-
+            
             # Exécuter la recherche hybride avec paramètres adaptés
             documents = await self.hybrid_search(
                 query_vector=query_vector,
@@ -401,10 +392,10 @@ class HybridWeaviateRetriever:
                 alpha=adjusted_params["alpha"],
                 intent_result=intent_result,
             )
-
+            
             # Post-traitement adaptatif
             processed_docs = self._post_process_results(documents, search_strategy)
-
+            
             # Métriques
             processing_time = time.time() - start_time
             self.last_query_analytics = {
@@ -414,26 +405,20 @@ class HybridWeaviateRetriever:
                 "alpha_used": adjusted_params["alpha"],
                 "top_k_used": adjusted_params["top_k"],
             }
-
-            logger.info(
-                f"Adaptive search completed: {search_strategy['name']} strategy, {len(processed_docs)} results in {processing_time:.3f}s"
-            )
-
+            
+            logger.info(f"Adaptive search completed: {search_strategy['name']} strategy, {len(processed_docs)} results in {processing_time:.3f}s")
+            
             return processed_docs
-
+            
         except Exception as e:
             logger.error(f"Erreur recherche adaptative: {e}")
             # Fallback vers recherche hybride standard
-            return await self.hybrid_search(
-                query_vector, query_text, top_k, intent_result=intent_result
-            )
+            return await self.hybrid_search(query_vector, query_text, top_k, intent_result=intent_result)
 
-    def _analyze_search_context(
-        self, query_text: str, intent_result=None, context: Dict = None
-    ) -> Dict:
+    def _analyze_search_context(self, query_text: str, intent_result=None, context: Dict = None) -> Dict:
         """Analyse le contexte pour déterminer la stratégie de recherche optimale"""
         query_lower = query_text.lower()
-
+        
         # Stratégie par défaut
         strategy = {
             "name": "balanced",
@@ -443,59 +428,44 @@ class HybridWeaviateRetriever:
             "diversity_focus": False,
             "entity_boost": False,
         }
-
+        
         # Requêtes techniques précises -> BM25 favorisé
-        if any(
-            term in query_lower
-            for term in ["fcr", "poids", "température", "mortalité", "consommation"]
-        ):
-            strategy.update(
-                {
-                    "name": "factual",
-                    "description": "Recherche factuelle précise",
-                    "alpha_base": 0.3,
-                    "top_k_multiplier": 0.8,
-                    "entity_boost": True,
-                }
-            )
-
+        if any(term in query_lower for term in ["fcr", "poids", "température", "mortalité", "consommation"]):
+            strategy.update({
+                "name": "factual",
+                "description": "Recherche factuelle précise",
+                "alpha_base": 0.3,
+                "top_k_multiplier": 0.8,
+                "entity_boost": True,
+            })
+        
         # Requêtes de diagnostic -> recherche diversifiée
-        elif any(
-            term in query_lower
-            for term in ["symptôme", "problème", "maladie", "diagnostic"]
-        ):
-            strategy.update(
-                {
-                    "name": "diagnostic",
-                    "description": "Recherche diagnostique diversifiée",
-                    "alpha_base": 0.6,
-                    "top_k_multiplier": 1.3,
-                    "diversity_focus": True,
-                }
-            )
-
+        elif any(term in query_lower for term in ["symptôme", "problème", "maladie", "diagnostic"]):
+            strategy.update({
+                "name": "diagnostic",
+                "description": "Recherche diagnostique diversifiée",
+                "alpha_base": 0.6,
+                "top_k_multiplier": 1.3,
+                "diversity_focus": True,
+            })
+        
         # Requêtes conceptuelles -> vectoriel favorisé
-        elif any(
-            term in query_lower
-            for term in ["comment", "pourquoi", "expliquer", "optimiser"]
-        ):
-            strategy.update(
-                {
-                    "name": "conceptual",
-                    "description": "Recherche conceptuelle sémantique",
-                    "alpha_base": 0.8,
-                    "top_k_multiplier": 1.2,
-                    "diversity_focus": True,
-                }
-            )
-
+        elif any(term in query_lower for term in ["comment", "pourquoi", "expliquer", "optimiser"]):
+            strategy.update({
+                "name": "conceptual",
+                "description": "Recherche conceptuelle sémantique",
+                "alpha_base": 0.8,
+                "top_k_multiplier": 1.2,
+                "diversity_focus": True,
+            })
+        
         # Boost si entités spécifiques détectées
         if intent_result and hasattr(intent_result, "detected_entities"):
             entities = intent_result.detected_entities
             if any(entity in entities for entity in ["line", "species", "age_days"]):
                 strategy["entity_boost"] = True
                 strategy["alpha_base"] *= 0.9  # Favoriser légèrement BM25
-
+        
         return strategy
 
     def _adjust_search_parameters(self, strategy: Dict, base_top_k: int) -> Dict:
@@ -506,55 +476,51 @@ class HybridWeaviateRetriever:
             "diversity_threshold": 0.8 if strategy["diversity_focus"] else 0.6,
         }
 
-    def _post_process_results(
-        self, documents: List[Document], strategy: Dict
-    ) -> List[Document]:
+    def _post_process_results(self, documents: List[Document], strategy: Dict) -> List[Document]:
         """Post-traitement des résultats selon la stratégie"""
         if not documents:
             return documents
-
+        
         processed_docs = documents.copy()
-
+        
         # Diversification si requise
         if strategy.get("diversity_focus", False):
             processed_docs = self._ensure_result_diversity(processed_docs)
-
+        
         # Boost des documents avec entités si requis
         if strategy.get("entity_boost", False):
             processed_docs = self._boost_entity_documents(processed_docs)
-
+        
         return processed_docs
 
     def _ensure_result_diversity(self, documents: List[Document]) -> List[Document]:
         """Assure la diversité des résultats"""
         if len(documents) <= 3:
             return documents
-
+        
         diverse_docs = [documents[0]]  # Premier document toujours inclus
         diversity_threshold = 0.7
-
+        
         for doc in documents[1:]:
             # Calculer similarité avec documents déjà sélectionnés
             is_diverse = True
             doc_content = doc.content.lower()
-
+            
             for selected_doc in diverse_docs:
                 selected_content = selected_doc.content.lower()
                 # Similarité basique par mots communs
                 doc_words = set(doc_content.split())
                 selected_words = set(selected_content.split())
-
+                
                 if doc_words and selected_words:
-                    similarity = len(doc_words & selected_words) / len(
-                        doc_words | selected_words
-                    )
+                    similarity = len(doc_words & selected_words) / len(doc_words | selected_words)
                     if similarity > diversity_threshold:
                         is_diverse = False
                         break
-
+            
             if is_diverse:
                 diverse_docs.append(doc)
-
+        
         return diverse_docs
 
     def _boost_entity_documents(self, documents: List[Document]) -> List[Document]:
@@ -562,16 +528,13 @@ class HybridWeaviateRetriever:
         for doc in documents:
             # Boost basé sur la présence de métadonnées d'entités
             metadata = doc.metadata or {}
-            entity_count = sum(
-                1
-                for key in ["geneticLine", "species", "phase", "age_band"]
-                if metadata.get(key)
-            )
-
+            entity_count = sum(1 for key in ["geneticLine", "species", "phase", "age_band"] 
+                             if metadata.get(key))
+            
             if entity_count > 0:
                 # Augmenter légèrement le score
                 doc.score = min(1.0, doc.score * (1.0 + entity_count * 0.1))
-
+        
         # Re-trier par score
         documents.sort(key=lambda x: x.score, reverse=True)
         return documents
@@ -662,7 +625,9 @@ class HybridWeaviateRetriever:
                     )
             except Exception as e:
                 logger.warning(f"Erreur métadonnées: {e}")
-                search_params["return_metadata"] = wvc.query.MetadataQuery(score=True)
+                search_params["return_metadata"] = wvc.query.MetadataQuery(
+                    score=True
+                )
 
             # Vector si supporté
             if self.api_capabilities.get("hybrid_with_vector", True):
@@ -695,12 +660,8 @@ class HybridWeaviateRetriever:
                     self.api_capabilities["hybrid_with_where"] = False
                     result = collection.query.hybrid(**search_params)
                 elif "explain_score" in error_str:
-                    logger.warning(
-                        "Explain_score non supporté, retry avec métadonnées simples"
-                    )
-                    search_params["return_metadata"] = wvc.query.MetadataQuery(
-                        score=True
-                    )
+                    logger.warning("Explain_score non supporté, retry avec métadonnées simples")
+                    search_params["return_metadata"] = wvc.query.MetadataQuery(score=True)
                     self.api_capabilities["explain_score_available"] = False
                     result = collection.query.hybrid(**search_params)
                 else:
@@ -795,9 +756,7 @@ class HybridWeaviateRetriever:
                     }
 
                     # Ajouter le filtre si disponible
-                    if where_filter and self.api_capabilities.get(
-                        "hybrid_with_where", True
-                    ):
+                    if where_filter and self.api_capabilities.get("hybrid_with_where", True):
                         v4_filter = self._to_v4_filter(where_filter)
                         if v4_filter is not None:
                             optional_params["where"] = v4_filter
@@ -974,9 +933,7 @@ async def test_retriever_capabilities(
             test_results["vector_search_working"] = len(fallback_docs) >= 0
 
             # ✅ NOUVEAU: Test recherche adaptative
-            adaptive_docs = await retriever.adaptive_search(
-                test_vector, "test adaptive query", top_k=1
-            )
+            adaptive_docs = await retriever.adaptive_search(test_vector, "test adaptive query", top_k=1)
             test_results["adaptive_search_working"] = len(adaptive_docs) >= 0
 
     except Exception as e:
@@ -1067,9 +1024,7 @@ def validate_retriever_corrections() -> Dict[str, bool]:
         "diagnostic_tools": "diagnose_retriever_issues" in globals(),
         "test_functions": "test_retriever_capabilities" in globals(),
         "unused_variables_fixed": True,  # ✅ Nouveau: Variables inutilisées corrigées
-        "adaptive_search_implemented": hasattr(
-            HybridWeaviateRetriever, "adaptive_search"
-        ),  # ✅ NOUVEAU
+        "adaptive_search_implemented": hasattr(HybridWeaviateRetriever, "adaptive_search"),  # ✅ NOUVEAU
     }
 
     all_corrections_applied = all(validation_results.values())
