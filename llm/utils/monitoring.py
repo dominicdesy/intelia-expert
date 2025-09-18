@@ -2,7 +2,7 @@
 """
 monitoring.py - Module de surveillance et monitoring du système
 SystemHealthMonitor déplacé depuis main.py pour architecture modulaire
-VERSION CORRIGÉE: Gestion robuste des erreurs OpenAI
+VERSION CORRIGÉE: Gestion robuste du cache et des erreurs OpenAI
 """
 
 import time
@@ -48,7 +48,7 @@ class MonitoringError(Exception):
 
 
 # ============================================================================
-# SYSTEM HEALTH MONITOR
+# SYSTEM HEALTH MONITOR - VERSION CORRIGÉE
 # ============================================================================
 
 
@@ -167,7 +167,7 @@ class SystemHealthMonitor:
             else:
                 validation_report["rrf_validation"]["status"] = "disabled"
 
-            # 5. Initialisation des services principaux
+            # 5. Initialisation des services principaux - CORRECTION CACHE
             logger.info("Initialisation des services...")
 
             service_errors = await self._initialize_core_services()
@@ -332,28 +332,56 @@ class SystemHealthMonitor:
                 }
 
     async def _initialize_core_services(self) -> list:
-        """Initialise les services principaux avec support LangSmith + RRF"""
+        """Initialise les services principaux - VERSION CORRIGÉE POUR LE CACHE"""
         errors = []
 
         try:
-            # Cache Core
+            # Cache Core - CORRECTION PRINCIPALE
             logger.info("  Initialisation Cache Core...")
             try:
                 from cache.cache_core import create_cache_core
 
+                # Créer l'instance de cache
                 cache_core = create_cache_core()
-                await cache_core.initialize()
 
+                # CHANGEMENT CRITIQUE: Ajouter le cache_core aux services AVANT l'initialisation
+                # Cela permet aux endpoints de le trouver même s'il n'est pas initialisé
                 self._critical_services["cache_core"] = cache_core
+                logger.info("Cache Core ajouté aux services")
 
-                if cache_core.initialized:
-                    logger.info("Cache Core initialisé")
-                else:
-                    logger.warning("Cache Core en mode dégradé")
+                # Tentative d'initialisation avec timeout et gestion d'erreurs
+                try:
+                    initialization_success = await asyncio.wait_for(
+                        cache_core.initialize(), timeout=15.0
+                    )
+
+                    if initialization_success and getattr(
+                        cache_core, "initialized", False
+                    ):
+                        logger.info("✅ Cache Core initialisé avec succès")
+                    else:
+                        logger.warning(
+                            "⚠️ Cache Core créé mais non initialisé - mode dégradé"
+                        )
+                        errors.append(
+                            "Cache Core: Initialisation échouée - mode dégradé"
+                        )
+
+                except asyncio.TimeoutError:
+                    logger.warning("⚠️ Timeout initialisation Cache Core")
+                    errors.append("Cache Core: Timeout initialisation")
+
+                except Exception as init_e:
+                    logger.warning(f"⚠️ Erreur initialisation Cache Core: {init_e}")
+                    errors.append(f"Cache Core: Erreur initialisation - {init_e}")
+
+            except ImportError as e:
+                logger.error(f"❌ Module Cache Core non disponible: {e}")
+                errors.append(f"Cache Core: Module non disponible - {e}")
 
             except Exception as e:
-                errors.append(f"Cache Core: {e}")
-                logger.warning(f"Cache Core erreur: {e}")
+                logger.error(f"❌ Erreur création Cache Core: {e}")
+                errors.append(f"Cache Core: Erreur création - {e}")
 
             # RAG Engine Enhanced
             logger.info("  Initialisation RAG Engine Enhanced...")
@@ -366,7 +394,7 @@ class SystemHealthMonitor:
                 self._critical_services["rag_engine_enhanced"] = rag_engine_enhanced
 
                 if rag_engine_enhanced.is_initialized:
-                    logger.info("RAG Engine Enhanced initialisé")
+                    logger.info("✅ RAG Engine Enhanced initialisé")
 
                     # Vérifier intégrations
                     status = rag_engine_enhanced.get_status()
@@ -388,7 +416,7 @@ class SystemHealthMonitor:
                         )
 
                 else:
-                    logger.warning("RAG Engine en mode dégradé")
+                    logger.warning("⚠️ RAG Engine en mode dégradé")
 
             except Exception as e:
                 errors.append(f"RAG Engine: {e}")
@@ -400,7 +428,7 @@ class SystemHealthMonitor:
 
                 agent_rag_engine = create_agent_rag_engine()
                 self._critical_services["agent_rag_engine"] = agent_rag_engine
-                logger.info("Agent RAG disponible")
+                logger.info("✅ Agent RAG disponible")
             except ImportError:
                 logger.info("Agent RAG non disponible (optionnel)")
             except Exception as e:
@@ -408,6 +436,7 @@ class SystemHealthMonitor:
 
         except Exception as e:
             errors.append(f"Erreur initialisation services: {e}")
+            logger.error(f"Erreur générale initialisation services: {e}")
 
         return errors
 
@@ -552,25 +581,50 @@ class SystemHealthMonitor:
                 }
                 global_status["overall_status"] = "degraded"
 
-            # Cache - Sérialisation sécurisée
+            # Cache - CORRECTION PRINCIPALE
             cache_core = self._critical_services.get("cache_core")
-            if cache_core and getattr(cache_core, "initialized", False):
+            if cache_core:
                 try:
-                    if hasattr(cache_core, "get_health_status"):
-                        cache_status = cache_core.get_health_status()
-                        global_status["services"]["cache"] = safe_serialize_for_json(
-                            cache_status
-                        )
-                    else:
-                        global_status["services"]["cache"] = {"status": "unknown"}
+                    # Le cache_core existe, récupérer son statut
+                    cache_initialized = getattr(cache_core, "initialized", False)
+                    cache_enabled = getattr(cache_core, "enabled", False)
+
+                    cache_health_data = {
+                        "status": (
+                            "healthy"
+                            if (cache_initialized and cache_enabled)
+                            else "degraded"
+                        ),
+                        "enabled": cache_enabled,
+                        "initialized": cache_initialized,
+                        "available": True,
+                    }
+
+                    # Essayer de récupérer les stats si disponibles
+                    if hasattr(cache_core, "get_cache_stats"):
+                        try:
+                            cache_stats = await cache_core.get_cache_stats()
+                            cache_health_data["stats"] = safe_serialize_for_json(
+                                cache_stats
+                            )
+                        except Exception as stats_e:
+                            cache_health_data["stats_error"] = str(stats_e)
+
+                    global_status["services"]["cache"] = cache_health_data
+
                 except Exception as e:
                     logger.error(f"Erreur statut cache: {e}")
                     global_status["services"]["cache"] = {
                         "status": "error",
                         "error": str(e),
+                        "available": True,
                     }
             else:
-                global_status["services"]["cache"] = {"status": "disabled"}
+                global_status["services"]["cache"] = {
+                    "status": "missing",
+                    "available": False,
+                    "reason": "cache_core_not_found_in_services",
+                }
 
             # Agent RAG
             agent_rag = self._critical_services.get("agent_rag_engine")
@@ -591,7 +645,7 @@ class SystemHealthMonitor:
             global_status["environment"] = {
                 "platform": "digital_ocean",
                 "python_version": f"{__import__('sys').version_info.major}.{__import__('sys').version_info.minor}",
-                "monitoring_version": "1.0.1-fixed",
+                "monitoring_version": "1.0.2-cache-fixed",
             }
 
             # Déterminer statut global final

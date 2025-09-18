@@ -206,7 +206,7 @@ jobs:
           doctl apps get-deployment ${{ secrets.DO_APP_ID }} $DEPLOYMENT_ID || true
           exit 1
 
-  # 🧹 Registry cleanup - Garde seulement 6 images par repo
+  # 🧹 Registry cleanup - Garde seulement 6 images par repo (VERSION CORRIGÉE)
   cleanup:
     runs-on: ubuntu-latest
     needs: [build-frontend, build-backend, build-llm, deploy]
@@ -217,78 +217,102 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Smart cleanup - Keep only 6 images per repo
+      - name: Registry cleanup - Keep only 6 images per repo
         run: |
-          echo "🧹 NETTOYAGE INTELLIGENT DU REGISTRY"
-          echo "===================================="
+          echo "🧹 NETTOYAGE REGISTRY - VERSION CORRIGÉE"
+          echo "========================================"
           
           cleanup_repo() {
             local repo=$1
-            echo "🔍 Analyse de $repo..."
+            echo ""
+            echo "🔍 Traitement du repository: $repo"
             
-            # Vérifier si le repo existe
-            if ! doctl registry repository list | grep -q "^$repo$"; then
-              echo "  ⚠️  Repository $repo non trouvé - SKIP"
-              return 0
+            # Vérifier l'existence du repository avec format correct
+            if ! doctl registry repository list --format Name --no-header | grep -q "^$repo$"; then
+              echo "  ❌ Repository $repo non trouvé"
+              return 1
             fi
             
-            # Compter les images actuelles
-            local manifests=$(doctl registry repository list-manifests $repo --format Digest,Updated,Tags --no-header 2>/dev/null || echo "")
+            echo "  ✅ Repository trouvé"
+            
+            # Obtenir tous les manifests avec leurs métadonnées
+            local manifests=$(doctl registry repository list-manifests $repo --format Digest,Updated,Tags --no-header 2>/dev/null)
             
             if [ -z "$manifests" ]; then
-              echo "  📭 Repository $repo vide - SKIP"
+              echo "  📭 Aucune image dans $repo"
               return 0
             fi
             
+            # Compter le nombre d'images
             local total=$(echo "$manifests" | wc -l)
-            echo "  📊 Images actuelles: $total"
+            echo "  📊 Nombre d'images actuelles: $total"
             
+            # Vérifier si nettoyage nécessaire
             if [ $total -le 6 ]; then
-              echo "  ✅ Aucun nettoyage nécessaire ($total <= 6)"
+              echo "  ✅ Nettoyage non nécessaire ($total images <= 6)"
               return 0
             fi
             
+            # Calculer combien supprimer
             local to_delete=$((total - 6))
-            echo "  🗑️  Images à supprimer: $to_delete"
+            echo "  🗑️  Images à supprimer: $to_delete (garder les 6 plus récentes)"
             
-            # Supprimer les plus anciennes (tri par date, garde les 6 plus récentes)
-            echo "$manifests" | sort -k2 | head -n $to_delete | while read -r line; do
-              local digest=$(echo "$line" | awk '{print $1}')
-              local date=$(echo "$line" | awk '{print $2}')
-              local tags=$(echo "$line" | awk '{$1=""; $2=""; print $0}' | sed 's/^ *//')
-              
-              if [ ! -z "$digest" ] && [[ "$digest" == sha256:* ]]; then
-                echo "    🔥 Suppression: $digest ($date) [$tags]"
+            # Supprimer les images les plus anciennes (tri par date, garde les plus récentes)
+            local deleted=0
+            echo "$manifests" | sort -k2 | head -n $to_delete | while IFS=$'\t' read -r digest updated tags; do
+              if [ -n "$digest" ] && [[ "$digest" =~ ^sha256: ]]; then
+                echo "    🔥 Suppression: $digest"
+                echo "       📅 Date: $updated"
+                echo "       🏷️  Tags: $tags"
+                
                 if doctl registry repository delete-manifest --force $repo $digest 2>/dev/null; then
-                  echo "    ✅ Supprimé avec succès"
+                  echo "       ✅ Supprimé avec succès"
+                  ((deleted++))
                 else
-                  echo "    ⚠️  Échec de suppression"
+                  echo "       ❌ Échec de suppression"
                 fi
               else
-                echo "    ⚠️  Digest invalide: $digest - SKIP"
+                echo "    ⚠️  Digest invalide ignoré: $digest"
               fi
             done
             
-            # Vérification finale
+            # Vérification post-nettoyage
+            sleep 5
             local remaining=$(doctl registry repository list-manifests $repo --format Digest --no-header 2>/dev/null | wc -l)
-            echo "  📊 Images restantes: $remaining"
+            echo "  📊 Images restantes après nettoyage: $remaining"
+            
+            if [ $remaining -gt 6 ]; then
+              echo "  ⚠️  Attention: Plus de 6 images restantes, nettoyage partiel"
+            else
+              echo "  ✅ Nettoyage terminé avec succès"
+            fi
           }
           
-          # Nettoyer les trois repos
+          # Nettoyer les trois repositories
+          echo "🚀 Début du nettoyage des repositories..."
+          
           for repo in intelia-frontend intelia-backend intelia-llm; do
             cleanup_repo "$repo"
-            echo ""
           done
           
-          # Garbage collection global
-          echo "🗑️ Lancement du garbage collection..."
+          echo ""
+          echo "🗑️ Lancement du garbage collection global..."
           if doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force 2>/dev/null; then
-            echo "✅ Garbage collection démarré"
+            echo "✅ Garbage collection démarré avec succès"
           else
-            echo "⚠️  Garbage collection déjà en cours ou en erreur"
+            echo "⚠️  Garbage collection: déjà en cours ou erreur"
           fi
           
-          echo "🎉 Nettoyage terminé !"
+          echo ""
+          echo "🎉 NETTOYAGE TERMINÉ !"
+          echo "====================="
+          
+          # Affichage final du statut
+          echo "📊 Statut final des repositories:"
+          for repo in intelia-frontend intelia-backend intelia-llm; do
+            local count=$(doctl registry repository list-manifests $repo --format Digest --no-header 2>/dev/null | wc -l || echo "0")
+            echo "  $repo: $count images"
+          done
 
   # 📊 Résumé final
   summary:
