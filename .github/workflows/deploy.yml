@@ -227,45 +227,60 @@ jobs:
 
       - name: Cleanup old images (keep only 8 per repo)
         run: |
-          echo "🧹 Nettoyage agressif des anciennes images..."
+          echo "Nettoyage agressif des anciennes images..."
           
           # Fonction pour nettoyer un repository
           cleanup_repo() {
             local repo=$1
             echo "Nettoyage de $repo..."
             
-            # Obtenir tous les manifests triés par date (plus récent en premier)
-            local manifests=$(doctl registry repository list-manifests $repo --format Digest --no-header | head -n +100)
-            local count=$(echo "$manifests" | wc -l)
+            # Compter les images actuelles
+            local total=$(doctl registry repository list-manifests $repo --format Digest --no-header | wc -l)
+            echo "  Images actuelles: $total"
             
-            echo "  Images actuelles: $count"
-            
-            if [ $count -gt 8 ]; then
-              local to_delete=$((count - 8))
+            if [ $total -gt 8 ]; then
+              local to_delete=$((total - 8))
               echo "  À supprimer: $to_delete images"
               
-              # Supprimer les plus anciennes (garder les 8 plus récentes)
-              echo "$manifests" | tail -n +9 | while read digest; do
-                if [ ! -z "$digest" ]; then
-                  echo "  Suppression: $digest"
-                  doctl registry repository delete-manifest $repo $digest --force || echo "    Échec suppression $digest"
+              # Obtenir les digests des plus anciennes images à supprimer
+              doctl registry repository list-manifests $repo --format Digest,Updated --no-header | \
+              sort -k2 | \
+              head -n $to_delete | \
+              awk '{print $1}' | \
+              while read digest; do
+                if [ ! -z "$digest" ] && [[ "$digest" == sha256:* ]]; then
+                  echo "    Suppression: $digest"
+                  doctl registry repository delete-manifest $repo $digest --force
+                  if [ $? -eq 0 ]; then
+                    echo "    ✓ Supprimé avec succès"
+                  else
+                    echo "    ✗ Échec de suppression"
+                  fi
                 fi
               done
             else
-              echo "  Aucun nettoyage nécessaire (≤8 images)"
+              echo "  Aucun nettoyage nécessaire ($total ≤ 8)"
             fi
+            
+            # Vérifier le résultat final
+            local remaining=$(doctl registry repository list-manifests $repo --format Digest --no-header | wc -l)
+            echo "  Images restantes: $remaining"
           }
           
           # Nettoyer chaque repository
-          cleanup_repo "intelia-backend"
-          cleanup_repo "intelia-frontend"  
-          cleanup_repo "intelia-llm"
+          for repo in intelia-backend intelia-frontend intelia-llm; do
+            if doctl registry repository list | grep -q "$repo"; then
+              cleanup_repo "$repo"
+            else
+              echo "Repository $repo non trouvé"
+            fi
+          done
           
           # Garbage collection pour libérer l'espace
-          echo "🗑️ Lancement du garbage collection..."
+          echo "Lancement du garbage collection..."
           doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force || echo "Garbage collection déjà en cours"
           
-          echo "✅ Nettoyage terminé"
+          echo "Nettoyage terminé"
 
   # Résumé
   summary:
