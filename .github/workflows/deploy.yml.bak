@@ -131,48 +131,10 @@ jobs:
           platforms: linux/amd64
           provenance: false
 
-  # NOUVEAU JOB: Déploiement automatique
-  deploy:
-    name: Deploy to DigitalOcean App Platform
-    runs-on: ubuntu-latest
-    needs: [build-frontend, build-backend, build-llm]
-    if: ${{ always() && (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success' || needs.build-llm.result == 'success') }}
-    steps:
-      - name: Install doctl
-        run: |
-          curl -sL https://github.com/digitalocean/doctl/releases/latest/download/doctl-$(uname -s | tr '[:upper:]' '[:lower:]')-amd64.tar.gz \
-          | tar -xz
-          sudo mv doctl /usr/local/bin/doctl
-
-      - name: Auth doctl
-        env:
-          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-        run: doctl auth init -t "$DIGITALOCEAN_ACCESS_TOKEN"
-
-      # Option A: Déploiement simple avec les tags latest
-      - name: Trigger redeploy (use current app sources)
-        run: |
-          echo "🚀 Déclenchement du redéploiement..."
-          doctl apps create-deployment ${{ secrets.DO_APP_ID }} --force-redeploy
-
-      # Option B: Déploiement avec tags immuables (décommentez si préféré)
-      # - name: Update app spec with immutable tags
-      #   run: |
-      #     echo "📝 Mise à jour avec tags immuables..."
-      #     doctl apps spec get ${{ secrets.DO_APP_ID }} > app.yaml
-      #     # Remplace les tags latest par le SHA du commit
-      #     sed -i "s/tag: latest/tag: ${{ github.sha }}/g" app.yaml
-      #     doctl apps update ${{ secrets.DO_APP_ID }} --spec app.yaml
-
-      - name: Deployment status
-        run: |
-          echo "✅ Déploiement déclenché avec succès"
-          echo "📍 Vérifiez le statut sur: https://cloud.digitalocean.com/apps"
-
   # Nettoyage optionnel
   cleanup:
     runs-on: ubuntu-latest
-    needs: [build-frontend, build-backend, build-llm, deploy]
+    needs: [build-frontend, build-backend, build-llm]
     if: always() && (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success' || needs.build-llm.result == 'success')
     steps:
       - name: Install doctl
@@ -182,7 +144,7 @@ jobs:
 
       - name: Cleanup old images
         run: |
-          echo "🧹 Nettoyage des anciennes images..."
+          echo "Nettoyage des anciennes images..."
           
           # Nettoyage frontend
           if doctl registry repository list | grep -q "intelia-frontend"; then
@@ -208,7 +170,7 @@ jobs:
   # Résumé
   summary:
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-frontend, build-backend, build-llm, deploy, cleanup]
+    needs: [detect-changes, build-frontend, build-backend, build-llm, cleanup]
     if: always()
     steps:
       - name: Deployment Summary
@@ -233,6 +195,3 @@ jobs:
           else
             echo "LLM: ⏸️ INCHANGÉ"
           fi
-          
-          echo ""
-          echo "Déploiement: ${{ needs.deploy.result == 'success' && '✅ RÉUSSI' || '❌ ÉCHEC' }}"
