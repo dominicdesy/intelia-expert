@@ -207,25 +207,64 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Simple registry cleanup
+      - name: Aggressive registry cleanup - Keep 8 images max
         run: |
-          echo "🧹 NETTOYAGE SIMPLE DU REGISTRY"
-          echo "==============================="
+          echo "🧹 NETTOYAGE AGRESSIF DU REGISTRY - MAX 8 IMAGES"
+          echo "================================================"
           
-          # Garbage collection global - simple et efficace
-          echo "🗑️ Lancement du garbage collection..."
-          if doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force 2>/dev/null; then
-            echo "✅ Garbage collection démarré avec succès"
-          else
-            echo "⚠️ Garbage collection déjà en cours ou non nécessaire"
-          fi
+          # Fonction de nettoyage forcé
+          cleanup_repo_aggressive() {
+            local repo=$1
+            echo ""
+            echo "🔍 Nettoyage de $repo..."
+            
+            # Lister toutes les images avec leur âge
+            local all_manifests=$(doctl registry repository list-manifests $repo --format Digest,Updated,Tags --no-header 2>/dev/null)
+            local total_count=$(echo "$all_manifests" | grep -c "sha256:" 2>/dev/null || echo "0")
+            
+            echo "  📊 Images trouvées: $total_count"
+            
+            if [ "$total_count" -le 8 ]; then
+              echo "  ✅ Pas de nettoyage nécessaire ($total_count <= 8)"
+              return 0
+            fi
+            
+            local to_delete=$((total_count - 8))
+            echo "  🗑️ Images à supprimer: $to_delete"
+            
+            # Supprimer les plus anciennes (tri par date, garde les 8 plus récentes)
+            # Exclure buildcache, latest, main des suppressions
+            local deleted=0
+            echo "$all_manifests" | grep "sha256:" | grep -v -E "(buildcache|latest|main$)" | sort -k2 | head -n $to_delete | while read digest updated tags; do
+              echo "    🔥 Suppression: ${digest:0:25}... [$tags] ($updated)"
+              if doctl registry repository delete-manifest --force $repo $digest 2>/dev/null; then
+                echo "      ✅ Supprimé"
+                deleted=$((deleted + 1))
+              else
+                echo "      ❌ Échec"
+              fi
+            done
+            
+            # Vérification post-nettoyage
+            sleep 3
+            local remaining=$(doctl registry repository list-manifests $repo --format Digest --no-header 2>/dev/null | grep -c "sha256:" || echo "0")
+            echo "  📊 Images restantes: $remaining"
+          }
           
-          # Optionnel: Affichage du statut
+          # Nettoyer les trois repositories
+          for repo in intelia-frontend intelia-backend intelia-llm; do
+            cleanup_repo_aggressive $repo
+          done
+          
           echo ""
-          echo "📊 Statut actuel des repositories:"
-          doctl registry repository list --format Name,TagCount,UpdatedAt 2>/dev/null || echo "Impossible d'afficher le statut"
+          echo "🗑️ Garbage collection final..."
+          doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force 2>/dev/null && echo "✅ GC lancé" || echo "⚠️ GC déjà en cours"
           
-          echo "🎉 Nettoyage terminé"
+          echo ""
+          echo "📊 STATUT FINAL:"
+          doctl registry repository list --format Name,TagCount,UpdatedAt
+          
+          echo "🎉 Nettoyage agressif terminé"
 
   # 📊 Résumé (basé sur la version qui fonctionnait)
   summary:

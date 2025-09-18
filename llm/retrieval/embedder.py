@@ -24,28 +24,79 @@ class OpenAIEmbedder:
         self.cache_manager = cache_manager
         self.model = model
 
+    async def get_embedding(self, text: str) -> List[float]:
+        """CORRECTION: Méthode manquante appelée par rag_engine.py"""
+        return await self.embed_query(text)
+
     async def embed_query(self, text: str) -> List[float]:
         # Vérifier le cache externe
         if self.cache_manager and self.cache_manager.enabled:
-            cached_embedding = await self.cache_manager.get_embedding(text)
-            if cached_embedding:
-                METRICS.cache_hit("embedding")
-                return cached_embedding
+            try:
+                # Utiliser la méthode appropriée selon le type de cache
+                if hasattr(self.cache_manager, "semantic_cache"):
+                    cached_embedding = (
+                        await self.cache_manager.semantic_cache.get_embedding(text)
+                    )
+                else:
+                    cached_embedding = await self.cache_manager.get_embedding(text)
+
+                if cached_embedding:
+                    METRICS.cache_hit("embedding")
+                    return cached_embedding
+            except Exception as e:
+                logger.warning(f"Erreur lecture cache embedding: {e}")
 
         try:
+            # Validation du client
+            if not self.client:
+                logger.error("Client OpenAI non initialisé")
+                return []
+
+            # Validation de la clé API
+            if not hasattr(self.client, "api_key") or not self.client.api_key:
+                logger.error("Clé API OpenAI manquante")
+                return []
+
+            # Appel API OpenAI avec gestion d'erreurs détaillée
             response = await self.client.embeddings.create(
                 model=self.model, input=text, encoding_format="float"
             )
+
+            if not response or not response.data or len(response.data) == 0:
+                logger.error("Réponse OpenAI vide ou malformée")
+                return []
+
             embedding = response.data[0].embedding
 
-            # Mettre en cache externe
+            # Mettre en cache externe avec gestion d'erreurs
             if self.cache_manager and self.cache_manager.enabled:
-                await self.cache_manager.set_embedding(text, embedding)
+                try:
+                    if hasattr(self.cache_manager, "semantic_cache"):
+                        await self.cache_manager.semantic_cache.set_embedding(
+                            text, embedding
+                        )
+                    else:
+                        await self.cache_manager.set_embedding(text, embedding)
+                except Exception as e:
+                    logger.warning(f"Erreur mise en cache embedding: {e}")
 
             METRICS.cache_miss("embedding")
+            logger.debug(
+                f"Embedding généré pour: {text[:50]}... (longueur: {len(embedding)})"
+            )
             return embedding
+
         except Exception as e:
-            logger.error(f"Erreur embedding: {e}")
+            logger.error(f"Erreur embedding OpenAI: {e}")
+            logger.error(f"Modèle utilisé: {self.model}")
+            logger.error(f"Texte (longueur {len(text)}): {text[:100]}...")
+
+            # Log détaillé pour diagnostic
+            if hasattr(e, "response"):
+                logger.error(f"Réponse HTTP: {e.response}")
+            if hasattr(e, "status_code"):
+                logger.error(f"Status code: {e.status_code}")
+
             return []
 
     async def embed_documents(self, texts: List[str]) -> List[List[float]]:
@@ -56,11 +107,22 @@ class OpenAIEmbedder:
         # Vérifier le cache pour chaque texte
         if self.cache_manager and self.cache_manager.enabled:
             for i, text in enumerate(texts):
-                cached = await self.cache_manager.get_embedding(text)
-                if cached:
-                    results.append((i, cached))
-                    METRICS.cache_hit("embedding")
-                else:
+                try:
+                    if hasattr(self.cache_manager, "semantic_cache"):
+                        cached = await self.cache_manager.semantic_cache.get_embedding(
+                            text
+                        )
+                    else:
+                        cached = await self.cache_manager.get_embedding(text)
+
+                    if cached:
+                        results.append((i, cached))
+                        METRICS.cache_hit("embedding")
+                    else:
+                        uncached_texts.append(text)
+                        uncached_indices.append(i)
+                except Exception as e:
+                    logger.warning(f"Erreur cache pour texte {i}: {e}")
                     uncached_texts.append(text)
                     uncached_indices.append(i)
         else:
@@ -70,19 +132,46 @@ class OpenAIEmbedder:
         # Générer les embeddings manquants
         if uncached_texts:
             try:
+                # Validation du client
+                if not self.client:
+                    logger.error("Client OpenAI non initialisé pour batch")
+                    return []
+
                 response = await self.client.embeddings.create(
                     model=self.model, input=uncached_texts, encoding_format="float"
                 )
+
+                if not response or not response.data:
+                    logger.error("Réponse batch OpenAI vide")
+                    return []
+
                 new_embeddings = [item.embedding for item in response.data]
 
                 # Ajouter aux résultats et mettre en cache
                 for idx, embedding in zip(uncached_indices, new_embeddings):
                     if self.cache_manager and self.cache_manager.enabled:
-                        await self.cache_manager.set_embedding(texts[idx], embedding)
+                        try:
+                            if hasattr(self.cache_manager, "semantic_cache"):
+                                await self.cache_manager.semantic_cache.set_embedding(
+                                    texts[idx], embedding
+                                )
+                            else:
+                                await self.cache_manager.set_embedding(
+                                    texts[idx], embedding
+                                )
+                        except Exception as e:
+                            logger.warning(f"Erreur cache batch pour {idx}: {e}")
+
                     results.append((idx, embedding))
                     METRICS.cache_miss("embedding")
+
+                logger.debug(f"Embeddings batch générés: {len(new_embeddings)} textes")
+
             except Exception as e:
                 logger.error(f"Erreur embeddings batch: {e}")
+                logger.error(f"Nombre de textes: {len(uncached_texts)}")
+                if hasattr(e, "response"):
+                    logger.error(f"Réponse HTTP batch: {e.response}")
                 return []
 
         # Trier par index original
