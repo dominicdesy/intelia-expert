@@ -1,13 +1,14 @@
-# Stage 1: Builder
+# Stage 1: Builder optimisé avec cache des layers
 FROM python:3.11-slim as builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /build
 
-# Installation des outils de build
+# Installation des outils de build (Layer mis en cache)
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
@@ -15,13 +16,17 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Installation des dépendances dans un répertoire isolé
+# OPTIMISATION CLÉE: Copier requirements.txt AVANT le code source
+# Ce layer sera mis en cache tant que requirements.txt ne change pas
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
+
+# Installation GROUPÉE de toutes les dépendances (Layer mis en cache)
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && pip install --no-cache-dir --target=/opt/venv \
+       torch --index-url https://download.pytorch.org/whl/cpu \
     && pip install --no-cache-dir --target=/opt/venv -r requirements.txt
 
-# Stage 2: Runtime minimal
+# Stage 2: Runtime minimal (inchangé)
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -31,10 +36,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Copie seulement les dépendances installées (pas les outils de build)
+# Copie des dépendances installées (Layer mis en cache)
 COPY --from=builder /opt/venv /opt/venv
 
-# Copie du code source
+# OPTIMISATION: Copier le code source EN DERNIER
+# Seul ce layer sera reconstruit quand vous modifiez votre code
 COPY . .
 
 # Nettoyage final
