@@ -143,20 +143,32 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      # Option A: Déploiement simple avec les tags latest
+      # Option A: Déploiement simple avec force rebuild
       - name: Trigger redeploy (use current app sources)
         run: |
           echo "🚀 Déclenchement du redéploiement..."
-          doctl apps create-deployment ${{ secrets.DO_APP_ID }} --force-redeploy
+          doctl apps create-deployment ${{ secrets.DO_APP_ID }} --force-rebuild --wait
 
-      # Option B: Déploiement avec tags immuables (décommentez si préféré)
-      # - name: Update app spec with immutable tags
+      # Option B: Déploiement avec tags immuables (recommandé & idempotent)
+      # Décommentez si vous préférez piloter par tag SHA plutôt que latest
+      # - name: Update spec with immutable image tags and deploy
+      #   env:
+      #     DO_APP_ID: ${{ secrets.DO_APP_ID }}
+      #     GITHUB_SHA: ${{ github.sha }}
       #   run: |
-      #     echo "📝 Mise à jour avec tags immuables..."
-      #     doctl apps spec get ${{ secrets.DO_APP_ID }} > app.yaml
-      #     # Remplace les tags latest par le SHA du commit
-      #     sed -i "s/tag: latest/tag: ${{ github.sha }}/g" app.yaml
-      #     doctl apps update ${{ secrets.DO_APP_ID }} --spec app.yaml
+      #     echo "📦 Récupération de la spec..."
+      #     doctl apps spec get "$DO_APP_ID" > app.yaml
+      #
+      #     # Remplacez par les noms EXACTS de vos services dans App Platform:
+      #     # ex: backend, frontend, llm
+      #     yq -i '(.spec.services[] | select(.name=="backend").image.tag) = env(GITHUB_SHA)' app.yaml
+      #     yq -i '(.spec.services[] | select(.name=="frontend").image.tag) = env(GITHUB_SHA)' app.yaml
+      #     yq -i '(.spec.services[] | select(.name=="llm").image.tag) = env(GITHUB_SHA)' app.yaml
+      #
+      #     echo "📝 Mise à jour de l'app spec..."
+      #     doctl apps update "$DO_APP_ID" --spec app.yaml
+      #     echo "🚀 Déploiement..."
+      #     doctl apps create-deployment "$DO_APP_ID" --wait
 
       - name: Deployment status
         run: |
