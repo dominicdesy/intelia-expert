@@ -3,12 +3,13 @@
 """
 main.py - Intelia Expert Backend - ARCHITECTURE MODULAIRE PURE
 Point d'entrée minimaliste avec délégation complète aux modules
+VERSION FINALE: Tous endpoints dans le router
 """
 
 # === DEBUG DEPLOYMENT - MESSAGES VISIBLES ===
 print("=" * 80)
-print("🔥 NOUVELLE VERSION MAIN.PY CHARGÉE - DEPLOYMENT TEST 2024-09-18-16:00")
-print("🔥 VERSION: 4.0.2-services-injection-fixed-DEBUG")
+print("🔥 VERSION FINALE MAIN.PY CHARGÉE - TOUS ENDPOINTS DANS ROUTER")
+print("🔥 VERSION: 4.0.3-endpoints-centralized")
 print("🔥 TIMESTAMP CHARGEMENT:", __import__('time').time())
 print("=" * 80)
 
@@ -35,26 +36,25 @@ setup_logging(os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
 
 # Message de log immédiat
-logger.critical("🚨 NOUVELLE VERSION DÉTECTÉE - main.py version 4.0.2-services-injection-fixed-DEBUG")
-logger.critical("🚨 Si vous voyez ce message, la nouvelle version est chargée !")
+logger.critical("🚨 VERSION FINALE DÉTECTÉE - main.py version 4.0.3-endpoints-centralized")
+logger.critical("🚨 Tous les endpoints sont maintenant dans le router !")
 logger.critical("🚨 TIMESTAMP LOGGER: %s", time.time())
 
 # Services globaux (injectés dans les endpoints)
 services = {}
 
 # ============================================================================
-# GESTION DU CYCLE DE VIE - VERSION CORRIGÉE INJECTION SERVICES
+# GESTION DU CYCLE DE VIE - VERSION FINALE
 # ============================================================================
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Gestion du cycle de vie avec injection correcte des services"""
 
     # MESSAGE CRITIQUE AU DÉMARRAGE
-    logger.critical("🔥🔥🔥 DÉMARRAGE NOUVELLE VERSION - INJECTION SERVICES CORRIGÉE 🔥🔥🔥")
+    logger.critical("🔥🔥🔥 DÉMARRAGE VERSION FINALE - ARCHITECTURE CENTRALISÉE 🔥🔥🔥")
     logger.critical("🔥🔥🔥 TIMESTAMP LIFESPAN: %s 🔥🔥🔥", time.time())
-    print("🔥🔥🔥 LIFESPAN DÉMARRÉ - NOUVELLE VERSION 🔥🔥🔥")
+    print("🔥🔥🔥 LIFESPAN DÉMARRÉ - VERSION FINALE 🔥🔥🔥")
 
     logger.info("🚀 Démarrage Intelia Expert Backend - Architecture Modulaire")
 
@@ -78,7 +78,7 @@ async def lifespan(app: FastAPI):
         health_monitor = await create_health_monitor()
         services["health_monitor"] = health_monitor
 
-        # 4. Validation startup complète - CORRECTION CACHE
+        # 4. Validation startup complète
         logger.info("Validation startup requirements...")
         validation_result = await asyncio.wait_for(
             health_monitor.validate_startup_requirements(), timeout=STARTUP_TIMEOUT
@@ -86,11 +86,9 @@ async def lifespan(app: FastAPI):
 
         # CHANGEMENT PRINCIPAL: Ne pas arrêter l'app si seul le cache échoue
         if validation_result["overall_status"] == "failed":
-            # Vérifier si ce sont des erreurs critiques ou juste du cache/redis
             errors = validation_result.get("errors", [])
             critical_errors = [
-                err
-                for err in errors
+                err for err in errors
                 if not any(
                     keyword in err.lower()
                     for keyword in ["cache", "redis", "connexion", "timeout", "network"]
@@ -109,7 +107,6 @@ async def lifespan(app: FastAPI):
             logger.warning("⚠️ Application démarrée en mode dégradé")
             for warning in validation_result.get("warnings", []):
                 logger.warning(f"  - {warning}")
-
         else:
             logger.info("✅ Application démarrée avec succès")
 
@@ -141,18 +138,14 @@ async def lifespan(app: FastAPI):
         # Log statut des intégrations avancées
         langsmith_status = validation_result.get("langsmith_validation", {})
         if langsmith_status.get("status") == "configured":
-            logger.info(
-                f"🧠 LangSmith actif - Projet: {langsmith_status.get('project')}"
-            )
+            logger.info(f"🧠 LangSmith actif - Projet: {langsmith_status.get('project')}")
 
         rrf_status = validation_result.get("rrf_validation", {})
         if rrf_status.get("status") == "configured":
-            logger.info(
-                f"⚡ RRF Intelligent actif - Learning: {rrf_status.get('learning_mode')}"
-            )
+            logger.info(f"⚡ RRF Intelligent actif - Learning: {rrf_status.get('learning_mode')}")
 
-        # 6. CORRECTION CRITIQUE : Re-créer le router avec les services initialisés
-        logger.critical("🔧 INJECTION DES SERVICES - ÉTAPE CRITIQUE 🔧")
+        # 6. CORRECTION FINALE : Re-créer le router avec les services initialisés
+        logger.critical("🔧 INJECTION DES SERVICES - ARCHITECTURE CENTRALISÉE 🔧")
         logger.info("Mise à jour du router avec services initialisés...")
 
         # Créer le nouveau router avec les services maintenant disponibles
@@ -162,7 +155,7 @@ async def lifespan(app: FastAPI):
         app.router.routes.clear()
         app.include_router(updated_router)
 
-        logger.critical("✅ ROUTER MIS À JOUR AVEC SERVICES INJECTÉS - CORRECTION ACTIVE ✅")
+        logger.critical("✅ ROUTER CENTRALISÉ MIS À JOUR AVEC SERVICES INJECTÉS ✅")
         logger.info("✅ Router mis à jour avec services injectés")
 
         # 7. Application prête
@@ -170,9 +163,7 @@ async def lifespan(app: FastAPI):
         logger.info("📊 Services initialisés:")
         for service_name, service in services.items():
             service_status = "✅ OK" if service else "❌ FAILED"
-            logger.info(
-                f"  - {service_name}: {type(service).__name__} {service_status}"
-            )
+            logger.info(f"  - {service_name}: {type(service).__name__} {service_status}")
 
         # Log final du mode de fonctionnement
         if validation_result["overall_status"] == "healthy":
@@ -182,14 +173,13 @@ async def lifespan(app: FastAPI):
         else:
             logger.info("🔶 Mode: MINIMAL (fonctionnalités de base)")
 
-        logger.critical("🎉 APPLICATION NOUVELLE VERSION PRÊTE À RECEVOIR DES REQUÊTES 🎉")
-        print("🎉 APPLICATION NOUVELLE VERSION PRÊTE 🎉")
+        logger.critical("🎉 APPLICATION VERSION FINALE PRÊTE - ARCHITECTURE CENTRALISÉE 🎉")
+        print("🎉 APPLICATION VERSION FINALE PRÊTE 🎉")
 
         yield
 
     except asyncio.TimeoutError:
         logger.error(f"❌ Timeout startup après {STARTUP_TIMEOUT}s")
-        # Ne pas raise - permettre le démarrage en mode minimal
         logger.warning("Démarrage en mode minimal suite au timeout")
         yield
 
@@ -197,7 +187,6 @@ async def lifespan(app: FastAPI):
         logger.error(f"❌ Erreur au démarrage: {e}")
         logger.warning("Tentative de démarrage en mode minimal...")
 
-        # Créer un health monitor minimal si possible
         if "health_monitor" not in services:
             try:
                 minimal_monitor = await create_health_monitor()
@@ -206,13 +195,12 @@ async def lifespan(app: FastAPI):
             except Exception as monitor_e:
                 logger.error(f"Impossible de créer health monitor: {monitor_e}")
 
-        # Permettre le démarrage même avec des erreurs
         yield
 
     finally:
         # Nettoyage amélioré
         logger.info("🧹 Nettoyage des ressources...")
-        logger.critical("🔥 SHUTDOWN NOUVELLE VERSION 🔥")
+        logger.critical("🔥 SHUTDOWN VERSION FINALE 🔥")
 
         try:
             # Cleanup des services via health monitor
@@ -249,9 +237,7 @@ async def lifespan(app: FastAPI):
                         cleanup_errors.append(f"Agent RAG cleanup: {e}")
 
                 if cleanup_errors:
-                    logger.warning(
-                        f"Erreurs de nettoyage (non critiques): {cleanup_errors}"
-                    )
+                    logger.warning(f"Erreurs de nettoyage (non critiques): {cleanup_errors}")
 
             # Nettoyer les services globaux
             services.clear()
@@ -261,23 +247,22 @@ async def lifespan(app: FastAPI):
 
         logger.info("✅ Application arrêtée proprement")
 
-
 # ============================================================================
-# CRÉATION DE L'APPLICATION
+# CRÉATION DE L'APPLICATION - VERSION FINALE SIMPLIFIÉE
 # ============================================================================
 
 # MESSAGE DEBUG CRÉATION APP
-logger.critical("🏗️ CRÉATION FASTAPI APP - NOUVELLE VERSION 🏗️")
+logger.critical("🏗️ CRÉATION FASTAPI APP - VERSION FINALE 🏗️")
 
 # Créer l'application FastAPI
 app = FastAPI(
     title="Intelia Expert Backend",
-    description="API RAG Enhanced avec LangSmith et RRF Intelligent - Architecture Modulaire Robuste",
-    version="4.0.2-debug-deployment-test",
+    description="API RAG Enhanced avec LangSmith et RRF Intelligent - Architecture Centralisée",
+    version="4.0.3-endpoints-centralized",
     lifespan=lifespan,
 )
 
-logger.critical("✅ FASTAPI APP CRÉÉE AVEC NOUVELLE VERSION ✅")
+logger.critical("✅ FASTAPI APP CRÉÉE AVEC ARCHITECTURE CENTRALISÉE ✅")
 
 # Configuration CORS
 app.add_middleware(
@@ -288,128 +273,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# CORRECTION CRITIQUE: Créer un router initial vide, il sera mis à jour dans lifespan
-# Le vrai router avec services sera créé dans la fonction lifespan
+# ARCHITECTURE FINALE: Router initial vide, sera mis à jour dans lifespan
 initial_router = create_router({})  # Router vide au démarrage
 app.include_router(initial_router)
 
-logger.critical("🔗 ROUTER INITIAL AJOUTÉ - SERA MIS À JOUR DANS LIFESPAN 🔗")
-
-# ============================================================================
-# ENDPOINTS DIRECTS (pour compatibilité et debug)
-# ============================================================================
-
-
-@app.get("/llm/test-json")
-async def test_json_direct():
-    """Test simple de sérialisation JSON"""
-    from utils.utilities import safe_serialize_for_json
-
-    try:
-        test_data = {
-            "string": "test",
-            "number": 42,
-            "boolean": True,
-            "list": [1, 2, 3],
-            "dict": {"nested": "value"},
-            "timestamp": time.time(),
-        }
-
-        # Test de sérialisation
-        safe_data = safe_serialize_for_json(test_data)
-
-        return {
-            "status": "success",
-            "original_data": test_data,
-            "serialized_data": safe_data,
-            "json_test": "OK",
-            "architecture": "modular-robust",
-            "debug_version": "4.0.2-debug-deployment-test"
-        }
-
-    except Exception as e:
-        return {"status": "error", "error": str(e), "json_test": "FAILED"}
-
-
-@app.get("/llm/startup-info")
-async def startup_info():
-    """Informations sur le démarrage et les services"""
-    try:
-        health_monitor = services.get("health_monitor")
-        if not health_monitor:
-            return {"error": "Health monitor non disponible", "debug_version": "4.0.2-debug-deployment-test"}
-
-        # Récupérer les informations de validation
-        validation_report = getattr(health_monitor, "validation_report", {})
-
-        return {
-            "startup_status": validation_report.get("overall_status", "unknown"),
-            "startup_duration": validation_report.get("startup_duration", 0),
-            "services_available": (
-                list(health_monitor.get_all_services().keys())
-                if hasattr(health_monitor, "get_all_services")
-                else []
-            ),
-            "errors": validation_report.get("errors", []),
-            "warnings": validation_report.get("warnings", []),
-            "cache_available": "cache_core"
-            in (
-                health_monitor.get_all_services()
-                if hasattr(health_monitor, "get_all_services")
-                else {}
-            ),
-            "timestamp": time.time(),
-            "debug_version": "4.0.2-debug-deployment-test"
-        }
-
-    except Exception as e:
-        return {"error": str(e), "timestamp": time.time(), "debug_version": "4.0.2-debug-deployment-test"}
-
-
-@app.get("/llm/version")
-async def version_info():
-    """Endpoint de version pour vérifier les déploiements"""
-    import importlib.util
-
-    # Test d'import du cache pour diagnostic
-    cache_import_status = "unknown"
-    try:
-        spec = importlib.util.find_spec("cache.cache_core")
-        if spec is not None:
-            cache_import_status = "success"
-        else:
-            cache_import_status = "failed: module not found"
-    except Exception as e:
-        cache_import_status = f"error: {str(e)}"
-
-    return {
-        "message": "🔥 NOUVELLE VERSION CONFIRMÉE 🔥",
-        "version": "4.0.2-debug-deployment-test",
-        "timestamp": time.time(),
-        "build_time": "2024-09-18-16:00-DEBUG",
-        "corrections_deployed": True,
-        "cache_import_test": cache_import_status,
-        "health_monitor_available": "health_monitor" in services,
-        "services_count": len(services),
-        "services_list": list(services.keys()),
-        "python_working_dir": os.getcwd(),
-        "app_status": "running",
-        "router_injection": "fixed-debug",
-        "deployment_confirmed": "SI VOUS VOYEZ CE MESSAGE, LA NOUVELLE VERSION TOURNE!"
-    }
-
-
-@app.get("/llm/deployment-test")
-async def deployment_test():
-    """Endpoint de test simple pour confirmer le déploiement"""
-    return {
-        "message": "🎉 NOUVELLE VERSION DÉPLOYÉE AVEC SUCCÈS! 🎉",
-        "version": "4.0.2-debug-deployment-test",
-        "timestamp": time.time(),
-        "confirmation": "Si vous voyez ce message, la nouvelle version tourne bien",
-        "endpoints_available": ["/version", "/startup-info", "/test-json", "/deployment-test"]
-    }
-
+logger.critical("🔗 ROUTER INITIAL AJOUTÉ - TOUS ENDPOINTS DANS LE ROUTER 🔗")
 
 # ============================================================================
 # POINT D'ENTRÉE
@@ -421,11 +289,11 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
     host = os.getenv("HOST", "0.0.0.0")
 
-    logger.critical("🚀 DÉMARRAGE SERVEUR NOUVELLE VERSION SUR %s:%s", host, port)
+    logger.critical("🚀 DÉMARRAGE SERVEUR VERSION FINALE SUR %s:%s", host, port)
     logger.info(f"🚀 Démarrage serveur sur {host}:{port}")
-    logger.info("🔧 Architecture modulaire robuste activée")
+    logger.info("🔧 Architecture modulaire centralisée activée")
     logger.info("🛡️ Mode dégradé supporté pour cache/Redis")
     logger.info("🔧 Injection des services corrigée")
-    logger.critical("🔥 VERSION DEBUG: 4.0.2-debug-deployment-test 🔥")
+    logger.critical("🔥 VERSION FINALE: 4.0.3-endpoints-centralized 🔥")
 
     uvicorn.run("main:app", host=host, port=port, reload=False, log_level="info")
