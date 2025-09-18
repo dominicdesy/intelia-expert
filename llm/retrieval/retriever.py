@@ -6,7 +6,6 @@ retriever.py - Retriever hybride optimisé avec cache et fallbacks - VERSION COM
 import logging
 import time
 import re
-import anyio
 from typing import Dict, List, Any
 from core.data_models import Document  # ✅ CORRIGÉ: Import depuis core/
 from utils.utilities import METRICS
@@ -77,66 +76,51 @@ class HybridWeaviateRetriever:
         self.dimension_detection_attempted = True
 
         try:
+            # CORRECTION: Fonction synchrone directe pour éviter anyio.to_thread
+            collection = self.client.collections.get(self.collection_name)
 
-            def _sync_detect_dimension():
-                collection = self.client.collections.get(self.collection_name)
+            # Test avec différentes dimensions courantes
+            test_vectors = {
+                384: [0.1] * 384,
+                1536: [0.1] * 1536,
+                3072: [0.1] * 3072,
+            }
 
-                # CORRIGÉ: Test avec différentes dimensions courantes
-                test_vectors = {
-                    384: [0.1] * 384,  # OpenAI text-embedding-ada-002 ancienne
-                    1536: [0.1]
-                    * 1536,  # OpenAI text-embedding-ada-002 nouvelle + text-embedding-3-small
-                    3072: [0.1] * 3072,  # OpenAI text-embedding-3-large
-                }
+            for size, vector in test_vectors.items():
+                try:
+                    # Test direct sans anyio
+                    collection.query.near_vector(
+                        vector,
+                        limit=1,
+                    )
 
-                for size, vector in test_vectors.items():
-                    try:
-                        # CORRIGÉ: Syntaxe v4 - paramètre positionnel
-                        collection.query.near_vector(
-                            vector,  # Paramètre positionnel
-                            limit=1,
-                        )
+                    # Si aucune exception, cette dimension fonctionne
+                    self.working_vector_dimension = size
+                    self.dimension_detection_success = True
+                    logger.info(f"Dimension vectorielle détectée: {size}")
+                    return size
 
-                        # Si aucune exception, cette dimension fonctionne
-                        self.working_vector_dimension = size
-                        self.dimension_detection_success = True
-                        logger.info(f"Dimension vectorielle détectée: {size}")
-                        return size
+                except Exception as e:
+                    error_str = str(e).lower()
+                    if any(
+                        keyword in error_str
+                        for keyword in [
+                            "vector lengths don't match",
+                            "dimension",
+                            "length mismatch",
+                            "size mismatch",
+                        ]
+                    ):
+                        logger.debug(f"Dimension {size} incorrecte: {e}")
+                        continue
+                    else:
+                        logger.warning(f"Erreur API Weaviate (dimension {size}): {e}")
+                        break
 
-                    except Exception as e:
-                        error_str = str(e).lower()
-                        if any(
-                            keyword in error_str
-                            for keyword in [
-                                "vector lengths don't match",
-                                "dimension",
-                                "length mismatch",
-                                "size mismatch",
-                            ]
-                        ):
-                            logger.debug(f"Dimension {size} incorrecte: {e}")
-                            continue
-                        else:
-                            # Erreur différente (pas de dimension), arrêter les tests
-                            logger.warning(
-                                f"Erreur API Weaviate (dimension {size}): {e}"
-                            )
-                            break
-
-                # Aucune dimension détectée avec succès
-                logger.warning("Aucune dimension détectée, utilisation 384 par défaut")
-                self.working_vector_dimension = 384
-                return 384
-
-            # Exécution dans un thread pour éviter le blocage - CORRECTION Import
-            dimension = await anyio.to_thread(_sync_detect_dimension)
-
-            if dimension is None:
-                logger.error("Impossible de détecter la dimension vectorielle")
-                self.api_capabilities["api_stability"] = "degraded"
-                self.working_vector_dimension = 384  # Fallback sécurisé
-
-            return self.working_vector_dimension
+            # Aucune dimension détectée avec succès
+            logger.warning("Aucune dimension détectée, utilisation 384 par défaut")
+            self.working_vector_dimension = 384
+            return 384
 
         except Exception as e:
             logger.error(f"Erreur détection dimension: {e}")
@@ -150,77 +134,63 @@ class HybridWeaviateRetriever:
             return
 
         try:
+            # CORRECTION: Fonction directe sans anyio.to_thread
+            collection = self.client.collections.get(self.collection_name)
+            test_vector = [0.1] * self.working_vector_dimension
 
-            def _sync_test_features():
-                collection = self.client.collections.get(self.collection_name)
-                test_vector = [0.1] * self.working_vector_dimension
+            # Test 1: Hybrid query basique
+            try:
+                collection.query.hybrid(query="test capacity", limit=1)
+                logger.info("Hybrid query basique fonctionne")
+            except Exception as e:
+                logger.warning(f"Hybrid query limité: {e}")
+                self.api_capabilities["api_stability"] = "limited"
 
-                # Test 1: Hybrid query basique
-                try:
-                    _ = collection.query.hybrid(
-                        query="test capacity", limit=1
-                    )  # ✅ CORRIGÉ: Utilisation explicite de _
-                    logger.info("✅ Hybrid query basique fonctionne")
-                except Exception as e:
-                    logger.warning(f"⚠️ Hybrid query limité: {e}")
-                    self.api_capabilities["api_stability"] = "limited"
+            # Test 2: Hybrid avec vector
+            try:
+                collection.query.hybrid(
+                    query="test",
+                    vector=test_vector,
+                    limit=1,
+                )
+                self.api_capabilities["hybrid_with_vector"] = True
+                logger.info("Hybrid avec vector supporté")
+            except Exception as e:
+                self.api_capabilities["hybrid_with_vector"] = False
+                logger.warning(f"Hybrid sans vector: {e}")
+                if hasattr(METRICS, "api_correction_applied"):
+                    METRICS.api_correction_applied("hybrid_no_vector")
 
-                # Test 2: Hybrid avec vector - CORRIGÉ
-                try:
-                    _ = collection.query.hybrid(  # ✅ CORRIGÉ: Utilisation explicite de _
-                        query="test",
-                        # CORRIGÉ: Pour hybrid(), vector reste un paramètre nommé
-                        vector=test_vector,
+            # Test 3: Explain score
+            try:
+                if (
+                    wvc
+                    and hasattr(wvc, "query")
+                    and hasattr(wvc.query, "MetadataQuery")
+                ):
+                    collection.query.near_vector(
+                        test_vector,
                         limit=1,
+                        return_metadata=wvc.query.MetadataQuery(
+                            score=True, explain_score=True
+                        ),
                     )
-                    self.api_capabilities["hybrid_with_vector"] = True
-                    logger.info("✅ Hybrid avec vector supporté")
-                except Exception as e:
-                    self.api_capabilities["hybrid_with_vector"] = False
-                    logger.warning(f"❌ Hybrid sans vector: {e}")
-                    if hasattr(METRICS, "api_correction_applied"):
-                        METRICS.api_correction_applied("hybrid_no_vector")
+                    self.api_capabilities["explain_score_available"] = True
+                    logger.info("Explain score disponible")
+            except Exception as e:
+                self.api_capabilities["explain_score_available"] = False
+                logger.warning(f"Explain score indisponible: {e}")
 
-                # Test 3: Explain score - CORRIGÉ
-                try:
-                    if (
-                        wvc
-                        and hasattr(wvc, "query")
-                        and hasattr(wvc.query, "MetadataQuery")
-                    ):
-                        # CORRIGÉ: Syntaxe v4 pour near_vector
-                        _ = collection.query.near_vector(  # ✅ CORRIGÉ: Utilisation explicite de _
-                            test_vector,  # ✅ CORRIGÉ: Paramètre positionnel
-                            limit=1,
-                            return_metadata=wvc.query.MetadataQuery(
-                                score=True, explain_score=True
-                            ),
-                        )
-                        # Note: Vérification des résultats supprimée car variable result inutilisée
-                        self.api_capabilities["explain_score_available"] = True
-                        logger.info("✅ Explain score disponible")
-                except Exception as e:
-                    self.api_capabilities["explain_score_available"] = False
-                    logger.warning(f"❌ Explain score indisponible: {e}")
-
-                # Test 4: Filtres - CORRIGÉ
-                try:
-                    if wvc and hasattr(wvc, "query") and hasattr(wvc.query, "Filter"):
-                        test_filter = wvc.query.Filter.by_property("species").equal(
-                            "test"
-                        )
-                        _ = collection.query.hybrid(  # ✅ CORRIGÉ: Utilisation explicite de _
-                            query="test", where=test_filter, limit=1
-                        )
-                        self.api_capabilities["hybrid_with_where"] = True
-                        logger.info("✅ Filtres supportés")
-                except Exception as e:
-                    self.api_capabilities["hybrid_with_where"] = False
-                    logger.warning(f"❌ Filtres non supportés: {e}")
-
-                return True
-
-            await anyio.to_thread(_sync_test_features)
+            # Test 4: Filtres
+            try:
+                if wvc and hasattr(wvc, "query") and hasattr(wvc.query, "Filter"):
+                    test_filter = wvc.query.Filter.by_property("species").equal("test")
+                    collection.query.hybrid(query="test", where=test_filter, limit=1)
+                    self.api_capabilities["hybrid_with_where"] = True
+                    logger.info("Filtres supportés")
+            except Exception as e:
+                self.api_capabilities["hybrid_with_where"] = False
+                logger.warning(f"Filtres non supportés: {e}")
 
         except Exception as e:
             logger.error(f"Erreur test fonctionnalités API: {e}")
@@ -673,84 +643,70 @@ class HybridWeaviateRetriever:
     ) -> List[Document]:
         """CORRIGÉ: Recherche hybride native Weaviate v4 avec syntaxe corrigée"""
         try:
+            # CORRECTION: Fonction directe sans anyio.to_thread
+            collection = self.client.collections.get(self.collection_name)
 
-            def _sync_hybrid_search():
-                collection = self.client.collections.get(self.collection_name)
+            search_params = {"query": query_text, "alpha": alpha, "limit": top_k}
 
-                search_params = {"query": query_text, "alpha": alpha, "limit": top_k}
-
-                # Métadonnées avec gestion d'erreurs
-                try:
-                    if ENABLE_API_DIAGNOSTICS and self.api_capabilities.get(
-                        "explain_score_available"
-                    ):
-                        search_params["return_metadata"] = wvc.query.MetadataQuery(
-                            score=True, explain_score=True, creation_time=True
-                        )
-                    else:
-                        search_params["return_metadata"] = wvc.query.MetadataQuery(
-                            score=True
-                        )
-                except Exception as e:
-                    logger.warning(f"Erreur métadonnées: {e}")
+            # Métadonnées avec gestion d'erreurs
+            try:
+                if ENABLE_API_DIAGNOSTICS and self.api_capabilities.get(
+                    "explain_score_available"
+                ):
+                    search_params["return_metadata"] = wvc.query.MetadataQuery(
+                        score=True, explain_score=True, creation_time=True
+                    )
+                else:
                     search_params["return_metadata"] = wvc.query.MetadataQuery(
                         score=True
                     )
+            except Exception as e:
+                logger.warning(f"Erreur métadonnées: {e}")
+                search_params["return_metadata"] = wvc.query.MetadataQuery(score=True)
 
-                # Vector si supporté
-                if self.api_capabilities.get("hybrid_with_vector", True):
-                    search_params["vector"] = query_vector
+            # Vector si supporté
+            if self.api_capabilities.get("hybrid_with_vector", True):
+                search_params["vector"] = query_vector
 
-                # Filtre si supporté
-                if where_filter and self.api_capabilities.get(
-                    "hybrid_with_where", True
-                ):
-                    v4_filter = self._to_v4_filter(where_filter)
-                    if v4_filter is not None:
-                        search_params["where"] = v4_filter
+            # Filtre si supporté
+            if where_filter and self.api_capabilities.get("hybrid_with_where", True):
+                v4_filter = self._to_v4_filter(where_filter)
+                if v4_filter is not None:
+                    search_params["where"] = v4_filter
 
-                try:
-                    return collection.query.hybrid(**search_params)
-                except TypeError as e:
-                    # CORRECTION: Gestion runtime des erreurs d'arguments
-                    self.api_capabilities["runtime_corrections"] += 1
-                    if hasattr(METRICS, "api_correction_applied"):
-                        METRICS.api_correction_applied("hybrid_runtime_fix")
+            try:
+                result = collection.query.hybrid(**search_params)
+            except TypeError as e:
+                # Gestion runtime des erreurs d'arguments
+                self.api_capabilities["runtime_corrections"] += 1
+                if hasattr(METRICS, "api_correction_applied"):
+                    METRICS.api_correction_applied("hybrid_runtime_fix")
 
-                    error_str = str(e).lower()
+                error_str = str(e).lower()
 
-                    if "vector" in error_str and "vector" in search_params:
-                        logger.warning(
-                            "Paramètre 'vector' non supporté, retry sans vector"
-                        )
-                        del search_params["vector"]
-                        self.api_capabilities["hybrid_with_vector"] = False
-                        return collection.query.hybrid(**search_params)
-
-                    if "where" in error_str and "where" in search_params:
-                        logger.warning(
-                            "Paramètre 'where' non supporté, retry sans filtre"
-                        )
-                        del search_params["where"]
-                        self.api_capabilities["hybrid_with_where"] = False
-                        return collection.query.hybrid(**search_params)
-
-                    if "explain_score" in error_str:
-                        logger.warning(
-                            "Explain_score non supporté, retry avec métadonnées simples"
-                        )
-                        search_params["return_metadata"] = wvc.query.MetadataQuery(
-                            score=True
-                        )
-                        self.api_capabilities["explain_score_available"] = False
-                        return collection.query.hybrid(**search_params)
-
+                if "vector" in error_str and "vector" in search_params:
+                    logger.warning("Paramètre 'vector' non supporté, retry sans vector")
+                    del search_params["vector"]
+                    self.api_capabilities["hybrid_with_vector"] = False
+                    result = collection.query.hybrid(**search_params)
+                elif "where" in error_str and "where" in search_params:
+                    logger.warning("Paramètre 'where' non supporté, retry sans filtre")
+                    del search_params["where"]
+                    self.api_capabilities["hybrid_with_where"] = False
+                    result = collection.query.hybrid(**search_params)
+                elif "explain_score" in error_str:
+                    logger.warning(
+                        "Explain_score non supporté, retry avec métadonnées simples"
+                    )
+                    search_params["return_metadata"] = wvc.query.MetadataQuery(
+                        score=True
+                    )
+                    self.api_capabilities["explain_score_available"] = False
+                    result = collection.query.hybrid(**search_params)
+                else:
                     # Fallback minimal
                     logger.warning("Fallback vers recherche hybride minimale")
-                    return collection.query.hybrid(query=query_text, limit=top_k)
-
-            # Exécution synchrone
-            result = await anyio.to_thread(_sync_hybrid_search)
+                    result = collection.query.hybrid(query=query_text, limit=top_k)
 
             # Conversion des résultats avec gestion d'erreurs
             documents = []
@@ -824,45 +780,43 @@ class HybridWeaviateRetriever:
         """CORRIGÉ: Fallback vectoriel avec syntaxe v4 corrigée"""
         try:
             if self.is_v4:
+                # CORRECTION: Fonction directe sans anyio.to_thread
+                collection = self.client.collections.get(self.collection_name)
 
-                def _sync_vector_search():
-                    collection = self.client.collections.get(self.collection_name)
+                # S'assurer de la bonne dimension
+                adjusted_vector = self._adjust_vector_dimension(query_vector)
 
-                    # S'assurer de la bonne dimension
-                    adjusted_vector = self._adjust_vector_dimension(query_vector)
+                # Syntaxe v4 pour near_vector
+                try:
+                    # Construire les paramètres optionnels
+                    optional_params = {
+                        "limit": top_k,
+                        "return_metadata": wvc.query.MetadataQuery(score=True),
+                    }
 
-                    # CORRIGÉ: Syntaxe v4 pour near_vector - paramètres positionnels et nommés
-                    try:
-                        # Construire les paramètres optionnels
-                        optional_params = {
-                            "limit": top_k,
-                            "return_metadata": wvc.query.MetadataQuery(score=True),
-                        }
+                    # Ajouter le filtre si disponible
+                    if where_filter and self.api_capabilities.get(
+                        "hybrid_with_where", True
+                    ):
+                        v4_filter = self._to_v4_filter(where_filter)
+                        if v4_filter is not None:
+                            optional_params["where"] = v4_filter
 
-                        # Ajouter le filtre si disponible
-                        if where_filter and self.api_capabilities.get(
-                            "hybrid_with_where", True
-                        ):
-                            v4_filter = self._to_v4_filter(where_filter)
-                            if v4_filter is not None:
-                                optional_params["where"] = v4_filter
+                    # Appel avec syntaxe v4 - vector en paramètre positionnel
+                    result = collection.query.near_vector(
+                        adjusted_vector,
+                        **optional_params,
+                    )
 
-                        # CORRIGÉ: Appel avec syntaxe v4 - vector en paramètre positionnel
-                        return collection.query.near_vector(
-                            adjusted_vector,  # ✅ CORRIGÉ: Paramètre positionnel
-                            **optional_params,
-                        )
+                except Exception as e:
+                    logger.warning(f"Erreur near_vector avec filtres: {e}")
+                    # Fallback sans filtres
+                    result = collection.query.near_vector(
+                        adjusted_vector,
+                        limit=top_k,
+                        return_metadata=wvc.query.MetadataQuery(score=True),
+                    )
 
-                    except Exception as e:
-                        logger.warning(f"Erreur near_vector avec filtres: {e}")
-                        # Fallback sans filtres
-                        return collection.query.near_vector(
-                            adjusted_vector,  # ✅ CORRIGÉ: Paramètre positionnel
-                            limit=top_k,
-                            return_metadata=wvc.query.MetadataQuery(score=True),
-                        )
-
-                result = await anyio.to_thread(_sync_vector_search)
                 return self._convert_v4_results_to_documents(result.objects)
             else:
                 return await self._vector_search_v3(query_vector, top_k, where_filter)
