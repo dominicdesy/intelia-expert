@@ -2,12 +2,11 @@
 """
 redis_cache_manager.py - Gestionnaire de cache Redis principal (refactorisé)
 Point d'entrée principal pour le cache Redis avec fonctionnalités modulaires
-VERSION PERFECTIONNÉE: Interface complète pour compatibilité rag_engine.py
+CORRIGÉ: Classes stub renommées pour éviter les conflits de nommage
 """
 
 import logging
 from typing import Dict, List, Optional, Any
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +31,16 @@ except ImportError as e:
     logger.warning(f"Semantic cache module not available: {e}")
     SEMANTIC_AVAILABLE = False
 
+    # CORRECTION: Classe stub renommée pour éviter le conflit de nommage
+    class SemanticCacheManagerStub:
+        """Stub pour SemanticCacheManager quand les dépendances ne sont pas disponibles"""
+
+        def __init__(self, *args, **kwargs):
+            raise NotImplementedError(
+                "SemanticCacheManager not available - install required dependencies or check module imports"
+            )
+
+
 try:
     from .cache_stats import CacheStatsManager
 
@@ -41,16 +50,26 @@ except ImportError as e:
     logger.warning(f"Cache stats module not available: {e}")
     STATS_AVAILABLE = False
 
+    # CORRECTION: Classe stub renommée pour éviter le conflit de nommage
+    class CacheStatsManagerStub:
+        """Stub pour CacheStatsManager quand les dépendances ne sont pas disponibles"""
+
+        def __init__(self, *args, **kwargs):
+            raise NotImplementedError(
+                "CacheStatsManager not available - install required dependencies or check module imports"
+            )
+
 
 class RAGCacheManager:
     """
     Gestionnaire de cache Redis principal - Interface unifiée
     Délègue les fonctionnalités aux modules spécialisés
-    VERSION PERFECTIONNÉE avec interface complète
     """
 
     def __init__(self, redis_url: str = None, default_ttl: int = None):
-        """Initialise le gestionnaire de cache avec modules spécialisés"""
+        """
+        Initialise le gestionnaire de cache avec modules spécialisés
+        """
         if not CACHE_CORE_AVAILABLE:
             raise ImportError(
                 "Cannot initialize RAGCacheManager: Redis dependencies not available"
@@ -69,7 +88,7 @@ class RAGCacheManager:
             # Initialiser le core avec la configuration
             self.core = RedisCacheCore(config)
 
-            # Modules optionnels - avec gestion d'erreurs explicites
+            # Modules optionnels - avec gestion d'erreurs explicites et classes stub corrigées
             try:
                 if SEMANTIC_AVAILABLE:
                     self.semantic = SemanticCacheManager(self.core)
@@ -77,6 +96,7 @@ class RAGCacheManager:
                     logger.warning(
                         "Semantic cache module not available - related features disabled"
                     )
+                    # CORRECTION: Utiliser None au lieu de la classe stub
                     self.semantic = None
             except Exception as e:
                 logger.error(f"Failed to initialize semantic cache: {e}")
@@ -89,6 +109,7 @@ class RAGCacheManager:
                     logger.warning(
                         "Stats cache module not available - statistics disabled"
                     )
+                    # CORRECTION: Utiliser None au lieu de la classe stub
                     self.stats = None
             except Exception as e:
                 logger.error(f"Failed to initialize stats cache: {e}")
@@ -141,153 +162,6 @@ class RAGCacheManager:
             and getattr(self.core, "client", None) is not None
             and getattr(self.core, "enabled", False)
         )
-
-    # ===== MÉTHODES GÉNÉRIQUES POUR COMPATIBILITÉ RAG_ENGINE =====
-    async def get(self, key: str) -> Optional[bytes]:
-        """Méthode générique get pour compatibilité avec rag_engine.py"""
-        if not self.core or not self.core.client:
-            logger.debug("Core cache not available for get")
-            return None
-
-        try:
-            result = await self.core.client.get(key)
-            if result:
-                logger.debug(f"Cache GET hit: {key[:50]}...")
-                return result
-            else:
-                logger.debug(f"Cache GET miss: {key[:50]}...")
-                return None
-        except Exception as e:
-            logger.warning(f"Erreur cache get: {e}")
-            return None
-
-    async def set(self, key: str, value: bytes, ttl: int = None) -> bool:
-        """Méthode générique set pour compatibilité avec rag_engine.py"""
-        if not self.core or not self.core.client:
-            logger.debug("Core cache not available for set")
-            return False
-
-        try:
-            if ttl is None:
-                ttl = getattr(self.core.config, "default_ttl", 3600)
-
-            await self.core.client.setex(key, ttl, value)
-            logger.debug(f"Cache SET success: {key[:50]}... (TTL: {ttl}s)")
-            return True
-        except Exception as e:
-            logger.warning(f"Erreur cache set: {e}")
-            return False
-
-    async def delete(self, key: str) -> bool:
-        """Supprime une clé du cache"""
-        if not self.core or not self.core.client:
-            logger.debug("Core cache not available for delete")
-            return False
-
-        try:
-            result = await self.core.client.delete(key)
-            logger.debug(f"Cache DELETE: {key[:50]}... (result: {result})")
-            return bool(result)
-        except Exception as e:
-            logger.warning(f"Erreur cache delete: {e}")
-            return False
-
-    async def exists(self, key: str) -> bool:
-        """Vérifie si une clé existe"""
-        if not self.core or not self.core.client:
-            return False
-
-        try:
-            result = await self.core.client.exists(key)
-            return bool(result)
-        except Exception as e:
-            logger.warning(f"Erreur cache exists: {e}")
-            return False
-
-    # ===== MÉTHODES DE CACHE SIMPLIFIÉES POUR RAG_ENGINE =====
-    async def get_cached_response(self, cache_key: str) -> Optional[Dict]:
-        """Récupère une réponse mise en cache (format dict)"""
-        try:
-            # Essayer d'abord le cache sémantique si disponible
-            if self.semantic:
-                # Extraire les composants de la clé pour le cache sémantique
-                # Format attendu: "tenant:hash:language:context"
-                parts = cache_key.split(":")
-                if len(parts) >= 3:
-                    # Construire une requête approximative pour le cache sémantique
-                    query_approx = (
-                        f"query_{parts[1][:8]}"  # Hash court comme approximation
-                    )
-                    context_hash = parts[3] if len(parts) > 3 else ""
-                    language = parts[2] if len(parts) > 2 else "fr"
-
-                    response = await self.semantic.get_response(
-                        query_approx, context_hash, language
-                    )
-                    if response:
-                        return {
-                            "answer": response,
-                            "confidence": 0.85,
-                            "source": "semantic_cache",
-                            "timestamp": __import__("time").time(),
-                        }
-
-            # Fallback vers cache générique
-            cached_data = await self.get(cache_key)
-            if cached_data:
-                try:
-                    data = json.loads(cached_data.decode("utf-8"))
-                    return data
-                except (json.JSONDecodeError, UnicodeDecodeError) as e:
-                    logger.warning(f"Erreur décodage cache: {e}")
-                    # Si c'est juste une string, la retourner comme réponse simple
-                    return {
-                        "answer": cached_data.decode("utf-8", errors="ignore"),
-                        "confidence": 0.8,
-                        "source": "simple_cache",
-                        "timestamp": __import__("time").time(),
-                    }
-
-            return None
-        except Exception as e:
-            logger.warning(f"Erreur get_cached_response: {e}")
-            return None
-
-    async def cache_response(self, cache_key: str, response_data: Dict) -> bool:
-        """Met en cache une réponse (format dict)"""
-        try:
-            # Essayer d'abord le cache sémantique si possible
-            if self.semantic and "answer" in response_data:
-                parts = cache_key.split(":")
-                if len(parts) >= 3:
-                    query_approx = f"query_{parts[1][:8]}"
-                    context_hash = parts[3] if len(parts) > 3 else ""
-                    language = parts[2] if len(parts) > 2 else "fr"
-
-                    try:
-                        await self.semantic.set_response(
-                            query_approx,
-                            context_hash,
-                            response_data["answer"],
-                            language,
-                        )
-                        logger.debug("Réponse mise en cache sémantique")
-                    except Exception as e:
-                        logger.warning(f"Erreur cache sémantique: {e}")
-
-            # Toujours mettre en cache générique aussi pour compatibilité
-            json_data = json.dumps(response_data).encode("utf-8")
-            ttl = response_data.get("ttl", 3600)  # 1 heure par défaut
-
-            success = await self.set(cache_key, json_data, ttl)
-            if success:
-                logger.debug(f"Réponse mise en cache générique: {cache_key[:50]}...")
-
-            return success
-
-        except Exception as e:
-            logger.warning(f"Erreur cache_response: {e}")
-            return False
 
     # ===== MÉTHODES EMBEDDINGS =====
     async def get_embedding(self, text: str) -> Optional[List[float]]:
@@ -399,6 +273,7 @@ class RAGCacheManager:
     def generate_context_hash(self, documents: List[Dict]) -> str:
         """Génère un hash du contexte pour le cache"""
         import hashlib
+        import json
 
         try:
             content = json.dumps(
@@ -454,73 +329,6 @@ class RAGCacheManager:
             logger.warning(f"Erreur debug_semantic_extraction: {e}")
             return {"error": str(e)}
 
-    # ===== MÉTHODES DE DIAGNOSTIC ET MAINTENANCE =====
-    async def health_check(self) -> Dict[str, Any]:
-        """Vérifie la santé complète du cache"""
-        health = {
-            "timestamp": __import__("time").time(),
-            "overall_status": "unknown",
-            "components": {
-                "core": {"available": bool(self.core), "initialized": self.initialized},
-                "semantic": {"available": bool(self.semantic)},
-                "stats": {"available": bool(self.stats)},
-            },
-            "connectivity": {"redis": False},
-            "performance": {"test_duration": 0.0},
-        }
-
-        try:
-            # Test de connectivité Redis
-            if self.core and self.core.client:
-                start_time = __import__("time").time()
-
-                # Test ping
-                await self.core.client.ping()
-                health["connectivity"]["redis"] = True
-
-                # Test set/get simple
-                test_key = "health_check_test"
-                test_value = b"health_check_value"
-
-                await self.set(test_key, test_value, 60)  # 60s TTL
-                retrieved = await self.get(test_key)
-
-                if retrieved == test_value:
-                    health["performance"]["round_trip_success"] = True
-                    await self.delete(test_key)  # Cleanup
-
-                health["performance"]["test_duration"] = (
-                    __import__("time").time() - start_time
-                )
-
-            # Déterminer le statut global
-            if health["connectivity"]["redis"] and self.initialized:
-                health["overall_status"] = "healthy"
-            elif self.initialized:
-                health["overall_status"] = "degraded"
-            else:
-                health["overall_status"] = "unhealthy"
-
-        except Exception as e:
-            health["overall_status"] = "unhealthy"
-            health["error"] = str(e)
-            logger.error(f"Health check failed: {e}")
-
-        return health
-
-    async def clear_namespace(self, namespace: str = "default") -> int:
-        """Vide un namespace complet"""
-        if not self.core:
-            logger.warning("Core cache not available for clear_namespace")
-            return 0
-
-        try:
-            pattern = f"intelia_rag:{namespace}:*"
-            return await self.core.invalidate_pattern(pattern, namespace)
-        except Exception as e:
-            logger.error(f"Erreur clear_namespace: {e}")
-            return 0
-
     # ===== FERMETURE =====
     async def close(self):
         """Ferme la connexion Redis proprement"""
@@ -533,28 +341,6 @@ class RAGCacheManager:
 
         self.client = None
         self.initialized = False
-
-    # ===== MÉTHODES MAGIQUES POUR COMPATIBILITÉ =====
-    def __bool__(self) -> bool:
-        """Permet d'utiliser if cache_manager: ..."""
-        return self.enabled and self.initialized
-
-    def __str__(self) -> str:
-        """Représentation string pour debugging"""
-        return (
-            f"RAGCacheManager(enabled={self.enabled}, initialized={self.initialized})"
-        )
-
-    def __repr__(self) -> str:
-        """Représentation détaillée"""
-        return (
-            f"RAGCacheManager("
-            f"enabled={self.enabled}, "
-            f"initialized={self.initialized}, "
-            f"semantic={'available' if self.semantic else 'unavailable'}, "
-            f"stats={'available' if self.stats else 'unavailable'}"
-            f")"
-        )
 
 
 # Factory function avec gestion d'erreurs explicite

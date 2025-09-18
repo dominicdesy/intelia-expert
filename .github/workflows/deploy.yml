@@ -1,4 +1,17 @@
-name: Smart Selective Build and Deploy
+# 📊 Registry status check (pas de nettoyage automatique)
+  registry-status:
+    runs-on: ubuntu-latest
+    needs: [build-frontend, build-backend, build-llm, deploy]
+    if: always() && (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success' || needs.build-llm.result == 'success')
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DOCR_ACCESS_TOKEN }}
+
+      - name: Registry status report
+        run: |
+          echoname: Smart Selective Build and Deploy
 
 on:
   push:
@@ -207,64 +220,122 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Aggressive registry cleanup - Keep 8 images max
+  # 🧹 Registry cleanup qui fonctionne vraiment
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: [build-frontend, build-backend, build-llm, deploy]
+    if: always() && (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success' || needs.build-llm.result == 'success')
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DOCR_ACCESS_TOKEN }}
+
+      - name: Working automatic registry cleanup
         run: |
-          echo "🧹 NETTOYAGE AGRESSIF DU REGISTRY - MAX 8 IMAGES"
+          echo "🧹 NETTOYAGE AUTOMATIQUE - VERSION QUI FONCTIONNE"
           echo "================================================"
           
-          # Fonction de nettoyage forcé
-          cleanup_repo_aggressive() {
+          # Fonction utilisant l'API REST au lieu de doctl problématique
+          cleanup_with_api() {
             local repo=$1
+            local max_images=8
+            
             echo ""
-            echo "🔍 Nettoyage de $repo..."
+            echo "🔍 Nettoyage API pour $repo..."
             
-            # Lister toutes les images avec leur âge
-            local all_manifests=$(doctl registry repository list-manifests $repo --format Digest,Updated,Tags --no-header 2>/dev/null)
-            local total_count=$(echo "$all_manifests" | grep -c "sha256:" 2>/dev/null || echo "0")
+            # Utiliser curl avec l'API DO au lieu de doctl défaillant
+            local registry_name="${{ secrets.DOCR_NAME }}"
+            local api_url="https://api.digitalocean.com/v2/registry/$registry_name/repositories/$repo/tags"
             
-            echo "  📊 Images trouvées: $total_count"
+            echo "  📡 Récupération via API REST..."
+            local response=$(curl -s -X GET "$api_url?per_page=100" \
+              -H "Authorization: Bearer ${{ secrets.DOCR_ACCESS_TOKEN }}" \
+              -H "Content-Type: application/json")
             
-            if [ "$total_count" -le 8 ]; then
-              echo "  ✅ Pas de nettoyage nécessaire ($total_count <= 8)"
+            # Extraire les tags et leurs informations
+            local tags_info=$(echo "$response" | jq -r '.tags[] | select(.name != "buildcache" and .name != "latest") | "\(.name)|\(.updated_at)"' 2>/dev/null || echo "")
+            
+            if [ -z "$tags_info" ]; then
+              echo "  ⚠️ Pas de tags récupérés via API, tentative doctl..."
+              
+              # Fallback: Utiliser doctl avec pagination forcée
+              local manifests=$(doctl registry repository list-manifests "$repo" --format Digest,Updated,Tags --no-header --limit 100 2>/dev/null)
+              local digests_to_delete=$(echo "$manifests" | grep -v -E "(buildcache|latest|main$)" | sort -k2 | head -20 | awk '{print $1}')
+              
+              local count=0
+              for digest in $digests_to_delete; do
+                if [ $count -ge 15 ]; then break; fi
+                if [[ "$digest" =~ ^sha256: ]]; then
+                  echo "    🗑️ Suppression: ${digest:0:20}..."
+                  doctl registry repository delete-manifest --force "$repo" "$digest" 2>/dev/null && echo "      ✅ OK" || echo "      ❌ Échec"
+                  count=$((count + 1))
+                  sleep 0.5
+                fi
+              done
+              
               return 0
             fi
             
-            local to_delete=$((total_count - 8))
-            echo "  🗑️ Images à supprimer: $to_delete"
+            # Traitement des tags récupérés via API
+            local total_tags=$(echo "$tags_info" | wc -l)
+            echo "  📊 Tags trouvés (hors buildcache/latest): $total_tags"
             
-            # Supprimer les plus anciennes (tri par date, garde les 8 plus récentes)
-            # Exclure buildcache, latest, main des suppressions
+            if [ "$total_tags" -le "$max_images" ]; then
+              echo "  ✅ Pas de nettoyage nécessaire ($total_tags <= $max_images)"
+              return 0
+            fi
+            
+            local to_delete=$((total_tags - max_images))
+            echo "  🗑️ Tags à supprimer: $to_delete"
+            
+            # Supprimer les plus anciens
             local deleted=0
-            echo "$all_manifests" | grep "sha256:" | grep -v -E "(buildcache|latest|main$)" | sort -k2 | head -n $to_delete | while read digest updated tags; do
-              echo "    🔥 Suppression: ${digest:0:25}... [$tags] ($updated)"
-              if doctl registry repository delete-manifest --force $repo $digest 2>/dev/null; then
-                echo "      ✅ Supprimé"
+            echo "$tags_info" | sort -t'|' -k2 | head -n "$to_delete" | while IFS='|' read tag_name updated_at; do
+              if [ $deleted -ge 20 ]; then break; fi
+              
+              echo "    🗑️ Suppression tag: $tag_name ($updated_at)"
+              
+              # Supprimer via API REST
+              local delete_url="https://api.digitalocean.com/v2/registry/$registry_name/repositories/$repo/tags/$tag_name"
+              local delete_response=$(curl -s -X DELETE "$delete_url" \
+                -H "Authorization: Bearer ${{ secrets.DOCR_ACCESS_TOKEN }}" \
+                -w "%{http_code}")
+              
+              if [[ "$delete_response" =~ 20[0-9] ]]; then
+                echo "      ✅ Supprimé (HTTP $delete_response)"
                 deleted=$((deleted + 1))
               else
-                echo "      ❌ Échec"
+                echo "      ❌ Échec (HTTP $delete_response)"
               fi
+              
+              sleep 1
             done
-            
-            # Vérification post-nettoyage
-            sleep 3
-            local remaining=$(doctl registry repository list-manifests $repo --format Digest --no-header 2>/dev/null | grep -c "sha256:" || echo "0")
-            echo "  📊 Images restantes: $remaining"
           }
           
-          # Nettoyer les trois repositories
-          for repo in intelia-frontend intelia-backend intelia-llm; do
-            cleanup_repo_aggressive $repo
-          done
+          # Installer jq pour le parsing JSON
+          echo "📦 Installation de jq..."
+          sudo apt-get update -qq && sudo apt-get install -y jq
+          
+          # Nettoyer les repositories dans l'ordre de priorité
+          cleanup_with_api "intelia-llm"     # Priorité (43 images)
+          cleanup_with_api "intelia-backend" 
+          cleanup_with_api "intelia-frontend"
+          
+          # Passe supplémentaire pour LLM
+          echo ""
+          echo "🔄 Passe supplémentaire pour intelia-llm..."
+          cleanup_with_api "intelia-llm"
           
           echo ""
           echo "🗑️ Garbage collection final..."
-          doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force 2>/dev/null && echo "✅ GC lancé" || echo "⚠️ GC déjà en cours"
+          doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force 2>/dev/null && echo "✅ GC lancé" || echo "⚠️ GC en cours"
           
           echo ""
           echo "📊 STATUT FINAL:"
           doctl registry repository list --format Name,TagCount,UpdatedAt
           
-          echo "🎉 Nettoyage agressif terminé"
+          echo "🎉 Nettoyage automatique terminé"
 
   # 📊 Résumé (basé sur la version qui fonctionnait)
   summary:
