@@ -806,10 +806,6 @@ class EnhancedOODDetector:
             # Statistiques détaillées
             METRICS.ood_stats["total_queries"] += 1
             METRICS.ood_stats[f"level_{domain_analysis.relevance_level.value}"] += 1
-
-            if not isinstance(METRICS.ood_stats["threshold_applications"], dict):
-                METRICS.ood_stats["threshold_applications"] = {}
-
             METRICS.ood_stats["threshold_applications"][threshold] = (
                 METRICS.ood_stats["threshold_applications"].get(threshold, 0) + 1
             )

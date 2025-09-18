@@ -201,7 +201,6 @@ jobs:
     name: Cleanup old images in DOCR
     runs-on: ubuntu-latest
     needs: [build-frontend, build-backend, build-llm, deploy]
-    # On veut nettoyer même si un build ou le déploiement a échoué
     if: always()
     steps:
       - name: Install doctl
@@ -218,109 +217,142 @@ jobs:
       - name: Cleanup DOCR tags & dangling manifests
         shell: bash
         env:
-          # Optionnel: true pour tester sans supprimer
-          DRY_RUN: "false"
-          # Optionnel: si tu as plusieurs registries, dé-commente et renseigne-le
-          # DOCR_REGISTRY: "mon-registry"
+          # --- OPTIONS ---
+          DRY_RUN: "false"                # "true" pour tester sans supprimer
+          # DOCR_REGISTRY: "mon-registry" # dé-commente si tu as plusieurs registries
+          KEEP_LLM: "25"                  # garder N tags (hors protégés) pour intelia-llm
+          KEEP_BACKEND: "20"
+          KEEP_FRONTEND: "20"
+          LIMIT_LLM: "150"                # limite de suppressions max
+          LIMIT_BACKEND: "120"
+          LIMIT_FRONTEND: "120"
         run: |
           set -Eeuo pipefail
           shopt -s inherit_errexit || true
 
+          # Tags/Jets à ne JAMAIS supprimer
           PROTECTED_REGEX='^(latest|main|prod|stable|buildcache)$'
+          # Option --registry si défini
+          REGISTRY_OPT=()
+          [[ -n "${DOCR_REGISTRY:-}" ]] && REGISTRY_OPT+=(--registry "${DOCR_REGISTRY}")
 
-          # $1: repo, $2: KEEP (conserver N plus récents, hors protégés), $3: LIMIT (max suppressions)
+          # Wrapper doctl avec retries, et retour détaillé en cas d’erreur
+          doctl_run() {
+            # usage: doctl_run <cmd...>
+            if ! out="$(doctl --http-retry-max 8 "${@}" 2>&1)"; then
+              echo "      ⛔ doctl error: ${out}"
+              return 1
+            fi
+            printf '%s\n' "${out}"
+          }
+
+          # $1 repo ; $2 KEEP ; $3 LIMIT
           cleanup_repo() {
-            local repo="$1"
-            local KEEP="${2:-20}"
-            local LIMIT="${3:-100}"
-
+            local repo="$1" KEEP="${2:-20}" LIMIT="${3:-100}"
             echo ""
             echo "🏷️ Nettoyage de ${repo}…"
-            echo "  ⚖️  Règles: garder ${KEEP} plus récents (hors protégés), limite ${LIMIT} suppressions"
+            echo "  ⚖️  Règles: garder ${KEEP} (hors protégés), limite ${LIMIT}"
 
-            # Récupération JSON
-            if [[ -n "${DOCR_REGISTRY:-}" ]]; then
-              doctl registry repository list-tags "${repo}" --registry "${DOCR_REGISTRY}" -o json > "/tmp/${repo}.json"
-            else
-              doctl registry repository list-tags "${repo}" -o json > "/tmp/${repo}.json"
+            # 1) Lister en JSON
+            if ! doctl_run registry repository list-tags "${repo}" "${REGISTRY_OPT[@]}" -o json >"/tmp/${repo}.json"; then
+              echo "  ❌ Impossible de lister les tags pour ${repo}"
+              return 0
             fi
 
             local total
             total=$(jq 'length' "/tmp/${repo}.json")
             echo "  📦 Entrées totales (tags + dangling): ${total}"
 
-            # Liste triée des entries taggées (UpdatedAt desc), en TSV: updated_at \t tag \t digest
+            # 2) Construire listes: tagged (hors protégés) trié par updated_at desc, et dangling (tag vide)
             jq -r --arg re "${PROTECTED_REGEX}" '
-              map(.updated_at=(.updated_at // "1970-01-01 00:00:00 +0000 UTC"))    # fallback
+              map(.updated_at=(.updated_at // "1970-01-01T00:00:00Z")) 
               | sort_by(.updated_at) | reverse
               | .[]
               | select((.tag // "") != "")
               | select((.tag | test($re)) | not)
               | "\(.updated_at)\t\(.tag)\t\(.manifest_digest)"
-            ' "/tmp/${repo}.json" > "/tmp/${repo}_tagged.tsv"
+            ' "/tmp/${repo}.json" >"/tmp/${repo}_tagged.tsv"
 
-            # Liste des digests "dangling" (sans tag), unique
             jq -r '
               .[]
               | select((.tag // "") == "")
               | .manifest_digest
-            ' "/tmp/${repo}.json" | awk 'NF' | sort -u > "/tmp/${repo}_dangling.txt"
+            ' "/tmp/${repo}.json" | awk 'NF' | sort -u >"/tmp/${repo}_dangling.txt"
 
             local tagged_total dangling_total
-            tagged_total=$(wc -l < "/tmp/${repo}_tagged.tsv" | tr -d ' ')
-            dangling_total=$(wc -l < "/tmp/${repo}_dangling.txt" | tr -d ' ')
+            tagged_total=$(wc -l <"/tmp/${repo}_tagged.tsv" | tr -d ' ')
+            dangling_total=$(wc -l <"/tmp/${repo}_dangling.txt" | tr -d ' ')
             echo "  🏷️ Tags candidats (hors protégés): ${tagged_total}"
             echo "  🧩 Manifests orphelins (dangling): ${dangling_total}"
 
-            # Conserver les KEEP plus récents; supprimer le reste
+            # 3) Conserver les KEEP plus récents
             if (( KEEP > 0 )) && (( tagged_total > KEEP )); then
-              tail -n +$((KEEP+1)) "/tmp/${repo}_tagged.tsv" > "/tmp/${repo}_to_delete.tsv"
+              tail -n +$((KEEP+1)) "/tmp/${repo}_tagged.tsv" >"/tmp/${repo}_to_delete.tsv"
             else
               cp "/tmp/${repo}_tagged.tsv" "/tmp/${repo}_to_delete.tsv"
             fi
 
             local deleted=0
 
-            # --- Suppression par TAG ---
+            # Helper: renvoie "1" si le digest possède au moins un tag protégé
+            has_protected_tag_for_digest() {
+              local digest="$1"
+              jq -r --arg d "${digest}" --arg re "${PROTECTED_REGEX}" '
+                .[] | select(.manifest_digest == $d and (.tag // "") != "")
+                | .tag
+              ' "/tmp/${repo}.json" | grep -E -q "${PROTECTED_REGEX}" && echo 1 || echo 0
+            }
+
+            # 4) Suppression par TAG (avec fallback par manifest si utile/sûr)
             if [[ -s "/tmp/${repo}_to_delete.tsv" ]]; then
               echo "  🔥 Suppression par tag…"
-              while IFS=$'\t' read -r updated_at tag digest; do
+              while IFS=$'\t' read -r updated_at raw_tag digest; do
+                # trim
+                tag="$(printf '%s' "${raw_tag}" | tr -d '\r' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
                 [[ -z "${tag}" ]] && continue
                 (( deleted >= LIMIT )) && { echo "  ⛔ Limite atteinte (${LIMIT})"; break; }
 
-                echo "    🗑️ delete-tag: ${tag}  (updated: ${updated_at})"
+                echo "    🗑️ delete-tag: ${tag} (updated: ${updated_at})"
                 if [[ "${DRY_RUN}" == "true" ]]; then
                   echo "      🧪 DRY_RUN → skip"
                   ((deleted++))
                   continue
                 fi
 
-                if [[ -n "${DOCR_REGISTRY:-}" ]]; then
-                  if doctl registry repository delete-tag -f "${repo}" "${tag}" --registry "${DOCR_REGISTRY}" >/dev/null 2>&1; then
-                    echo "      ✅ OK"
-                    ((deleted++))
-                  else
-                    echo "      ❌ Échec"
-                  fi
+                if doctl_run registry repository delete-tag -f "${repo}" "${tag}" "${REGISTRY_OPT[@]}"; then
+                  echo "      ✅ OK (tag)"
+                  ((deleted++))
                 else
-                  if doctl registry repository delete-tag -f "${repo}" "${tag}" >/dev/null 2>&1; then
-                    echo "      ✅ OK"
-                    ((deleted++))
+                  # Fallback: on peut supprimer le manifest si et seulement si il ne porte AUCUN tag protégé
+                  if [[ -n "${digest}" && "$(has_protected_tag_for_digest "${digest}")" -eq 0 ]]; then
+                    echo "      ↪️ Fallback: delete-manifest ${digest} (aucun tag protégé lié)"
+                    if doctl_run registry repository delete-manifest -f "${repo}" "${digest}" "${REGISTRY_OPT[@]}"; then
+                      echo "        ✅ OK (manifest) — toutes les étiquettes sur ce digest disparaissent"
+                      ((deleted++))
+                    else
+                      echo "        ❌ Échec (manifest)"
+                    fi
                   else
-                    echo "      ❌ Échec"
+                    echo "      🔒 Fallback interdit: digest avec tag protégé (ou digest vide)"
                   fi
                 fi
-              done < "/tmp/${repo}_to_delete.tsv"
+              done <"/tmp/${repo}_to_delete.tsv"
             else
-              echo "  ✅ Rien à supprimer par tag (après conservation des ${KEEP} plus récents)"
+              echo "  ✅ Rien à supprimer par tag (après conservation)"
             fi
 
-            # --- Suppression des MANIFESTS orphelins ---
+            # 5) Suppression des MANIFESTS orphelins (dangling)
             if [[ -s "/tmp/${repo}_dangling.txt" ]]; then
               echo "  🧹 Suppression des manifests orphelins…"
               while read -r digest; do
                 [[ -z "${digest}" ]] && continue
                 (( deleted >= LIMIT )) && { echo "  ⛔ Limite atteinte (${LIMIT})"; break; }
+
+                # Par sécurité, re-vérifie qu'il n'existe vraiment plus de tag
+                if jq -e --arg d "${digest}" '.[] | select(.manifest_digest == $d and (.tag // "") != "")' "/tmp/${repo}.json" >/dev/null; then
+                  echo "    ⚠️ Digest ${digest} a encore des tags → skip"
+                  continue
+                fi
 
                 echo "    🗑️ delete-manifest: ${digest}"
                 if [[ "${DRY_RUN}" == "true" ]]; then
@@ -329,22 +361,13 @@ jobs:
                   continue
                 fi
 
-                if [[ -n "${DOCR_REGISTRY:-}" ]]; then
-                  if doctl registry repository delete-manifest -f "${repo}" "${digest}" --registry "${DOCR_REGISTRY}" >/dev/null 2>&1; then
-                    echo "      ✅ OK"
-                    ((deleted++))
-                  else
-                    echo "      ❌ Échec"
-                  fi
+                if doctl_run registry repository delete-manifest -f "${repo}" "${digest}" "${REGISTRY_OPT[@]}"; then
+                  echo "      ✅ OK (manifest)"
+                  ((deleted++))
                 else
-                  if doctl registry repository delete-manifest -f "${repo}" "${digest}" >/dev/null 2>&1; then
-                    echo "      ✅ OK"
-                    ((deleted++))
-                  else
-                    echo "      ❌ Échec"
-                  fi
+                  echo "      ❌ Échec (manifest)"
                 fi
-              done < "/tmp/${repo}_dangling.txt"
+              done <"/tmp/${repo}_dangling.txt"
             else
               echo "  ✅ Aucun manifest orphelin à supprimer"
             fi
@@ -352,10 +375,10 @@ jobs:
             echo "  📊 Total supprimé (${repo}): ${deleted}"
           }
 
-          # --------- Dépôts à nettoyer (ajuste KEEP / LIMIT selon ton besoin) ----------
-          cleanup_repo "intelia-llm"      25 150   # garder 25 récents, max 150 suppressions
-          cleanup_repo "intelia-backend"  20 120
-          cleanup_repo "intelia-frontend" 20 120
+          # --- Lance le cleanup sur tes dépôts ---
+          cleanup_repo "intelia-llm"      "${KEEP_LLM}"      "${LIMIT_LLM}"
+          cleanup_repo "intelia-backend"  "${KEEP_BACKEND}"  "${LIMIT_BACKEND}"
+          cleanup_repo "intelia-frontend" "${KEEP_FRONTEND}" "${LIMIT_FRONTEND}"
 
   # 📊 Résumé (basé sur la version qui fonctionnait)
   summary:
