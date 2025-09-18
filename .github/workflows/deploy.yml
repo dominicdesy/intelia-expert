@@ -143,10 +143,54 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
+      # Vérification de la disponibilité des images avant déploiement
+      - name: Verify images availability
+        run: |
+          echo "🔍 Vérification des images dans le registry..."
+          
+          # Vérifier quelles images ont été buildées dans ce workflow
+          IMAGES_TO_CHECK=""
+          if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
+            IMAGES_TO_CHECK="$IMAGES_TO_CHECK intelia-frontend"
+          fi
+          if [[ "${{ needs.build-backend.result }}" == "success" ]]; then
+            IMAGES_TO_CHECK="$IMAGES_TO_CHECK intelia-backend"
+          fi
+          if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
+            IMAGES_TO_CHECK="$IMAGES_TO_CHECK intelia-llm"
+          fi
+          
+          echo "Images à vérifier: $IMAGES_TO_CHECK"
+          
+          # Vérifier chaque image
+          for image in $IMAGES_TO_CHECK; do
+            echo "Vérification de $image:latest..."
+            if doctl registry repository list-manifests $image --format Tag | grep -q "latest"; then
+              echo "✅ $image:latest trouvée"
+            else
+              echo "❌ $image:latest introuvable"
+              echo "📋 Tags disponibles pour $image:"
+              doctl registry repository list-manifests $image --format Tag || echo "Aucun tag trouvé"
+            fi
+          done
+
       # Option A: Déploiement simple avec force rebuild
       - name: Trigger redeploy (use current app sources)
         run: |
           echo "🚀 Déclenchement du redéploiement..."
+          echo "App ID: ${{ secrets.DO_APP_ID }}"
+          if [ -z "${{ secrets.DO_APP_ID }}" ]; then
+            echo "❌ Erreur: DO_APP_ID secret n'est pas configuré"
+            echo "👉 Ajoutez le secret DO_APP_ID dans GitHub Settings > Secrets"
+            echo "💡 Pour trouver votre App ID:"
+            echo "   doctl apps list --format ID,Spec.Name"
+            exit 1
+          fi
+          
+          # Attendre un peu pour la propagation du registry
+          echo "⏳ Attente de 30s pour la propagation du registry..."
+          sleep 30
+          
           doctl apps create-deployment ${{ secrets.DO_APP_ID }} --force-rebuild --wait
 
       # Option B: Déploiement avec tags immuables (recommandé & idempotent)
@@ -225,7 +269,7 @@ jobs:
           if [[ "${{ needs.detect-changes.outputs.frontend-changed }}" == "true" ]]; then
             echo "Frontend: ${{ needs.build-frontend.result == 'success' && '✅ DÉPLOYÉ' || '❌ ÉCHEC' }}"
           else
-            echo "Frontend: ⏸️ INCHANGÉ"
+            echo "Frontend:⏸️ INCHANGÉ"
           fi
           
           if [[ "${{ needs.detect-changes.outputs.backend-changed }}" == "true" ]]; then
