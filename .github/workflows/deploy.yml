@@ -250,12 +250,7 @@ jobs:
               while read digest; do
                 if [ ! -z "$digest" ] && [[ "$digest" == sha256:* ]]; then
                   echo "    Suppression: $digest"
-                  doctl registry repository delete-manifest $repo $digest --force
-                  if [ $? -eq 0 ]; then
-                    echo "    ✓ Supprimé avec succès"
-                  else
-                    echo "    ✗ Échec de suppression"
-                  fi
+                  echo "y" | doctl registry repository delete-manifest $repo $digest || echo "    Échec de suppression"
                 fi
               done
             else
