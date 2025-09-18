@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 api/endpoints.py - Module des endpoints API
-Tous les endpoints déplacés depuis main.py pour architecture modulaire
+VERSION CORRIGÉE - Import BASE_PATH depuis config au lieu de le redéfinir
 """
 
 import time
@@ -14,8 +14,9 @@ from collections import OrderedDict
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 
-# ✅ CORRECTION: Suppression de BASE_PATH et MAX_REQUEST_SIZE des imports config
+# ✅ CORRECTION: Importer BASE_PATH depuis config au lieu de le redéfinir
 from config.config import (
+    BASE_PATH,  # ← AJOUT CRITIQUE
     MAX_CONVERSATION_CONTEXT,
     TENANT_TTL,
     MAX_TENANTS,
@@ -34,12 +35,11 @@ from utils.utilities import (
     detect_language_enhanced,
 )
 
-# ✅ CORRECTION: Import depuis utils au lieu de core
 from utils.imports_and_dependencies import get_full_status_report
 
-# ✅ CORRECTION: Définir les constantes manquantes
-MAX_REQUEST_SIZE = 8000
-BASE_PATH = "/api/v1"
+# ✅ CORRECTION: Supprimer la redéfinition de BASE_PATH
+# BASE_PATH = "/api/v1"  ← SUPPRIMÉ
+MAX_REQUEST_SIZE = 8000  # Garde cette constante locale
 
 logger = logging.getLogger(__name__)
 
@@ -409,6 +409,12 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                     "timestamp": time.time(),
                 },
             )
+
+    # ✅ CORRECTION: Utiliser BASE_PATH depuis config (qui vaut "")
+    # Donc les routes seront maintenant:
+    # - /status/dependencies au lieu de /api/v1/status/dependencies
+    # - /status/rag au lieu de /api/v1/status/rag
+    # - /chat au lieu de /api/v1/chat
 
     @router.get(f"{BASE_PATH}/status/dependencies")
     async def dependencies_status():
