@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 generators.py - Générateurs de réponses enrichis avec entités et cache externe
-Version fusionnée avec toutes les fonctionnalités avancées
+Version fusionnée avec toutes les fonctionnalités avancées - CORRIGÉE
 """
 
 import logging
@@ -121,7 +121,6 @@ class EnhancedResponseGenerator:
                                 METRICS.semantic_fallback_used()
                             else:
                                 METRICS.semantic_cache_hit("exact")
-                        # CORRECTION: Remplacer bare except par Exception
                         except Exception:
                             pass
                     return cached_response
@@ -173,7 +172,9 @@ class EnhancedResponseGenerator:
                         ),
                         "conversation_context_used": bool(conversation_context),
                         "intent_detected": (
-                            str(intent_result.intent_type) if intent_result else None
+                            str(getattr(intent_result, "intent_type", ""))
+                            if intent_result
+                            else None
                         ),
                         "entities_found": (
                             getattr(intent_result, "detected_entities", {})
@@ -236,18 +237,21 @@ class EnhancedResponseGenerator:
                         f"Phase {entities['phase']}: {self.entity_contexts['phase'][phase]}"
                     )
 
-            # Focus métrique
+            # Focus métrique - CORRECTION: Accès cohérent à intent_result
             metric_focus = ""
             detected_metrics = []
+            expanded_query = getattr(intent_result, "expanded_query", "")
+
             for metric, keywords in self.performance_metrics.items():
-                if metric in entities or any(
-                    (
-                        kw in intent_result.expanded_query.lower()
-                        if hasattr(intent_result, "expanded_query")
-                        else False
-                    )
-                    for kw in keywords
-                ):
+                # Vérifier si la métrique est dans les entités OU dans la query étendue
+                metric_in_entities = metric in entities
+                metric_in_query = (
+                    any(kw in expanded_query.lower() for kw in keywords)
+                    if expanded_query
+                    else False
+                )
+
+                if metric_in_entities or metric_in_query:
                     detected_metrics.extend(keywords)
 
             if detected_metrics:
@@ -282,22 +286,16 @@ class EnhancedResponseGenerator:
                 elif "layer" in species or "ponte" in species:
                     species_focus = "Objectifs ponte: intensité, persistance, qualité œuf, viabilité"
 
-            # Indicateurs de performance attendus
+            # Indicateurs de performance attendus - CORRECTION: Accès cohérent
             performance_indicators = []
-            if (
-                "weight" in entities or "poids" in intent_result.expanded_query.lower()
-                if hasattr(intent_result, "expanded_query")
-                else False
+            if "weight" in entities or (
+                "poids" in expanded_query.lower() if expanded_query else False
             ):
                 performance_indicators.extend(
                     ["poids vif", "gain quotidien", "homogénéité du lot"]
                 )
             if "fcr" in entities or any(
-                (
-                    term in intent_result.expanded_query.lower()
-                    if hasattr(intent_result, "expanded_query")
-                    else False
-                )
+                term in expanded_query.lower() if expanded_query else False
                 for term in ["conversion", "indice"]
             ):
                 performance_indicators.extend(

@@ -821,15 +821,15 @@ class InteliaRAGEngine:
             # Génération de la réponse
             try:
                 if self.generator:
-                    response_text = await self.generator.generate_response(
+                    response_result = await self.generator.generate_response(
                         query,
                         filtered_docs,
+                        intent_result,
                         conversation_context_str,
                         language,
-                        intent_result,  # Réordonné selon la signature du générateur
                     )
 
-                    if not response_text or not isinstance(response_text, str):
+                    if not response_result or not response_result.answer:
                         return RAGResult(source=RAGSource.GENERATION_FAILED)
 
             except Exception as e:
@@ -902,7 +902,7 @@ class InteliaRAGEngine:
             # Construire le résultat
             result = RAGResult(
                 source=RAGSource.RAG_SUCCESS,
-                answer=response_text,
+                answer=response_result.answer,
                 confidence=final_confidence,
                 metadata=metadata,
             )
