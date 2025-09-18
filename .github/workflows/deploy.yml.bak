@@ -1,13 +1,8 @@
-name: Smart Selective Build and Deploy
+name: Simple Build and Deploy
 
 on:
   push:
     branches: [ main ]
-    paths-ignore:
-      - '**.md'
-      - '.gitignore'
-      - 'docs/**'
-      - 'README.md'
   workflow_dispatch:
 
 concurrency:
@@ -15,7 +10,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # 🔍 Détecter les changements avec debug
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -38,22 +32,10 @@ jobs:
             llm:
               - 'llm/**'
 
-      - name: Debug changes detection
-        run: |
-          echo "=== CHANGEMENTS DÉTECTÉS ==="
-          echo "Frontend changed: ${{ steps.changes.outputs.frontend }}"
-          echo "Backend changed: ${{ steps.changes.outputs.backend }}"
-          echo "LLM changed: ${{ steps.changes.outputs.llm }}"
-          echo ""
-          echo "=== FICHIERS MODIFIÉS ==="
-          git diff --name-only HEAD~1 HEAD || git diff --name-only HEAD
-          echo "=========================="
-
-  # 🎯 Build Frontend - SEULEMENT si changé
   build-frontend:
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.frontend-changed == 'true'
+    if: always() && (needs.detect-changes.outputs.frontend-changed == 'true' || needs.detect-changes.outputs.backend-changed == 'true' || needs.detect-changes.outputs.llm-changed == 'true')
     steps:
       - uses: actions/checkout@v4
 
@@ -67,7 +49,7 @@ jobs:
           username: doctl
           password: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Build & push frontend
+      - name: Build and push frontend
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
@@ -86,11 +68,10 @@ jobs:
             NEXT_PUBLIC_API_BASE_URL=https://expert.intelia.com/api
             NEXT_PUBLIC_API_URL=https://expert.intelia.com/api
 
-  # 🎯 Build Backend - SEULEMENT si changé  
   build-backend:
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.backend-changed == 'true'
+    if: always() && (needs.detect-changes.outputs.frontend-changed == 'true' || needs.detect-changes.outputs.backend-changed == 'true' || needs.detect-changes.outputs.llm-changed == 'true')
     steps:
       - uses: actions/checkout@v4
 
@@ -104,7 +85,7 @@ jobs:
           username: doctl
           password: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Build & push backend
+      - name: Build and push backend
         uses: docker/build-push-action@v6
         with:
           context: ./backend
@@ -118,11 +99,10 @@ jobs:
           platforms: linux/amd64
           provenance: false
 
-  # 🎯 Build LLM - SEULEMENT si changé
   build-llm:
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.llm-changed == 'true'
+    if: always() && (needs.detect-changes.outputs.frontend-changed == 'true' || needs.detect-changes.outputs.backend-changed == 'true' || needs.detect-changes.outputs.llm-changed == 'true')
     steps:
       - uses: actions/checkout@v4
 
@@ -136,7 +116,7 @@ jobs:
           username: doctl
           password: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Build & push LLM
+      - name: Build and push LLM
         uses: docker/build-push-action@v6
         with:
           context: ./llm
@@ -150,51 +130,65 @@ jobs:
           platforms: linux/amd64
           provenance: false
 
-  # 🚀 Deploy - SEULEMENT si au moins un service a été buildé
   deploy:
     name: Deploy to DigitalOcean App Platform
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-frontend, build-backend, build-llm]
-    if: always() && (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success' || needs.build-llm.result == 'success')
+    needs: [build-frontend, build-backend, build-llm]
+    if: ${{ always() && (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success' || needs.build-llm.result == 'success') }}
     steps:
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Wait for registry propagation
+      - name: Verify main tags availability
         run: |
-          echo "⏳ Attente de 30s pour la propagation du registry..."
-          sleep 30
+          echo "Verification des tags 'main' dans le registry..."
+          
+          for repo in intelia-backend intelia-frontend intelia-llm; do
+            echo "Verification de $repo:main..."
+            if doctl registry repository list-manifests $repo --format Tag | grep -q "main"; then
+              echo "OK $repo:main trouvee"
+            else
+              echo "ERREUR $repo:main introuvable - le deploiement va echouer"
+              exit 1
+            fi
+          done
 
-      - name: Trigger App Platform deployment
+      - name: Trigger redeploy with detailed monitoring
         run: |
-          echo "🚀 Déclenchement du redéploiement..."
+          echo "Declenchement du redeploiement..."
+          echo "App ID: ${{ secrets.DO_APP_ID }}"
           if [ -z "${{ secrets.DO_APP_ID }}" ]; then
-            echo "❌ ERREUR: DO_APP_ID secret n'est pas configuré"
+            echo "ERREUR: DO_APP_ID secret n'est pas configure"
+            echo "Ajoutez le secret DO_APP_ID dans GitHub Settings > Secrets"
             exit 1
           fi
           
-          DEPLOYMENT_ID=$(doctl apps create-deployment ${{ secrets.DO_APP_ID }} --force-rebuild --format ID --no-header)
-          echo "📋 Deployment ID: $DEPLOYMENT_ID"
+          echo "Attente de 30s pour la propagation du registry..."
+          sleep 30
           
-          echo "👀 Surveillance du déploiement (timeout 10 min)..."
+          DEPLOYMENT_ID=$(doctl apps create-deployment ${{ secrets.DO_APP_ID }} --force-rebuild --format ID --no-header)
+          echo "Deployment ID: $DEPLOYMENT_ID"
+          
+          echo "Surveillance du deploiement (timeout 10 min)..."
           for i in {1..60}; do
             STATUS=$(doctl apps get-deployment ${{ secrets.DO_APP_ID }} $DEPLOYMENT_ID --format Phase --no-header 2>/dev/null || echo "UNKNOWN")
             echo "[$i/60] Statut: $STATUS"
             
             case $STATUS in
               "ACTIVE"|"RUNNING")
-                echo "✅ Déploiement réussi !"
+                echo "Deploiement reussi !"
                 exit 0
                 ;;
               "ERROR"|"FAILED")
-                echo "❌ Déploiement échoué"
+                echo "Deploiement echoue"
+                echo "Details de l'erreur :"
                 doctl apps get-deployment ${{ secrets.DO_APP_ID }} $DEPLOYMENT_ID || true
                 exit 1
                 ;;
               "CANCELED"|"SUPERSEDED")
-                echo "⚠️ Déploiement annulé ou remplacé"
+                echo "Deploiement annule ou remplace"
                 exit 1
                 ;;
             esac
@@ -202,13 +196,17 @@ jobs:
             sleep 10
           done
           
-          echo "⏰ Timeout atteint"
+          echo "Timeout atteint - verification finale..."
           doctl apps get-deployment ${{ secrets.DO_APP_ID }} $DEPLOYMENT_ID || true
-          exit 1
 
-  # 🧹 Registry cleanup - Garde seulement 6 images par repo
+      - name: Deployment status
+        run: |
+          echo "Deploiement declenche avec succes"
+          echo "Verifiez le statut sur: https://cloud.digitalocean.com/apps"
+
   cleanup:
     runs-on: ubuntu-latest
+    # FORCE RELOAD - version avec --force correcte
     needs: [build-frontend, build-backend, build-llm, deploy]
     if: always() && (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success' || needs.build-llm.result == 'success')
     steps:
@@ -217,80 +215,52 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Smart cleanup - Keep only 6 images per repo
+      - name: Cleanup old images (keep only 8 per repo)
         run: |
-          echo "🧹 NETTOYAGE INTELLIGENT DU REGISTRY"
-          echo "===================================="
+          echo "Nettoyage agressif des anciennes images..."
           
           cleanup_repo() {
             local repo=$1
-            echo "🔍 Analyse de $repo..."
+            echo "Nettoyage de $repo..."
             
-            # Vérifier si le repo existe
-            if ! doctl registry repository list | grep -q "^$repo$"; then
-              echo "  ⚠️  Repository $repo non trouvé - SKIP"
-              return 0
-            fi
+            local total=$(doctl registry repository list-manifests $repo --format Digest --no-header | wc -l)
+            echo "  Images actuelles: $total"
             
-            # Compter les images actuelles
-            local manifests=$(doctl registry repository list-manifests $repo --format Digest,Updated,Tags --no-header 2>/dev/null || echo "")
-            
-            if [ -z "$manifests" ]; then
-              echo "  📭 Repository $repo vide - SKIP"
-              return 0
-            fi
-            
-            local total=$(echo "$manifests" | wc -l)
-            echo "  📊 Images actuelles: $total"
-            
-            if [ $total -le 6 ]; then
-              echo "  ✅ Aucun nettoyage nécessaire ($total <= 6)"
-              return 0
-            fi
-            
-            local to_delete=$((total - 6))
-            echo "  🗑️  Images à supprimer: $to_delete"
-            
-            # Supprimer les plus anciennes (tri par date, garde les 6 plus récentes)
-            echo "$manifests" | sort -k2 | head -n $to_delete | while read -r line; do
-              local digest=$(echo "$line" | awk '{print $1}')
-              local date=$(echo "$line" | awk '{print $2}')
-              local tags=$(echo "$line" | awk '{$1=""; $2=""; print $0}' | sed 's/^ *//')
+            if [ $total -gt 8 ]; then
+              local to_delete=$((total - 8))
+              echo "  A supprimer: $to_delete images"
               
-              if [ ! -z "$digest" ] && [[ "$digest" == sha256:* ]]; then
-                echo "    🔥 Suppression: $digest ($date) [$tags]"
-                if doctl registry repository delete-manifest --force $repo $digest 2>/dev/null; then
-                  echo "    ✅ Supprimé avec succès"
-                else
-                  echo "    ⚠️  Échec de suppression"
+              doctl registry repository list-manifests $repo --format Digest,Updated --no-header | \
+              sort -k2 | \
+              head -n $to_delete | \
+              awk '{print $1}' | \
+              while read digest; do
+                if [ ! -z "$digest" ] && [[ "$digest" == sha256:* ]]; then
+                  echo "    Suppression: $digest"
+                  doctl registry repository delete-manifest --force $repo $digest || echo "    Echec de suppression"
                 fi
-              else
-                echo "    ⚠️  Digest invalide: $digest - SKIP"
-              fi
-            done
+              done
+            else
+              echo "  Aucun nettoyage necessaire ($total <= 8)"
+            fi
             
-            # Vérification finale
-            local remaining=$(doctl registry repository list-manifests $repo --format Digest --no-header 2>/dev/null | wc -l)
-            echo "  📊 Images restantes: $remaining"
+            local remaining=$(doctl registry repository list-manifests $repo --format Digest --no-header | wc -l)
+            echo "  Images restantes: $remaining"
           }
           
-          # Nettoyer les trois repos
-          for repo in intelia-frontend intelia-backend intelia-llm; do
-            cleanup_repo "$repo"
-            echo ""
+          for repo in intelia-backend intelia-frontend intelia-llm; do
+            if doctl registry repository list | grep -q "$repo"; then
+              cleanup_repo "$repo"
+            else
+              echo "Repository $repo non trouve"
+            fi
           done
           
-          # Garbage collection global
-          echo "🗑️ Lancement du garbage collection..."
-          if doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force 2>/dev/null; then
-            echo "✅ Garbage collection démarré"
-          else
-            echo "⚠️  Garbage collection déjà en cours ou en erreur"
-          fi
+          echo "Lancement du garbage collection..."
+          doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force || echo "Garbage collection deja en cours"
           
-          echo "🎉 Nettoyage terminé !"
+          echo "Nettoyage termine"
 
-  # 📊 Résumé final
   summary:
     runs-on: ubuntu-latest
     needs: [detect-changes, build-frontend, build-backend, build-llm, deploy, cleanup]
@@ -298,52 +268,26 @@ jobs:
     steps:
       - name: Deployment Summary
         run: |
-          echo "🚀 RÉSUMÉ DU DÉPLOIEMENT"
-          echo "========================"
+          echo "DEPLOIEMENT TERMINE"
+          echo "===================="
           
-          # Frontend
           if [[ "${{ needs.detect-changes.outputs.frontend-changed }}" == "true" ]]; then
-            if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
-              echo "✅ Frontend: DÉPLOYÉ"
-            else
-              echo "❌ Frontend: ÉCHEC"
-            fi
+            echo "Frontend: ${{ needs.build-frontend.result == 'success' && 'DEPLOYE' || 'ECHEC' }}"
           else
-            echo "⏸️ Frontend: IGNORÉ (aucun changement)"
+            echo "Frontend: INCHANGE"
           fi
           
-          # Backend  
           if [[ "${{ needs.detect-changes.outputs.backend-changed }}" == "true" ]]; then
-            if [[ "${{ needs.build-backend.result }}" == "success" ]]; then
-              echo "✅ Backend: DÉPLOYÉ"
-            else
-              echo "❌ Backend: ÉCHEC" 
-            fi
+            echo "Backend: ${{ needs.build-backend.result == 'success' && 'DEPLOYE' || 'ECHEC' }}"
           else
-            echo "⏸️ Backend: IGNORÉ (aucun changement)"
+            echo "Backend: INCHANGE"
           fi
           
-          # LLM
           if [[ "${{ needs.detect-changes.outputs.llm-changed }}" == "true" ]]; then
-            if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
-              echo "✅ LLM: DÉPLOYÉ"
-            else
-              echo "❌ LLM: ÉCHEC"
-            fi
+            echo "LLM: ${{ needs.build-llm.result == 'success' && 'DEPLOYE' || 'ECHEC' }}"
           else
-            echo "⏸️ LLM: IGNORÉ (aucun changement)"
+            echo "LLM: INCHANGE"
           fi
           
           echo ""
-          echo "📋 Déploiement global: ${{ needs.deploy.result == 'success' && '✅ RÉUSSI' || '❌ ÉCHEC' }}"
-          echo "🧹 Nettoyage: ${{ needs.cleanup.result == 'success' && '✅ TERMINÉ' || '⚠️ PARTIEL' }}"
-          
-          # Compter les services déployés
-          deployed=0
-          if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then ((deployed++)); fi
-          if [[ "${{ needs.build-backend.result }}" == "success" ]]; then ((deployed++)); fi
-          if [[ "${{ needs.build-llm.result }}" == "success" ]]; then ((deployed++)); fi
-          
-          echo ""
-          echo "📊 Services déployés: $deployed/3"
-          echo "🔗 App Platform: https://cloud.digitalocean.com/apps"
+          echo "Deploiement: ${{ needs.deploy.result == 'success' && 'REUSSI' || 'ECHEC' }}"
