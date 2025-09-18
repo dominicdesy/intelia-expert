@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 generators.py - Générateurs de réponses enrichis avec entités et cache externe
-Version fusionnée avec toutes les fonctionnalités avancées - CORRIGÉE
+Version corrigée - Erreur cache manager résolue
 """
 
 import logging
-import time
 import re
 from typing import List, Tuple, Dict
 from dataclasses import dataclass
@@ -158,32 +157,10 @@ class EnhancedResponseGenerator:
                 [self._doc_to_dict(doc) for doc in context_docs],
             )
 
-            # Mettre en cache avec métadonnées enrichies
+            # Mettre en cache - CORRIGÉ: paramètre metadata supprimé
             if self.cache_manager and self.cache_manager.enabled:
                 await self.cache_manager.set_response(
-                    query,
-                    context_hash,
-                    enhanced_response,
-                    language,
-                    metadata={
-                        "generation_time": time.time(),
-                        "enrichment_used": bool(
-                            enrichment.entity_context or enrichment.metric_focus
-                        ),
-                        "conversation_context_used": bool(conversation_context),
-                        "intent_detected": (
-                            str(getattr(intent_result, "intent_type", ""))
-                            if intent_result
-                            else None
-                        ),
-                        "entities_found": (
-                            getattr(intent_result, "detected_entities", {})
-                            if intent_result
-                            else {}
-                        ),
-                        "performance_indicators": enrichment.performance_indicators,
-                        "confidence_boosters": enrichment.confidence_boosters,
-                    },
+                    query, context_hash, enhanced_response, language
                 )
 
             return enhanced_response
@@ -237,7 +214,7 @@ class EnhancedResponseGenerator:
                         f"Phase {entities['phase']}: {self.entity_contexts['phase'][phase]}"
                     )
 
-            # Focus métrique - CORRECTION: Accès cohérent à intent_result
+            # Focus métrique - CORRIGÉ: Accès cohérent à intent_result
             metric_focus = ""
             detected_metrics = []
             expanded_query = getattr(intent_result, "expanded_query", "")
@@ -286,7 +263,7 @@ class EnhancedResponseGenerator:
                 elif "layer" in species or "ponte" in species:
                     species_focus = "Objectifs ponte: intensité, persistance, qualité œuf, viabilité"
 
-            # Indicateurs de performance attendus - CORRECTION: Accès cohérent
+            # Indicateurs de performance attendus - CORRIGÉ: Accès cohérent
             performance_indicators = []
             if "weight" in entities or (
                 "poids" in expanded_query.lower() if expanded_query else False

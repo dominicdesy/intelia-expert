@@ -207,70 +207,87 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Cleanup old image tags (safe & robust)
+      - name: Ensure jq is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v jq >/dev/null || sudo apt-get update -y && sudo apt-get install -y jq
+
+      - name: Cleanup DOCR tags & dangling manifests
         shell: bash
         run: |
           set -euo pipefail
 
+          # Tags à ne JAMAIS supprimer
+          PROTECTED_REGEX='^(latest|main|prod|stable|buildcache)$'
+
           cleanup_repo() {
             local repo="$1"
-            local max_delete="${2:-25}"   # limite de sécurité
+            local max_delete="${2:-50}"  # limite de sécurité
+            local deleted=0
 
             echo ""
-            echo "🏷️ Nettoyage par tags de ${repo}..."
-            echo "  📋 Récupération des tags (sans en-tête)…"
+            echo "🏷️ Nettoyage de ${repo}…"
+            echo "  📋 Récupération (JSON) des tags + digests…"
 
-            # On ne récupère QUE la colonne Tag, sans en-tête ; pagination large pour éviter les manques
-            mapfile -t TAGS < <(
-              doctl registry repository list-tags "${repo}" \
-                --format Tag \
-                --no-header \
-                --page 1 --page-size 200 \
-              | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
-              | grep -v -E '^(latest|main|prod|stable|buildcache)$' \
-              | grep -v '^$'
-            )
+            # On récupère tout en JSON, puis on extrait "tag" et "manifest_digest" proprement.
+            # NB: certaines entrées ont tag == "" => manifests orphelins (dangling).
+            doctl registry repository list-tags "${repo}" \
+              --page 1 --page-size 500 -o json > /tmp/${repo}_tags.json
 
-            local total="${#TAGS[@]}"
-            echo "  📊 Tags supprimables: ${total}"
-            if (( total == 0 )); then
-              echo "  ✅ Rien à supprimer"
-              return 0
-            fi
+            # Compte brut (toutes entrées, y compris protégées et vides)
+            local total
+            total=$(jq 'length' /tmp/${repo}_tags.json)
+            echo "  📊 Entrées (tags + dangling): ${total}"
 
-            local deleted=0
-            for tag in "${TAGS[@]}"; do
-              (( deleted >= max_delete )) && break
+            # On parcourt proprement, sans header ni colonnes "humaines"
+            # Format TSV: "<tag>\t<digest>"
+            jq -r '.[] | [.tag, .manifest_digest] | @tsv' /tmp/${repo}_tags.json | \
+            while IFS=$'\t' read -r tag digest; do
+              # Limite de sécurité
+              if (( deleted >= max_delete )); then
+                echo "  ⛔ Limite de sécurité atteinte (${max_delete})."
+                break
+              fi
+
+              # Cas 1: manifest orphelin (tag vide)
+              if [[ -z "${tag}" || "${tag}" == "null" ]]; then
+                if [[ -n "${digest}" && "${digest}" != "null" ]]; then
+                  echo "    🗑️ Suppression manifest orphelin (digest): ${digest}"
+                  if doctl registry repository delete-manifest -f "${repo}" "${digest}" >/dev/null 2>&1; then
+                    echo "      ✅ OK (manifest)"
+                    ((deleted++))
+                  else
+                    echo "      ❌ Échec (manifest)"
+                  fi
+                fi
+                continue
+              fi
+
+              # Cas 2: tag protégé
+              if [[ "${tag}" =~ ${PROTECTED_REGEX} ]]; then
+                echo "    🔒 Skip tag protégé: ${tag}"
+                continue
+              fi
+
+              # Cas 3: suppression par tag
               echo "    🗑️ Suppression tag: ${tag}"
               if doctl registry repository delete-tag -f "${repo}" "${tag}" >/dev/null 2>&1; then
-                echo "      ✅ OK"
+                echo "      ✅ OK (tag)"
                 ((deleted++))
               else
-                echo "      ❌ Échec suppression tag"
+                echo "      ❌ Échec (tag)"
               fi
             done
-            echo "  📊 Tags supprimés: ${deleted}"
+
+            echo "  📊 Total supprimé (${repo}): ${deleted}"
           }
 
-          # Exécuter sur tes 3 dépôts
-          cleanup_repo "intelia-llm"  30
-          cleanup_repo "intelia-backend" 25
-          cleanup_repo "intelia-frontend" 25
+          # Appliquer sur tes dépôts (ajuste la limite au besoin)
+          cleanup_repo "intelia-llm"  60
+          cleanup_repo "intelia-backend" 40
+          cleanup_repo "intelia-frontend" 40
 
-          
-          echo ""
-          echo "🗑️ Garbage collection final..."
-          doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force 2>/dev/null || echo "GC en cours"
-          
-          echo ""
-          echo "📊 STATUT ACTUEL:"
-          doctl registry repository list --format Name,TagCount,UpdatedAt
-          
-          echo ""
-          echo "📝 RÉSUMÉ:"
-          echo "- Si TagCount reste élevé: le nettoyage automatique via scripts a des limitations"
-          echo "- Solution recommandée: nettoyage manuel via interface web DigitalOcean"
-          echo "- Le garbage collection peut prendre jusqu'à 2h pour être visible"
 
   # 📊 Résumé (basé sur la version qui fonctionnait)
   summary:
