@@ -1,4 +1,23 @@
-name: Simple Build and Deploy
+- name: Cleanup old images (keep only 8 per repo)
+        run: |
+          echo "Nettoyage agressif des anciennes images..."
+          
+          # Fonction pour nettoyer un repository
+          cleanup_repo() {
+            local repo=$1
+            echo "Nettoyage de $repo..."
+            
+            # Compter les images actuelles
+            local total=$(doctl registry repository list-manifests $repo --format Digest --no-header | wc -l)
+            echo "  Images actuelles: $total"
+            
+            if [ $total -gt 8 ]; then
+              local to_delete=$((total - 8))
+              echo "  À supprimer: $to_delete images"
+              
+              # Obtenir les digests des plus anciennes images à supprimer
+              doctl registry repository list-manifests $repo --format Digest,Updated --no-header | \
+              sort -k2name: Simple Build and Deploy
 
 on:
   push:
@@ -250,7 +269,7 @@ jobs:
               while read digest; do
                 if [ ! -z "$digest" ] && [[ "$digest" == sha256:* ]]; then
                   echo "    Suppression: $digest"
-                  echo "y" | doctl registry repository delete-manifest $repo $digest || echo "    Échec de suppression"
+                  doctl registry repository delete-manifest --force $repo $digest || echo "    Échec de suppression"
                 fi
               done
             else
