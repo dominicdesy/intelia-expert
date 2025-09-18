@@ -124,26 +124,12 @@ class MetricsCollector:
         self.semantic_cache_stats["fallback_hits"] += 1
 
     def ood_filtered(self, score: float, reason: str):
-        """Enregistre un filtrage OOD avec détails - VERSION CORRIGÉE"""
         self.ood_stats[f"ood_{reason}"] += 1
         self.ood_stats["ood_total"] += 1
-
-        # CORRECTION : Validation du type de score
-        if isinstance(score, (int, float)):
-            score_value = float(score)
-        else:
-            score_value = 0.5  # Valeur par défaut sécurisée
-
-        # Calcul de la moyenne glissante
-        current_avg = self.ood_stats.get("avg_ood_score", 0.0)
-        total_filtered = self.ood_stats["ood_total"]
-
-        if total_filtered > 0:
-            self.ood_stats["avg_ood_score"] = (
-                current_avg * (total_filtered - 1) + score_value
-            ) / total_filtered
-        else:
-            self.ood_stats["avg_ood_score"] = score_value
+        self.ood_stats["avg_ood_score"] = (
+            self.ood_stats.get("avg_ood_score", 0.0) * (self.ood_stats["ood_total"] - 1)
+            + score
+        ) / self.ood_stats["ood_total"]
 
     # ✅ NOUVEAU: Méthode manquante ood_accepted()
     def ood_accepted(self, score: float, reason: str = "accepted"):
