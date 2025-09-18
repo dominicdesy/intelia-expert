@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 api/endpoints.py - Module des endpoints API
-VERSION CORRIGÉE - Import BASE_PATH depuis config au lieu de le redéfinir
+VERSION CORRIGÉE - Cache status avec gestion robuste des erreurs
 """
 
 import time
@@ -14,9 +14,9 @@ from collections import OrderedDict
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 
-# ✅ CORRECTION: Importer BASE_PATH depuis config au lieu de le redéfinir
+# Imports modulaires
 from config.config import (
-    BASE_PATH,  # ← AJOUT CRITIQUE
+    BASE_PATH,
     MAX_CONVERSATION_CONTEXT,
     TENANT_TTL,
     MAX_TENANTS,
@@ -37,8 +37,6 @@ from utils.utilities import (
 
 from utils.imports_and_dependencies import get_full_status_report
 
-# ✅ CORRECTION: Supprimer la redéfinition de BASE_PATH
-# BASE_PATH = "/api/v1"  ← SUPPRIMÉ
 MAX_REQUEST_SIZE = 8000  # Garde cette constante locale
 
 logger = logging.getLogger(__name__)
@@ -349,7 +347,7 @@ class EndpointMetricsCollector(MetricsCollector):
 metrics_collector = EndpointMetricsCollector()
 
 # ============================================================================
-# CRÉATION DU ROUTER AVEC SERVICES
+# CRÉATION DU ROUTER AVEC SERVICES - VERSION CORRIGÉE
 # ============================================================================
 
 
@@ -410,12 +408,6 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                 },
             )
 
-    # ✅ CORRECTION: Utiliser BASE_PATH depuis config (qui vaut "")
-    # Donc les routes seront maintenant:
-    # - /status/dependencies au lieu de /api/v1/status/dependencies
-    # - /status/rag au lieu de /api/v1/status/rag
-    # - /chat au lieu de /api/v1/chat
-
     @router.get(f"{BASE_PATH}/status/dependencies")
     async def dependencies_status():
         """Statut détaillé des dépendances"""
@@ -468,43 +460,85 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             logger.error(f"Erreur RAG status: {e}")
             return {"initialized": False, "error": str(e), "timestamp": time.time()}
 
+    # CORRECTION PRINCIPALE: Endpoint cache status avec gestion robuste
     @router.get(f"{BASE_PATH}/status/cache")
     async def cache_status():
-        """Statut détaillé du cache Redis"""
+        """Statut détaillé du cache Redis - VERSION CORRIGÉE"""
         try:
             health_monitor = get_service("health_monitor")
+            
+            # NOUVELLE LOGIQUE: Plus de "Health monitor non disponible"
             if not health_monitor:
-                return {"error": "Health monitor non disponible"}
-
-            cache_core = health_monitor.get_service("cache_core")
-            if not cache_core:
                 return {
                     "enabled": False,
                     "initialized": False,
-                    "error": "Cache Core non disponible",
+                    "available": False,
+                    "error": "SystemHealthMonitor non accessible depuis les services",
+                    "debug_info": {
+                        "services_available": list(_services.keys()),
+                        "health_monitor_in_services": "health_monitor" in _services,
+                    },
                     "timestamp": time.time(),
                 }
 
-            # Récupération sécurisée des stats cache
+            # Tenter de récupérer le cache_core
+            cache_core = health_monitor.get_service("cache_core")
+            if not cache_core:
+                # Diagnostic détaillé si cache_core absent
+                all_services = health_monitor.get_all_services() if hasattr(health_monitor, "get_all_services") else {}
+                
+                return {
+                    "enabled": False,
+                    "initialized": False,
+                    "available": False,
+                    "error": "Cache Core non trouvé dans les services du health monitor",
+                    "debug_info": {
+                        "health_monitor_services": list(all_services.keys()),
+                        "cache_core_in_services": "cache_core" in all_services,
+                        "services_count": len(all_services),
+                    },
+                    "timestamp": time.time(),
+                }
+
+            # Cache_core trouvé - analyser son état
+            cache_enabled = safe_get_attribute(cache_core, "enabled", False)
+            cache_initialized = safe_get_attribute(cache_core, "initialized", False)
+            
+            # Récupération sécurisée des statistiques
+            cache_stats = {}
+            cache_health = {}
+            
             try:
-                cache_health = (
-                    cache_core.get_health_status()
-                    if hasattr(cache_core, "get_health_status")
-                    else {}
-                )
-                cache_stats = (
-                    cache_core.get_stats() if hasattr(cache_core, "get_stats") else {}
-                )
-            except Exception as e:
-                logger.error(f"Erreur récupération stats cache: {e}")
-                cache_health = {"error": str(e)}
-                cache_stats = {}
+                if hasattr(cache_core, "get_cache_stats"):
+                    cache_stats = await cache_core.get_cache_stats()
+                elif hasattr(cache_core, "get_stats"):
+                    cache_stats = cache_core.get_stats()
+            except Exception as stats_e:
+                cache_stats = {"stats_error": str(stats_e)}
+            
+            try:
+                if hasattr(cache_core, "get_health_status"):
+                    cache_health = cache_core.get_health_status()
+            except Exception as health_e:
+                cache_health = {"health_error": str(health_e)}
 
             return {
-                "enabled": safe_get_attribute(cache_core, "enabled", False),
-                "initialized": safe_get_attribute(cache_core, "initialized", False),
+                "enabled": cache_enabled,
+                "initialized": cache_initialized,
+                "available": True,
                 "status": safe_dict_get(cache_health, "status", "unknown"),
                 "stats": safe_serialize_for_json(cache_stats),
+                "health": safe_serialize_for_json(cache_health),
+                "debug_info": {
+                    "cache_core_type": type(cache_core).__name__,
+                    "cache_core_methods": [
+                        method for method in dir(cache_core) 
+                        if not method.startswith('_') and callable(getattr(cache_core, method))
+                    ][:10],  # Limiter à 10 méthodes pour lisibilité
+                    "has_client": hasattr(cache_core, "client"),
+                    "client_available": getattr(cache_core, "client", None) is not None,
+                    "has_config": hasattr(cache_core, "config"),
+                },
                 "timestamp": time.time(),
             }
 
@@ -513,7 +547,12 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             return {
                 "enabled": False,
                 "initialized": False,
-                "error": str(e),
+                "available": False,
+                "error": f"Erreur lors de la vérification du statut cache: {str(e)}",
+                "debug_info": {
+                    "exception_type": type(e).__name__,
+                    "services_available": list(_services.keys()),
+                },
                 "timestamp": time.time(),
             }
 
@@ -567,15 +606,21 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                         logger.error(f"Erreur métriques RAG: {e}")
                         base_metrics["rag_engine"] = {"error": str(e)}
 
-                # Cache stats externe
+                # Cache stats externe - CORRECTION
                 cache_core = health_monitor.get_service("cache_core")
-                if cache_core and getattr(cache_core, "initialized", False):
+                if cache_core:
                     try:
-                        cache_stats = (
-                            cache_core.get_stats()
-                            if hasattr(cache_core, "get_stats")
-                            else {}
-                        )
+                        if hasattr(cache_core, "get_cache_stats"):
+                            cache_stats = await cache_core.get_cache_stats()
+                        elif hasattr(cache_core, "get_stats"):
+                            cache_stats = cache_core.get_stats()
+                        else:
+                            cache_stats = {
+                                "enabled": getattr(cache_core, "enabled", False),
+                                "initialized": getattr(cache_core, "initialized", False),
+                                "no_stats_method": True
+                            }
+                        
                         base_metrics["cache"] = safe_serialize_for_json(cache_stats)
                     except Exception as e:
                         logger.error(f"Erreur métriques cache: {e}")
@@ -647,7 +692,7 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                                     tenant_id=tenant_id,
                                     language=language,
                                 )
-                                logger.info("✅ RAG generate_response réussi")
+                                logger.info("RAG generate_response réussi")
 
                             except Exception as generate_error:
                                 logger.warning(
