@@ -2,6 +2,7 @@
 """
 monitoring.py - Module de surveillance et monitoring du système
 SystemHealthMonitor déplacé depuis main.py pour architecture modulaire
+VERSION CORRIGÉE: Gestion robuste des erreurs OpenAI
 """
 
 import time
@@ -61,6 +62,7 @@ class SystemHealthMonitor:
         self.component_status = {}
         self.validation_report = {}
         self._critical_services = {}
+        self._openai_validation_mode = "strict"  # strict, permissive, skip
 
     async def validate_startup_requirements(self, timeout: int = 30) -> Dict[str, Any]:
         """Valide tous les prérequis au démarrage avec gestion d'erreurs stricte"""
@@ -93,31 +95,38 @@ class SystemHealthMonitor:
                         f"Dépendances critiques manquantes: {dependency_status['critical_missing']}"
                     )
 
-                logger.info("✅ Dépendances critiques validées")
+                logger.info("Dépendances critiques validées")
 
             except Exception as e:
                 validation_report["errors"].append(f"Dépendances critiques: {e}")
                 raise StartupValidationError(f"Validation dépendances échouée: {e}")
 
-            # 2. Validation de la configuration OpenAI
+            # 2. Validation de la configuration OpenAI - VERSION CORRIGÉE
             logger.info("Validation configuration OpenAI...")
 
             if not OPENAI_API_KEY:
-                raise StartupValidationError("OPENAI_API_KEY non configurée")
+                logger.warning("OPENAI_API_KEY non configurée - Mode dégradé")
+                validation_report["warnings"].append("OPENAI_API_KEY non configurée")
+                validation_report["configuration_validation"]["openai"] = "missing"
+            else:
+                # Validation robuste de la clé OpenAI
+                openai_status = await self._validate_openai_config(OPENAI_API_KEY)
+                validation_report["configuration_validation"]["openai"] = openai_status
 
-            try:
-                from openai import AsyncOpenAI
-
-                test_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
-
-                # Test simple avec timeout
-                await asyncio.wait_for(test_client.models.list(), timeout=10.0)
-                validation_report["configuration_validation"]["openai"] = "ok"
-                logger.info("✅ Configuration OpenAI validée")
-
-            except Exception as e:
-                validation_report["errors"].append(f"OpenAI: {e}")
-                raise StartupValidationError(f"Configuration OpenAI invalide: {e}")
+                if openai_status["status"] == "valid":
+                    logger.info("Configuration OpenAI validée")
+                elif openai_status["status"] == "invalid":
+                    # CHANGEMENT PRINCIPAL: Ne pas arrêter l'app, juste avertir
+                    logger.warning(
+                        f"Configuration OpenAI invalide: {openai_status['error']}"
+                    )
+                    validation_report["warnings"].append(
+                        f"OpenAI invalide: {openai_status['error']}"
+                    )
+                    # Permettre à l'application de continuer en mode dégradé
+                elif openai_status["status"] == "timeout":
+                    logger.warning("Timeout validation OpenAI - Mode dégradé")
+                    validation_report["warnings"].append("Timeout validation OpenAI")
 
             # 3. Validation LangSmith
             logger.info("Validation configuration LangSmith...")
@@ -136,7 +145,7 @@ class SystemHealthMonitor:
                             "project": LANGSMITH_PROJECT,
                             "status": "configured",
                         }
-                        logger.info("✅ LangSmith configuré")
+                        logger.info("LangSmith configuré")
                     except Exception as e:
                         validation_report["warnings"].append(f"LangSmith: {e}")
                         validation_report["langsmith_validation"]["status"] = "error"
@@ -154,7 +163,7 @@ class SystemHealthMonitor:
                     "redis_required": True,
                     "status": "configured",
                 }
-                logger.info("✅ RRF Intelligent configuré")
+                logger.info("RRF Intelligent configuré")
             else:
                 validation_report["rrf_validation"]["status"] = "disabled"
 
@@ -163,10 +172,8 @@ class SystemHealthMonitor:
 
             service_errors = await self._initialize_core_services()
             if service_errors:
-                validation_report["errors"].extend(service_errors)
-                raise StartupValidationError(
-                    f"Échec initialisation services: {service_errors}"
-                )
+                validation_report["warnings"].extend(service_errors)
+                logger.warning(f"Certains services en mode dégradé: {service_errors}")
 
             # 6. Tests de connectivité
             logger.info("Tests de connectivité...")
@@ -192,12 +199,24 @@ class SystemHealthMonitor:
             # 7. Validation finale
             validation_report["startup_duration"] = time.time() - start_time
 
-            if validation_report["errors"]:
+            # LOGIQUE DE STATUS MODIFIÉE: Plus permissive
+            critical_errors = [
+                err
+                for err in validation_report["errors"]
+                if "critique" in err.lower() or "critical" in err.lower()
+            ]
+
+            if critical_errors:
                 validation_report["overall_status"] = "failed"
+                logger.error(f"Erreurs critiques détectées: {critical_errors}")
             elif validation_report["warnings"]:
                 validation_report["overall_status"] = "degraded"
+                logger.warning(
+                    f"Application en mode dégradé: {len(validation_report['warnings'])} avertissements"
+                )
             else:
                 validation_report["overall_status"] = "healthy"
+                logger.info("Application en parfaite santé")
 
             self.validation_report = validation_report
             return validation_report
@@ -213,6 +232,104 @@ class SystemHealthMonitor:
             validation_report["overall_status"] = "failed"
             self.validation_report = validation_report
             raise StartupValidationError(f"Validation échouée: {e}")
+
+    async def _validate_openai_config(
+        self, api_key: str, timeout: float = 10.0
+    ) -> Dict[str, Any]:
+        """Validation robuste de la configuration OpenAI avec gestion d'erreurs complète"""
+
+        if not api_key:
+            return {"status": "missing", "error": "API key manquante"}
+
+        # Validation basique du format de la clé
+        if not api_key.startswith(("sk-", "sk-proj-")):
+            return {"status": "invalid", "error": "Format de clé API invalide"}
+
+        # Masquer la clé dans les logs (sécurité)
+        masked_key = f"{api_key[:8]}...{api_key[-4:]}" if len(api_key) > 12 else "***"
+        logger.debug(f"Validation OpenAI avec clé: {masked_key}")
+
+        try:
+            from openai import AsyncOpenAI
+
+            test_client = AsyncOpenAI(
+                api_key=api_key,
+                timeout=timeout,
+                max_retries=1,  # Une seule tentative pour le startup
+            )
+
+            # Test simple avec gestion d'erreur appropriée
+            await asyncio.wait_for(test_client.models.list(), timeout=timeout)
+
+            return {
+                "status": "valid",
+                "api_key_format": "ok",
+                "connectivity": "ok",
+                "masked_key": masked_key,
+            }
+
+        except asyncio.TimeoutError:
+            logger.warning(f"Timeout validation OpenAI après {timeout}s")
+            return {
+                "status": "timeout",
+                "error": f"Timeout après {timeout}s",
+                "masked_key": masked_key,
+            }
+
+        except ImportError as e:
+            logger.error(f"Module OpenAI non disponible: {e}")
+            return {
+                "status": "missing_module",
+                "error": f"Module OpenAI non installé: {e}",
+                "masked_key": masked_key,
+            }
+
+        except Exception as e:
+            error_type = type(e).__name__
+            error_msg = str(e)
+
+            # Classification des erreurs
+            if (
+                "401" in error_msg
+                or "Unauthorized" in error_msg
+                or "invalid_api_key" in error_msg
+            ):
+                logger.warning(f"Clé API OpenAI invalide: {masked_key}")
+                return {
+                    "status": "invalid",
+                    "error": "Clé API invalide ou expirée",
+                    "error_type": error_type,
+                    "masked_key": masked_key,
+                }
+            elif "403" in error_msg or "Forbidden" in error_msg:
+                return {
+                    "status": "forbidden",
+                    "error": "Accès refusé - vérifier les permissions",
+                    "error_type": error_type,
+                    "masked_key": masked_key,
+                }
+            elif "429" in error_msg or "rate_limit" in error_msg.lower():
+                return {
+                    "status": "rate_limited",
+                    "error": "Limite de taux atteinte",
+                    "error_type": error_type,
+                    "masked_key": masked_key,
+                }
+            elif "network" in error_msg.lower() or "connection" in error_msg.lower():
+                return {
+                    "status": "network_error",
+                    "error": "Erreur de connectivité réseau",
+                    "error_type": error_type,
+                    "masked_key": masked_key,
+                }
+            else:
+                logger.error(f"Erreur OpenAI inattendue: {error_type}: {error_msg}")
+                return {
+                    "status": "unknown_error",
+                    "error": f"{error_type}: {error_msg}",
+                    "error_type": error_type,
+                    "masked_key": masked_key,
+                }
 
     async def _initialize_core_services(self) -> list:
         """Initialise les services principaux avec support LangSmith + RRF"""
@@ -230,9 +347,9 @@ class SystemHealthMonitor:
                 self._critical_services["cache_core"] = cache_core
 
                 if cache_core.initialized:
-                    logger.info("✅ Cache Core initialisé")
+                    logger.info("Cache Core initialisé")
                 else:
-                    logger.warning("⚠️ Cache Core en mode dégradé")
+                    logger.warning("Cache Core en mode dégradé")
 
             except Exception as e:
                 errors.append(f"Cache Core: {e}")
@@ -249,7 +366,7 @@ class SystemHealthMonitor:
                 self._critical_services["rag_engine_enhanced"] = rag_engine_enhanced
 
                 if rag_engine_enhanced.is_initialized:
-                    logger.info("✅ RAG Engine Enhanced initialisé")
+                    logger.info("RAG Engine Enhanced initialisé")
 
                     # Vérifier intégrations
                     status = rag_engine_enhanced.get_status()
@@ -258,7 +375,7 @@ class SystemHealthMonitor:
                     langsmith_status = safe_dict_get(status, "langsmith", {})
                     if safe_dict_get(langsmith_status, "enabled", False):
                         project = safe_dict_get(langsmith_status, "project", "")
-                        logger.info(f"✅ LangSmith actif - Projet: {project}")
+                        logger.info(f"LangSmith actif - Projet: {project}")
 
                     # Log statut RRF Intelligent
                     rrf_status = safe_dict_get(status, "intelligent_rrf", {})
@@ -267,11 +384,11 @@ class SystemHealthMonitor:
                             rrf_status, "learning_mode", False
                         )
                         logger.info(
-                            f"✅ RRF Intelligent actif - Learning: {learning_mode}"
+                            f"RRF Intelligent actif - Learning: {learning_mode}"
                         )
 
                 else:
-                    logger.warning("⚠️ RAG Engine en mode dégradé")
+                    logger.warning("RAG Engine en mode dégradé")
 
             except Exception as e:
                 errors.append(f"RAG Engine: {e}")
@@ -283,7 +400,7 @@ class SystemHealthMonitor:
 
                 agent_rag_engine = create_agent_rag_engine()
                 self._critical_services["agent_rag_engine"] = agent_rag_engine
-                logger.info("✅ Agent RAG disponible")
+                logger.info("Agent RAG disponible")
             except ImportError:
                 logger.info("Agent RAG non disponible (optionnel)")
             except Exception as e:
@@ -474,7 +591,7 @@ class SystemHealthMonitor:
             global_status["environment"] = {
                 "platform": "digital_ocean",
                 "python_version": f"{__import__('sys').version_info.major}.{__import__('sys').version_info.minor}",
-                "monitoring_version": "1.0.0",
+                "monitoring_version": "1.0.1-fixed",
             }
 
             # Déterminer statut global final

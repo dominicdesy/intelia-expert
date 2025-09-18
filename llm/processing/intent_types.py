@@ -68,7 +68,7 @@ class IntentValidationResult:
             return f"Validation échouée ({len(self.errors)} erreurs, {len(self.warnings)} avertissements)"
 
 
-# CORRECTION CRITIQUE: Ajout de la classe ConfigurationValidator manquante
+# CORRECTION CRITIQUE: Ajout de la classe ConfigurationValidator avec méthode de classe
 @dataclass
 class ConfigurationValidator:
     """Validateur de configuration pour les générateurs et processeurs d'intention"""
@@ -173,7 +173,8 @@ class ConfigurationValidator:
                 validation_metadata={"error": str(e)},
             )
 
-    def validate_configuration(self, config: Dict[str, Any]) -> IntentValidationResult:
+    @classmethod  # ✅ CORRECTION: Méthode de classe au lieu de méthode d'instance
+    def validate_configuration(cls, config: Dict[str, Any]) -> IntentValidationResult:
         """Valide une configuration générale"""
         errors = []
         warnings = []

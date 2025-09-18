@@ -703,7 +703,7 @@ class HybridWeaviateRetriever:
 
 
 # NOUVEAU: Fonction factory pour compatibilité
-def create_hybrid_retriever(
+def create_weaviate_retriever(
     client, collection_name: str = "InteliaKnowledge"
 ) -> HybridWeaviateRetriever:
     """Factory pour créer un retriever hybride configuré"""

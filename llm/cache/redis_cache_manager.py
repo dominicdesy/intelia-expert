@@ -2,7 +2,7 @@
 """
 redis_cache_manager.py - Gestionnaire de cache Redis principal (refactorisé)
 Point d'entrée principal pour le cache Redis avec fonctionnalités modulaires
-CORRIGÉ: Import relatif au lieu d'import absolu
+CORRIGÉ: Classes stub renommées pour éviter les conflits de nommage
 """
 
 import logging
@@ -31,11 +31,13 @@ except ImportError as e:
     logger.warning(f"Semantic cache module not available: {e}")
     SEMANTIC_AVAILABLE = False
 
-    # Classe stub qui lève des erreurs explicites
-    class SemanticCacheManager:
+    # CORRECTION: Classe stub renommée pour éviter le conflit de nommage
+    class SemanticCacheManagerStub:
+        """Stub pour SemanticCacheManager quand les dépendances ne sont pas disponibles"""
+
         def __init__(self, *args, **kwargs):
             raise NotImplementedError(
-                "SemanticCacheManager requires additional dependencies"
+                "SemanticCacheManager not available - install required dependencies or check module imports"
             )
 
 
@@ -48,11 +50,13 @@ except ImportError as e:
     logger.warning(f"Cache stats module not available: {e}")
     STATS_AVAILABLE = False
 
-    # Classe stub qui lève des erreurs explicites
-    class CacheStatsManager:
+    # CORRECTION: Classe stub renommée pour éviter le conflit de nommage
+    class CacheStatsManagerStub:
+        """Stub pour CacheStatsManager quand les dépendances ne sont pas disponibles"""
+
         def __init__(self, *args, **kwargs):
             raise NotImplementedError(
-                "CacheStatsManager requires additional dependencies"
+                "CacheStatsManager not available - install required dependencies or check module imports"
             )
 
 
@@ -84,7 +88,7 @@ class RAGCacheManager:
             # Initialiser le core avec la configuration
             self.core = RedisCacheCore(config)
 
-            # Modules optionnels - avec gestion d'erreurs explicites
+            # Modules optionnels - avec gestion d'erreurs explicites et classes stub corrigées
             try:
                 if SEMANTIC_AVAILABLE:
                     self.semantic = SemanticCacheManager(self.core)
@@ -92,6 +96,7 @@ class RAGCacheManager:
                     logger.warning(
                         "Semantic cache module not available - related features disabled"
                     )
+                    # CORRECTION: Utiliser None au lieu de la classe stub
                     self.semantic = None
             except Exception as e:
                 logger.error(f"Failed to initialize semantic cache: {e}")
@@ -104,6 +109,7 @@ class RAGCacheManager:
                     logger.warning(
                         "Stats cache module not available - statistics disabled"
                     )
+                    # CORRECTION: Utiliser None au lieu de la classe stub
                     self.stats = None
             except Exception as e:
                 logger.error(f"Failed to initialize stats cache: {e}")
