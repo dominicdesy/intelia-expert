@@ -161,8 +161,8 @@ jobs:
             fi
           done
 
-      # Déploiement avec le tag 'main' que cherche App Platform
-      - name: Trigger redeploy
+      # Déploiement avec diagnostic détaillé
+      - name: Trigger redeploy with detailed monitoring
         run: |
           echo "🚀 Déclenchement du redéploiement..."
           echo "App ID: ${{ secrets.DO_APP_ID }}"
@@ -175,7 +175,39 @@ jobs:
           echo "⏳ Attente de 30s pour la propagation du registry..."
           sleep 30
           
-          doctl apps create-deployment ${{ secrets.DO_APP_ID }} --force-rebuild --wait
+          # Lancer le déploiement sans --wait pour éviter le timeout
+          echo "🔄 Lancement du déploiement..."
+          DEPLOYMENT_ID=$(doctl apps create-deployment ${{ secrets.DO_APP_ID }} --force-rebuild --format ID --no-header)
+          echo "📋 Deployment ID: $DEPLOYMENT_ID"
+          
+          # Monitoring manuel avec timeout plus long
+          echo "👀 Surveillance du déploiement (timeout 10 min)..."
+          for i in {1..60}; do
+            STATUS=$(doctl apps get-deployment ${{ secrets.DO_APP_ID }} $DEPLOYMENT_ID --format Phase --no-header 2>/dev/null || echo "UNKNOWN")
+            echo "[$i/60] Statut: $STATUS"
+            
+            case $STATUS in
+              "ACTIVE"|"RUNNING")
+                echo "✅ Déploiement réussi !"
+                exit 0
+                ;;
+              "ERROR"|"FAILED")
+                echo "❌ Déploiement échoué"
+                echo "📋 Détails de l'erreur :"
+                doctl apps get-deployment ${{ secrets.DO_APP_ID }} $DEPLOYMENT_ID || true
+                exit 1
+                ;;
+              "CANCELED"|"SUPERSEDED")
+                echo "⚠️ Déploiement annulé ou remplacé"
+                exit 1
+                ;;
+            esac
+            
+            sleep 10
+          done
+          
+          echo "⏰ Timeout atteint - vérification finale..."
+          doctl apps get-deployment ${{ secrets.DO_APP_ID }} $DEPLOYMENT_ID || true
 
       - name: Deployment status
         run: |
