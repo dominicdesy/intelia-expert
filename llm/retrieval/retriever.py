@@ -378,7 +378,7 @@ class HybridWeaviateRetriever:
 
         return final_alpha
 
-    # ✅ NOUVEAU: Méthode manquante adaptive_search()
+    # ✅ NOUVEAU: Méthode manquante adaptive_search() - SIGNATURE CORRIGÉE
     async def adaptive_search(
         self,
         query_vector: List[float],
@@ -386,6 +386,9 @@ class HybridWeaviateRetriever:
         top_k: int = 15,
         intent_result=None,
         context: Dict = None,
+        alpha: float = None,  # ✅ AJOUT: Paramètre alpha manquant
+        where_filter: Dict = None,  # ✅ AJOUT: Paramètre where_filter manquant
+        **kwargs,  # ✅ AJOUT: Pour compatibilité avec autres paramètres
     ) -> List[Document]:
         """
         Recherche adaptative qui ajuste automatiquement les paramètres selon le contexte

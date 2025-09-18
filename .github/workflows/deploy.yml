@@ -207,88 +207,99 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Brutal but working registry cleanup
+      - name: Tag-based cleanup that actually works
         run: |
-          echo "🧹 NETTOYAGE BRUTAL - APPROCHE SIMPLIFIÉE"
-          echo "========================================="
+          echo "🧹 NETTOYAGE PAR TAGS - APPROCHE QUI FONCTIONNE"
+          echo "==============================================="
           
-          # Fonction de nettoyage brutal - supprime en masse
-          brutal_cleanup() {
+          # Le problème : doctl list-manifests retourne des digests non-supprimables
+          # Solution : Utiliser les tags qui sont supprimables
+          
+          cleanup_by_tags() {
             local repo=$1
             echo ""
-            echo "🔥 Nettoyage brutal de $repo..."
+            echo "🏷️ Nettoyage par tags de $repo..."
             
-            # Récupérer TOUS les digests possibles sans format complexe
-            local all_digests=$(doctl registry repository list-manifests $repo --no-header 2>/dev/null | grep "sha256:" | awk '{print $1}')
+            # Récupérer les tags (pas les digests) car ils sont supprimables
+            echo "  📋 Récupération des tags..."
+            local tags_raw=$(doctl registry repository list-tags $repo --format Tag,UpdatedAt --no-header 2>/dev/null)
             
-            if [ -z "$all_digests" ]; then
-              echo "  ❌ Aucun digest trouvé"
+            if [ -z "$tags_raw" ]; then
+              echo "  ❌ Aucun tag trouvé"
               return 0
             fi
             
-            local total=$(echo "$all_digests" | wc -l)
-            echo "  📊 Digests trouvés: $total"
+            # Filtrer les tags (exclure buildcache, latest, main)
+            local deletable_tags=$(echo "$tags_raw" | grep -v -E "(buildcache|latest|main)" | head -20)
             
-            # Pour LLM avec 47 images, supprimer les 30 premiers (brutal mais efficace)
-            local max_to_delete=30
-            if [ "$repo" = "intelia-llm" ]; then
-              max_to_delete=35  # Plus agressif pour LLM
-            else
-              max_to_delete=5   # Modéré pour les autres
+            if [ -z "$deletable_tags" ]; then
+              echo "  ✅ Aucun tag supprimable trouvé"
+              return 0
             fi
             
-            echo "  🗑️ Suppression brutale de $max_to_delete digests..."
+            local tag_count=$(echo "$deletable_tags" | wc -l)
+            echo "  📊 Tags supprimables: $tag_count"
             
-            local count=0
-            echo "$all_digests" | head -n $max_to_delete | while read digest; do
-              if [ $count -ge $max_to_delete ]; then break; fi
+            # Supprimer les tags un par un (plus fiable que les digests)
+            local deleted=0
+            echo "$deletable_tags" | while read tag_line; do
+              local tag_name=$(echo "$tag_line" | awk '{print $1}')
+              local updated_at=$(echo "$tag_line" | awk '{print $2}')
               
-              echo "    💥 Suppression $((count+1))/$max_to_delete: ${digest:0:20}..."
-              
-              if doctl registry repository delete-manifest --force $repo $digest >/dev/null 2>&1; then
-                echo "      ✅ OK"
-              else
-                echo "      ⚠️ Échec (normal pour certains digests)"
+              if [ -n "$tag_name" ] && [ "$tag_name" != "buildcache" ] && [ "$tag_name" != "latest" ]; then
+                echo "    🗑️ Suppression tag: $tag_name ($updated_at)"
+                
+                if doctl registry repository delete-tag --force $repo $tag_name >/dev/null 2>&1; then
+                  echo "      ✅ Tag supprimé avec succès"
+                  deleted=$((deleted + 1))
+                else
+                  echo "      ❌ Échec suppression tag"
+                fi
+                
+                sleep 0.5
               fi
-              
-              count=$((count + 1))
-              
-              # Petite pause pour éviter rate limiting
-              sleep 0.2
             done
             
-            echo "  ⏳ Attente 10s pour synchronisation..."
-            sleep 10
-            
-            # Statut après nettoyage
-            local remaining=$(doctl registry repository list --format Name,TagCount --no-header 2>/dev/null | grep "^$repo " | awk '{print $2}' || echo "?")
-            echo "  📊 Images restantes: $remaining"
+            echo "  📊 Tags supprimés: $deleted"
           }
           
-          echo "🚀 Nettoyage en ordre de priorité..."
+          # Alternative si delete-tag ne marche pas : suppression par digest spécifique
+          fallback_cleanup() {
+            local repo=$1
+            echo ""
+            echo "🔄 Fallback : suppression ciblée pour $repo..."
+            
+            # Essayer de supprimer seulement les 5 manifests les plus anciens
+            local recent_manifests=$(doctl registry repository list-manifests $repo --format Digest,Tags --no-header 2>/dev/null | tail -10)
+            
+            echo "$recent_manifests" | head -5 | while read digest tags; do
+              if [[ "$digest" =~ ^sha256: ]] && [[ "$tags" != *"buildcache"* ]] && [[ "$tags" != *"latest"* ]]; then
+                echo "    🎯 Tentative suppression: ${digest:0:20}... [$tags]"
+                doctl registry repository delete-manifest --force $repo $digest >/dev/null 2>&1 && echo "      ✅ OK" || echo "      ⚠️ Échec"
+              fi
+            done
+          }
           
-          # LLM en premier (47 images - critique)
-          brutal_cleanup "intelia-llm"
+          echo "🚀 Nettoyage par tags (plus fiable)..."
           
-          # Double passe pour LLM si nécessaire
+          # Nettoyer LLM en priorité avec les deux méthodes
+          cleanup_by_tags "intelia-llm"
+          fallback_cleanup "intelia-llm"
+          
+          # Nettoyer les autres repos
+          cleanup_by_tags "intelia-backend"
+          cleanup_by_tags "intelia-frontend"
+          
           echo ""
-          echo "🔄 Seconde passe pour intelia-llm..."
-          brutal_cleanup "intelia-llm"
-          
-          # Autres repos (déjà dans les limites acceptables)
-          brutal_cleanup "intelia-backend" 
-          brutal_cleanup "intelia-frontend"
+          echo "🗑️ Garbage collection pour finaliser..."
+          doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force >/dev/null 2>&1
           
           echo ""
-          echo "🗑️ Garbage collection final..."
-          doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force >/dev/null 2>&1 && echo "✅ GC lancé" || echo "⚠️ GC déjà actif"
-          
-          echo ""
-          echo "📊 STATUT FINAL APRÈS NETTOYAGE:"
+          echo "📊 RÉSULTATS APRÈS NETTOYAGE:"
           doctl registry repository list --format Name,TagCount,UpdatedAt
           
           echo ""
-          echo "🎉 Nettoyage brutal terminé - Vérifiez les résultats ci-dessus"
+          echo "💡 Si le nombre d'images reste élevé, il faut attendre le garbage collection (peut prendre 10-30 minutes)"
 
   # 📊 Résumé (basé sur la version qui fonctionnait)
   summary:
