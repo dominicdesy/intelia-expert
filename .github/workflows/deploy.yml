@@ -206,6 +206,7 @@ jobs:
 
   cleanup:
     runs-on: ubuntu-latest
+    # FORCE RELOAD - version avec --force correcte
     needs: [build-frontend, build-backend, build-llm, deploy]
     if: always() && (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success' || needs.build-llm.result == 'success')
     steps:
