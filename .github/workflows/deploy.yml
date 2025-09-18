@@ -141,7 +141,7 @@ jobs:
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
         with:
-          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
       # Option A: Déploiement simple avec les tags latest
       - name: Trigger redeploy (use current app sources)
