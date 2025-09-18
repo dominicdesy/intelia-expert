@@ -321,37 +321,6 @@ async def startup_info():
         return {"error": str(e), "timestamp": __import__("time").time()}
 
 
-@app.get("/version")
-async def version_info():
-    """Endpoint de version pour vérifier les déploiements"""
-    import time
-    
-    # Test d'import du cache pour diagnostic
-    cache_import_status = "unknown"
-    try:
-        from cache.cache_core import create_cache_core
-        cache_import_status = "success"
-    except ImportError as e:
-        cache_import_status = f"failed: {str(e)}"
-    except Exception as e:
-        cache_import_status = f"error: {str(e)}"
-    
-    return {
-        "version": "4.0.1-cache-debug",
-        "timestamp": time.time(),
-        "build_time": "2024-09-18-14:15",
-        "corrections_deployed": True,
-        "cache_import_test": cache_import_status,
-        "health_monitor_available": "health_monitor" in services,
-        "services_count": len(services),
-        "python_working_dir": os.getcwd(),
-        "app_status": "running"
-    }
-
-
-
-
-
 # ============================================================================
 # POINT D'ENTRÉE
 # ============================================================================

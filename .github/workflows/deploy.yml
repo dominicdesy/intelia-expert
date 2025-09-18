@@ -75,7 +75,7 @@ jobs:
           tags: |
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:latest
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:${{ github.sha }}
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache,mode=max
           platforms: linux/amd64
@@ -85,6 +85,7 @@ jobs:
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
             NEXT_PUBLIC_API_BASE_URL=https://expert.intelia.com/api
             NEXT_PUBLIC_API_URL=https://expert.intelia.com/api
+            BUILDKIT_INLINE_CACHE=1
 
   # 🎯 Build Backend - SEULEMENT si changé  
   build-backend:
@@ -112,11 +113,12 @@ jobs:
           tags: |
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:latest
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:${{ github.sha }}
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache,mode=max
           platforms: linux/amd64
           provenance: false
+          build-args: BUILDKIT_INLINE_CACHE=1
 
   # 🎯 Build LLM - SEULEMENT si changé
   build-llm:
@@ -144,11 +146,12 @@ jobs:
           tags: |
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:latest
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:${{ github.sha }}
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main-${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache,mode=max
           platforms: linux/amd64
           provenance: false
+          build-args: BUILDKIT_INLINE_CACHE=1
 
   # 🚀 Deploy - SEULEMENT si au moins un service a été buildé
   deploy:
@@ -206,7 +209,7 @@ jobs:
           doctl apps get-deployment ${{ secrets.DO_APP_ID }} $DEPLOYMENT_ID || true
           exit 1
 
-  # 🧹 Registry cleanup - Garde seulement 6 images par repo (VERSION CORRIGÉE)
+  # 🧹 Registry cleanup - Version avec diagnostic d'abord
   cleanup:
     runs-on: ubuntu-latest
     needs: [build-frontend, build-backend, build-llm, deploy]
@@ -217,104 +220,107 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Registry cleanup - Keep only 6 images per repo
+      - name: Registry diagnostic and cleanup
         run: |
-          echo "🧹 NETTOYAGE REGISTRY - VERSION CORRIGÉE"
-          echo "========================================"
+          echo "🔍 DIAGNOSTIC COMPLET DU REGISTRY"
+          echo "================================="
           
-          cleanup_repo() {
-            local repo=$1
+          # 1. Lister TOUS les repositories disponibles
+          echo "📋 Repositories disponibles dans le registry:"
+          doctl registry repository list --format Name,TagCount,UpdatedAt || echo "Erreur listing repositories"
+          
+          echo ""
+          echo "🔍 Recherche des repositories intelia..."
+          
+          # 2. Fonction de nettoyage avec gestion d'erreur robuste
+          cleanup_if_exists() {
+            local repo_name=$1
             echo ""
-            echo "🔍 Traitement du repository: $repo"
+            echo "🔍 Vérification de: $repo_name"
             
-            # Vérifier l'existence du repository avec format correct
-            if ! doctl registry repository list --format Name --no-header | grep -q "^$repo$"; then
-              echo "  ❌ Repository $repo non trouvé"
+            # Chercher le repo avec plusieurs variations possibles
+            local found_repos=$(doctl registry repository list --format Name --no-header 2>/dev/null | grep -E "(^${repo_name}$|intelia.*${repo_name#intelia-})" || echo "")
+            
+            if [ -z "$found_repos" ]; then
+              echo "  ⚠️  Repository $repo_name non trouvé"
+              echo "  💡 Tentative de recherche alternative..."
+              
+              # Chercher des variations du nom
+              local alt_search=$(doctl registry repository list --format Name --no-header 2>/dev/null | grep -i "${repo_name#intelia-}" || echo "")
+              if [ -n "$alt_search" ]; then
+                echo "  🔍 Repositories similaires trouvés: $alt_search"
+              else
+                echo "  ❌ Aucun repository similaire trouvé"
+              fi
               return 1
             fi
             
-            echo "  ✅ Repository trouvé"
+            echo "  ✅ Repository trouvé: $found_repos"
             
-            # Obtenir tous les manifests avec leurs métadonnées
-            local manifests=$(doctl registry repository list-manifests $repo --format Digest,Updated,Tags --no-header 2>/dev/null)
-            
-            if [ -z "$manifests" ]; then
-              echo "  📭 Aucune image dans $repo"
-              return 0
-            fi
-            
-            # Compter le nombre d'images
-            local total=$(echo "$manifests" | wc -l)
-            echo "  📊 Nombre d'images actuelles: $total"
-            
-            # Vérifier si nettoyage nécessaire
-            if [ $total -le 6 ]; then
-              echo "  ✅ Nettoyage non nécessaire ($total images <= 6)"
-              return 0
-            fi
-            
-            # Calculer combien supprimer
-            local to_delete=$((total - 6))
-            echo "  🗑️  Images à supprimer: $to_delete (garder les 6 plus récentes)"
-            
-            # Supprimer les images les plus anciennes (tri par date, garde les plus récentes)
-            local deleted=0
-            echo "$manifests" | sort -k2 | head -n $to_delete | while IFS=$'\t' read -r digest updated tags; do
-              if [ -n "$digest" ] && [[ "$digest" =~ ^sha256: ]]; then
-                echo "    🔥 Suppression: $digest"
-                echo "       📅 Date: $updated"
-                echo "       🏷️  Tags: $tags"
+            # Pour chaque repo trouvé, effectuer le nettoyage
+            echo "$found_repos" | while read -r actual_repo; do
+              if [ -n "$actual_repo" ]; then
+                echo "  🧹 Nettoyage de: $actual_repo"
                 
-                if doctl registry repository delete-manifest --force $repo $digest 2>/dev/null; then
-                  echo "       ✅ Supprimé avec succès"
-                  ((deleted++))
-                else
-                  echo "       ❌ Échec de suppression"
+                local manifests=$(doctl registry repository list-manifests "$actual_repo" --format Digest,Updated --no-header 2>/dev/null || echo "")
+                
+                if [ -z "$manifests" ]; then
+                  echo "    📭 Repository vide"
+                  continue
                 fi
-              else
-                echo "    ⚠️  Digest invalide ignoré: $digest"
+                
+                local total=$(echo "$manifests" | wc -l)
+                echo "    📊 Images actuelles: $total"
+                
+                if [ "$total" -le 6 ]; then
+                  echo "    ✅ Pas de nettoyage nécessaire ($total <= 6)"
+                  continue
+                fi
+                
+                local to_delete=$((total - 6))
+                echo "    🗑️  Suppression de $to_delete images anciennes..."
+                
+                # Supprimer les plus anciennes
+                echo "$manifests" | sort -k2 | head -n "$to_delete" | while read -r digest updated; do
+                  if [ -n "$digest" ] && [[ "$digest" =~ ^sha256: ]]; then
+                    echo "      🔥 Suppression: $digest ($updated)"
+                    if doctl registry repository delete-manifest --force "$actual_repo" "$digest" 2>/dev/null; then
+                      echo "      ✅ Supprimé"
+                    else
+                      echo "      ❌ Échec"
+                    fi
+                  fi
+                done
+                
+                # Vérification finale
+                local remaining=$(doctl registry repository list-manifests "$actual_repo" --format Digest --no-header 2>/dev/null | wc -l || echo "0")
+                echo "    📊 Images restantes: $remaining"
               fi
             done
-            
-            # Vérification post-nettoyage
-            sleep 5
-            local remaining=$(doctl registry repository list-manifests $repo --format Digest --no-header 2>/dev/null | wc -l)
-            echo "  📊 Images restantes après nettoyage: $remaining"
-            
-            if [ $remaining -gt 6 ]; then
-              echo "  ⚠️  Attention: Plus de 6 images restantes, nettoyage partiel"
-            else
-              echo "  ✅ Nettoyage terminé avec succès"
-            fi
           }
           
-          # Nettoyer les trois repositories
-          echo "🚀 Début du nettoyage des repositories..."
-          
-          for repo in intelia-frontend intelia-backend intelia-llm; do
-            cleanup_repo "$repo"
-          done
-          
+          # 3. Nettoyer les repositories s'ils existent
           echo ""
-          echo "🗑️ Lancement du garbage collection global..."
-          if doctl registry garbage-collection start ${{ secrets.DOCR_NAME }} --force 2>/dev/null; then
-            echo "✅ Garbage collection démarré avec succès"
+          echo "🚀 NETTOYAGE DES REPOSITORIES"
+          echo "============================="
+          
+          cleanup_if_exists "intelia-frontend"
+          cleanup_if_exists "intelia-backend"
+          cleanup_if_exists "intelia-llm"
+          
+          # 4. Garbage collection si au moins un nettoyage a eu lieu
+          echo ""
+          echo "🗑️ Tentative de garbage collection..."
+          if doctl registry garbage-collection start "${{ secrets.DOCR_NAME }}" --force 2>/dev/null; then
+            echo "✅ Garbage collection démarré"
           else
-            echo "⚠️  Garbage collection: déjà en cours ou erreur"
+            echo "⚠️  Garbage collection: déjà en cours ou erreur (normal)"
           fi
           
           echo ""
-          echo "🎉 NETTOYAGE TERMINÉ !"
-          echo "====================="
-          
-          # Affichage final du statut
-          echo "📊 Statut final des repositories:"
-          for repo in intelia-frontend intelia-backend intelia-llm; do
-            local count=$(doctl registry repository list-manifests $repo --format Digest --no-header 2>/dev/null | wc -l || echo "0")
-            echo "  $repo: $count images"
-          done
+          echo "🎉 DIAGNOSTIC ET NETTOYAGE TERMINÉS"
 
-  # 📊 Résumé final
+  # 📊 Résumé final (basé sur deploy.yml.bak qui fonctionnait)
   summary:
     runs-on: ubuntu-latest
     needs: [detect-changes, build-frontend, build-backend, build-llm, deploy, cleanup]
@@ -322,45 +328,45 @@ jobs:
     steps:
       - name: Deployment Summary
         run: |
-          echo "🚀 RÉSUMÉ DU DÉPLOIEMENT"
-          echo "========================"
+          echo "🚀 DEPLOYMENT SUMMARY"
+          echo "===================="
           
           # Frontend
           if [[ "${{ needs.detect-changes.outputs.frontend-changed }}" == "true" ]]; then
             if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
-              echo "✅ Frontend: DÉPLOYÉ"
+              echo "✅ Frontend: DEPLOYED"
             else
-              echo "❌ Frontend: ÉCHEC"
+              echo "❌ Frontend: FAILED"
             fi
           else
-            echo "⏸️ Frontend: IGNORÉ (aucun changement)"
+            echo "⏸️ Frontend: SKIPPED (no changes)"
           fi
           
           # Backend  
           if [[ "${{ needs.detect-changes.outputs.backend-changed }}" == "true" ]]; then
             if [[ "${{ needs.build-backend.result }}" == "success" ]]; then
-              echo "✅ Backend: DÉPLOYÉ"
+              echo "✅ Backend: DEPLOYED"
             else
-              echo "❌ Backend: ÉCHEC" 
+              echo "❌ Backend: FAILED" 
             fi
           else
-            echo "⏸️ Backend: IGNORÉ (aucun changement)"
+            echo "⏸️ Backend: SKIPPED (no changes)"
           fi
           
           # LLM
           if [[ "${{ needs.detect-changes.outputs.llm-changed }}" == "true" ]]; then
             if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
-              echo "✅ LLM: DÉPLOYÉ"
+              echo "✅ LLM: DEPLOYED"
             else
-              echo "❌ LLM: ÉCHEC"
+              echo "❌ LLM: FAILED"
             fi
           else
-            echo "⏸️ LLM: IGNORÉ (aucun changement)"
+            echo "⏸️ LLM: SKIPPED (no changes)"
           fi
           
           echo ""
-          echo "📋 Déploiement global: ${{ needs.deploy.result == 'success' && '✅ RÉUSSI' || '❌ ÉCHEC' }}"
-          echo "🧹 Nettoyage: ${{ needs.cleanup.result == 'success' && '✅ TERMINÉ' || '⚠️ PARTIEL' }}"
+          echo "📋 Déploiement: ${{ needs.deploy.result == 'success' && '✅ RÉUSSI' || '❌ ÉCHEC' }}"
+          echo "🧹 Nettoyage: ${{ needs.cleanup.result == 'success' && '✅ TERMINÉ' || '⚠️ VÉRIFIÉ' }}"
           
           # Compter les services déployés
           deployed=0
