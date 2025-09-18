@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 # GESTION MÉMOIRE TENANT (Version modulaire)
 # ============================================================================
 
+
 class TenantMemory(OrderedDict):
     """Cache LRU avec TTL pour la mémoire de conversation - Version modulaire"""
 
@@ -55,7 +56,9 @@ class TenantMemory(OrderedDict):
 
     def set(self, tenant_id: str, item: list):
         if not tenant_id or not isinstance(item, list):
-            logger.warning(f"Paramètres invalides pour TenantMemory.set: {tenant_id}, {type(item)}")
+            logger.warning(
+                f"Paramètres invalides pour TenantMemory.set: {tenant_id}, {type(item)}"
+            )
             return
 
         now = time.time()
@@ -64,7 +67,9 @@ class TenantMemory(OrderedDict):
 
         # Purge TTL
         try:
-            expired_keys = [k for k, v in self.items() if now - v.get("ts", 0) > self.tenant_ttl]
+            expired_keys = [
+                k for k, v in self.items() if now - v.get("ts", 0) > self.tenant_ttl
+            ]
             for k in expired_keys:
                 del self[k]
                 logger.debug(f"Tenant {k} expiré (TTL)")
@@ -104,10 +109,14 @@ class TenantMemory(OrderedDict):
             except Exception as e:
                 logger.warning(f"Erreur mise à jour last_query: {e}")
 
+
 # Instance globale
 conversation_memory = TenantMemory()
 
-def add_to_conversation_memory(tenant_id: str, question: str, answer: str, source: str = "rag_enhanced"):
+
+def add_to_conversation_memory(
+    tenant_id: str, question: str, answer: str, source: str = "rag_enhanced"
+):
     """Ajoute un échange à la mémoire de conversation avec validation"""
     if not tenant_id or not question or not answer:
         logger.warning("Paramètres invalides pour add_to_conversation_memory")
@@ -117,12 +126,14 @@ def add_to_conversation_memory(tenant_id: str, question: str, answer: str, sourc
         tenant_data = conversation_memory.get(tenant_id, {"data": []})
         history = tenant_data.get("data", [])
 
-        history.append({
-            "question": question[:1000],
-            "answer": answer[:2000],
-            "timestamp": time.time(),
-            "answer_source": source,
-        })
+        history.append(
+            {
+                "question": question[:1000],
+                "answer": answer[:2000],
+                "timestamp": time.time(),
+                "answer_source": source,
+            }
+        )
 
         if len(history) > MAX_CONVERSATION_CONTEXT:
             history = history[-MAX_CONVERSATION_CONTEXT:]
@@ -132,9 +143,11 @@ def add_to_conversation_memory(tenant_id: str, question: str, answer: str, sourc
     except Exception as e:
         logger.error(f"Erreur ajout conversation memory: {e}")
 
+
 # ============================================================================
 # COLLECTEUR DE MÉTRIQUES POUR ENDPOINTS
 # ============================================================================
+
 
 class EndpointMetricsCollector(MetricsCollector):
     """Collecteur de métriques spécialisé pour les endpoints"""
@@ -142,22 +155,40 @@ class EndpointMetricsCollector(MetricsCollector):
     def __init__(self):
         super().__init__()
         self.endpoint_metrics = {
-            "total_queries": 0, "rag_enhanced_queries": 0, "agent_queries": 0,
-            "simple_queries": 0, "complex_queries": 0, "rag_standard_queries": 0,
-            "ood_filtered": 0, "fallback_queries": 0, "verified_responses": 0,
-            "cache_hits": 0, "cache_misses": 0, "semantic_cache_hits": 0,
-            "fallback_cache_hits": 0, "hybrid_searches": 0, "guardrail_violations": 0,
-            "api_corrections": 0, "errors": 0, "langsmith_traces": 0,
-            "langsmith_errors": 0, "hallucination_alerts": 0,
-            "intelligent_rrf_queries": 0, "genetic_boosts_applied": 0,
-            "rrf_learning_updates": 0, "avg_processing_time": 0.0, "avg_confidence": 0.0,
+            "total_queries": 0,
+            "rag_enhanced_queries": 0,
+            "agent_queries": 0,
+            "simple_queries": 0,
+            "complex_queries": 0,
+            "rag_standard_queries": 0,
+            "ood_filtered": 0,
+            "fallback_queries": 0,
+            "verified_responses": 0,
+            "cache_hits": 0,
+            "cache_misses": 0,
+            "semantic_cache_hits": 0,
+            "fallback_cache_hits": 0,
+            "hybrid_searches": 0,
+            "guardrail_violations": 0,
+            "api_corrections": 0,
+            "errors": 0,
+            "langsmith_traces": 0,
+            "langsmith_errors": 0,
+            "hallucination_alerts": 0,
+            "intelligent_rrf_queries": 0,
+            "genetic_boosts_applied": 0,
+            "rrf_learning_updates": 0,
+            "avg_processing_time": 0.0,
+            "avg_confidence": 0.0,
         }
         self.recent_processing_times = []
         self.recent_confidences = []
         self.latency_percentiles = {"p50": 0.0, "p95": 0.0, "p99": 0.0}
         self.max_recent_samples = 100
 
-    def record_query(self, result, source_type: str = "unknown", endpoint_time: float = 0.0):
+    def record_query(
+        self, result, source_type: str = "unknown", endpoint_time: float = 0.0
+    ):
         """Enregistre les métriques avec support LangSmith et RRF"""
         if not ENABLE_METRICS_LOGGING:
             return
@@ -174,13 +205,19 @@ class EndpointMetricsCollector(MetricsCollector):
                 self.endpoint_metrics["errors"] += 1
 
             # Traitement des métriques temporelles et métadonnées
-            processing_time = endpoint_time if endpoint_time > 0 else safe_get_attribute(result, "processing_time", 0)
+            processing_time = (
+                endpoint_time
+                if endpoint_time > 0
+                else safe_get_attribute(result, "processing_time", 0)
+            )
             if processing_time > 0:
                 self.recent_processing_times.append(float(processing_time))
                 if len(self.recent_processing_times) > self.max_recent_samples:
                     self.recent_processing_times.pop(0)
                 if self.recent_processing_times:
-                    self.endpoint_metrics["avg_processing_time"] = sum(self.recent_processing_times) / len(self.recent_processing_times)
+                    self.endpoint_metrics["avg_processing_time"] = sum(
+                        self.recent_processing_times
+                    ) / len(self.recent_processing_times)
 
             confidence = safe_get_attribute(result, "confidence", 0)
             if confidence > 0:
@@ -188,7 +225,9 @@ class EndpointMetricsCollector(MetricsCollector):
                 if len(self.recent_confidences) > self.max_recent_samples:
                     self.recent_confidences.pop(0)
                 if self.recent_confidences:
-                    self.endpoint_metrics["avg_confidence"] = sum(self.recent_confidences) / len(self.recent_confidences)
+                    self.endpoint_metrics["avg_confidence"] = sum(
+                        self.recent_confidences
+                    ) / len(self.recent_confidences)
 
         except Exception as e:
             logger.warning(f"Erreur enregistrement métriques: {e}")
@@ -198,23 +237,43 @@ class EndpointMetricsCollector(MetricsCollector):
         """Retourne les métriques enrichies avec protection contre les erreurs"""
         try:
             total_queries = max(1, self.endpoint_metrics["total_queries"])
-            total_cache_requests = max(1, self.endpoint_metrics["cache_hits"] + self.endpoint_metrics["cache_misses"])
+            total_cache_requests = max(
+                1,
+                self.endpoint_metrics["cache_hits"]
+                + self.endpoint_metrics["cache_misses"],
+            )
 
             return {
                 **self.endpoint_metrics,
-                "success_rate": (self.endpoint_metrics["rag_enhanced_queries"] + self.endpoint_metrics["verified_responses"] + self.endpoint_metrics["agent_queries"]) / total_queries,
-                "enhanced_rag_usage_rate": self.endpoint_metrics["rag_enhanced_queries"] / total_queries,
-                "cache_hit_rate": self.endpoint_metrics["cache_hits"] / total_cache_requests,
-                "semantic_cache_hit_rate": self.endpoint_metrics["semantic_cache_hits"] / total_cache_requests,
+                "success_rate": (
+                    self.endpoint_metrics["rag_enhanced_queries"]
+                    + self.endpoint_metrics["verified_responses"]
+                    + self.endpoint_metrics["agent_queries"]
+                )
+                / total_queries,
+                "enhanced_rag_usage_rate": self.endpoint_metrics["rag_enhanced_queries"]
+                / total_queries,
+                "cache_hit_rate": self.endpoint_metrics["cache_hits"]
+                / total_cache_requests,
+                "semantic_cache_hit_rate": self.endpoint_metrics["semantic_cache_hits"]
+                / total_cache_requests,
                 "error_rate": self.endpoint_metrics["errors"] / total_queries,
                 "latency_percentiles": self.latency_percentiles,
-                "langsmith_usage_rate": self.endpoint_metrics["langsmith_traces"] / total_queries,
-                "rrf_intelligent_usage_rate": self.endpoint_metrics["intelligent_rrf_queries"] / total_queries,
-                "hallucination_alert_rate": self.endpoint_metrics["hallucination_alerts"] / total_queries,
+                "langsmith_usage_rate": self.endpoint_metrics["langsmith_traces"]
+                / total_queries,
+                "rrf_intelligent_usage_rate": self.endpoint_metrics[
+                    "intelligent_rrf_queries"
+                ]
+                / total_queries,
+                "hallucination_alert_rate": self.endpoint_metrics[
+                    "hallucination_alerts"
+                ]
+                / total_queries,
             }
         except Exception as e:
             logger.error(f"Erreur calcul métriques: {e}")
             return self.endpoint_metrics
+
 
 # Instance globale
 metrics_collector = EndpointMetricsCollector()
@@ -222,6 +281,7 @@ metrics_collector = EndpointMetricsCollector()
 # ============================================================================
 # CRÉATION DU ROUTER AVEC TOUS LES ENDPOINTS CENTRALISÉS
 # ============================================================================
+
 
 def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
     """Crée le router avec TOUS les endpoints centralisés"""
@@ -264,7 +324,7 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             "app_status": "running",
             "router_injection": "centralized-final",
             "deployment_confirmed": "TOUS LES ENDPOINTS SONT MAINTENANT DANS LE ROUTER !",
-            "architecture": "centralized-router"
+            "architecture": "centralized-router",
         }
 
     @router.get(f"{BASE_PATH}/deployment-test")
@@ -277,14 +337,14 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             "confirmation": "Tous les endpoints sont maintenant dans le router centralisé",
             "endpoints_available": [
                 f"{BASE_PATH}/version",
-                f"{BASE_PATH}/deployment-test", 
+                f"{BASE_PATH}/deployment-test",
                 f"{BASE_PATH}/test-json",
                 f"{BASE_PATH}/startup-info",
                 f"{BASE_PATH}/health",
                 f"{BASE_PATH}/status/cache",
-                f"{BASE_PATH}/metrics"
+                f"{BASE_PATH}/metrics",
             ],
-            "architecture": "centralized-router"
+            "architecture": "centralized-router",
         }
 
     @router.get(f"{BASE_PATH}/test-json")
@@ -309,7 +369,7 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                 "serialized_data": safe_data,
                 "json_test": "OK",
                 "architecture": "centralized-router",
-                "debug_version": "4.0.3-endpoints-centralized"
+                "debug_version": "4.0.3-endpoints-centralized",
             }
 
         except Exception as e:
@@ -322,9 +382,9 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             health_monitor = get_service("health_monitor")
             if not health_monitor:
                 return {
-                    "error": "Health monitor non disponible", 
+                    "error": "Health monitor non disponible",
                     "debug_version": "4.0.3-endpoints-centralized",
-                    "architecture": "centralized-router"
+                    "architecture": "centralized-router",
                 }
 
             # Récupérer les informations de validation
@@ -340,22 +400,23 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                 ),
                 "errors": validation_report.get("errors", []),
                 "warnings": validation_report.get("warnings", []),
-                "cache_available": "cache_core" in (
+                "cache_available": "cache_core"
+                in (
                     health_monitor.get_all_services()
                     if hasattr(health_monitor, "get_all_services")
                     else {}
                 ),
                 "timestamp": time.time(),
                 "debug_version": "4.0.3-endpoints-centralized",
-                "architecture": "centralized-router"
+                "architecture": "centralized-router",
             }
 
         except Exception as e:
             return {
-                "error": str(e), 
-                "timestamp": time.time(), 
+                "error": str(e),
+                "timestamp": time.time(),
                 "debug_version": "4.0.3-endpoints-centralized",
-                "architecture": "centralized-router"
+                "architecture": "centralized-router",
             }
 
     # ========================================================================
@@ -371,7 +432,10 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                 health_status = await health_monitor.get_health_status()
 
                 # Code de statut HTTP selon l'état
-                if health_status["overall_status"] in ["healthy", "healthy_with_warnings"]:
+                if health_status["overall_status"] in [
+                    "healthy",
+                    "healthy_with_warnings",
+                ]:
                     status_code = 200
                 elif health_status["overall_status"] == "degraded":
                     status_code = 200
@@ -439,8 +503,12 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                 "optimizations": safe_dict_get(safe_status, "optimizations", {}),
                 "langsmith": safe_dict_get(safe_status, "langsmith", {}),
                 "intelligent_rrf": safe_dict_get(safe_status, "intelligent_rrf", {}),
-                "optimization_stats": safe_dict_get(safe_status, "optimization_stats", {}),
-                "weaviate_connected": bool(safe_get_attribute(rag_engine, "weaviate_client")),
+                "optimization_stats": safe_dict_get(
+                    safe_status, "optimization_stats", {}
+                ),
+                "weaviate_connected": bool(
+                    safe_get_attribute(rag_engine, "weaviate_client")
+                ),
                 "timestamp": time.time(),
             }
 
@@ -465,7 +533,7 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                         "health_monitor_in_services": "health_monitor" in _services,
                     },
                     "timestamp": time.time(),
-                    "architecture": "centralized-router"
+                    "architecture": "centralized-router",
                 }
 
             # Tenter de récupérer le cache_core
@@ -488,7 +556,7 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                         "services_count": len(all_services),
                     },
                     "timestamp": time.time(),
-                    "architecture": "centralized-router"
+                    "architecture": "centralized-router",
                 }
 
             # Cache_core trouvé - analyser son état
@@ -527,7 +595,7 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                     "has_config": hasattr(cache_core, "config"),
                 },
                 "timestamp": time.time(),
-                "architecture": "centralized-router"
+                "architecture": "centralized-router",
             }
 
         except Exception as e:
@@ -542,7 +610,7 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                     "services_available": list(_services.keys()),
                 },
                 "timestamp": time.time(),
-                "architecture": "centralized-router"
+                "architecture": "centralized-router",
             }
 
     @router.get(f"{BASE_PATH}/metrics")
@@ -558,25 +626,39 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                         "ttl_seconds": TENANT_TTL,
                     }
                 },
-                "architecture": "centralized-router"
+                "architecture": "centralized-router",
             }
 
             # Métriques RAG Engine enrichies
             health_monitor = get_service("health_monitor")
             if health_monitor:
                 rag_engine = health_monitor.get_service("rag_engine_enhanced")
-                if rag_engine and safe_get_attribute(rag_engine, "is_initialized", False):
+                if rag_engine and safe_get_attribute(
+                    rag_engine, "is_initialized", False
+                ):
                     try:
                         rag_status = rag_engine.get_status()
                         safe_rag_status = safe_serialize_for_json(rag_status)
 
                         base_metrics["rag_engine"] = {
-                            "approach": safe_dict_get(safe_rag_status, "approach", "unknown"),
-                            "optimizations": safe_dict_get(safe_rag_status, "optimizations", {}),
-                            "langsmith": safe_dict_get(safe_rag_status, "langsmith", {}),
-                            "intelligent_rrf": safe_dict_get(safe_rag_status, "intelligent_rrf", {}),
-                            "optimization_stats": safe_dict_get(safe_rag_status, "optimization_stats", {}),
-                            "weaviate_capabilities": safe_dict_get(safe_rag_status, "api_capabilities", {}),
+                            "approach": safe_dict_get(
+                                safe_rag_status, "approach", "unknown"
+                            ),
+                            "optimizations": safe_dict_get(
+                                safe_rag_status, "optimizations", {}
+                            ),
+                            "langsmith": safe_dict_get(
+                                safe_rag_status, "langsmith", {}
+                            ),
+                            "intelligent_rrf": safe_dict_get(
+                                safe_rag_status, "intelligent_rrf", {}
+                            ),
+                            "optimization_stats": safe_dict_get(
+                                safe_rag_status, "optimization_stats", {}
+                            ),
+                            "weaviate_capabilities": safe_dict_get(
+                                safe_rag_status, "api_capabilities", {}
+                            ),
                         }
                     except Exception as e:
                         logger.error(f"Erreur métriques RAG: {e}")
@@ -593,7 +675,9 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                         else:
                             cache_stats = {
                                 "enabled": getattr(cache_core, "enabled", False),
-                                "initialized": getattr(cache_core, "initialized", False),
+                                "initialized": getattr(
+                                    cache_core, "initialized", False
+                                ),
                                 "no_stats_method": True,
                             }
 
@@ -606,7 +690,11 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
 
         except Exception as e:
             logger.error(f"Erreur récupération métriques: {e}")
-            return {"error": str(e), "timestamp": time.time(), "architecture": "centralized-router"}
+            return {
+                "error": str(e),
+                "timestamp": time.time(),
+                "architecture": "centralized-router",
+            }
 
     # ========================================================================
     # ENDPOINT CHAT PRINCIPAL
@@ -656,7 +744,9 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             if health_monitor:
                 rag_engine = health_monitor.get_service("rag_engine_enhanced")
 
-                if rag_engine and safe_get_attribute(rag_engine, "is_initialized", False):
+                if rag_engine and safe_get_attribute(
+                    rag_engine, "is_initialized", False
+                ):
                     try:
                         # Essayer generate_response en premier
                         if hasattr(rag_engine, "generate_response"):
@@ -669,9 +759,13 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                                 logger.info("RAG generate_response réussi")
 
                             except Exception as generate_error:
-                                logger.warning(f"generate_response échoué: {generate_error}")
+                                logger.warning(
+                                    f"generate_response échoué: {generate_error}"
+                                )
                                 use_fallback = True
-                                fallback_reason = f"generate_response_failed: {str(generate_error)}"
+                                fallback_reason = (
+                                    f"generate_response_failed: {str(generate_error)}"
+                                )
                         else:
                             use_fallback = True
                             fallback_reason = "generate_response_not_available"
@@ -689,7 +783,9 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
 
             # Utiliser réponses aviculture au lieu de OOD
             if use_fallback or not rag_result:
-                logger.info(f"Utilisation fallback aviculture - Raison: {fallback_reason}")
+                logger.info(
+                    f"Utilisation fallback aviculture - Raison: {fallback_reason}"
+                )
 
                 # Générer une vraie réponse aviculture
                 aviculture_response = get_aviculture_response(message, language)
@@ -712,7 +808,9 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
 
             # Enregistrer métriques
             total_processing_time = time.time() - total_start_time
-            metrics_collector.record_query(rag_result, "rag_enhanced", total_processing_time)
+            metrics_collector.record_query(
+                rag_result, "rag_enhanced", total_processing_time
+            )
 
             # Streaming de la réponse
             async def generate_response():
@@ -721,7 +819,9 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                     metadata = safe_get_attribute(rag_result, "metadata", {}) or {}
                     source = safe_get_attribute(rag_result, "source", "unknown")
                     confidence = safe_get_attribute(rag_result, "confidence", 0.5)
-                    processing_time = safe_get_attribute(rag_result, "processing_time", 0)
+                    processing_time = safe_get_attribute(
+                        rag_result, "processing_time", 0
+                    )
 
                     # Convertir source enum si nécessaire
                     if hasattr(source, "value"):
@@ -729,14 +829,18 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                     else:
                         source = str(source)
 
-                    yield sse_event({
-                        "type": "start",
-                        "source": source,
-                        "confidence": float(confidence),
-                        "processing_time": float(processing_time),
-                        "fallback_used": safe_dict_get(metadata, "fallback_used", False),
-                        "architecture": "centralized-router"
-                    })
+                    yield sse_event(
+                        {
+                            "type": "start",
+                            "source": source,
+                            "confidence": float(confidence),
+                            "processing_time": float(processing_time),
+                            "fallback_used": safe_dict_get(
+                                metadata, "fallback_used", False
+                            ),
+                            "architecture": "centralized-router",
+                        }
+                    )
 
                     # Contenu de la réponse
                     answer = safe_get_attribute(rag_result, "answer", "")
@@ -752,7 +856,9 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                         chunks = smart_chunk_text(str(answer), STREAM_CHUNK_LEN)
 
                         for i, chunk in enumerate(chunks):
-                            yield sse_event({"type": "chunk", "content": chunk, "chunk_index": i})
+                            yield sse_event(
+                                {"type": "chunk", "content": chunk, "chunk_index": i}
+                            )
                             await asyncio.sleep(0.01)
 
                     # Informations finales
@@ -760,18 +866,22 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                     if not isinstance(context_docs, list):
                         context_docs = []
 
-                    yield sse_event({
-                        "type": "end",
-                        "total_time": total_processing_time,
-                        "confidence": float(confidence),
-                        "documents_used": len(context_docs),
-                        "source": source,
-                        "architecture": "centralized-router"
-                    })
+                    yield sse_event(
+                        {
+                            "type": "end",
+                            "total_time": total_processing_time,
+                            "confidence": float(confidence),
+                            "documents_used": len(context_docs),
+                            "source": source,
+                            "architecture": "centralized-router",
+                        }
+                    )
 
                     # Enregistrer en mémoire si tout est OK
                     if answer and source:
-                        add_to_conversation_memory(tenant_id, message, str(answer), "rag_enhanced")
+                        add_to_conversation_memory(
+                            tenant_id, message, str(answer), "rag_enhanced"
+                        )
 
                 except Exception as e:
                     logger.error(f"Erreur streaming: {e}")
@@ -783,7 +893,9 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             raise
         except Exception as e:
             logger.error(f"Erreur chat endpoint: {e}")
-            metrics_collector.record_query({"source": "error"}, "error", time.time() - total_start_time)
+            metrics_collector.record_query(
+                {"source": "error"}, "error", time.time() - total_start_time
+            )
             return JSONResponse(
                 status_code=500, content={"error": f"Erreur traitement: {str(e)}"}
             )
@@ -801,14 +913,26 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             message = get_out_of_domain_message(language)
 
             async def ood_response():
-                yield sse_event({"type": "start", "reason": "out_of_domain", "architecture": "centralized-router"})
+                yield sse_event(
+                    {
+                        "type": "start",
+                        "reason": "out_of_domain",
+                        "architecture": "centralized-router",
+                    }
+                )
 
                 chunks = smart_chunk_text(message, STREAM_CHUNK_LEN)
                 for chunk in chunks:
                     yield sse_event({"type": "chunk", "content": chunk})
                     await asyncio.sleep(0.05)
 
-                yield sse_event({"type": "end", "confidence": 1.0, "architecture": "centralized-router"})
+                yield sse_event(
+                    {
+                        "type": "end",
+                        "confidence": 1.0,
+                        "architecture": "centralized-router",
+                    }
+                )
 
             return StreamingResponse(ood_response(), media_type="text/plain")
 
@@ -817,6 +941,7 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             return JSONResponse(status_code=500, content={"error": str(e)})
 
     return router
+
 
 # ============================================================================
 # EXPORTS

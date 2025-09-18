@@ -1,9 +1,17 @@
 # -*- coding: utf-8 -*-
+
 """
 main.py - Intelia Expert Backend - ARCHITECTURE MODULAIRE PURE
 Point d'entrée minimaliste avec délégation complète aux modules
 VERSION FINALE: Tous endpoints dans le router
 """
+
+# === DEBUG DEPLOYMENT - MESSAGES VISIBLES ===
+print("=" * 80)
+print("🔥 VERSION FINALE MAIN.PY CHARGÉE - TOUS ENDPOINTS DANS ROUTER")
+print("🔥 VERSION: 4.0.3-endpoints-centralized")
+print("🔥 TIMESTAMP CHARGEMENT:", __import__('time').time())
+print("=" * 80)
 
 import os
 import asyncio
@@ -22,22 +30,13 @@ from utils.monitoring import create_health_monitor
 from utils.utilities import setup_logging
 from api.endpoints import create_router
 
-# === DEBUG DEPLOYMENT - MESSAGES VISIBLES ===
-print("=" * 80)
-print("🔥 VERSION FINALE MAIN.PY CHARGÉE - TOUS ENDPOINTS DANS ROUTER")
-print("🔥 VERSION: 4.0.3-endpoints-centralized")
-print("🔥 TIMESTAMP CHARGEMENT:", time.time())
-print("=" * 80)
-
 # Configuration
 load_dotenv()
 setup_logging(os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
 
 # Message de log immédiat
-logger.critical(
-    "🚨 VERSION FINALE DÉTECTÉE - main.py version 4.0.3-endpoints-centralized"
-)
+logger.critical("🚨 VERSION FINALE DÉTECTÉE - main.py version 4.0.3-endpoints-centralized")
 logger.critical("🚨 Tous les endpoints sont maintenant dans le router !")
 logger.critical("🚨 TIMESTAMP LOGGER: %s", time.time())
 
@@ -47,7 +46,6 @@ services = {}
 # ============================================================================
 # GESTION DU CYCLE DE VIE - VERSION FINALE
 # ============================================================================
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -90,8 +88,7 @@ async def lifespan(app: FastAPI):
         if validation_result["overall_status"] == "failed":
             errors = validation_result.get("errors", [])
             critical_errors = [
-                err
-                for err in errors
+                err for err in errors
                 if not any(
                     keyword in err.lower()
                     for keyword in ["cache", "redis", "connexion", "timeout", "network"]
@@ -141,15 +138,11 @@ async def lifespan(app: FastAPI):
         # Log statut des intégrations avancées
         langsmith_status = validation_result.get("langsmith_validation", {})
         if langsmith_status.get("status") == "configured":
-            logger.info(
-                f"🧠 LangSmith actif - Projet: {langsmith_status.get('project')}"
-            )
+            logger.info(f"🧠 LangSmith actif - Projet: {langsmith_status.get('project')}")
 
         rrf_status = validation_result.get("rrf_validation", {})
         if rrf_status.get("status") == "configured":
-            logger.info(
-                f"⚡ RRF Intelligent actif - Learning: {rrf_status.get('learning_mode')}"
-            )
+            logger.info(f"⚡ RRF Intelligent actif - Learning: {rrf_status.get('learning_mode')}")
 
         # 6. CORRECTION FINALE : Re-créer le router avec les services initialisés
         logger.critical("🔧 INJECTION DES SERVICES - ARCHITECTURE CENTRALISÉE 🔧")
@@ -170,9 +163,7 @@ async def lifespan(app: FastAPI):
         logger.info("📊 Services initialisés:")
         for service_name, service in services.items():
             service_status = "✅ OK" if service else "❌ FAILED"
-            logger.info(
-                f"  - {service_name}: {type(service).__name__} {service_status}"
-            )
+            logger.info(f"  - {service_name}: {type(service).__name__} {service_status}")
 
         # Log final du mode de fonctionnement
         if validation_result["overall_status"] == "healthy":
@@ -182,9 +173,7 @@ async def lifespan(app: FastAPI):
         else:
             logger.info("🔶 Mode: MINIMAL (fonctionnalités de base)")
 
-        logger.critical(
-            "🎉 APPLICATION VERSION FINALE PRÊTE - ARCHITECTURE CENTRALISÉE 🎉"
-        )
+        logger.critical("🎉 APPLICATION VERSION FINALE PRÊTE - ARCHITECTURE CENTRALISÉE 🎉")
         print("🎉 APPLICATION VERSION FINALE PRÊTE 🎉")
 
         yield
@@ -248,9 +237,7 @@ async def lifespan(app: FastAPI):
                         cleanup_errors.append(f"Agent RAG cleanup: {e}")
 
                 if cleanup_errors:
-                    logger.warning(
-                        f"Erreurs de nettoyage (non critiques): {cleanup_errors}"
-                    )
+                    logger.warning(f"Erreurs de nettoyage (non critiques): {cleanup_errors}")
 
             # Nettoyer les services globaux
             services.clear()
@@ -260,13 +247,12 @@ async def lifespan(app: FastAPI):
 
         logger.info("✅ Application arrêtée proprement")
 
-
 # ============================================================================
 # CRÉATION DE L'APPLICATION - VERSION FINALE SIMPLIFIÉE
 # ============================================================================
 
 # MESSAGE DEBUG CRÉATION APP
-logger.critical("🗂️ CRÉATION FASTAPI APP - VERSION FINALE 🗂️")
+logger.critical("🏗️ CRÉATION FASTAPI APP - VERSION FINALE 🏗️")
 
 # Créer l'application FastAPI
 app = FastAPI(

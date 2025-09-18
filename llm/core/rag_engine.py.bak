@@ -207,8 +207,6 @@ class InteliaRAGEngine:
             "weaviate_capabilities": {},
             "dynamic_ood_threshold_adjustments": 0,
             "conversation_context_usage": 0,
-            # NOUVEAU: Stats cache
-            "cache_sets": 0,
         }
 
     def _build_openai_client(self) -> AsyncOpenAI:
@@ -583,7 +581,7 @@ class InteliaRAGEngine:
         language: Optional[str],
         explain_score: Optional[float],
     ) -> RAGResult:
-        """Méthode core de génération avec cache optimisé"""
+        """Méthode core de génération"""
 
         if self.degraded_mode:
             return RAGResult(
@@ -597,77 +595,6 @@ class InteliaRAGEngine:
             # Détection langue
             if not language:
                 language = detect_language_enhanced(query, default="fr")
-
-            # NOUVEAU: Vérification cache AVANT traitement
-            cache_key = None
-            if self.cache_manager and self.cache_manager.enabled:
-                try:
-                    # Créer une clé de cache unique
-                    import hashlib
-
-                    context_hash = ""
-                    if conversation_context:
-                        context_str = str(conversation_context)
-                        context_hash = hashlib.md5(context_str.encode()).hexdigest()[:8]
-
-                    cache_key = f"{tenant_id}:{hashlib.md5(query.encode()).hexdigest()}:{language}:{context_hash}"
-
-                    # Utiliser la méthode get_response du cache sémantique si disponible
-                    if hasattr(self.cache_manager, "semantic_cache"):
-                        cached_response = (
-                            await self.cache_manager.semantic_cache.get_response(
-                                query, context_hash, language
-                            )
-                        )
-                    else:
-                        # Fallback vers cache simple
-                        cached_response = await self.cache_manager.get(cache_key)
-                        if cached_response and isinstance(cached_response, bytes):
-                            cached_response = cached_response.decode("utf-8")
-
-                    if cached_response:
-                        self.optimization_stats["cache_hits"] += 1
-                        logger.info(f"Cache HIT pour requête: {query[:50]}...")
-
-                        # Si c'est une chaîne, créer la structure attendue
-                        if isinstance(cached_response, str):
-                            return RAGResult(
-                                source=RAGSource.RAG_SUCCESS,
-                                answer=cached_response,
-                                confidence=0.85,  # Confiance élevée pour cache
-                                metadata={
-                                    "cache_hit": True,
-                                    "processing_time": time.time() - start_time,
-                                    "cache_type": (
-                                        "semantic"
-                                        if hasattr(self.cache_manager, "semantic_cache")
-                                        else "simple"
-                                    ),
-                                },
-                            )
-                        # Si c'est un dict avec la structure complète
-                        elif isinstance(cached_response, dict):
-                            return RAGResult(
-                                source=RAGSource.RAG_SUCCESS,
-                                answer=cached_response.get("answer", ""),
-                                confidence=cached_response.get("confidence", 0.85),
-                                metadata={
-                                    "cache_hit": True,
-                                    "processing_time": time.time() - start_time,
-                                    "cache_type": (
-                                        "semantic"
-                                        if hasattr(self.cache_manager, "semantic_cache")
-                                        else "simple"
-                                    ),
-                                    **cached_response.get("metadata", {}),
-                                },
-                            )
-                    else:
-                        self.optimization_stats["cache_misses"] += 1
-
-                except Exception as e:
-                    logger.warning(f"Erreur consultation cache: {e}")
-                    self.optimization_stats["cache_misses"] += 1
 
             # Intent processing avec gestion d'erreurs robuste
             intent_result = None
@@ -899,61 +826,14 @@ class InteliaRAGEngine:
                 )
                 metadata["intent_confidence"] = intent_result.confidence
 
-            # Construire le résultat
-            result = RAGResult(
+            METRICS.observe_latency(time.time() - start_time)
+
+            return RAGResult(
                 source=RAGSource.RAG_SUCCESS,
                 answer=response_result.answer,
                 confidence=final_confidence,
                 metadata=metadata,
             )
-
-            # NOUVEAU: Stocker en cache après génération réussie
-            if (
-                self.cache_manager
-                and self.cache_manager.enabled
-                and cache_key
-                and result.source == RAGSource.RAG_SUCCESS
-            ):
-                try:
-                    cache_data = {
-                        "answer": result.answer,
-                        "confidence": result.confidence,
-                        "timestamp": time.time(),
-                        "metadata": {"cached_at": time.time(), "cache_version": "1.0"},
-                    }
-
-                    # Utiliser la méthode set_response du cache sémantique si disponible
-                    if hasattr(self.cache_manager, "semantic_cache"):
-                        context_hash = ""
-                        if conversation_context:
-                            import hashlib
-
-                            context_str = str(conversation_context)
-                            context_hash = hashlib.md5(
-                                context_str.encode()
-                            ).hexdigest()[:8]
-
-                        await self.cache_manager.semantic_cache.set_response(
-                            query, context_hash, result.answer, language
-                        )
-                    else:
-                        # Fallback vers cache simple
-                        import json
-
-                        await self.cache_manager.set(
-                            cache_key,
-                            json.dumps(cache_data).encode("utf-8"),
-                            ttl=3600,  # 1 heure
-                        )
-
-                    self.optimization_stats["cache_sets"] += 1
-                    logger.debug(f"Réponse mise en cache avec clé: {cache_key}")
-
-                except Exception as e:
-                    logger.warning(f"Erreur mise en cache: {e}")
-
-            METRICS.observe_latency(time.time() - start_time)
-            return result
 
         except Exception as e:
             logger.error(f"Erreur génération réponse core: {e}")
