@@ -1,14 +1,23 @@
-# -*- coding: utf-8 -*-
+p# -*- coding: utf-8 -*-
 
 """
 main.py - Intelia Expert Backend - ARCHITECTURE MODULAIRE PURE
 Point d'entrée minimaliste avec délégation complète aux modules
 VERSION CORRIGÉE: Injection des services réparée pour le cache
+DEBUG: Messages visibles pour tracer le déploiement
 """
+
+# === DEBUG DEPLOYMENT - MESSAGES VISIBLES ===
+print("=" * 80)
+print("🔥 NOUVELLE VERSION MAIN.PY CHARGÉE - DEPLOYMENT TEST 2024-09-18-16:00")
+print("🔥 VERSION: 4.0.2-services-injection-fixed-DEBUG")
+print("🔥 TIMESTAMP CHARGEMENT:", __import__('time').time())
+print("=" * 80)
 
 import os
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -27,6 +36,11 @@ load_dotenv()
 setup_logging(os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
 
+# Message de log immédiat
+logger.critical("🚨 NOUVELLE VERSION DÉTECTÉE - main.py version 4.0.2-services-injection-fixed-DEBUG")
+logger.critical("🚨 Si vous voyez ce message, la nouvelle version est chargée !")
+logger.critical("🚨 TIMESTAMP LOGGER: %s", time.time())
+
 # Services globaux (injectés dans les endpoints)
 services = {}
 
@@ -38,6 +52,11 @@ services = {}
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Gestion du cycle de vie avec injection correcte des services"""
+
+    # MESSAGE CRITIQUE AU DÉMARRAGE
+    logger.critical("🔥🔥🔥 DÉMARRAGE NOUVELLE VERSION - INJECTION SERVICES CORRIGÉE 🔥🔥🔥")
+    logger.critical("🔥🔥🔥 TIMESTAMP LIFESPAN: %s 🔥🔥🔥", time.time())
+    print("🔥🔥🔥 LIFESPAN DÉMARRÉ - NOUVELLE VERSION 🔥🔥🔥")
 
     logger.info("🚀 Démarrage Intelia Expert Backend - Architecture Modulaire")
 
@@ -135,6 +154,7 @@ async def lifespan(app: FastAPI):
             )
 
         # 6. CORRECTION CRITIQUE : Re-créer le router avec les services initialisés
+        logger.critical("🔧 INJECTION DES SERVICES - ÉTAPE CRITIQUE 🔧")
         logger.info("Mise à jour du router avec services initialisés...")
 
         # Créer le nouveau router avec les services maintenant disponibles
@@ -144,6 +164,7 @@ async def lifespan(app: FastAPI):
         app.router.routes.clear()
         app.include_router(updated_router)
 
+        logger.critical("✅ ROUTER MIS À JOUR AVEC SERVICES INJECTÉS - CORRECTION ACTIVE ✅")
         logger.info("✅ Router mis à jour avec services injectés")
 
         # 7. Application prête
@@ -162,6 +183,9 @@ async def lifespan(app: FastAPI):
             logger.info("🔶 Mode: DÉGRADÉ (services essentiels seulement)")
         else:
             logger.info("🔶 Mode: MINIMAL (fonctionnalités de base)")
+
+        logger.critical("🎉 APPLICATION NOUVELLE VERSION PRÊTE À RECEVOIR DES REQUÊTES 🎉")
+        print("🎉 APPLICATION NOUVELLE VERSION PRÊTE 🎉")
 
         yield
 
@@ -190,6 +214,7 @@ async def lifespan(app: FastAPI):
     finally:
         # Nettoyage amélioré
         logger.info("🧹 Nettoyage des ressources...")
+        logger.critical("🔥 SHUTDOWN NOUVELLE VERSION 🔥")
 
         try:
             # Cleanup des services via health monitor
@@ -243,13 +268,18 @@ async def lifespan(app: FastAPI):
 # CRÉATION DE L'APPLICATION
 # ============================================================================
 
+# MESSAGE DEBUG CRÉATION APP
+logger.critical("🏗️ CRÉATION FASTAPI APP - NOUVELLE VERSION 🏗️")
+
 # Créer l'application FastAPI
 app = FastAPI(
     title="Intelia Expert Backend",
     description="API RAG Enhanced avec LangSmith et RRF Intelligent - Architecture Modulaire Robuste",
-    version="4.0.0-modular-robust",
+    version="4.0.2-debug-deployment-test",
     lifespan=lifespan,
 )
+
+logger.critical("✅ FASTAPI APP CRÉÉE AVEC NOUVELLE VERSION ✅")
 
 # Configuration CORS
 app.add_middleware(
@@ -264,6 +294,8 @@ app.add_middleware(
 # Le vrai router avec services sera créé dans la fonction lifespan
 initial_router = create_router({})  # Router vide au démarrage
 app.include_router(initial_router)
+
+logger.critical("🔗 ROUTER INITIAL AJOUTÉ - SERA MIS À JOUR DANS LIFESPAN 🔗")
 
 # ============================================================================
 # ENDPOINTS DIRECTS (pour compatibilité et debug)
@@ -282,7 +314,7 @@ async def test_json_direct():
             "boolean": True,
             "list": [1, 2, 3],
             "dict": {"nested": "value"},
-            "timestamp": __import__("time").time(),
+            "timestamp": time.time(),
         }
 
         # Test de sérialisation
@@ -294,6 +326,7 @@ async def test_json_direct():
             "serialized_data": safe_data,
             "json_test": "OK",
             "architecture": "modular-robust",
+            "debug_version": "4.0.2-debug-deployment-test"
         }
 
     except Exception as e:
@@ -306,7 +339,7 @@ async def startup_info():
     try:
         health_monitor = services.get("health_monitor")
         if not health_monitor:
-            return {"error": "Health monitor non disponible"}
+            return {"error": "Health monitor non disponible", "debug_version": "4.0.2-debug-deployment-test"}
 
         # Récupérer les informations de validation
         validation_report = getattr(health_monitor, "validation_report", {})
@@ -327,17 +360,17 @@ async def startup_info():
                 if hasattr(health_monitor, "get_all_services")
                 else {}
             ),
-            "timestamp": __import__("time").time(),
+            "timestamp": time.time(),
+            "debug_version": "4.0.2-debug-deployment-test"
         }
 
     except Exception as e:
-        return {"error": str(e), "timestamp": __import__("time").time()}
+        return {"error": str(e), "timestamp": time.time(), "debug_version": "4.0.2-debug-deployment-test"}
 
 
 @app.get("/version")
 async def version_info():
     """Endpoint de version pour vérifier les déploiements"""
-    import time
     import importlib.util
 
     # Test d'import du cache pour diagnostic
@@ -352,9 +385,10 @@ async def version_info():
         cache_import_status = f"error: {str(e)}"
 
     return {
-        "version": "4.0.2-services-injection-fixed",
+        "message": "🔥 NOUVELLE VERSION CONFIRMÉE 🔥",
+        "version": "4.0.2-debug-deployment-test",
         "timestamp": time.time(),
-        "build_time": "2024-09-18-15:00",
+        "build_time": "2024-09-18-16:00-DEBUG",
         "corrections_deployed": True,
         "cache_import_test": cache_import_status,
         "health_monitor_available": "health_monitor" in services,
@@ -362,7 +396,20 @@ async def version_info():
         "services_list": list(services.keys()),
         "python_working_dir": os.getcwd(),
         "app_status": "running",
-        "router_injection": "fixed",
+        "router_injection": "fixed-debug",
+        "deployment_confirmed": "SI VOUS VOYEZ CE MESSAGE, LA NOUVELLE VERSION TOURNE!"
+    }
+
+
+@app.get("/deployment-test")
+async def deployment_test():
+    """Endpoint de test simple pour confirmer le déploiement"""
+    return {
+        "message": "🎉 NOUVELLE VERSION DÉPLOYÉE AVEC SUCCÈS! 🎉",
+        "version": "4.0.2-debug-deployment-test",
+        "timestamp": time.time(),
+        "confirmation": "Si vous voyez ce message, la nouvelle version tourne bien",
+        "endpoints_available": ["/version", "/startup-info", "/test-json", "/deployment-test"]
     }
 
 
@@ -376,9 +423,11 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
     host = os.getenv("HOST", "0.0.0.0")
 
+    logger.critical("🚀 DÉMARRAGE SERVEUR NOUVELLE VERSION SUR %s:%s", host, port)
     logger.info(f"🚀 Démarrage serveur sur {host}:{port}")
     logger.info("🔧 Architecture modulaire robuste activée")
     logger.info("🛡️ Mode dégradé supporté pour cache/Redis")
     logger.info("🔧 Injection des services corrigée")
+    logger.critical("🔥 VERSION DEBUG: 4.0.2-debug-deployment-test 🔥")
 
     uvicorn.run("main:app", host=host, port=port, reload=False, log_level="info")
