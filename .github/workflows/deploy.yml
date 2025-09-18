@@ -58,7 +58,8 @@ jobs:
           push: true
           tags: |
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:latest
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:${{ github.sha }}
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:${{ github.sha }}com/${{ secrets.DOCR_NAME }}/intelia-frontend:${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache,mode=max
           platforms: linux/amd64
@@ -94,6 +95,7 @@ jobs:
           push: true
           tags: |
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:latest
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache,mode=max
@@ -125,6 +127,7 @@ jobs:
           push: true
           tags: |
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:latest
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache,mode=max
@@ -143,53 +146,18 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      # Diagnostic complet avant déploiement
-      - name: Debug App Platform configuration
+      # Vérification que les tags 'main' sont bien pushés
+      - name: Verify main tags availability
         run: |
-          echo "🔍 Diagnostic de la configuration App Platform..."
+          echo "🔍 Vérification des tags 'main' dans le registry..."
           
-          # Récupérer la spec actuelle de l'app
-          echo "📋 Récupération de la spec actuelle..."
-          doctl apps spec get ${{ secrets.DO_APP_ID }} > current-app-spec.yaml
-          
-          echo "📝 Configuration actuelle de l'app:"
-          cat current-app-spec.yaml
-          
-          echo ""
-          echo "🔍 Images configurées dans App Platform:"
-          # Extraire les images de la spec
-          grep -A 2 -B 2 "image:" current-app-spec.yaml || echo "Aucune image trouvée dans la spec"
-          
-          echo ""
-          echo "📦 Images disponibles dans le registry:"
-          
-          # Lister toutes les images du registry
-          echo "Backend images:"
-          doctl registry repository list-manifests intelia-backend --format Tag,Digest | head -5
-          echo ""
-          echo "Frontend images:"
-          doctl registry repository list-manifests intelia-frontend --format Tag,Digest | head -5
-          echo ""
-          echo "LLM images:"
-          doctl registry repository list-manifests intelia-llm --format Tag,Digest | head -5
-
-      # Vérification de la disponibilité des images avant déploiement
-      - name: Verify images availability
-        run: |
-          echo "🔍 Vérification des images dans le registry..."
-          
-          # Vérifier les tags latest spécifiquement
           for repo in intelia-backend intelia-frontend intelia-llm; do
-            echo "Vérification de $repo..."
-            if doctl registry repository list-manifests $repo --format Tag | grep -q "latest"; then
-              echo "✅ $repo:latest trouvée"
-              # Obtenir le digest de l'image latest
-              digest=$(doctl registry repository list-manifests $repo --format Tag,Digest | grep "latest" | awk '{print $2}' | head -1)
-              echo "   Digest: $digest"
+            echo "Vérification de $repo:main..."
+            if doctl registry repository list-manifests $repo --format Tag | grep -q "main"; then
+              echo "✅ $repo:main trouvée"
             else
-              echo "❌ $repo:latest introuvable"
-              echo "📋 Tags disponibles pour $repo:"
-              doctl registry repository list-manifests $repo --format Tag | head -5
+              echo "❌ $repo:main introuvable - le déploiement va échouer"
+              exit 1
             fi
           done
 
