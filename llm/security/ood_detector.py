@@ -383,27 +383,36 @@ class MultilingualOODDetector:
         self, query: str, intent_result=None, language: str = "fr"
     ) -> Tuple[bool, float, Dict[str, float]]:
         """
-        CORRECTION PRINCIPALE: Version synchrone qui évite les conflits d'event loop
-        Utilise un executor séparé au lieu de créer de nouveaux loops
+        CORRECTION FINALE: Logique optimisée pour chaque type de langue
         """
         try:
-            # CORRECTION CRITIQUE: Détecter si on est dans un contexte async
-            try:
-                asyncio.get_running_loop()
-                # Si on est déjà dans un event loop, utiliser la version entièrement synchrone
-                logger.debug(
-                    "Event loop détecté, utilisation fallback synchrone direct"
+            # NOUVEAU: Stratégie par langue au lieu de détection d'event loop
+            if language in ["fr", "en"]:
+                # Langues principales - traitement direct synchrone optimisé
+                return self._calculate_ood_score_direct_sync(
+                    query, intent_result, language
                 )
+
+            elif language in ["es", "de", "it", "pt", "nl", "pl", "id"]:
+                # Langues européennes/latines - traitement hybride
+                try:
+                    return asyncio.run(
+                        self._calculate_ood_score_async(query, intent_result, language)
+                    )
+                except Exception as e:
+                    logger.debug(f"Async échoué pour {language}: {e}, fallback sync")
+                    return self._calculate_ood_score_direct_sync(
+                        query, intent_result, language
+                    )
+
+            else:
+                # Langues non-latines (hi, zh, th) - fallback direct pour éviter les problèmes
                 return self._calculate_ood_score_fallback_sync(
                     query, intent_result, language
                 )
-            except RuntimeError:
-                # Pas d'event loop en cours, on peut utiliser asyncio.run
-                return asyncio.run(
-                    self._calculate_ood_score_async(query, intent_result, language)
-                )
+
         except Exception as e:
-            logger.warning(f"Erreur calcul OOD async: {e}, fallback synchrone")
+            logger.warning(f"Erreur calcul OOD pour {language}: {e}, fallback général")
             return self._calculate_ood_score_fallback_sync(
                 query, intent_result, language
             )
@@ -544,6 +553,60 @@ class MultilingualOODDetector:
         }
 
         return is_in_domain, boosted_score, score_details
+
+    def _calculate_ood_score_direct_sync(
+        self, query: str, intent_result=None, language: str = "fr"
+    ) -> Tuple[bool, float, Dict[str, float]]:
+        """NOUVELLE: Version synchrone directe optimisée pour fr/en"""
+        normalized_query = self._normalize_query_preserve_script(query, language)
+        words = normalized_query.split()
+
+        if not words:
+            return False, 0.0, {"error": "empty_query"}
+
+        # Traitement synchrone optimisé
+        context_analysis = self._analyze_query_context_sync(
+            normalized_query, words, intent_result
+        )
+        domain_analysis = self._calculate_domain_relevance_sync(words, context_analysis)
+        blocked_analysis = self._detect_blocked_terms_sync(normalized_query, words)
+
+        boosted_score = self._apply_context_boosters_sync(
+            domain_analysis.final_score, context_analysis, intent_result
+        )
+
+        base_threshold = self._select_adaptive_threshold_sync(
+            context_analysis, domain_analysis
+        )
+        adjusted_threshold = base_threshold * self.language_adjustments.get(
+            language, 1.0
+        )
+
+        is_in_domain = (
+            boosted_score > adjusted_threshold and not blocked_analysis["is_blocked"]
+        )
+
+        # Log optimisé
+        logger.debug(
+            f"OOD Direct [{language}]: '{query[:40]}...' | Score: {boosted_score:.3f} vs {adjusted_threshold:.3f} | {'ACCEPTÉ' if is_in_domain else 'REJETÉ'}"
+        )
+
+        self._update_ood_metrics(domain_analysis, adjusted_threshold, is_in_domain)
+
+        return (
+            is_in_domain,
+            boosted_score,
+            {
+                "vocab_score": domain_analysis.final_score,
+                "boosted_score": boosted_score,
+                "threshold_used": adjusted_threshold,
+                "language": language,
+                "method": "direct_sync_optimized",
+                "domain_words_found": len(domain_analysis.domain_words),
+                "relevance_level": domain_analysis.relevance_level.value,
+                "reasoning": domain_analysis.reasoning,
+            },
+        )
 
     async def _calculate_ood_score_multilingual_async(
         self, query: str, intent_result=None, language: str = "hi"
