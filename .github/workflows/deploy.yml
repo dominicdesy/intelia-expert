@@ -1,7 +1,4 @@
-- name: Simple cleanup - Keep 8 most recent images
-        shell: bash
-        run: |
-          KEEP_IMAGES=8name: Smart Selective Build and Deploy
+name: Smart Selective Build and Deploy
 
 on:
   push:
@@ -18,7 +15,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Detecter les changements
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -47,7 +43,6 @@ jobs:
           echo "Backend changed: ${{ steps.changes.outputs.backend }}"
           echo "LLM changed: ${{ steps.changes.outputs.llm }}"
 
-  # Build Frontend - SEULEMENT si change
   build-frontend:
     runs-on: ubuntu-latest
     needs: detect-changes
@@ -81,7 +76,6 @@ jobs:
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
             BUILDKIT_INLINE_CACHE=1
 
-  # Build Backend - SEULEMENT si change  
   build-backend:
     runs-on: ubuntu-latest
     needs: detect-changes
@@ -112,7 +106,6 @@ jobs:
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache,mode=max
           build-args: BUILDKIT_INLINE_CACHE=1
 
-  # Build LLM - SEULEMENT si change
   build-llm:
     runs-on: ubuntu-latest
     needs: detect-changes
@@ -143,7 +136,6 @@ jobs:
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache,mode=max
           build-args: BUILDKIT_INLINE_CACHE=1
 
-  # Deploy - SEULEMENT si au moins un service a ete build
   deploy:
     name: Deploy to DigitalOcean App Platform
     runs-on: ubuntu-latest
@@ -199,7 +191,6 @@ jobs:
           doctl apps get-deployment ${{ secrets.DO_APP_ID }} $DEPLOYMENT_ID || true
           exit 1
 
-  # Nettoyage automatique
   cleanup:
     name: Cleanup old DOCR images
     runs-on: ubuntu-latest
@@ -219,8 +210,6 @@ jobs:
       - name: Simple cleanup - Keep 8 most recent images
         shell: bash
         run: |
-          # Retirer set -e pour eviter echec complet du script
-          
           KEEP_IMAGES=8
           REPOSITORIES=("intelia-frontend" "intelia-backend" "intelia-llm")
           
@@ -231,22 +220,17 @@ jobs:
             echo "Traitement de $repo..."
             
             echo "Recuperation de la liste des images..."
-            # Utiliser directement JSON pour eviter les problemes de parsing
             if ! doctl registry repository list-tags "$repo" --output json > "/tmp/${repo}.json" 2>/dev/null; then
               echo "Repository $repo introuvable"
               continue
             fi
             
-            # DEBUG: Voir ce qu'on a recupere
             echo "DEBUG - Contenu JSON:"
             head -10 "/tmp/${repo}.json"
             
-            # Extraire tag et updated_at du JSON de maniere propre
             if command -v jq >/dev/null 2>&1; then
-              # Avec jq si disponible
               cat "/tmp/${repo}.json" | jq -r '.[] | "\(.tag) \(.updated_at)"' > "/tmp/${repo}_clean.txt" 2>/dev/null
             else
-              # Sans jq, parsing manuel basique
               echo "jq non disponible, utilisation parsing manuel"
               grep -o '"tag":"[^"]*"' "/tmp/${repo}.json" | cut -d'"' -f4 > "/tmp/${repo}_tags_only.txt"
               grep -o '"updated_at":"[^"]*"' "/tmp/${repo}.json" | cut -d'"' -f4 > "/tmp/${repo}_dates_only.txt"
@@ -258,7 +242,6 @@ jobs:
             
             echo "Total des images valides: $total_images"
             
-            # DEBUG: Montrer les premieres lignes nettoyees
             echo "DEBUG - Premiers tags nettoyes:"
             head -5 "/tmp/${repo}_clean.txt"
             
@@ -267,8 +250,6 @@ jobs:
               continue
             fi
             
-            # Trier par date (colonne 2) et prendre les plus anciens
-            # MAIS proteger les tags importants
             PROTECTED_TAGS="latest|main|buildcache|prod|stable"
             
             sort -k2,2 "/tmp/${repo}_clean.txt" | \
@@ -295,10 +276,8 @@ jobs:
             failed=0
             
             while IFS= read -r tag; do
-              # Nettoyer et valider le tag
               tag=$(echo "$tag" | tr -d '\r\n' | xargs)
               
-              # Ignorer les tags invalides
               if [ -z "$tag" ] || [ "$tag" = "Tag" ] || [ "$tag" = "tag" ] || [ "$tag" = "null" ]; then
                 echo "Tag invalide ignore: '$tag'"
                 continue
@@ -308,7 +287,6 @@ jobs:
               
               success=false
               for attempt in {1..3}; do
-                # Suppression avec flags corrects selon la documentation
                 if doctl registry repository delete-tag "$repo" "$tag" --force --interactive=false 2>/dev/null; then
                   echo "   Supprime avec succes"
                   ((deleted++))
@@ -316,7 +294,6 @@ jobs:
                   break
                 else
                   echo "   Echec tentative $attempt - erreur:"
-                  # Afficher l'erreur pour diagnostic
                   doctl registry repository delete-tag "$repo" "$tag" --force --interactive=false 2>&1 || true
                   sleep 2
                 fi
@@ -336,14 +313,12 @@ jobs:
             echo "   Echecs: $failed"
             echo "   Images restantes: ~$((total_images - deleted))"
             
-            # Ne pas faire echouer le script si quelques suppressions ont echoue
             if [ "$failed" -gt 0 ] && [ "$deleted" -eq 0 ]; then
               echo "   ATTENTION: Aucune suppression reussie pour $repo"
             elif [ "$failed" -gt 0 ]; then
               echo "   INFO: Quelques echecs, mais $deleted suppressions reussies"
             fi
             
-            # Nettoyage des fichiers temporaires
             rm -f "/tmp/${repo}"_*.txt "/tmp/${repo}.json"
             
             echo "Traitement termine pour $repo"
@@ -355,8 +330,6 @@ jobs:
       - name: Cleanup orphaned manifests
         shell: bash
         run: |
-          # Ne pas utiliser set -e pour eviter echec du job
-          
           REPOSITORIES=("intelia-frontend" "intelia-backend" "intelia-llm")
           
           echo ""
@@ -430,7 +403,6 @@ jobs:
           echo ""
           echo "Nettoyage complet termine!"
 
-  # Resume
   summary:
     runs-on: ubuntu-latest
     needs: [detect-changes, build-frontend, build-backend, build-llm, deploy, cleanup]
@@ -441,7 +413,6 @@ jobs:
           echo "DEPLOYMENT SUMMARY"
           echo "=================="
           
-          # Frontend
           if [[ "${{ needs.detect-changes.outputs.frontend-changed }}" == "true" ]]; then
             if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
               echo "Frontend: DEPLOYED"
@@ -452,7 +423,6 @@ jobs:
             echo "Frontend: SKIPPED (no changes)"
           fi
           
-          # Backend  
           if [[ "${{ needs.detect-changes.outputs.backend-changed }}" == "true" ]]; then
             if [[ "${{ needs.build-backend.result }}" == "success" ]]; then
               echo "Backend: DEPLOYED"
@@ -463,7 +433,6 @@ jobs:
             echo "Backend: SKIPPED (no changes)"
           fi
           
-          # LLM
           if [[ "${{ needs.detect-changes.outputs.llm-changed }}" == "true" ]]; then
             if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
               echo "LLM: DEPLOYED"
