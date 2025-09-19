@@ -140,10 +140,10 @@ class MultilingualOODDetector:
         return fallback_terms
 
     def _build_domain_vocabulary(self) -> Dict[DomainRelevance, Set[str]]:
-        """Construit un vocabulaire hiérarchisé du domaine avicole"""
+        """Construit un vocabulaire hiérarchisé du domaine avicole multilingue"""
         return {
             DomainRelevance.HIGH: {
-                # Termes hautement spécifiques à l'aviculture
+                # Termes hautement spécifiques à l'aviculture - ÉTENDU MULTILINGUE
                 "fcr",
                 "ic",
                 "indice",
@@ -198,9 +198,58 @@ class MultilingualOODDetector:
                 "carcass",
                 "rendement",
                 "yield",
+                # NOUVEAU: Termes Hindi (हिन्दी)
+                "मुर्गी",
+                "चिकन",
+                "कॉब",
+                "रॉस",
+                "अंडा",
+                "अंडे",
+                "मुर्गा",
+                "मुर्गियाँ",
+                "ब्रॉयलर",
+                "लेयर",
+                "चूजा",
+                "चूजे",
+                "हैचरी",
+                "टीकाकरण",
+                "मांस",
+                "वध",
+                # NOUVEAU: Termes Chinois (中文)
+                "鸡",
+                "鸡肉",
+                "肉鸡",
+                "蛋鸡",
+                "科宝",
+                "罗斯",
+                "哈伯德",
+                "鸡蛋",
+                "蛋",
+                "孵化场",
+                "孵化",
+                "疫苗",
+                "接种",
+                "屠宰",
+                "肉质",
+                "产蛋",
+                "饲料转化率",
+                # NOUVEAU: Termes Thaï (ไทย)
+                "ไก่",
+                "เนื้อไก่",
+                "ไก่เนื้อ",
+                "ไก่ไข่",
+                "คอบบ์",
+                "รอสส์",
+                "ไข่",
+                "ไข่ไก่",
+                "โรงฟัก",
+                "การฟัก",
+                "วัคซีน",
+                "การฉีดวัคซีน",
+                "เชื้อโรค",
             },
             DomainRelevance.MEDIUM: {
-                # Termes liés à l'élevage et la nutrition animale
+                # Termes liés à l'élevage et la nutrition animale - ÉTENDU MULTILINGUE
                 "élevage",
                 "éleveur",
                 "farm",
@@ -265,9 +314,103 @@ class MultilingualOODDetector:
                 "espace",
                 "space",
                 "surface",
+                # NOUVEAU: Termes Hindi moyens
+                "पालन",
+                "किसान",
+                "खेत",
+                "आहार",
+                "भोजन",
+                "खाना",
+                "पोषण",
+                "प्रोटीन",
+                "ऊर्जा",
+                "कैलोरी",
+                "विटामिन",
+                "खनिज",
+                "विकास",
+                "वृद्धि",
+                "वजन",
+                "भार",
+                "किलो",
+                "ग्राम",
+                "स्वास्थ्य",
+                "बीमारी",
+                "उपचार",
+                "इलाज",
+                "पशु चिकित्सक",
+                "घर",
+                "इमारत",
+                "तापमान",
+                "हवा",
+                "रोशनी",
+                "घनत्व",
+                "जगह",
+                "क्षेत्र",
+                # NOUVEAU: Termes Chinois moyens
+                "养殖",
+                "农民",
+                "农场",
+                "饲料",
+                "喂食",
+                "营养",
+                "蛋白质",
+                "能量",
+                "卡路里",
+                "维生素",
+                "矿物质",
+                "钙",
+                "磷",
+                "生长",
+                "发育",
+                "体重",
+                "重量",
+                "克",
+                "公斤",
+                "性能",
+                "生产力",
+                "效率",
+                "健康",
+                "疾病",
+                "病理",
+                "兽医",
+                "治疗",
+                "住房",
+                "建筑",
+                "鸡舍",
+                "温度",
+                "通风",
+                "照明",
+                "密度",
+                "空间",
+                "表面",
+                # NOUVEAU: Termes Thaï moyens
+                "การเลี้ยง",
+                "เกษตรกร",
+                "ฟาร์ม",
+                "อาหาร",
+                "การให้อาหาร",
+                "โภชนาการ",
+                "โปรตีน",
+                "พลังงาน",
+                "แคลอรี",
+                "วิตามิน",
+                "แร่ธาตุ",
+                "การเจริญเติบโต",
+                "น้ำหนัก",
+                "กิโลกรัม",
+                "กรัม",
+                "สุขภาพ",
+                "โรค",
+                "การรักษา",
+                "สัตวแพทย์",
+                "เรือนเลี้ยง",
+                "อาคาร",
+                "อุณหภูมิ",
+                "การระบายอากาศ",
+                "แสงสว่าง",
             },
             DomainRelevance.LOW: {
-                # Termes agricoles généraux
+                # Termes agricoles généraux - ÉTENDU MULTILINGUE
                 "agriculture",
                 "agricultural",
                 "rural",
@@ -310,9 +453,74 @@ class MultilingualOODDetector:
                 "norme",
                 "standard",
                 "label",
+                # NOUVEAU: Termes Hindi généraux
+                "कृषि",
+                "ग्रामीण",
+                "गांव",
+                "जानवर",
+                "पशु",
+                "मवेशी",
+                "उत्पादन",
+                "उत्पादक",
+                "गुणवत्ता",
+                "सुरक्षा",
+                "स्वच्छता",
+                "आर्थिक",
+                "लागत",
+                "कीमत",
+                "बाजार",
+                "बिक्री",
+                "व्यावसायिक",
+                "पर्यावरण",
+                "टिकाऊ",
+                "जैविक",
+                "प्राकृतिक",
+                # NOUVEAU: Termes Chinois généraux
+                "农业",
+                "农村",
+                "动物",
+                "牲畜",
+                "生产",
+                "生产者",
+                "质量",
+                "安全",
+                "卫生",
+                "经济",
+                "成本",
+                "价格",
+                "市场",
+                "销售",
+                "商业",
+                "环境",
+                "可持续",
+                "有机",
+                "天然",
+                "法规",
+                "标准",
+                "标签",
+                # NOUVEAU: Termes Thaï généraux
+                "เกษตรกรรม",
+                "ชนบท",
+                "สัตว์",
+                "ปศุสัตว์",
+                "การผลิต",
+                "ผู้ผลิต",
+                "คุณภาพ",
+                "ความปลอดภัย",
+                "สุขอนามัย",
+                "เศรษฐกิจ",
+                "ต้นทุน",
+                "ราคา",
+                "ตลาด",
+                "การขาย",
+                "เชิงพาณิชย์",
+                "สิ่งแวดล้อม",
+                "ยั่งยืน",
+                "อินทรีย์",
+                "ธรรมชาติ",
             },
             DomainRelevance.GENERIC: {
-                # Mots-outils et termes génériques
+                # Mots-outils et termes génériques multilingues
                 "comment",
                 "how",
                 "quoi",
@@ -363,6 +571,82 @@ class MultilingualOODDetector:
                 "system",
                 "processus",
                 "process",
+                # NOUVEAU: Mots-outils Hindi
+                "कैसे",
+                "क्या",
+                "क्यों",
+                "कब",
+                "कहाँ",
+                "कितना",
+                "कौन",
+                "कौन सा",
+                "बेहतर",
+                "अच्छा",
+                "आदर्श",
+                "सुझाव",
+                "समस्या",
+                "समाधान",
+                "मदद",
+                "जानकारी",
+                "डेटा",
+                "अध्ययन",
+                "उदाहरण",
+                "मामला",
+                "स्थिति",
+                "तरीका",
+                "तकनीक",
+                "प्रौद्योगिकी",
+                # NOUVEAU: Mots-outils Chinois
+                "如何",
+                "怎么",
+                "什么",
+                "为什么",
+                "什么时候",
+                "哪里",
+                "多少",
+                "哪个",
+                "谁",
+                "最好",
+                "理想",
+                "推荐",
+                "建议",
+                "问题",
+                "解决方案",
+                "帮助",
+                "信息",
+                "数据",
+                "研究",
+                "例子",
+                "案例",
+                "情况",
+                "方法",
+                "技术",
+                "技术",
+                "系统",
+                "过程",
+                # NOUVEAU: Mots-outils Thaï
+                "อย่างไร",
+                "อะไร",
+                "ทำไม",
+                "เมื่อไหร่",
+                "ที่ไหน",
+                "เท่าไหร่",
+                "ใคร",
+                "ไหน",
+                "ดีที่สุด",
+                "เหมาะสม",
+                "แนะนำ",
+                "คำแนะนำ",
+                "ปัญหา",
+                "วิธีแก้ไข",
+                "ช่วยเหลือ",
+                "ข้อมูล",
+                "การศึกษา",
+                "ตัวอย่าง",
+                "กรณี",
+                "สถานการณ์",
+                "วิธี",
+                "เทคนิค",
             },
         }
 
@@ -707,25 +991,108 @@ class MultilingualOODDetector:
         return self._simple_translation_fallback(query, source_lang)
 
     def _simple_translation_fallback(self, query: str, source_lang: str) -> str:
-        """Traduction basique par patterns pour les cas d'urgence"""
+        """Traduction basique par patterns pour les cas d'urgence - ÉTENDUE MULTILINGUE"""
         basic_translations = {
             "hi": {
+                # ÉTENDU: Dictionnaire Hindi complet
                 "मुर्गी": "poulet",
                 "चिकन": "poulet",
+                "कॉब": "cobb",
+                "रॉस": "ross",
                 "वजन": "poids",
+                "भार": "poids",
                 "दिन": "jour",
+                "दिनों": "jours",
                 "नर": "mâle",
                 "मादा": "femelle",
                 "भोजन": "aliment",
+                "आहार": "alimentation",
+                "अंडा": "œuf",
+                "अंडे": "œufs",
+                "मुर्गा": "coq",
+                "चूजा": "poussin",
+                "चूजे": "poussins",
+                "पालन": "élevage",
+                "किसान": "fermier",
+                "खेत": "ferme",
+                "स्वास्थ्य": "santé",
+                "बीमारी": "maladie",
+                "विकास": "croissance",
+                "प्रदर्शन": "performance",
+                "ग्राम": "gramme",
+                "किलो": "kilo",
+                "किलोग्राम": "kilogramme",
+                "सप्ताह": "semaine",
+                "महीना": "mois",
+                "साल": "année",
+                "वर्ष": "année",
             },
             "zh": {
+                # ÉTENDU: Dictionnaire Chinois complet
                 "鸡": "poulet",
+                "鸡肉": "poulet",
+                "肉鸡": "poulet de chair",
+                "蛋鸡": "pondeuse",
+                "科宝": "cobb",
+                "罗斯": "ross",
+                "哈伯德": "hubbard",
                 "体重": "poids",
                 "重量": "poids",
+                "重": "poids",
                 "天": "jour",
+                "日": "jour",
                 "公": "mâle",
                 "母": "femelle",
+                "雄": "mâle",
+                "雌": "femelle",
                 "饲料": "aliment",
+                "喂食": "alimentation",
+                "营养": "nutrition",
+                "蛋": "œuf",
+                "鸡蛋": "œuf",
+                "孵化": "éclosion",
+                "生长": "croissance",
+                "发育": "développement",
+                "性能": "performance",
+                "健康": "santé",
+                "疾病": "maladie",
+                "克": "gramme",
+                "公斤": "kilogramme",
+                "周": "semaine",
+                "月": "mois",
+                "年": "année",
+                "养殖": "élevage",
+                "农场": "ferme",
+                "农民": "fermier",
+            },
+            "th": {
+                # ÉTENDU: Dictionnaire Thaï complet
+                "ไก่": "poulet",
+                "เนื้อไก่": "poulet",
+                "ไก่เนื้อ": "poulet de chair",
+                "ไก่ไข่": "pondeuse",
+                "คอบบ์": "cobb",
+                "รอสส์": "ross",
+                "น้ำหนัก": "poids",
+                "วัน": "jour",
+                "ตัวผู้": "mâle",
+                "ตัวเมีย": "femelle",
+                "อาหาร": "aliment",
+                "การให้อาหาร": "alimentation",
+                "โภชนาการ": "nutrition",
+                "ไข่": "œuf",
+                "ไข่ไก่": "œuf de poule",
+                "การเจริญเติบโต": "croissance",
+                "สุขภาพ": "santé",
+                "โรค": "maladie",
+                "กรัม": "gramme",
+                "กิโลกรัม": "kilogramme",
+                "สัปดาห์": "semaine",
+                "เดือน": "mois",
+                "ปี": "année",
+                "การเลี้ยง": "élevage",
+                "ฟาร์ม": "ferme",
+                "เกษตรกร": "fermier",
             },
             "en": {
                 "chicken": "poulet",
@@ -735,6 +1102,43 @@ class MultilingualOODDetector:
                 "day": "jour",
                 "male": "mâle",
                 "female": "femelle",
+                "broiler": "poulet de chair",
+                "layer": "pondeuse",
+                "chick": "poussin",
+            },
+            "es": {
+                "pollo": "poulet",
+                "peso": "poids",
+                "días": "jours",
+                "día": "jour",
+                "macho": "mâle",
+                "hembra": "femelle",
+                "pollito": "poussin",
+            },
+            "de": {
+                "huhn": "poulet",
+                "hähnchen": "poulet",
+                "gewicht": "poids",
+                "tage": "jours",
+                "tag": "jour",
+                "männlich": "mâle",
+                "weiblich": "femelle",
+            },
+            "it": {
+                "pollo": "poulet",
+                "peso": "poids",
+                "giorni": "jours",
+                "giorno": "jour",
+                "maschio": "mâle",
+                "femmina": "femelle",
+            },
+            "pt": {
+                "frango": "poulet",
+                "peso": "poids",
+                "dias": "jours",
+                "dia": "jour",
+                "macho": "mâle",
+                "fêmea": "femelle",
             },
         }
 
@@ -748,44 +1152,130 @@ class MultilingualOODDetector:
                     flags=re.IGNORECASE,
                 )
 
+        # Préserver les termes techniques universels (nombres, marques)
+        technical_terms = ["cobb", "ross", "hubbard", "isa", "fcr", "500", "308", "708"]
+        for term in technical_terms:
+            if term in query.lower():
+                translated = translated.replace(term, term)
+
+        # Si la traduction a changé significativement, log pour diagnostic
+        if translated != query.lower():
+            logger.debug(
+                f"Traduction fallback [{source_lang}->fr]: '{query[:30]}' -> '{translated[:30]}'"
+            )
+
         return translated
 
-    async def _fallback_analysis_async(
-        self, query: str, language: str
+    def _calculate_ood_score_fallback_sync(
+        self, query: str, intent_result=None, language: str = "fr"
     ) -> Tuple[bool, float, Dict]:
-        """Analyse de secours sans traduction pour cas d'urgence"""
-        # Recherche de termes techniques universels
-        universal_terms = ["cobb", "ross", "hubbard", "isa", "fcr", "308", "500"]
+        """
+        CORRECTION MULTILINGUE: Analyse de secours optimisée pour Hindi et Chinois
+        """
+        # Recherche de termes techniques universels (marchent dans toutes les langues)
+        universal_terms = [
+            "cobb",
+            "ross",
+            "hubbard",
+            "isa",
+            "fcr",
+            "308",
+            "500",
+            "308",
+            "708",
+        ]
         found_universal = sum(
             1 for term in universal_terms if term.lower() in query.lower()
         )
 
-        # Recherche de nombres
+        # Recherche de nombres (indicateurs de spécificité technique)
         numbers = re.findall(r"\d+", query)
 
-        # Recherche de patterns aviculture
-        poultry_patterns = [
-            r"\d+\s*(?:g|kg|gram|kilogram)",
-            r"\d+\s*(?:day|jour|dia|tag|giorno|วัน|天|दिन)",
-            r"\d+\s*%",
+        # NOUVEAU: Patterns aviculture étendus pour scripts non-latins
+        enhanced_patterns = [
+            r"\d+\s*(?:g|kg|gram|kilogram|克|公斤)",  # Poids (+ chinois)
+            r"\d+\s*(?:day|jour|dia|tag|giorno|วัน|天|दिन|hari)",  # Âge (multilingue)
+            r"\d+\s*%",  # Pourcentages universels
+            # NOUVEAU: Termes aviculture en Hindi
+            r"(?:मुर्गी|चिकन|कॉब|रॉस)",  # Poulet, Cobb, Ross en Hindi
+            r"(?:वजन|भार)",  # Poids en Hindi
+            r"(?:दिन|दिनों)",  # Jour(s) en Hindi
+            r"(?:नर|मादा)",  # Mâle/femelle en Hindi
+            # NOUVEAU: Termes aviculture en Chinois
+            r"(?:鸡|鸡肉|肉鸡|蛋鸡)",  # Poulet en chinois
+            r"(?:体重|重量|重)",  # Poids en chinois
+            r"(?:天|日)",  # Jour en chinois
+            r"(?:公|母|雄|雌)",  # Mâle/femelle en chinois
+            r"(?:科宝|罗斯)",  # Cobb/Ross en chinois
         ]
+
         pattern_matches = sum(
             1
-            for pattern in poultry_patterns
+            for pattern in enhanced_patterns
             if re.search(pattern, query, re.IGNORECASE)
         )
 
-        # Score basique avec bonus pour termes techniques
+        # NOUVEAU: Bonus spécifique pour langues asiatiques
+        asian_language_bonus = 0.0
+        if language in ["hi", "zh", "th"]:
+            # Détecter si la requête contient des termes d'aviculture dans ces langues
+            hindi_poultry_terms = ["मुर्गी", "चिकन", "कॉब", "वजन", "दिन", "नर", "मादा"]
+            chinese_poultry_terms = [
+                "鸡",
+                "体重",
+                "重量",
+                "天",
+                "公",
+                "母",
+                "科宝",
+                "罗斯",
+            ]
+            thai_poultry_terms = ["ไก่", "น้ำหนัก", "วัน", "ตัวผู้", "ตัวเมีย"]
+
+            if language == "hi":
+                asian_terms_found = sum(
+                    1 for term in hindi_poultry_terms if term in query
+                )
+            elif language == "zh":
+                asian_terms_found = sum(
+                    1 for term in chinese_poultry_terms if term in query
+                )
+            elif language == "th":
+                asian_terms_found = sum(
+                    1 for term in thai_poultry_terms if term in query
+                )
+            else:
+                asian_terms_found = 0
+
+            if asian_terms_found >= 1:
+                asian_language_bonus = 0.3  # Bonus significatif
+            elif pattern_matches >= 1:
+                asian_language_bonus = 0.2  # Bonus pour patterns numériques
+
+        # Score basique avec bonus pour termes techniques et langues asiatiques
         base_score = (
-            (found_universal * 0.4) + (len(numbers) * 0.1) + (pattern_matches * 0.2)
+            (found_universal * 0.4)
+            + (len(numbers) * 0.1)
+            + (pattern_matches * 0.15)
+            + asian_language_bonus
         )
 
-        # Seuil très permissif pour éviter de bloquer des questions légitimes
-        fallback_threshold = 0.08
+        # CORRECTION CRITIQUE: Seuils adaptatifs par langue
+        if language in ["hi", "zh", "th"]:
+            # Seuil très permissif pour éviter de bloquer des questions légitimes en langues asiatiques
+            fallback_threshold = 0.05  # Très bas
+        else:
+            fallback_threshold = 0.08  # Standard
+
         is_in_domain = base_score > fallback_threshold or found_universal > 0
 
+        # Log détaillé pour diagnostic
         logger.info(
-            f"OOD Fallback [{language}]: '{query[:40]}...' | Score: {base_score:.3f} | Termes techniques: {found_universal} | Patterns: {pattern_matches} | Décision: {'ACCEPTÉ' if is_in_domain else 'REJETÉ'}"
+            f"OOD Fallback [{language}]: '{query[:40]}...' | "
+            f"Score: {base_score:.3f} vs {fallback_threshold:.3f} | "
+            f"Universels: {found_universal} | Patterns: {pattern_matches} | "
+            f"Bonus asiatique: {asian_language_bonus:.3f} | "
+            f"Décision: {'ACCEPTÉ' if is_in_domain else 'REJETÉ'}"
         )
 
         return (
@@ -797,9 +1287,10 @@ class MultilingualOODDetector:
                 "universal_terms_found": found_universal,
                 "numbers_found": len(numbers),
                 "poultry_patterns": pattern_matches,
+                "asian_language_bonus": asian_language_bonus,
                 "threshold": fallback_threshold,
-                "reasoning": f"Fallback analysis - {found_universal} universal terms, {pattern_matches} patterns",
-                "translation_failed": True,
+                "reasoning": f"Fallback analysis - {found_universal} universels, {pattern_matches} patterns, bonus asiatique {asian_language_bonus:.3f}",
+                "enhanced_multilingue": True,
             },
         )
 
