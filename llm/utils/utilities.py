@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 utilities.py - Fonctions utilitaires multilingues
-Version 2.1 avec CORRECTION SÉRIALISATION JSON pour LanguageDetectionResult
-CORRECTION CRITIQUE: Sérialisation dataclass + validate_intent_result manquant
+Version 2.2 - CORRECTION CRITIQUE: Export FAST_LANGDETECT_AVAILABLE
+CORRECTION: Respect PEP 8 avec imports en haut + gestion conditionnelle
 """
 
 import os
@@ -17,7 +17,24 @@ from pathlib import Path
 from dataclasses import dataclass
 from enum import Enum
 
-# Imports configuration multilingue
+# Imports conditionnels pour détection de langue
+try:
+    import fasttext
+except ImportError:
+    fasttext = None
+
+try:
+    from fastlangdetect import detect, LangDetectException
+except ImportError:
+    detect = None
+    LangDetectException = Exception
+
+try:
+    from unidecode import unidecode
+except ImportError:
+    unidecode = None
+
+# Imports configuration
 from config.config import (
     SUPPORTED_LANGUAGES,
     DEFAULT_LANGUAGE,
@@ -25,45 +42,30 @@ from config.config import (
     LANG_DETECTION_MIN_LENGTH,
     LANG_DETECTION_CONFIDENCE_THRESHOLD,
     FASTTEXT_MODEL_PATH,
-    # SUPPRIMÉ: FRENCH_HINTS, ENGLISH_HINTS, FRENCH_CHARS (remplacé par service traduction)
 )
 
-# Import service traduction (lazy loading)
-_translation_service = None
-
-# Import FastText (remplace langdetect)
-try:
-    import fasttext
-
-    FASTTEXT_AVAILABLE = True
-    _fasttext_model = None
-    logger = logging.getLogger(__name__)
-    logger.info("FastText disponible pour détection multilingue")
-except ImportError:
-    FASTTEXT_AVAILABLE = False
-    fasttext = None
-    # Fallback vers fast-langdetect si disponible
-    try:
-        from fastlangdetect import detect, LangDetectException
-
-        FAST_LANGDETECT_AVAILABLE = True
-        logger = logging.getLogger(__name__)
-        logger.info("fast-langdetect disponible comme fallback")
-    except ImportError:
-        FAST_LANGDETECT_AVAILABLE = False
-        detect = None
-        LangDetectException = Exception
-
-# Import conditionnel unidecode
-try:
-    from unidecode import unidecode
-
-    UNIDECODE_AVAILABLE = True
-except ImportError:
-    UNIDECODE_AVAILABLE = False
-    unidecode = None
+# ============================================================================
+# DÉFINITION DES FLAGS APRÈS IMPORTS (Conforme PEP 8)
+# ============================================================================
 
 logger = logging.getLogger(__name__)
+
+# FLAGS de disponibilité des modules (définis après imports)
+FASTTEXT_AVAILABLE = fasttext is not None
+FAST_LANGDETECT_AVAILABLE = detect is not None
+UNIDECODE_AVAILABLE = unidecode is not None
+
+# Log des disponibilités
+if FASTTEXT_AVAILABLE:
+    logger.info("FastText disponible pour détection multilingue")
+if FAST_LANGDETECT_AVAILABLE:
+    logger.info("fast-langdetect disponible comme fallback")
+if not FASTTEXT_AVAILABLE and not FAST_LANGDETECT_AVAILABLE:
+    logger.warning("Aucun module de détection de langue disponible")
+
+# Variables globales
+_translation_service = None
+_fasttext_model = None
 
 # ============================================================================
 # CLASSES DE DONNÉES - VERSION CORRIGÉE AVEC SÉRIALISATION JSON
@@ -617,7 +619,7 @@ def get_out_of_domain_message(language: str = None) -> str:
         "pl": "Specjalizuję się w hodowli drobiu i produkcji kurcząt. Mogę pomóc z: Wydajność (FCR, waga, wzrost), Żywienie (programy żywieniowe), Środowisko (temperatura, wentylacja), Zdrowie (profilaktyka, szczepienia), i Zarządzanie techniczne. Zadaj mi konkretne pytanie!",
         "hi": "मैं मुर्गीपालन और ब्रॉयलर उत्पादन में विशेषज्ञता रखता हूं। मैं इनमें मदद कर सकता हूं: प्रदर्शन (FCR, वजन, वृद्धि), पोषण (आहार कार्यक्रम), पर्यावरण (तापमान, वेंटिलेशन), स्वास्थ्य (रोकथाम, टीकाकरण), और तकनीकी प्रबंधन। मुझसे कोई विशिष्ट प्रश्न पूछें!",
         "zh": "我专门从事家禽养殖和肉鸡生产。我可以帮助: 性能 (FCR, 体重, 生长), 营养 (饲养计划), 环境 (温度, 通风), 健康 (预防, 疫苗接种), 和技术管理。请问我一个具体问题！",
-        "th": "ฉันเชี่ยวชาญด้านการเลี้ยงสัตว์ปีกและการผลิตไก่เนื้อ ฉันสามารถช่วยได้ในเรื่อง: ประสิทธิภาพ (FCR, น้ำหนัก, การเจริญเติบโต), โภชนาการ (โปรแกรมการให้อาหาร), สิ่งแวดล้อม (อุณหภูมิ, การระบายอากาศ), สุขภาพ (การป้องกัน, การฉีดวัคซีน), และการจัดการทางเทคนิค กรุณาถามคำถามเฉพาะเจาะจง!",
+        "th": "ฉันเชี่ยวชาญด้านการเลี้ยงสัตว์ปีกและการผลิตไก่เนื้อ ฉันสามารถช่วยได้ในเรื่อง: ประสิทธิภาพ (FCR, น้ำหนัก, การเจริญเติบโต), โภชนาการ (โปรแกรมการให้อาหาร), สิ่งแวดล้อม (อุณหภูมิ, การระบายอากาศ), สุขภาพ (การป้องกัน, การฉีดวัคซีน), และการจัดการทางเทคนิค กรุณาถามคำถามเฉพาะจง!",
         "id": "Saya ahli dalam budidaya unggas dan produksi ayam pedaging. Saya dapat membantu dengan: Performa (FCR, berat, pertumbuhan), Nutrisi (program pakan), Lingkungan (suhu, ventilasi), Kesehatan (pencegahan, vaksinasi), dan Manajemen teknis. Ajukan pertanyaan spesifik kepada saya!",
     }
 
@@ -1240,39 +1242,43 @@ COMPREHENSIVE_TEST_QUERIES = [
 # ============================================================================
 
 __all__ = [
-    # Classes de données multilingues - NOUVEAU
+    # CORRECTION CRITIQUE: FLAGS D'IMPORT
+    "FASTTEXT_AVAILABLE",
+    "FAST_LANGDETECT_AVAILABLE",
+    "UNIDECODE_AVAILABLE",
+    # Classes de données multilingues
     "LanguageDetectionResult",
     "ValidationReport",
     "ProcessingResult",
-    # Détection langue multilingue - REMPLACÉ
+    # Détection langue multilingue
     "detect_language_enhanced",
-    # Support langues - NOUVEAU
+    # Support langues
     "is_supported_language",
     "normalize_language_code",
     "get_universal_translation",
-    # Messages multilingues - ÉTENDU
+    # Messages multilingues
     "get_out_of_domain_message",
     "get_aviculture_response",
     # CORRECTION CRITIQUE: Ajout fonction manquante
     "validate_intent_result",
-    # Métriques - MAINTENU
+    # Métriques
     "METRICS",
     "MetricsCollector",
     "get_all_metrics_json",
-    # Weaviate - MAINTENU
+    # Weaviate
     "build_where_filter",
-    # Intent processing - MAINTENU
+    # Intent processing
     "create_intent_processor",
     "process_query_with_intents",
     "validate_intents_config",
     "IntentProcessorFactory",
-    # Utilitaires - MAINTENU
+    # Utilitaires
     "safe_serialize_for_json",
     "safe_get_attribute",
     "safe_dict_get",
     "sse_event",
     "smart_chunk_text",
     "setup_logging",
-    # Données test - ÉTENDU
+    # Données test
     "COMPREHENSIVE_TEST_QUERIES",
 ]

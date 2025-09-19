@@ -192,56 +192,153 @@ jobs:
           exit 1
 
   cleanup:
-    name: Cleanup old DOCR images
+    name: Cleanup old DOCR images via API
     runs-on: ubuntu-latest
     needs: [detect-changes]
     if: always() && needs.detect-changes.result == 'success'
     steps:
-      - name: Install doctl
-        uses: digitalocean/action-doctl@v2
-        with:
-          token: ${{ secrets.DOCR_ACCESS_TOKEN }}
+      - name: Cleanup DOCR repositories via REST API
+        shell: bash
+        run: |
+          KEEP_IMAGES=8
+          REPOSITORIES=("intelia-frontend" "intelia-backend" "intelia-llm")
+          REGISTRY_NAME="${{ secrets.DOCR_NAME }}"
+          API_TOKEN="${{ secrets.DOCR_ACCESS_TOKEN }}"
+          
+          echo "Nettoyage via API REST DigitalOcean - garder $KEEP_IMAGES images par repo"
+          
+          for repo in "${REPOSITORIES[@]}"; do
+            echo ""
+            echo "=== Traitement de $repo ==="
+            
+            # 1. Récupérer la liste des tags via API
+            echo "Récupération des tags..."
+            response=$(curl -s -X GET \
+              "https://api.digitalocean.com/v2/registry/${REGISTRY_NAME}/repositories/${repo}/tags" \
+              -H "Authorization: Bearer ${API_TOKEN}" \
+              -H "Content-Type: application/json")
+            
+            # Vérifier si le repository existe
+            if echo "$response" | grep -q '"id":"not_found"'; then
+              echo "Repository $repo non trouvé"
+              continue
+            fi
+            
+            # 2. Parser les tags et dates avec jq
+            tags_data=$(echo "$response" | jq -r '.tags[] | "\(.tag) \(.updated_at)"' 2>/dev/null)
+            
+            if [ -z "$tags_data" ]; then
+              echo "Aucun tag trouvé pour $repo"
+              continue
+            fi
+            
+            echo "$tags_data" > "/tmp/${repo}_tags.txt"
+            total_tags=$(wc -l < "/tmp/${repo}_tags.txt")
+            
+            echo "Total tags: $total_tags"
+            echo "Premiers tags:"
+            head -5 "/tmp/${repo}_tags.txt"
+            
+            if [ "$total_tags" -le "$KEEP_IMAGES" ]; then
+              echo "Pas de nettoyage nécessaire ($total_tags <= $KEEP_IMAGES)"
+              continue
+            fi
+            
+            # 3. Identifier les tags à supprimer (garder les plus récents)
+            # Trier par date (plus anciens en premier) et prendre les premiers
+            to_delete_count=$((total_tags - KEEP_IMAGES))
+            echo "À supprimer: $to_delete_count tags"
+            
+            sort -k2,2 "/tmp/${repo}_tags.txt" | \
+            head -n "$to_delete_count" | \
+            awk '{print $1}' | \
+            grep -vE "^(latest|main|buildcache|prod|stable)$" > "/tmp/${repo}_to_delete.txt"
+            
+            actual_to_delete=$(wc -l < "/tmp/${repo}_to_delete.txt")
+            echo "Tags à supprimer (après filtrage des protégés): $actual_to_delete"
+            
+            if [ "$actual_to_delete" -eq 0 ]; then
+              echo "Aucun tag à supprimer après filtrage"
+              continue
+            fi
+            
+            echo "Tags qui seront supprimés:"
+            cat "/tmp/${repo}_to_delete.txt"
+            
+            # 4. Supprimer les tags via API REST
+            deleted=0
+            failed=0
+            
+            while IFS= read -r tag; do
+              if [ -z "$tag" ]; then continue; fi
+              
+              echo "Suppression API: $tag"
+              
+              # Appel API DELETE
+              http_code=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+                "https://api.digitalocean.com/v2/registry/${REGISTRY_NAME}/repositories/${repo}/tags/${tag}" \
+                -H "Authorization: Bearer ${API_TOKEN}")
+              
+              if [ "$http_code" = "204" ] || [ "$http_code" = "200" ]; then
+                echo "  ✓ Supprimé (HTTP $http_code)"
+                ((deleted++))
+              else
+                echo "  ✗ Échec (HTTP $http_code)"
+                ((failed++))
+              fi
+              
+              # Pause pour éviter rate limiting
+              sleep 0.5
+              
+            done < "/tmp/${repo}_to_delete.txt"
+            
+            echo ""
+            echo "Résumé $repo:"
+            echo "  Supprimés: $deleted"
+            echo "  Échecs: $failed"
+            echo "  Restants estimés: $((total_tags - deleted))"
+            
+            # Nettoyage fichiers temporaires
+            rm -f "/tmp/${repo}_tags.txt" "/tmp/${repo}_to_delete.txt"
+            
+          done
+          
+          echo ""
+          echo "=== Nettoyage terminé ==="
 
-      - name: Log in to DigitalOcean Container Registry
-        run: doctl registry login --expiry-seconds 1200
+      - name: Trigger garbage collection
+        run: |
+          echo "Déclenchement du garbage collection..."
+          
+          response=$(curl -s -X POST \
+            "https://api.digitalocean.com/v2/registry/${{ secrets.DOCR_NAME }}/garbage-collection" \
+            -H "Authorization: Bearer ${{ secrets.DOCR_ACCESS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"type":"untagged manifests and blobs"}')
+          
+          if echo "$response" | grep -q '"uuid"'; then
+            echo "Garbage collection démarré"
+            echo "$response" | jq -r '.garbage_collection.uuid' 2>/dev/null || echo "ID non récupérable"
+          else
+            echo "Garbage collection déjà en cours ou erreur"
+          fi
 
-      - name: Cleanup intelia-frontend registry
-        uses: raisedadead/action-docr-cleanup@v1
-        with:
-          repository_name: 'intelia-frontend'
-          days: '0'
-          keep_last: '8'
-          bypass_safety: 'true'
-
-      - name: Cleanup intelia-backend registry
-        uses: raisedadead/action-docr-cleanup@v1
-        with:
-          repository_name: 'intelia-backend'
-          days: '0'
-          keep_last: '8'
-          bypass_safety: 'true'
-
-      - name: Cleanup intelia-llm registry
-        uses: raisedadead/action-docr-cleanup@v1
-        with:
-          repository_name: 'intelia-llm'
-          days: '0'
-          keep_last: '8'
-          bypass_safety: 'true'
-
-      - name: Final status
+      - name: Final status check
         run: |
           echo ""
-          echo "ETAT FINAL DU REGISTRY:"
-          echo "======================"
+          echo "=== État final du registry ==="
           
           for repo in intelia-frontend intelia-backend intelia-llm; do
-            count=$(doctl registry repository list-tags "$repo" --format "Tag" --no-header 2>/dev/null | wc -l || echo "?")
+            response=$(curl -s -X GET \
+              "https://api.digitalocean.com/v2/registry/${{ secrets.DOCR_NAME }}/repositories/${repo}/tags" \
+              -H "Authorization: Bearer ${{ secrets.DOCR_ACCESS_TOKEN }}")
+            
+            count=$(echo "$response" | jq '.tags | length' 2>/dev/null || echo "?")
             echo "$repo: $count images"
           done
           
           echo ""
-          echo "Nettoyage complet termine!"
+          echo "Nettoyage complet terminé!"
 
   summary:
     runs-on: ubuntu-latest
