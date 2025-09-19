@@ -2,6 +2,7 @@
 """
 utilities.py - Fonctions utilitaires multilingues
 Version 2.0 avec support FastText et service de traduction hybride
+CORRECTION CRITIQUE: Ajout de validate_intent_result manquant
 """
 
 import os
@@ -143,6 +144,56 @@ def _get_translation_service():
             _translation_service = None
 
     return _translation_service
+
+
+# ============================================================================
+# CORRECTION CRITIQUE: FONCTION MANQUANTE
+# ============================================================================
+
+
+def validate_intent_result(intent_result) -> bool:
+    """
+    Valide qu'un résultat d'intention est conforme aux attentes
+
+    Args:
+        intent_result: Résultat d'une classification d'intention
+
+    Returns:
+        bool: True si valide, False sinon
+    """
+    if intent_result is None:
+        return False
+
+    # Validation basique de la structure
+    try:
+        # Vérifier attributs requis
+        required_attrs = ["intent_type", "confidence", "detected_entities"]
+
+        for attr in required_attrs:
+            if not hasattr(intent_result, attr):
+                logger.debug(f"Attribut manquant dans intent_result: {attr}")
+                return False
+
+        # Validation de la confiance
+        if not (0.0 <= intent_result.confidence <= 1.0):
+            logger.debug(f"Confiance invalide: {intent_result.confidence}")
+            return False
+
+        # Validation du type d'intention
+        if intent_result.intent_type is None:
+            logger.debug("Type d'intention null")
+            return False
+
+        # Validation des entités (doit être une liste)
+        if not isinstance(intent_result.detected_entities, list):
+            logger.debug("detected_entities n'est pas une liste")
+            return False
+
+        return True
+
+    except Exception as e:
+        logger.debug(f"Erreur validation intent_result: {e}")
+        return False
 
 
 # ============================================================================
@@ -459,7 +510,7 @@ def get_out_of_domain_message(language: str = None) -> str:
         "it": "Mi specializzo in avicoltura e produzione di polli. Posso aiutare con: Prestazioni (FCR, peso, crescita), Nutrizione (programmi alimentari), Ambiente (temperatura, ventilazione), Salute (prevenzione, vaccinazione), e Gestione tecnica. Fatemi una domanda specifica!",
         "pt": "Especializo-me na avicultura e produção de frangos. Posso ajudar com: Desempenho (FCR, peso, crescimento), Nutrição (programas alimentares), Ambiente (temperatura, ventilação), Saúde (prevenção, vacinação), e Gestão técnica. Faça-me uma pergunta específica!",
         "nl": "Ik specialiseer me in pluimveehouderij en vleeskuikenproductie. Ik kan helpen met: Prestaties (FCR, gewicht, groei), Voeding (voerprogramma's), Omgeving (temperatuur, ventilatie), Gezondheid (preventie, vaccinatie), en Technisch beheer. Stel me een specifieke vraag!",
-        "pl": "Specjalizuję się w hodowli drobiu i produkcji kurczaków. Mogę pomóc z: Wydajność (FCR, waga, wzrost), Żywienie (programy żywieniowe), Środowisko (temperatura, wentylacja), Zdrowie (profilaktyka, szczepienia), i Zarządzanie techniczne. Zadaj mi konkretne pytanie!",
+        "pl": "Specjalizuję się w hodowli drobiu i produkcji kurcząt. Mogę pomóc z: Wydajność (FCR, waga, wzrost), Żywienie (programy żywieniowe), Środowisko (temperatura, wentylacja), Zdrowie (profilaktyka, szczepienia), i Zarządzanie techniczne. Zadaj mi konkretne pytanie!",
         "hi": "मैं मुर्गीपालन और ब्रॉयलर उत्पादन में विशेषज्ञता रखता हूं। मैं इनमें मदद कर सकता हूं: प्रदर्शन (FCR, वजन, वृद्धि), पोषण (आहार कार्यक्रम), पर्यावरण (तापमान, वेंटिलेशन), स्वास्थ्य (रोकथाम, टीकाकरण), और तकनीकी प्रबंधन। मुझसे कोई विशिष्ट प्रश्न पूछें!",
         "zh": "我专门从事家禽养殖和肉鸡生产。我可以帮助: 性能 (FCR, 体重, 生长), 营养 (饲养计划), 环境 (温度, 通风), 健康 (预防, 疫苗接种), 和技术管理。请问我一个具体问题！",
         "th": "ฉันเชี่ยวชาญด้านการเลี้ยงสัตว์ปีกและการผลิตไก่เนื้อ ฉันสามารถช่วยได้ในเรื่อง: ประสิทธิภาพ (FCR, น้ำหนัก, การเจริญเติบโต), โภชนาการ (โปรแกรมการให้อาหาร), สิ่งแวดล้อม (อุณหภูมิ, การระบายอากาศ), สุขภาพ (การป้องกัน, การฉีดวัคซีน), และการจัดการทางเทคนิค กรุณาถามคำถามเฉพาะเจาะจง!",
@@ -1116,6 +1167,8 @@ __all__ = [
     # Messages multilingues - ÉTENDU
     "get_out_of_domain_message",
     "get_aviculture_response",
+    # CORRECTION CRITIQUE: Ajout fonction manquante
+    "validate_intent_result",
     # Métriques - MAINTENU
     "METRICS",
     "MetricsCollector",
