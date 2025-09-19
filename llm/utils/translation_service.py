@@ -3,6 +3,7 @@
 translation_service.py - Service de traduction universel hybride
 Combine dictionnaire local + Google Translate avec cache intelligent
 Version avec chargement dynamique des dictionnaires par langue
+CORRECTION: Gestion variable d'environnement pour clé API Google
 """
 
 import json
@@ -99,7 +100,7 @@ class UniversalTranslationService:
         self._validate_setup()
 
     def _validate_setup(self) -> None:
-        """Valide la configuration initiale"""
+        """CORRECTION: Valide la configuration initiale avec gestion variable d'environnement"""
         if not self.dict_path.exists():
             logger.warning(f"Répertoire dictionnaires non trouvé: {self.dict_path}")
             # Créer le répertoire s'il n'existe pas
@@ -111,9 +112,22 @@ class UniversalTranslationService:
                     "Google Translate demandé mais google-cloud-translate non installé"
                 )
                 self.enable_google_fallback = False
-            elif not self.google_api_key:
-                logger.warning("Google Translate activé mais API key manquante")
-                self.enable_google_fallback = False
+            else:
+                # CORRECTION: Vérifier la clé depuis variables d'environnement
+                import os
+
+                api_key = self.google_api_key or os.getenv("GOOGLE_TRANSLATE_API_KEY")
+
+                if not api_key:
+                    logger.debug("Google Translate activé mais aucune clé API trouvée")
+                    self.enable_google_fallback = False
+                elif api_key.startswith("AIza"):
+                    logger.debug("Clé API Google Translate détectée")
+                elif os.path.isfile(api_key):
+                    logger.debug("Fichier service account Google détecté")
+                else:
+                    logger.debug(f"Format de clé API non reconnu: {api_key[:10]}...")
+                    self.enable_google_fallback = False
 
         logger.info(
             f"Service traduction initialisé - Répertoire: {self.dict_path}, Google: {self.enable_google_fallback}"
@@ -192,24 +206,61 @@ class UniversalTranslationService:
 
     @property
     def google_client(self):
-        """Google Client avec lazy loading thread-safe"""
+        """CORRECTION: Google Client avec gestion variable d'environnement"""
         if not self.enable_google_fallback:
             return None
 
         if self._google_client is None:
             with self._google_client_lock:
-                if self._google_client is None and self.google_api_key:
+                if self._google_client is None:
                     try:
-                        # Configuration credentials
                         import os
 
-                        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
-                            self.google_api_key
+                        # CORRECTION: Récupérer la clé depuis les variables d'environnement
+                        api_key = self.google_api_key or os.getenv(
+                            "GOOGLE_TRANSLATE_API_KEY"
                         )
-                        self._google_client = translate.Client()
-                        logger.info("Google Translate client initialisé")
+
+                        if api_key and api_key.startswith("AIza"):
+                            # Clé API directe (format AIzaSy...)
+                            logger.debug(
+                                "Configuration Google Translate avec clé API directe"
+                            )
+                            self._google_client = translate.Client(api_key=api_key)
+                            logger.info(
+                                "Google Translate client initialisé avec clé API"
+                            )
+
+                        elif api_key and os.path.isfile(api_key):
+                            # Fichier de service account JSON
+                            logger.debug(
+                                "Configuration Google Translate avec service account"
+                            )
+                            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = api_key
+                            self._google_client = translate.Client()
+                            logger.info(
+                                "Google Translate client initialisé avec service account"
+                            )
+
+                        else:
+                            # Pas de clé valide trouvée
+                            if api_key:
+                                logger.debug(
+                                    f"Format de clé API non reconnu: {api_key[:10]}..."
+                                )
+                            else:
+                                logger.debug("Aucune clé Google Translate trouvée")
+                            logger.info(
+                                "Google Translate désactivé - fonctionnement en mode local"
+                            )
+                            self.enable_google_fallback = False
+                            return None
+
                     except Exception as e:
-                        logger.error(f"Erreur initialisation Google client: {e}")
+                        logger.debug(f"Erreur initialisation Google Translate: {e}")
+                        logger.info(
+                            "Google Translate non disponible - fonctionnement en mode local"
+                        )
                         self.enable_google_fallback = False
 
         return self._google_client

@@ -209,22 +209,25 @@ jobs:
         uses: raisedadead/action-docr-cleanup@v1
         with:
           repository_name: 'intelia-frontend'
-          days: '1'
+          days: '0'
           keep_last: '8'
+          bypass_safety: 'true'
 
       - name: Cleanup intelia-backend registry
         uses: raisedadead/action-docr-cleanup@v1
         with:
           repository_name: 'intelia-backend'
-          days: '1'
+          days: '0'
           keep_last: '8'
+          bypass_safety: 'true'
 
       - name: Cleanup intelia-llm registry
         uses: raisedadead/action-docr-cleanup@v1
         with:
           repository_name: 'intelia-llm'
-          days: '1'
+          days: '0'
           keep_last: '8'
+          bypass_safety: 'true'
 
       - name: Final status
         run: |
