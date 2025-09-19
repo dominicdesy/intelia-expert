@@ -2,6 +2,7 @@
 """
 ood_detector.py - Détecteur hors-domaine intelligent et multilingue
 Version corrigée avec support complet pour toutes les langues via traduction
+CORRECTION: Ajout de la méthode publique calculate_ood_score_multilingual manquante
 """
 
 import logging
@@ -1024,12 +1025,13 @@ class MultilingualOODDetector:
         }
 
 
-# Classe pour compatibilité descendante
+# Classe pour compatibilité descendante - CORRECTION PRINCIPALE
 class EnhancedOODDetector(MultilingualOODDetector):
     """Alias pour compatibilité avec le code existant"""
 
-    def __init__(self, blocked_terms_path: str = None):
-        super().__init__(blocked_terms_path)
+    def __init__(self, blocked_terms_path: str = None, openai_client=None):
+        # CORRECTION: Passer le client OpenAI à la classe parent
+        super().__init__(blocked_terms_path, openai_client)
 
     def calculate_ood_score(
         self, query: str, intent_result=None
@@ -1046,11 +1048,41 @@ class EnhancedOODDetector(MultilingualOODDetector):
             super().calculate_ood_score(query, intent_result, "fr")
         )
 
+    # AJOUT DE LA MÉTHODE PUBLIQUE MANQUANTE - CORRECTION CRITIQUE
+    def calculate_ood_score_multilingual(
+        self, query: str, intent_result=None, language: str = "fr"
+    ) -> Tuple[bool, float, Dict[str, float]]:
+        """
+        Méthode publique pour calcul OOD multilingue
+        CORRECTION: Cette méthode était manquante et causait l'erreur dans les logs
+        """
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
 
-# Factory functions
-def create_ood_detector(blocked_terms_path: str = None) -> EnhancedOODDetector:
-    """Crée une instance du détecteur OOD avec compatibilité"""
-    return EnhancedOODDetector(blocked_terms_path)
+        # Appel de la méthode privée _calculate_ood_score_multilingual
+        return loop.run_until_complete(
+            self._calculate_ood_score_multilingual(query, intent_result, language)
+        )
+
+    # AJOUT MÉTHODE ASYNC PUBLIQUE POUR API MODERNE
+    async def async_calculate_ood_score_multilingual(
+        self, query: str, intent_result=None, language: str = "fr"
+    ) -> Tuple[bool, float, Dict[str, float]]:
+        """Version asynchrone publique pour la méthode multilingue"""
+        return await self._calculate_ood_score_multilingual(
+            query, intent_result, language
+        )
+
+
+# Factory functions - CORRECTION DES PARAMÈTRES
+def create_ood_detector(
+    blocked_terms_path: str = None, openai_client=None
+) -> EnhancedOODDetector:
+    """Crée une instance du détecteur OOD avec compatibilité - PARAMÈTRES CORRIGÉS"""
+    return EnhancedOODDetector(blocked_terms_path, openai_client)
 
 
 def create_multilingual_ood_detector(
