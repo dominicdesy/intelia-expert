@@ -1,225 +1,110 @@
-# Core FastAPI - Versions stables
+# ===== REQUIREMENTS.TXT - INTELIA EXPERT BACKEND =====
+# Version corrigée post-analyse logs production (2025-09-19)
+# Corrections: Google Translate, dimensions vectorielles, cache optimisé
+
+# === CORE FASTAPI - Versions stables ===
 fastapi==0.112.2
 uvicorn[standard]==0.30.6
 python-dotenv==1.0.1
 
-# HTTP clients - Versions compatibles
-httpx==0.27.0
+# === HTTP CLIENTS - Versions compatibles ===
+httpx[http2]==0.27.0
 httpcore==1.0.5
+anyio>=4.0.0
 
-# OpenAI API - Version LTS stable
+# === OPENAI API - Version LTS stable ===
 openai==1.42.0
 
-# Weaviate Client - Version mise à jour pour corriger les erreurs API
+# === WEAVIATE CLIENT - Version corrigée pour dimensions ===
 weaviate-client==4.16.10
 
-# Redis pour cache - Versions synchronisées
-redis==5.0.1
+# === REDIS CACHE - Performance optimisée ===
+redis[hiredis]==5.0.1
 hiredis==2.3.2
 
-# ===== NOUVEAU: SUPPORT MULTILINGUE =====
-# FastText pour détection langue (remplace langdetect)
+# === CORRECTIONS BUGS PRODUCTION ===
+
+# Google Cloud Translation - VERSION CORRIGÉE API
+google-cloud-translate>=3.15.0,<4.0.0
+google-auth>=2.23.0
+google-auth-oauthlib>=1.0.0
+
+# Retry et résilience - Fix timeouts et erreurs réseau
+tenacity>=8.2.0
+backoff>=2.2.0
+
+# Gestion fichiers async - Optimisation I/O
+aiofiles>=23.0.0
+
+# Utilitaires ML - Fix dimensions vectorielles
+scikit-learn>=1.3.0,<1.5.0
+
+# Monitoring avancé - Diagnostic mémoire
+memory-profiler>=0.61.0
+
+# === SUPPORT MULTILINGUE - FastText corrigé ===
 fasttext-langdetect>=1.0.3
 # Alternative si fasttext-langdetect indisponible:
 # fast-langdetect>=0.3.0
 
-# Google Cloud Translation API (optionnel)
-google-cloud-translate>=3.8.0
-google-auth>=2.0.0
-
 # Cache intelligent multilingue
 cachetools>=5.3.0
 
-# Intelligence métier - Versions testées
+# === INTELLIGENCE MÉTIER - Versions testées ===
 transformers==4.45.2
 torch>=2.0.0,<2.5.0
 
-# ===== ANCIEN: Détection langue - REMPLACÉ =====
-# langdetect==1.0.9  # SUPPRIMÉ - Remplacé par fasttext-langdetect
-
-# Traitement de texte - CRITIQUE pour normalisation
+# === TRAITEMENT TEXTE - Normalisation critique ===
 unidecode==1.3.8
 
-# Reranking et similarité - Versions compatibles
+# === RERANKING ET SIMILARITÉ ===
 sentence-transformers==3.1.1
 voyageai==0.2.3
 
-# LangSmith pour monitoring LLM
+# === LANGSMITH MONITORING - Versions compatibles ===
 langchain-core==0.1.16
 langsmith>=0.0.83,<0.1.0
 
-# Utilitaires de base - Versions stables
+# === UTILITAIRES BASE - Versions stables ===
 numpy>=1.24.0,<2.0.0
 scipy>=1.11.0,<1.15.0
 pandas>=2.0.0,<3.0.0
 
-# Sécurité et validation - Pydantic v2 stable
+# === SÉCURITÉ ET VALIDATION - Pydantic v2 ===
 pydantic>=2.8.0,<3.0.0
+validators>=0.22.0
+bleach>=6.0.0
 
-# Monitoring et logging
+# === MONITORING ET LOGGING ===
 prometheus-client==0.20.0
 structlog==23.2.0
 
-# Support fichiers
+# === SUPPORT FICHIERS ===
 openpyxl==3.1.2
 
-# Tests - Versions compatibles
+# === TESTS - Versions compatibles ===
 pytest==8.3.3
 pytest-asyncio==0.24.0
 
-# Outils développement
+# === OUTILS DÉVELOPPEMENT ===
 black==24.10.0
 flake8==7.1.1
 
-# Async et agents
+# === ASYNC ET AGENTS ===
 dataclasses-json==0.6.7
 asyncio-throttle==1.0.2
 
-# Compatibilité Python 3.13
+# === COMPATIBILITÉ PYTHON 3.13 ===
 typing-extensions>=4.8.0
 
-# ===== CONTRAINTES DE SÉCURITÉ =====
-# Éviter les vulnérabilités connues
+# === CONTRAINTES SÉCURITÉ - Versions renforcées ===
 urllib3>=2.0.0,<3.0.0
 certifi>=2023.7.22
-
-# Versions minimales pour sécurité
-cryptography>=41.0.0
+cryptography>=41.0.7
 requests>=2.31.0
 
-# ===== OPTIMISATIONS POUR DÉPLOIEMENT =====
-# Compression et performance
+# === OPTIMISATIONS DÉPLOIEMENT ===
 brotli>=1.0.9
 zstandard>=0.22.0
-
-# Monitoring système
 psutil>=5.9.0
 
-# ===== NOTES DE COMPATIBILITÉ MULTILINGUE =====
-
-# fasttext-langdetect : Remplacement de langdetect
-#   - Plus rapide et plus précis pour 13+ langues
-#   - Support Unicode natif (chinois, hindi, thaï)
-#   - Modèle pré-entraîné inclus
-#   - Compatible avec FastText officiel
-
-# google-cloud-translate 3.8.0+ : Traduction fallback
-#   - API Translation v2 et v3 supportées
-#   - Gestion automatique des credentials
-#   - Rate limiting et retry intégrés
-#   - Support batch pour optimisation coûts
-
-# cachetools 5.3.0+ : Cache intelligent traductions
-#   - LRU Cache avec TTL
-#   - Thread-safe pour production
-#   - Métriques intégrées
-#   - Support persistence Redis
-
-# ===== VARIABLES D'ENVIRONNEMENT DIGITAL OCEAN =====
-
-# Configuration Base Digital Ocean App Platform :
-# REDIS_URL=redis://localhost:6379
-# WEAVIATE_URL=http://localhost:8080
-# OPENAI_API_KEY=your_key_here
-# LANGSMITH_API_KEY=your_langsmith_key_here
-# LANGSMITH_PROJECT=intelia-aviculture
-# CACHE_ENABLED=true
-# CACHE_TOTAL_MEMORY_LIMIT_MB=100
-# ENABLE_INTELLIGENT_RRF=false
-# RRF_LEARNING_MODE=true
-# RRF_GENETIC_BOOST=true
-# LOG_LEVEL=INFO
-
-# ===== NOUVELLES VARIABLES MULTILINGUES =====
-
-# OBLIGATOIRES pour fonctionnement multilingue:
-# UNIVERSAL_DICT_PATH=config/universal_terms.json
-# SUPPORTED_LANGUAGES=de,en,es,fr,hi,id,it,nl,pl,pt,th,zh
-# DEFAULT_LANGUAGE=fr
-# FALLBACK_LANGUAGE=en
-
-# OPTIONNELLES pour Google Translate:
-# GOOGLE_TRANSLATE_API_KEY=your_google_api_key
-# ENABLE_GOOGLE_TRANSLATE_FALLBACK=true
-# GOOGLE_APPLICATION_CREDENTIALS=path/to/service-account.json
-# TRANSLATION_CONFIDENCE_THRESHOLD=0.7
-# GOOGLE_TRANSLATE_MAX_RETRIES=3
-# GOOGLE_TRANSLATE_TIMEOUT=10
-
-# FastText et détection langue:
-# FASTTEXT_MODEL_PATH=models/lid.176.ftz
-# LANG_DETECTION_MIN_LENGTH=15
-# LANG_DETECTION_CONFIDENCE_THRESHOLD=0.8
-
-# Cache et performance multilingue:
-# TRANSLATION_CACHE_SIZE=10000
-# TRANSLATION_CACHE_TTL=86400
-# MULTILINGUAL_CACHE_ENABLED=true
-
-# Debug et monitoring multilingue:
-# TRANSLATION_DEBUG=false
-# ENABLE_TRANSLATION_METRICS=true
-
-# ===== CHANGEMENTS PRINCIPAUX VERSION MULTILINGUE =====
-
-# 1. Détection langue: langdetect → fasttext-langdetect
-#    - Plus rapide et précis pour 13+ langues  
-#    - Support Unicode natif (chinois, hindi, thaï)
-#    - Modèle léger intégré
-#    - Compatible FastText officiel
-
-# 2. Service traduction: Ajout google-cloud-translate
-#    - Fallback intelligent pour termes manquants
-#    - Cache 2-niveaux (mémoire + Redis)
-#    - Rate limiting et retry automatiques
-#    - Support batch pour optimisation coûts
-
-# 3. Cache multilingue: cachetools
-#    - LRU Cache avec TTL configurables
-#    - Thread-safe pour production
-#    - Métriques intégrées hit/miss
-#    - Persistence optionnelle Redis
-
-# 4. Architecture hybride:
-#    - Dictionnaire local (rapide, gratuit)
-#    - Google Translate (couverture complète)
-#    - Fallback progressif intelligent
-#    - Monitoring performance par langue
-
-# 5. Cette mise à jour ajoute:
-#    ✅ Support natif 13 langues
-#    ✅ Détection langue FastText
-#    ✅ Service traduction hybride
-#    ✅ Cache intelligent multilingue
-#    ✅ Monitoring traductions
-#    ✅ Fallbacks gracieux
-#    ✅ Variables environnement étendues
-
-# ===== INSTALLATION PRODUCTION =====
-
-# Option 1: Installation complète avec Google Translate
-# pip install -r requirements.txt
-
-# Option 2: Installation sans Google Translate (mode local uniquement)
-# pip install -r requirements.txt --no-deps google-cloud-translate
-# Puis définir ENABLE_GOOGLE_TRANSLATE_FALLBACK=false
-
-# Option 3: Installation Docker optimisée
-# FROM python:3.11-slim
-# COPY requirements.txt .
-# RUN pip install --no-cache-dir -r requirements.txt
-# RUN python -c "import fasttext; fasttext.load_model()" # Préchargement modèle
-
-# ===== TESTS DE VALIDATION POST-INSTALLATION =====
-
-# Test détection langue:
-# python -c "from fasttext import load_model; print('FastText OK')"
-
-# Test Google Translate (si activé):
-# python -c "from google.cloud import translate_v2; print('Google Translate OK')"
-
-# Test cache:
-# python -c "from cachetools import TTLCache; print('Cache OK')"
-
-# Test complet service traduction:
-# python -c "from utils.translation_service import create_translation_service; print('Service OK')"
