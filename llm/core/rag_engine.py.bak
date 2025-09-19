@@ -74,12 +74,7 @@ except Exception as e:
     raise
 
 try:
-    from utils.utilities import (
-        METRICS,
-        detect_language_enhanced,
-        build_where_filter,
-        get_out_of_domain_message,
-    )
+    from utils.utilities import METRICS, detect_language_enhanced, build_where_filter
 
     logger.debug("Utilities importé avec succès")
 except Exception as e:
@@ -695,29 +690,31 @@ class InteliaRAGEngine:
             # OOD detection avec seuil dynamique
             if self.ood_detector:
                 try:
-                    # Nouveau : passer la langue détectée
                     is_in_domain, domain_score, score_details = (
-                        await self.ood_detector.calculate_ood_score_multilingual(
-                            query, language, intent_result
-                        )
+                        self.ood_detector.calculate_ood_score(query, intent_result)
                     )
 
+                    if score_details.get("genetic_metric_present") or score_details.get(
+                        "generic_vocab_only"
+                    ):
+                        self.optimization_stats[
+                            "dynamic_ood_threshold_adjustments"
+                        ] += 1
+
                     if not is_in_domain:
+                        METRICS.inc("requests_ood")
+                        METRICS.observe_latency(time.time() - start_time)
                         return RAGResult(
                             source=RAGSource.OOD_FILTERED,
-                            answer=get_out_of_domain_message(
-                                language
-                            ),  # Message dans la bonne langue
+                            answer="Désolé, cette question sort du domaine avicole. Pose-moi une question sur l'aviculture.",
                             confidence=0.0,
                             metadata={
                                 "ood_score": domain_score,
                                 "reason": "out_of_domain",
-                                "language": language,
-                                "translation_details": score_details,
                             },
                         )
                 except Exception as e:
-                    logger.warning(f"Erreur OOD multilingue: {e}")
+                    logger.warning(f"Erreur OOD detector: {e}")
 
             # Préparation contexte conversation
             conversation_context_str = ""

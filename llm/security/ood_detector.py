@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-ood_detector.py - Détecteur hors-domaine intelligent et adaptatif
-Version perfectionnée avec scoring précis et seuils dynamiques
+ood_detector.py - Détecteur hors-domaine intelligent et multilingue
+Version corrigée avec support complet pour toutes les langues via traduction
 """
 
 import logging
 import json
 import os
 import re
+import asyncio
 from typing import Dict, List, Tuple, Set
 from dataclasses import dataclass
 from enum import Enum
-from config.config import OOD_MIN_SCORE, OOD_STRICT_SCORE
 from utils.utilities import METRICS
 from utils.imports_and_dependencies import UNIDECODE_AVAILABLE
 
@@ -24,11 +24,11 @@ logger = logging.getLogger(__name__)
 class DomainRelevance(Enum):
     """Niveaux de pertinence pour le domaine avicole"""
 
-    HIGH = "high"  # Très pertinent (lignées, FCR, etc.)
-    MEDIUM = "medium"  # Moyennement pertinent (animaux, élevage)
-    LOW = "low"  # Faiblement pertinent (agriculture générale)
-    GENERIC = "generic"  # Générique (comment, quoi, etc.)
-    BLOCKED = "blocked"  # Explicitement bloqué
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    GENERIC = "generic"
+    BLOCKED = "blocked"
 
 
 @dataclass
@@ -42,28 +42,63 @@ class DomainScore:
     confidence_boosters: Dict[str, float]
     threshold_applied: float
     reasoning: str
+    translation_used: bool = False
+    original_language: str = "fr"
 
 
-class EnhancedOODDetector:
-    """Détecteur hors-domaine intelligent pour l'aviculture"""
+class MultilingualOODDetector:
+    """Détecteur hors-domaine intelligent avec support multilingue complet"""
 
-    def __init__(self, blocked_terms_path: str = None):
+    def __init__(self, blocked_terms_path: str = None, openai_client=None):
         self.blocked_terms = self._load_blocked_terms(blocked_terms_path)
         self.domain_vocabulary = self._build_domain_vocabulary()
+        self.openai_client = openai_client
+        self.translation_cache = {}
 
-        # Seuils adaptatifs selon le contexte
+        # Langues supportées (basé sur languages.json)
+        self.supported_languages = [
+            "fr",
+            "en",
+            "es",
+            "de",
+            "it",
+            "pt",
+            "nl",
+            "pl",
+            "hi",
+            "id",
+            "th",
+            "zh",
+        ]
+
+        # Seuils adaptatifs selon le contexte et la langue
         self.adaptive_thresholds = {
-            "technical_query": 0.10,  # Requêtes avec termes techniques
-            "numeric_query": 0.15,  # Requêtes avec chiffres/mesures
-            "standard_query": 0.20,  # Requêtes standards
-            "generic_query": 0.30,  # Requêtes génériques
-            "suspicious_query": 0.50,  # Requêtes suspectes
+            "technical_query": 0.10,
+            "numeric_query": 0.15,
+            "standard_query": 0.20,
+            "generic_query": 0.30,
+            "suspicious_query": 0.50,
+        }
+
+        # Ajustements par langue (plus permissif pour langues éloignées)
+        self.language_adjustments = {
+            "fr": 1.0,  # Langue de référence
+            "en": 0.95,  # Très proche
+            "es": 0.90,  # Langues latines
+            "it": 0.90,
+            "pt": 0.90,
+            "de": 0.85,  # Germanique
+            "nl": 0.85,
+            "pl": 0.80,  # Slave
+            "hi": 0.75,  # Scripts non-latins, plus permissif
+            "th": 0.75,
+            "zh": 0.75,
+            "id": 0.85,  # Austronésien mais script latin
         }
 
     def _load_blocked_terms(self, path: str = None) -> Dict[str, List[str]]:
         """Charge les termes explicitement bloqués"""
         if path is None:
-            # Recherche multi-emplacements pour blocked_terms.json
             possible_paths = [
                 os.getenv("BLOCKED_TERMS_FILE", ""),
                 "/app/config/blocked_terms.json",
@@ -78,7 +113,6 @@ class EnhancedOODDetector:
         for attempt_path in possible_paths:
             if not attempt_path or not os.path.exists(attempt_path):
                 continue
-
             try:
                 with open(attempt_path, "r", encoding="utf-8") as f:
                     blocked_terms = json.load(f)
@@ -97,14 +131,13 @@ class EnhancedOODDetector:
             "sports": ["football", "soccer", "basketball", "tennis", "sport"],
             "technology": ["iphone", "android", "computer", "software", "app"],
         }
-
         logger.warning(
             f"Utilisation des termes bloqués fallback: {len(fallback_terms)} catégories"
         )
         return fallback_terms
 
     def _build_domain_vocabulary(self) -> Dict[DomainRelevance, Set[str]]:
-        """Construit un vocabulaire hiérarchisé du domaine avicole"""
+        """Construit un vocabulaire hiérarchisé du domaine avicole (français/anglais de base)"""
         return {
             DomainRelevance.HIGH: {
                 # Termes hautement spécifiques à l'aviculture
@@ -330,19 +363,35 @@ class EnhancedOODDetector:
             },
         }
 
-    def calculate_ood_score(
-        self, query: str, intent_result=None
+    async def calculate_ood_score(
+        self, query: str, intent_result=None, language: str = "fr"
     ) -> Tuple[bool, float, Dict[str, float]]:
-        """Calcul intelligent du score OOD avec analyse contextuelle"""
+        """Point d'entrée principal avec support multilingue automatique"""
 
-        # Normalisation et préparation
-        normalized_query = self._normalize_query(query)
+        # Si la langue est français ou anglais, traitement direct
+        if language in ["fr", "en"]:
+            return await self._calculate_ood_score_direct(
+                query, intent_result, language
+            )
+
+        # Pour les autres langues, utiliser la traduction
+        return await self._calculate_ood_score_multilingual(
+            query, intent_result, language
+        )
+
+    async def _calculate_ood_score_direct(
+        self, query: str, intent_result=None, language: str = "fr"
+    ) -> Tuple[bool, float, Dict[str, float]]:
+        """Calcul OOD direct pour français/anglais"""
+
+        # Normalisation adaptée (sans destruction des scripts non-latins)
+        normalized_query = self._normalize_query_preserve_script(query, language)
         words = normalized_query.split()
 
         if not words:
             return False, 0.0, {"error": "empty_query"}
 
-        # Analyse contextuelle de la requête
+        # Analyse contextuelle
         context_analysis = self._analyze_query_context(
             normalized_query, words, intent_result
         )
@@ -358,56 +407,330 @@ class EnhancedOODDetector:
             domain_analysis.final_score, context_analysis, intent_result
         )
 
-        # Sélection du seuil adaptatif
-        threshold = self._select_adaptive_threshold(context_analysis, domain_analysis)
-
-        # Décision finale
-        is_in_domain = boosted_score > threshold and not blocked_analysis["is_blocked"]
-
-        # Logging détaillé pour debugging
-        self._log_ood_decision(
-            query, words, domain_analysis, boosted_score, threshold, is_in_domain
+        # Sélection du seuil adaptatif avec ajustement linguistique
+        base_threshold = self._select_adaptive_threshold(
+            context_analysis, domain_analysis
+        )
+        adjusted_threshold = base_threshold * self.language_adjustments.get(
+            language, 1.0
         )
 
-        # Métriques et statistiques
-        self._update_ood_metrics(domain_analysis, threshold, is_in_domain)
+        # Décision finale
+        is_in_domain = (
+            boosted_score > adjusted_threshold and not blocked_analysis["is_blocked"]
+        )
+
+        # Logging et métriques
+        self._log_ood_decision(
+            query,
+            words,
+            domain_analysis,
+            boosted_score,
+            adjusted_threshold,
+            is_in_domain,
+        )
+        self._update_ood_metrics(domain_analysis, adjusted_threshold, is_in_domain)
 
         # Construction de la réponse détaillée
         score_details = {
             "vocab_score": domain_analysis.final_score,
             "boosted_score": boosted_score,
-            "threshold_used": threshold,
+            "threshold_used": adjusted_threshold,
+            "base_threshold": base_threshold,
+            "language_adjustment": self.language_adjustments.get(language, 1.0),
             "domain_words_found": len(domain_analysis.domain_words),
             "blocked_terms_found": len(domain_analysis.blocked_terms),
             "context_type": context_analysis["type"],
             "relevance_level": domain_analysis.relevance_level.value,
             "confidence_boosters": domain_analysis.confidence_boosters,
             "reasoning": domain_analysis.reasoning,
-            "technical_indicators": context_analysis.get("technical_indicators", []),
-            "numeric_indicators": context_analysis.get("numeric_indicators", []),
+            "language": language,
+            "translation_used": False,
         }
 
         return is_in_domain, boosted_score, score_details
 
-    def _normalize_query(self, query: str) -> str:
-        """Normalisation avancée de la requête"""
+    async def _calculate_ood_score_multilingual(
+        self, query: str, intent_result=None, language: str = "hi"
+    ) -> Tuple[bool, float, Dict[str, float]]:
+        """Calcul OOD avec traduction automatique pour langues non-françaises/anglaises"""
+
+        try:
+            # Tentative de traduction vers le français
+            translated_query = await self._translate_to_french(query, language)
+
+            if not translated_query or translated_query == query:
+                # Traduction échouée, utiliser l'analyse de fallback
+                return await self._fallback_analysis(query, language)
+
+            # Analyse OOD sur la version traduite
+            is_in_domain, score, details = await self._calculate_ood_score_direct(
+                translated_query, intent_result, "fr"
+            )
+
+            # Ajustement du seuil pour les langues traduites (plus permissif)
+            translation_adjustment = self.language_adjustments.get(language, 0.75)
+            adjusted_threshold = details["threshold_used"] * translation_adjustment
+            is_in_domain = score > adjusted_threshold
+
+            # Enrichir les détails avec les informations de traduction
+            details.update(
+                {
+                    "original_language": language,
+                    "original_query": query,
+                    "translated_query": translated_query,
+                    "translation_used": True,
+                    "translation_adjustment": translation_adjustment,
+                    "final_threshold": adjusted_threshold,
+                    "final_decision_overridden": details["threshold_used"]
+                    != adjusted_threshold,
+                }
+            )
+
+            # Log spécifique pour traductions
+            logger.debug(
+                f"OOD Multilingue [{language}]: '{query[:30]}...' -> "
+                f"'{translated_query[:30]}...' | Score: {score:.3f} | "
+                f"Seuil ajusté: {adjusted_threshold:.3f} | "
+                f"Décision: {'ACCEPTÉ' if is_in_domain else 'REJETÉ'}"
+            )
+
+            return is_in_domain, score, details
+
+        except Exception as e:
+            logger.warning(f"Erreur traduction {language}: {e}")
+            # Fallback robuste
+            return await self._fallback_analysis(query, language)
+
+    async def _translate_to_french(self, query: str, source_lang: str) -> str:
+        """Traduction vers le français via OpenAI avec cache"""
+
+        # Vérification du cache
+        cache_key = f"{source_lang}:{hash(query)}"
+        if cache_key in self.translation_cache:
+            return self.translation_cache[cache_key]
+
+        # Traduction via OpenAI si client disponible
+        if self.openai_client:
+            try:
+                response = await self.openai_client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": f"Translate the following poultry/agriculture query from {source_lang} to French. "
+                            "Keep technical terms like 'Cobb 500', 'Ross 308', 'FCR' unchanged. "
+                            "Return only the French translation, no explanations.",
+                        },
+                        {"role": "user", "content": query},
+                    ],
+                    max_tokens=150,
+                    temperature=0,
+                )
+
+                translated = response.choices[0].message.content.strip()
+
+                # Validation basique de la traduction
+                if len(translated) > 0 and len(translated) < len(query) * 3:
+                    self.translation_cache[cache_key] = translated
+                    logger.debug(
+                        f"Traduction OpenAI [{source_lang}->fr]: '{query}' -> '{translated}'"
+                    )
+                    return translated
+                else:
+                    logger.warning(f"Traduction OpenAI suspecte pour: {query}")
+
+            except Exception as e:
+                logger.error(f"Erreur traduction OpenAI: {e}")
+
+        # Fallback avec traduction basique par patterns
+        return self._simple_translation_fallback(query, source_lang)
+
+    def _simple_translation_fallback(self, query: str, source_lang: str) -> str:
+        """Traduction basique par patterns pour les cas d'urgence"""
+
+        # Dictionnaires de base pour termes courants aviculture
+        basic_translations = {
+            "en": {
+                "chicken": "poulet",
+                "poultry": "volaille",
+                "weight": "poids",
+                "days": "jours",
+                "day": "jour",
+                "male": "mâle",
+                "female": "femelle",
+                "feed": "aliment",
+                "growth": "croissance",
+                "mortality": "mortalité",
+            },
+            "es": {
+                "pollo": "poulet",
+                "peso": "poids",
+                "días": "jours",
+                "día": "jour",
+                "macho": "mâle",
+                "hembra": "femelle",
+                "gallina": "poule",
+                "alimentación": "alimentation",
+                "crecimiento": "croissance",
+            },
+            "de": {
+                "huhn": "poulet",
+                "hähnchen": "poulet",
+                "gewicht": "poids",
+                "tage": "jours",
+                "tag": "jour",
+                "männlich": "mâle",
+                "weiblich": "femelle",
+                "futter": "aliment",
+                "wachstum": "croissance",
+            },
+            "it": {
+                "pollo": "poulet",
+                "peso": "poids",
+                "giorni": "jours",
+                "giorno": "jour",
+                "maschio": "mâle",
+                "femmina": "femelle",
+                "alimentazione": "alimentation",
+            },
+            "pt": {
+                "frango": "poulet",
+                "peso": "poids",
+                "dias": "jours",
+                "dia": "jour",
+                "macho": "mâle",
+                "fêmea": "femelle",
+                "alimentação": "alimentation",
+            },
+            "hi": {
+                "मुर्गी": "poulet",
+                "चिकन": "poulet",
+                "वजन": "poids",
+                "दिन": "jour",
+                "नर": "mâle",
+                "मादा": "femelle",
+                "भोजन": "aliment",
+            },
+            "zh": {
+                "鸡": "poulet",
+                "体重": "poids",
+                "重量": "poids",
+                "天": "jour",
+                "公": "mâle",
+                "母": "femelle",
+                "饲料": "aliment",
+            },
+            "th": {
+                "ไก่": "poulet",
+                "น้ำหนัก": "poids",
+                "วัน": "jour",
+                "ตัวผู้": "mâle",
+                "ตัวเมีย": "femelle",
+                "อาหาร": "aliment",
+            },
+        }
+
+        translated = query.lower()
+        if source_lang in basic_translations:
+            for foreign_term, french_term in basic_translations[source_lang].items():
+                translated = re.sub(
+                    rf"\b{re.escape(foreign_term)}\b",
+                    french_term,
+                    translated,
+                    flags=re.IGNORECASE,
+                )
+
+        # Conserver les termes techniques universels
+        technical_terms = ["cobb", "ross", "hubbard", "isa", "fcr"]
+        for term in technical_terms:
+            if term in query.lower():
+                translated = translated.replace(term, term)
+
+        logger.debug(
+            f"Traduction fallback [{source_lang}->fr]: '{query}' -> '{translated}'"
+        )
+        return translated
+
+    async def _fallback_analysis(
+        self, query: str, language: str
+    ) -> Tuple[bool, float, Dict]:
+        """Analyse de secours sans traduction pour cas d'urgence"""
+
+        # Recherche de termes techniques universels
+        universal_terms = ["cobb", "ross", "hubbard", "isa", "fcr", "308", "500"]
+        found_universal = sum(
+            1 for term in universal_terms if term.lower() in query.lower()
+        )
+
+        # Recherche de nombres (indicateurs de spécificité technique)
+        numbers = re.findall(r"\d+", query)
+
+        # Recherche de patterns aviculture (unités, âges)
+        poultry_patterns = [
+            r"\d+\s*(?:g|kg|gram|kilogram)",  # Poids
+            r"\d+\s*(?:day|jour|dia|tag|giorno|วัน|天|दिन)",  # Âge
+            r"\d+\s*%",  # Pourcentages
+        ]
+        pattern_matches = sum(
+            1
+            for pattern in poultry_patterns
+            if re.search(pattern, query, re.IGNORECASE)
+        )
+
+        # Score basique avec bonus pour termes techniques
+        base_score = (
+            (found_universal * 0.4) + (len(numbers) * 0.1) + (pattern_matches * 0.2)
+        )
+
+        # Seuil très permissif pour éviter de bloquer des questions légitimes
+        fallback_threshold = 0.08
+        is_in_domain = base_score > fallback_threshold or found_universal > 0
+
+        logger.info(
+            f"OOD Fallback [{language}]: '{query[:40]}...' | "
+            f"Score: {base_score:.3f} | Termes techniques: {found_universal} | "
+            f"Patterns: {pattern_matches} | Décision: {'ACCEPTÉ' if is_in_domain else 'REJETÉ'}"
+        )
+
+        return (
+            is_in_domain,
+            base_score,
+            {
+                "fallback_used": True,
+                "language": language,
+                "universal_terms_found": found_universal,
+                "numbers_found": len(numbers),
+                "poultry_patterns": pattern_matches,
+                "threshold": fallback_threshold,
+                "reasoning": f"Fallback analysis - {found_universal} universal terms, {pattern_matches} patterns",
+                "translation_failed": True,
+            },
+        )
+
+    def _normalize_query_preserve_script(self, query: str, language: str) -> str:
+        """Normalisation qui préserve les scripts non-latins"""
         if not query:
             return ""
 
-        # Conversion unicode si disponible
+        # Pour les scripts non-latins, ne PAS utiliser unidecode
+        if language in ["hi", "th", "zh"]:
+            # Normalisation légère sans destruction du script
+            normalized = query.lower()
+            # Supprimer seulement la ponctuation excessive
+            normalized = re.sub(r"[^\w\s\d.,%-]", " ", normalized)
+            normalized = re.sub(r"\s+", " ", normalized).strip()
+            return normalized
+
+        # Pour les scripts latins, normalisation standard
         normalized = unidecode(query).lower() if UNIDECODE_AVAILABLE else query.lower()
-
-        # Nettoyage des caractères spéciaux mais préservation des chiffres
         normalized = re.sub(r"[^\w\s\d.,%-]", " ", normalized)
-
-        # Normalisation des espaces
         normalized = re.sub(r"\s+", " ", normalized).strip()
 
-        # Expansion des acronymes courants en aviculture
+        # Expansion des acronymes courants
         acronym_expansions = {
             "ic": "indice conversion",
             "fcr": "feed conversion ratio",
-            "adr": "alimentation distribution",
             "pv": "poids vif",
             "gmq": "gain moyen quotidien",
         }
@@ -420,8 +743,7 @@ class EnhancedOODDetector:
     def _analyze_query_context(
         self, query: str, words: List[str], intent_result=None
     ) -> Dict:
-        """Analyse contextuelle approfondie de la requête"""
-
+        """Analyse contextuelle de la requête"""
         context = {
             "type": "standard_query",
             "technical_indicators": [],
@@ -435,15 +757,16 @@ class EnhancedOODDetector:
         technical_patterns = [
             (r"\b(?:fcr|ic|indice)\b", "conversion_metric"),
             (r"\b(?:ross|cobb|hubbard|isa)\s*\d*\b", "genetic_line"),
-            (r"\b\d+\s*(?:jour|day|semaine|week)s?\b", "age_specification"),
-            (r"\b\d+[.,]?\d*\s*(?:g|kg|gramme|kilo)\b", "weight_measure"),
+            (
+                r"\b\d+\s*(?:jour|day|semaine|week|dia|tag|giorno|วัน|天|दिन)s?\b",
+                "age_specification",
+            ),
+            (r"\b\d+[.,]?\d*\s*(?:g|kg|gramme|gram|kilogram)\b", "weight_measure"),
             (r"\b\d+[.,]?\d*\s*%\b", "percentage_value"),
-            (r"\b(?:température|temp|°c|celsius)\b", "environmental_param"),
-            (r"\b(?:vaccination|vaccin|prophylaxie)\b", "health_protocol"),
         ]
 
         for pattern, indicator_type in technical_patterns:
-            matches = re.findall(pattern, query)
+            matches = re.findall(pattern, query, re.IGNORECASE)
             if matches:
                 context["technical_indicators"].append(
                     {"type": indicator_type, "matches": matches, "count": len(matches)}
@@ -451,15 +774,13 @@ class EnhancedOODDetector:
 
         # Détection d'indicateurs numériques
         numeric_patterns = [
-            r"\b\d+[.,]?\d*\s*(?:g|kg|gramme|kilogramme)s?\b",
+            r"\b\d+[.,]?\d*\s*(?:g|kg|gramme|gram|kilogram)s?\b",
             r"\b\d+[.,]?\d*\s*%\b",
-            r"\b\d+[.,]?\d*\s*(?:°c|degré|celsius)\b",
-            r"\b\d+\s*(?:jour|day|semaine|week|mois|month)s?\b",
-            r"\b\d+[.,]?\d*\s*(?:l|litre|ml|millilitre)s?\b",
+            r"\b\d+\s*(?:jour|day|semaine|week|dia|tag|giorno|วัน|天|दिन)s?\b",
         ]
 
         for pattern in numeric_patterns:
-            matches = re.findall(pattern, query)
+            matches = re.findall(pattern, query, re.IGNORECASE)
             context["numeric_indicators"].extend(matches)
 
         # Classification du type de requête
@@ -469,25 +790,17 @@ class EnhancedOODDetector:
         elif len(context["numeric_indicators"]) >= 1:
             context["type"] = "numeric_query"
             context["specificity_level"] = "high"
-        elif any(word in query for word in ["comment", "how", "pourquoi", "why"]):
-            context["question_type"] = "how_to"
-            context["specificity_level"] = "medium"
-        elif any(word in query for word in ["quel", "quelle", "what", "which"]):
-            context["question_type"] = "information_seeking"
-            context["specificity_level"] = "medium"
 
-        # Intégration des informations d'intention si disponibles
+        # Intégration des informations d'intention
         if intent_result:
             try:
                 if hasattr(intent_result, "confidence"):
                     context["intent_confidence"] = float(intent_result.confidence)
-
                 if hasattr(intent_result, "detected_entities"):
                     entities = intent_result.detected_entities
                     if len(entities) >= 2:
                         context["type"] = "technical_query"
                         context["specificity_level"] = "very_high"
-
             except Exception as e:
                 logger.warning(f"Erreur analyse intention: {e}")
 
@@ -496,39 +809,23 @@ class EnhancedOODDetector:
     def _calculate_domain_relevance(
         self, words: List[str], context_analysis: Dict
     ) -> DomainScore:
-        """Calcul précis de la pertinence domaine avec scoring hiérarchique"""
-
+        """Calcul de la pertinence domaine"""
         domain_words = []
         relevance_scores = {level: 0 for level in DomainRelevance}
-        word_contributions = {}
 
-        # Analyse mot par mot avec pondération
+        # Analyse mot par mot
         for word in words:
             word_clean = word.strip().lower()
-            if len(word_clean) < 2:  # Ignorer mots trop courts
+            if len(word_clean) < 2:
                 continue
 
-            # Recherche dans chaque niveau de pertinence
             for level, vocabulary in self.domain_vocabulary.items():
                 if word_clean in vocabulary:
                     domain_words.append(word_clean)
                     relevance_scores[level] += 1
-                    word_contributions[word_clean] = level
-                    break  # Un mot ne peut appartenir qu'à un niveau
+                    break
 
-                # Recherche de correspondances partielles pour les termes composés
-                for vocab_term in vocabulary:
-                    if len(vocab_term) > 4 and (
-                        word_clean in vocab_term or vocab_term in word_clean
-                    ):
-                        domain_words.append(f"{word_clean}~{vocab_term}")
-                        relevance_scores[
-                            level
-                        ] += 0.7  # Score réduit pour match partiel
-                        word_contributions[word_clean] = level
-                        break
-
-        # Calcul du score final avec pondération hiérarchique
+        # Calcul du score avec pondération
         weight_multipliers = {
             DomainRelevance.HIGH: 1.0,
             DomainRelevance.MEDIUM: 0.6,
@@ -542,11 +839,10 @@ class EnhancedOODDetector:
             if level != DomainRelevance.BLOCKED
         )
 
-        # Normalisation par rapport au nombre total de mots significatifs
         significant_words = [w for w in words if len(w.strip()) >= 2]
         base_score = weighted_score / len(significant_words) if significant_words else 0
 
-        # Détermination du niveau de pertinence global
+        # Détermination du niveau de pertinence
         if relevance_scores[DomainRelevance.HIGH] >= 2:
             overall_relevance = DomainRelevance.HIGH
         elif (
@@ -569,12 +865,9 @@ class EnhancedOODDetector:
         else:
             overall_relevance = DomainRelevance.GENERIC
 
-        # Bonus pour cohérence contextuelle
+        # Bonus contextuel
         context_bonus = 0.0
-        if context_analysis["type"] == "technical_query" and overall_relevance in [
-            DomainRelevance.HIGH,
-            DomainRelevance.MEDIUM,
-        ]:
+        if context_analysis["type"] == "technical_query":
             context_bonus += 0.15
         if len(context_analysis["technical_indicators"]) >= 1:
             context_bonus += 0.1
@@ -583,15 +876,6 @@ class EnhancedOODDetector:
 
         final_score = min(1.0, base_score + context_bonus)
 
-        # Construction du raisonnement
-        reasoning_parts = [
-            f"Mots domaine: {len(domain_words)}/{len(significant_words)}",
-            f"Niveau: {overall_relevance.value}",
-            f"Score base: {base_score:.3f}",
-        ]
-        if context_bonus > 0:
-            reasoning_parts.append(f"Bonus contexte: +{context_bonus:.3f}")
-
         confidence_boosters = {
             "context_bonus": context_bonus,
             "high_relevance_words": relevance_scores[DomainRelevance.HIGH],
@@ -599,170 +883,77 @@ class EnhancedOODDetector:
             "technical_indicators": len(context_analysis["technical_indicators"]),
         }
 
+        reasoning = f"Mots domaine: {len(domain_words)}/{len(significant_words)} | Niveau: {overall_relevance.value} | Score: {final_score:.3f}"
+
         return DomainScore(
             final_score=final_score,
             relevance_level=overall_relevance,
             domain_words=domain_words,
-            blocked_terms=[],  # Sera rempli par _detect_blocked_terms
+            blocked_terms=[],
             confidence_boosters=confidence_boosters,
-            threshold_applied=0.0,  # Sera défini plus tard
-            reasoning=" | ".join(reasoning_parts),
+            threshold_applied=0.0,
+            reasoning=reasoning,
         )
 
     def _detect_blocked_terms(self, query: str, words: List[str]) -> Dict:
-        """Détection intelligente des termes explicitement bloqués"""
-
+        """Détection des termes bloqués"""
         blocked_found = []
-        blocking_categories = []
         is_blocked = False
 
         for category, terms in self.blocked_terms.items():
-            category_matches = []
-
             for term in terms:
-                # Recherche exacte et partielle
                 if term.lower() in query:
-                    category_matches.append(term)
                     blocked_found.append(term)
 
-            if category_matches:
-                blocking_categories.append(
-                    {
-                        "category": category,
-                        "matches": category_matches,
-                        "severity": self._get_blocking_severity(category),
-                    }
-                )
-
-        # Décision de blocage basée sur la sévérité
-        high_severity_blocks = [
-            cat
-            for cat in blocking_categories
-            if cat["severity"] in ["critical", "high"]
-        ]
-
-        if high_severity_blocks:
-            is_blocked = True
-        elif len(blocking_categories) >= 2:  # Multiple catégories = suspect
-            is_blocked = True
-        elif len(blocked_found) >= 3:  # Beaucoup de termes bloqués = suspect
+        # Décision de blocage
+        if len(blocked_found) >= 2:
             is_blocked = True
 
         return {
             "is_blocked": is_blocked,
             "blocked_terms": blocked_found,
-            "blocking_categories": blocking_categories,
             "block_score": len(blocked_found) / max(len(words), 1),
         }
-
-    def _get_blocking_severity(self, category: str) -> str:
-        """Détermine la sévérité d'une catégorie de blocage"""
-        severity_mapping = {
-            "adult_content": "critical",
-            "illegal": "critical",
-            "hate_speech": "critical",
-            "violence": "critical",
-            "crypto_finance": "high",
-            "politics": "high",
-            "medical_advice": "high",
-            "entertainment": "medium",
-            "sports": "medium",
-            "technology": "low",
-            "general": "low",
-        }
-        return severity_mapping.get(category, "medium")
 
     def _apply_context_boosters(
         self, base_score: float, context_analysis: Dict, intent_result=None
     ) -> float:
-        """Application de boosters contextuels intelligents"""
-
+        """Application de boosters contextuels"""
         boosted_score = base_score
 
-        # Booster pour requêtes techniques
         if context_analysis["type"] == "technical_query":
             boosted_score += 0.15
 
-        # Booster pour indicateurs numériques spécifiques
         numeric_count = len(context_analysis["numeric_indicators"])
         if numeric_count >= 2:
             boosted_score += 0.1
         elif numeric_count == 1:
             boosted_score += 0.05
 
-        # Booster pour confiance d'intention élevée
         if context_analysis["intent_confidence"] > 0.8:
             boosted_score += 0.1
-        elif context_analysis["intent_confidence"] > 0.6:
-            boosted_score += 0.05
 
-        # Booster pour spécificité élevée
-        if context_analysis["specificity_level"] == "very_high":
-            boosted_score += 0.12
-        elif context_analysis["specificity_level"] == "high":
-            boosted_score += 0.08
-
-        # Booster pour entités métier détectées
-        if intent_result and hasattr(intent_result, "detected_entities"):
-            entities = intent_result.detected_entities
-            business_entities = [
-                "line",
-                "species",
-                "age_days",
-                "weight",
-                "fcr",
-                "phase",
-            ]
-            detected_business = [e for e in business_entities if e in entities]
-
-            if len(detected_business) >= 3:
-                boosted_score += 0.2
-            elif len(detected_business) >= 2:
-                boosted_score += 0.15
-            elif len(detected_business) >= 1:
-                boosted_score += 0.1
-
-        # Limitation du score final
         return min(0.98, boosted_score)
 
     def _select_adaptive_threshold(
         self, context_analysis: Dict, domain_analysis: DomainScore
     ) -> float:
-        """Sélection intelligente du seuil adaptatif"""
-
-        # Seuil de base selon le type de requête
+        """Sélection du seuil adaptatif"""
         base_threshold = self.adaptive_thresholds.get(
             context_analysis["type"], self.adaptive_thresholds["standard_query"]
         )
 
-        # Ajustements contextuels
-        adjustments = []
-
-        # Plus strict pour requêtes très génériques
+        # Ajustements
         if (
             context_analysis["specificity_level"] == "low"
             and domain_analysis.relevance_level == DomainRelevance.GENERIC
         ):
-            adjustments.append(("generic_penalty", +0.1))
+            base_threshold += 0.1
 
-        # Plus permissif pour requêtes avec indicateurs techniques
         if len(context_analysis["technical_indicators"]) >= 2:
-            adjustments.append(("technical_bonus", -0.05))
+            base_threshold -= 0.05
 
-        # Plus permissif pour requêtes avec entités métier
-        if domain_analysis.confidence_boosters.get("high_relevance_words", 0) >= 2:
-            adjustments.append(("domain_expert", -0.05))
-
-        # Application des ajustements
-        final_threshold = base_threshold
-        for reason, adjustment in adjustments:
-            final_threshold += adjustment
-            logger.debug(f"Ajustement seuil {reason}: {adjustment:+.3f}")
-
-        # Limites de sécurité
-        final_threshold = max(0.05, min(0.6, final_threshold))
-
-        return final_threshold
+        return max(0.05, min(0.6, base_threshold))
 
     def _log_ood_decision(
         self,
@@ -773,124 +964,97 @@ class EnhancedOODDetector:
         threshold: float,
         is_in_domain: bool,
     ) -> None:
-        """Logging détaillé des décisions OOD pour debugging"""
-
+        """Logging des décisions OOD"""
         decision = "ACCEPTÉ" if is_in_domain else "REJETÉ"
-
         logger.debug(
             f"OOD {decision}: '{query[:50]}...' | "
             f"Score: {final_score:.3f} vs Seuil: {threshold:.3f} | "
-            f"Mots domaine: {len(domain_analysis.domain_words)}/{len(words)} | "
-            f"Niveau: {domain_analysis.relevance_level.value} | "
-            f"Raisonnement: {domain_analysis.reasoning}"
+            f"Mots domaine: {len(domain_analysis.domain_words)}/{len(words)}"
         )
-
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"  Mots trouvés: {domain_analysis.domain_words}")
-            logger.debug(f"  Boosters: {domain_analysis.confidence_boosters}")
 
     def _update_ood_metrics(
         self, domain_analysis: DomainScore, threshold: float, is_in_domain: bool
     ) -> None:
-        """Mise à jour des métriques et statistiques OOD"""
-
+        """Mise à jour des métriques"""
         try:
-            # Métriques de base
             if is_in_domain:
                 METRICS.ood_accepted(
                     domain_analysis.final_score, domain_analysis.relevance_level.value
                 )
             else:
                 METRICS.ood_filtered(domain_analysis.final_score, "threshold_not_met")
-
-            # Statistiques détaillées
-            METRICS.ood_stats["total_queries"] += 1
-            METRICS.ood_stats[f"level_{domain_analysis.relevance_level.value}"] += 1
-
-            if not isinstance(METRICS.ood_stats["threshold_applications"], dict):
-                METRICS.ood_stats["threshold_applications"] = {}
-
-            METRICS.ood_stats["threshold_applications"][threshold] = (
-                METRICS.ood_stats["threshold_applications"].get(threshold, 0) + 1
-            )
-
-            # Métriques de performance du système
-            if len(domain_analysis.domain_words) >= 2:
-                METRICS.ood_stats["high_domain_content"] += 1
-
-            if domain_analysis.confidence_boosters.get("technical_indicators", 0) >= 1:
-                METRICS.ood_stats["technical_queries"] += 1
-
         except Exception as e:
             logger.warning(f"Erreur mise à jour métriques OOD: {e}")
 
     def get_detector_stats(self) -> Dict:
-        """Statistiques détaillées du détecteur"""
-
+        """Statistiques du détecteur"""
         vocab_stats = {
             level.value: len(terms) for level, terms in self.domain_vocabulary.items()
         }
-
         blocked_stats = {
             category: len(terms) for category, terms in self.blocked_terms.items()
         }
 
         return {
-            "version": "enhanced_adaptive_v2.0",
+            "version": "multilingual_v1.0",
             "vocabulary_stats": vocab_stats,
             "blocked_terms_stats": blocked_stats,
             "adaptive_thresholds": self.adaptive_thresholds.copy(),
+            "language_adjustments": self.language_adjustments.copy(),
+            "supported_languages": self.supported_languages.copy(),
+            "translation_cache_size": len(self.translation_cache),
             "total_domain_terms": sum(
                 len(terms) for terms in self.domain_vocabulary.values()
             ),
-            "total_blocked_terms": sum(
-                len(terms) for terms in self.blocked_terms.values()
-            ),
-            "current_config": {
-                "base_min_score": OOD_MIN_SCORE,
-                "base_strict_score": OOD_STRICT_SCORE,
-                "unidecode_available": UNIDECODE_AVAILABLE,
-            },
         }
 
-    def test_query_analysis(self, query: str) -> Dict:
+    async def test_query_analysis(self, query: str, language: str = "fr") -> Dict:
         """Méthode de test pour analyser une requête en détail"""
-
-        normalized = self._normalize_query(query)
-        words = normalized.split()
-        context = self._analyze_query_context(normalized, words, None)
-        domain_analysis = self._calculate_domain_relevance(words, context)
-        blocked_analysis = self._detect_blocked_terms(normalized, words)
-
-        boosted_score = self._apply_context_boosters(
-            domain_analysis.final_score, context, None
+        is_in_domain, score, details = await self.calculate_ood_score(
+            query, None, language
         )
-        threshold = self._select_adaptive_threshold(context, domain_analysis)
-        is_in_domain = boosted_score > threshold and not blocked_analysis["is_blocked"]
 
         return {
             "original_query": query,
-            "normalized_query": normalized,
-            "words": words,
-            "context_analysis": context,
-            "domain_analysis": {
-                "score": domain_analysis.final_score,
-                "relevance_level": domain_analysis.relevance_level.value,
-                "domain_words": domain_analysis.domain_words,
-                "reasoning": domain_analysis.reasoning,
-                "boosters": domain_analysis.confidence_boosters,
-            },
-            "blocked_analysis": blocked_analysis,
-            "final_results": {
-                "boosted_score": boosted_score,
-                "threshold": threshold,
-                "is_in_domain": is_in_domain,
-                "decision": "ACCEPTED" if is_in_domain else "REJECTED",
-            },
+            "language": language,
+            "final_score": score,
+            "is_in_domain": is_in_domain,
+            "decision": "ACCEPTED" if is_in_domain else "REJECTED",
+            "details": details,
         }
 
 
-# Factory pour compatibilité
+# Classe pour compatibilité descendante
+class EnhancedOODDetector(MultilingualOODDetector):
+    """Alias pour compatibilité avec le code existant"""
+
+    def __init__(self, blocked_terms_path: str = None):
+        super().__init__(blocked_terms_path)
+
+    def calculate_ood_score(
+        self, query: str, intent_result=None
+    ) -> Tuple[bool, float, Dict[str, float]]:
+        """Méthode synchrone pour compatibilité - utilise le français par défaut"""
+        # Conversion en appel asynchrone avec langue française par défaut
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        return loop.run_until_complete(
+            super().calculate_ood_score(query, intent_result, "fr")
+        )
+
+
+# Factory functions
 def create_ood_detector(blocked_terms_path: str = None) -> EnhancedOODDetector:
-    """Crée une instance du détecteur OOD optimisé"""
+    """Crée une instance du détecteur OOD avec compatibilité"""
     return EnhancedOODDetector(blocked_terms_path)
+
+
+def create_multilingual_ood_detector(
+    blocked_terms_path: str = None, openai_client=None
+) -> MultilingualOODDetector:
+    """Crée une instance du détecteur OOD multilingue complet"""
+    return MultilingualOODDetector(blocked_terms_path, openai_client)
