@@ -625,7 +625,13 @@ class MultilingualOODDetector:
     def _translate_sync_wrapper(self, query: str, source_lang: str) -> str:
         """Wrapper synchrone pour la traduction OpenAI"""
         try:
-            response = self.openai_client.chat.completions.create(
+            # CORRECTION CRITIQUE: Utiliser un client synchrone au lieu d'async
+            import openai
+
+            # Créer un client synchrone temporaire pour cette opération
+            sync_client = openai.OpenAI(api_key=self.openai_client.api_key)
+
+            response = sync_client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {
