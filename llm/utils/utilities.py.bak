@@ -320,32 +320,11 @@ def _load_fasttext_model():
         try:
             model_path = FASTTEXT_MODEL_PATH
             if not os.path.exists(model_path):
-                logger.info(f"Modèle FastText non trouvé: {model_path}")
-
-                # Déterminer le type de modèle selon FASTTEXT_MODEL_PATH
-                if "lid" in model_path.lower() or "176" in model_path:
-                    # Modèle de détection de langue
-                    logger.info("Téléchargement du modèle de détection de langue...")
-                    import fasttext.util
-
-                    fasttext.util.download_model("lid", if_exists="ignore")
-                    # Vérifier si le téléchargement a créé le fichier attendu
-                    if not os.path.exists(model_path):
-                        # Essayer le nom de fichier standard après téléchargement
-                        if os.path.exists("lid.176.ftz"):
-                            model_path = "lid.176.ftz"
-                else:
-                    # Modèle d'embeddings - utiliser le nom dans la variable d'environnement
-                    logger.info(f"Téléchargement du modèle d'embeddings: {model_path}")
-                    import fasttext.util
-
-                    if "en" in model_path:
-                        fasttext.util.download_model("en", if_exists="ignore")
-                        # Le fichier téléchargé sera probablement cc.en.300.bin
-                        if not os.path.exists(model_path) and os.path.exists(
-                            "cc.en.300.bin"
-                        ):
-                            model_path = "cc.en.300.bin"
+                logger.warning(f"Modèle FastText non trouvé: {model_path}")
+                logger.info(
+                    "Le modèle devrait être pré-chargé au démarrage de l'application"
+                )
+                return None
 
             _fasttext_model = fasttext.load_model(model_path)
             logger.info(f"Modèle FastText chargé: {model_path}")

@@ -11,7 +11,6 @@ import time
 import json
 import logging
 import statistics
-import dataclasses
 from collections import defaultdict
 from typing import Dict, List, Optional, Any
 from pathlib import Path
@@ -179,27 +178,28 @@ class ProcessingResult:
 # ============================================================================
 # FONCTION DE SÉRIALISATION CORRIGÉE - SUPPORT DATACLASSES
 # ============================================================================
-
-
 def safe_serialize_for_json(obj: Any) -> Any:
-    """Convertit récursivement les objets en types JSON-safe avec support dataclasses"""
+    """Convertit récursivement les objets en types JSON-safe"""
     if obj is None:
         return None
     elif isinstance(obj, (str, int, float, bool)):
         return obj
     elif isinstance(obj, Enum):
         return obj.value
-    elif dataclasses.is_dataclass(obj):
-        # CORRECTION PRINCIPALE: Support spécifique pour les dataclasses
-        if hasattr(obj, "to_dict"):
-            # Utiliser la méthode to_dict si disponible
-            return obj.to_dict()
-        else:
-            # Fallback vers conversion directe des champs
-            return {
-                field.name: safe_serialize_for_json(getattr(obj, field.name))
-                for field in dataclasses.fields(obj)
-            }
+
+    # NOUVEAU: Gestion spéciale pour LanguageDetectionResult
+    elif (
+        hasattr(obj, "language")
+        and hasattr(obj, "confidence")
+        and hasattr(obj, "source")
+    ):
+        return {
+            "language": obj.language,
+            "confidence": float(obj.confidence),
+            "source": obj.source,
+            "processing_time_ms": getattr(obj, "processing_time_ms", 0),
+        }
+
     elif isinstance(obj, dict):
         return {k: safe_serialize_for_json(v) for k, v in obj.items()}
     elif isinstance(obj, (list, tuple)):
@@ -213,8 +213,6 @@ def safe_serialize_for_json(obj: Any) -> Any:
 # ============================================================================
 # SERVICE DE TRADUCTION (LAZY LOADING)
 # ============================================================================
-
-
 def _get_translation_service():
     """Récupère le service de traduction avec lazy loading"""
     global _translation_service

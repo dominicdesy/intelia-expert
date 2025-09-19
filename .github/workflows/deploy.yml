@@ -303,25 +303,35 @@ jobs:
               
               echo "Suppression: $tag"
               
+              # Verifier d'abord que le tag existe encore
+              if ! doctl registry repository list-tags "$repo" --format "Tag" --no-header | grep -q "^${tag}$"; then
+                echo "   Tag '$tag' n'existe plus, ignore"
+                continue
+              fi
+              
               success=false
-              for attempt in {1..2}; do
-                if doctl registry repository delete-tag "$repo" "$tag" --force 2>/dev/null; then
+              for attempt in {1..3}; do
+                if doctl registry repository delete-tag "$repo" "$tag" --force 2>&1; then
                   echo "   Supprime avec succes"
                   ((deleted++))
                   success=true
                   break
                 else
                   echo "   Echec tentative $attempt"
-                  sleep 1
+                  # Afficher l'erreur complete pour diagnostic
+                  doctl registry repository delete-tag "$repo" "$tag" --force || true
+                  sleep 2
                 fi
               done
               
               if [ "$success" = false ]; then
                 ((failed++))
                 echo "   ECHEC FINAL pour tag: $tag"
+                # Continuer au lieu de fail le script entier
+                echo "   Continuing with next tag..."
               fi
               
-              sleep 0.5
+              sleep 1
               
             done < "/tmp/${repo}_to_delete.txt"
             
@@ -329,6 +339,13 @@ jobs:
             echo "   Supprimes: $deleted"
             echo "   Echecs: $failed"
             echo "   Images restantes: ~$((total_images - deleted))"
+            
+            # Ne pas faire echouer le script si quelques suppressions ont echoue
+            if [ "$failed" -gt 0 ] && [ "$deleted" -eq 0 ]; then
+              echo "   ATTENTION: Aucune suppression reussie pour $repo"
+            elif [ "$failed" -gt 0 ]; then
+              echo "   INFO: Quelques echecs, mais $deleted suppressions reussies"
+            fi
             
             # Nettoyage des fichiers temporaires
             rm -f "/tmp/${repo}"_*.txt "/tmp/${repo}.json"
