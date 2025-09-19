@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-
 rag_engine.py - RAG Engine Enhanced avec LangSmith et RRF Intelligent
-
+Version corrigée pour compatibilité avec le nouveau ood_detector.py
 """
 
 import os
@@ -272,11 +271,14 @@ class InteliaRAGEngine:
 
             logger.debug("Étape 3: Composants de base...")
 
-            # 3. Composants de base
+            # 3. Composants de base - CORRECTION CRITIQUE: Passer openai_client au détecteur OOD
             try:
                 self.embedder = OpenAIEmbedder(self.openai_client, self.cache_manager)
                 self.memory = ConversationMemory(self.openai_client)
-                self.ood_detector = EnhancedOODDetector()
+                # CORRECTION: Passer le client OpenAI pour la traduction multilingue
+                self.ood_detector = EnhancedOODDetector(
+                    blocked_terms_path=None, openai_client=self.openai_client
+                )
                 logger.debug("Composants de base initialisés")
             except Exception as e:
                 logger.error(f"Erreur composants de base: {e}")
@@ -692,22 +694,20 @@ class InteliaRAGEngine:
                     logger.warning(f"Erreur intent processor: {e}")
                     intent_result = None
 
-            # OOD detection avec seuil dynamique
+            # CORRECTION CRITIQUE: OOD detection avec nouvelle API
             if self.ood_detector:
                 try:
-                    # Nouveau : passer la langue détectée
+                    # NOUVEAU: Utiliser calculate_ood_score_multilingual() synchrone
                     is_in_domain, domain_score, score_details = (
-                        await self.ood_detector.calculate_ood_score_multilingual(
-                            query, language, intent_result
+                        self.ood_detector.calculate_ood_score_multilingual(
+                            query, intent_result, language
                         )
                     )
 
                     if not is_in_domain:
                         return RAGResult(
                             source=RAGSource.OOD_FILTERED,
-                            answer=get_out_of_domain_message(
-                                language
-                            ),  # Message dans la bonne langue
+                            answer=get_out_of_domain_message(language),
                             confidence=0.0,
                             metadata={
                                 "ood_score": domain_score,
@@ -718,6 +718,26 @@ class InteliaRAGEngine:
                         )
                 except Exception as e:
                     logger.warning(f"Erreur OOD multilingue: {e}")
+                    # Fallback vers méthode standard si multilingue échoue
+                    try:
+                        is_in_domain, domain_score, score_details = (
+                            self.ood_detector.calculate_ood_score(query, intent_result)
+                        )
+                        if not is_in_domain:
+                            return RAGResult(
+                                source=RAGSource.OOD_FILTERED,
+                                answer=get_out_of_domain_message(language),
+                                confidence=0.0,
+                                metadata={
+                                    "ood_score": domain_score,
+                                    "reason": "out_of_domain",
+                                    "language": language,
+                                    "fallback_used": True,
+                                },
+                            )
+                    except Exception as fallback_error:
+                        logger.error(f"Erreur OOD fallback: {fallback_error}")
+                        # Continuer sans OOD si tout échoue
 
             # Préparation contexte conversation
             conversation_context_str = ""
@@ -813,18 +833,18 @@ class InteliaRAGEngine:
                 doc for doc in documents if doc.score >= effective_threshold
             ]
 
-            # Logs de diagnostic pour debugging
-            logger.error(f"🔍 DEBUG RAG: documents trouvés: {len(documents)}")
-            logger.error(f"🔍 DEBUG RAG: seuil appliqué: {effective_threshold}")
+            # Logs de diagnostic pour debugging - CHANGEMENT: debug au lieu d'error
+            logger.debug(f"🔍 DEBUG RAG: documents trouvés: {len(documents)}")
+            logger.debug(f"🔍 DEBUG RAG: seuil appliqué: {effective_threshold}")
             if documents:
                 scores = [doc.score for doc in documents]
-                logger.error(f"🔍 DEBUG RAG: scores des documents: {scores}")
-                logger.error(f"🔍 DEBUG RAG: score max: {max(scores)}")
-            logger.error(f"🔍 DEBUG RAG: documents filtrés: {len(filtered_docs)}")
+                logger.debug(f"🔍 DEBUG RAG: scores des documents: {scores}")
+                logger.debug(f"🔍 DEBUG RAG: score max: {max(scores)}")
+            logger.debug(f"🔍 DEBUG RAG: documents filtrés: {len(filtered_docs)}")
 
             # Vérification et retour LOW_CONFIDENCE si nécessaire
             if not filtered_docs:
-                logger.error(
+                logger.debug(
                     "🚨 DEBUG RAG: RETOURNE LOW_CONFIDENCE - aucun document ne passe le seuil"
                 )
                 return RAGResult(
