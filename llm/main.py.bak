@@ -79,42 +79,7 @@ async def lifespan(app: FastAPI):
         logger.info("Pré-chargement du modèle FastText...")
         try:
             from utils.utilities import _load_fasttext_model
-            from config.config import FASTTEXT_MODEL_PATH
-            import os
 
-            # Vérifier si le modèle existe, sinon le télécharger
-            if not os.path.exists(FASTTEXT_MODEL_PATH):
-                logger.info(f"Téléchargement du modèle FastText: {FASTTEXT_MODEL_PATH}")
-                import fasttext.util
-
-                # Télécharger selon le type de modèle dans la variable d'environnement
-                if "lid" in FASTTEXT_MODEL_PATH.lower() or "176" in FASTTEXT_MODEL_PATH:
-                    # Modèle de détection de langue
-                    logger.info("Téléchargement du modèle de détection de langue...")
-                    fasttext.util.download_model("lid", if_exists="ignore")
-                    # Le fichier téléchargé sera lid.176.ftz
-                    if not os.path.exists(FASTTEXT_MODEL_PATH) and os.path.exists(
-                        "lid.176.ftz"
-                    ):
-                        # Créer un lien symbolique ou copier le fichier
-                        import shutil
-
-                        shutil.copy("lid.176.ftz", FASTTEXT_MODEL_PATH)
-                        logger.info(f"Modèle copié vers: {FASTTEXT_MODEL_PATH}")
-                else:
-                    # Modèle d'embeddings
-                    if "en" in FASTTEXT_MODEL_PATH:
-                        logger.info("Téléchargement du modèle d'embeddings anglais...")
-                        fasttext.util.download_model("en", if_exists="ignore")
-                        if not os.path.exists(FASTTEXT_MODEL_PATH) and os.path.exists(
-                            "cc.en.300.bin"
-                        ):
-                            import shutil
-
-                            shutil.copy("cc.en.300.bin", FASTTEXT_MODEL_PATH)
-                            logger.info(f"Modèle copié vers: {FASTTEXT_MODEL_PATH}")
-
-            # Maintenant essayer de charger le modèle
             fasttext_model = _load_fasttext_model()
             if fasttext_model:
                 logger.info("✅ Modèle FastText pré-chargé avec succès")
@@ -122,13 +87,8 @@ async def lifespan(app: FastAPI):
                 logger.warning(
                     "⚠️ Modèle FastText non disponible - détection langue dégradée"
                 )
-
         except Exception as e:
             logger.warning(f"⚠️ Erreur pré-chargement FastText: {e}")
-            # Log plus détaillé pour diagnostic
-            import traceback
-
-            logger.debug(f"Traceback FastText: {traceback.format_exc()}")
 
         # 4. Créer health monitor
         logger.info("Initialisation SystemHealthMonitor...")
