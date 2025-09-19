@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-embedder.py - Embedder OpenAI avec cache Redis externe optimisé
+embedder.py - Embedder OpenAI avec cache Redis externe optimisé - CORRIGÉ
 """
 
 import logging
+import os
 from typing import List
 from utils.utilities import METRICS
 from utils.imports_and_dependencies import AsyncOpenAI
@@ -18,11 +19,17 @@ class OpenAIEmbedder:
         self,
         client: AsyncOpenAI,
         cache_manager=None,
-        model: str = "text-embedding-3-small",
+        model: str = None,
     ):
         self.client = client
         self.cache_manager = cache_manager
-        self.model = model
+        # CORRECTION CRITIQUE: Utiliser la variable d'environnement au lieu de hardcoder
+        self.model = model or os.getenv(
+            "OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"
+        )
+
+        # Log du modèle utilisé pour diagnostic
+        logger.info(f"Embedder initialisé avec le modèle: {self.model}")
 
     async def get_embedding(self, text: str) -> List[float]:
         """CORRECTION: Méthode manquante appelée par rag_engine.py"""

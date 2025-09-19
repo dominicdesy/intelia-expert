@@ -15,7 +15,7 @@ import psutil
 import pathlib
 from datetime import datetime
 from contextlib import asynccontextmanager
-from typing import Optional, Dict
+from typing import Optional
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,6 +24,7 @@ from fastapi.responses import JSONResponse
 # .env (facultatif)
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
@@ -40,7 +41,10 @@ ALLOWED_ORIGINS = os.getenv(
 
 # ACTIVATION SYNTHESE LLM AU DEMARRAGE (CONSERVE)
 synthesis_enabled = str(os.getenv("ENABLE_SYNTH_PROMPT", "0")).lower() in (
-    "1", "true", "yes", "on",
+    "1",
+    "true",
+    "yes",
+    "on",
 )
 if synthesis_enabled:
     logger.info("✅ Synthese LLM activee (ENABLE_SYNTH_PROMPT=1)")
@@ -63,6 +67,7 @@ STATS_CACHE_AVAILABLE = False
 try:
     from app.api.v1.stats_cache import get_stats_cache
     from app.api.v1.stats_updater import run_update_cycle
+
     STATS_CACHE_AVAILABLE = True
     logger.info("✅ Systeme de cache statistiques importe avec succes")
 except ImportError as e:
@@ -141,6 +146,7 @@ async def periodic_monitoring():
             # Log des metriques serveur dans la base
             try:
                 from app.api.v1.logging import get_analytics_manager
+
                 analytics = get_analytics_manager()
 
                 # Calculer l'heure tronquee pour le groupement
@@ -260,14 +266,18 @@ async def lifespan(app: FastAPI):
             # Analytics
             try:
                 from app.api.v1.logging import get_analytics
+
                 analytics_status = get_analytics()
-                logger.info(f"✅ Service analytics: {analytics_status.get('status', 'unknown')}")
+                logger.info(
+                    f"✅ Service analytics: {analytics_status.get('status', 'unknown')}"
+                )
             except Exception as e:
                 logger.warning(f"⚠️ Service analytics partiellement disponible: {e}")
 
             # Billing
             try:
                 from app.api.v1.billing import get_billing_manager
+
                 billing = get_billing_manager()
                 logger.info(f"✅ Service billing: {len(billing.plans)} plans charges")
             except Exception as e:
@@ -285,11 +295,14 @@ async def lifespan(app: FastAPI):
                         cache_stats = "cache initialise"
                     logger.info(f"✅ Cache statistiques initialise: {cache_stats}")
                 except Exception as e:
-                    logger.warning(f"⚠️ Cache statistiques partiellement disponible: {e}")
+                    logger.warning(
+                        f"⚠️ Cache statistiques partiellement disponible: {e}"
+                    )
 
             # Nettoyage sessions
             try:
                 from app.api.v1.pipeline.postgres_memory import PostgresMemory
+
                 memory = PostgresMemory()
                 cleaned = memory.cleanup_old_sessions(days_old=7)
                 if cleaned > 0:
@@ -305,6 +318,7 @@ async def lifespan(app: FastAPI):
     app.state.supabase = None
     try:
         from supabase import create_client
+
         url, key = os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_ANON_KEY")
         if url and key:
             app.state.supabase = create_client(url, key)
@@ -316,9 +330,11 @@ async def lifespan(app: FastAPI):
 
     # ========== RAG EXTERNALISÉ ==========
     app.state.rag = None
-    app.state.rag_broiler = None  
+    app.state.rag_broiler = None
     app.state.rag_layer = None
-    logger.info("ℹ️ RAG externalisé vers expert.intelia.com/llm - aucun chargement local")
+    logger.info(
+        "ℹ️ RAG externalisé vers expert.intelia.com/llm - aucun chargement local"
+    )
 
     # ========== DEMARRAGE DU MONITORING & SCHEDULER ==========
     monitoring_task = None
@@ -368,10 +384,14 @@ async def lifespan(app: FastAPI):
 
     # Statistiques finales
     uptime_hours = (time.time() - start_time) / 3600
-    final_stats = f"{request_counter} requetes en {uptime_hours:.1f}h, {error_counter} erreurs"
+    final_stats = (
+        f"{request_counter} requetes en {uptime_hours:.1f}h, {error_counter} erreurs"
+    )
 
     if STATS_CACHE_AVAILABLE and cache_update_counter > 0:
-        cache_success_rate = (cache_update_counter / max(cache_update_counter + cache_error_counter, 1)) * 100
+        cache_success_rate = (
+            cache_update_counter / max(cache_update_counter + cache_error_counter, 1)
+        ) * 100
         final_stats += f", cache: {cache_update_counter} mises a jour ({cache_success_rate:.1f}% succes)"
 
     logger.info(f"📈 Statistiques finales: {final_stats}")
@@ -442,12 +462,15 @@ async def monitoring_middleware(request: Request, call_next):
         active_requests -= 1
         processing_time = (time.time() - start_time_req) * 1000
         if processing_time > 5000:  # Plus de 5 secondes
-            logger.warning(f"🌀 Requete lente: {request.method} {request.url.path} - {processing_time:.0f}ms")
+            logger.warning(
+                f"🌀 Requete lente: {request.method} {request.url.path} - {processing_time:.0f}ms"
+            )
 
 
 # === MIDDLEWARE D'AUTHENTIFICATION ===
 try:
     from app.middleware.auth_middleware import auth_middleware
+
     app.middleware("http")(auth_middleware)
     logger.info("✅ Middleware d'authentification active")
 except ImportError as e:
@@ -462,14 +485,16 @@ async def simple_health_check():
     """Health check ultra simple pour DigitalOcean App Platform"""
     return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
 
+
 @app.get("/health/ready", tags=["Health"])
 async def readiness_check():
     """Readiness check pour vérifier si l'app est prête"""
     return {
         "status": "ready",
         "timestamp": datetime.utcnow().isoformat(),
-        "uptime_seconds": int(time.time() - start_time)
+        "uptime_seconds": int(time.time() - start_time),
     }
+
 
 @app.get("/health/live", tags=["Health"])
 async def liveness_check():
@@ -497,7 +522,9 @@ async def chat_stream_direct(request: Request):
             body_json = json.loads(body_bytes.decode("utf-8"))
 
             # Extraire les donnees pour le logging
-            user_question = body_json.get("message_preview", body_json.get("question", ""))
+            user_question = body_json.get(
+                "message_preview", body_json.get("question", "")
+            )
             session_id = body_json.get("session_id", "")
 
             # Extraire user_email depuis l'auth header si possible
@@ -505,7 +532,10 @@ async def chat_stream_direct(request: Request):
             if auth_header:
                 try:
                     from app.api.v1.auth import get_current_user_from_token
-                    user_info = await get_current_user_from_token(auth_header.replace("Bearer ", ""))
+
+                    user_info = await get_current_user_from_token(
+                        auth_header.replace("Bearer ", "")
+                    )
                     user_email = user_info.get("email", "")
                 except Exception:
                     user_email = "anonymous"
@@ -524,7 +554,9 @@ async def chat_stream_direct(request: Request):
             logger.info(f"Question extraite: {user_question[:100]}...")
 
         except (json.JSONDecodeError, UnicodeDecodeError):
-            logger.warning("Impossible de parser/transformer le body JSON, envoi tel quel")
+            logger.warning(
+                "Impossible de parser/transformer le body JSON, envoi tel quel"
+            )
 
         # Headers a transferer
         headers = {
@@ -537,7 +569,13 @@ async def chat_stream_direct(request: Request):
         }
 
         # Transferer tous les headers importants du frontend
-        for header_name in ["Authorization", "Cookie", "X-Session-ID", "X-User-ID", "X-Tenant-ID"]:
+        for header_name in [
+            "Authorization",
+            "Cookie",
+            "X-Session-ID",
+            "X-User-ID",
+            "X-Tenant-ID",
+        ]:
             header_value = request.headers.get(header_name)
             if header_value:
                 headers[header_name] = header_value
@@ -556,7 +594,9 @@ async def chat_stream_direct(request: Request):
 
         # Proxy vers le service LLM externe
         async with httpx.AsyncClient(follow_redirects=True) as client:
-            response = await client.post(target_url, content=body_bytes, headers=headers, timeout=60.0)
+            response = await client.post(
+                target_url, content=body_bytes, headers=headers, timeout=60.0
+            )
 
             logger.info(f"Reponse LLM service: {response.status_code}")
 
@@ -578,7 +618,9 @@ async def chat_stream_direct(request: Request):
                     headers={
                         "Cache-Control": "no-cache",
                         "Connection": "keep-alive",
-                        "Access-Control-Allow-Origin": request.headers.get("Origin", "*"),
+                        "Access-Control-Allow-Origin": request.headers.get(
+                            "Origin", "*"
+                        ),
                         "Access-Control-Allow-Credentials": "true",
                     },
                 )
@@ -594,9 +636,13 @@ async def chat_stream_direct(request: Request):
                         for line in full_response.split("\n"):
                             if line.startswith("data: "):
                                 try:
-                                    event_data = json.loads(line[6:])  # Enlever "data: "
+                                    event_data = json.loads(
+                                        line[6:]
+                                    )  # Enlever "data: "
                                     if event_data.get("type") == "final":
-                                        extracted_response = event_data.get("answer", "")
+                                        extracted_response = event_data.get(
+                                            "answer", ""
+                                        )
                                         break
                                     elif event_data.get("type") == "delta":
                                         extracted_response += event_data.get("text", "")
@@ -609,12 +655,20 @@ async def chat_stream_direct(request: Request):
                             question=user_question,
                             response_text=extracted_response,
                             response_source="llm_service",
-                            processing_time_ms=int((time.time() - start_time_req) * 1000),
+                            processing_time_ms=int(
+                                (time.time() - start_time_req) * 1000
+                            ),
                             session_id=session_id,
-                            language=(body_json.get("lang", "fr") if "body_json" in locals() else "fr"),
+                            language=(
+                                body_json.get("lang", "fr")
+                                if "body_json" in locals()
+                                else "fr"
+                            ),
                         )
 
-                        logger.info(f"Question enregistrée: {user_email} -> {len(user_question)} chars question, {len(extracted_response)} chars response")
+                        logger.info(
+                            f"Question enregistrée: {user_email} -> {len(user_question)} chars question, {len(extracted_response)} chars response"
+                        )
 
                     except Exception as log_error:
                         logger.error(f"Erreur enregistrement question: {log_error}")
@@ -641,13 +695,17 @@ async def chat_stream_direct(request: Request):
                 except Exception as log_error:
                     logger.error(f"Erreur enregistrement erreur: {log_error}")
 
-                logger.error(f"LLM service error {response.status_code}: {error_content}")
+                logger.error(
+                    f"LLM service error {response.status_code}: {error_content}"
+                )
 
                 return JSONResponse(
                     status_code=response.status_code,
                     content={
                         "detail": f"LLM service error: {response.status_code}",
-                        "upstream_error": (response.text if response.text else "No details"),
+                        "upstream_error": (
+                            response.text if response.text else "No details"
+                        ),
                     },
                 )
 
@@ -668,7 +726,9 @@ async def chat_stream_direct(request: Request):
             logger.error(f"Erreur enregistrement erreur proxy: {log_error}")
 
         logger.error(f"Erreur proxy chat direct: {e}")
-        return JSONResponse(status_code=500, content={"detail": f"Proxy error: {str(e)}"})
+        return JSONResponse(
+            status_code=500, content={"detail": f"Proxy error: {str(e)}"}
+        )
 
 
 # Fonction utilitaire pour l'enregistrement asynchrone
@@ -685,6 +745,7 @@ async def log_user_question_async(
     """Enregistre une question/réponse de manière asynchrone"""
     try:
         from app.api.v1.logging import get_analytics_manager
+
         analytics = get_analytics_manager()
 
         # Utiliser la méthode log_user_question si elle existe
@@ -712,6 +773,7 @@ async def chat_health_direct():
     """Health check du service LLM externe"""
     try:
         import httpx
+
         target_url = "https://expert.intelia.com/llm/health"
         async with httpx.AsyncClient() as client:
             response = await client.get(target_url, timeout=10.0)
@@ -723,6 +785,7 @@ async def chat_health_direct():
 # === MONTAGE DES ROUTERS ===
 try:
     from app.api.v1 import router as api_v1_router
+
     app.include_router(api_v1_router)
     logger.info("✅ Router API v1 charge depuis __init__.py")
 except ImportError as e:
@@ -730,6 +793,7 @@ except ImportError as e:
     logger.info("🔧 Creation d'un router v1 temporaire avec endpoints selectionnes...")
 
     from fastapi import APIRouter
+
     temp_v1_router = APIRouter(prefix="/v1", tags=["v1"])
 
     # === ENDPOINTS SELECTIONNES UNIQUEMENT ===
@@ -754,9 +818,7 @@ except ImportError as e:
         try:
             router_module = __import__(f"app.api.v1.{router_name}", fromlist=["router"])
             temp_v1_router.include_router(
-                router_module.router, 
-                prefix=prefix if prefix else "",
-                tags=[tag]
+                router_module.router, prefix=prefix if prefix else "", tags=[tag]
             )
             logger.info(f"✅ {router_name.capitalize()} router ajoute")
         except ImportError as e:
@@ -781,6 +843,7 @@ async def complete_health_check():
         # Check base de donnees et analytics
         try:
             from app.api.v1.logging import get_analytics_manager
+
             get_analytics_manager()
             health_status["components"]["analytics"] = {
                 "status": "healthy",
@@ -788,12 +851,16 @@ async def complete_health_check():
                 "tables_created": True,
             }
         except Exception as e:
-            health_status["components"]["analytics"] = {"status": "unhealthy", "error": str(e)}
+            health_status["components"]["analytics"] = {
+                "status": "unhealthy",
+                "error": str(e),
+            }
             health_status["status"] = "degraded"
 
         # Check systeme de facturation
         try:
             from app.api.v1.billing import get_billing_manager
+
             billing = get_billing_manager()
             health_status["components"]["billing"] = {
                 "status": "healthy",
@@ -801,7 +868,10 @@ async def complete_health_check():
                 "quota_enforcement": True,
             }
         except Exception as e:
-            health_status["components"]["billing"] = {"status": "unhealthy", "error": str(e)}
+            health_status["components"]["billing"] = {
+                "status": "unhealthy",
+                "error": str(e),
+            }
             health_status["status"] = "degraded"
 
         # Check systeme de cache statistiques
@@ -813,13 +883,20 @@ async def complete_health_check():
                 else:
                     cache_stats = "disponible"
 
-                scheduler_active = stats_scheduler_task is not None and not stats_scheduler_task.done()
+                scheduler_active = (
+                    stats_scheduler_task is not None and not stats_scheduler_task.done()
+                )
                 cache_success_rate = 100
                 if cache_update_counter + cache_error_counter > 0:
-                    cache_success_rate = (cache_update_counter / (cache_update_counter + cache_error_counter)) * 100
+                    cache_success_rate = (
+                        cache_update_counter
+                        / (cache_update_counter + cache_error_counter)
+                    ) * 100
 
                 health_status["components"]["statistics_cache"] = {
-                    "status": ("healthy" if cache_stats and scheduler_active else "degraded"),
+                    "status": (
+                        "healthy" if cache_stats and scheduler_active else "degraded"
+                    ),
                     "scheduler_active": scheduler_active,
                     "cache_updates": cache_update_counter,
                     "cache_errors": cache_error_counter,
@@ -827,7 +904,10 @@ async def complete_health_check():
                     "cache_entries": cache_stats,
                 }
             except Exception as e:
-                health_status["components"]["statistics_cache"] = {"status": "unhealthy", "error": str(e)}
+                health_status["components"]["statistics_cache"] = {
+                    "status": "unhealthy",
+                    "error": str(e),
+                }
                 health_status["status"] = "degraded"
         else:
             health_status["components"]["statistics_cache"] = {
@@ -837,10 +917,10 @@ async def complete_health_check():
 
         # Check RAG (externe)
         health_status["components"]["rag"] = {
-            "status": "external", 
+            "status": "external",
             "message": "RAG géré par expert.intelia.com/llm",
             "local_rags": 0,
-            "external_endpoint": "https://expert.intelia.com/llm"
+            "external_endpoint": "https://expert.intelia.com/llm",
         }
 
         # Check OpenAI
@@ -875,17 +955,24 @@ async def complete_health_check():
         health_status["metrics"] = {
             "uptime_hours": round(uptime_hours, 2),
             "total_requests": request_counter,
-            "error_rate_percent": round((error_counter / max(request_counter, 1)) * 100, 2),
+            "error_rate_percent": round(
+                (error_counter / max(request_counter, 1)) * 100, 2
+            ),
             "active_requests": active_requests,
             "cache_updates": cache_update_counter,
             "cache_errors": cache_error_counter,
-            "scheduler_active": (stats_scheduler_task is not None and not stats_scheduler_task.done() if STATS_CACHE_AVAILABLE else False),
+            "scheduler_active": (
+                stats_scheduler_task is not None and not stats_scheduler_task.done()
+                if STATS_CACHE_AVAILABLE
+                else False
+            ),
             "memory_percent_container": get_container_memory_percent(),
         }
 
         # Determiner le statut global
         component_statuses = [
-            comp["status"] for comp in health_status["components"].values()
+            comp["status"]
+            for comp in health_status["components"].values()
             if comp["status"] in ["healthy", "degraded", "unhealthy"]
         ]
 
@@ -918,7 +1005,7 @@ async def root():
             "uptime_hours": round(uptime_hours, 2),
             "environment": os.getenv("ENV", "production"),
             "rag_system": "external_llm_service",
-            "health": "ready"
+            "health": "ready",
         }
 
     cache_status = "not_available"
@@ -975,8 +1062,12 @@ async def http_exc_handler(request: Request, exc: HTTPException):
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Access-Control-Allow-Credentials"] = "false"
 
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Session-ID"
+    response.headers["Access-Control-Allow-Methods"] = (
+        "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+    )
+    response.headers["Access-Control-Allow-Headers"] = (
+        "Content-Type, Authorization, X-Session-ID"
+    )
 
     return response
 
@@ -997,7 +1088,7 @@ async def generic_exc_handler(request: Request, exc: Exception):
     origin = request.headers.get("Origin")
     allowed_origins = [
         "https://expert.intelia.com",
-        "http://localhost:3000", 
+        "http://localhost:3000",
         "http://localhost:8080",
     ]
 
@@ -1008,12 +1099,19 @@ async def generic_exc_handler(request: Request, exc: Exception):
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Access-Control-Allow-Credentials"] = "false"
 
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Session-ID"
+    response.headers["Access-Control-Allow-Methods"] = (
+        "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+    )
+    response.headers["Access-Control-Allow-Headers"] = (
+        "Content-Type, Authorization, X-Session-ID"
+    )
 
     return response
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host=os.getenv("HOST", "0.0.0.0"), port=int(os.getenv("PORT", "8080")))
+
+    uvicorn.run(
+        app, host=os.getenv("HOST", "0.0.0.0"), port=int(os.getenv("PORT", "8080"))
+    )

@@ -206,7 +206,7 @@ class UniversalTranslationService:
 
     @property
     def google_client(self):
-        """CORRECTION: Google Client avec gestion variable d'environnement"""
+        """CORRECTION: Google Client avec nouvelle API compatible"""
         if not self.enable_google_fallback:
             return None
 
@@ -222,25 +222,85 @@ class UniversalTranslationService:
                         )
 
                         if api_key and api_key.startswith("AIza"):
-                            # Clé API directe (format AIzaSy...)
+                            # CORRECTION CRITIQUE: Nouvelle méthode compatible
                             logger.debug(
                                 "Configuration Google Translate avec clé API directe"
                             )
-                            self._google_client = translate.Client(api_key=api_key)
+
+                            # Utilisation de l'API REST directe pour éviter les problèmes de version
+                            import requests
+
+                            class SimpleGoogleTranslateClient:
+                                def __init__(self, api_key):
+                                    self.api_key = api_key
+                                    self.base_url = "https://translation.googleapis.com/language/translate/v2"
+
+                                def translate(
+                                    self,
+                                    text,
+                                    target_language="en",
+                                    source_language=None,
+                                ):
+                                    """Traduction via API REST Google"""
+                                    params = {
+                                        "q": text,
+                                        "target": target_language,
+                                        "key": self.api_key,
+                                        "format": "text",
+                                    }
+                                    if source_language and source_language != "auto":
+                                        params["source"] = source_language
+
+                                    try:
+                                        response = requests.get(
+                                            self.base_url, params=params, timeout=10
+                                        )
+                                        response.raise_for_status()
+
+                                        result = response.json()
+                                        if (
+                                            "data" in result
+                                            and "translations" in result["data"]
+                                        ):
+                                            translated_text = result["data"][
+                                                "translations"
+                                            ][0]["translatedText"]
+                                            return {
+                                                "translatedText": translated_text,
+                                                "detectedSourceLanguage": result[
+                                                    "data"
+                                                ]["translations"][0].get(
+                                                    "detectedSourceLanguage"
+                                                ),
+                                            }
+                                    except Exception as e:
+                                        logger.warning(
+                                            f"Erreur API Google Translate: {e}"
+                                        )
+                                        return None
+
+                                    return None
+
+                            self._google_client = SimpleGoogleTranslateClient(api_key)
                             logger.info(
-                                "Google Translate client initialisé avec clé API"
+                                "Google Translate client initialisé avec clé API (REST)"
                             )
 
                         elif api_key and os.path.isfile(api_key):
-                            # Fichier de service account JSON
+                            # Fichier de service account JSON (méthode standard)
                             logger.debug(
                                 "Configuration Google Translate avec service account"
                             )
-                            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = api_key
-                            self._google_client = translate.Client()
-                            logger.info(
-                                "Google Translate client initialisé avec service account"
-                            )
+                            try:
+                                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = api_key
+                                self._google_client = translate.Client()
+                                logger.info(
+                                    "Google Translate client initialisé avec service account"
+                                )
+                            except Exception as e:
+                                logger.debug(f"Erreur service account: {e}")
+                                self.enable_google_fallback = False
+                                return None
 
                         else:
                             # Pas de clé valide trouvée
@@ -387,6 +447,9 @@ class UniversalTranslationService:
                 target_language=google_target,
                 source_language=google_source if google_source != "auto" else None,
             )
+
+            if not result:
+                return None
 
             processing_time = int((time.time() - start_time) * 1000)
 
