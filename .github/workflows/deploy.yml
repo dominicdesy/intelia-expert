@@ -1,11 +1,6 @@
 - name: Simple cleanup - Keep 8 most recent images
         shell: bash
-        env:
-          DOCTL_INTERACTIVE: "false"
         run: |
-          # Configuration pour eviter les confirmations interactives
-          export DOCTL_INTERACTIVE=false
-          
           KEEP_IMAGES=8name: Smart Selective Build and Deploy
 
 on:
