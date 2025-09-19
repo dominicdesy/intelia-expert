@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ood_detector.py - Détecteur hors-domaine intelligent et multilingue
-Version 2.0 - Intégration complète avec le service de traduction universel
+Version 2.1 - CORRECTION CIBLÉE: service de traduction avec fallback robuste
 """
 
 import logging
@@ -21,7 +21,6 @@ from config.config import (
 
 # Imports service traduction et utilitaires
 from utils.utilities import METRICS, detect_language_enhanced
-from utils.translation_service import get_translation_service
 from utils.imports_and_dependencies import UNIDECODE_AVAILABLE
 
 if UNIDECODE_AVAILABLE:
@@ -59,12 +58,14 @@ class DomainScore:
 class MultilingualOODDetector:
     """
     Détecteur hors-domaine intelligent avec support multilingue intégré
-    Utilise le service de traduction universel et le dictionnaire centralisé
+    CORRECTION: Gestion robuste du service de traduction avec fallback
     """
 
     def __init__(self, blocked_terms_path: str = None):
         self.blocked_terms = self._load_blocked_terms(blocked_terms_path)
-        self.translation_service = get_translation_service()
+
+        # CORRECTION: Initialisation sécurisée du service de traduction
+        self.translation_service = self._init_translation_service_safe()
         self.translation_cache = {}
 
         # Configuration multilingue
@@ -98,6 +99,68 @@ class MultilingualOODDetector:
             "zh": 0.70,  # Plus permissif pour Chinois
             "id": 0.85,
         }
+
+    def _init_translation_service_safe(self):
+        """CORRECTION: Initialise le service de traduction avec gestion d'erreurs robuste"""
+        try:
+            # Tentative d'import et d'initialisation
+            from utils.translation_service import get_translation_service
+
+            # Récupération du service existant
+            service = get_translation_service()
+
+            if service is None:
+                logger.debug(
+                    "Service de traduction non initialisé, tentative d'initialisation..."
+                )
+
+                # Import des configurations si disponibles
+                try:
+                    from utils.translation_service import (
+                        init_global_translation_service,
+                    )
+                    from config.config import (
+                        UNIVERSAL_DICT_PATH,
+                        GOOGLE_TRANSLATE_API_KEY,
+                        ENABLE_GOOGLE_TRANSLATE_FALLBACK,
+                        TRANSLATION_CACHE_SIZE,
+                        TRANSLATION_CACHE_TTL,
+                        TRANSLATION_CONFIDENCE_THRESHOLD,
+                    )
+
+                    # Initialisation avec configuration
+                    service = init_global_translation_service(
+                        dict_path=UNIVERSAL_DICT_PATH,
+                        supported_languages=SUPPORTED_LANGUAGES,
+                        google_api_key=GOOGLE_TRANSLATE_API_KEY,
+                        enable_google_fallback=ENABLE_GOOGLE_TRANSLATE_FALLBACK,
+                        cache_size=TRANSLATION_CACHE_SIZE,
+                        cache_ttl=TRANSLATION_CACHE_TTL,
+                        confidence_threshold=TRANSLATION_CONFIDENCE_THRESHOLD,
+                    )
+
+                    if service:
+                        logger.info("Service de traduction initialisé avec succès")
+                    else:
+                        logger.debug("Échec d'initialisation du service de traduction")
+
+                except ImportError:
+                    logger.debug(
+                        "Configuration de traduction manquante, utilisation fallback"
+                    )
+                    service = None
+
+            elif hasattr(service, "is_healthy") and not service.is_healthy():
+                logger.debug("Service de traduction disponible mais non fonctionnel")
+                service = None
+            else:
+                logger.debug("Service de traduction disponible et fonctionnel")
+
+            return service
+
+        except Exception as e:
+            logger.debug(f"Erreur initialisation service de traduction: {e}")
+            return None
 
     def _load_blocked_terms(self, path: str = None) -> Dict[str, List[str]]:
         """Charge les termes explicitement bloqués depuis JSON"""
@@ -142,7 +205,7 @@ class MultilingualOODDetector:
     def _build_domain_vocabulary_from_service(self) -> Dict[DomainRelevance, Set[str]]:
         """
         Construit le vocabulaire du domaine depuis le service de traduction universel
-        Remplace le vocabulaire hardcodé par une approche dynamique
+        CORRECTION: Fallback robuste si service indisponible
         """
         vocabulary = {level: set() for level in DomainRelevance}
 
@@ -175,7 +238,13 @@ class MultilingualOODDetector:
                 for domain in aviculture_domains:
                     # Récupérer pour chaque langue supportée
                     for lang in self.supported_languages:
-                        terms = self.translation_service.get_domain_terms(domain, lang)
+                        if hasattr(self.translation_service, "get_domain_terms"):
+                            terms = self.translation_service.get_domain_terms(
+                                domain, lang
+                            )
+                        else:
+                            # Fallback si méthode non disponible
+                            terms = []
 
                         # Classification automatique selon le domaine
                         if domain in ["genetic_lines", "performance_metrics"]:
@@ -185,7 +254,7 @@ class MultilingualOODDetector:
                         else:
                             low_priority_base.update(term.lower() for term in terms)
 
-                logger.info(
+                logger.debug(
                     f"Vocabulaire étendu via service traduction: "
                     f"{len(high_priority_base)} haute priorité, "
                     f"{len(medium_priority_base)} moyenne, "
@@ -193,9 +262,66 @@ class MultilingualOODDetector:
                 )
 
             except Exception as e:
-                logger.warning(
+                logger.debug(
                     f"Erreur extension vocabulaire via service traduction: {e}"
                 )
+        else:
+            # CORRECTION: Vocabulaire étendu de fallback
+            logger.debug(
+                "Service traduction indisponible, utilisation vocabulaire étendu de fallback"
+            )
+
+            # Ajouter termes multilingues essentiels
+            high_priority_base.update(
+                [
+                    "ross",
+                    "cobb",
+                    "hubbard",
+                    "isa",
+                    "aviagen",
+                    "peterson",
+                    "fcr",
+                    "adr",
+                    "adg",
+                    "epef",
+                    "eef",
+                    "conversion",
+                    "broiler",
+                    "poulet",
+                    "pollo",
+                    "frango",
+                    "鸡",
+                    "دجاج",
+                    "poultry",
+                    "volaille",
+                    "avicultura",
+                    "aviculture",
+                ]
+            )
+
+            medium_priority_base.update(
+                [
+                    "feed",
+                    "nutrition",
+                    "alimentation",
+                    "pienso",
+                    "ração",
+                    "weight",
+                    "poids",
+                    "peso",
+                    "waga",
+                    "重量",
+                    "وزن",
+                    "mortality",
+                    "mortalité",
+                    "mortalidad",
+                    "मृत्यु दर",
+                    "housing",
+                    "élevage",
+                    "crianza",
+                    "alojamiento",
+                ]
+            )
 
         # Construction finale du vocabulaire hiérarchisé
         vocabulary[DomainRelevance.HIGH] = high_priority_base
@@ -231,7 +357,7 @@ class MultilingualOODDetector:
             "क्या",
             "क्यों",
             "कब",
-            "कहां",
+            "कहाँ",
             "कितना",
             "कौन",
             "कौन सा",
@@ -399,10 +525,12 @@ class MultilingualOODDetector:
     def _calculate_ood_with_translation(
         self, query: str, intent_result=None, language: str = "es"
     ) -> Tuple[bool, float, Dict[str, float]]:
-        """Calcul OOD avec traduction via service universel"""
+        """CORRECTION: Calcul OOD avec traduction via service universel"""
 
         if not self.translation_service:
-            logger.warning("Service traduction indisponible, utilisation fallback")
+            logger.debug(
+                f"Service traduction indisponible, utilisation fallback pour langue {language}"
+            )
             return self._calculate_ood_fallback(query, intent_result, language)
 
         try:
@@ -456,7 +584,7 @@ class MultilingualOODDetector:
             return is_in_domain, score, details
 
         except Exception as e:
-            logger.warning(f"Erreur traduction {language}: {e}, utilisation fallback")
+            logger.debug(f"Erreur traduction {language}: {e}, utilisation fallback")
             return self._calculate_ood_fallback(query, intent_result, language)
 
     def _calculate_ood_non_latin(
@@ -499,58 +627,99 @@ class MultilingualOODDetector:
     def _calculate_ood_fallback(
         self, query: str, intent_result=None, language: str = "fr"
     ) -> Tuple[bool, float, Dict[str, float]]:
-        """Méthode de fallback robuste pour cas d'urgence"""
+        """CORRECTION: Méthode de fallback robuste avec vocabulaire multilingue étendu"""
 
-        # Détection basique de termes techniques universels
-        universal_terms = ["cobb", "ross", "hubbard", "isa", "fcr", "500", "308", "708"]
-        found_universal = sum(
-            1 for term in universal_terms if term.lower() in query.lower()
-        )
+        logger.debug(f"OOD Fallback [{language}]: '{query[:30]}...'")
 
-        # Détection nombres (indicateur spécificité)
-        numbers = re.findall(r"\d+", query)
+        # Analyse de base avec vocabulaire multilingue étendu
+        query_lower = query.lower()
+        domain_score = 0.0
+        matched_terms = []
 
-        # Patterns techniques basiques
-        technical_patterns = [
-            r"\d+\s*(?:g|kg|gram)",  # Poids
-            r"\d+\s*(?:day|jour|dia|tag|giorno|วัน|天|दिन|hari)",  # Âge multilingue
-            r"\d+\s*%",  # Pourcentages
-        ]
+        # Termes universels reconnus (multilingues)
+        universal_terms = {
+            # Lignées (multilingue)
+            "ross",
+            "cobb",
+            "hubbard",
+            "isa",
+            "aviagen",
+            "peterson",
+            # Métriques universelles
+            "fcr",
+            "adr",
+            "adg",
+            "epef",
+            "eef",
+            # Mots génériques aviculture
+            "broiler",
+            "poultry",
+            "chicken",
+            "pullet",
+            "hen",
+            "poulet",
+            "volaille",
+            "aviculture",
+            "élevage",
+            "pollo",
+            "ave",
+            "crianza",
+            "avicultura",
+            "frango",
+            "franga",
+            "avicultura",
+            "鸡",
+            "家禽",
+            "养殖",
+            "饲养",
+            "دجاج",
+            "دواجن",
+            "تربية",
+        }
 
-        pattern_matches = sum(
-            1
-            for pattern in technical_patterns
-            if re.search(pattern, query, re.IGNORECASE)
-        )
+        # Recherche de termes pertinents
+        for term in universal_terms:
+            if term in query_lower:
+                domain_score += 0.3
+                matched_terms.append(term)
 
-        # Score basique
-        base_score = (
-            (found_universal * 0.4) + (len(numbers) * 0.1) + (pattern_matches * 0.15)
-        )
+        # Boost pour valeurs numériques (probablement techniques)
+        if re.search(r"\b\d+\s*(?:j|day|días?|jours?|天|يوم)\b", query_lower):
+            domain_score += 0.4
+            matched_terms.append("age_numeric")
 
-        # Seuil très permissif pour éviter faux négatifs
-        fallback_threshold = 0.05 if language in ["hi", "zh", "th"] else 0.08
+        if re.search(r"\b\d+\.?\d*\s*(?:kg|g|lb|%)\b", query_lower):
+            domain_score += 0.3
+            matched_terms.append("weight_numeric")
 
-        is_in_domain = base_score > fallback_threshold or found_universal > 0
+        # Détermination du seuil ajusté par langue
+        base_threshold = 0.30 if language in ["hi", "zh", "th", "ar"] else 0.20
+        language_adjustment = self.language_adjustments.get(language, 0.80)
+        adjusted_threshold = base_threshold * language_adjustment
 
+        is_in_domain = domain_score >= adjusted_threshold
+
+        details = {
+            "method": "fallback",
+            "language": language,
+            "score": domain_score,
+            "threshold_used": adjusted_threshold,
+            "base_threshold": base_threshold,
+            "language_adjustment": language_adjustment,
+            "matched_terms": matched_terms,
+            "term_count": len(matched_terms),
+            "translation_used": False,
+            "fallback_reason": "translation_service_unavailable",
+        }
+
+        # Log de la décision
+        decision = "ACCEPTÉ" if is_in_domain else "REJETÉ"
         logger.info(
-            f"OOD Fallback [{language}]: '{query[:40]}...' | Score: {base_score:.3f} | {'ACCEPTÉ' if is_in_domain else 'REJETÉ'}"
+            f"OOD Fallback [{language}]: '{query[:30]}...' | "
+            f"Score: {domain_score:.3f} | {decision}"
         )
 
-        return (
-            is_in_domain,
-            base_score,
-            {
-                "language": language,
-                "method": "fallback",
-                "universal_terms_found": found_universal,
-                "numbers_found": len(numbers),
-                "pattern_matches": pattern_matches,
-                "threshold": fallback_threshold,
-                "reasoning": f"Fallback - {found_universal} universels, {pattern_matches} patterns",
-                "fallback_used": True,
-            },
-        )
+        return is_in_domain, domain_score, details
 
     # ===== MÉTHODES UTILITAIRES =====
 
@@ -600,7 +769,7 @@ class MultilingualOODDetector:
         # Détection indicateurs techniques multilingues
         technical_patterns = [
             (
-                r"\b(?:fcr|ic|indice|feed.conversion|料肉比|एफसीआर)\b",
+                r"\b(?:fcr|ic|indice|feed.conversion|料肉比|फसीआर)\b",
                 "conversion_metric",
             ),
             (r"\b(?:ross|cobb|hubbard|isa|罗斯|科宝|रॉस|कॉब)\s*\d*\b", "genetic_line"),
@@ -885,22 +1054,29 @@ class MultilingualOODDetector:
         }
 
         return {
-            "version": "multilingual_v2.0_integrated",
+            "version": "multilingual_v2.1_corrected",
             "vocabulary_stats": vocab_stats,
             "blocked_terms_stats": blocked_stats,
             "adaptive_thresholds": self.adaptive_thresholds.copy(),
             "language_adjustments": self.language_adjustments.copy(),
             "supported_languages": list(self.supported_languages),
             "translation_service_available": self.translation_service is not None,
+            "translation_service_healthy": (
+                self.translation_service.is_healthy()
+                if self.translation_service
+                and hasattr(self.translation_service, "is_healthy")
+                else False
+            ),
             "total_domain_terms": sum(
                 len(terms) for terms in self.domain_vocabulary.values()
             ),
             "integration_features": [
-                "universal_translation_service_integrated",
+                "universal_translation_service_with_fallback",
                 "dynamic_vocabulary_from_dict",
                 "language_specific_analysis",
                 "unicode_script_preservation",
                 "adaptive_thresholds_by_language",
+                "robust_error_handling",
             ],
         }
 
