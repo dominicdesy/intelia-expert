@@ -75,12 +75,27 @@ async def lifespan(app: FastAPI):
         require_critical_dependencies()
         logger.info("✅ Dépendances critiques validées")
 
-        # 3. Créer health monitor
+        # 3. Pré-chargement du modèle FastText pour détection multilingue
+        logger.info("Pré-chargement du modèle FastText...")
+        try:
+            from utils.utilities import _load_fasttext_model
+
+            fasttext_model = _load_fasttext_model()
+            if fasttext_model:
+                logger.info("✅ Modèle FastText pré-chargé avec succès")
+            else:
+                logger.warning(
+                    "⚠️ Modèle FastText non disponible - détection langue dégradée"
+                )
+        except Exception as e:
+            logger.warning(f"⚠️ Erreur pré-chargement FastText: {e}")
+
+        # 4. Créer health monitor
         logger.info("Initialisation SystemHealthMonitor...")
         health_monitor = await create_health_monitor()
         services["health_monitor"] = health_monitor
 
-        # 4. Validation startup complète
+        # 5. Validation startup complète
         logger.info("Validation startup requirements...")
         validation_result = await asyncio.wait_for(
             health_monitor.validate_startup_requirements(), timeout=STARTUP_TIMEOUT
