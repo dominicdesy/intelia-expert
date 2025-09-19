@@ -786,6 +786,8 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                 "serialization_version": "test_compatible",
             }
 
+
+
     # Ajout à votre fichier endpoints.py - Endpoint de diagnostic pour Digital Ocean
 
     @router.get(f"{BASE_PATH}/diagnostic/rag")
@@ -802,84 +804,73 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             "tests_performed": [],
             "issues_found": [],
             "recommendations": [],
-            "summary": {},
+            "summary": {}
         }
-
+        
         try:
             # ==== TEST 1: INITIALISATION ET SERVICES ====
             print("🔍 Test 1: Vérification des services...")
             test1_results = await _test_service_availability(_services)
             diagnostic_results["tests_performed"].append("service_availability")
             diagnostic_results["test_1_services"] = test1_results
-
+            
             # ==== TEST 2: CONNEXION WEAVIATE ====
             print("🔗 Test 2: Connexion Weaviate...")
             test2_results = await _test_weaviate_connection(_services)
             diagnostic_results["tests_performed"].append("weaviate_connection")
             diagnostic_results["test_2_weaviate"] = test2_results
-
+            
             # ==== TEST 3: GÉNÉRATION EMBEDDINGS ====
             print("🔤 Test 3: Génération embeddings...")
             test3_results = await _test_embedding_generation(_services)
             diagnostic_results["tests_performed"].append("embedding_generation")
             diagnostic_results["test_3_embeddings"] = test3_results
-
+            
             # ==== TEST 4: RÉCUPÉRATION DIRECTE ====
             print("📥 Test 4: Récupération documents...")
             test4_results = await _test_document_retrieval(_services)
             diagnostic_results["tests_performed"].append("document_retrieval")
             diagnostic_results["test_4_retrieval"] = test4_results
-
+            
             # ==== TEST 5: REQUÊTES SPÉCIFIQUES COBB ====
             print("🎯 Test 5: Requêtes spécifiques...")
             test5_results = await _test_specific_queries(_services)
             diagnostic_results["tests_performed"].append("specific_queries")
             diagnostic_results["test_5_cobb_queries"] = test5_results
-
+            
             # ==== TEST 6: ANALYSE MÉTADONNÉES ====
             print("🔍 Test 6: Structure des métadonnées...")
             test6_results = await _test_metadata_structure(_services)
             diagnostic_results["tests_performed"].append("metadata_analysis")
             diagnostic_results["test_6_metadata"] = test6_results
-
+            
             # ==== ANALYSE GLOBALE ====
-            diagnostic_results["summary"] = _analyze_diagnostic_results(
-                [
-                    test1_results,
-                    test2_results,
-                    test3_results,
-                    test4_results,
-                    test5_results,
-                    test6_results,
-                ]
-            )
-
+            diagnostic_results["summary"] = _analyze_diagnostic_results([
+                test1_results, test2_results, test3_results, 
+                test4_results, test5_results, test6_results
+            ])
+            
             # Génération des recommandations
-            diagnostic_results["recommendations"] = _generate_recommendations(
-                diagnostic_results
-            )
-
+            diagnostic_results["recommendations"] = _generate_recommendations(diagnostic_results)
+            
             diagnostic_results["total_duration"] = time.time() - start_time
             diagnostic_results["status"] = "completed"
-
-            print(
-                f"✅ Diagnostic terminé en {diagnostic_results['total_duration']:.2f}s"
-            )
-
+            
+            print(f"✅ Diagnostic terminé en {diagnostic_results['total_duration']:.2f}s")
+            
             return safe_serialize_for_json(diagnostic_results)
-
+            
         except Exception as e:
             logger.error(f"Erreur diagnostic RAG: {e}")
-            diagnostic_results.update(
-                {
-                    "status": "error",
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                    "total_duration": time.time() - start_time,
-                }
-            )
+            diagnostic_results.update({
+                "status": "error",
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "total_duration": time.time() - start_time
+            })
             return JSONResponse(
-                status_code=500, content=safe_serialize_for_json(diagnostic_results)
+                status_code=500, 
+                content=safe_serialize_for_json(diagnostic_results)
             )
 
     async def _test_service_availability(services: Dict) -> Dict:
@@ -888,41 +879,40 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             "test_name": "Service Availability",
             "success": True,
             "details": {},
-            "issues": [],
+            "issues": []
         }
-
+        
         try:
             health_monitor = services.get("health_monitor")
             results["details"]["health_monitor"] = bool(health_monitor)
-
+            
             if health_monitor:
                 rag_engine = health_monitor.get_service("rag_engine_enhanced")
                 results["details"]["rag_engine"] = bool(rag_engine)
                 results["details"]["rag_initialized"] = bool(
-                    rag_engine
-                    and safe_get_attribute(rag_engine, "is_initialized", False)
+                    rag_engine and safe_get_attribute(rag_engine, "is_initialized", False)
                 )
-
+                
                 cache_core = health_monitor.get_service("cache_core")
                 results["details"]["cache_core"] = bool(cache_core)
-
+                
                 if not rag_engine:
                     results["issues"].append("RAG Engine non disponible")
                 elif not safe_get_attribute(rag_engine, "is_initialized", False):
                     results["issues"].append("RAG Engine non initialisé")
-
+                    
             else:
                 results["issues"].append("Health Monitor non disponible")
                 results["success"] = False
-
+                
             results["details"]["services_count"] = len(services)
             results["details"]["available_services"] = list(services.keys())
-
+            
         except Exception as e:
             results["success"] = False
             results["error"] = str(e)
             results["issues"].append(f"Erreur test services: {e}")
-
+        
         return results
 
     async def _test_weaviate_connection(services: Dict) -> Dict:
@@ -931,24 +921,24 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             "test_name": "Weaviate Connection",
             "success": False,
             "details": {},
-            "issues": [],
+            "issues": []
         }
-
+        
         try:
             health_monitor = services.get("health_monitor")
             if not health_monitor:
                 results["issues"].append("Health Monitor manquant")
                 return results
-
+                
             rag_engine = health_monitor.get_service("rag_engine_enhanced")
             if not rag_engine:
                 results["issues"].append("RAG Engine manquant")
                 return results
-
+                
             # Test connexion client
             weaviate_client = safe_get_attribute(rag_engine, "weaviate_client")
             results["details"]["client_available"] = bool(weaviate_client)
-
+            
             if weaviate_client:
                 # Test de base
                 try:
@@ -956,19 +946,14 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                         None, weaviate_client.is_ready
                     )
                     results["details"]["is_ready"] = is_ready
-
+                    
                     if is_ready:
                         # Tentative de récupération collections
                         try:
-                            if hasattr(weaviate_client, "collections"):
+                            if hasattr(weaviate_client, 'collections'):
                                 # Weaviate v4
-                                collections = (
-                                    await asyncio.get_event_loop().run_in_executor(
-                                        None,
-                                        lambda: list(
-                                            weaviate_client.collections.list_all()
-                                        ),
-                                    )
+                                collections = await asyncio.get_event_loop().run_in_executor(
+                                    None, lambda: list(weaviate_client.collections.list_all())
                                 )
                                 collection_names = [c.name for c in collections]
                                 results["details"]["weaviate_version"] = "v4"
@@ -977,87 +962,63 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                                 schema = await asyncio.get_event_loop().run_in_executor(
                                     None, weaviate_client.schema.get
                                 )
-                                collection_names = [
-                                    cls["class"] for cls in schema["classes"]
-                                ]
+                                collection_names = [cls['class'] for cls in schema['classes']]
                                 results["details"]["weaviate_version"] = "v3"
-
+                            
                             results["details"]["collections"] = collection_names
-                            results["details"]["collections_count"] = len(
-                                collection_names
-                            )
-
+                            results["details"]["collections_count"] = len(collection_names)
+                            
                             # Test comptage documents pour collection principale
                             main_collection = None
                             max_docs = 0
-
+                            
                             for collection_name in collection_names:
                                 try:
-                                    if hasattr(weaviate_client, "collections"):
-                                        collection = weaviate_client.collections.get(
-                                            collection_name
-                                        )
+                                    if hasattr(weaviate_client, 'collections'):
+                                        collection = weaviate_client.collections.get(collection_name)
                                         count_result = await asyncio.get_event_loop().run_in_executor(
-                                            None,
-                                            lambda: collection.aggregate.over_all(
-                                                total_count=True
-                                            ),
+                                            None, lambda: collection.aggregate.over_all(total_count=True)
                                         )
-                                        doc_count = getattr(
-                                            count_result, "total_count", 0
-                                        )
+                                        doc_count = getattr(count_result, 'total_count', 0)
                                     else:
                                         # v3 fallback
                                         count_result = await asyncio.get_event_loop().run_in_executor(
-                                            None,
-                                            lambda: weaviate_client.query.aggregate(
-                                                collection_name
-                                            )
-                                            .with_meta_count()
-                                            .do(),
+                                            None, lambda: weaviate_client.query.aggregate(collection_name).with_meta_count().do()
                                         )
-                                        doc_count = count_result["data"]["Aggregate"][
-                                            collection_name
-                                        ][0]["meta"]["count"]
-
+                                        doc_count = count_result['data']['Aggregate'][collection_name][0]['meta']['count']
+                                    
                                     if doc_count > max_docs:
                                         max_docs = doc_count
                                         main_collection = collection_name
-
+                                        
                                 except Exception as count_e:
-                                    logger.warning(
-                                        f"Erreur comptage {collection_name}: {count_e}"
-                                    )
-
+                                    logger.warning(f"Erreur comptage {collection_name}: {count_e}")
+                            
                             results["details"]["main_collection"] = main_collection
                             results["details"]["document_count"] = max_docs
                             results["success"] = True
-
+                            
                             if max_docs == 0:
-                                results["issues"].append(
-                                    "Aucun document trouvé dans Weaviate"
-                                )
+                                results["issues"].append("Aucun document trouvé dans Weaviate")
                             elif max_docs < 1000:
-                                results["issues"].append(
-                                    f"Peu de documents: {max_docs} (attendu: ~2000+)"
-                                )
-
+                                results["issues"].append(f"Peu de documents: {max_docs} (attendu: ~2000+)")
+                                
                         except Exception as e:
                             results["issues"].append(f"Erreur accès collections: {e}")
-
+                            
                     else:
                         results["issues"].append("Weaviate client pas ready")
-
+                        
                 except Exception as e:
                     results["issues"].append(f"Erreur test ready: {e}")
-
+                    
             else:
                 results["issues"].append("Client Weaviate non disponible")
-
+                
         except Exception as e:
             results["error"] = str(e)
             results["issues"].append(f"Erreur générale test Weaviate: {e}")
-
+        
         return results
 
     async def _test_embedding_generation(services: Dict) -> Dict:
@@ -1066,36 +1027,36 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             "test_name": "Embedding Generation",
             "success": False,
             "details": {},
-            "issues": [],
+            "issues": []
         }
-
+        
         try:
             health_monitor = services.get("health_monitor")
             if not health_monitor:
                 results["issues"].append("Health Monitor manquant")
                 return results
-
+                
             rag_engine = health_monitor.get_service("rag_engine_enhanced")
             if not rag_engine:
                 results["issues"].append("RAG Engine manquant")
                 return results
-
+            
             embedder = safe_get_attribute(rag_engine, "embedder")
             if not embedder:
                 results["issues"].append("Embedder non disponible")
                 return results
-
+            
             # Test avec plusieurs requêtes
             test_queries = [
                 "poids Cobb 500 mâle 17 jours",
                 "weight Cobb 500 male 17 days",
                 "performance poulet de chair",
-                "Ross 308 croissance",
+                "Ross 308 croissance"
             ]
-
+            
             embedding_results = {}
             successful_embeddings = 0
-
+            
             for query in test_queries:
                 try:
                     embedding = await embedder.get_embedding(query)
@@ -1104,46 +1065,42 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                             "success": True,
                             "dimension": len(embedding),
                             "first_values": embedding[:3] if embedding else [],
-                            "has_numeric_values": all(
-                                isinstance(x, (int, float)) for x in embedding[:5]
-                            ),
+                            "has_numeric_values": all(isinstance(x, (int, float)) for x in embedding[:5])
                         }
                         successful_embeddings += 1
                     else:
                         embedding_results[query] = {
                             "success": False,
-                            "error": "Embedding vide ou None",
+                            "error": "Embedding vide ou None"
                         }
                 except Exception as e:
-                    embedding_results[query] = {"success": False, "error": str(e)}
-
+                    embedding_results[query] = {
+                        "success": False,
+                        "error": str(e)
+                    }
+            
             results["details"]["test_queries"] = test_queries
             results["details"]["embedding_results"] = embedding_results
             results["details"]["successful_embeddings"] = successful_embeddings
-            results["details"]["success_rate"] = successful_embeddings / len(
-                test_queries
-            )
-
+            results["details"]["success_rate"] = successful_embeddings / len(test_queries)
+            
             if successful_embeddings > 0:
                 results["success"] = True
-
+                
                 # Vérifier la cohérence des dimensions
                 dimensions = [
-                    result["dimension"]
-                    for result in embedding_results.values()
+                    result["dimension"] for result in embedding_results.values() 
                     if result.get("success") and "dimension" in result
                 ]
                 if dimensions and len(set(dimensions)) > 1:
-                    results["issues"].append(
-                        f"Dimensions inconsistantes: {set(dimensions)}"
-                    )
+                    results["issues"].append(f"Dimensions inconsistantes: {set(dimensions)}")
             else:
                 results["issues"].append("Aucun embedding généré avec succès")
-
+                
         except Exception as e:
             results["error"] = str(e)
             results["issues"].append(f"Erreur test embeddings: {e}")
-
+        
         return results
 
     async def _test_document_retrieval(services: Dict) -> Dict:
@@ -1152,123 +1109,108 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             "test_name": "Document Retrieval",
             "success": False,
             "details": {},
-            "issues": [],
+            "issues": []
         }
-
+        
         try:
             health_monitor = services.get("health_monitor")
             if not health_monitor:
                 results["issues"].append("Health Monitor manquant")
                 return results
-
+                
             rag_engine = health_monitor.get_service("rag_engine_enhanced")
             if not rag_engine:
                 results["issues"].append("RAG Engine manquant")
                 return results
-
+                
             retriever = safe_get_attribute(rag_engine, "retriever")
             embedder = safe_get_attribute(rag_engine, "embedder")
-
+            
             if not retriever:
                 results["issues"].append("Retriever non disponible")
                 return results
             if not embedder:
                 results["issues"].append("Embedder non disponible")
                 return results
-
+            
             # Test de récupération avec différentes requêtes
             test_cases = [
                 {"query": "Cobb 500 poids", "expected_terms": ["cobb", "500", "poids"]},
                 {"query": "Ross 308 performance", "expected_terms": ["ross", "308"]},
-                {
-                    "query": "poulet de chair croissance",
-                    "expected_terms": ["poulet", "chair"],
-                },
+                {"query": "poulet de chair croissance", "expected_terms": ["poulet", "chair"]},
             ]
-
+            
             retrieval_results = {}
             total_docs_found = 0
-
+            
             for test_case in test_cases:
                 query = test_case["query"]
                 try:
                     # Générer embedding
                     embedding = await embedder.get_embedding(query)
-
+                    
                     if not embedding:
                         retrieval_results[query] = {"error": "Embedding failed"}
                         continue
-
+                    
                     # Récupération hybride
                     documents = await retriever.hybrid_search(
                         query_vector=embedding,
                         query_text=query,
                         top_k=10,
                         where_filter={},
-                        alpha=0.5,
+                        alpha=0.5
                     )
-
+                    
                     docs_info = []
                     for i, doc in enumerate(documents[:3]):  # Top 3 pour diagnostic
                         doc_info = {
-                            "score": getattr(doc, "score", 0),
-                            "title": getattr(doc, "metadata", {}).get(
-                                "title", "Sans titre"
-                            ),
-                            "genetic_line": getattr(doc, "metadata", {}).get(
-                                "geneticLine", "unknown"
-                            ),
-                            "content_preview": (
-                                (getattr(doc, "content", "")[:100] + "...")
-                                if getattr(doc, "content", "")
-                                else "Pas de contenu"
-                            ),
+                            "score": getattr(doc, 'score', 0),
+                            "title": getattr(doc, 'metadata', {}).get('title', 'Sans titre'),
+                            "genetic_line": getattr(doc, 'metadata', {}).get('geneticLine', 'unknown'),
+                            "content_preview": (getattr(doc, 'content', '')[:100] + '...') if getattr(doc, 'content', '') else 'Pas de contenu',
                             "has_expected_terms": any(
-                                term.lower() in getattr(doc, "content", "").lower()
+                                term.lower() in getattr(doc, 'content', '').lower() 
                                 for term in test_case["expected_terms"]
-                            ),
+                            )
                         }
                         docs_info.append(doc_info)
-
+                    
                     retrieval_results[query] = {
                         "success": True,
                         "documents_found": len(documents),
                         "top_documents": docs_info,
-                        "has_relevant_results": any(
-                            doc_info["has_expected_terms"] for doc_info in docs_info
-                        ),
+                        "has_relevant_results": any(doc_info["has_expected_terms"] for doc_info in docs_info)
                     }
-
+                    
                     total_docs_found += len(documents)
-
+                    
                 except Exception as e:
-                    retrieval_results[query] = {"success": False, "error": str(e)}
-
+                    retrieval_results[query] = {
+                        "success": False,
+                        "error": str(e)
+                    }
+            
             results["details"]["retrieval_results"] = retrieval_results
             results["details"]["total_documents_found"] = total_docs_found
-            results["details"]["avg_docs_per_query"] = (
-                total_docs_found / len(test_cases) if test_cases else 0
-            )
-
+            results["details"]["avg_docs_per_query"] = total_docs_found / len(test_cases) if test_cases else 0
+            
             successful_retrievals = sum(
-                1
-                for result in retrieval_results.values()
+                1 for result in retrieval_results.values() 
                 if result.get("success") and result.get("documents_found", 0) > 0
             )
-
+            
             if successful_retrievals > 0:
                 results["success"] = True
                 if total_docs_found == 0:
-                    results["issues"].append(
-                        "Récupération fonctionne mais aucun document trouvé"
-                    )
+                    results["issues"].append("Récupération fonctionne mais aucun document trouvé")
             else:
                 results["issues"].append("Aucune récupération réussie")
-
+                
         except Exception as e:
             results["error"] = str(e)
             results["issues"].append(f"Erreur test récupération: {e}")
-
+        
         return results
 
     async def _test_specific_queries(services: Dict) -> Dict:
@@ -1277,71 +1219,69 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             "test_name": "Specific Problematic Queries",
             "success": False,
             "details": {},
-            "issues": [],
+            "issues": []
         }
-
+        
         try:
             health_monitor = services.get("health_monitor")
             if not health_monitor:
                 results["issues"].append("Health Monitor manquant")
                 return results
-
+                
             rag_engine = health_monitor.get_service("rag_engine_enhanced")
             if not rag_engine:
                 results["issues"].append("RAG Engine manquant")
                 return results
-
+                
             # Les requêtes problématiques identifiées
             problem_queries = [
                 "poids Cobb 500 mâle 17 jours",
                 "quel est le poids d'un poulet Cobb 500 mâle à 17 jours",
                 "Cobb 500 male weight 17 days",
-                "performance Cobb 500 17 jours",
+                "performance Cobb 500 17 jours"
             ]
-
+            
             query_results = {}
             documents_used_count = 0
-
+            
             for query in problem_queries:
                 try:
                     start_time = time.time()
-
+                    
                     result = await rag_engine.generate_response(
-                        query=query, tenant_id="diagnostic_test", language="fr"
+                        query=query,
+                        tenant_id="diagnostic_test",
+                        language="fr"
                     )
-
+                    
                     processing_time = time.time() - start_time
-
+                    
                     # Analyse détaillée du résultat
-                    source = getattr(result, "source", None)
-                    source_value = (
-                        source.value if hasattr(source, "value") else str(source)
-                    )
-
-                    metadata = getattr(result, "metadata", {}) or {}
-                    docs_used = metadata.get("documents_used", 0)
-                    docs_found = metadata.get("documents_found", 0)
-                    confidence = getattr(result, "confidence", 0)
-                    response_text = getattr(result, "answer", "") or getattr(
-                        result, "response", ""
-                    )
-
+                    source = getattr(result, 'source', None)
+                    source_value = source.value if hasattr(source, 'value') else str(source)
+                    
+                    metadata = getattr(result, 'metadata', {}) or {}
+                    docs_used = metadata.get('documents_used', 0)
+                    docs_found = metadata.get('documents_found', 0)
+                    confidence = getattr(result, 'confidence', 0)
+                    response_text = getattr(result, 'answer', '') or getattr(result, 'response', '')
+                    
                     # Analyse du contenu pour détecter des valeurs spécifiques
                     has_specific_weight = any(
-                        pattern in response_text.lower()
-                        for pattern in ["gramme", "kg", "g)", "poids", "weight", "gram"]
+                        pattern in response_text.lower() 
+                        for pattern in ['gramme', 'kg', 'g)', 'poids', 'weight', 'gram']
                     )
-
+                    
                     has_generic_response = any(
                         pattern in response_text.lower()
                         for pattern in [
-                            "les documents fournis ne contiennent pas",
-                            "information spécifique",
-                            "données générales",
-                            "je n'ai pas d'information spécifique",
+                            'les documents fournis ne contiennent pas',
+                            'information spécifique', 
+                            'données générales',
+                            'je n\'ai pas d\'information spécifique'
                         ]
                     )
-
+                    
                     query_results[query] = {
                         "source": source_value,
                         "confidence": float(confidence),
@@ -1351,62 +1291,49 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                         "response_length": len(response_text),
                         "has_specific_weight": has_specific_weight,
                         "has_generic_response": has_generic_response,
-                        "response_preview": (
-                            response_text[:200] + "..."
-                            if len(response_text) > 200
-                            else response_text
-                        ),
+                        "response_preview": response_text[:200] + '...' if len(response_text) > 200 else response_text
                     }
-
+                    
                     documents_used_count += docs_used
-
+                    
                 except Exception as e:
-                    query_results[query] = {"error": str(e), "success": False}
-
+                    query_results[query] = {
+                        "error": str(e),
+                        "success": False
+                    }
+            
             results["details"]["query_results"] = query_results
             results["details"]["total_documents_used"] = documents_used_count
-            results["details"]["avg_documents_per_query"] = documents_used_count / len(
-                problem_queries
-            )
-
+            results["details"]["avg_documents_per_query"] = documents_used_count / len(problem_queries)
+            
             # Analyse des patterns problématiques
             zero_docs_queries = [
-                query
-                for query, result in query_results.items()
+                query for query, result in query_results.items()
                 if result.get("documents_used", -1) == 0
             ]
-
+            
             generic_responses = [
-                query
-                for query, result in query_results.items()
+                query for query, result in query_results.items()
                 if result.get("has_generic_response", False)
             ]
-
+            
             results["details"]["zero_documents_used_queries"] = zero_docs_queries
             results["details"]["generic_responses"] = generic_responses
-            results["details"]["zero_docs_ratio"] = len(zero_docs_queries) / len(
-                problem_queries
-            )
-
+            results["details"]["zero_docs_ratio"] = len(zero_docs_queries) / len(problem_queries)
+            
             if documents_used_count > 0:
                 results["success"] = True
             else:
-                results["issues"].append(
-                    "PROBLÈME CRITIQUE: Aucun document utilisé pour les requêtes spécifiques"
-                )
-                results["issues"].append(
-                    "Le système récupère mais n'utilise pas les documents"
-                )
-
+                results["issues"].append("PROBLÈME CRITIQUE: Aucun document utilisé pour les requêtes spécifiques")
+                results["issues"].append("Le système récupère mais n'utilise pas les documents")
+                
             if len(zero_docs_queries) > len(problem_queries) // 2:
-                results["issues"].append(
-                    f"Majorité des requêtes avec 0 documents utilisés: {len(zero_docs_queries)}/{len(problem_queries)}"
-                )
-
+                results["issues"].append(f"Majorité des requêtes avec 0 documents utilisés: {len(zero_docs_queries)}/{len(problem_queries)}")
+                
         except Exception as e:
             results["error"] = str(e)
             results["issues"].append(f"Erreur test requêtes spécifiques: {e}")
-
+        
         return results
 
     async def _test_metadata_structure(services: Dict) -> Dict:
@@ -1415,166 +1342,125 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             "test_name": "Metadata Structure Analysis",
             "success": False,
             "details": {},
-            "issues": [],
+            "issues": []
         }
-
+        
         try:
             health_monitor = services.get("health_monitor")
             if not health_monitor:
                 results["issues"].append("Health Monitor manquant")
                 return results
-
+                
             rag_engine = health_monitor.get_service("rag_engine_enhanced")
             if not rag_engine:
                 results["issues"].append("RAG Engine manquant")
                 return results
-
+            
             weaviate_client = safe_get_attribute(rag_engine, "weaviate_client")
             if not weaviate_client:
                 results["issues"].append("Client Weaviate manquant")
                 return results
-
+            
             # Récupérer quelques échantillons de documents pour analyser la structure
             try:
-                if hasattr(weaviate_client, "collections"):
+                if hasattr(weaviate_client, 'collections'):
                     # v4 - trouver la collection principale
                     collections = await asyncio.get_event_loop().run_in_executor(
                         None, lambda: list(weaviate_client.collections.list_all())
                     )
-
+                    
                     main_collection = None
                     for collection in collections:
                         try:
                             count = await asyncio.get_event_loop().run_in_executor(
-                                None,
-                                lambda: collection.aggregate.over_all(total_count=True),
+                                None, lambda: collection.aggregate.over_all(total_count=True)
                             )
-                            if (
-                                hasattr(count, "total_count")
-                                and count.total_count > 100
-                            ):
+                            if hasattr(count, 'total_count') and count.total_count > 100:
                                 main_collection = collection
                                 break
-                        except Exception:
+                        except:
                             continue
-
+                    
                     if main_collection:
                         # Échantillonner quelques documents
                         sample_docs = await asyncio.get_event_loop().run_in_executor(
                             None, lambda: main_collection.query.fetch_objects(limit=5)
                         )
-
+                        
                         if sample_docs and sample_docs.objects:
                             sample_analysis = []
                             genetic_lines_found = []
-
+                            
                             for obj in sample_docs.objects:
                                 props = obj.properties or {}
                                 doc_analysis = {
-                                    "genetic_line": props.get(
-                                        "geneticLine", "NOT_FOUND"
-                                    ),
-                                    "species": props.get("species", "NOT_FOUND"),
-                                    "title": (
-                                        props.get("title", "NOT_FOUND")[:50]
-                                        if props.get("title")
-                                        else "NOT_FOUND"
-                                    ),
-                                    "category": props.get("category", "NOT_FOUND"),
-                                    "intent_type": props.get("intentType", "NOT_FOUND"),
-                                    "has_performance_data": props.get(
-                                        "hasPerformanceData", False
-                                    ),
-                                    "language": props.get("language", "NOT_FOUND"),
+                                    "genetic_line": props.get('geneticLine', 'NOT_FOUND'),
+                                    "species": props.get('species', 'NOT_FOUND'),
+                                    "title": props.get('title', 'NOT_FOUND')[:50] if props.get('title') else 'NOT_FOUND',
+                                    "category": props.get('category', 'NOT_FOUND'),
+                                    "intent_type": props.get('intentType', 'NOT_FOUND'),
+                                    "has_performance_data": props.get('hasPerformanceData', False),
+                                    "language": props.get('language', 'NOT_FOUND')
                                 }
                                 sample_analysis.append(doc_analysis)
-
-                                gl = props.get("geneticLine")
+                                
+                                gl = props.get('geneticLine')
                                 if gl and gl not in genetic_lines_found:
                                     genetic_lines_found.append(gl)
-
+                            
                             results["details"]["sample_documents"] = sample_analysis
-                            results["details"][
-                                "genetic_lines_found"
-                            ] = genetic_lines_found
-                            results["details"]["has_cobb_500"] = any(
-                                "cobb" in str(gl).lower() for gl in genetic_lines_found
-                            )
+                            results["details"]["genetic_lines_found"] = genetic_lines_found
+                            results["details"]["has_cobb_500"] = any('cobb' in str(gl).lower() for gl in genetic_lines_found)
                             results["details"]["collection_name"] = main_collection.name
-
+                            
                             # Vérifier la présence des champs essentiels
                             missing_fields = []
                             for doc in sample_analysis:
                                 for field, value in doc.items():
-                                    if (
-                                        value == "NOT_FOUND"
-                                        and field not in missing_fields
-                                    ):
+                                    if value == 'NOT_FOUND' and field not in missing_fields:
                                         missing_fields.append(field)
-
+                            
                             results["details"]["missing_fields"] = missing_fields
-
-                            if "cobb" in str(genetic_lines_found).lower():
+                            
+                            if 'cobb' in str(genetic_lines_found).lower():
                                 results["success"] = True
                             else:
-                                results["issues"].append(
-                                    "Pas de données Cobb trouvées dans l'échantillon"
-                                )
-
+                                results["issues"].append("Pas de données Cobb trouvées dans l'échantillon")
+                                
                             if missing_fields:
-                                results["issues"].append(
-                                    f"Champs manquants détectés: {missing_fields}"
-                                )
-
+                                results["issues"].append(f"Champs manquants détectés: {missing_fields}")
+                                
                         else:
-                            results["issues"].append(
-                                "Impossible de récupérer des échantillons de documents"
-                            )
+                            results["issues"].append("Impossible de récupérer des échantillons de documents")
                     else:
                         results["issues"].append("Collection principale non trouvée")
-
+                        
                 else:
-                    results["issues"].append(
-                        "API Weaviate v3 non supportée pour ce test"
-                    )
-
+                    results["issues"].append("API Weaviate v3 non supportée pour ce test")
+                    
             except Exception as e:
                 results["issues"].append(f"Erreur analyse métadonnées: {e}")
-
+                
         except Exception as e:
             results["error"] = str(e)
             results["issues"].append(f"Erreur test structure métadonnées: {e}")
-
+        
         return results
 
     def _analyze_diagnostic_results(test_results: list) -> Dict:
         """Analyse globale des résultats de diagnostic"""
         total_tests = len(test_results)
         passed_tests = sum(1 for test in test_results if test.get("success", False))
-
+        
         all_issues = []
         for test in test_results:
             all_issues.extend(test.get("issues", []))
-
+        
         # Catégorisation des problèmes
         critical_issues = [issue for issue in all_issues if "CRITIQUE" in issue.upper()]
-        connection_issues = [
-            issue
-            for issue in all_issues
-            if any(
-                word in issue.lower()
-                for word in ["connexion", "connection", "client", "disponible"]
-            )
-        ]
-        document_issues = [
-            issue
-            for issue in all_issues
-            if any(
-                word in issue.lower()
-                for word in ["document", "récupération", "retrieval"]
-            )
-        ]
-
+        connection_issues = [issue for issue in all_issues if any(word in issue.lower() for word in ["connexion", "connection", "client", "disponible"])]
+        document_issues = [issue for issue in all_issues if any(word in issue.lower() for word in ["document", "récupération", "retrieval"])]
+        
         return {
             "total_tests": total_tests,
             "passed_tests": passed_tests,
@@ -1585,88 +1471,69 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             "document_issues_count": len(document_issues),
             "critical_issues": critical_issues,
             "most_common_issues": all_issues[:5],  # Top 5 des problèmes
-            "overall_health": (
-                "healthy"
-                if passed_tests >= total_tests * 0.8
-                else "degraded" if passed_tests >= total_tests * 0.5 else "critical"
-            ),
+            "overall_health": "healthy" if passed_tests >= total_tests * 0.8 else "degraded" if passed_tests >= total_tests * 0.5 else "critical"
         }
 
     def _generate_recommendations(diagnostic_results: Dict) -> list:
         """Génère des recommandations basées sur les résultats"""
         recommendations = []
-
+        
         # Analyse des tests
         test2 = diagnostic_results.get("test_2_weaviate", {})
         test4 = diagnostic_results.get("test_4_retrieval", {})
         test5 = diagnostic_results.get("test_5_cobb_queries", {})
-
+        
         # Recommandations basées sur Weaviate
         if not test2.get("success"):
-            recommendations.append(
-                {
-                    "priority": "CRITICAL",
-                    "category": "Infrastructure",
-                    "issue": "Problème connexion Weaviate",
-                    "action": "Vérifier WEAVIATE_URL et WEAVIATE_API_KEY dans les variables d'environnement",
-                }
-            )
+            recommendations.append({
+                "priority": "CRITICAL",
+                "category": "Infrastructure",
+                "issue": "Problème connexion Weaviate",
+                "action": "Vérifier WEAVIATE_URL et WEAVIATE_API_KEY dans les variables d'environnement"
+            })
         elif test2.get("details", {}).get("document_count", 0) == 0:
-            recommendations.append(
-                {
-                    "priority": "CRITICAL",
-                    "category": "Data",
-                    "issue": "Base Weaviate vide",
-                    "action": "Exécuter sync_to_weaviate.py pour peupler la base de données",
-                }
-            )
-
+            recommendations.append({
+                "priority": "CRITICAL", 
+                "category": "Data",
+                "issue": "Base Weaviate vide",
+                "action": "Exécuter sync_to_weaviate.py pour peupler la base de données"
+            })
+        
         # Recommandations basées sur la récupération
-        if (
-            test4.get("success")
-            and test5.get("details", {}).get("total_documents_used", 0) == 0
-        ):
-            recommendations.append(
-                {
-                    "priority": "HIGH",
-                    "category": "RAG Logic",
-                    "issue": "Documents récupérés mais non utilisés",
-                    "action": "Vérifier les seuils de confiance dans rag_engine.py (_calculate_confidence)",
-                }
-            )
-
-            recommendations.append(
-                {
-                    "priority": "HIGH",
-                    "category": "RAG Logic",
-                    "issue": "Filtres trop restrictifs possibles",
-                    "action": "Analyser build_where_filter() dans utilities.py",
-                }
-            )
-
+        if test4.get("success") and test5.get("details", {}).get("total_documents_used", 0) == 0:
+            recommendations.append({
+                "priority": "HIGH",
+                "category": "RAG Logic",
+                "issue": "Documents récupérés mais non utilisés",
+                "action": "Vérifier les seuils de confiance dans rag_engine.py (_calculate_confidence)"
+            })
+            
+            recommendations.append({
+                "priority": "HIGH",
+                "category": "RAG Logic", 
+                "issue": "Filtres trop restrictifs possibles",
+                "action": "Analyser build_where_filter() dans utilities.py"
+            })
+        
         # Recommandations métadonnées
         test6 = diagnostic_results.get("test_6_metadata", {})
         if test6.get("success") and not test6.get("details", {}).get("has_cobb_500"):
-            recommendations.append(
-                {
-                    "priority": "MEDIUM",
-                    "category": "Data Quality",
-                    "issue": "Données Cobb 500 non trouvées dans l'échantillon",
-                    "action": "Vérifier la normalisation des geneticLine dans sync_to_weaviate.py",
-                }
-            )
-
+            recommendations.append({
+                "priority": "MEDIUM",
+                "category": "Data Quality",
+                "issue": "Données Cobb 500 non trouvées dans l'échantillon",
+                "action": "Vérifier la normalisation des geneticLine dans sync_to_weaviate.py"
+            })
+        
         # Recommandations générales
         if diagnostic_results["summary"]["success_rate"] < 0.7:
-            recommendations.append(
-                {
-                    "priority": "HIGH",
-                    "category": "System",
-                    "issue": "Taux de réussite faible des tests",
-                    "action": "Examiner les logs détaillés et activer le mode DEBUG",
-                }
-            )
-
+            recommendations.append({
+                "priority": "HIGH",
+                "category": "System",
+                "issue": "Taux de réussite faible des tests",
+                "action": "Examiner les logs détaillés et activer le mode DEBUG"
+            })
+        
         return recommendations
 
     # Ajoutez également cet endpoint de test de requête simple
@@ -1677,39 +1544,52 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             health_monitor = get_service("health_monitor")
             if not health_monitor:
                 return {"status": "error", "message": "Health monitor non disponible"}
-
+            
             rag_engine = health_monitor.get_service("rag_engine_enhanced")
             if not rag_engine:
                 return {"status": "error", "message": "RAG engine non disponible"}
-
+            
             # Test simple
             result = await rag_engine.generate_response(
-                query="poids Cobb 500", tenant_id="quick_test"
+                query="poids Cobb 500",
+                tenant_id="quick_test"
             )
-
+            
             return {
                 "status": "success",
                 "query": "poids Cobb 500",
-                "source": (
-                    result.source.value
-                    if hasattr(result.source, "value")
-                    else str(result.source)
-                ),
+                "source": result.source.value if hasattr(result.source, 'value') else str(result.source),
                 "confidence": result.confidence,
-                "documents_used": result.metadata.get("documents_used", 0),
-                "has_response": bool(
-                    getattr(result, "answer", "") or getattr(result, "response", "")
-                ),
-                "timestamp": time.time(),
+                "documents_used": result.metadata.get('documents_used', 0),
+                "has_response": bool(getattr(result, 'answer', '') or getattr(result, 'response', '')),
+                "timestamp": time.time()
             }
-
+            
         except Exception as e:
             return {
-                "status": "error",
+                "status": "error", 
                 "message": str(e),
                 "error_type": type(e).__name__,
-                "timestamp": time.time(),
+                "timestamp": time.time()
             }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     # ========================================================================
     # ENDPOINT CHAT (inchangé mais utilise la sérialisation corrigée)
