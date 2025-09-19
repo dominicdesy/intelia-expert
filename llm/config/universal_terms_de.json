@@ -1,0 +1,165 @@
+{
+  "metadata": {
+    "language": "de",
+    "version": "2.1.0"
+  },
+  "equipment_types": {
+    "chain_feeder": ["kettenfütterung", "futterkette", "kettenanlage"],
+    "pan_feeder": ["tellerfütterung", "futterteller", "rundteller"],
+    "tube_feeder": ["rohrfütterung", "futterrohr", "rohrsystem"],
+    "bell_drinker": ["glockentrÄnke", "hängetrÄnke", "rundtrÄnke"],
+    "cup_drinker": ["schalentrÄnke", "wasserbecher", "trinkschale"],
+    "tunnel_ventilation": ["tunnellüftung", "tunneleffekt", "längslüftung"],
+    "cross_ventilation": ["querlüftung", "querventilation", "kreuzlüftung"],
+    "radiant_heaters": ["strahlungsheizung", "infrarotstrahler", "wärmestrahler"],
+    "hot_air_blowers": ["heißluftgebläse", "warmluftgebläse", "luftheizer"]
+  },
+  "substrate_materials": {
+    "litter": ["einstreu", "bodenmaterial", "stroh", "unterlage"],
+    "wood_shavings": ["holzspäne", "sägespäne", "hobelspäne"],
+    "rice_husks": ["reisschalen", "reishülsen", "reisspelzen"],
+    "straw": ["stroh", "weizenstroh", "gerstenstroh"]
+  },
+  "additional_pathologies": {
+    "avian_influenza": ["geflügelpest", "vogelgrippe", "aviäre influenza", "h5n1"],
+    "mareks_disease": ["marek-krankheit", "marek", "lymphome", "lähmung"],
+    "lameness": ["lahmheit", "gangstörung", "lokomotorische störungen"],
+    "pododermatitis": ["ballengeschwür", "fußballendermatitis", "sprunggelenkdermatitis"],
+    "crossbeak": ["kreuzschnabel", "schnabeldeformation", "scherensnabel"]
+  },
+  "production_systems": {
+    "enriched_cage": ["ausgestalteter käfig", "angereicherte haltung", "verbesserter käfig"],
+    "aviary_system": ["volierenhaltung", "voliere system", "mehretagensystem"],
+    "free_range": ["freilandhaltung", "auslaufhaltung", "extensive haltung"]
+  },
+  "biosecurity_health": {
+    "biosecurity": ["biosicherheit", "biologische sicherheit", "rein-raus verfahren"],
+    "probiotics": ["probiotika", "nützliche mikroorganismen", "darmbakterien"],
+    "antibiotics": ["antibiotika", "antimikrobielle", "therapeutika", "wachstumsförderer"],
+    "vaccine": ["impfstoff", "impfung", "immunisierung", "prophylaxe"]
+  },
+  "egg_defects": {
+    "cracked_shell": ["schalenriss", "gesprungene schale", "haarriss"],
+    "soft_shelled_egg": ["weichei", "weiche schale", "schalenloses ei"],
+    "misshapen_egg": ["missgebildetes ei", "deformiertes ei", "abnorme form"]
+  },
+  "genetic_lines": {
+    "ross_308": ["ross 308", "ross308", "ross broiler", "r308"],
+    "ross_708": ["ross 708", "ross708", "r708"],
+    "cobb_500": ["cobb 500", "cobb500", "cobb broiler", "c500"],
+    "hubbard_classic": ["hubbard classic", "hubbard klassik", "classic"],
+    "freedom_ranger": ["freedom ranger", "freiland ranger", "ranger"],
+    "isa_brown": ["isa brown", "isa braun", "isa legehenne", "braune isa"],
+    "lohmann_brown": ["lohmann brown", "lohmann braun", "lohmann legehenne", "lb"],
+    "hy_line": ["hy-line", "hyline", "hy line"]
+  },
+  "site_types": {
+    "broiler_farm": ["broiler", "masthähnchen", "hähnchenmast", "broiler farm"],
+    "layer_farm": ["legehenne", "eierproduktion", "legehennenhaltung", "hühnerei"],
+    "breeder_farm": ["elterntierhalterung", "zuchttiere", "elterntiere"],
+    "hatchery": ["brüterei", "brutanlage", "kükenbrüterei"],
+    "feed_mill": ["futtermühle", "futtermittelwerk", "futterfabrik"]
+  },
+  "performance_metrics": {
+    "feed_conversion_ratio": ["futterverwertung", "fcr", "futterkonversion", "umwandlungsrate"],
+    "average_daily_gain": ["tägliche zunahme", "tageszunahme", "adg", "g/tag"],
+    "feed_intake": ["futteraufnahme", "fi", "futterverbrauch", "g/tier/tag"],
+    "water_intake": ["wasseraufnahme", "wasserverbrauch", "l/1000/tag"],
+    "body_weight": ["gewicht", "körpergewicht", "lebendgewicht", "durchschnittsgewicht", "zielgewicht"],
+    "mortality": ["sterblichkeit", "mortalitätsrate", "tod", "verluste", "ausfälle"],
+    "egg_production": ["eierproduktion", "legeleistung", "legerate", "eierleistung", "eiablage"],
+    "uniformity": ["gleichmäßigkeit", "homogenität", "variationskoeffizient"],
+    "epef": ["epef", "produktionseffizienzfaktor", "leistungsindex"]
+  },
+  "nutrition_detailed": {
+    "crude_protein": ["rohprotein", "rp", "protein", "eiweiß"],
+    "metabolizable_energy": ["umsetzbare energie", "me", "kcal/kg", "energiedichte"],
+    "lysine": ["lysin", "verdauliches lysin", "lysin dig"],
+    "methionine": ["methionin", "met", "methionin+cystin", "met+cys"],
+    "calcium": ["kalzium", "calcium", "ca", "kalk"],
+    "phosphorus": ["phosphor", "p", "verdaulicher phosphor", "p dig"],
+    "digestible_phosphorus": ["verdaulicher phosphor", "dp", "verfügbarer phosphor"],
+    "electrolyte_balance": ["elektrolytbalance", "deb", "elektrolytgleichgewicht"],
+    "sodium": ["natrium", "na", "salz"],
+    "chloride": ["chlorid", "cl", "chlor"],
+    "potassium": ["kalium", "k", "kali"]
+  },
+  "pathology_specific": {
+    "gumboro": ["gumboro", "gumboro-krankheit", "infektiöse bursitis"],
+    "newcastle": ["newcastle", "newcastle-krankheit", "atypische geflügelpest"],
+    "coccidiosis": ["kokzidiose", "kokzidien", "eimeria", "kokzidiostatikum"],
+    "colibacillosis": ["colibacillose", "e.coli", "escherichia coli"],
+    "necrotic_enteritis": ["nekrotische enteritis", "clostridium perfringens", "darmnekrose"],
+    "eimeria_tenella": ["eimeria tenella", "blinddarmkokzidiose", "zäkalkokzidiose"],
+    "salmonella": ["salmonellen", "salmonellose", "paratyphus"],
+    "mycoplasma": ["mykoplasmen", "mykoplasma", "chronische atemwegserkrankung"],
+    "infectious_bronchitis_virus": ["ibv", "infektiöse bronchitis", "ib", "bronchitisvirus"]
+  },
+  "infrastructure_environment": {
+    "ventilation_rate": ["lüftungsrate", "luftdurchsatz", "m3/h/kg", "luftwechsel"],
+    "static_pressure": ["statischer druck", "pa", "pascal", "unterdruck", "negativdruck"],
+    "ammonia": ["ammoniak", "nh3", "ppm", "ammoniakkonzentration"],
+    "co2_concentration": ["co2", "kohlendioxid", "ppm co2", "co2-konzentration"],
+    "relative_humidity": ["relative luftfeuchtigkeit", "rh", "luftfeuchtigkeit"],
+    "feeder_space": ["futterplatz", "cm/tier", "futterlänge"],
+    "drinker_flow_rate": ["tränkendurchfluss", "nippeldurchfluss", "ml/min/nippel"],
+    "lighting_hours": ["beleuchtungsdauer", "photoperiode", "lichtstunden"],
+    "light_intensity": ["lichtstärke", "lux", "beleuchtungsstärke", "helligkeit"]
+  },
+  "welfare_management": {
+    "stocking_density": ["besatzdichte", "dichte", "kg/m2", "tiere/m2", "belegung"],
+    "heat_stress": ["hitzestress", "wärmestress", "hyperthermie", "hitzschlag"],
+    "feather_pecking": ["federpicken", "kannibalismus", "gefiederpicken", "pickverhalten"]
+  },
+  "equipment_settings": {
+    "nipple_height": ["nippelhöhe", "tränkenhöhe", "wasserhöhe"],
+    "brooding_temperature": ["temperaturkurve", "heizprogramm", "aufzuchttemperatur"],
+    "minimum_ventilation": ["mindestlüftung", "lüftungsprogramm", "mindestluftrate"],
+    "static_pressure_setpoints": ["sollwerte statischer druck", "zieldruck", "druckeinstellung"],
+    "co2_maximum_ppm": ["co2 maximum", "co2 grenzwert", "co2 schwelle"]
+  },
+  "reproduction_laying": {
+    "sexual_maturity": ["geschlechtsreife", "alter erste ei", "photostimulation"],
+    "laying_rate": ["legerate", "legeLeistung", "% legung", "eierproduktion"],
+    "egg_weight": ["eigewicht", "eimasse", "eigröße", "durchschnittsgewicht ei"],
+    "shell_quality": ["schalenqualität", "schalendicke", "schalenfestigkeit", "weichschalig"]
+  },
+  "phases": {
+    "starter": ["starter", "anfang", "startphase", "phase 1", "vor-starter"],
+    "grower": ["mast", "wachstum", "wachstumsphase", "phase 2"],
+    "finisher": ["endmast", "finish", "endphase", "phase 3"]
+  },
+  "taxonomy_classification": {
+    "commercial_strain": ["zuchtlinie", "stamm", "linie", "rasse"],
+    "sex_class": ["männlich", "weiblich", "gemischt", "ungetrennt"],
+    "age_brackets": ["0-10 tage", "11-35 tage", "36-42 tage", "phase 1", "phase 2", "phase 3"]
+  },
+  "question_patterns": {
+    "weight_query": ["wie ist das gewicht", "zielgewicht", "durchschnittsgewicht", "wie schwer", "welches gewicht"],
+    "fcr_query": ["optimale fcr", "futterverwertung", "futterkonversion"],
+    "water_query": ["wasserverbrauch", "wasseraufnahme", "liter pro tag"],
+    "nutrient_requirement_query": ["proteingehalt", "lysinbedarf", "kalziumbedarf"],
+    "environment_setpoint_query": ["optimale temperatur", "ziel feuchtigkeit", "maximales co2"],
+    "production_index_query": ["durchschnittliche epef", "normale iep", "effizienzindex"],
+    "vaccination_protocol_query": ["impfprotokoll", "impfschema", "impfprogramm"],
+    "space_equipment_query": ["futterplatz", "nipple einstellung", "tränkenhöhe"],
+    "problem_report": ["meine hühner", "ich beobachte", "meine hennen", "problem mit", "meine vögel"],
+    "health_diagnosis": ["welche symptome", "diagnose", "krankheit", "was verursacht"],
+    "management_how": ["wie verwalten", "wie behandeln", "was tun", "wie verbessern"]
+  },
+  "units_measures": {
+    "days": ["tage", "tag", "t"],
+    "weeks": ["wochen", "woche", "w"],
+    "grams": ["gramm", "g"],
+    "kilograms": ["kilogramm", "kg", "kilo"],
+    "percentage": ["prozent", "prozentsatz", "%"],
+    "liters": ["liter", "l"],
+    "celsius": ["celsius", "grad celsius", "°c", "grad"]
+  },
+  "health_symptoms": {
+    "respiratory": ["atemweg", "husten", "dyspnoe", "atmung", "nasenausfluss"],
+    "digestive": ["verdauung", "durchfall", "erbrechen", "anorexie", "appetitverlust"],
+    "nervous": ["nervös", "ataxie", "lähmung", "krämpfe", "zittern"],
+    "general": ["allgemein", "lethargie", "fieber", "schwäche", "depression"]
+  }
+}

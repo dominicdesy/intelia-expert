@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 utilities.py - Fonctions utilitaires multilingues
-Version 2.0 avec support FastText et service de traduction hybride
-CORRECTION CRITIQUE: Ajout de validate_intent_result manquant
+Version 2.1 avec CORRECTION SÉRIALISATION JSON pour LanguageDetectionResult
+CORRECTION CRITIQUE: Sérialisation dataclass + validate_intent_result manquant
 """
 
 import os
@@ -11,6 +11,7 @@ import time
 import json
 import logging
 import statistics
+import dataclasses
 from collections import defaultdict
 from typing import Dict, List, Optional, Any
 from pathlib import Path
@@ -66,23 +67,49 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # ============================================================================
-# CLASSES DE DONNÉES
+# CLASSES DE DONNÉES - VERSION CORRIGÉE AVEC SÉRIALISATION JSON
 # ============================================================================
 
 
 @dataclass
 class LanguageDetectionResult:
-    """Résultat de détection de langue avec confiance"""
+    """Résultat de détection de langue avec confiance - CORRIGÉ pour sérialisation JSON"""
 
     language: str
     confidence: float
     source: str  # "fasttext", "fast-langdetect", "universal_patterns", "fallback"
     processing_time_ms: int = 0
 
+    def to_dict(self) -> dict:
+        """Conversion en dictionnaire pour sérialisation JSON"""
+        return {
+            "language": self.language,
+            "confidence": self.confidence,
+            "source": self.source,
+            "processing_time_ms": self.processing_time_ms,
+        }
+
+    def __hash__(self):
+        """Rendre hashable pour utilisation comme clé de cache"""
+        return hash(
+            (self.language, self.confidence, self.source, self.processing_time_ms)
+        )
+
+    def __eq__(self, other):
+        """Comparaison d'égalité pour le cache"""
+        if not isinstance(other, LanguageDetectionResult):
+            return False
+        return (
+            self.language == other.language
+            and self.confidence == other.confidence
+            and self.source == other.source
+            and self.processing_time_ms == other.processing_time_ms
+        )
+
 
 @dataclass
 class ValidationReport:
-    """Rapport de validation détaillé"""
+    """Rapport de validation détaillé - CORRIGÉ pour sérialisation JSON"""
 
     is_valid: bool
     errors: List[str]
@@ -90,16 +117,97 @@ class ValidationReport:
     stats: Dict[str, Any]
     recommendations: List[str]
 
+    def to_dict(self) -> dict:
+        """Conversion en dictionnaire pour sérialisation JSON"""
+        return {
+            "is_valid": self.is_valid,
+            "errors": self.errors,
+            "warnings": self.warnings,
+            "stats": self.stats,
+            "recommendations": self.recommendations,
+        }
+
+    def __hash__(self):
+        """Rendre hashable pour utilisation comme clé de cache"""
+        return hash(
+            (
+                self.is_valid,
+                tuple(self.errors),
+                tuple(self.warnings),
+                tuple(self.recommendations),
+                # Ne pas inclure stats car peut contenir des types non-hashable
+            )
+        )
+
 
 @dataclass
 class ProcessingResult:
-    """Résultat de traitement d'une requête"""
+    """Résultat de traitement d'une requête - CORRIGÉ pour sérialisation JSON"""
 
     success: bool
     result: Optional[Any] = None
     error_message: Optional[str] = None
     processing_time: float = 0.0
     metadata: Dict[str, Any] = None
+
+    def __post_init__(self):
+        if self.metadata is None:
+            self.metadata = {}
+
+    def to_dict(self) -> dict:
+        """Conversion en dictionnaire pour sérialisation JSON"""
+        return {
+            "success": self.success,
+            "result": safe_serialize_for_json(self.result),
+            "error_message": self.error_message,
+            "processing_time": self.processing_time,
+            "metadata": self.metadata,
+        }
+
+    def __hash__(self):
+        """Rendre hashable pour utilisation comme clé de cache"""
+        return hash(
+            (
+                self.success,
+                self.error_message,
+                self.processing_time,
+                # Ne pas inclure result et metadata car peuvent contenir des types non-hashable
+            )
+        )
+
+
+# ============================================================================
+# FONCTION DE SÉRIALISATION CORRIGÉE - SUPPORT DATACLASSES
+# ============================================================================
+
+
+def safe_serialize_for_json(obj: Any) -> Any:
+    """Convertit récursivement les objets en types JSON-safe avec support dataclasses"""
+    if obj is None:
+        return None
+    elif isinstance(obj, (str, int, float, bool)):
+        return obj
+    elif isinstance(obj, Enum):
+        return obj.value
+    elif dataclasses.is_dataclass(obj):
+        # CORRECTION PRINCIPALE: Support spécifique pour les dataclasses
+        if hasattr(obj, "to_dict"):
+            # Utiliser la méthode to_dict si disponible
+            return obj.to_dict()
+        else:
+            # Fallback vers conversion directe des champs
+            return {
+                field.name: safe_serialize_for_json(getattr(obj, field.name))
+                for field in dataclasses.fields(obj)
+            }
+    elif isinstance(obj, dict):
+        return {k: safe_serialize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [safe_serialize_for_json(item) for item in obj]
+    elif hasattr(obj, "__dict__"):
+        return safe_serialize_for_json(obj.__dict__)
+    else:
+        return str(obj)
 
 
 # ============================================================================
@@ -870,24 +978,6 @@ def build_where_filter(intent_result) -> Dict:
 
 
 # Autres fonctions utilitaires maintenues
-def safe_serialize_for_json(obj: Any) -> Any:
-    """Convertit récursivement les objets en types JSON-safe"""
-    if obj is None:
-        return None
-    elif isinstance(obj, (str, int, float, bool)):
-        return obj
-    elif isinstance(obj, Enum):
-        return obj.value
-    elif isinstance(obj, dict):
-        return {k: safe_serialize_for_json(v) for k, v in obj.items()}
-    elif isinstance(obj, (list, tuple)):
-        return [safe_serialize_for_json(item) for item in obj]
-    elif hasattr(obj, "__dict__"):
-        return safe_serialize_for_json(obj.__dict__)
-    else:
-        return str(obj)
-
-
 def safe_get_attribute(obj: Any, attr: str, default: Any = None) -> Any:
     """Récupération sécurisée d'attributs avec validation de type"""
     try:

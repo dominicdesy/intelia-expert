@@ -1,0 +1,165 @@
+{
+  "metadata": {
+    "language": "nl",
+    "version": "2.1.0"
+  },
+  "equipment_types": {
+    "chain_feeder": ["kettengoot", "voederketting", "kettensysteem"],
+    "pan_feeder": ["panvoeder", "voederpan", "ronde voeder"],
+    "tube_feeder": ["buisvoeder", "voederbuis", "buissysteem"],
+    "bell_drinker": ["klokdrinker", "hangende drinker", "ronde drinker"],
+    "cup_drinker": ["komdrinkbak", "waterkom", "drinkkom"],
+    "tunnel_ventilation": ["tunnelventilatie", "tunneleffect", "langsventilatie"],
+    "cross_ventilation": ["dwarsventilatie", "kruisventilatie", "dwarse luchtstroom"],
+    "radiant_heaters": ["stralingsverwaming", "radiantverwarming", "warmtestraling"],
+    "hot_air_blowers": ["heteluchtblazer", "warmluchtventilator", "luchtverwarmer"]
+  },
+  "substrate_materials": {
+    "litter": ["strooisel", "bodembedekking", "onderlaag"],
+    "wood_shavings": ["houtkrullen", "schaafsel", "zaagsel"],
+    "rice_husks": ["rijstdoppen", "rijstkaf", "rijstschillen"],
+    "straw": ["stro", "tarwestro", "gerstestro"]
+  },
+  "additional_pathologies": {
+    "avian_influenza": ["vogelgriep", "aviaire influenza", "h5n1", "ai"],
+    "mareks_disease": ["marek ziekte", "marek", "lymfomen", "verlamming"],
+    "lameness": ["kreupelheid", "loopstoornissen", "bewegingsproblemen"],
+    "pododermatitis": ["voetbaldermatitis", "hakbrand", "pootproblemen"],
+    "crossbeak": ["kruissnavel", "snavelafwijking", "scheefsnavel"]
+  },
+  "production_systems": {
+    "enriched_cage": ["verrijkte kooi", "verbeterde kooi", "uitgebreide kooi"],
+    "aviary_system": ["voliëresysteem", "vrije uitloop systeem", "meerlaags systeem"],
+    "free_range": ["vrije uitloop", "scharrelsysteem", "extensief houden"]
+  },
+  "biosecurity_health": {
+    "biosecurity": ["biosecurity", "biologische veiligheid", "all-in all-out"],
+    "probiotics": ["probiotica", "nuttige micro-organismen", "darmbacteriën"],
+    "antibiotics": ["antibiotica", "antimicrobiële", "therapeutisch", "groeibevorderaars"],
+    "vaccine": ["vaccin", "vaccinatie", "immunisatie", "profylaxe"]
+  },
+  "egg_defects": {
+    "cracked_shell": ["gebarsten schaal", "schaalbreuk", "haarscheurtje"],
+    "soft_shelled_egg": ["zachtschalig ei", "ei zonder schaal", "rubberachtig ei"],
+    "misshapen_egg": ["misvormde ei", "abnormale vorm", "onregelmatig ei"]
+  },
+  "genetic_lines": {
+    "ross_308": ["ross 308", "ross308", "ross broiler", "r308"],
+    "ross_708": ["ross 708", "ross708", "r708"],
+    "cobb_500": ["cobb 500", "cobb500", "cobb broiler", "c500"],
+    "hubbard_classic": ["hubbard classic", "hubbard klassiek", "classic"],
+    "freedom_ranger": ["freedom ranger", "vrije ranger", "scharrelhaan"],
+    "isa_brown": ["isa brown", "isa bruin", "isa leghen", "bruine isa"],
+    "lohmann_brown": ["lohmann brown", "lohmann bruin", "lohmann leghen", "lb"],
+    "hy_line": ["hy-line", "hyline", "hy line"]
+  },
+  "site_types": {
+    "broiler_farm": ["broiler", "vleeskuiken", "broilerhouderij", "vleeskip"],
+    "layer_farm": ["leghen", "legkip", "eierproductie", "legbatterij"],
+    "breeder_farm": ["fokkerij", "ouderdieren", "broedstam"],
+    "hatchery": ["broederij", "uitkomsthal", "broedmachine"],
+    "feed_mill": ["voederfabriek", "mengvoederbedrijf", "molen"]
+  },
+  "performance_metrics": {
+    "feed_conversion_ratio": ["voederconversie", "fcr", "voederefficiëntie"],
+    "average_daily_gain": ["dagelijkse groei", "adg", "gemiddelde daggroei"],
+    "feed_intake": ["voederopname", "voederverbruik", "g/dier/dag"],
+    "water_intake": ["wateropname", "waterverbruik", "l/1000/dag"],
+    "body_weight": ["gewicht", "lichaamsgewicht", "levend gewicht", "gemiddeld gewicht", "streefgewicht"],
+    "mortality": ["sterfte", "sterftecijfer", "dood", "verliezen", "uitval"],
+    "egg_production": ["eierproductie", "legprestatie", "legpercentage", "eiproductie", "leggen"],
+    "uniformity": ["uniformiteit", "gelijkmatigheid", "variatiecoëfficiënt"],
+    "epef": ["epef", "productie-efficiëntiefactor", "prestatie-index"]
+  },
+  "nutrition_detailed": {
+    "crude_protein": ["ruw eiwit", "re", "proteïne", "eiwit"],
+    "metabolizable_energy": ["metaboliseerbare energie", "me", "kcal/kg", "energiedichtheid"],
+    "lysine": ["lysine", "verteerbare lysine", "lysine dig"],
+    "methionine": ["methionine", "met", "methionine+cysteine", "met+cys"],
+    "calcium": ["calcium", "ca", "kalk", "calciumcarbonaat"],
+    "phosphorus": ["fosfor", "p", "verteerbare fosfor", "p dig"],
+    "digestible_phosphorus": ["verteerbare fosfor", "dp", "beschikbare fosfor"],
+    "electrolyte_balance": ["elektrolytbalans", "deb", "elektrolytevenwicht"],
+    "sodium": ["natrium", "na", "zout"],
+    "chloride": ["chloride", "cl", "chloor"],
+    "potassium": ["kalium", "k", "potas"]
+  },
+  "pathology_specific": {
+    "gumboro": ["gumboro", "gumboro ziekte", "infectieuze bursitis"],
+    "newcastle": ["newcastle", "newcastle ziekte", "pseudovogelpest"],
+    "coccidiosis": ["coccidiose", "coccidiën", "eimeria", "coccidiostaticum"],
+    "colibacillosis": ["colibacillose", "e.coli", "escherichia coli"],
+    "necrotic_enteritis": ["necrotiserende enteritis", "clostridium perfringens", "darmnecrose"],
+    "eimeria_tenella": ["eimeria tenella", "blindedarmcoccidiose", "cecale coccidiën"],
+    "salmonella": ["salmonella", "salmonellose", "paratyfus"],
+    "mycoplasma": ["mycoplasma", "mycoplasmose", "chronische luchtwegziekte"],
+    "infectious_bronchitis_virus": ["ibv", "infectieuze bronchitis", "ib", "bronchitisvirus"]
+  },
+  "infrastructure_environment": {
+    "ventilation_rate": ["ventilatiedebiet", "luchtverversing", "m3/h/kg", "luchtwisseling"],
+    "static_pressure": ["statische druk", "pa", "pascal", "onderdruk", "negatieve druk"],
+    "ammonia": ["ammoniak", "nh3", "ppm", "ammoniakconcentratie"],
+    "co2_concentration": ["co2", "koolstofdioxide", "ppm co2", "co2-concentratie"],
+    "relative_humidity": ["relatieve vochtigheid", "rv", "luchtvochtigheid"],
+    "feeder_space": ["voederruimte", "cm/dier", "voederlengte"],
+    "drinker_flow_rate": ["drinkwaterdebiet", "nippeldebiet", "ml/min/nippel"],
+    "lighting_hours": ["verlichtingsduur", "fotoperiode", "lichturen"],
+    "light_intensity": ["lichtsterkte", "lux", "verlichting", "helderheid"]
+  },
+  "welfare_management": {
+    "stocking_density": ["bezettingsdichtheid", "dichtheid", "kg/m2", "dieren/m2"],
+    "heat_stress": ["hittestress", "warmtestress", "hyperthermie", "oververhitting"],
+    "feather_pecking": ["verenpikken", "kannibalisme", "pikgedrag", "verenplukken"]
+  },
+  "equipment_settings": {
+    "nipple_height": ["nippelhoogte", "drinkhoogte", "waterhoogte"],
+    "brooding_temperature": ["temperatuurcurve", "verwarmingsprogramma", "opfoktemperatuur"],
+    "minimum_ventilation": ["minimumventilatie", "ventilatieprogramma", "minimum debiet"],
+    "static_pressure_setpoints": ["drukinstellingen", "doeldruk", "drukregelingen"],
+    "co2_maximum_ppm": ["co2 maximum", "co2 limiet", "co2 drempel"]
+  },
+  "reproduction_laying": {
+    "sexual_maturity": ["geslachtsrijpheid", "leeftijd eerste ei", "photostimulatie"],
+    "laying_rate": ["legpercentage", "% leg", "legprestatie", "eierproductie"],
+    "egg_weight": ["eigewicht", "eimassa", "eikaliber", "gemiddeld eigewicht"],
+    "shell_quality": ["schaalKwaliteit", "schaaldikte", "schaalsterkte", "dunne schaal"]
+  },
+  "phases": {
+    "starter": ["starter", "begin", "startfase", "fase 1", "voor-starter"],
+    "grower": ["groei", "groeifase", "fase 2", "opfok"],
+    "finisher": ["afmest", "eindgase", "fase 3", "finish"]
+  },
+  "taxonomy_classification": {
+    "commercial_strain": ["commerciële lijn", "stam", "ras", "linie"],
+    "sex_class": ["mannen", "vrouwen", "gemengd", "ongekuind"],
+    "age_brackets": ["0-10 dagen", "11-35 dagen", "36-42 dagen", "fase 1", "fase 2", "fase 3"]
+  },
+  "question_patterns": {
+    "weight_query": ["wat is het gewicht", "streefgewicht", "gemiddeld gewicht", "hoeveel weegt", "welk gewicht"],
+    "fcr_query": ["optimale fcr", "voederconversie", "voederefficiëntie"],
+    "water_query": ["waterverbruik", "wateropname", "liter per dag"],
+    "nutrient_requirement_query": ["eiwitgehalte", "lysinebehoefte", "calciumbehoefte"],
+    "environment_setpoint_query": ["optimale temperatuur", "doel vochtigheid", "maximum co2"],
+    "production_index_query": ["gemiddelde epef", "normale iep", "efficiëntie-index"],
+    "vaccination_protocol_query": ["vaccinatieprotocol", "vaccinatieschema", "vaccinatieprogramma"],
+    "space_equipment_query": ["voederruimte", "nipple instelling", "drinkhoogte"],
+    "problem_report": ["mijn kippen", "ik observeer", "mijn hennen", "probleem met", "mijn vogels"],
+    "health_diagnosis": ["welke symptomen", "diagnose", "ziekte", "wat veroorzaakt"],
+    "management_how": ["hoe beheren", "hoe behandelen", "wat doen", "hoe verbeteren"]
+  },
+  "units_measures": {
+    "days": ["dagen", "dag", "d"],
+    "weeks": ["weken", "week", "w"],
+    "grams": ["gram", "g"],
+    "kilograms": ["kilogram", "kg", "kilo"],
+    "percentage": ["percentage", "procent", "%"],
+    "liters": ["liter", "l"],
+    "celsius": ["celsius", "graden celsius", "°c", "graden"]
+  },
+  "health_symptoms": {
+    "respiratory": ["ademhaling", "hoest", "dyspneu", "ademhaling", "neusuitvloeiing"],
+    "digestive": ["vertering", "diarree", "braken", "anorexie", "verlies eetlust"],
+    "nervous": ["zenuwstelsel", "ataxie", "verlamming", "stuipen", "trillingen"],
+    "general": ["algemeen", "lethargie", "koorts", "zwakte", "depressie"]
+  }
+}

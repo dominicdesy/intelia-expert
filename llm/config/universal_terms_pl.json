@@ -1,0 +1,165 @@
+{
+  "metadata": {
+    "language": "pl",
+    "version": "2.1.0"
+  },
+  "equipment_types": {
+    "chain_feeder": ["karmnik łańcuchowy", "łańcuch paszowy", "system łańcuchowy"],
+    "pan_feeder": ["karmnik talerzowy", "talerz paszowy", "okrągły karmnik"],
+    "tube_feeder": ["karmnik rurowy", "rura paszowa", "system rurowy"],
+    "bell_drinker": ["pojnik dzwonowy", "dzwon pojny", "pojnik wiszący"],
+    "cup_drinker": ["pojnik kubkowy", "kubek pojny", "miseczka na wodę"],
+    "tunnel_ventilation": ["wentylacja tunelowa", "efekt tunelu", "wentylacja podłużna"],
+    "cross_ventilation": ["wentylacja poprzeczna", "wentylacja krzyżowa", "przepływ poprzeczny"],
+    "radiant_heaters": ["grzejniki promieniowe", "ogrzewanie promieniowe", "rury promieniowe"],
+    "hot_air_blowers": ["dmuchawy gorącego powietrza", "nagrzewnice powietrza"]
+  },
+  "substrate_materials": {
+    "litter": ["ściółka", "podściółka", "materiał podłogowy"],
+    "wood_shavings": ["wióry drzewne", "trociny", "wiórki"],
+    "rice_husks": ["łuski ryżowe", "plewy ryżowe", "otręby ryżowe"],
+    "straw": ["słoma", "słoma pszenna", "słoma jęczmienna"]
+  },
+  "additional_pathologies": {
+    "avian_influenza": ["grypa ptaków", "grypa drobiu", "h5n1", "ptasia grypa"],
+    "mareks_disease": ["choroba mareka", "marek", "chłoniaki", "paraliż"],
+    "lameness": ["kulawizna", "problemy lokomotoryczne", "zaburzenia chodu"],
+    "pododermatitis": ["zapalenie opuszek", "dermatoza stóp", "oparzenia staw skokowy"],
+    "crossbeak": ["krzyżowy dziób", "deformacja dzioba", "krzywizna dzioba"]
+  },
+  "production_systems": {
+    "enriched_cage": ["klatka wzbogacona", "klatka ulepszona", "klatka zmodyfikowana"],
+    "aviary_system": ["system woliery", "system wielopoziomowy", "woliera"],
+    "free_range": ["wolny wybieg", "system ekstensywny", "hodowla na pastwisku"]
+  },
+  "biosecurity_health": {
+    "biosecurity": ["bioasekuracja", "bezpieczeństwo biologiczne", "system zamknięty"],
+    "probiotics": ["probiotyki", "korzystne mikroorganizmy", "bakterie kwasu mlekowego"],
+    "antibiotics": ["antybiotyki", "przeciwdrobnoustroje", "terapeutyczne"],
+    "vaccine": ["szczepionka", "szczepienie", "immunizacja", "profilaktyka"]
+  },
+  "egg_defects": {
+    "cracked_shell": ["pęknięta skorupa", "rysa skorupy", "uszkodzona skorupa"],
+    "soft_shelled_egg": ["miękka skorupa", "jajo bez skorupy", "jajo gumowate"],
+    "misshapen_egg": ["zniekształcone jajo", "nieprawidłowy kształt", "deformacja jaja"]
+  },
+  "genetic_lines": {
+    "ross_308": ["ross 308", "ross308", "kurczak ross", "brojler ross"],
+    "ross_708": ["ross 708", "ross708", "kurczak ross 708"],
+    "cobb_500": ["cobb 500", "cobb500", "kurczak cobb", "brojler cobb"],
+    "hubbard_classic": ["hubbard classic", "hubbard klasyczny", "classic"],
+    "freedom_ranger": ["freedom ranger", "ranger wolny", "kurczak wiejski"],
+    "isa_brown": ["isa brown", "isa brązowa", "kura isa", "nioska isa"],
+    "lohmann_brown": ["lohmann brown", "lohmann brązowa", "kura lohmann", "nioska lohmann"],
+    "hy_line": ["hy-line", "hyline", "hy line"]
+  },
+  "site_types": {
+    "broiler_farm": ["broiler", "kurczak brojler", "ferma broiler", "kurczak mięsny"],
+    "layer_farm": ["nioska", "kura nioska", "ferma jaj", "jaja"],
+    "breeder_farm": ["ferma rozpłodowa", "stado rodzicielskie", "rozpłodniki"],
+    "hatchery": ["wylęgarnia", "inkubatorium", "lęgnia"],
+    "feed_mill": ["wytwórnia pasz", "mieszalnia", "młyn paszowy"]
+  },
+  "performance_metrics": {
+    "feed_conversion_ratio": ["współczynnik konwersji", "fcr", "przelicznik paszowy"],
+    "average_daily_gain": ["przyrost dzienny", "adg", "średni przyrost"],
+    "feed_intake": ["spożycie paszy", "konsumpcja", "g/sztuka/dzień"],
+    "water_intake": ["spożycie wody", "konsumpcja wody", "l/1000/dzień"],
+    "body_weight": ["waga", "masa ciała", "waga żywa", "średnia waga", "waga docelowa"],
+    "mortality": ["śmiertelność", "wskaźnik śmiertelności", "śmierć", "straty", "upadki"],
+    "egg_production": ["produkcja jaj", "nieśność", "wskaźnik nieśności", "wydajność jaj", "znoszenie"],
+    "uniformity": ["jednorodność", "uniformność", "współczynnik zmienności"],
+    "epef": ["epef", "wskaźnik efektywności produkcji", "indeks wydajności"]
+  },
+  "nutrition_detailed": {
+    "crude_protein": ["białko surowe", "bs", "białko", "proteina"],
+    "metabolizable_energy": ["energia metaboliczna", "em", "kcal/kg", "gęstość energetyczna"],
+    "lysine": ["lizyna", "lizyna strawna", "lizyna dig"],
+    "methionine": ["metionina", "met", "metionina+cysteina", "met+cys"],
+    "calcium": ["wapń", "calcium", "ca", "węglan wapnia"],
+    "phosphorus": ["fosfor", "p", "fosfor strawny", "p dig"],
+    "digestible_phosphorus": ["fosfor strawny", "dp", "fosfor dostępny"],
+    "electrolyte_balance": ["równowaga elektrolitowa", "deb", "balans elektrolitowy"],
+    "sodium": ["sód", "na", "sól"],
+    "chloride": ["chlorek", "cl", "chlor"],
+    "potassium": ["potas", "k", "potaz"]
+  },
+  "pathology_specific": {
+    "gumboro": ["gumboro", "choroba gumboro", "zakaźne zapalenie"],
+    "newcastle": ["newcastle", "choroba newcastle", "pseudozachorka"],
+    "coccidiosis": ["kokcydioza", "kokcydia", "eimeria", "kokcydiostatyk"],
+    "colibacillosis": ["kolibacyloza", "e.coli", "escherichia coli"],
+    "necrotic_enteritis": ["martwicze zapalenie", "clostridium perfringens", "martwica jelit"],
+    "eimeria_tenella": ["eimeria tenella", "kokcydioza kątnicza", "kokcydia kątnicza"],
+    "salmonella": ["salmonella", "salmoneloza", "paratyfus"],
+    "mycoplasma": ["mykoplazma", "mykoplazma", "chroniczna choroba oddechowa"],
+    "infectious_bronchitis_virus": ["ibv", "zakaźne zapalenie oskrzeli", "zzo"]
+  },
+  "infrastructure_environment": {
+    "ventilation_rate": ["natężenie wentylacji", "wydajność wentylacji", "m3/h/kg"],
+    "static_pressure": ["ciśnienie statyczne", "pa", "pascal", "podciśnienie"],
+    "ammonia": ["amoniak", "nh3", "ppm", "stężenie amoniaku"],
+    "co2_concentration": ["co2", "dwutlenek węgla", "ppm co2", "stężenie co2"],
+    "relative_humidity": ["wilgotność względna", "rh", "wilgotność"],
+    "feeder_space": ["miejsce przy karmiku", "cm/sztuka", "długość karmika"],
+    "drinker_flow_rate": ["przepływ pojnika", "wydajność smoczka", "ml/min/smoczek"],
+    "lighting_hours": ["długość oświetlenia", "fotoperiod", "godziny światła"],
+    "light_intensity": ["natężenie światła", "lux", "oświetlenie", "jasność"]
+  },
+  "welfare_management": {
+    "stocking_density": ["zagęszczenie", "gęstość", "kg/m2", "sztuk/m2"],
+    "heat_stress": ["stres cieplny", "stres termiczny", "przegrzanie", "hipertermia"],
+    "feather_pecking": ["skubanie piór", "kanibalizm", "dziobanie", "wyrywanie piór"]
+  },
+  "equipment_settings": {
+    "nipple_height": ["wysokość smoczków", "wysokość pojników"],
+    "brooding_temperature": ["krzywa temperatury", "program grzewczy", "temperatura odchowu"],
+    "minimum_ventilation": ["wentylacja minimalna", "program wentylacji", "minimalny przepływ"],
+    "static_pressure_setpoints": ["nastawy ciśnienia", "ciśnienie docelowe", "regulacja ciśnienia"],
+    "co2_maximum_ppm": ["co2 maksimum", "limit co2", "próg co2"]
+  },
+  "reproduction_laying": {
+    "sexual_maturity": ["dojrzałość płciowa", "wiek pierwszego jaja", "fotostymulacja"],
+    "laying_rate": ["wskaźnik nieśności", "% nieśność", "produkcja jaj"],
+    "egg_weight": ["waga jaja", "masa jaja", "kaliber jaja", "średnia waga jaja"],
+    "shell_quality": ["jakość skorupy", "grubość skorupy", "wytrzymałość skorupy"]
+  },
+  "phases": {
+    "starter": ["starter", "początek", "faza startowa", "faza 1", "przed-starter"],
+    "grower": ["wzrost", "faza wzrostu", "odchów", "fase 2"],
+    "finisher": ["finisher", "faza końcowa", "wykańczanie", "faza 3"]
+  },
+  "taxonomy_classification": {
+    "commercial_strain": ["linia handlowa", "szczep", "rasa", "odmiana"],
+    "sex_class": ["samce", "samice", "mieszane", "nieselektowane"],
+    "age_brackets": ["0-10 dni", "11-35 dni", "36-42 dni", "faza 1", "faza 2", "faza 3"]
+  },
+  "question_patterns": {
+    "weight_query": ["jaka jest waga", "waga docelowa", "średnia waga", "ile waży", "jaka waga"],
+    "fcr_query": ["optymalne fcr", "konwersja paszowa", "przelicznik"],
+    "water_query": ["zużycie wody", "spożycie wody", "litry dziennie"],
+    "nutrient_requirement_query": ["poziom białka", "zapotrzebowanie lizyny", "potrzeba wapnia"],
+    "environment_setpoint_query": ["optymalna temperatura", "docelowa wilgotność", "maksymalne co2"],
+    "production_index_query": ["średnia epef", "normalna iep", "wskaźnik wydajności"],
+    "vaccination_protocol_query": ["protokół szczepień", "schemat szczepień", "program szczepień"],
+    "space_equipment_query": ["miejsce karmika", "ustawienia smoczka", "wysokość pojnika"],
+    "problem_report": ["moje kurczaki", "obserwuję", "moje kury", "problem z", "moje ptaki"],
+    "health_diagnosis": ["jakie objawy", "diagnoza", "choroba", "co powoduje"],
+    "management_how": ["jak zarządzać", "jak leczyć", "co robić", "jak poprawić"]
+  },
+  "units_measures": {
+    "days": ["dni", "dzień", "d"],
+    "weeks": ["tygodnie", "tydzień", "tyg", "t"],
+    "grams": ["gramy", "gram", "g"],
+    "kilograms": ["kilogramy", "kilogram", "kg"],
+    "percentage": ["procent", "procenty", "%"],
+    "liters": ["litry", "litr", "l"],
+    "celsius": ["celsius", "stopnie celsjusza", "°c", "stopnie"]
+  },
+  "health_symptoms": {
+    "respiratory": ["oddechowy", "kaszel", "duszność", "oddychanie", "wyciek z nosa"],
+    "digestive": ["trawienny", "biegunka", "wymioty", "anoreksja", "utrata apetytu"],
+    "nervous": ["nerwowy", "ataksja", "paraliż", "drgawki", "drżenia"],
+    "general": ["ogólny", "letarg", "gorączka", "słabość", "depresja"]
+  }
+}

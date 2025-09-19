@@ -1,0 +1,165 @@
+{
+  "metadata": {
+    "language": "pt",
+    "version": "2.1.0"
+  },
+  "equipment_types": {
+    "chain_feeder": ["comedouro corrente", "corrente alimentação", "sistema corrente"],
+    "pan_feeder": ["comedouro prato", "bandeja alimentação", "prato circular"],
+    "tube_feeder": ["comedouro tubo", "tubo alimentação", "alimentador tubular"],
+    "bell_drinker": ["bebedouro sino", "sino água", "bebedouro suspenso"],
+    "cup_drinker": ["bebedouro copo", "copo água", "taça água"],
+    "tunnel_ventilation": ["ventilação túnel", "efeito túnel", "ventilação longitudinal"],
+    "cross_ventilation": ["ventilação cruzada", "ventilação transversal", "fluxo cruzado"],
+    "radiant_heaters": ["aquecedores radiantes", "aquecimento radiante", "tubos radiantes"],
+    "hot_air_blowers": ["sopradores ar quente", "aquecedores ar forçado"]
+  },
+  "substrate_materials": {
+    "litter": ["cama", "substrato", "material cama", "cobertura solo"],
+    "wood_shavings": ["aparas madeira", "serragem", "aparas"],
+    "rice_husks": ["casca arroz", "palha arroz", "cascas de arroz"],
+    "straw": ["palha", "palha trigo", "palha cevada"]
+  },
+  "additional_pathologies": {
+    "avian_influenza": ["gripe aviária", "influenza aviária", "peste aviária", "h5n1"],
+    "mareks_disease": ["doença marek", "marek", "linfomas", "paralisia"],
+    "lameness": ["claudicação", "mancamento", "problemas locomotores"],
+    "pododermatitis": ["pododermatite", "dermatite plantar", "queimadura jarrete"],
+    "crossbeak": ["bico cruzado", "deformidade bico", "bico torto"]
+  },
+  "production_systems": {
+    "enriched_cage": ["gaiola enriquecida", "gaiola melhorada", "gaiola modificada"],
+    "aviary_system": ["sistema aviário", "aviário", "sistema multi-nível"],
+    "free_range": ["caipira", "criação extensiva", "pasto livre", "ao ar livre"]
+  },
+  "biosecurity_health": {
+    "biosecurity": ["biossegurança", "segurança biológica", "tudo dentro tudo fora"],
+    "probiotics": ["probióticos", "microrganismos benéficos", "culturas vivas"],
+    "antibiotics": ["antibióticos", "antimicrobianos", "terapêuticos", "promotores"],
+    "vaccine": ["vacina", "vacinação", "imunização", "profilaxia"]
+  },
+  "egg_defects": {
+    "cracked_shell": ["casca rachada", "ovo trincado", "fissura casca"],
+    "soft_shelled_egg": ["ovo mole", "casca mole", "ovo sem casca"],
+    "misshapen_egg": ["ovo deformado", "forma anormal", "ovo irregular"]
+  },
+  "genetic_lines": {
+    "ross_308": ["ross 308", "ross308", "frango ross", "broiler ross"],
+    "ross_708": ["ross 708", "ross708", "frango ross 708"],
+    "cobb_500": ["cobb 500", "cobb500", "frango cobb", "broiler cobb"],
+    "hubbard_classic": ["hubbard classic", "hubbard clássico", "classic"],
+    "freedom_ranger": ["freedom ranger", "ranger livre", "frango caipira"],
+    "isa_brown": ["isa brown", "isa marrom", "galinha isa", "poedeira isa"],
+    "lohmann_brown": ["lohmann brown", "lohmann marrom", "galinha lohmann", "poedeira lohmann"],
+    "hy_line": ["hy-line", "hyline", "hy line"]
+  },
+  "site_types": {
+    "broiler_farm": ["broiler", "frango de corte", "granja broiler", "frango carne"],
+    "layer_farm": ["poedeira", "galinha poedeira", "granja ovos", "ovos"],
+    "breeder_farm": ["reprodutores", "granja reprodução", "estoque parental"],
+    "hatchery": ["incubatório", "chocadeira", "nascedouro"],
+    "feed_mill": ["fábrica ração", "moinho", "planta ração"]
+  },
+  "performance_metrics": {
+    "feed_conversion_ratio": ["conversão alimentar", "fcr", "índice conversão"],
+    "average_daily_gain": ["ganho diário médio", "adg", "g/dia"],
+    "feed_intake": ["consumo ração", "ingestão", "g/ave/dia"],
+    "water_intake": ["consumo água", "ingestão água", "l/1000/dia"],
+    "body_weight": ["peso", "peso corporal", "peso vivo", "peso médio", "peso alvo"],
+    "mortality": ["mortalidade", "taxa mortalidade", "morte", "perdas", "óbitos"],
+    "egg_production": ["produção ovos", "postura", "taxa postura", "produção ovo", "oviposição"],
+    "uniformity": ["uniformidade", "homogeneidade", "coeficiente variação"],
+    "epef": ["epef", "fator eficiência produção", "índice eficiência"]
+  },
+  "nutrition_detailed": {
+    "crude_protein": ["proteína bruta", "pb", "proteína", "proteínas"],
+    "metabolizable_energy": ["energia metabolizável", "em", "kcal/kg", "densidade energética"],
+    "lysine": ["lisina", "lisina digestível", "lisina dig"],
+    "methionine": ["metionina", "met", "metionina+cistina", "met+cis"],
+    "calcium": ["cálcio", "ca", "carbonato de cálcio"],
+    "phosphorus": ["fósforo", "p", "fósforo digestível", "p dig"],
+    "digestible_phosphorus": ["fósforo digestível", "dp", "fósforo disponível"],
+    "electrolyte_balance": ["balanço eletrolítico", "deb", "equilíbrio eletrolítico"],
+    "sodium": ["sódio", "na", "sal"],
+    "chloride": ["cloreto", "cl", "cloro"],
+    "potassium": ["potássio", "k", "potassa"]
+  },
+  "pathology_specific": {
+    "gumboro": ["gumboro", "doença de gumboro", "bursite infecciosa"],
+    "newcastle": ["newcastle", "doença de newcastle", "pseudopeste aviária"],
+    "coccidiosis": ["coccidiose", "coccídias", "eimeria", "coccidiostático"],
+    "colibacillosis": ["colibacilose", "e.coli", "escherichia coli"],
+    "necrotic_enteritis": ["enterite necrótica", "clostridium perfringens", "necrose intestinal"],
+    "eimeria_tenella": ["eimeria tenella", "coccidiose cecal", "coccidia cecal"],
+    "salmonella": ["salmonela", "salmonelose", "paratifoide"],
+    "mycoplasma": ["micoplasma", "micoplasmose", "doença respiratória crônica"],
+    "infectious_bronchitis_virus": ["ibv", "bronquite infecciosa", "bi", "vírus bronquite"]
+  },
+  "infrastructure_environment": {
+    "ventilation_rate": ["taxa ventilação", "vazão ventilação", "m3/h/kg", "renovação ar"],
+    "static_pressure": ["pressão estática", "pa", "pascal", "depressão", "pressão negativa"],
+    "ammonia": ["amônia", "nh3", "ppm", "concentração amônia"],
+    "co2_concentration": ["co2", "dióxido carbono", "ppm co2", "concentração co2"],
+    "relative_humidity": ["umidade relativa", "ur", "umidade"],
+    "feeder_space": ["espaço comedouro", "cm/ave", "comprimento comedouro"],
+    "drinker_flow_rate": ["vazão bebedouro", "fluxo nipple", "ml/min/bico"],
+    "lighting_hours": ["horas luz", "fotoperíodo", "duração iluminação"],
+    "light_intensity": ["intensidade luz", "lux", "iluminação", "luminosidade"]
+  },
+  "welfare_management": {
+    "stocking_density": ["densidade criação", "densidade", "kg/m2", "aves/m2"],
+    "heat_stress": ["estresse térmico", "estresse calor", "hipertermia", "golpe calor"],
+    "feather_pecking": ["bicagem penas", "canibalismo", "arranque penas", "debicagem"]
+  },
+  "equipment_settings": {
+    "nipple_height": ["altura nipples", "altura bebedouros", "altura bicos"],
+    "brooding_temperature": ["curva temperatura", "programa aquecimento", "temperatura criação"],
+    "minimum_ventilation": ["ventilação mínima", "programa ventilação", "vazão mínima"],
+    "static_pressure_setpoints": ["setpoints pressão estática", "pressão alvo", "ajuste pressão"],
+    "co2_maximum_ppm": ["co2 máximo", "limite co2", "limiar co2"]
+  },
+  "reproduction_laying": {
+    "sexual_maturity": ["maturidade sexual", "idade primeira postura", "fotoestimulação"],
+    "laying_rate": ["taxa postura", "% postura", "produção", "oviposição"],
+    "egg_weight": ["peso ovo", "massa ovo", "calibre ovo", "tamanho ovo"],
+    "shell_quality": ["qualidade casca", "espessura casca", "resistência casca", "cascas moles"]
+  },
+  "phases": {
+    "starter": ["inicial", "arranque", "início", "fase inicial", "pré-inicial"],
+    "grower": ["crescimento", "engorda", "fase crescimento", "fase 2"],
+    "finisher": ["terminação", "acabamento", "fase final", "fase 3"]
+  },
+  "taxonomy_classification": {
+    "commercial_strain": ["linhagem comercial", "cepa", "raça", "estirpe"],
+    "sex_class": ["machos", "fêmeas", "misto", "não sexado"],
+    "age_brackets": ["0-10 dias", "11-35 dias", "36-42 dias", "fase 1", "fase 2", "fase 3"]
+  },
+  "question_patterns": {
+    "weight_query": ["qual é o peso", "peso alvo", "peso médio", "quanto pesa", "que peso"],
+    "fcr_query": ["fcr ótimo", "conversão alimentar", "índice conversão"],
+    "water_query": ["consumo água", "ingestão água", "litros por dia"],
+    "nutrient_requirement_query": ["nível proteína", "exigência lisina", "necessidade cálcio"],
+    "environment_setpoint_query": ["temperatura ótima", "umidade alvo", "co2 máximo"],
+    "production_index_query": ["epef médio", "iep normal", "índice eficiência"],
+    "vaccination_protocol_query": ["protocolo vacinação", "esquema vacinal", "programa vacinas"],
+    "space_equipment_query": ["espaço comedouro", "ajuste nipples", "altura bebedouro"],
+    "problem_report": ["minhas galinhas", "observo", "minhas galinhas", "problema com", "minhas aves"],
+    "health_diagnosis": ["que sintomas", "diagnóstico", "doença", "o que causa"],
+    "management_how": ["como gerenciar", "como tratar", "o que fazer", "como melhorar"]
+  },
+  "units_measures": {
+    "days": ["dias", "dia", "d"],
+    "weeks": ["semanas", "semana", "sem", "s"],
+    "grams": ["gramas", "grama", "g"],
+    "kilograms": ["quilogramas", "quilograma", "kg", "quilo"],
+    "percentage": ["porcentagem", "por cento", "%"],
+    "liters": ["litros", "litro", "l"],
+    "celsius": ["celsius", "graus celsius", "°c", "graus"]
+  },
+  "health_symptoms": {
+    "respiratory": ["respiratório", "tosse", "dispneia", "respiração", "secreção nasal"],
+    "digestive": ["digestivo", "diarreia", "vômito", "anorexia", "perda apetite"],
+    "nervous": ["nervoso", "ataxia", "paralisia", "convulsões", "tremores"],
+    "general": ["geral", "letargia", "febre", "fraqueza", "depressão"]
+  }
+}

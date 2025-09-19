@@ -1,0 +1,165 @@
+{
+  "metadata": {
+    "language": "zh",
+    "version": "2.1.0"
+  },
+  "equipment_types": {
+    "chain_feeder": ["链式料线", "输料链", "链式喂料系统"],
+    "pan_feeder": ["盘式料槽", "圆盘喂料器", "料盘"],
+    "tube_feeder": ["管式喂料器", "料管", "管式料槽"],
+    "bell_drinker": ["钟式饮水器", "吊钟饮水器", "悬挂式饮水器"],
+    "cup_drinker": ["杯式饮水器", "水杯", "饮水杯"],
+    "tunnel_ventilation": ["隧道通风", "纵向通风", "隧道效应"],
+    "cross_ventilation": ["横向通风", "交叉通风", "侧向通风"],
+    "radiant_heaters": ["辐射加热器", "红外线加热", "辐射管"],
+    "hot_air_blowers": ["热风机", "暖风机", "热空气吹风机"]
+  },
+  "substrate_materials": {
+    "litter": ["垫料", "垫草", "铺垫材料", "地面垫料"],
+    "wood_shavings": ["木屑", "刨花", "锯末", "木削"],
+    "rice_husks": ["稻壳", "谷壳", "米糠壳"],
+    "straw": ["稻草", "麦秸", "大麦秸"]
+  },
+  "additional_pathologies": {
+    "avian_influenza": ["禽流感", "鸟流感", "H5N1", "AI", "禽瘟"],
+    "mareks_disease": ["马立克氏病", "马立克病", "淋巴瘤", "麻痹"],
+    "lameness": ["跛行", "行走困难", "运动障碍", "腿部问题"],
+    "pododermatitis": ["足垫皮炎", "脚垫炎", "跗关节烧伤"],
+    "crossbeak": ["交叉喙", "剪刀嘴", "喙畸形"]
+  },
+  "production_systems": {
+    "enriched_cage": ["丰富笼", "改进笼", "强化笼", "福利笼"],
+    "aviary_system": ["鸟舍系统", "平养系统", "多层架养"],
+    "free_range": ["放养", "自由放牧", "散养", "户外饲养"]
+  },
+  "biosecurity_health": {
+    "biosecurity": ["生物安全", "生物防护", "全进全出", "卫生防疫"],
+    "probiotics": ["益生菌", "有益微生物", "活菌培养物"],
+    "antibiotics": ["抗生素", "抗菌药", "治疗药物", "促生长剂"],
+    "vaccine": ["疫苗", "免疫接种", "预防接种", "免疫"]
+  },
+  "egg_defects": {
+    "cracked_shell": ["破壳蛋", "裂纹蛋", "蛋壳裂缝"],
+    "soft_shelled_egg": ["软壳蛋", "无壳蛋", "薄壳蛋"],
+    "misshapen_egg": ["畸形蛋", "异形蛋", "变形蛋"]
+  },
+  "genetic_lines": {
+    "ross_308": ["罗斯308", "Ross308", "罗斯肉鸡", "R308"],
+    "ross_708": ["罗斯708", "Ross708", "R708"],
+    "cobb_500": ["科宝500", "Cobb500", "科宝肉鸡", "C500"],
+    "hubbard_classic": ["哈伯德经典", "Classic", "哈伯德"],
+    "freedom_ranger": ["自由放养鸡", "Freedom Ranger", "散养鸡"],
+    "isa_brown": ["伊莎褐", "ISA褐", "伊莎蛋鸡", "褐壳蛋鸡"],
+    "lohmann_brown": ["罗曼褐", "Lohmann褐", "罗曼蛋鸡", "LB"],
+    "hy_line": ["海兰", "Hy-Line", "HL"]
+  },
+  "site_types": {
+    "broiler_farm": ["肉鸡", "肉鸡场", "肉用鸡", "肉鸡养殖"],
+    "layer_farm": ["蛋鸡", "蛋鸡场", "产蛋鸡", "鸡蛋生产"],
+    "breeder_farm": ["种鸡场", "父母代", "种鸡", "繁殖场"],
+    "hatchery": ["孵化场", "孵化厂", "孵化器"],
+    "feed_mill": ["饲料厂", "饲料加工厂", "配合饲料厂"]
+  },
+  "performance_metrics": {
+    "feed_conversion_ratio": ["料肉比", "饲料转化率", "料重比", "FCR"],
+    "average_daily_gain": ["平均日增重", "日增重", "ADG", "克/天"],
+    "feed_intake": ["采食量", "日采食量", "克/只/天"],
+    "water_intake": ["耗水量", "饮水量", "升/1000只/天"],
+    "body_weight": ["重量", "体重", "活重", "平均重量", "目标重量"],
+    "mortality": ["死亡率", "死亡", "损失", "淘汰率", "伤亡"],
+    "egg_production": ["产蛋率", "产蛋", "鸡蛋产量", "产蛋性能", "下蛋率"],
+    "uniformity": ["均匀度", "整齐度", "变异系数", "一致性"],
+    "epef": ["欧洲效益指数", "生产效率因子", "EPEF"]
+  },
+  "nutrition_detailed": {
+    "crude_protein": ["粗蛋白", "蛋白质", "蛋白", "CP"],
+    "metabolizable_energy": ["代谢能", "ME", "千卡/公斤", "能量密度"],
+    "lysine": ["赖氨酸", "可消化赖氨酸", "赖氨酸"],
+    "methionine": ["蛋氨酸", "甲硫氨酸", "蛋+胱氨酸", "含硫氨基酸"],
+    "calcium": ["钙", "石灰石", "碳酸钙", "Ca"],
+    "phosphorus": ["磷", "可利用磷", "有效磷", "P"],
+    "digestible_phosphorus": ["可消化磷", "有效磷", "DP", "可利用磷"],
+    "electrolyte_balance": ["日粮电解质平衡", "DEB", "电解质平衡"],
+    "sodium": ["钠", "Na", "盐"],
+    "chloride": ["氯化物", "Cl", "氯"],
+    "potassium": ["钾", "K", "钾盐"]
+  },
+  "pathology_specific": {
+    "gumboro": ["法氏囊病", "甘保罗病", "传染性法氏囊病"],
+    "newcastle": ["新城疫", "鸡新城疫", "亚洲鸡瘟"],
+    "coccidiosis": ["球虫病", "球虫", "艾美耳球虫", "抗球虫药"],
+    "colibacillosis": ["大肠杆菌病", "大肠埃希菌", "E.coli"],
+    "necrotic_enteritis": ["坏死性肠炎", "产气荚膜梭菌", "肠道坏死"],
+    "eimeria_tenella": ["柔嫩艾美耳球虫", "盲肠球虫病"],
+    "salmonella": ["沙门菌", "沙门氏菌病", "副伤寒"],
+    "mycoplasma": ["支原体", "支原体病", "慢性呼吸道病"],
+    "infectious_bronchitis_virus": ["IBV", "传染性支气管炎", "支气管炎病毒"]
+  },
+  "infrastructure_environment": {
+    "ventilation_rate": ["通风率", "换气量", "立方米/小时/公斤", "最小通风"],
+    "static_pressure": ["静压", "帕斯卡", "负压", "压差"],
+    "ammonia": ["氨气", "NH3", "ppm", "氨气浓度"],
+    "co2_concentration": ["二氧化碳", "CO2", "ppm", "二氧化碳浓度"],
+    "relative_humidity": ["相对湿度", "RH", "湿度"],
+    "feeder_space": ["采食位", "厘米/只", "料槽长度", "采食空间"],
+    "drinker_flow_rate": ["饮水器流速", "乳头流量", "毫升/分钟/个"],
+    "lighting_hours": ["光照时间", "光周期", "小时/天"],
+    "light_intensity": ["光照强度", "勒克斯", "光照度", "亮度"]
+  },
+  "welfare_management": {
+    "stocking_density": ["饲养密度", "密度", "公斤/平米", "只/平米"],
+    "heat_stress": ["热应激", "高温应激", "热射病", "中暑"],
+    "feather_pecking": ["啄羽", "食羽癖", "同类相食", "羽毛啄食"]
+  },
+  "equipment_settings": {
+    "nipple_height": ["乳头高度", "饮水器高度", "厘米高度"],
+    "brooding_temperature": ["温度曲线", "加热程序", "育雏温度"],
+    "minimum_ventilation": ["最小通风", "通风程序", "最低通风量"],
+    "static_pressure_setpoints": ["静压设定值", "目标压力", "压力设置"],
+    "co2_maximum_ppm": ["最大二氧化碳", "CO2限值", "CO2阈值"]
+  },
+  "reproduction_laying": {
+    "sexual_maturity": ["性成熟", "开产日龄", "光刺激", "见蛋日龄"],
+    "laying_rate": ["产蛋率", "产蛋百分比", "产蛋性能", "下蛋率"],
+    "egg_weight": ["蛋重", "鸡蛋重量", "蛋的重量", "平均蛋重"],
+    "shell_quality": ["蛋壳质量", "蛋壳厚度", "蛋壳强度", "软壳蛋"]
+  },
+  "phases": {
+    "starter": ["开食料", "起始阶段", "第一阶段", "前期料", "雏鸡料"],
+    "grower": ["生长料", "生长阶段", "第二阶段", "中期料"],
+    "finisher": ["育肥料", "育肥阶段", "第三阶段", "后期料"]
+  },
+  "taxonomy_classification": {
+    "commercial_strain": ["商业品系", "品种", "品系", "种系"],
+    "sex_class": ["公", "母", "混合", "未分性别"],
+    "age_brackets": ["0-10天", "11-35天", "36-42天", "第一阶段", "第二阶段", "第三阶段"]
+  },
+  "question_patterns": {
+    "weight_query": ["重量是多少", "目标重量", "平均重量", "重多少", "什么重量"],
+    "fcr_query": ["最佳料肉比", "饲料转化率", "料重比"],
+    "water_query": ["耗水量", "饮水量", "升/天"],
+    "nutrient_requirement_query": ["蛋白质水平", "赖氨酸需要量", "钙需求"],
+    "environment_setpoint_query": ["最适温度", "目标湿度", "最大二氧化碳"],
+    "production_index_query": ["平均EPEF", "正常IEP", "效率指数"],
+    "vaccination_protocol_query": ["疫苗程序", "免疫计划", "疫苗方案"],
+    "space_equipment_query": ["采食位", "乳头设置", "饮水器高度"],
+    "problem_report": ["我的鸡", "我观察到", "我的母鸡", "有问题", "我的鸟"],
+    "health_diagnosis": ["什么症状", "诊断", "疾病", "什么原因", "临床症状"],
+    "management_how": ["如何管理", "如何治疗", "怎么办", "如何改善"]
+  },
+  "units_measures": {
+    "days": ["天", "日", "d"],
+    "weeks": ["周", "星期", "周"],
+    "grams": ["克", "g"],
+    "kilograms": ["公斤", "千克", "kg"],
+    "percentage": ["百分比", "百分率", "%"],
+    "liters": ["升", "公升", "l"],
+    "celsius": ["摄氏度", "摄氏", "°c", "度"]
+  },
+  "health_symptoms": {
+    "respiratory": ["呼吸道", "咳嗽", "呼吸困难", "鼻分泌物"],
+    "digestive": ["消化道", "腹泻", "呕吐", "厌食", "食欲不振"],
+    "nervous": ["神经系统", "共济失调", "麻痹", "抽搐", "震颤"],
+    "general": ["一般症状", "嗜睡", "发热", "虚弱", "精神沉郁"]
+  }
+}

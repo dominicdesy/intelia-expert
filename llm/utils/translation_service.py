@@ -2,6 +2,7 @@
 """
 translation_service.py - Service de traduction universel hybride
 Combine dictionnaire local + Google Translate avec cache intelligent
+Version avec chargement dynamique des dictionnaires par langue
 """
 
 import json
@@ -23,6 +24,10 @@ except ImportError:
     translate = None
 
 logger = logging.getLogger(__name__)
+
+# Constantes pour le chargement dynamique
+FALLBACK_LANGUAGE = "en"
+DICTIONARY_PREFIX = "universal_terms"
 
 
 @dataclass
@@ -53,6 +58,7 @@ class UniversalTranslationService:
     """
     Service de traduction hybride avec dictionnaire local + Google Translate
     Architecture à 3 niveaux: Cache → Dictionnaire local → Google API
+    Chargement dynamique des dictionnaires par langue
     """
 
     def __init__(
@@ -76,7 +82,10 @@ class UniversalTranslationService:
 
         # Cache 2-niveaux
         self._memory_cache = TTLCache(maxsize=cache_size, ttl=cache_ttl)
-        self._local_dict: Dict[str, Any] = {}
+
+        # Dictionnaires par langue (chargement dynamique)
+        self._language_dictionaries: Dict[str, Dict[str, Any]] = {}
+        self._dictionary_lock = threading.Lock()
 
         # Google Client (lazy loading)
         self._google_client = None
@@ -86,16 +95,15 @@ class UniversalTranslationService:
         self.stats = CacheStats()
         self._stats_lock = threading.Lock()
 
-        # Chargement dictionnaire
-        self._load_universal_dictionary()
-
         # Validation initiale
         self._validate_setup()
 
     def _validate_setup(self) -> None:
         """Valide la configuration initiale"""
         if not self.dict_path.exists():
-            logger.warning(f"Dictionnaire universel non trouvé: {self.dict_path}")
+            logger.warning(f"Répertoire dictionnaires non trouvé: {self.dict_path}")
+            # Créer le répertoire s'il n'existe pas
+            self.dict_path.mkdir(parents=True, exist_ok=True)
 
         if self.enable_google_fallback:
             if not GOOGLE_TRANSLATE_AVAILABLE:
@@ -108,31 +116,79 @@ class UniversalTranslationService:
                 self.enable_google_fallback = False
 
         logger.info(
-            f"Service traduction initialisé - Local: {bool(self._local_dict)}, Google: {self.enable_google_fallback}"
+            f"Service traduction initialisé - Répertoire: {self.dict_path}, Google: {self.enable_google_fallback}"
         )
 
-    def _load_universal_dictionary(self) -> None:
-        """Charge le dictionnaire universel depuis JSON"""
-        try:
-            if self.dict_path.exists():
-                with open(self.dict_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    self._local_dict = data
+    def _load_language_dictionary(self, language: str) -> Dict[str, Any]:
+        """Charge le dictionnaire pour une langue spécifique avec fallback"""
+        # Vérifier si déjà chargé
+        if language in self._language_dictionaries:
+            return self._language_dictionaries[language]
+
+        with self._dictionary_lock:
+            # Double-check après acquisition du verrou
+            if language in self._language_dictionaries:
+                return self._language_dictionaries[language]
+
+            # Construire le chemin du fichier
+            file_path = self.dict_path / f"{DICTIONARY_PREFIX}_{language}.json"
+
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    dictionary_data = json.load(f)
+                    self._language_dictionaries[language] = dictionary_data
                     logger.info(
-                        f"Dictionnaire chargé: {len(data.get('domains', {}))} domaines"
+                        f"Dictionnaire {language} chargé: {len(dictionary_data.get('domains', {}))} domaines"
                     )
-            else:
-                logger.warning(f"Fichier dictionnaire non trouvé: {self.dict_path}")
-                self._local_dict = {
+                    return dictionary_data
+
+            except FileNotFoundError:
+                logger.warning(f"Dictionnaire {language} non trouvé: {file_path}")
+
+                # Fallback vers langue par défaut si différente
+                if language != FALLBACK_LANGUAGE:
+                    logger.info(f"Fallback vers dictionnaire {FALLBACK_LANGUAGE}")
+                    try:
+                        fallback_dict = self._load_language_dictionary(
+                            FALLBACK_LANGUAGE
+                        )
+                        # Mettre en cache pour éviter les re-tentatives
+                        self._language_dictionaries[language] = fallback_dict
+                        return fallback_dict
+                    except Exception as e:
+                        logger.error(f"Erreur fallback vers {FALLBACK_LANGUAGE}: {e}")
+
+                # Dictionnaire vide en dernier recours
+                empty_dict = {
                     "domains": {},
-                    "metadata": {"languages": list(self.supported_languages)},
+                    "metadata": {
+                        "language": language,
+                        "loaded_at": time.time(),
+                        "source": "empty_fallback",
+                    },
                 }
-        except Exception as e:
-            logger.error(f"Erreur chargement dictionnaire: {e}")
-            self._local_dict = {
-                "domains": {},
-                "metadata": {"languages": list(self.supported_languages)},
-            }
+                self._language_dictionaries[language] = empty_dict
+                return empty_dict
+
+            except Exception as e:
+                logger.error(f"Erreur chargement dictionnaire {language}: {e}")
+                # Dictionnaire vide en cas d'erreur
+                empty_dict = {
+                    "domains": {},
+                    "metadata": {
+                        "language": language,
+                        "error": str(e),
+                        "source": "error_fallback",
+                    },
+                }
+                self._language_dictionaries[language] = empty_dict
+                return empty_dict
+
+    def _get_language_dictionary(self, language: str) -> Dict[str, Any]:
+        """Récupère le dictionnaire pour une langue (avec chargement lazy)"""
+        if language not in self._language_dictionaries:
+            return self._load_language_dictionary(language)
+        return self._language_dictionaries[language]
 
     @property
     def google_client(self):
@@ -191,48 +247,68 @@ class UniversalTranslationService:
         self._memory_cache[key] = result
 
     def _search_local_dictionary(
-        self, term: str, target_lang: str, domain: Optional[str] = None
+        self,
+        term: str,
+        target_lang: str,
+        source_lang: Optional[str] = None,
+        domain: Optional[str] = None,
     ) -> Optional[TranslationResult]:
-        """Recherche dans le dictionnaire local avec logique de domaine"""
+        """Recherche dans le dictionnaire local avec logique de domaine et langue source"""
         start_time = time.time()
 
         # Normalisation du terme
         term_lower = term.lower().strip()
 
-        # Recherche par domaine si spécifié
-        domains_to_search = (
-            [domain] if domain else self._local_dict.get("domains", {}).keys()
-        )
+        # Déterminer les langues à examiner pour la recherche
+        search_languages = []
+        if source_lang and source_lang != "auto":
+            search_languages.append(source_lang)
+        else:
+            # Rechercher dans toutes les langues supportées
+            search_languages.extend(self.supported_languages)
 
-        for domain_key in domains_to_search:
-            domain_data = self._local_dict.get("domains", {}).get(domain_key, {})
+        # Recherche dans les dictionnaires des langues sources potentielles
+        for search_lang in search_languages:
+            lang_dict = self._get_language_dictionary(search_lang)
+            domains_data = lang_dict.get("domains", {})
 
-            for term_key, term_data in domain_data.items():
-                if not isinstance(term_data, dict):
+            # Recherche par domaine si spécifié
+            domains_to_search = [domain] if domain else domains_data.keys()
+
+            for domain_key in domains_to_search:
+                if domain_key not in domains_data:
                     continue
 
-                translations = term_data.get("translations", {})
+                domain_data = domains_data[domain_key]
 
-                # Recherche dans toutes les langues du terme
-                for lang, variants in translations.items():
-                    if isinstance(variants, list):
-                        for variant in variants:
-                            if variant.lower() == term_lower:
-                                # Trouvé! Récupérer la traduction cible
-                                target_variants = translations.get(target_lang, [])
-                                if target_variants:
-                                    processing_time = int(
-                                        (time.time() - start_time) * 1000
-                                    )
-                                    confidence = term_data.get("confidence", 0.9)
+                for term_key, term_data in domain_data.items():
+                    if not isinstance(term_data, dict):
+                        continue
 
-                                    return TranslationResult(
-                                        text=target_variants[0],  # Première variante
-                                        source="local",
-                                        confidence=confidence,
-                                        language=target_lang,
-                                        processing_time_ms=processing_time,
-                                    )
+                    translations = term_data.get("translations", {})
+
+                    # Recherche dans toutes les langues du terme
+                    for lang, variants in translations.items():
+                        if isinstance(variants, list):
+                            for variant in variants:
+                                if variant.lower() == term_lower:
+                                    # Trouvé! Récupérer la traduction cible
+                                    target_variants = translations.get(target_lang, [])
+                                    if target_variants:
+                                        processing_time = int(
+                                            (time.time() - start_time) * 1000
+                                        )
+                                        confidence = term_data.get("confidence", 0.9)
+
+                                        return TranslationResult(
+                                            text=target_variants[
+                                                0
+                                            ],  # Première variante
+                                            source="local",
+                                            confidence=confidence,
+                                            language=target_lang,
+                                            processing_time_ms=processing_time,
+                                        )
 
         return None
 
@@ -311,7 +387,7 @@ class UniversalTranslationService:
         """
         Traduit un terme avec logique de fallback intelligente
         1. Cache mémoire
-        2. Dictionnaire local
+        2. Dictionnaire local (chargement dynamique par langue)
         3. Google Translate (si activé)
         4. Fallback (terme original)
         """
@@ -329,15 +405,17 @@ class UniversalTranslationService:
             )
 
         # Clé de cache
-        cache_key = f"{term.lower()}:{target_language}:{domain or 'general'}"
+        cache_key = f"{term.lower()}:{target_language}:{source_language or 'auto'}:{domain or 'general'}"
 
         # 1. Vérification cache
         cached_result = self._get_from_cache(cache_key)
         if cached_result:
             return cached_result
 
-        # 2. Recherche dictionnaire local
-        local_result = self._search_local_dictionary(term, target_language, domain)
+        # 2. Recherche dictionnaire local (avec chargement dynamique)
+        local_result = self._search_local_dictionary(
+            term, target_language, source_language, domain
+        )
         if local_result and local_result.confidence >= self.confidence_threshold:
             self._cache_result(cache_key, local_result)
             self._update_stats("local")
@@ -385,7 +463,8 @@ class UniversalTranslationService:
 
     def get_domain_terms(self, domain: str, language: str) -> List[str]:
         """Récupère tous les termes d'un domaine pour une langue"""
-        domain_data = self._local_dict.get("domains", {}).get(domain, {})
+        lang_dict = self._get_language_dictionary(language)
+        domain_data = lang_dict.get("domains", {}).get(domain, {})
         terms = []
 
         for term_key, term_data in domain_data.items():
@@ -394,11 +473,43 @@ class UniversalTranslationService:
                 lang_variants = translations.get(language, [])
                 terms.extend(lang_variants)
 
-        return list(set(terms))  # Dédoublonnage
+        return list(set(terms))  # Déduplication
 
-    def get_available_domains(self) -> List[str]:
-        """Retourne la liste des domaines disponibles"""
-        return list(self._local_dict.get("domains", {}).keys())
+    def get_available_domains(self, language: Optional[str] = None) -> List[str]:
+        """Retourne la liste des domaines disponibles pour une langue"""
+        if language:
+            lang_dict = self._get_language_dictionary(language)
+            return list(lang_dict.get("domains", {}).keys())
+        else:
+            # Agréger les domaines de toutes les langues chargées
+            all_domains = set()
+            for lang in self.supported_languages:
+                if lang in self._language_dictionaries:
+                    lang_dict = self._language_dictionaries[lang]
+                    all_domains.update(lang_dict.get("domains", {}).keys())
+            return list(all_domains)
+
+    def get_loaded_languages(self) -> List[str]:
+        """Retourne la liste des langues dont le dictionnaire est chargé"""
+        return list(self._language_dictionaries.keys())
+
+    def preload_languages(self, languages: List[str]) -> Dict[str, bool]:
+        """Précharge les dictionnaires pour plusieurs langues"""
+        results = {}
+        for lang in languages:
+            if lang in self.supported_languages:
+                try:
+                    self._load_language_dictionary(lang)
+                    results[lang] = True
+                    logger.info(f"Dictionnaire {lang} préchargé")
+                except Exception as e:
+                    logger.error(f"Erreur préchargement {lang}: {e}")
+                    results[lang] = False
+            else:
+                results[lang] = False
+                logger.warning(f"Langue non supportée pour préchargement: {lang}")
+
+        return results
 
     def get_cache_stats(self) -> CacheStats:
         """Retourne les statistiques du cache"""
@@ -417,60 +528,93 @@ class UniversalTranslationService:
         self._memory_cache.clear()
         logger.info("Cache traduction vidé")
 
-    def reload_dictionary(self) -> bool:
-        """Recharge le dictionnaire depuis le fichier"""
+    def reload_language_dictionary(self, language: str) -> bool:
+        """Recharge le dictionnaire d'une langue spécifique"""
         try:
-            self._load_universal_dictionary()
-            self.clear_cache()  # Vider le cache après rechargement
-            logger.info("Dictionnaire rechargé")
-            return True
+            with self._dictionary_lock:
+                # Supprimer l'ancien dictionnaire du cache
+                if language in self._language_dictionaries:
+                    del self._language_dictionaries[language]
+
+                # Recharger
+                self._load_language_dictionary(language)
+
+                # Vider le cache mémoire pour cette langue
+                keys_to_remove = [
+                    k for k in self._memory_cache.keys() if f":{language}:" in k
+                ]
+                for key in keys_to_remove:
+                    del self._memory_cache[key]
+
+                logger.info(f"Dictionnaire {language} rechargé")
+                return True
         except Exception as e:
-            logger.error(f"Erreur rechargement dictionnaire: {e}")
+            logger.error(f"Erreur rechargement dictionnaire {language}: {e}")
             return False
+
+    def reload_all_dictionaries(self) -> Dict[str, bool]:
+        """Recharge tous les dictionnaires chargés"""
+        loaded_languages = list(self._language_dictionaries.keys())
+        results = {}
+
+        for lang in loaded_languages:
+            results[lang] = self.reload_language_dictionary(lang)
+
+        return results
 
     def add_validated_term(
         self,
         term: str,
         translations: Dict[str, List[str]],
         domain: str,
+        language: str,
         confidence: float = 0.9,
     ) -> bool:
-        """Ajoute un terme validé au dictionnaire local"""
+        """Ajoute un terme validé au dictionnaire d'une langue spécifique"""
         try:
+            # Charger le dictionnaire de la langue si nécessaire
+            lang_dict = self._get_language_dictionary(language)
+
             # Mise à jour du dictionnaire en mémoire
-            if "domains" not in self._local_dict:
-                self._local_dict["domains"] = {}
+            if "domains" not in lang_dict:
+                lang_dict["domains"] = {}
 
-            if domain not in self._local_dict["domains"]:
-                self._local_dict["domains"][domain] = {}
+            if domain not in lang_dict["domains"]:
+                lang_dict["domains"][domain] = {}
 
-            self._local_dict["domains"][domain][term] = {
+            lang_dict["domains"][domain][term] = {
                 "canonical": term,
                 "domain": domain,
                 "confidence": confidence,
                 "translations": translations,
                 "source": "manual_validation",
+                "added_at": time.time(),
             }
 
-            logger.info(f"Terme ajouté: {term} dans domaine {domain}")
+            logger.info(
+                f"Terme ajouté: {term} dans domaine {domain} (langue: {language})"
+            )
             return True
 
         except Exception as e:
-            logger.error(f"Erreur ajout terme {term}: {e}")
+            logger.error(f"Erreur ajout terme {term} (langue: {language}): {e}")
             return False
 
     def is_healthy(self) -> bool:
         """Vérifie l'état de santé du service"""
         try:
-            # Test dictionnaire local
-            local_ok = bool(self._local_dict.get("domains"))
+            # Test répertoire dictionnaires
+            dict_path_ok = self.dict_path.exists()
 
             # Test Google si activé
             google_ok = True
             if self.enable_google_fallback:
                 google_ok = self.google_client is not None
 
-            return local_ok and google_ok
+            # Test chargement au moins une langue
+            at_least_one_dict = len(self._language_dictionaries) > 0
+
+            return dict_path_ok and google_ok and at_least_one_dict
 
         except Exception:
             return False
