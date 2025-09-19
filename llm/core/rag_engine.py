@@ -804,18 +804,35 @@ class InteliaRAGEngine:
             if not documents:
                 return RAGResult(source=RAGSource.NO_DOCUMENTS_FOUND)
 
-            # Filtrage par seuil de confiance
+            # ✅ CORRECTION: Logs de debug AVANT le filtrage et la vérification
             effective_threshold = RAG_CONFIDENCE_THRESHOLD
             filtered_docs = [
                 doc for doc in documents if doc.score >= effective_threshold
             ]
 
+            # Logs de diagnostic pour debugging
+            logger.error(f"🔍 DEBUG RAG: documents trouvés: {len(documents)}")
+            logger.error(f"🔍 DEBUG RAG: seuil appliqué: {effective_threshold}")
+            if documents:
+                scores = [doc.score for doc in documents]
+                logger.error(f"🔍 DEBUG RAG: scores des documents: {scores}")
+                logger.error(f"🔍 DEBUG RAG: score max: {max(scores)}")
+            logger.error(f"🔍 DEBUG RAG: documents filtrés: {len(filtered_docs)}")
+
+            # Vérification et retour LOW_CONFIDENCE si nécessaire
             if not filtered_docs:
+                logger.error(
+                    "🚨 DEBUG RAG: RETOURNE LOW_CONFIDENCE - aucun document ne passe le seuil"
+                )
                 return RAGResult(
                     source=RAGSource.LOW_CONFIDENCE,
                     metadata={
                         "threshold": effective_threshold,
-                        "max_score": max([d.score for d in documents]),
+                        "max_score": (
+                            max([d.score for d in documents]) if documents else 0
+                        ),
+                        "documents_found": len(documents),
+                        "reason": "all_documents_below_threshold",
                     },
                 )
 
@@ -827,7 +844,7 @@ class InteliaRAGEngine:
                         filtered_docs,
                         conversation_context_str,
                         language,
-                        intent_result,  # Réordonné selon la signature du générateur
+                        intent_result,
                     )
 
                     if not response_text or not isinstance(response_text, str):
@@ -1174,8 +1191,6 @@ class InteliaRAGEngine:
             return await self.retriever.adaptive_search(
                 query_vector, query_text, top_k, where_filter, alpha=alpha
             )
-
-    # 3. AJOUTER UNE MÉTHODE DE VALIDATION GLOBALE
 
     def _validate_intent_before_retrieval(self, intent_result) -> tuple[bool, any]:
         """

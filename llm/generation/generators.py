@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 generators.py - Générateurs de réponses enrichis avec entités et cache externe
-Version corrigée - Erreur cache manager résolue
+Version corrigée - Erreur cache manager résolue + Protection documents vides
 """
 
 import logging
@@ -98,6 +98,12 @@ class EnhancedResponseGenerator:
         intent_result=None,
     ) -> str:
         """Génère une réponse enrichie avec cache externe + instrumentation sémantique"""
+
+        # ✅ CORRECTION: Protection contre les documents vides placée au bon endroit
+        if not context_docs or len(context_docs) == 0:
+            logger.warning("⚠️ Générateur appelé avec 0 documents - protection activée")
+            return "Je n'ai pas trouvé de documents pertinents dans ma base de connaissances pour répondre à votre question. Pouvez-vous reformuler ou être plus spécifique ?"
+
         try:
             # Vérifier le cache externe
             cache_hit_details = {"semantic_reasoning": "", "cache_type": ""}
