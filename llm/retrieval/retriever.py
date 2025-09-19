@@ -662,9 +662,7 @@ class HybridWeaviateRetriever:
                     len(documents),
                     alpha,
                     time.time() - start_time,
-                    intent_type=(
-                        intent_result.intent_type.value if intent_result else None
-                    ),
+                    intent_type=self._safe_extract_intent_type(intent_result),
                 )
 
             return documents
@@ -916,6 +914,40 @@ class HybridWeaviateRetriever:
             documents.append(doc)
 
         return documents
+
+    def _safe_extract_intent_type(self, intent_result) -> str:
+        """Extraction sécurisée du type d'intention pour métriques"""
+        if not intent_result:
+            return None
+
+        try:
+            # CAS 1: Objet IntentResult standard
+            if hasattr(intent_result, "intent_type"):
+                intent_type_attr = intent_result.intent_type
+                if hasattr(intent_type_attr, "value"):
+                    return intent_type_attr.value
+                else:
+                    return str(intent_type_attr)
+
+            # CAS 2: Dictionnaire
+            elif isinstance(intent_result, dict):
+                intent_type = intent_result.get("intent_type")
+                if intent_type:
+                    if hasattr(intent_type, "value"):
+                        return intent_type.value
+                    elif isinstance(intent_type, str):
+                        return intent_type
+                    else:
+                        return str(intent_type)
+
+            # CAS 3: String directement
+            elif isinstance(intent_result, str):
+                return intent_result
+
+        except Exception as e:
+            logger.debug(f"Erreur extraction intent_type pour métriques: {e}")
+
+        return "unknown"
 
     def get_retrieval_analytics(self) -> Dict[str, Any]:
         """NOUVEAU: Analytics de récupération pour monitoring"""
