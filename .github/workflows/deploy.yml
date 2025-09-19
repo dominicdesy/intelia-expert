@@ -216,7 +216,7 @@ jobs:
       - name: Simple cleanup - Keep 8 most recent images
         shell: bash
         run: |
-          set -e
+          # Retirer set -e pour eviter echec complet du script
           
           KEEP_IMAGES=8
           REPOSITORIES=("intelia-frontend" "intelia-backend" "intelia-llm")
@@ -296,30 +296,25 @@ jobs:
               tag=$(echo "$tag" | tr -d '\r\n' | xargs)
               
               # Ignorer les tags invalides
-              if [ -z "$tag" ] || [ "$tag" = "Tag" ] || [ "$tag" = "tag" ]; then
+              if [ -z "$tag" ] || [ "$tag" = "Tag" ] || [ "$tag" = "tag" ] || [ "$tag" = "null" ]; then
                 echo "Tag invalide ignore: '$tag'"
                 continue
               fi
               
               echo "Suppression: $tag"
               
-              # Verifier d'abord que le tag existe encore
-              if ! doctl registry repository list-tags "$repo" --format "Tag" --no-header | grep -q "^${tag}$"; then
-                echo "   Tag '$tag' n'existe plus, ignore"
-                continue
-              fi
-              
               success=false
               for attempt in {1..3}; do
-                if doctl registry repository delete-tag "$repo" "$tag" --force 2>&1; then
+                # Suppression directe sans verification prealable
+                if doctl registry repository delete-tag "$repo" "$tag" --force 2>/dev/null; then
                   echo "   Supprime avec succes"
                   ((deleted++))
                   success=true
                   break
                 else
-                  echo "   Echec tentative $attempt"
-                  # Afficher l'erreur complete pour diagnostic
-                  doctl registry repository delete-tag "$repo" "$tag" --force || true
+                  echo "   Echec tentative $attempt - erreur:"
+                  # Afficher l'erreur pour diagnostic
+                  doctl registry repository delete-tag "$repo" "$tag" --force 2>&1 || true
                   sleep 2
                 fi
               done
@@ -327,8 +322,6 @@ jobs:
               if [ "$success" = false ]; then
                 ((failed++))
                 echo "   ECHEC FINAL pour tag: $tag"
-                # Continuer au lieu de fail le script entier
-                echo "   Continuing with next tag..."
               fi
               
               sleep 1
@@ -359,7 +352,7 @@ jobs:
       - name: Cleanup orphaned manifests
         shell: bash
         run: |
-          set -e
+          # Ne pas utiliser set -e pour eviter echec du job
           
           REPOSITORIES=("intelia-frontend" "intelia-backend" "intelia-llm")
           
@@ -371,7 +364,7 @@ jobs:
             
             if doctl registry repository list-manifests "$repo" --format "Digest,Tags" --no-header 2>/dev/null > "/tmp/${repo}_manifests.txt"; then
               
-              orphan_count=$(grep -E "^sha256:[a-f0-9]+[[:space:]]*$" "/tmp/${repo}_manifests.txt" | wc -l)
+              orphan_count=$(grep -E "^sha256:[a-f0-9]+[[:space:]]*$" "/tmp/${repo}_manifests.txt" | wc -l || echo "0")
               
               if [ "$orphan_count" -gt 0 ]; then
                 echo "Manifests orphelins trouves: $orphan_count"
@@ -396,7 +389,7 @@ jobs:
                     
                     sleep 0.5
                     
-                  done < "/tmp/${repo}_orphans.txt"
+                  done < "/tmp/${repo}_orphans.txt" || true
                   
                   echo "Manifests supprimes: $manifest_deleted"
                 else
@@ -410,7 +403,7 @@ jobs:
             else
               echo "Impossible de lister les manifests pour $repo"
             fi
-          done
+          done || true
 
       - name: Final status and cleanup
         run: |

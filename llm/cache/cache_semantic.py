@@ -15,6 +15,28 @@ from typing import Dict, List, Optional, Any, Set
 logger = logging.getLogger(__name__)
 
 
+def clean_language_detection_result(obj):
+    """Nettoie les objets LanguageDetectionResult avant mise en cache"""
+    if (
+        hasattr(obj, "language")
+        and hasattr(obj, "confidence")
+        and hasattr(obj, "source")
+    ):
+        # Remplacer LanguageDetectionResult par un dict simple
+        return {
+            "language": obj.language,
+            "confidence": float(obj.confidence),
+            "source": obj.source,
+            "processing_time_ms": getattr(obj, "processing_time_ms", 0),
+        }
+    elif isinstance(obj, dict):
+        return {k: clean_language_detection_result(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [clean_language_detection_result(item) for item in obj]
+    else:
+        return obj
+
+
 class SemanticCacheManager:
     """Gestionnaire du cache sémantique avec normalisation intelligente"""
 
@@ -709,11 +731,14 @@ class SemanticCacheManager:
             return
 
         try:
-            cache_data = {
-                "query": query,
-                "context_hash": context_hash,
-                "language": language,
-            }
+            # Nettoyer les données avant stockage
+            cache_data = clean_language_detection_result(
+                {
+                    "query": query,
+                    "context_hash": context_hash,
+                    "language": language,
+                }
+            )
 
             response_bytes = response.encode("utf-8")
 
@@ -828,6 +853,9 @@ class SemanticCacheManager:
             else:
                 data = intent_result
 
+            # Nettoyer les données avant stockage
+            data = clean_language_detection_result(data)
+
             serialized = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
             compressed = self.core._compress_data(serialized)
 
@@ -892,7 +920,6 @@ class SemanticCacheManager:
                     semantic_exists = semantic_cached is not None
                     fallback_semantic_exists = fallback_semantic_cached is not None
                     simple_exists = simple_cached is not None
-                # CORRECTION: Remplacer bare except par Exception
                 except Exception:
                     pass
 
