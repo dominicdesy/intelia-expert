@@ -196,7 +196,7 @@ jobs:
           doctl apps get-deployment ${{ secrets.DO_APP_ID }} $DEPLOYMENT_ID || true
           exit 1
 
-  # 🧹 Nettoyage automatique avec API REST
+      # 🧹 Nettoyage automatique avec API REST
       cleanup:
         name: Cleanup old DOCR images
         runs-on: ubuntu-latest
@@ -218,7 +218,6 @@ jobs:
             run: |
               set -e
               
-              # Configuration
               KEEP_IMAGES=8
               REPOSITORIES=("intelia-frontend" "intelia-backend" "intelia-llm")
               
@@ -228,14 +227,12 @@ jobs:
                 echo ""
                 echo "📦 Traitement de $repo..."
                 
-                # Obtenir tous les tags triés par date (plus récent en premier)
                 echo "📋 Récupération de la liste des images..."
                 if ! doctl registry repository list-tags "$repo" --format "Tag,UpdatedAt" --no-header > "/tmp/${repo}_all.txt" 2>/dev/null; then
                   echo "❌ Repository $repo introuvable"
                   continue
                 fi
                 
-                # Nettoyer et compter
                 grep -v "^[[:space:]]*$" "/tmp/${repo}_all.txt" > "/tmp/${repo}_clean.txt"
                 total_images=$(cat "/tmp/${repo}_clean.txt" | wc -l)
                 
@@ -246,8 +243,6 @@ jobs:
                   continue
                 fi
                 
-                # Trier par date (colonne UpdatedAt) - plus récent en premier
-                # Puis prendre tout ce qui est après les 8 premiers
                 sort -k2,2r "/tmp/${repo}_clean.txt" | \
                 tail -n +$((KEEP_IMAGES + 1)) | \
                 awk '{print $1}' > "/tmp/${repo}_to_delete.txt"
@@ -262,22 +257,19 @@ jobs:
                   continue
                 fi
                 
-                # Afficher un aperçu des images à supprimer
                 echo "🔍 Aperçu des tags à supprimer:"
-                head -5 "/tmp/${repo}_to_delete.txt" | while read tag; do
+                head -5 "/tmp/${repo}_to_delete.txt" | while read -r tag; do
                   echo "   - $tag"
                 done
                 if [ "$to_delete" -gt 5 ]; then
                   echo "   ... et $((to_delete - 5)) autres"
                 fi
                 
-                # Supprimer les tags un par un
                 echo "🗑️ Début de la suppression..."
                 deleted=0
                 failed=0
                 
                 while IFS= read -r tag; do
-                  # Nettoyer le tag
                   tag=$(echo "$tag" | tr -d '\r\n' | xargs)
                   
                   if [ -z "$tag" ]; then
@@ -286,7 +278,6 @@ jobs:
                   
                   echo "🗑️ Suppression: $tag"
                   
-                  # Tentative de suppression (2 essais max)
                   success=false
                   for attempt in {1..2}; do
                     if doctl registry repository delete-tag "$repo" "$tag" --force 2>/dev/null; then
@@ -304,7 +295,6 @@ jobs:
                     ((failed++))
                   fi
                   
-                  # Pause entre suppressions pour éviter rate limiting
                   sleep 0.5
                   
                 done < "/tmp/${repo}_to_delete.txt"
@@ -314,7 +304,6 @@ jobs:
                 echo "   ❌ Échecs: $failed"
                 echo "   🎯 Images restantes: ~$((total_images - deleted))"
                 
-                # Nettoyage des fichiers temporaires
                 rm -f "/tmp/${repo}"_*.txt
                 
                 echo "✅ Traitement terminé pour $repo"
@@ -336,16 +325,13 @@ jobs:
               for repo in "${REPOSITORIES[@]}"; do
                 echo "🔍 Vérification des manifests orphelins pour $repo..."
                 
-                # Lister les manifests et chercher ceux sans tags
                 if doctl registry repository list-manifests "$repo" --format "Digest,Tags" --no-header 2>/dev/null > "/tmp/${repo}_manifests.txt"; then
                   
-                  # Chercher les manifests sans tags (ligne se terminant par des espaces)
                   orphan_count=$(grep -E "^sha256:[a-f0-9]+[[:space:]]*$" "/tmp/${repo}_manifests.txt" | wc -l)
                   
                   if [ "$orphan_count" -gt 0 ]; then
                     echo "🗑️ Manifests orphelins trouvés: $orphan_count"
                     
-                    # Limiter à 15 suppressions pour la sécurité
                     if [ "$orphan_count" -le 15 ]; then
                       grep -E "^sha256:[a-f0-9]+[[:space:]]*$" "/tmp/${repo}_manifests.txt" | \
                       awk '{print $1}' > "/tmp/${repo}_orphans.txt"
