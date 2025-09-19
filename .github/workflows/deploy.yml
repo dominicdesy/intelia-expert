@@ -233,19 +233,52 @@ jobs:
               continue
             fi
             
-            grep -v "^[[:space:]]*$" "/tmp/${repo}_all.txt" > "/tmp/${repo}_clean.txt"
+            # DEBUG: Voir ce qu'on a recupere
+            echo "DEBUG - Contenu brut du fichier:"
+            head -10 "/tmp/${repo}_all.txt"
+            
+            # Nettoyer: supprimer lignes vides ET headers potentiels
+            grep -v "^[[:space:]]*$" "/tmp/${repo}_all.txt" | \
+            grep -v "^Tag[[:space:]]" | \
+            grep -v "^tag[[:space:]]" > "/tmp/${repo}_clean.txt" || true
+            
+            # Si le fichier nettoye est vide, utiliser une approche differente
+            if [ ! -s "/tmp/${repo}_clean.txt" ]; then
+              echo "Approche alternative: utilisation de --output json"
+              if doctl registry repository list-tags "$repo" --output json > "/tmp/${repo}.json" 2>/dev/null; then
+                # Extraire tag et updated_at du JSON
+                cat "/tmp/${repo}.json" | jq -r '.[] | "\(.tag) \(.updated_at)"' > "/tmp/${repo}_clean.txt" 2>/dev/null || {
+                  echo "Erreur avec jq, utilisation approche basique"
+                  doctl registry repository list-tags "$repo" --format "Tag" --no-header | \
+                  grep -v "^[[:space:]]*$" | \
+                  grep -v "^Tag$" | \
+                  awk '{print $1 " 2024-01-01"}' > "/tmp/${repo}_clean.txt"
+                }
+              else
+                echo "Impossible de recuperer les tags pour $repo"
+                continue
+              fi
+            fi
+            
             total_images=$(cat "/tmp/${repo}_clean.txt" | wc -l)
             
-            echo "Total des images: $total_images"
+            echo "Total des images valides: $total_images"
+            
+            # DEBUG: Montrer les premieres lignes nettoyees
+            echo "DEBUG - Premiers tags nettoyes:"
+            head -5 "/tmp/${repo}_clean.txt"
             
             if [ "$total_images" -le "$KEEP_IMAGES" ]; then
               echo "Pas de nettoyage necessaire pour $repo ($total_images <= $KEEP_IMAGES)"
               continue
             fi
             
-            sort -k2,2r "/tmp/${repo}_clean.txt" | \
-            tail -n +$((KEEP_IMAGES + 1)) | \
-            awk '{print $1}' > "/tmp/${repo}_to_delete.txt"
+            # Trier par date (colonne 2) et prendre les plus anciens
+            sort -k2,2 "/tmp/${repo}_clean.txt" | \
+            head -n $((total_images - KEEP_IMAGES)) | \
+            awk '{print $1}' | \
+            grep -v "^[[:space:]]*$" | \
+            grep -v "^Tag$" > "/tmp/${repo}_to_delete.txt"
             
             to_delete=$(cat "/tmp/${repo}_to_delete.txt" | wc -l)
             to_keep=$((total_images - to_delete))
@@ -257,22 +290,20 @@ jobs:
               continue
             fi
             
-            echo "Apercu des tags a supprimer:"
-            head -5 "/tmp/${repo}_to_delete.txt" | while read -r tag; do
-              echo "   - $tag"
-            done
-            if [ "$to_delete" -gt 5 ]; then
-              echo "   ... et $((to_delete - 5)) autres"
-            fi
+            echo "Tags a supprimer:"
+            cat "/tmp/${repo}_to_delete.txt"
             
             echo "Debut de la suppression..."
             deleted=0
             failed=0
             
             while IFS= read -r tag; do
+              # Nettoyer et valider le tag
               tag=$(echo "$tag" | tr -d '\r\n' | xargs)
               
-              if [ -z "$tag" ]; then
+              # Ignorer les tags invalides
+              if [ -z "$tag" ] || [ "$tag" = "Tag" ] || [ "$tag" = "tag" ]; then
+                echo "Tag invalide ignore: '$tag'"
                 continue
               fi
               
@@ -293,6 +324,7 @@ jobs:
               
               if [ "$success" = false ]; then
                 ((failed++))
+                echo "   ECHEC FINAL pour tag: $tag"
               fi
               
               sleep 0.5
@@ -304,7 +336,8 @@ jobs:
             echo "   Echecs: $failed"
             echo "   Images restantes: ~$((total_images - deleted))"
             
-            rm -f "/tmp/${repo}"_*.txt
+            # Nettoyage des fichiers temporaires
+            rm -f "/tmp/${repo}"_*.txt "/tmp/${repo}.json"
             
             echo "Traitement termine pour $repo"
           done
