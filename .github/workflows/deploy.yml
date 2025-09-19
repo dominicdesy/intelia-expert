@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # 🔍 Détecter les changements
+  # Detecter les changements
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -44,7 +44,7 @@ jobs:
           echo "Backend changed: ${{ steps.changes.outputs.backend }}"
           echo "LLM changed: ${{ steps.changes.outputs.llm }}"
 
-  # 🎯 Build Frontend - SEULEMENT si changé
+  # Build Frontend - SEULEMENT si change
   build-frontend:
     runs-on: ubuntu-latest
     needs: detect-changes
@@ -78,7 +78,7 @@ jobs:
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
             BUILDKIT_INLINE_CACHE=1
 
-  # 🎯 Build Backend - SEULEMENT si changé  
+  # Build Backend - SEULEMENT si change  
   build-backend:
     runs-on: ubuntu-latest
     needs: detect-changes
@@ -109,7 +109,7 @@ jobs:
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache,mode=max
           build-args: BUILDKIT_INLINE_CACHE=1
 
-  # 🎯 Build LLM - SEULEMENT si changé
+  # Build LLM - SEULEMENT si change
   build-llm:
     runs-on: ubuntu-latest
     needs: detect-changes
@@ -140,7 +140,7 @@ jobs:
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache,mode=max
           build-args: BUILDKIT_INLINE_CACHE=1
 
-  # 🚀 Deploy - SEULEMENT si au moins un service a été buildé
+  # Deploy - SEULEMENT si au moins un service a ete build
   deploy:
     name: Deploy to DigitalOcean App Platform
     runs-on: ubuntu-latest
@@ -154,37 +154,37 @@ jobs:
 
       - name: Wait for registry propagation
         run: |
-          echo "⏳ Attente de 30s pour la propagation du registry..."
+          echo "Attente de 30s pour la propagation du registry..."
           sleep 30
 
       - name: Trigger App Platform deployment
         run: |
-          echo "🚀 Déclenchement du redéploiement..."
+          echo "Declenchement du redeploiement..."
           if [ -z "${{ secrets.DO_APP_ID }}" ]; then
-            echo "❌ ERREUR: DO_APP_ID secret n'est pas configuré"
+            echo "ERREUR: DO_APP_ID secret n'est pas configure"
             exit 1
           fi
           
           DEPLOYMENT_ID=$(doctl apps create-deployment ${{ secrets.DO_APP_ID }} --force-rebuild --format ID --no-header)
-          echo "📋 Deployment ID: $DEPLOYMENT_ID"
+          echo "Deployment ID: $DEPLOYMENT_ID"
           
-          echo "👀 Surveillance du déploiement (timeout 10 min)..."
+          echo "Surveillance du deploiement (timeout 10 min)..."
           for i in {1..60}; do
             STATUS=$(doctl apps get-deployment ${{ secrets.DO_APP_ID }} $DEPLOYMENT_ID --format Phase --no-header 2>/dev/null || echo "UNKNOWN")
             echo "[$i/60] Statut: $STATUS"
             
             case $STATUS in
               "ACTIVE"|"RUNNING")
-                echo "✅ Déploiement réussi !"
+                echo "Deploiement reussi !"
                 exit 0
                 ;;
               "ERROR"|"FAILED")
-                echo "❌ Déploiement échoué"
+                echo "Deploiement echoue"
                 doctl apps get-deployment ${{ secrets.DO_APP_ID }} $DEPLOYMENT_ID || true
                 exit 1
                 ;;
               "CANCELED"|"SUPERSEDED")
-                echo "⚠️ Déploiement annulé ou remplacé"
+                echo "Deploiement annule ou remplace"
                 exit 1
                 ;;
             esac
@@ -192,206 +192,205 @@ jobs:
             sleep 10
           done
           
-          echo "⏰ Timeout atteint"
+          echo "Timeout atteint"
           doctl apps get-deployment ${{ secrets.DO_APP_ID }} $DEPLOYMENT_ID || true
           exit 1
 
-      # 🧹 Nettoyage automatique avec API REST
-      cleanup:
-        name: Cleanup old DOCR images
-        runs-on: ubuntu-latest
-        needs: [detect-changes]
-        if: always() && needs.detect-changes.result == 'success'
-        steps:
-          - name: Install doctl
-            uses: digitalocean/action-doctl@v2
-            with:
-              token: ${{ secrets.DOCR_ACCESS_TOKEN }}
+  # Nettoyage automatique
+  cleanup:
+    name: Cleanup old DOCR images
+    runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: always() && needs.detect-changes.result == 'success'
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-          - name: Verify doctl authentication
-            run: |
-              doctl auth list
-              doctl registry repository list
+      - name: Verify doctl authentication
+        run: |
+          doctl auth list
+          doctl registry repository list
 
-          - name: Simple cleanup - Keep 8 most recent images
-            shell: bash
-            run: |
-              set -e
+      - name: Simple cleanup - Keep 8 most recent images
+        shell: bash
+        run: |
+          set -e
+          
+          KEEP_IMAGES=8
+          REPOSITORIES=("intelia-frontend" "intelia-backend" "intelia-llm")
+          
+          echo "Nettoyage simple: garder les $KEEP_IMAGES plus recents par repository"
+          
+          for repo in "${REPOSITORIES[@]}"; do
+            echo ""
+            echo "Traitement de $repo..."
+            
+            echo "Recuperation de la liste des images..."
+            if ! doctl registry repository list-tags "$repo" --format "Tag,UpdatedAt" --no-header > "/tmp/${repo}_all.txt" 2>/dev/null; then
+              echo "Repository $repo introuvable"
+              continue
+            fi
+            
+            grep -v "^[[:space:]]*$" "/tmp/${repo}_all.txt" > "/tmp/${repo}_clean.txt"
+            total_images=$(cat "/tmp/${repo}_clean.txt" | wc -l)
+            
+            echo "Total des images: $total_images"
+            
+            if [ "$total_images" -le "$KEEP_IMAGES" ]; then
+              echo "Pas de nettoyage necessaire pour $repo ($total_images <= $KEEP_IMAGES)"
+              continue
+            fi
+            
+            sort -k2,2r "/tmp/${repo}_clean.txt" | \
+            tail -n +$((KEEP_IMAGES + 1)) | \
+            awk '{print $1}' > "/tmp/${repo}_to_delete.txt"
+            
+            to_delete=$(cat "/tmp/${repo}_to_delete.txt" | wc -l)
+            to_keep=$((total_images - to_delete))
+            
+            echo "A garder: $to_keep, A supprimer: $to_delete"
+            
+            if [ "$to_delete" -eq 0 ]; then
+              echo "Rien a supprimer pour $repo"
+              continue
+            fi
+            
+            echo "Apercu des tags a supprimer:"
+            head -5 "/tmp/${repo}_to_delete.txt" | while read -r tag; do
+              echo "   - $tag"
+            done
+            if [ "$to_delete" -gt 5 ]; then
+              echo "   ... et $((to_delete - 5)) autres"
+            fi
+            
+            echo "Debut de la suppression..."
+            deleted=0
+            failed=0
+            
+            while IFS= read -r tag; do
+              tag=$(echo "$tag" | tr -d '\r\n' | xargs)
               
-              KEEP_IMAGES=8
-              REPOSITORIES=("intelia-frontend" "intelia-backend" "intelia-llm")
-              
-              echo "🧹 Nettoyage simple: garder les $KEEP_IMAGES plus récents par repository"
-              
-              for repo in "${REPOSITORIES[@]}"; do
-                echo ""
-                echo "📦 Traitement de $repo..."
-                
-                echo "📋 Récupération de la liste des images..."
-                if ! doctl registry repository list-tags "$repo" --format "Tag,UpdatedAt" --no-header > "/tmp/${repo}_all.txt" 2>/dev/null; then
-                  echo "❌ Repository $repo introuvable"
-                  continue
-                fi
-                
-                grep -v "^[[:space:]]*$" "/tmp/${repo}_all.txt" > "/tmp/${repo}_clean.txt"
-                total_images=$(cat "/tmp/${repo}_clean.txt" | wc -l)
-                
-                echo "📊 Total des images: $total_images"
-                
-                if [ "$total_images" -le "$KEEP_IMAGES" ]; then
-                  echo "✅ Pas de nettoyage nécessaire pour $repo ($total_images <= $KEEP_IMAGES)"
-                  continue
-                fi
-                
-                sort -k2,2r "/tmp/${repo}_clean.txt" | \
-                tail -n +$((KEEP_IMAGES + 1)) | \
-                awk '{print $1}' > "/tmp/${repo}_to_delete.txt"
-                
-                to_delete=$(cat "/tmp/${repo}_to_delete.txt" | wc -l)
-                to_keep=$((total_images - to_delete))
-                
-                echo "📊 À garder: $to_keep, À supprimer: $to_delete"
-                
-                if [ "$to_delete" -eq 0 ]; then
-                  echo "✅ Rien à supprimer pour $repo"
-                  continue
-                fi
-                
-                echo "🔍 Aperçu des tags à supprimer:"
-                head -5 "/tmp/${repo}_to_delete.txt" | while read -r tag; do
-                  echo "   - $tag"
-                done
-                if [ "$to_delete" -gt 5 ]; then
-                  echo "   ... et $((to_delete - 5)) autres"
-                fi
-                
-                echo "🗑️ Début de la suppression..."
-                deleted=0
-                failed=0
-                
-                while IFS= read -r tag; do
-                  tag=$(echo "$tag" | tr -d '\r\n' | xargs)
-                  
-                  if [ -z "$tag" ]; then
-                    continue
-                  fi
-                  
-                  echo "🗑️ Suppression: $tag"
-                  
-                  success=false
-                  for attempt in {1..2}; do
-                    if doctl registry repository delete-tag "$repo" "$tag" --force 2>/dev/null; then
-                      echo "   ✅ Supprimé avec succès"
-                      ((deleted++))
-                      success=true
-                      break
-                    else
-                      echo "   ⚠️ Échec tentative $attempt"
-                      sleep 1
-                    fi
-                  done
-                  
-                  if [ "$success" = false ]; then
-                    ((failed++))
-                  fi
-                  
-                  sleep 0.5
-                  
-                done < "/tmp/${repo}_to_delete.txt"
-                
-                echo "📊 Résumé $repo:"
-                echo "   ✅ Supprimés: $deleted"
-                echo "   ❌ Échecs: $failed"
-                echo "   🎯 Images restantes: ~$((total_images - deleted))"
-                
-                rm -f "/tmp/${repo}"_*.txt
-                
-                echo "✅ Traitement terminé pour $repo"
-              done
-              
-              echo ""
-              echo "🎉 Nettoyage terminé pour tous les repositories!"
-
-          - name: Cleanup orphaned manifests
-            shell: bash
-            run: |
-              set -e
-              
-              REPOSITORIES=("intelia-frontend" "intelia-backend" "intelia-llm")
-              
-              echo ""
-              echo "🧹 Nettoyage des manifests orphelins..."
-              
-              for repo in "${REPOSITORIES[@]}"; do
-                echo "🔍 Vérification des manifests orphelins pour $repo..."
-                
-                if doctl registry repository list-manifests "$repo" --format "Digest,Tags" --no-header 2>/dev/null > "/tmp/${repo}_manifests.txt"; then
-                  
-                  orphan_count=$(grep -E "^sha256:[a-f0-9]+[[:space:]]*$" "/tmp/${repo}_manifests.txt" | wc -l)
-                  
-                  if [ "$orphan_count" -gt 0 ]; then
-                    echo "🗑️ Manifests orphelins trouvés: $orphan_count"
-                    
-                    if [ "$orphan_count" -le 15 ]; then
-                      grep -E "^sha256:[a-f0-9]+[[:space:]]*$" "/tmp/${repo}_manifests.txt" | \
-                      awk '{print $1}' > "/tmp/${repo}_orphans.txt"
-                      
-                      manifest_deleted=0
-                      while IFS= read -r digest; do
-                        digest=$(echo "$digest" | tr -d '\r\n' | xargs)
-                        if [ -z "$digest" ]; then continue; fi
-                        
-                        echo "🗑️ Suppression manifest orphelin: ${digest:0:25}..."
-                        
-                        if doctl registry repository delete-manifest "$repo" "$digest" --force 2>/dev/null; then
-                          echo "   ✅ Supprimé"
-                          ((manifest_deleted++))
-                        else
-                          echo "   ⚠️ Échec"
-                        fi
-                        
-                        sleep 0.5
-                        
-                      done < "/tmp/${repo}_orphans.txt"
-                      
-                      echo "📊 Manifests supprimés: $manifest_deleted"
-                    else
-                      echo "⚠️ Trop de manifests orphelins ($orphan_count) - suppression manuelle recommandée"
-                    fi
-                  else
-                    echo "✅ Pas de manifests orphelins"
-                  fi
-                  
-                  rm -f "/tmp/${repo}_manifests.txt" "/tmp/${repo}_orphans.txt"
-                else
-                  echo "⚠️ Impossible de lister les manifests pour $repo"
-                fi
-              done
-
-          - name: Final status and cleanup
-            run: |
-              echo ""
-              echo "📊 ÉTAT FINAL DU REGISTRY:"
-              echo "=========================="
-              
-              for repo in intelia-frontend intelia-backend intelia-llm; do
-                count=$(doctl registry repository list-tags "$repo" --format "Tag" --no-header 2>/dev/null | wc -l || echo "?")
-                echo "📦 $repo: $count images"
-              done
-              
-              echo ""
-              echo "🗑️ Déclenchement du garbage collection..."
-              if doctl registry garbage-collection start --include-untagged-manifests 2>/dev/null; then
-                echo "✅ Garbage collection démarré (libération d'espace en cours)"
-              else
-                echo "ℹ️ Garbage collection déjà en cours ou non nécessaire"
+              if [ -z "$tag" ]; then
+                continue
               fi
               
-              echo ""
-              echo "🎉 Nettoyage complet terminé!"
+              echo "Suppression: $tag"
+              
+              success=false
+              for attempt in {1..2}; do
+                if doctl registry repository delete-tag "$repo" "$tag" --force 2>/dev/null; then
+                  echo "   Supprime avec succes"
+                  ((deleted++))
+                  success=true
+                  break
+                else
+                  echo "   Echec tentative $attempt"
+                  sleep 1
+                fi
+              done
+              
+              if [ "$success" = false ]; then
+                ((failed++))
+              fi
+              
+              sleep 0.5
+              
+            done < "/tmp/${repo}_to_delete.txt"
+            
+            echo "Resume $repo:"
+            echo "   Supprimes: $deleted"
+            echo "   Echecs: $failed"
+            echo "   Images restantes: ~$((total_images - deleted))"
+            
+            rm -f "/tmp/${repo}"_*.txt
+            
+            echo "Traitement termine pour $repo"
+          done
+          
+          echo ""
+          echo "Nettoyage termine pour tous les repositories!"
 
+      - name: Cleanup orphaned manifests
+        shell: bash
+        run: |
+          set -e
+          
+          REPOSITORIES=("intelia-frontend" "intelia-backend" "intelia-llm")
+          
+          echo ""
+          echo "Nettoyage des manifests orphelins..."
+          
+          for repo in "${REPOSITORIES[@]}"; do
+            echo "Verification des manifests orphelins pour $repo..."
+            
+            if doctl registry repository list-manifests "$repo" --format "Digest,Tags" --no-header 2>/dev/null > "/tmp/${repo}_manifests.txt"; then
+              
+              orphan_count=$(grep -E "^sha256:[a-f0-9]+[[:space:]]*$" "/tmp/${repo}_manifests.txt" | wc -l)
+              
+              if [ "$orphan_count" -gt 0 ]; then
+                echo "Manifests orphelins trouves: $orphan_count"
+                
+                if [ "$orphan_count" -le 15 ]; then
+                  grep -E "^sha256:[a-f0-9]+[[:space:]]*$" "/tmp/${repo}_manifests.txt" | \
+                  awk '{print $1}' > "/tmp/${repo}_orphans.txt"
+                  
+                  manifest_deleted=0
+                  while IFS= read -r digest; do
+                    digest=$(echo "$digest" | tr -d '\r\n' | xargs)
+                    if [ -z "$digest" ]; then continue; fi
+                    
+                    echo "Suppression manifest orphelin: ${digest:0:25}..."
+                    
+                    if doctl registry repository delete-manifest "$repo" "$digest" --force 2>/dev/null; then
+                      echo "   Supprime"
+                      ((manifest_deleted++))
+                    else
+                      echo "   Echec"
+                    fi
+                    
+                    sleep 0.5
+                    
+                  done < "/tmp/${repo}_orphans.txt"
+                  
+                  echo "Manifests supprimes: $manifest_deleted"
+                else
+                  echo "Trop de manifests orphelins ($orphan_count) - suppression manuelle recommandee"
+                fi
+              else
+                echo "Pas de manifests orphelins"
+              fi
+              
+              rm -f "/tmp/${repo}_manifests.txt" "/tmp/${repo}_orphans.txt"
+            else
+              echo "Impossible de lister les manifests pour $repo"
+            fi
+          done
 
-  # 📊 Résumé (basé sur la version qui fonctionnait)
+      - name: Final status and cleanup
+        run: |
+          echo ""
+          echo "ETAT FINAL DU REGISTRY:"
+          echo "======================"
+          
+          for repo in intelia-frontend intelia-backend intelia-llm; do
+            count=$(doctl registry repository list-tags "$repo" --format "Tag" --no-header 2>/dev/null | wc -l || echo "?")
+            echo "$repo: $count images"
+          done
+          
+          echo ""
+          echo "Declenchement du garbage collection..."
+          if doctl registry garbage-collection start --include-untagged-manifests 2>/dev/null; then
+            echo "Garbage collection demarre (liberation d'espace en cours)"
+          else
+            echo "Garbage collection deja en cours ou non necessaire"
+          fi
+          
+          echo ""
+          echo "Nettoyage complet termine!"
+
+  # Resume
   summary:
     runs-on: ubuntu-latest
     needs: [detect-changes, build-frontend, build-backend, build-llm, deploy, cleanup]
@@ -399,42 +398,51 @@ jobs:
     steps:
       - name: Deployment Summary
         run: |
-          echo "🚀 DEPLOYMENT SUMMARY"
-          echo "===================="
+          echo "DEPLOYMENT SUMMARY"
+          echo "=================="
           
           # Frontend
           if [[ "${{ needs.detect-changes.outputs.frontend-changed }}" == "true" ]]; then
             if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
-              echo "✅ Frontend: DEPLOYED"
+              echo "Frontend: DEPLOYED"
             else
-              echo "❌ Frontend: FAILED"
+              echo "Frontend: FAILED"
             fi
           else
-            echo "⏸️ Frontend: SKIPPED (no changes)"
+            echo "Frontend: SKIPPED (no changes)"
           fi
           
           # Backend  
           if [[ "${{ needs.detect-changes.outputs.backend-changed }}" == "true" ]]; then
             if [[ "${{ needs.build-backend.result }}" == "success" ]]; then
-              echo "✅ Backend: DEPLOYED"
+              echo "Backend: DEPLOYED"
             else
-              echo "❌ Backend: FAILED" 
+              echo "Backend: FAILED" 
             fi
           else
-            echo "⏸️ Backend: SKIPPED (no changes)"
+            echo "Backend: SKIPPED (no changes)"
           fi
           
           # LLM
           if [[ "${{ needs.detect-changes.outputs.llm-changed }}" == "true" ]]; then
             if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
-              echo "✅ LLM: DEPLOYED"
+              echo "LLM: DEPLOYED"
             else
-              echo "❌ LLM: FAILED"
+              echo "LLM: FAILED"
             fi
           else
-            echo "⏸️ LLM: SKIPPED (no changes)"
+            echo "LLM: SKIPPED (no changes)"
           fi
           
           echo ""
-          echo "📋 Déploiement: ${{ needs.deploy.result == 'success' && '✅ RÉUSSI' || '❌ ÉCHEC' }}"
-          echo "🧹 Nettoyage: ${{ needs.cleanup.result == 'success' && '✅ TERMINÉ' || '⚠️ PARTIEL' }}"
+          if [[ "${{ needs.deploy.result }}" == "success" ]]; then
+            echo "Deploiement: REUSSI"
+          else
+            echo "Deploiement: ECHEC"
+          fi
+          
+          if [[ "${{ needs.cleanup.result }}" == "success" ]]; then
+            echo "Nettoyage: TERMINE"
+          else
+            echo "Nettoyage: PARTIEL"
+          fi
