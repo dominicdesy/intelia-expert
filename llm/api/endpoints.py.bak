@@ -1879,31 +1879,11 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                     if not isinstance(context_docs, list):
                         context_docs = []
 
-                    # ✅ CORRECTION: Extraire documents_used des métadonnées
-                    documents_used = 0
-                    if hasattr(rag_result, "metadata") and rag_result.metadata:
-                        documents_used = rag_result.metadata.get("documents_used", 0)
-
-                    # Si pas trouvé dans metadata, fallback sur context_docs
-                    if documents_used == 0:
-                        documents_used = len(context_docs)
-
-                    # 🔍 DEBUG: Log pour diagnostic
-                    logger.error(
-                        f"🔍 DEBUG API: documents_used dans la réponse = {documents_used}"
-                    )
-                    logger.error(
-                        f"🔍 DEBUG API: context_docs length = {len(context_docs)}"
-                    )
-                    logger.error(
-                        f"🔍 DEBUG API: metadata = {getattr(rag_result, 'metadata', {})}"
-                    )
-
                     end_data = {
                         "type": "end",
                         "total_time": total_processing_time,
                         "confidence": float(confidence),
-                        "documents_used": documents_used,  # ✅ CORRIGÉ
+                        "documents_used": len(context_docs),
                         "source": source,
                         "architecture": "centralized-router-test-compatible",
                     }
