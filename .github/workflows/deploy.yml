@@ -197,143 +197,212 @@ jobs:
           exit 1
 
   # 🧹 Nettoyage automatique avec API REST
-  cleanup:
-    name: Cleanup old DOCR images
-    runs-on: ubuntu-latest
-    needs: [detect-changes]
-    if: always() && needs.detect-changes.result == 'success'
-    steps:
-      - name: Install doctl
-        uses: digitalocean/action-doctl@v2
-        with:
-          token: ${{ secrets.DOCR_ACCESS_TOKEN }}
+      cleanup:
+        name: Cleanup old DOCR images
+        runs-on: ubuntu-latest
+        needs: [detect-changes]
+        if: always() && needs.detect-changes.result == 'success'
+        steps:
+          - name: Install doctl
+            uses: digitalocean/action-doctl@v2
+            with:
+              token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Verify doctl authentication
-        run: |
-          doctl auth list
-          doctl registry repository list || echo "Registry access test failed"
+          - name: Verify doctl authentication
+            run: |
+              doctl auth list
+              doctl registry repository list
 
-      - name: Cleanup DOCR repositories
-        shell: bash
-        run: |
-          set -e
-          
-          # Configuration
-          KEEP_TAGS=20
-          REPOSITORIES=("intelia-frontend" "intelia-backend" "intelia-llm")
-          PROTECTED_TAGS="latest|main|prod|stable|buildcache"
-          
-          echo "🧹 Démarrage du nettoyage DOCR..."
-          
-          for repo in "${REPOSITORIES[@]}"; do
-            echo ""
-            echo "📦 Nettoyage de $repo..."
-            
-            # Lister tous les tags avec timestamps
-            echo "📋 Récupération de la liste des tags..."
-            if ! doctl registry repository list-tags "$repo" --format "Tag,UpdatedAt" --no-header > "/tmp/${repo}_tags.txt" 2>/dev/null; then
-              echo "❌ Impossible de lister les tags pour $repo (repository might not exist)"
-              continue
-            fi
-            
-            # Compter le total
-            total_tags=$(grep -v "^$" "/tmp/${repo}_tags.txt" | wc -l)
-            echo "📊 Total des tags: $total_tags"
-            
-            if [ "$total_tags" -le "$KEEP_TAGS" ]; then
-              echo "✅ Pas de nettoyage nécessaire pour $repo ($total_tags <= $KEEP_TAGS)"
-              continue
-            fi
-            
-            # Filtrer les tags protégés et trier par date
-            echo "🔍 Identification des tags à supprimer..."
-            grep -v "^$" "/tmp/${repo}_tags.txt" | \
-            grep -vE "^($PROTECTED_TAGS)[[:space:]]" | \
-            sort -k2,2 | \
-            head -n -${KEEP_TAGS} | \
-            awk '{print $1}' > "/tmp/${repo}_to_delete.txt"
-            
-            # Compter les tags à supprimer
-            to_delete=$(cat "/tmp/${repo}_to_delete.txt" | wc -l)
-            echo "🗑️ Tags à supprimer: $to_delete"
-            
-            if [ "$to_delete" -eq 0 ]; then
-              echo "✅ Aucun tag à supprimer pour $repo"
-              continue
-            fi
-            
-            # Supprimer les tags un par un avec retry
-            deleted=0
-            while IFS= read -r tag; do
-              if [ -z "$tag" ]; then continue; fi
+          - name: Simple cleanup - Keep 8 most recent images
+            shell: bash
+            run: |
+              set -e
               
-              echo "🗑️ Suppression du tag: $tag"
+              # Configuration
+              KEEP_IMAGES=8
+              REPOSITORIES=("intelia-frontend" "intelia-backend" "intelia-llm")
               
-              # Tentative de suppression avec retry
-              for attempt in {1..3}; do
-                if doctl registry repository delete-tag "$repo" "$tag" --force; then
-                  echo "   ✅ Supprimé: $tag (tentative $attempt)"
-                  ((deleted++))
-                  break
-                else
-                  echo "   ⚠️ Échec tentative $attempt pour $tag"
-                  if [ $attempt -lt 3 ]; then
-                    sleep 2
-                  fi
+              echo "🧹 Nettoyage simple: garder les $KEEP_IMAGES plus récents par repository"
+              
+              for repo in "${REPOSITORIES[@]}"; do
+                echo ""
+                echo "📦 Traitement de $repo..."
+                
+                # Obtenir tous les tags triés par date (plus récent en premier)
+                echo "📋 Récupération de la liste des images..."
+                if ! doctl registry repository list-tags "$repo" --format "Tag,UpdatedAt" --no-header > "/tmp/${repo}_all.txt" 2>/dev/null; then
+                  echo "❌ Repository $repo introuvable"
+                  continue
                 fi
+                
+                # Nettoyer et compter
+                grep -v "^[[:space:]]*$" "/tmp/${repo}_all.txt" > "/tmp/${repo}_clean.txt"
+                total_images=$(cat "/tmp/${repo}_clean.txt" | wc -l)
+                
+                echo "📊 Total des images: $total_images"
+                
+                if [ "$total_images" -le "$KEEP_IMAGES" ]; then
+                  echo "✅ Pas de nettoyage nécessaire pour $repo ($total_images <= $KEEP_IMAGES)"
+                  continue
+                fi
+                
+                # Trier par date (colonne UpdatedAt) - plus récent en premier
+                # Puis prendre tout ce qui est après les 8 premiers
+                sort -k2,2r "/tmp/${repo}_clean.txt" | \
+                tail -n +$((KEEP_IMAGES + 1)) | \
+                awk '{print $1}' > "/tmp/${repo}_to_delete.txt"
+                
+                to_delete=$(cat "/tmp/${repo}_to_delete.txt" | wc -l)
+                to_keep=$((total_images - to_delete))
+                
+                echo "📊 À garder: $to_keep, À supprimer: $to_delete"
+                
+                if [ "$to_delete" -eq 0 ]; then
+                  echo "✅ Rien à supprimer pour $repo"
+                  continue
+                fi
+                
+                # Afficher un aperçu des images à supprimer
+                echo "🔍 Aperçu des tags à supprimer:"
+                head -5 "/tmp/${repo}_to_delete.txt" | while read tag; do
+                  echo "   - $tag"
+                done
+                if [ "$to_delete" -gt 5 ]; then
+                  echo "   ... et $((to_delete - 5)) autres"
+                fi
+                
+                # Supprimer les tags un par un
+                echo "🗑️ Début de la suppression..."
+                deleted=0
+                failed=0
+                
+                while IFS= read -r tag; do
+                  # Nettoyer le tag
+                  tag=$(echo "$tag" | tr -d '\r\n' | xargs)
+                  
+                  if [ -z "$tag" ]; then
+                    continue
+                  fi
+                  
+                  echo "🗑️ Suppression: $tag"
+                  
+                  # Tentative de suppression (2 essais max)
+                  success=false
+                  for attempt in {1..2}; do
+                    if doctl registry repository delete-tag "$repo" "$tag" --force 2>/dev/null; then
+                      echo "   ✅ Supprimé avec succès"
+                      ((deleted++))
+                      success=true
+                      break
+                    else
+                      echo "   ⚠️ Échec tentative $attempt"
+                      sleep 1
+                    fi
+                  done
+                  
+                  if [ "$success" = false ]; then
+                    ((failed++))
+                  fi
+                  
+                  # Pause entre suppressions pour éviter rate limiting
+                  sleep 0.5
+                  
+                done < "/tmp/${repo}_to_delete.txt"
+                
+                echo "📊 Résumé $repo:"
+                echo "   ✅ Supprimés: $deleted"
+                echo "   ❌ Échecs: $failed"
+                echo "   🎯 Images restantes: ~$((total_images - deleted))"
+                
+                # Nettoyage des fichiers temporaires
+                rm -f "/tmp/${repo}"_*.txt
+                
+                echo "✅ Traitement terminé pour $repo"
               done
               
-              # Limite de sécurité
-              if [ $deleted -ge 50 ]; then
-                echo "⚠️ Limite de sécurité atteinte (50 suppressions)"
-                break
-              fi
-              
-            done < "/tmp/${repo}_to_delete.txt"
-            
-            echo "📊 Résumé $repo: $deleted tags supprimés"
-            
-            # Nettoyage des fichiers temporaires
-            rm -f "/tmp/${repo}_tags.txt" "/tmp/${repo}_to_delete.txt"
-          done
-          
-          echo ""
-          echo "✅ Nettoyage terminé pour tous les repositories"
+              echo ""
+              echo "🎉 Nettoyage terminé pour tous les repositories!"
 
-      - name: Cleanup dangling manifests (optional)
-        shell: bash
-        run: |
-          set -e
-          
-          REPOSITORIES=("intelia-frontend" "intelia-backend" "intelia-llm")
-          
-          echo "🧹 Nettoyage des manifests orphelins..."
-          
-          for repo in "${REPOSITORIES[@]}"; do
-            echo "🔍 Vérification des manifests orphelins pour $repo..."
-            
-            # Cette commande peut échouer si pas de manifests orphelins
-            if doctl registry repository list-manifests "$repo" --format "Digest,Tags" --no-header 2>/dev/null | grep -E "^[a-f0-9]+[[:space:]]*$" > "/tmp/${repo}_orphans.txt"; then
+          - name: Cleanup orphaned manifests
+            shell: bash
+            run: |
+              set -e
               
-              orphan_count=$(wc -l < "/tmp/${repo}_orphans.txt")
-              echo "🗑️ Manifests orphelins trouvés: $orphan_count"
+              REPOSITORIES=("intelia-frontend" "intelia-backend" "intelia-llm")
               
-              if [ "$orphan_count" -gt 0 ] && [ "$orphan_count" -lt 20 ]; then
-                while IFS= read -r digest; do
-                  if [ -n "$digest" ]; then
-                    echo "🗑️ Suppression manifest orphelin: $digest"
-                    doctl registry repository delete-manifest "$repo" "$digest" --force || echo "⚠️ Échec suppression manifest $digest"
+              echo ""
+              echo "🧹 Nettoyage des manifests orphelins..."
+              
+              for repo in "${REPOSITORIES[@]}"; do
+                echo "🔍 Vérification des manifests orphelins pour $repo..."
+                
+                # Lister les manifests et chercher ceux sans tags
+                if doctl registry repository list-manifests "$repo" --format "Digest,Tags" --no-header 2>/dev/null > "/tmp/${repo}_manifests.txt"; then
+                  
+                  # Chercher les manifests sans tags (ligne se terminant par des espaces)
+                  orphan_count=$(grep -E "^sha256:[a-f0-9]+[[:space:]]*$" "/tmp/${repo}_manifests.txt" | wc -l)
+                  
+                  if [ "$orphan_count" -gt 0 ]; then
+                    echo "🗑️ Manifests orphelins trouvés: $orphan_count"
+                    
+                    # Limiter à 15 suppressions pour la sécurité
+                    if [ "$orphan_count" -le 15 ]; then
+                      grep -E "^sha256:[a-f0-9]+[[:space:]]*$" "/tmp/${repo}_manifests.txt" | \
+                      awk '{print $1}' > "/tmp/${repo}_orphans.txt"
+                      
+                      manifest_deleted=0
+                      while IFS= read -r digest; do
+                        digest=$(echo "$digest" | tr -d '\r\n' | xargs)
+                        if [ -z "$digest" ]; then continue; fi
+                        
+                        echo "🗑️ Suppression manifest orphelin: ${digest:0:25}..."
+                        
+                        if doctl registry repository delete-manifest "$repo" "$digest" --force 2>/dev/null; then
+                          echo "   ✅ Supprimé"
+                          ((manifest_deleted++))
+                        else
+                          echo "   ⚠️ Échec"
+                        fi
+                        
+                        sleep 0.5
+                        
+                      done < "/tmp/${repo}_orphans.txt"
+                      
+                      echo "📊 Manifests supprimés: $manifest_deleted"
+                    else
+                      echo "⚠️ Trop de manifests orphelins ($orphan_count) - suppression manuelle recommandée"
+                    fi
+                  else
+                    echo "✅ Pas de manifests orphelins"
                   fi
-                done < "/tmp/${repo}_orphans.txt"
+                  
+                  rm -f "/tmp/${repo}_manifests.txt" "/tmp/${repo}_orphans.txt"
+                else
+                  echo "⚠️ Impossible de lister les manifests pour $repo"
+                fi
+              done
+
+          - name: Final status and cleanup
+            run: |
+              echo ""
+              echo "📊 ÉTAT FINAL DU REGISTRY:"
+              echo "=========================="
+              
+              for repo in intelia-frontend intelia-backend intelia-llm; do
+                count=$(doctl registry repository list-tags "$repo" --format "Tag" --no-header 2>/dev/null | wc -l || echo "?")
+                echo "📦 $repo: $count images"
+              done
+              
+              echo ""
+              echo "🗑️ Déclenchement du garbage collection..."
+              if doctl registry garbage-collection start --include-untagged-manifests 2>/dev/null; then
+                echo "✅ Garbage collection démarré (libération d'espace en cours)"
               else
-                echo "⚠️ Trop de manifests orphelins ($orphan_count) - suppression manuelle recommandée"
+                echo "ℹ️ Garbage collection déjà en cours ou non nécessaire"
               fi
               
-              rm -f "/tmp/${repo}_orphans.txt"
-            else
-              echo "✅ Pas de manifests orphelins pour $repo"
-            fi
-          done
+              echo ""
+              echo "🎉 Nettoyage complet terminé!"
 
 
   # 📊 Résumé (basé sur la version qui fonctionnait)

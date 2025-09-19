@@ -206,7 +206,7 @@ jobs:
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
         with:
-          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
       - name: Verify doctl authentication
         run: |
@@ -255,7 +255,7 @@ jobs:
             
             # Compter les tags à supprimer
             to_delete=$(cat "/tmp/${repo}_to_delete.txt" | wc -l)
-            echo "🗑️  Tags à supprimer: $to_delete"
+            echo "🗑️ Tags à supprimer: $to_delete"
             
             if [ "$to_delete" -eq 0 ]; then
               echo "✅ Aucun tag à supprimer pour $repo"
@@ -267,7 +267,7 @@ jobs:
             while IFS= read -r tag; do
               if [ -z "$tag" ]; then continue; fi
               
-              echo "🗑️  Suppression du tag: $tag"
+              echo "🗑️ Suppression du tag: $tag"
               
               # Tentative de suppression avec retry
               for attempt in {1..3}; do
@@ -276,7 +276,7 @@ jobs:
                   ((deleted++))
                   break
                 else
-                  echo "   ⚠️  Échec tentative $attempt pour $tag"
+                  echo "   ⚠️ Échec tentative $attempt pour $tag"
                   if [ $attempt -lt 3 ]; then
                     sleep 2
                   fi
@@ -285,7 +285,7 @@ jobs:
               
               # Limite de sécurité
               if [ $deleted -ge 50 ]; then
-                echo "⚠️  Limite de sécurité atteinte (50 suppressions)"
+                echo "⚠️ Limite de sécurité atteinte (50 suppressions)"
                 break
               fi
               
@@ -316,17 +316,17 @@ jobs:
             if doctl registry repository list-manifests "$repo" --format "Digest,Tags" --no-header 2>/dev/null | grep -E "^[a-f0-9]+[[:space:]]*$" > "/tmp/${repo}_orphans.txt"; then
               
               orphan_count=$(wc -l < "/tmp/${repo}_orphans.txt")
-              echo "🗑️  Manifests orphelins trouvés: $orphan_count"
+              echo "🗑️ Manifests orphelins trouvés: $orphan_count"
               
               if [ "$orphan_count" -gt 0 ] && [ "$orphan_count" -lt 20 ]; then
                 while IFS= read -r digest; do
                   if [ -n "$digest" ]; then
-                    echo "🗑️  Suppression manifest orphelin: $digest"
-                    doctl registry repository delete-manifest "$repo" "$digest" --force || echo "⚠️  Échec suppression manifest $digest"
+                    echo "🗑️ Suppression manifest orphelin: $digest"
+                    doctl registry repository delete-manifest "$repo" "$digest" --force || echo "⚠️ Échec suppression manifest $digest"
                   fi
                 done < "/tmp/${repo}_orphans.txt"
               else
-                echo "⚠️  Trop de manifests orphelins ($orphan_count) - suppression manuelle recommandée"
+                echo "⚠️ Trop de manifests orphelins ($orphan_count) - suppression manuelle recommandée"
               fi
               
               rm -f "/tmp/${repo}_orphans.txt"

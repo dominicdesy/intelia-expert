@@ -85,24 +85,26 @@ async def lifespan(app: FastAPI):
             # Vérifier si le modèle existe, sinon le télécharger
             if not os.path.exists(FASTTEXT_MODEL_PATH):
                 logger.info(f"Téléchargement du modèle FastText: {FASTTEXT_MODEL_PATH}")
-                import fasttext.util
 
                 # Télécharger selon le type de modèle dans la variable d'environnement
                 if "lid" in FASTTEXT_MODEL_PATH.lower() or "176" in FASTTEXT_MODEL_PATH:
-                    # Modèle de détection de langue
-                    logger.info("Téléchargement du modèle de détection de langue...")
-                    fasttext.util.download_model("lid", if_exists="ignore")
-                    # Le fichier téléchargé sera lid.176.ftz
-                    if not os.path.exists(FASTTEXT_MODEL_PATH) and os.path.exists(
-                        "lid.176.ftz"
-                    ):
-                        # Créer un lien symbolique ou copier le fichier
-                        import shutil
+                    # Modèle de détection de langue - téléchargement direct
+                    logger.info(
+                        "Téléchargement direct du modèle de détection de langue..."
+                    )
+                    import urllib.request
 
-                        shutil.copy("lid.176.ftz", FASTTEXT_MODEL_PATH)
-                        logger.info(f"Modèle copié vers: {FASTTEXT_MODEL_PATH}")
+                    # URL directe du modèle de détection de langue FastText
+                    model_url = "https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.ftz"
+                    logger.info("Téléchargement depuis l'URL officielle FastText...")
+
+                    urllib.request.urlretrieve(model_url, FASTTEXT_MODEL_PATH)
+                    logger.info(f"Modèle téléchargé vers: {FASTTEXT_MODEL_PATH}")
+
                 else:
-                    # Modèle d'embeddings
+                    # Modèle d'embeddings - utiliser fasttext.util
+                    import fasttext.util
+
                     if "en" in FASTTEXT_MODEL_PATH:
                         logger.info("Téléchargement du modèle d'embeddings anglais...")
                         fasttext.util.download_model("en", if_exists="ignore")
