@@ -200,12 +200,16 @@ jobs:
       - name: Cleanup DOCR repositories via REST API
         shell: bash
         run: |
+          set +e  # Continue même en cas d'erreur
+          
           KEEP_IMAGES=8
           REPOSITORIES=("intelia-frontend" "intelia-backend" "intelia-llm")
           REGISTRY_NAME="${{ secrets.DOCR_NAME }}"
           API_TOKEN="${{ secrets.DOCR_ACCESS_TOKEN }}"
           
           echo "Nettoyage via API REST DigitalOcean - garder $KEEP_IMAGES images par repo"
+          
+          overall_success=true
           
           for repo in "${REPOSITORIES[@]}"; do
             echo ""
@@ -225,7 +229,10 @@ jobs:
             fi
             
             # 2. Parser les tags et dates avec jq
-            tags_data=$(echo "$response" | jq -r '.tags[] | "\(.tag) \(.updated_at)"' 2>/dev/null)
+            if ! tags_data=$(echo "$response" | jq -r '.tags[]? | "\(.tag) \(.updated_at)"' 2>/dev/null); then
+              echo "Erreur parsing JSON pour $repo"
+              continue
+            fi
             
             if [ -z "$tags_data" ]; then
               echo "Aucun tag trouvé pour $repo"
@@ -245,10 +252,10 @@ jobs:
             fi
             
             # 3. Identifier les tags à supprimer (garder les plus récents)
-            # Trier par date (plus anciens en premier) et prendre les premiers
             to_delete_count=$((total_tags - KEEP_IMAGES))
             echo "À supprimer: $to_delete_count tags"
             
+            # Trier par date et prendre les plus anciens, en filtrant les protégés
             sort -k2,2 "/tmp/${repo}_tags.txt" | \
             head -n "$to_delete_count" | \
             awk '{print $1}' | \
@@ -274,16 +281,23 @@ jobs:
               
               echo "Suppression API: $tag"
               
-              # Appel API DELETE
-              http_code=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+              # Appel API DELETE avec gestion d'erreur améliorée
+              http_code=$(curl -s -o /tmp/delete_response.txt -w "%{http_code}" -X DELETE \
                 "https://api.digitalocean.com/v2/registry/${REGISTRY_NAME}/repositories/${repo}/tags/${tag}" \
                 -H "Authorization: Bearer ${API_TOKEN}")
               
               if [ "$http_code" = "204" ] || [ "$http_code" = "200" ]; then
                 echo "  ✓ Supprimé (HTTP $http_code)"
                 ((deleted++))
+              elif [ "$http_code" = "404" ]; then
+                echo "  ! Tag déjà supprimé (HTTP $http_code)"
+                ((deleted++))  # Compter comme succès
               else
                 echo "  ✗ Échec (HTTP $http_code)"
+                # Afficher la réponse d'erreur si disponible
+                if [ -f /tmp/delete_response.txt ]; then
+                  echo "    Réponse API: $(cat /tmp/delete_response.txt)"
+                fi
                 ((failed++))
               fi
               
@@ -298,13 +312,25 @@ jobs:
             echo "  Échecs: $failed"
             echo "  Restants estimés: $((total_tags - deleted))"
             
+            # Marquer l'échec global si des erreurs dans ce repo
+            if [ "$failed" -gt 0 ]; then
+              overall_success=false
+            fi
+            
             # Nettoyage fichiers temporaires
-            rm -f "/tmp/${repo}_tags.txt" "/tmp/${repo}_to_delete.txt"
+            rm -f "/tmp/${repo}_tags.txt" "/tmp/${repo}_to_delete.txt" "/tmp/delete_response.txt"
             
           done
           
           echo ""
           echo "=== Nettoyage terminé ==="
+          
+          # Ne pas faire échouer le job entier même si quelques suppressions ont échoué
+          if [ "$overall_success" = false ]; then
+            echo "⚠️ Certaines suppressions ont échoué, mais le processus continue"
+          fi
+          
+          exit 0  # Toujours sortir avec succès pour ne pas bloquer le workflow
 
       - name: Trigger garbage collection
         run: |
