@@ -228,36 +228,27 @@ jobs:
             echo "Traitement de $repo..."
             
             echo "Recuperation de la liste des images..."
-            if ! doctl registry repository list-tags "$repo" --format "Tag,UpdatedAt" --no-header > "/tmp/${repo}_all.txt" 2>/dev/null; then
+            # Utiliser directement JSON pour eviter les problemes de parsing
+            if ! doctl registry repository list-tags "$repo" --output json > "/tmp/${repo}.json" 2>/dev/null; then
               echo "Repository $repo introuvable"
               continue
             fi
             
             # DEBUG: Voir ce qu'on a recupere
-            echo "DEBUG - Contenu brut du fichier:"
-            head -10 "/tmp/${repo}_all.txt"
+            echo "DEBUG - Contenu JSON:"
+            head -10 "/tmp/${repo}.json"
             
-            # Nettoyer: supprimer lignes vides ET headers potentiels
-            grep -v "^[[:space:]]*$" "/tmp/${repo}_all.txt" | \
-            grep -v "^Tag[[:space:]]" | \
-            grep -v "^tag[[:space:]]" > "/tmp/${repo}_clean.txt" || true
-            
-            # Si le fichier nettoye est vide, utiliser une approche differente
-            if [ ! -s "/tmp/${repo}_clean.txt" ]; then
-              echo "Approche alternative: utilisation de --output json"
-              if doctl registry repository list-tags "$repo" --output json > "/tmp/${repo}.json" 2>/dev/null; then
-                # Extraire tag et updated_at du JSON
-                cat "/tmp/${repo}.json" | jq -r '.[] | "\(.tag) \(.updated_at)"' > "/tmp/${repo}_clean.txt" 2>/dev/null || {
-                  echo "Erreur avec jq, utilisation approche basique"
-                  doctl registry repository list-tags "$repo" --format "Tag" --no-header | \
-                  grep -v "^[[:space:]]*$" | \
-                  grep -v "^Tag$" | \
-                  awk '{print $1 " 2024-01-01"}' > "/tmp/${repo}_clean.txt"
-                }
-              else
-                echo "Impossible de recuperer les tags pour $repo"
-                continue
-              fi
+            # Extraire tag et updated_at du JSON de maniere propre
+            if command -v jq >/dev/null 2>&1; then
+              # Avec jq si disponible
+              cat "/tmp/${repo}.json" | jq -r '.[] | "\(.tag) \(.updated_at)"' > "/tmp/${repo}_clean.txt" 2>/dev/null
+            else
+              # Sans jq, parsing manuel basique
+              echo "jq non disponible, utilisation parsing manuel"
+              grep -o '"tag":"[^"]*"' "/tmp/${repo}.json" | cut -d'"' -f4 > "/tmp/${repo}_tags_only.txt"
+              grep -o '"updated_at":"[^"]*"' "/tmp/${repo}.json" | cut -d'"' -f4 > "/tmp/${repo}_dates_only.txt"
+              paste "/tmp/${repo}_tags_only.txt" "/tmp/${repo}_dates_only.txt" > "/tmp/${repo}_clean.txt"
+              rm -f "/tmp/${repo}_tags_only.txt" "/tmp/${repo}_dates_only.txt"
             fi
             
             total_images=$(cat "/tmp/${repo}_clean.txt" | wc -l)
@@ -274,11 +265,14 @@ jobs:
             fi
             
             # Trier par date (colonne 2) et prendre les plus anciens
+            # MAIS proteger les tags importants
+            PROTECTED_TAGS="latest|main|buildcache|prod|stable"
+            
             sort -k2,2 "/tmp/${repo}_clean.txt" | \
             head -n $((total_images - KEEP_IMAGES)) | \
             awk '{print $1}' | \
             grep -v "^[[:space:]]*$" | \
-            grep -v "^Tag$" > "/tmp/${repo}_to_delete.txt"
+            grep -vE "^($PROTECTED_TAGS)$" > "/tmp/${repo}_to_delete.txt"
             
             to_delete=$(cat "/tmp/${repo}_to_delete.txt" | wc -l)
             to_keep=$((total_images - to_delete))

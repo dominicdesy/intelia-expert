@@ -273,11 +273,16 @@ class MultilingualOODDetector:
             )
 
         # Validation langue supportée
-        if language not in self.supported_languages:
+        actual_language = (
+            language.language if hasattr(language, "language") else language
+        )
+        if actual_language not in self.supported_languages:
             logger.warning(
-                f"Langue non supportée: {language}, utilisation fallback {self.default_language}"
+                f"Langue non supportée: {actual_language}, utilisation fallback {self.default_language}"
             )
             language = self.default_language
+        else:
+            language = actual_language
 
         # Traitement selon la stratégie de langue
         return self._calculate_ood_score_for_language(query, intent_result, language)

@@ -148,7 +148,25 @@ def safe_serialize_for_json(obj, _seen=None):
         if isinstance(obj, set):
             return list(obj)
 
-        # 9. Objets avec attributs (comme IntentResult)
+        # 9. NOUVEAU: Gestion spéciale pour LanguageDetectionResult
+        if (
+            hasattr(obj, "language")
+            and hasattr(obj, "confidence")
+            and hasattr(obj, "source")
+        ):
+            _seen.add(obj_id)
+            try:
+                result = {
+                    "language": obj.language,
+                    "confidence": float(obj.confidence),
+                    "source": obj.source,
+                    "processing_time_ms": getattr(obj, "processing_time_ms", 0),
+                }
+            finally:
+                _seen.remove(obj_id)
+            return result
+
+        # 10. Objets avec attributs (comme IntentResult)
         if strategy == "object" or hasattr(obj, "__dict__"):
             _seen.add(obj_id)
             try:
@@ -160,14 +178,14 @@ def safe_serialize_for_json(obj, _seen=None):
                 _seen.remove(obj_id)
             return result
 
-        # 10. CORRECTION: Gestion des bytes
+        # 11. CORRECTION: Gestion des bytes
         if isinstance(obj, bytes):
             try:
                 return obj.decode("utf-8")
             except UnicodeDecodeError:
                 return f"<bytes:{len(obj)}>"
 
-        # 11. Fallback sécurisé
+        # 12. Fallback sécurisé
         return str(obj)
 
     except Exception as e:
