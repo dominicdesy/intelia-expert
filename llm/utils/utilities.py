@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
-
 """
-
-utilities.py - Fonctions utilitaires unifiées COMPLÈTES
-Version modulaire avec toutes les fonctions nécessaires - CORRIGÉE
-
+utilities.py - Fonctions utilitaires multilingues
+Version 2.0 avec support FastText et service de traduction hybride
 """
 
 import os
@@ -19,39 +16,67 @@ from pathlib import Path
 from dataclasses import dataclass
 from enum import Enum
 
-# Imports modulaires
+# Imports configuration multilingue
 from config.config import (
+    SUPPORTED_LANGUAGES,
+    DEFAULT_LANGUAGE,
+    FALLBACK_LANGUAGE,
     LANG_DETECTION_MIN_LENGTH,
-    FRENCH_HINTS,
-    ENGLISH_HINTS,
-    FRENCH_CHARS,
+    LANG_DETECTION_CONFIDENCE_THRESHOLD,
+    FASTTEXT_MODEL_PATH,
+    # SUPPRIMÉ: FRENCH_HINTS, ENGLISH_HINTS, FRENCH_CHARS (remplacé par service traduction)
 )
 
-# CORRECTION: Éviter l'import circulaire - importer seulement si nécessaire
+# Import service traduction (lazy loading)
+_translation_service = None
+
+# Import FastText (remplace langdetect)
 try:
-    from utils.imports_and_dependencies import UNIDECODE_AVAILABLE
+    import fasttext
 
-    if UNIDECODE_AVAILABLE:
-        from unidecode import (
-            unidecode,
-        )  # noqa: F401  # Import nécessaire pour export global
+    FASTTEXT_AVAILABLE = True
+    _fasttext_model = None
+    logger = logging.getLogger(__name__)
+    logger.info("FastText disponible pour détection multilingue")
 except ImportError:
-    # Fallback si imports_and_dependencies n'est pas encore disponible
-    UNIDECODE_AVAILABLE = False
+    FASTTEXT_AVAILABLE = False
+    fasttext = None
+    # Fallback vers fast-langdetect si disponible
     try:
-        from unidecode import (
-            unidecode,
-        )  # noqa: F401  # Import nécessaire pour export global
+        from fastlangdetect import detect, LangDetectException
 
-        UNIDECODE_AVAILABLE = True
+        FAST_LANGDETECT_AVAILABLE = True
+        logger = logging.getLogger(__name__)
+        logger.info("fast-langdetect disponible comme fallback")
     except ImportError:
-        unidecode = None  # Définir comme None si pas disponible
+        FAST_LANGDETECT_AVAILABLE = False
+        detect = None
+        LangDetectException = Exception
+
+# Import conditionnel unidecode
+try:
+    from unidecode import unidecode
+
+    UNIDECODE_AVAILABLE = True
+except ImportError:
+    UNIDECODE_AVAILABLE = False
+    unidecode = None
 
 logger = logging.getLogger(__name__)
 
 # ============================================================================
 # CLASSES DE DONNÉES
 # ============================================================================
+
+
+@dataclass
+class LanguageDetectionResult:
+    """Résultat de détection de langue avec confiance"""
+
+    language: str
+    confidence: float
+    source: str  # "fasttext", "fast-langdetect", "universal_patterns", "fallback"
+    processing_time_ms: int = 0
 
 
 @dataclass
@@ -77,7 +102,514 @@ class ProcessingResult:
 
 
 # ============================================================================
-# COLLECTEUR DE MÉTRIQUES (Version complète avec méthodes manquantes)
+# SERVICE DE TRADUCTION (LAZY LOADING)
+# ============================================================================
+
+
+def _get_translation_service():
+    """Récupère le service de traduction avec lazy loading"""
+    global _translation_service
+
+    if _translation_service is None:
+        try:
+            from utils.translation_service import (
+                get_translation_service,
+                init_global_translation_service,
+            )
+            from config.config import (
+                UNIVERSAL_DICT_PATH,
+                GOOGLE_TRANSLATE_API_KEY,
+                ENABLE_GOOGLE_TRANSLATE_FALLBACK,
+                TRANSLATION_CACHE_SIZE,
+                TRANSLATION_CACHE_TTL,
+                TRANSLATION_CONFIDENCE_THRESHOLD,
+            )
+
+            # Initialisation si pas encore fait
+            _translation_service = get_translation_service()
+            if _translation_service is None:
+                _translation_service = init_global_translation_service(
+                    dict_path=UNIVERSAL_DICT_PATH,
+                    supported_languages=SUPPORTED_LANGUAGES,
+                    google_api_key=GOOGLE_TRANSLATE_API_KEY,
+                    enable_google_fallback=ENABLE_GOOGLE_TRANSLATE_FALLBACK,
+                    cache_size=TRANSLATION_CACHE_SIZE,
+                    cache_ttl=TRANSLATION_CACHE_TTL,
+                    confidence_threshold=TRANSLATION_CONFIDENCE_THRESHOLD,
+                )
+
+        except Exception as e:
+            logger.warning(f"Service de traduction indisponible: {e}")
+            _translation_service = None
+
+    return _translation_service
+
+
+# ============================================================================
+# DÉTECTION DE LANGUE MULTILINGUE (REMPLACE detect_language_enhanced)
+# ============================================================================
+
+
+def _load_fasttext_model():
+    """Charge le modèle FastText avec lazy loading"""
+    global _fasttext_model
+
+    if not FASTTEXT_AVAILABLE:
+        return None
+
+    if _fasttext_model is None:
+        try:
+            model_path = FASTTEXT_MODEL_PATH
+            if not os.path.exists(model_path):
+                # Téléchargement automatique du modèle lite
+                logger.info("Téléchargement modèle FastText...")
+                import fasttext.util
+
+                fasttext.util.download_model("en", if_exists="ignore")
+                # Utiliser le modèle par défaut
+                model_path = "lid.176.ftz"
+
+            _fasttext_model = fasttext.load_model(model_path)
+            logger.info(f"Modèle FastText chargé: {model_path}")
+
+        except Exception as e:
+            logger.warning(f"Erreur chargement FastText: {e}")
+            _fasttext_model = None
+
+    return _fasttext_model
+
+
+def _detect_with_universal_patterns(text: str) -> Optional[str]:
+    """Détection de langue via patterns universels du dictionnaire"""
+    translation_service = _get_translation_service()
+    if not translation_service:
+        return None
+
+    text_lower = text.lower()
+
+    # Patterns techniques universels (indépendants de la langue)
+    technical_patterns = {
+        "fcr",
+        "ross",
+        "cobb",
+        "hubbard",
+        "kg",
+        "gr",
+        "poids",
+        "weight",
+        "days",
+        "jours",
+        "j",
+        "d",
+        "%",
+        "mortality",
+        "mortalité",
+    }
+
+    # Si contient des termes techniques, probable contexte avicole
+    if any(pattern in text_lower for pattern in technical_patterns):
+
+        # Vérification patterns par langue via service traduction
+        for lang in SUPPORTED_LANGUAGES:
+            # Récupérer termes questions dans cette langue
+            question_terms = translation_service.get_domain_terms(
+                "question_words", lang
+            )
+            if any(term in text_lower for term in question_terms[:5]):  # Top 5 termes
+                return lang
+
+    return None
+
+
+def detect_language_enhanced(text: str, default: str = None) -> LanguageDetectionResult:
+    """
+    Détection de langue multilingue avec FastText
+    Remplace l'ancienne version langdetect avec support 13 langues
+    """
+    start_time = time.time()
+
+    if default is None:
+        default = DEFAULT_LANGUAGE
+
+    if not text or len(text.strip()) < 2:
+        return LanguageDetectionResult(
+            language=default,
+            confidence=0.0,
+            source="fallback",
+            processing_time_ms=int((time.time() - start_time) * 1000),
+        )
+
+    text_clean = text.strip()
+
+    # === LOGIQUE COURTE: Patterns universels ===
+    if len(text_clean) < LANG_DETECTION_MIN_LENGTH:
+
+        # 1. Essayer patterns universels du dictionnaire
+        universal_lang = _detect_with_universal_patterns(text_clean)
+        if universal_lang:
+            return LanguageDetectionResult(
+                language=universal_lang,
+                confidence=0.8,
+                source="universal_patterns",
+                processing_time_ms=int((time.time() - start_time) * 1000),
+            )
+
+        # 2. Patterns Unicode basiques
+        # Chinois
+        if re.search(r"[\u4e00-\u9fff]", text_clean):
+            return LanguageDetectionResult(
+                language="zh",
+                confidence=0.9,
+                source="unicode_patterns",
+                processing_time_ms=int((time.time() - start_time) * 1000),
+            )
+
+        # Hindi
+        if re.search(r"[\u0900-\u097f]", text_clean):
+            return LanguageDetectionResult(
+                language="hi",
+                confidence=0.9,
+                source="unicode_patterns",
+                processing_time_ms=int((time.time() - start_time) * 1000),
+            )
+
+        # Thaï
+        if re.search(r"[\u0e00-\u0e7f]", text_clean):
+            return LanguageDetectionResult(
+                language="th",
+                confidence=0.9,
+                source="unicode_patterns",
+                processing_time_ms=int((time.time() - start_time) * 1000),
+            )
+
+        # Fallback pour texte court
+        return LanguageDetectionResult(
+            language=default,
+            confidence=0.3,
+            source="fallback",
+            processing_time_ms=int((time.time() - start_time) * 1000),
+        )
+
+    # === LOGIQUE LONGUE: FastText ou fast-langdetect ===
+
+    # 1. Essayer FastText en priorité
+    if FASTTEXT_AVAILABLE:
+        model = _load_fasttext_model()
+        if model:
+            try:
+                predictions = model.predict(text_clean.replace("\n", " "), k=1)
+                if predictions and len(predictions) >= 2:
+                    lang_label = predictions[0][0].replace("__label__", "")
+                    confidence = float(predictions[1][0])
+
+                    # Normalisation code langue
+                    if lang_label == "zh-cn":
+                        lang_label = "zh"
+
+                    # Vérification langue supportée
+                    if (
+                        lang_label in SUPPORTED_LANGUAGES
+                        and confidence >= LANG_DETECTION_CONFIDENCE_THRESHOLD
+                    ):
+                        return LanguageDetectionResult(
+                            language=lang_label,
+                            confidence=confidence,
+                            source="fasttext",
+                            processing_time_ms=int((time.time() - start_time) * 1000),
+                        )
+
+            except Exception as e:
+                logger.debug(f"Erreur FastText pour '{text_clean[:50]}...': {e}")
+
+    # 2. Fallback vers fast-langdetect
+    if FAST_LANGDETECT_AVAILABLE:
+        try:
+            result = detect(text_clean, low_memory=True)
+            detected_lang = result["lang"]
+            confidence = result["score"]
+
+            # Normalisation et validation
+            if detected_lang == "zh-cn":
+                detected_lang = "zh"
+
+            if (
+                detected_lang in SUPPORTED_LANGUAGES
+                and confidence >= LANG_DETECTION_CONFIDENCE_THRESHOLD
+            ):
+                return LanguageDetectionResult(
+                    language=detected_lang,
+                    confidence=confidence,
+                    source="fast-langdetect",
+                    processing_time_ms=int((time.time() - start_time) * 1000),
+                )
+
+        except Exception as e:
+            logger.debug(f"Erreur fast-langdetect pour '{text_clean[:50]}...': {e}")
+
+    # 3. Dernier recours: patterns universels même pour texte long
+    universal_lang = _detect_with_universal_patterns(text_clean)
+    if universal_lang:
+        return LanguageDetectionResult(
+            language=universal_lang,
+            confidence=0.6,
+            source="universal_patterns_fallback",
+            processing_time_ms=int((time.time() - start_time) * 1000),
+        )
+
+    # 4. Fallback final
+    return LanguageDetectionResult(
+        language=FALLBACK_LANGUAGE,
+        confidence=0.2,
+        source="final_fallback",
+        processing_time_ms=int((time.time() - start_time) * 1000),
+    )
+
+
+# ============================================================================
+# SUPPORT DES LANGUES ET VALIDATION
+# ============================================================================
+
+
+def is_supported_language(language: str) -> bool:
+    """Vérifie si une langue est supportée"""
+    return language in SUPPORTED_LANGUAGES
+
+
+def normalize_language_code(language: str) -> str:
+    """Normalise un code langue vers le format supporté"""
+    if not language:
+        return DEFAULT_LANGUAGE
+
+    # Normalisation des codes courants
+    lang_lower = language.lower()
+
+    # Mappings spéciaux
+    mappings = {
+        "zh-cn": "zh",
+        "zh-tw": "zh",
+        "zh-hans": "zh",
+        "zh-hant": "zh",
+        "en-us": "en",
+        "en-gb": "en",
+        "fr-fr": "fr",
+        "fr-ca": "fr",
+        "es-es": "es",
+        "es-mx": "es",
+        "pt-br": "pt",
+        "pt-pt": "pt",
+    }
+
+    normalized = mappings.get(lang_lower, lang_lower.split("-")[0])
+
+    # Vérification finale
+    if normalized in SUPPORTED_LANGUAGES:
+        return normalized
+
+    return DEFAULT_LANGUAGE
+
+
+def get_universal_translation(
+    term: str, target_language: str, domain: str = None
+) -> str:
+    """Interface unifiée vers le service de traduction"""
+    translation_service = _get_translation_service()
+    if not translation_service:
+        return term
+
+    try:
+        result = translation_service.translate_term(
+            term, target_language, domain=domain
+        )
+        return result.text if result.confidence >= 0.5 else term
+    except Exception as e:
+        logger.debug(f"Erreur traduction universelle {term}->{target_language}: {e}")
+        return term
+
+
+# ============================================================================
+# FONCTIONS UTILITAIRES MULTILINGUES
+# ============================================================================
+
+
+def get_out_of_domain_message(language: str = None) -> str:
+    """Message hors domaine traduit selon la langue détectée"""
+
+    if language is None:
+        language = DEFAULT_LANGUAGE
+
+    # D'abord essayer le service de traduction
+    translation_service = _get_translation_service()
+    if translation_service:
+        try:
+            # Récupérer depuis le dictionnaire universel
+            result = translation_service.translate_term(
+                "out_of_domain_message", language, domain="system_messages"
+            )
+            if result.confidence >= 0.7:
+                return result.text
+        except Exception as e:
+            logger.debug(f"Erreur service traduction pour message OOD: {e}")
+
+    # Messages par défaut intégrés (fallback)
+    default_messages = {
+        "fr": "Je me spécialise dans l'aviculture et l'élevage de volailles. Je peux vous aider avec: Performance (FCR, poids, croissance), Nutrition (programmes alimentaires), Environnement (température, ventilation), Santé (prévention, vaccination), et Gestion technique. Posez-moi une question spécifique!",
+        "en": "I specialize in poultry farming and broiler production. I can help with: Performance (FCR, weight, growth), Nutrition (feeding programs), Environment (temperature, ventilation), Health (prevention, vaccination), and Technical management. Ask me a specific question!",
+        "es": "Me especializo en avicultura y producción de pollos. Puedo ayudar con: Rendimiento (FCR, peso, crecimiento), Nutrición (programas de alimentación), Ambiente (temperatura, ventilación), Salud (prevención, vacunación), y Gestión técnica. ¡Hágame una pregunta específica!",
+        "de": "Ich spezialisiere mich auf Geflügelzucht und Hähnchenmast. Ich kann helfen bei: Leistung (FCR, Gewicht, Wachstum), Ernährung (Fütterungsprogramme), Umgebung (Temperatur, Lüftung), Gesundheit (Vorbeugung, Impfung), und Technisches Management. Stellen Sie mir eine spezifische Frage!",
+        "it": "Mi specializzo in avicoltura e produzione di polli. Posso aiutare con: Prestazioni (FCR, peso, crescita), Nutrizione (programmi alimentari), Ambiente (temperatura, ventilazione), Salute (prevenzione, vaccinazione), e Gestione tecnica. Fatemi una domanda specifica!",
+        "pt": "Especializo-me na avicultura e produção de frangos. Posso ajudar com: Desempenho (FCR, peso, crescimento), Nutrição (programas alimentares), Ambiente (temperatura, ventilação), Saúde (prevenção, vacinação), e Gestão técnica. Faça-me uma pergunta específica!",
+        "nl": "Ik specialiseer me in pluimveehouderij en vleeskuikenproductie. Ik kan helpen met: Prestaties (FCR, gewicht, groei), Voeding (voerprogramma's), Omgeving (temperatuur, ventilatie), Gezondheid (preventie, vaccinatie), en Technisch beheer. Stel me een specifieke vraag!",
+        "pl": "Specjalizuję się w hodowli drobiu i produkcji kurczaków. Mogę pomóc z: Wydajność (FCR, waga, wzrost), Żywienie (programy żywieniowe), Środowisko (temperatura, wentylacja), Zdrowie (profilaktyka, szczepienia), i Zarządzanie techniczne. Zadaj mi konkretne pytanie!",
+        "hi": "मैं मुर्गीपालन और ब्रॉयलर उत्पादन में विशेषज्ञता रखता हूं। मैं इनमें मदद कर सकता हूं: प्रदर्शन (FCR, वजन, वृद्धि), पोषण (आहार कार्यक्रम), पर्यावरण (तापमान, वेंटिलेशन), स्वास्थ्य (रोकथाम, टीकाकरण), और तकनीकी प्रबंधन। मुझसे कोई विशिष्ट प्रश्न पूछें!",
+        "zh": "我专门从事家禽养殖和肉鸡生产。我可以帮助: 性能 (FCR, 体重, 生长), 营养 (饲养计划), 环境 (温度, 通风), 健康 (预防, 疫苗接种), 和技术管理。请问我一个具体问题！",
+        "th": "ฉันเชี่ยวชาญด้านการเลี้ยงสัตว์ปีกและการผลิตไก่เนื้อ ฉันสามารถช่วยได้ในเรื่อง: ประสิทธิภาพ (FCR, น้ำหนัก, การเจริญเติบโต), โภชนาการ (โปรแกรมการให้อาหาร), สิ่งแวดล้อม (อุณหภูมิ, การระบายอากาศ), สุขภาพ (การป้องกัน, การฉีดวัคซีน), และการจัดการทางเทคนิค กรุณาถามคำถามเฉพาะเจาะจง!",
+        "id": "Saya ahli dalam budidaya unggas dan produksi ayam pedaging. Saya dapat membantu dengan: Performa (FCR, berat, pertumbuhan), Nutrisi (program pakan), Lingkungan (suhu, ventilasi), Kesehatan (pencegahan, vaksinasi), dan Manajemen teknis. Ajukan pertanyaan spesifik kepada saya!",
+    }
+
+    return default_messages.get(
+        language, default_messages.get(FALLBACK_LANGUAGE, default_messages["en"])
+    )
+
+
+def get_aviculture_response(message: str, language: str = None) -> str:
+    """Génère une réponse aviculture multilingue si le RAG échoue"""
+
+    if language is None:
+        # Détection automatique de la langue
+        detection_result = detect_language_enhanced(message)
+        language = detection_result.language
+
+    # Normalisation du message
+    message_lower = message.lower()
+
+    # D'abord essayer le service de traduction pour des réponses avancées
+    translation_service = _get_translation_service()
+
+    # Détection du sujet principal
+    topic = None
+    if any(term in message_lower for term in ["fcr", "conversion", "indice"]):
+        topic = "fcr_information"
+    elif any(
+        term in message_lower for term in ["poids", "weight", "croissance", "growth"]
+    ):
+        topic = "weight_curves"
+    elif any(
+        term in message_lower
+        for term in ["température", "temperature", "ventilation", "climat"]
+    ):
+        topic = "temperature_program"
+    elif any(
+        term in message_lower for term in ["mortalité", "mortality", "santé", "health"]
+    ):
+        topic = "mortality_targets"
+    elif any(
+        term in message_lower
+        for term in ["alimentation", "nutrition", "aliment", "feed"]
+    ):
+        topic = "feeding_program"
+    else:
+        topic = "general_poultry_help"
+
+    # Essayer de récupérer la réponse traduite
+    if translation_service and topic:
+        try:
+            result = translation_service.translate_term(
+                topic, language, domain="aviculture_responses"
+            )
+            if result.confidence >= 0.6:
+                return result.text
+        except Exception as e:
+            logger.debug(f"Erreur service traduction pour réponse aviculture: {e}")
+
+    # Fallback vers réponses hardcodées multilingues
+    if any(term in message_lower for term in ["fcr", "conversion", "indice"]):
+        responses = {
+            "fr": """L'indice de conversion alimentaire (FCR) optimal varie selon l'âge et la souche :
+
+- **Poulets de chair Ross 308** :
+  - 0-21 jours : FCR cible 1.2-1.3
+  - 22-35 jours : FCR cible 1.4-1.6  
+  - 36-42 jours : FCR cible 1.7-1.9
+
+- **Facteurs influençant le FCR** :
+  - Qualité de l'aliment et formulation
+  - Température et ventilation du bâtiment
+  - Densité d'élevage
+  - Santé du troupeau
+  - Gestion de l'abreuvement
+
+Pour optimiser le FCR, surveillez la consommation quotidienne et ajustez la distribution selon les courbes de croissance standards.""",
+            "en": """Feed Conversion Ratio (FCR) targets vary by age and strain:
+
+- **Ross 308 Broilers**:
+  - 0-21 days: FCR target 1.2-1.3
+  - 22-35 days: FCR target 1.4-1.6
+  - 36-42 days: FCR target 1.7-1.9
+
+- **FCR Influencing Factors**:
+  - Feed quality and formulation
+  - House temperature and ventilation
+  - Stocking density
+  - Flock health status
+  - Water management
+
+To optimize FCR, monitor daily consumption and adjust distribution according to standard growth curves.""",
+            "es": """Los objetivos de Conversión Alimenticia (FCR) varían según edad y cepa:
+
+- **Pollos de engorde Ross 308**:
+  - 0-21 días: FCR objetivo 1.2-1.3
+  - 22-35 días: FCR objetivo 1.4-1.6
+  - 36-42 días: FCR objetivo 1.7-1.9
+
+- **Factores que influyen en FCR**:
+  - Calidad y formulación del alimento
+  - Temperatura y ventilación del galpón
+  - Densidad de población
+  - Estado de salud del lote
+  - Manejo del agua
+
+Para optimizar FCR, monitoree el consumo diario y ajuste la distribución según curvas de crecimiento estándar.""",
+        }
+        return responses.get(language, responses.get("en", responses["fr"]))
+
+    # Réponse générale multilingue
+    general_responses = {
+        "fr": """Je suis spécialisé dans l'aviculture et l'élevage de poulets de chair. Je peux vous aider sur :
+
+- **Performances** : FCR, poids, croissance, mortalité
+- **Nutrition** : Programmes alimentaires, formulation
+- **Environnement** : Température, ventilation, densité
+- **Santé** : Prévention, vaccination, biosécurité
+- **Technique** : Équipements, bâtiments, gestion
+
+Posez-moi une question précise sur l'un de ces domaines !""",
+        "en": """I specialize in poultry farming and broiler production. I can help with:
+
+- **Performance**: FCR, weight, growth, mortality
+- **Nutrition**: Feeding programs, formulation
+- **Environment**: Temperature, ventilation, density
+- **Health**: Prevention, vaccination, biosecurity
+- **Technical**: Equipment, housing, management
+
+Ask me a specific question about any of these areas!""",
+        "es": """Me especializo en avicultura y producción de pollos de engorde. Puedo ayudar con:
+
+- **Rendimiento**: FCR, peso, crecimiento, mortalidad
+- **Nutrición**: Programas alimentarios, formulación
+- **Ambiente**: Temperatura, ventilación, densidad
+- **Salud**: Prevención, vacunación, bioseguridad
+- **Técnico**: Equipos, alojamiento, gestión
+
+¡Hágame una pregunta específica sobre cualquiera de estas áreas!""",
+    }
+
+    return general_responses.get(
+        language, general_responses.get(FALLBACK_LANGUAGE, general_responses["en"])
+    )
+
+
+# ============================================================================
+# FONCTIONS UTILITAIRES CORE (MAINTENUES POUR COMPATIBILITÉ)
 # ============================================================================
 
 
@@ -124,17 +656,15 @@ class MetricsCollector:
         self.semantic_cache_stats["fallback_hits"] += 1
 
     def ood_filtered(self, score: float, reason: str):
-        """Enregistre un filtrage OOD avec détails - VERSION CORRIGÉE"""
+        """Enregistre un filtrage OOD avec détails"""
         self.ood_stats[f"ood_{reason}"] += 1
         self.ood_stats["ood_total"] += 1
 
-        # CORRECTION : Validation du type de score
         if isinstance(score, (int, float)):
             score_value = float(score)
         else:
-            score_value = 0.5  # Valeur par défaut sécurisée
+            score_value = 0.5
 
-        # Calcul de la moyenne glissante
         current_avg = self.ood_stats.get("avg_ood_score", 0.0)
         total_filtered = self.ood_stats["ood_total"]
 
@@ -145,13 +675,11 @@ class MetricsCollector:
         else:
             self.ood_stats["avg_ood_score"] = score_value
 
-    # ✅ NOUVEAU: Méthode manquante ood_accepted()
     def ood_accepted(self, score: float, reason: str = "accepted"):
         """Trace les requêtes acceptées après validation OOD"""
         self.ood_stats[f"ood_{reason}"] += 1
         self.ood_stats["ood_accepted_total"] += 1
 
-        # Mise à jour du score moyen pour les acceptées
         current_avg = self.ood_stats.get("avg_accepted_score", 0.0)
         total_accepted = self.ood_stats["ood_accepted_total"]
         if total_accepted > 0:
@@ -159,7 +687,6 @@ class MetricsCollector:
                 current_avg * (total_accepted - 1) + score
             ) / total_accepted
 
-    # ✅ NOUVEAU: Méthode manquante hybrid_search_completed()
     def hybrid_search_completed(
         self, results_count: int, alpha: float, duration: float, intent_type: str = None
     ):
@@ -171,7 +698,6 @@ class MetricsCollector:
         if intent_type:
             self.search_stats[f"intent_{intent_type}_searches"] += 1
 
-        # Moyenne glissante des performances
         searches = self.search_stats["hybrid_searches"]
         if searches > 0:
             self.search_stats["avg_results_per_search"] = (
@@ -181,7 +707,6 @@ class MetricsCollector:
                 self.search_stats["total_duration"] / searches
             )
 
-    # ✅ NOUVEAU: Méthodes additionnelles pour completeness
     def retrieval_error(self, error_type: str, error_msg: str):
         """Trace les erreurs de récupération"""
         self.search_stats[f"error_{error_type}"] += 1
@@ -219,294 +744,8 @@ class MetricsCollector:
         }
 
 
-# Instance globale - DÉFINIE AVANT TOUTE AUTRE UTILISATION
+# Instance globale
 METRICS = MetricsCollector()
-
-# ============================================================================
-# NOUVELLES FONCTIONS UTILITAIRES (depuis main.py)
-# ============================================================================
-
-
-def safe_serialize_for_json(obj: Any) -> Any:
-    """Convertit récursivement les objets en types JSON-safe"""
-    if obj is None:
-        return None
-    elif isinstance(obj, (str, int, float, bool)):
-        return obj
-    elif isinstance(obj, Enum):
-        return obj.value
-    elif isinstance(obj, dict):
-        return {k: safe_serialize_for_json(v) for k, v in obj.items()}
-    elif isinstance(obj, (list, tuple)):
-        return [safe_serialize_for_json(item) for item in obj]
-    elif hasattr(obj, "__dict__"):
-        return safe_serialize_for_json(obj.__dict__)
-    else:
-        return str(obj)
-
-
-def safe_get_attribute(obj: Any, attr: str, default: Any = None) -> Any:
-    """Récupération sécurisée d'attributs avec validation de type"""
-    try:
-        if obj is None:
-            return default
-
-        if isinstance(obj, dict):
-            return obj.get(attr, default)
-        elif hasattr(obj, attr):
-            return getattr(obj, attr, default)
-        else:
-            return default
-    except Exception as e:
-        logger.debug(f"Erreur récupération attribut {attr}: {e}")
-        return default
-
-
-def safe_dict_get(obj: Any, key: str, default: Any = None) -> Any:
-    """Version sécurisée de dict.get() qui évite les erreurs sur les strings"""
-    try:
-        if isinstance(obj, dict):
-            return obj.get(key, default)
-        else:
-            logger.debug(
-                f"Tentative d'appel .get() sur type {type(obj)}: {str(obj)[:100]}"
-            )
-            return default
-    except Exception as e:
-        logger.debug(f"Erreur safe_dict_get pour {key}: {e}")
-        return default
-
-
-def sse_event(obj: Dict[str, Any]) -> bytes:
-    """Formatage SSE avec gestion d'erreurs robuste"""
-    try:
-        safe_obj = safe_serialize_for_json(obj)
-        data = json.dumps(safe_obj, ensure_ascii=False)
-        return f"data: {data}\n\n".encode("utf-8")
-    except Exception as e:
-        logger.error(f"Erreur formatage SSE: {e}")
-        error_obj = {"type": "error", "message": "Erreur formatage données"}
-        data = json.dumps(error_obj, ensure_ascii=False)
-        return f"data: {data}\n\n".encode("utf-8")
-
-
-def smart_chunk_text(text: str, max_chunk_size: int = None) -> list:
-    """Découpe intelligente du texte avec validation"""
-    if not isinstance(text, str):
-        return []
-
-    max_chunk_size = max_chunk_size or int(os.getenv("STREAM_CHUNK_LEN", "400"))
-    if not text or len(text) <= max_chunk_size:
-        return [text] if text else []
-
-    try:
-        chunks = []
-        remaining_text = text
-
-        while remaining_text:
-            if len(remaining_text) <= max_chunk_size:
-                chunks.append(remaining_text)
-                break
-
-            # Recherche de points de coupure optimaux
-            cut_point = max_chunk_size
-
-            # Préférer les points après ponctuation
-            for i in range(max_chunk_size, max(max_chunk_size // 2, 0), -1):
-                if i < len(remaining_text) and remaining_text[i] in ".!?:":
-                    cut_point = i + 1
-                    break
-
-            # Sinon, couper sur un espace
-            if cut_point == max_chunk_size:
-                for i in range(max_chunk_size, max(max_chunk_size // 2, 0), -1):
-                    if i < len(remaining_text) and remaining_text[i] == " ":
-                        cut_point = i
-                        break
-
-            chunks.append(remaining_text[:cut_point])
-            remaining_text = remaining_text[cut_point:].lstrip()
-
-        return chunks
-
-    except Exception as e:
-        logger.error(f"Erreur découpe texte: {e}")
-        return [text[:max_chunk_size]] if text else []
-
-
-def get_out_of_domain_message(lang: Optional[str] = None) -> str:
-    """Messages out of domain multilingue"""
-    OUT_OF_DOMAIN_MESSAGES = {
-        "fr": "Désolé, cette question sort du domaine avicole. Pose-moi une question sur l'aviculture, l'élevage de volailles, la nutrition, la santé des oiseaux, ou les performances.",
-        "en": "Sorry, this question is outside the poultry domain. Ask me about poultry farming, bird nutrition, health, or performance.",
-        "es": "Lo siento, esta pregunta está fuera del dominio avícola. Pregúntame sobre avicultura, nutrición, salud o rendimiento de aves.",
-        "default": "Questions outside poultry domain not supported. Ask about poultry farming, nutrition, health, or performance.",
-    }
-
-    code = (lang or "").lower()
-    msg = OUT_OF_DOMAIN_MESSAGES.get(code)
-    if msg:
-        return msg
-
-    short = code.split("-")[0]
-    return OUT_OF_DOMAIN_MESSAGES.get(
-        short,
-        OUT_OF_DOMAIN_MESSAGES.get(
-            "default", "Questions outside domain not supported."
-        ),
-    )
-
-
-def get_aviculture_response(message: str, language: str = "fr") -> str:
-    """Génère une réponse aviculture basique si le RAG échoue"""
-
-    message_lower = message.lower()
-
-    # Réponses par sujet aviculture
-    if any(term in message_lower for term in ["fcr", "conversion", "indice"]):
-        if language == "fr":
-            return """L'indice de conversion alimentaire (FCR) optimal varie selon l'âge et la souche :
-
-- **Poulets de chair Ross 308** :
-  - 0-21 jours : FCR cible 1.2-1.3
-  - 22-35 jours : FCR cible 1.4-1.6  
-  - 36-42 jours : FCR cible 1.7-1.9
-
-- **Facteurs influençant le FCR** :
-  - Qualité de l'aliment et formulation
-  - Température et ventilation du bâtiment
-  - Densité d'élevage
-  - Santé du troupeau
-  - Gestion de l'abreuvement
-
-Pour optimiser le FCR, surveillez la consommation quotidienne et ajustez la distribution selon les courbes de croissance standards."""
-        else:
-            return "Feed Conversion Ratio (FCR) varies by age and strain. For Ross 308 broilers: 0-21 days FCR 1.2-1.3, 22-35 days FCR 1.4-1.6, 36-42 days FCR 1.7-1.9."
-
-    elif any(
-        term in message_lower for term in ["poids", "weight", "croissance", "growth"]
-    ):
-        if language == "fr":
-            return """**Courbes de poids standard poulets de chair :**
-
-- **Ross 308 (mélange)** :
-  - 7 jours : 180-200g
-  - 14 jours : 420-450g
-  - 21 jours : 750-800g
-  - 28 jours : 1.200-1.300g
-  - 35 jours : 1.800-1.950g
-  - 42 jours : 2.400-2.600g
-
-- **Facteurs de croissance** :
-  - Nutrition adaptée par phase
-  - Température optimale (32°C démarrage, baisse progressive)
-  - Densité max 30-33 kg/m²
-  - Éclairage progressif
-  - Prophylaxie sanitaire
-
-Surveillez l'uniformité du lot (CV < 10%) et ajustez l'alimentation si écart aux standards."""
-        else:
-            return "Standard broiler weight curves: Ross 308 - 7d: 180-200g, 14d: 420-450g, 21d: 750-800g, 28d: 1200-1300g, 35d: 1800-1950g, 42d: 2400-2600g."
-
-    elif any(
-        term in message_lower
-        for term in ["température", "temperature", "ventilation", "climat"]
-    ):
-        if language == "fr":
-            return """**Programme température poulets de chair :**
-
-- **Démarrage (0-7 jours)** : 32-34°C
-- **Croissance (8-21 jours)** : Réduction 2-3°C/semaine
-- **Finition (22-42 jours)** : 18-22°C
-
-- **Ventilation** :
-  - Minimum : 0.5 m³/h/kg vif
-  - Maximum : 3-4 m³/h/kg vif  
-  - Vitesse air max : 2.5 m/s
-
-- **Hygrométrie** : 60-70%
-
-**Points clés** :
-- Éviter les chocs thermiques
-- Ventilation progressive selon âge
-- Surveillance des zones froides/chaudes
-- Ajustement selon saison"""
-        else:
-            return "Broiler temperature program: Start 32-34°C (0-7 days), reduce 2-3°C/week, finish 18-22°C (22-42 days). Ventilation: 0.5-4 m³/h/kg, max air speed 2.5 m/s."
-
-    elif any(
-        term in message_lower for term in ["mortalité", "mortality", "santé", "health"]
-    ):
-        if language == "fr":
-            return """**Objectifs mortalité poulets de chair :**
-
-- **0-7 jours** : < 1%
-- **8-21 jours** : < 0.5%
-- **22-42 jours** : < 0.5%
-- **Total cycle** : < 2-3%
-
-**Principales causes mortalité :**
-- Ascite, syndrome de mort subite
-- Troubles locomoteurs
-- Maladies infectieuses (colibacillose, etc.)
-- Stress thermique ou nutritionnel
-
-**Prévention :**
-- Programme de démarrage rigoureux
-- Vaccination adaptée
-- Biosécurité stricte
-- Surveillance quotidienne
-- Nécropsies systématiques"""
-        else:
-            return "Broiler mortality targets: 0-7 days <1%, 8-21 days <0.5%, 22-42 days <0.5%, total <2-3%. Main causes: ascites, sudden death, locomotor issues, infections."
-
-    elif any(
-        term in message_lower
-        for term in ["alimentation", "nutrition", "aliment", "feed"]
-    ):
-        if language == "fr":
-            return """**Programme alimentaire 3 phases :**
-
-**STARTER (0-10 jours) :**
-- Protéines : 22-23%
-- Énergie : 3000-3050 kcal/kg
-- Présentation : miettes 2-3mm
-
-**CROISSANCE (11-25 jours) :**
-- Protéines : 20-21%
-- Énergie : 3100-3150 kcal/kg  
-- Présentation : granulés 3-4mm
-
-**FINITION (26-42 jours) :**
-- Protéines : 18-19%
-- Énergie : 3150-3200 kcal/kg
-- Présentation : granulés 4-5mm
-
-**Distribution :** 
-- Ad libitum avec restriction nocturne possible
-- Transition progressive entre phases (2-3 jours)"""
-        else:
-            return "3-phase feeding program: Starter (0-10d) 22-23% protein, 3000-3050 kcal/kg; Grower (11-25d) 20-21% protein, 3100-3150 kcal/kg; Finisher (26-42d) 18-19% protein, 3150-3200 kcal/kg."
-
-    else:
-        # Réponse générale aviculture
-        if language == "fr":
-            return """Je suis spécialisé dans l'aviculture et l'élevage de poulets de chair. Je peux vous aider sur :
-
-- **Performances** : FCR, poids, croissance, mortalité
-- **Nutrition** : Programmes alimentaires, formulation
-- **Environnement** : Température, ventilation, densité
-- **Santé** : Prévention, vaccination, biosécurité
-- **Technique** : Équipements, bâtiments, gestion
-
-Posez-moi une question précise sur l'un de ces domaines !"""
-        else:
-            return "I specialize in poultry farming and broiler production. I can help with: Performance (FCR, weight, growth), Nutrition (feeding programs), Environment (temperature, ventilation), Health (prevention, vaccination), and Technical management. Ask me a specific question!"
-
-
-# ============================================================================
-# FONCTIONS UTILITAIRES CORE (existantes)
-# ============================================================================
 
 
 def get_all_metrics_json(
@@ -517,47 +756,6 @@ def get_all_metrics_json(
     if extra:
         data.update(extra)
     return data
-
-
-def detect_language_enhanced(text: str, default: str = "fr") -> str:
-    """Détection de langue optimisée pour requêtes courtes et techniques"""
-    if len(text) < LANG_DETECTION_MIN_LENGTH:
-        s = f" {text.lower()} "
-
-        if any(ch in text.lower() for ch in FRENCH_CHARS):
-            return "fr"
-
-        fr = sum(1 for w in FRENCH_HINTS if w in s)
-        en = sum(1 for w in ENGLISH_HINTS if w in s)
-
-        # CORRECTION: Éviter multiples statements sur une ligne
-        if fr > en + 1:
-            return "fr"
-        if en > fr + 1:
-            return "en"
-
-        if re.search(r"\d+\s*[gj]", text.lower()):
-            return "fr"
-
-        return default
-    else:
-        try:
-            import langdetect
-
-            detected = langdetect.detect(text)
-            return detected if detected in ["fr", "en"] else default
-        # CORRECTION: Remplacer bare except par Exception
-        except Exception:
-            s = f" {text.lower()} "
-            fr = sum(1 for w in FRENCH_HINTS if w in s)
-            en = sum(1 for w in ENGLISH_HINTS if w in s)
-            if fr > en + 1:
-                return "fr"
-            if en > fr + 1:
-                return "en"
-            if any(ch in s for ch in FRENCH_CHARS):
-                return "fr"
-            return default
 
 
 def build_where_filter(intent_result) -> Dict:
@@ -620,41 +818,129 @@ def build_where_filter(intent_result) -> Dict:
         return {"operator": "And", "operands": where_conditions}
 
 
-# ============================================================================
-# DONNÉES DE TEST ET VALIDATION
-# ============================================================================
-
-COMPREHENSIVE_TEST_QUERIES = [
-    "Quel est le poids cible à 21 jours pour du Ross 308?",
-    "FCR optimal pour poulet de chair Cobb 500 à 35 jours",
-    "Consommation d'eau à 28 jours pour élevage tunnel",
-    "Température de démarrage pour poussins en tunnel",
-    "Ventilation minimale à 14 jours Ross 308",
-    "Humidité optimale phase starter",
-    "Programme de vaccination pour reproducteur",
-    "Protocole biosécurité couvoir",
-    "Densité optimale en élevage au sol",
-    "Mes poulets ont des signes respiratoires",
-    "Mortalité élevée à 10 jours que faire",
-    "Symptômes Newcastle chez reproducteurs",
-    "Coût alimentaire par kg de poids vif produit",
-    "Performance EPEF Ross 308 standard",
-    "Marge bénéficiaire par sujet abattu",
-    "Ross-308 35j FCR",
-    "C-500 poids 42 jours",
-    "Hubbard Flex vaccination",
-    "ISA Brown ponte pic",
-    "R308 démarrage température",
-    "Météo demain",  # Hors domaine
-    "Comment élever des chats",  # Hors domaine
-    "Performance globale exploitation complète multi-bâtiments",  # Complexe
-]
-
-# ============================================================================
-# FACTORY ET FONCTIONS DE VALIDATION
-# ============================================================================
+# Autres fonctions utilitaires maintenues
+def safe_serialize_for_json(obj: Any) -> Any:
+    """Convertit récursivement les objets en types JSON-safe"""
+    if obj is None:
+        return None
+    elif isinstance(obj, (str, int, float, bool)):
+        return obj
+    elif isinstance(obj, Enum):
+        return obj.value
+    elif isinstance(obj, dict):
+        return {k: safe_serialize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [safe_serialize_for_json(item) for item in obj]
+    elif hasattr(obj, "__dict__"):
+        return safe_serialize_for_json(obj.__dict__)
+    else:
+        return str(obj)
 
 
+def safe_get_attribute(obj: Any, attr: str, default: Any = None) -> Any:
+    """Récupération sécurisée d'attributs avec validation de type"""
+    try:
+        if obj is None:
+            return default
+        if isinstance(obj, dict):
+            return obj.get(attr, default)
+        elif hasattr(obj, attr):
+            return getattr(obj, attr, default)
+        else:
+            return default
+    except Exception as e:
+        logger.debug(f"Erreur récupération attribut {attr}: {e}")
+        return default
+
+
+def safe_dict_get(obj: Any, key: str, default: Any = None) -> Any:
+    """Version sécurisée de dict.get()"""
+    try:
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        else:
+            logger.debug(
+                f"Tentative d'appel .get() sur type {type(obj)}: {str(obj)[:100]}"
+            )
+            return default
+    except Exception as e:
+        logger.debug(f"Erreur safe_dict_get pour {key}: {e}")
+        return default
+
+
+def sse_event(obj: Dict[str, Any]) -> bytes:
+    """Formatage SSE avec gestion d'erreurs robuste"""
+    try:
+        safe_obj = safe_serialize_for_json(obj)
+        data = json.dumps(safe_obj, ensure_ascii=False)
+        return f"data: {data}\n\n".encode("utf-8")
+    except Exception as e:
+        logger.error(f"Erreur formatage SSE: {e}")
+        error_obj = {"type": "error", "message": "Erreur formatage données"}
+        data = json.dumps(error_obj, ensure_ascii=False)
+        return f"data: {data}\n\n".encode("utf-8")
+
+
+def smart_chunk_text(text: str, max_chunk_size: int = None) -> list:
+    """Découpe intelligente du texte avec validation"""
+    if not isinstance(text, str):
+        return []
+
+    max_chunk_size = max_chunk_size or 400
+    if not text or len(text) <= max_chunk_size:
+        return [text] if text else []
+
+    try:
+        chunks = []
+        remaining_text = text
+
+        while remaining_text:
+            if len(remaining_text) <= max_chunk_size:
+                chunks.append(remaining_text)
+                break
+
+            cut_point = max_chunk_size
+
+            # Préférer les points après ponctuation
+            for i in range(max_chunk_size, max(max_chunk_size // 2, 0), -1):
+                if i < len(remaining_text) and remaining_text[i] in ".!?:":
+                    cut_point = i + 1
+                    break
+
+            # Sinon, couper sur un espace
+            if cut_point == max_chunk_size:
+                for i in range(max_chunk_size, max(max_chunk_size // 2, 0), -1):
+                    if i < len(remaining_text) and remaining_text[i] == " ":
+                        cut_point = i
+                        break
+
+            chunks.append(remaining_text[:cut_point])
+            remaining_text = remaining_text[cut_point:].lstrip()
+
+        return chunks
+
+    except Exception as e:
+        logger.error(f"Erreur découpe texte: {e}")
+        return [text[:max_chunk_size]] if text else []
+
+
+def setup_logging(level: str = "INFO") -> None:
+    """Configure le logging pour l'application"""
+    logging.basicConfig(
+        level=getattr(logging, level.upper()),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.StreamHandler(),
+            (
+                logging.FileHandler("app.log")
+                if os.getenv("LOG_TO_FILE")
+                else logging.NullHandler()
+            ),
+        ],
+    )
+
+
+# Fonctions de processus d'intention (à maintenir pour compatibilité)
 class IntentProcessorFactory:
     """Factory robuste pour créer des processeurs d'intentions"""
 
@@ -662,7 +948,6 @@ class IntentProcessorFactory:
     def create_processor(
         intents_file_path: Optional[str] = None, validate_on_creation: bool = True
     ):
-        # CORRECTION: Utiliser string pour le type hint au lieu de forward reference
         try:
             from processing.intent_processor import IntentProcessor
         except ImportError as e:
@@ -671,42 +956,27 @@ class IntentProcessorFactory:
         if intents_file_path is None:
             base_dir = Path(__file__).parent.resolve()
             intents_file_path = base_dir.parent / "config" / "intents.json"
-            logger.info(f"Utilisation du chemin par défaut: {intents_file_path}")
 
-        try:
-            processor = IntentProcessor(str(intents_file_path))
+        processor = IntentProcessor(str(intents_file_path))
+        if validate_on_creation:
+            validation_result = processor.validate_current_config()
+            if not validation_result.is_valid:
+                raise ValueError(f"Configuration invalide: {validation_result.errors}")
 
-            if validate_on_creation:
-                validation_result = processor.validate_current_config()
-                if not validation_result.is_valid:
-                    raise ValueError(
-                        f"Configuration invalide: {validation_result.errors}"
-                    )
+        return processor
 
-            stats = processor.get_processing_stats()
-            health = stats.get("health_status", {})
 
-            if health.get("status") == "critical":
-                logger.error(
-                    f"Processeur créé mais en état critique: {health.get('reason')}"
-                )
-                raise RuntimeError(
-                    f"Processeur en état critique: {health.get('reason')}"
-                )
-
-            logger.info(
-                f"IntentProcessor créé avec succès - Statut: {health.get('status', 'unknown')}"
-            )
-            return processor
-
-        except Exception as e:
-            logger.error(f"Erreur création IntentProcessor: {e}")
-            raise RuntimeError(f"Impossible de créer IntentProcessor: {e}")
+def create_intent_processor(intents_file_path: Optional[str] = None):
+    """Factory principale pour créer un processeur d'intentions"""
+    return IntentProcessorFactory.create_processor(
+        intents_file_path, validate_on_creation=True
+    )
 
 
 def process_query_with_intents(
     processor, query: str, explain_score: Optional[float] = None, timeout: float = 5.0
 ) -> ProcessingResult:
+    """Traite une requête avec le processeur d'intentions"""
     start_time = time.time()
 
     if not processor:
@@ -716,9 +986,7 @@ def process_query_with_intents(
 
     if not query or not query.strip():
         return ProcessingResult(
-            success=False,
-            error_message="Requête vide ou invalide",
-            processing_time=0.0,
+            success=False, error_message="Requête vide ou invalide", processing_time=0.0
         )
 
     try:
@@ -782,17 +1050,8 @@ def validate_intents_config(
                 recommendations=["Vérifiez le chemin du fichier de configuration"],
             )
 
-        try:
-            with open(config_file, "r", encoding="utf-8") as f:
-                config = json.load(f)
-        except json.JSONDecodeError as e:
-            return ValidationReport(
-                is_valid=False,
-                errors=[f"Erreur JSON: {e}"],
-                warnings=[],
-                stats={},
-                recommendations=["Vérifiez la syntaxe JSON avec un validateur"],
-            )
+        with open(config_file, "r", encoding="utf-8") as f:
+            config = json.load(f)
 
         # Validation basique
         required_sections = ["aliases", "intents", "universal_slots"]
@@ -828,173 +1087,53 @@ def validate_intents_config(
         )
 
 
-# CORRECTION: Retirer le type hint problématique pour compatibilité
-def create_intent_processor(intents_file_path: Optional[str] = None):
-    """Factory principale pour créer un processeur d'intentions"""
-    return IntentProcessorFactory.create_processor(
-        intents_file_path, validate_on_creation=True
-    )
-
-
-# ============================================================================
-# SETUP ET CONFIGURATION
-# ============================================================================
-
-
-def setup_logging(level: str = "INFO") -> None:
-    """Configure le logging pour l'application"""
-    logging.basicConfig(
-        level=getattr(logging, level.upper()),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.StreamHandler(),
-            (
-                logging.FileHandler("app.log")
-                if os.getenv("LOG_TO_FILE")
-                else logging.NullHandler()
-            ),
-        ],
-    )
-
+# Données de test
+COMPREHENSIVE_TEST_QUERIES = [
+    "Quel est le poids cible à 21 jours pour du Ross 308?",
+    "FCR optimal pour poulet de chair Cobb 500 à 35 jours",
+    "What is the optimal FCR for Ross 308 at 35 days?",
+    "¿Cuál es el peso objetivo a 21 días para Ross 308?",
+    "Ross 308在35天时的最佳FCR是多少？",
+    "Ross 308 के लिए 35 दिन में अनुकूल FCR क्या है?",
+    "อัตราแปลงอาหารที่เหมาะสมสำหรับ Ross 308 อายุ 35 วันคืออะไร?",
+]
 
 # ============================================================================
 # EXPORTS
 # ============================================================================
 
-
-def safe_get_intent_attribute(intent_result, attribute_name, default_value=None):
-    """
-    Wrapper sécurisé pour accéder aux attributs d'intent_result
-    Gère les cas où intent_result est un dict ou un objet
-
-    Args:
-        intent_result: Objet IntentResult ou dictionnaire
-        attribute_name: Nom de l'attribut à récupérer
-        default_value: Valeur par défaut si non trouvé
-
-    Returns:
-        Valeur de l'attribut ou default_value
-    """
-    if not intent_result:
-        return default_value
-
-    try:
-        # Cas 1: Objet avec attributs
-        if hasattr(intent_result, attribute_name):
-            attr_value = getattr(intent_result, attribute_name)
-            # Gestion spéciale pour intent_type qui peut être un Enum
-            if attribute_name == "intent_type" and hasattr(attr_value, "value"):
-                return attr_value.value
-            return attr_value
-
-        # Cas 2: Dictionnaire
-        elif isinstance(intent_result, dict):
-            value = intent_result.get(attribute_name, default_value)
-            # Gestion spéciale pour intent_type dans dict
-            if attribute_name == "intent_type" and hasattr(value, "value"):
-                return value.value
-            return value
-
-        # Cas 3: Type inattendu
-        else:
-            logger.warning(f"Type intent_result inattendu: {type(intent_result)}")
-            return default_value
-
-    except Exception as e:
-        logger.error(f"Erreur accès attribut {attribute_name}: {e}")
-        return default_value
-
-
-def safe_get_intent_type(intent_result, default="general_poultry"):
-    """
-    Récupération sécurisée du type d'intention
-
-    Returns:
-        String du type d'intention
-    """
-    return safe_get_intent_attribute(intent_result, "intent_type", default)
-
-
-def safe_get_detected_entities(intent_result, default=None):
-    """
-    Récupération sécurisée des entités détectées
-
-    Returns:
-        Dict des entités ou dict vide
-    """
-    if default is None:
-        default = {}
-    return safe_get_intent_attribute(intent_result, "detected_entities", default)
-
-
-def safe_get_intent_confidence(intent_result, default=0.0):
-    """
-    Récupération sécurisée de la confiance de l'intention
-
-    Returns:
-        Float de la confiance
-    """
-    return safe_get_intent_attribute(intent_result, "confidence", default)
-
-
-def validate_intent_result(intent_result):
-    """
-    Valide et normalise un intent_result
-
-    Args:
-        intent_result: Objet ou dict intent_result
-
-    Returns:
-        Dict normalisé avec les champs essentiels
-    """
-    if not intent_result:
-        return {
-            "intent_type": "general_poultry",
-            "confidence": 0.0,
-            "detected_entities": {},
-            "expanded_query": "",
-            "metadata": {},
-            "is_valid": False,
-        }
-
-    return {
-        "intent_type": safe_get_intent_type(intent_result),
-        "confidence": safe_get_intent_confidence(intent_result),
-        "detected_entities": safe_get_detected_entities(intent_result),
-        "expanded_query": safe_get_intent_attribute(
-            intent_result, "expanded_query", ""
-        ),
-        "metadata": safe_get_intent_attribute(intent_result, "metadata", {}),
-        "is_valid": True,
-    }
-
-
 __all__ = [
-    # Métriques
+    # Classes de données multilingues - NOUVEAU
+    "LanguageDetectionResult",
+    "ValidationReport",
+    "ProcessingResult",
+    # Détection langue multilingue - REMPLACÉ
+    "detect_language_enhanced",
+    # Support langues - NOUVEAU
+    "is_supported_language",
+    "normalize_language_code",
+    "get_universal_translation",
+    # Messages multilingues - ÉTENDU
+    "get_out_of_domain_message",
+    "get_aviculture_response",
+    # Métriques - MAINTENU
     "METRICS",
     "MetricsCollector",
     "get_all_metrics_json",
-    # Détection langue
-    "detect_language_enhanced",
-    # Weaviate
+    # Weaviate - MAINTENU
     "build_where_filter",
-    # Intent processing
+    # Intent processing - MAINTENU
     "create_intent_processor",
     "process_query_with_intents",
     "validate_intents_config",
     "IntentProcessorFactory",
-    # Classes de données
-    "ValidationReport",
-    "ProcessingResult",
-    # Données de test
-    "COMPREHENSIVE_TEST_QUERIES",
-    # Nouvelles fonctions utilitaires
+    # Utilitaires - MAINTENU
     "safe_serialize_for_json",
     "safe_get_attribute",
     "safe_dict_get",
     "sse_event",
     "smart_chunk_text",
-    "get_out_of_domain_message",
-    "get_aviculture_response",
     "setup_logging",
+    # Données test - ÉTENDU
+    "COMPREHENSIVE_TEST_QUERIES",
 ]

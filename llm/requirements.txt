@@ -10,17 +10,32 @@ httpcore==1.0.5
 # OpenAI API - Version LTS stable
 openai==1.42.0
 
-# CORRIGÉ: Weaviate Client - Version mise à jour pour corriger les erreurs API
+# Weaviate Client - Version mise à jour pour corriger les erreurs API
 weaviate-client==4.16.10
 
 # Redis pour cache - Versions synchronisées
 redis==5.0.1
 hiredis==2.3.2
 
+# ===== NOUVEAU: SUPPORT MULTILINGUE =====
+# FastText pour détection langue (remplace langdetect)
+fasttext-langdetect>=1.0.3
+# Alternative si fasttext-langdetect indisponible:
+# fast-langdetect>=0.3.0
+
+# Google Cloud Translation API (optionnel)
+google-cloud-translate>=3.8.0
+google-auth>=2.0.0
+
+# Cache intelligent multilingue
+cachetools>=5.3.0
+
 # Intelligence métier - Versions testées
-langdetect==1.0.9
 transformers==4.45.2
 torch>=2.0.0,<2.5.0
+
+# ===== ANCIEN: Détection langue - REMPLACÉ =====
+# langdetect==1.0.9  # SUPPRIMÉ - Remplacé par fasttext-langdetect
 
 # Traitement de texte - CRITIQUE pour normalisation
 unidecode==1.3.8
@@ -29,8 +44,7 @@ unidecode==1.3.8
 sentence-transformers==3.1.1
 voyageai==0.2.3
 
-# === CORRIGÉ: LangSmith pour monitoring LLM ===
-# Mise à jour vers versions compatibles
+# LangSmith pour monitoring LLM
 langchain-core==0.1.16
 langsmith>=0.0.83,<0.1.0
 
@@ -65,7 +79,6 @@ asyncio-throttle==1.0.2
 typing-extensions>=4.8.0
 
 # ===== CONTRAINTES DE SÉCURITÉ =====
-
 # Éviter les vulnérabilités connues
 urllib3>=2.0.0,<3.0.0
 certifi>=2023.7.22
@@ -75,7 +88,6 @@ cryptography>=41.0.0
 requests>=2.31.0
 
 # ===== OPTIMISATIONS POUR DÉPLOIEMENT =====
-
 # Compression et performance
 brotli>=1.0.9
 zstandard>=0.22.0
@@ -83,24 +95,29 @@ zstandard>=0.22.0
 # Monitoring système
 psutil>=5.9.0
 
-# ===== NOTES DE COMPATIBILITÉ =====
+# ===== NOTES DE COMPATIBILITÉ MULTILINGUE =====
 
-# Weaviate 4.16.10 : CORRIGÉ - Version récente qui résout les erreurs API
-#   - Corrige les erreurs "near_vector() got an unexpected keyword argument 'vector'"
-#   - Corrige les erreurs "hybrid() got an unexpected keyword argument 'where'" 
-#   - Supporte correctement les dimensions vectorielles mixtes
-#   - API v4 complètement stabilisée
-# Redis 5.0.1 : Compatible avec toutes les fonctionnalités async
-# OpenAI 1.42.0 : API stable avec support streaming
-# Transformers 4.45.2 : Dernière version stable sans breaking changes
-# Torch <2.5.0 : Évite les incompatibilités récentes
-# Numpy <2.0.0 : Évite les breaking changes v2
-# Pydantic <3.0.0 : Reste sur v2 pour stabilité
-# LangSmith >=0.0.83,<0.1.0 : Compatible avec langchain-core 0.1.16
+# fasttext-langdetect : Remplacement de langdetect
+#   - Plus rapide et plus précis pour 13+ langues
+#   - Support Unicode natif (chinois, hindi, thaï)
+#   - Modèle pré-entraîné inclus
+#   - Compatible avec FastText officiel
+
+# google-cloud-translate 3.8.0+ : Traduction fallback
+#   - API Translation v2 et v3 supportées
+#   - Gestion automatique des credentials
+#   - Rate limiting et retry intégrés
+#   - Support batch pour optimisation coûts
+
+# cachetools 5.3.0+ : Cache intelligent traductions
+#   - LRU Cache avec TTL
+#   - Thread-safe pour production
+#   - Métriques intégrées
+#   - Support persistence Redis
 
 # ===== VARIABLES D'ENVIRONNEMENT DIGITAL OCEAN =====
 
-# À configurer dans Digital Ocean App Platform :
+# Configuration Base Digital Ocean App Platform :
 # REDIS_URL=redis://localhost:6379
 # WEAVIATE_URL=http://localhost:8080
 # OPENAI_API_KEY=your_key_here
@@ -113,15 +130,96 @@ psutil>=5.9.0
 # RRF_GENETIC_BOOST=true
 # LOG_LEVEL=INFO
 
-# ===== CHANGEMENTS PRINCIPAUX =====
+# ===== NOUVELLES VARIABLES MULTILINGUES =====
 
-# 1. weaviate-client: 4.7.1 → 4.16.10 
-#    - Résout les erreurs d'API v4 constatées dans les logs
-#    - Compatible avec le code existant dans retriever.py
-#    - Supporte les corrections runtime déjà implémentées
-#
-# 2. Cette mise à jour devrait éliminer :
-#    - ❌ near_vector() got an unexpected keyword argument 'vector'
-#    - ❌ hybrid() got an unexpected keyword argument 'where'
-#    - ❌ vector lengths don't match (meilleure gestion des dimensions)
-#    - ❌ Le mode dégradé au démarrage
+# OBLIGATOIRES pour fonctionnement multilingue:
+# UNIVERSAL_DICT_PATH=config/universal_terms.json
+# SUPPORTED_LANGUAGES=de,en,es,fr,hi,id,it,nl,pl,pt,th,zh
+# DEFAULT_LANGUAGE=fr
+# FALLBACK_LANGUAGE=en
+
+# OPTIONNELLES pour Google Translate:
+# GOOGLE_TRANSLATE_API_KEY=your_google_api_key
+# ENABLE_GOOGLE_TRANSLATE_FALLBACK=true
+# GOOGLE_APPLICATION_CREDENTIALS=path/to/service-account.json
+# TRANSLATION_CONFIDENCE_THRESHOLD=0.7
+# GOOGLE_TRANSLATE_MAX_RETRIES=3
+# GOOGLE_TRANSLATE_TIMEOUT=10
+
+# FastText et détection langue:
+# FASTTEXT_MODEL_PATH=models/lid.176.ftz
+# LANG_DETECTION_MIN_LENGTH=15
+# LANG_DETECTION_CONFIDENCE_THRESHOLD=0.8
+
+# Cache et performance multilingue:
+# TRANSLATION_CACHE_SIZE=10000
+# TRANSLATION_CACHE_TTL=86400
+# MULTILINGUAL_CACHE_ENABLED=true
+
+# Debug et monitoring multilingue:
+# TRANSLATION_DEBUG=false
+# ENABLE_TRANSLATION_METRICS=true
+
+# ===== CHANGEMENTS PRINCIPAUX VERSION MULTILINGUE =====
+
+# 1. Détection langue: langdetect → fasttext-langdetect
+#    - Plus rapide et précis pour 13+ langues  
+#    - Support Unicode natif (chinois, hindi, thaï)
+#    - Modèle léger intégré
+#    - Compatible FastText officiel
+
+# 2. Service traduction: Ajout google-cloud-translate
+#    - Fallback intelligent pour termes manquants
+#    - Cache 2-niveaux (mémoire + Redis)
+#    - Rate limiting et retry automatiques
+#    - Support batch pour optimisation coûts
+
+# 3. Cache multilingue: cachetools
+#    - LRU Cache avec TTL configurables
+#    - Thread-safe pour production
+#    - Métriques intégrées hit/miss
+#    - Persistence optionnelle Redis
+
+# 4. Architecture hybride:
+#    - Dictionnaire local (rapide, gratuit)
+#    - Google Translate (couverture complète)
+#    - Fallback progressif intelligent
+#    - Monitoring performance par langue
+
+# 5. Cette mise à jour ajoute:
+#    ✅ Support natif 13 langues
+#    ✅ Détection langue FastText
+#    ✅ Service traduction hybride
+#    ✅ Cache intelligent multilingue
+#    ✅ Monitoring traductions
+#    ✅ Fallbacks gracieux
+#    ✅ Variables environnement étendues
+
+# ===== INSTALLATION PRODUCTION =====
+
+# Option 1: Installation complète avec Google Translate
+# pip install -r requirements.txt
+
+# Option 2: Installation sans Google Translate (mode local uniquement)
+# pip install -r requirements.txt --no-deps google-cloud-translate
+# Puis définir ENABLE_GOOGLE_TRANSLATE_FALLBACK=false
+
+# Option 3: Installation Docker optimisée
+# FROM python:3.11-slim
+# COPY requirements.txt .
+# RUN pip install --no-cache-dir -r requirements.txt
+# RUN python -c "import fasttext; fasttext.load_model()" # Préchargement modèle
+
+# ===== TESTS DE VALIDATION POST-INSTALLATION =====
+
+# Test détection langue:
+# python -c "from fasttext import load_model; print('FastText OK')"
+
+# Test Google Translate (si activé):
+# python -c "from google.cloud import translate_v2; print('Google Translate OK')"
+
+# Test cache:
+# python -c "from cachetools import TTLCache; print('Cache OK')"
+
+# Test complet service traduction:
+# python -c "from utils.translation_service import create_translation_service; print('Service OK')"

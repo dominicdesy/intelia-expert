@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-config.py - Configuration centralisée avec support LangSmith et RRF Intelligent
-Optimisé pour Digital Ocean App Platform
-Version corrigée: Ajout ENTITY_CONTEXTS manquant pour le système RAG
-CORRIGÉ: Suppression du doublon ENABLE_API_DIAGNOSTICS
-CORRECTION: Ajout des constantes manquantes identifiées
+config.py - Configuration centralisée avec support multilingue
+OptimisÉ pour Digital Ocean App Platform
+Version multilingue: Support 13 langues + service traduction hybride
 """
 
 import os
@@ -21,7 +19,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 WEAVIATE_URL = os.getenv("WEAVIATE_URL", "http://localhost:8080")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
-# ===== NOUVEAU: LANGSMITH CONFIGURATION =====
+# ===== LANGSMITH CONFIGURATION =====
 LANGSMITH_ENABLED = os.getenv("LANGSMITH_ENABLED", "true").lower() == "true"
 LANGSMITH_API_KEY = os.getenv("LANGSMITH_API_KEY")
 LANGSMITH_PROJECT = os.getenv("LANGSMITH_PROJECT", "intelia-aviculture")
@@ -35,7 +33,60 @@ if LANGSMITH_ENABLED and not LANGSMITH_API_KEY:
         "LangSmith activé mais LANGSMITH_API_KEY manquante"
     )
 
-# ===== NOUVEAU: RRF INTELLIGENT CONFIGURATION =====
+# ===== NOUVEAU: CONFIGURATION MULTILINGUE =====
+# Langues supportées (13 langues ISO 639-1)
+SUPPORTED_LANGUAGES = {
+    "de",
+    "en",
+    "es",
+    "fr",
+    "hi",
+    "id",
+    "it",
+    "nl",
+    "pl",
+    "pt",
+    "th",
+    "zh",
+}
+DEFAULT_LANGUAGE = "fr"
+FALLBACK_LANGUAGE = "en"
+
+# Dictionnaire universel
+UNIVERSAL_DICT_PATH = os.getenv("UNIVERSAL_DICT_PATH", "config/universal_terms.json")
+
+# Google Translation API
+GOOGLE_TRANSLATE_API_KEY = os.getenv("GOOGLE_TRANSLATE_API_KEY")
+ENABLE_GOOGLE_TRANSLATE_FALLBACK = (
+    os.getenv("ENABLE_GOOGLE_TRANSLATE_FALLBACK", "false").lower() == "true"
+)
+TRANSLATION_CONFIDENCE_THRESHOLD = float(
+    os.getenv("TRANSLATION_CONFIDENCE_THRESHOLD", "0.7")
+)
+GOOGLE_TRANSLATE_MAX_RETRIES = int(os.getenv("GOOGLE_TRANSLATE_MAX_RETRIES", "3"))
+GOOGLE_TRANSLATE_TIMEOUT = int(os.getenv("GOOGLE_TRANSLATE_TIMEOUT", "10"))
+
+# FastText pour détection langue (remplace langdetect)
+FASTTEXT_MODEL_PATH = os.getenv("FASTTEXT_MODEL_PATH", "models/lid.176.ftz")
+LANG_DETECTION_MIN_LENGTH = int(os.getenv("LANG_DETECTION_MIN_LENGTH", "15"))
+LANG_DETECTION_CONFIDENCE_THRESHOLD = float(
+    os.getenv("LANG_DETECTION_CONFIDENCE_THRESHOLD", "0.8")
+)
+
+# Cache traductions multilingues
+TRANSLATION_CACHE_SIZE = int(os.getenv("TRANSLATION_CACHE_SIZE", "10000"))
+TRANSLATION_CACHE_TTL = int(os.getenv("TRANSLATION_CACHE_TTL", "86400"))  # 24h
+MULTILINGUAL_CACHE_ENABLED = (
+    os.getenv("MULTILINGUAL_CACHE_ENABLED", "true").lower() == "true"
+)
+
+# Debug et monitoring multilingue
+TRANSLATION_DEBUG = os.getenv("TRANSLATION_DEBUG", "false").lower() == "true"
+ENABLE_TRANSLATION_METRICS = (
+    os.getenv("ENABLE_TRANSLATION_METRICS", "true").lower() == "true"
+)
+
+# ===== RRF INTELLIGENT CONFIGURATION =====
 ENABLE_INTELLIGENT_RRF = os.getenv("ENABLE_INTELLIGENT_RRF", "false").lower() == "true"
 RRF_LEARNING_MODE = os.getenv("RRF_LEARNING_MODE", "true").lower() == "true"
 RRF_GENETIC_BOOST = os.getenv("RRF_GENETIC_BOOST", "true").lower() == "true"
@@ -83,10 +134,9 @@ OOD_STRICT_SCORE = float(os.getenv("OOD_STRICT_SCORE", "0.7"))
 ENTITY_ENRICHMENT_ENABLED = (
     os.getenv("ENTITY_ENRICHMENT_ENABLED", "true").lower() == "true"
 )
-# CORRECTION: Une seule définition de ENABLE_API_DIAGNOSTICS
 ENABLE_API_DIAGNOSTICS = os.getenv("ENABLE_API_DIAGNOSTICS", "false").lower() == "true"
 
-# ===== CONSTANTES MANQUANTES AJOUTÉES =====
+# ===== CONSTANTES SYSTÈME =====
 BASE_PATH = os.getenv("BASE_PATH", "")
 ALLOWED_ORIGINS = (
     os.getenv("ALLOWED_ORIGINS", "*").split(",")
@@ -99,7 +149,7 @@ MAX_TENANTS = int(os.getenv("MAX_TENANTS", "100"))
 STREAM_CHUNK_LEN = int(os.getenv("STREAM_CHUNK_LEN", "8"))
 ENABLE_METRICS_LOGGING = os.getenv("ENABLE_METRICS_LOGGING", "true").lower() == "true"
 
-# ===== ENTITY_CONTEXTS - CONFIGURATION MANQUANTE CRITIQUE =====
+# ===== ENTITY_CONTEXTS - CONFIGURATION CRITIQUE =====
 ENTITY_CONTEXTS = {
     "line": {
         "ross 308": "lignée à croissance rapide, optimisée pour le rendement carcasse et FCR",
@@ -151,254 +201,9 @@ ENTITY_CONTEXTS = {
     },
 }
 
-# ===== DÉTECTION DE LANGUE - VARIABLES MANQUANTES AJOUTÉES =====
-LANG_DETECTION_MIN_LENGTH = int(os.getenv("LANG_DETECTION_MIN_LENGTH", "20"))
-
-# Mots indicateurs français
-FRENCH_HINTS = [
-    "est",
-    "sont",
-    "était",
-    "sera",
-    "avec",
-    "dans",
-    "pour",
-    "que",
-    "qui",
-    "quoi",
-    "comment",
-    "pourquoi",
-    "quand",
-    "où",
-    "combien",
-    "quelle",
-    "quel",
-    "quels",
-    "quelles",
-    "celui",
-    "celle",
-    "ceux",
-    "celles",
-    "cette",
-    "ces",
-    "mon",
-    "ma",
-    "mes",
-    "ton",
-    "ta",
-    "tes",
-    "son",
-    "sa",
-    "ses",
-    "notre",
-    "nos",
-    "votre",
-    "vos",
-    "leur",
-    "leurs",
-    "le",
-    "la",
-    "les",
-    "un",
-    "une",
-    "des",
-    "du",
-    "de",
-    "au",
-    "aux",
-    "sur",
-    "sous",
-    "entre",
-    "vers",
-    "pendant",
-    "depuis",
-    "avant",
-    "après",
-    "chez",
-    "sans",
-    "très",
-    "plus",
-    "moins",
-    "aussi",
-    "encore",
-    "déjà",
-    "jamais",
-    "toujours",
-    "souvent",
-    "parfois",
-    "hier",
-    "aujourd",
-    "demain",
-    "matin",
-    "soir",
-    "nuit",
-    "jour",
-    "semaine",
-    "mois",
-    "année",
-    "temps",
-]
-
-# Mots indicateurs anglais
-ENGLISH_HINTS = [
-    "the",
-    "and",
-    "that",
-    "have",
-    "for",
-    "not",
-    "with",
-    "you",
-    "this",
-    "but",
-    "his",
-    "from",
-    "they",
-    "she",
-    "her",
-    "been",
-    "than",
-    "its",
-    "who",
-    "did",
-    "what",
-    "when",
-    "where",
-    "why",
-    "how",
-    "which",
-    "would",
-    "could",
-    "should",
-    "will",
-    "can",
-    "may",
-    "might",
-    "must",
-    "shall",
-    "about",
-    "into",
-    "through",
-    "during",
-    "before",
-    "after",
-    "above",
-    "below",
-    "between",
-    "among",
-    "under",
-    "over",
-    "very",
-    "more",
-    "most",
-    "less",
-    "much",
-    "many",
-    "some",
-    "any",
-    "all",
-    "both",
-    "each",
-    "every",
-    "other",
-    "another",
-    "such",
-    "only",
-    "own",
-    "same",
-    "few",
-    "little",
-    "long",
-    "good",
-    "new",
-    "first",
-    "last",
-    "next",
-    "old",
-    "great",
-    "small",
-    "large",
-    "right",
-    "left",
-    "high",
-    "low",
-    "here",
-    "there",
-    "now",
-    "then",
-    "today",
-    "tomorrow",
-    "yesterday",
-    "morning",
-    "evening",
-]
-
-# Caractères spéciaux français
-FRENCH_CHARS = [
-    "à",
-    "â",
-    "ä",
-    "ç",
-    "é",
-    "è",
-    "ê",
-    "ë",
-    "î",
-    "ï",
-    "ô",
-    "ö",
-    "ù",
-    "û",
-    "ü",
-    "ÿ",
-    "ñ",
-]
-
-# Mots techniques aviculture (français)
-AVICULTURE_FRENCH_TERMS = [
-    "poule",
-    "poulet",
-    "poussin",
-    "coq",
-    "volaille",
-    "ponte",
-    "œuf",
-    "œufs",
-    "alimentation",
-    "mangeoire",
-    "abreuvoir",
-    "poulailler",
-    "perchoir",
-    "pondoir",
-    "poussinière",
-    "élevage",
-    "couveuse",
-    "incubation",
-    "éclosion",
-    "vaccin",
-    "vermifuge",
-    "parasites",
-    "maladies",
-    "aviaires",
-    "stress",
-    "picage",
-    "plumage",
-    "mue",
-    "croissance",
-    "reproduction",
-    "fertilité",
-    "ponte",
-    "coquille",
-    "blanc",
-    "jaune",
-    "vitellus",
-    "albumen",
-    "chalaze",
-]
-
-# ===== DOMAINES KEYWORDS POUR OOD =====
+# ===== DOMAINES KEYWORDS POUR OOD (MULTILINGUE) =====
 DOMAIN_KEYWORDS = [
-    # Aviculture core
+    # Français - Aviculture core
     "poule",
     "poulet",
     "poussin",
@@ -407,6 +212,7 @@ DOMAIN_KEYWORDS = [
     "ponte",
     "œuf",
     "œufs",
+    # Anglais - Aviculture core
     "chicken",
     "hen",
     "rooster",
@@ -415,21 +221,20 @@ DOMAIN_KEYWORDS = [
     "egg",
     "eggs",
     "laying",
-    # Élevage et soins
-    "alimentation",
+    # Français - Équipements
     "mangeoire",
     "abreuvoir",
     "poulailler",
     "perchoir",
     "pondoir",
-    "feeding",
+    # Anglais - Équipements
     "feeder",
     "waterer",
     "coop",
     "roost",
     "nest",
     "housing",
-    # Santé et maladies
+    # Français - Santé
     "maladie",
     "vaccin",
     "vermifuge",
@@ -437,6 +242,7 @@ DOMAIN_KEYWORDS = [
     "stress",
     "picage",
     "plumage",
+    # Anglais - Santé
     "disease",
     "vaccine",
     "dewormer",
@@ -444,20 +250,17 @@ DOMAIN_KEYWORDS = [
     "stress",
     "pecking",
     "feather",
-    # Production
-    "ponte",
+    # Français - Production
     "production",
-    "œufs",
     "incubation",
     "éclosion",
     "couveuse",
-    "laying",
+    # Anglais - Production
     "production",
-    "eggs",
     "incubation",
     "hatching",
     "incubator",
-    # Nutrition
+    # Français - Nutrition
     "protéine",
     "calcium",
     "grain",
@@ -465,6 +268,7 @@ DOMAIN_KEYWORDS = [
     "blé",
     "soja",
     "vitamines",
+    # Anglais - Nutrition
     "protein",
     "calcium",
     "grain",
@@ -484,18 +288,15 @@ ENABLE_PERFORMANCE_MONITORING = (
 METRICS_EXPORT_INTERVAL = int(os.getenv("METRICS_EXPORT_INTERVAL", "60"))
 
 # ===== DIGITAL OCEAN SPECIFIC =====
-# Ces variables sont automatiquement disponibles sur DO App Platform
 DO_APP_NAME = os.getenv("DO_APP_NAME", "intelia-expert")
 DO_APP_TIER = os.getenv("DO_APP_TIER", "basic")
 
 # Configuration dynamique selon l'environnement DO
 if DO_APP_TIER == "professional":
-    # Configuration optimisée pour tier professionnel
     RAG_SIMILARITY_TOP_K = 20
     RRF_CACHE_SIZE = 2000
     ENABLE_INTELLIGENT_RRF = True
 elif DO_APP_TIER == "basic":
-    # Configuration conservatrice pour tier basic
     RAG_SIMILARITY_TOP_K = 12
     RRF_CACHE_SIZE = 500
     ENABLE_INTELLIGENT_RRF = False
@@ -513,6 +314,13 @@ def validate_config() -> tuple[bool, list[str]]:
     if LANGSMITH_ENABLED and not LANGSMITH_API_KEY:
         errors.append("LangSmith activé mais LANGSMITH_API_KEY manquante")
 
+    # Validation multilingue
+    if ENABLE_GOOGLE_TRANSLATE_FALLBACK and not GOOGLE_TRANSLATE_API_KEY:
+        errors.append("Google Translate activé mais GOOGLE_TRANSLATE_API_KEY manquante")
+
+    if not UNIVERSAL_DICT_PATH:
+        errors.append("UNIVERSAL_DICT_PATH manquant")
+
     # Validation valeurs numériques
     if RAG_SIMILARITY_TOP_K <= 0:
         errors.append("RAG_SIMILARITY_TOP_K doit être > 0")
@@ -526,11 +334,34 @@ def validate_config() -> tuple[bool, list[str]]:
     if not (0.0 <= SEMANTIC_CACHE_SIMILARITY_THRESHOLD <= 1.0):
         errors.append("SEMANTIC_CACHE_SIMILARITY_THRESHOLD doit être entre 0.0 et 1.0")
 
-    # Validation guardrails - CORRECTION PRINCIPALE
+    if not (0.0 <= TRANSLATION_CONFIDENCE_THRESHOLD <= 1.0):
+        errors.append("TRANSLATION_CONFIDENCE_THRESHOLD doit être entre 0.0 et 1.0")
+
+    if not (0.0 <= LANG_DETECTION_CONFIDENCE_THRESHOLD <= 1.0):
+        errors.append("LANG_DETECTION_CONFIDENCE_THRESHOLD doit être entre 0.0 et 1.0")
+
+    # Validation guardrails
     if GUARDRAILS_LEVEL not in ["strict", "moderate", "permissive"]:
         errors.append("GUARDRAILS_LEVEL doit être: strict, moderate, ou permissive")
 
     return len(errors) == 0, errors
+
+
+def validate_language_code(lang_code: str) -> bool:
+    """Valide qu'un code langue est supporté"""
+    return lang_code in SUPPORTED_LANGUAGES
+
+
+def get_supported_languages_info() -> dict:
+    """Retourne les informations sur les langues supportées"""
+    return {
+        "count": len(SUPPORTED_LANGUAGES),
+        "languages": list(SUPPORTED_LANGUAGES),
+        "default": DEFAULT_LANGUAGE,
+        "fallback": FALLBACK_LANGUAGE,
+        "google_translate_enabled": ENABLE_GOOGLE_TRANSLATE_FALLBACK,
+        "fasttext_enabled": bool(FASTTEXT_MODEL_PATH),
+    }
 
 
 # ===== STATUS REPORTING =====
@@ -546,6 +377,25 @@ def get_config_status() -> dict:
             "configured": bool(LANGSMITH_API_KEY),
             "project": LANGSMITH_PROJECT,
         },
+        "multilingual": {
+            "enabled": True,
+            "supported_languages": list(SUPPORTED_LANGUAGES),
+            "google_translate": {
+                "enabled": ENABLE_GOOGLE_TRANSLATE_FALLBACK,
+                "configured": bool(GOOGLE_TRANSLATE_API_KEY),
+                "confidence_threshold": TRANSLATION_CONFIDENCE_THRESHOLD,
+            },
+            "fasttext": {
+                "model_path": FASTTEXT_MODEL_PATH,
+                "min_length": LANG_DETECTION_MIN_LENGTH,
+                "confidence_threshold": LANG_DETECTION_CONFIDENCE_THRESHOLD,
+            },
+            "cache": {
+                "enabled": MULTILINGUAL_CACHE_ENABLED,
+                "size": TRANSLATION_CACHE_SIZE,
+                "ttl_hours": TRANSLATION_CACHE_TTL // 3600,
+            },
+        },
         "rrf_intelligent": {
             "enabled": ENABLE_INTELLIGENT_RRF,
             "learning_mode": RRF_LEARNING_MODE,
@@ -558,13 +408,6 @@ def get_config_status() -> dict:
             "phases_count": len(ENTITY_CONTEXTS["phase"]),
             "site_types_count": len(ENTITY_CONTEXTS["site_type"]),
             "environments_count": len(ENTITY_CONTEXTS["environment"]),
-        },
-        "language_detection": {
-            "min_length": LANG_DETECTION_MIN_LENGTH,
-            "french_hints_count": len(FRENCH_HINTS),
-            "english_hints_count": len(ENGLISH_HINTS),
-            "french_chars_count": len(FRENCH_CHARS),
-            "aviculture_terms_count": len(AVICULTURE_FRENCH_TERMS),
         },
         "environment": {
             "do_app_name": DO_APP_NAME,
@@ -590,6 +433,24 @@ __all__ = [
     "LANGSMITH_API_KEY",
     "LANGSMITH_PROJECT",
     "LANGSMITH_ENVIRONMENT",
+    # Multilingue - NOUVEAU
+    "SUPPORTED_LANGUAGES",
+    "DEFAULT_LANGUAGE",
+    "FALLBACK_LANGUAGE",
+    "UNIVERSAL_DICT_PATH",
+    "GOOGLE_TRANSLATE_API_KEY",
+    "ENABLE_GOOGLE_TRANSLATE_FALLBACK",
+    "TRANSLATION_CONFIDENCE_THRESHOLD",
+    "GOOGLE_TRANSLATE_MAX_RETRIES",
+    "GOOGLE_TRANSLATE_TIMEOUT",
+    "FASTTEXT_MODEL_PATH",
+    "LANG_DETECTION_MIN_LENGTH",
+    "LANG_DETECTION_CONFIDENCE_THRESHOLD",
+    "TRANSLATION_CACHE_SIZE",
+    "TRANSLATION_CACHE_TTL",
+    "MULTILINGUAL_CACHE_ENABLED",
+    "TRANSLATION_DEBUG",
+    "ENABLE_TRANSLATION_METRICS",
     # RRF Intelligent
     "ENABLE_INTELLIGENT_RRF",
     "RRF_LEARNING_MODE",
@@ -619,7 +480,7 @@ __all__ = [
     # Features
     "ENTITY_ENRICHMENT_ENABLED",
     "ENABLE_API_DIAGNOSTICS",
-    # CONSTANTES MANQUANTES AJOUTÉES
+    # Constantes système
     "BASE_PATH",
     "ALLOWED_ORIGINS",
     "STARTUP_TIMEOUT",
@@ -627,14 +488,9 @@ __all__ = [
     "MAX_TENANTS",
     "STREAM_CHUNK_LEN",
     "ENABLE_METRICS_LOGGING",
-    # ENTITY_CONTEXTS - AJOUT CRITIQUE
+    # Entity contexts
     "ENTITY_CONTEXTS",
-    # Language Detection
-    "LANG_DETECTION_MIN_LENGTH",
-    "FRENCH_HINTS",
-    "ENGLISH_HINTS",
-    "FRENCH_CHARS",
-    "AVICULTURE_FRENCH_TERMS",
+    # Domain keywords
     "DOMAIN_KEYWORDS",
     # Performance
     "ENABLE_PERFORMANCE_MONITORING",
@@ -645,4 +501,6 @@ __all__ = [
     # Fonctions
     "validate_config",
     "get_config_status",
+    "validate_language_code",
+    "get_supported_languages_info",
 ]

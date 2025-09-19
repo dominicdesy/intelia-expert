@@ -1,0 +1,2605 @@
+{
+  "metadata": {
+    "version": "2.1.0",
+    "source": "intents.json + questions_analysis + manual_validation + domain_extension + corrections + equipment_health_management",
+    "created": "2024",
+    "languages": ["de", "en", "es", "fr", "hi", "id", "it", "nl", "pl", "pt", "th", "zh"],
+    "total_terms": 365,
+    "confidence_threshold": 0.7,
+    "description": "Dictionnaire multilingue étendu pour classification avicole professionnelle - Version complète avec équipements et pathologies"
+  },
+
+  "equipment_types": {
+    "chain_feeder": {
+      "canonical": "chain_feeder",
+      "domain": "equipment",
+      "confidence": 0.94,
+      "unit": "",
+      "category": "feeding_equipment",
+      "translations": {
+        "fr": ["mangeoire chaîne", "chaîne d'alimentation", "distributeur chaîne", "feedchain"],
+        "en": ["chain feeder", "feeding chain", "chain feeding system", "feedchain"],
+        "es": ["comedero cadena", "cadena alimentación", "sistema cadena"],
+        "de": ["kettenfütterung", "futterkette", "kettenanlage"],
+        "it": ["mangiatoia catena", "catena alimentazione", "sistema catena"],
+        "pt": ["comedouro corrente", "corrente alimentação", "sistema corrente"],
+        "nl": ["kettengoot", "voederketting", "kettensysteem"],
+        "pl": ["karmnik łańcuchowy", "łańcuch paszowy", "system łańcuchowy"],
+        "hi": ["चेन फीडर", "श्रृंखला आहार", "चेन सिस्टम"],
+        "zh": ["链式料线", "输料链", "链式喂料系统"],
+        "th": ["ระบบให้อาหารแบบโซ่", "โซ่อาหาร", "เครื่องป้อนโซ่"],
+        "id": ["feeder rantai", "sistem rantai pakan", "rantai makanan"]
+      }
+    },
+
+    "pan_feeder": {
+      "canonical": "pan_feeder",
+      "domain": "equipment",
+      "confidence": 0.93,
+      "unit": "",
+      "category": "feeding_equipment",
+      "translations": {
+        "fr": ["mangeoire assiette", "assiette d'alimentation", "plateau repas"],
+        "en": ["pan feeder", "feeding pan", "feed pan", "circular feeder"],
+        "es": ["comedero plato", "bandeja alimentación", "plato circular"],
+        "de": ["tellerfütterung", "futterteller", "rundteller"],
+        "it": ["mangiatoia piatto", "piatto alimentazione", "mangiatoia circolare"],
+        "pt": ["comedouro prato", "bandeja alimentação", "prato circular"],
+        "nl": ["panvoeder", "voederpan", "ronde voeder"],
+        "pl": ["karmnik talerzowy", "talerz paszowy", "okrągły karmnik"],
+        "hi": ["पैन फीडर", "प्लेट आहार", "गोल भोजन"],
+        "zh": ["盘式料槽", "圆盘喂料器", "料盘"],
+        "th": ["ถาดอาหาร", "จานอาหาร", "ถาดป้อนอาหาร"],
+        "id": ["feeder piring", "panci pakan", "piring makanan"]
+      }
+    },
+
+    "tube_feeder": {
+      "canonical": "tube_feeder",
+      "domain": "equipment",
+      "confidence": 0.92,
+      "unit": "",
+      "category": "feeding_equipment",
+      "translations": {
+        "fr": ["mangeoire tube", "tube d'alimentation", "distributeur tubulaire"],
+        "en": ["tube feeder", "feeding tube", "tubular feeder"],
+        "es": ["comedero tubo", "tubo alimentación", "alimentador tubular"],
+        "de": ["rohrfütterung", "futterrohr", "rohrsystem"],
+        "it": ["mangiatoia tubo", "tubo alimentazione", "alimentatore tubolare"],
+        "pt": ["comedouro tubo", "tubo alimentação", "alimentador tubular"],
+        "nl": ["buisvoeder", "voederbuis", "buissysteem"],
+        "pl": ["karmnik rurowy", "rura paszowa", "system rurowy"],
+        "hi": ["ट्यूब फीडर", "नली आहार", "ट्यूबलर फीडर"],
+        "zh": ["管式喂料器", "料管", "管式料槽"],
+        "th": ["ท่ออาหาร", "หลอดป้อนอาหาร", "ระบบท่อ"],
+        "id": ["feeder tabung", "pipa pakan", "sistem tabung"]
+      }
+    },
+
+    "bell_drinker": {
+      "canonical": "bell_drinker",
+      "domain": "equipment",
+      "confidence": 0.94,
+      "unit": "",
+      "category": "drinking_equipment",
+      "translations": {
+        "fr": ["abreuvoir cloche", "cloche d'eau", "abreuvoir suspendu"],
+        "en": ["bell drinker", "bell waterer", "suspended drinker"],
+        "es": ["bebedero campana", "campana agua", "bebedero colgante"],
+        "de": ["glockentrÄnke", "hängetrÄnke", "rundtrÄnke"],
+        "it": ["abbeveratoio campana", "campana acqua", "abbeveratoio sospeso"],
+        "pt": ["bebedouro sino", "sino água", "bebedouro suspenso"],
+        "nl": ["klokdrinker", "hangende drinker", "ronde drinker"],
+        "pl": ["pojnik dzwonowy", "dzwon pojny", "pojnik wiszący"],
+        "hi": ["बेल ड्रिंकर", "घंटी पानी", "लटकने वाला पानी"],
+        "zh": ["钟式饮水器", "吊钟饮水器", "悬挂式饮水器"],
+        "th": ["ที่ดื่มแบบระฆัง", "ระฆังน้ำ", "ที่ดื่มแขวน"],
+        "id": ["minum bell", "lonceng air", "tempat minum gantung"]
+      }
+    },
+
+    "cup_drinker": {
+      "canonical": "cup_drinker",
+      "domain": "equipment",
+      "confidence": 0.92,
+      "unit": "",
+      "category": "drinking_equipment",
+      "translations": {
+        "fr": ["abreuvoir coupelle", "coupelle d'eau", "abreuvoir tasse"],
+        "en": ["cup drinker", "drinking cup", "water cup"],
+        "es": ["bebedero copa", "copa agua", "taza agua"],
+        "de": ["schalentrÄnke", "wasserbecher", "trinkschale"],
+        "it": ["abbeveratoio tazza", "tazza acqua", "coppetta acqua"],
+        "pt": ["bebedouro copo", "copo água", "taça água"],
+        "nl": ["komdrinkbak", "waterkom", "drinkkom"],
+        "pl": ["pojnik kubkowy", "kubek pojny", "miseczka na wodę"],
+        "hi": ["कप ड्रिंकर", "पानी का कप", "पेय कप"],
+        "zh": ["杯式饮水器", "水杯", "饮水杯"],
+        "th": ["ถ้วยดื่ม", "ถ้วยน้ำ", "ที่ดื่มแบบถ้วย"],
+        "id": ["minum cangkir", "cangkir air", "gelas minum"]
+      }
+    },
+
+    "tunnel_ventilation": {
+      "canonical": "tunnel_ventilation",
+      "domain": "equipment",
+      "confidence": 0.95,
+      "unit": "",
+      "category": "ventilation_system",
+      "translations": {
+        "fr": ["ventilation tunnel", "effet tunnel", "ventilation longitudinale"],
+        "en": ["tunnel ventilation", "tunnel effect", "longitudinal ventilation"],
+        "es": ["ventilación túnel", "efecto túnel", "ventilación longitudinal"],
+        "de": ["tunnellüftung", "tunneleffekt", "längslüftung"],
+        "it": ["ventilazione tunnel", "effetto tunnel", "ventilazione longitudinale"],
+        "pt": ["ventilação túnel", "efeito túnel", "ventilação longitudinal"],
+        "nl": ["tunnelventilatie", "tunneleffect", "langsventilatie"],
+        "pl": ["wentylacja tunelowa", "efekt tunelu", "wentylacja podłużna"],
+        "hi": ["टनल वेंटिलेशन", "टनल प्रभाव", "अनुदैर्ध्य वेंटिलेशन"],
+        "zh": ["隧道通风", "纵向通风", "隧道效应"],
+        "th": ["ระบายอากาศแบบอุโมงค์", "เอฟเฟกต์อุโมงค์"],
+        "id": ["ventilasi terowongan", "efek terowongan", "ventilasi memanjang"]
+      }
+    },
+
+    "cross_ventilation": {
+      "canonical": "cross_ventilation",
+      "domain": "equipment",
+      "confidence": 0.94,
+      "unit": "",
+      "category": "ventilation_system",
+      "translations": {
+        "fr": ["ventilation transversale", "ventilation croisée", "flux croisé"],
+        "en": ["cross ventilation", "transverse ventilation", "cross flow"],
+        "es": ["ventilación cruzada", "ventilación transversal", "flujo cruzado"],
+        "de": ["querlüftung", "querventilation", "kreuzlüftung"],
+        "it": ["ventilazione trasversale", "ventilazione incrociata", "flusso incrociato"],
+        "pt": ["ventilação cruzada", "ventilação transversal", "fluxo cruzado"],
+        "nl": ["dwarsventilatie", "kruisventilatie", "dwarse luchtstroom"],
+        "pl": ["wentylacja poprzeczna", "wentylacja krzyżowa", "przepływ poprzeczny"],
+        "hi": ["क्रॉस वेंटिलेशन", "अनुप्रस्थ वेंटिलेशन", "पार प्रवाह"],
+        "zh": ["横向通风", "交叉通风", "侧向通风"],
+        "th": ["ระบายอากาศแบบไขว้", "การไหลเวียนไขว้"],
+        "id": ["ventilasi silang", "ventilasi melintang", "aliran silang"]
+      }
+    },
+
+    "radiant_heaters": {
+      "canonical": "radiant_heaters",
+      "domain": "equipment",
+      "confidence": 0.93,
+      "unit": "",
+      "category": "heating_system",
+      "translations": {
+        "fr": ["radiateurs radiants", "chauffage radiant", "tubes radiants", "radiant"],
+        "en": ["radiant heaters", "radiant heating", "radiant tubes", "infrared heaters"],
+        "es": ["calentadores radiantes", "calefacción radiante", "tubos radiantes"],
+        "de": ["strahlungsheizung", "infrarotstrahler", "wärmestrahler"],
+        "it": ["riscaldatori radianti", "riscaldamento radiante", "tubi radianti"],
+        "pt": ["aquecedores radiantes", "aquecimento radiante", "tubos radiantes"],
+        "nl": ["stralingsverwaming", "radiantverwarming", "warmtestraling"],
+        "pl": ["grzejniki promieniowe", "ogrzewanie promieniowe", "rury promieniowe"],
+        "hi": ["रेडिएंट हीटर", "विकिरण तापन", "रेडिएंट ट्यूब"],
+        "zh": ["辐射加热器", "红外线加热", "辐射管"],
+        "th": ["เครื่องทำความร้อนแบบแผ่รังสี", "การให้ความร้อนแผ่รังสี"],
+        "id": ["pemanas radiasi", "pemanasan radiant", "tabung radiant"]
+      }
+    },
+
+    "hot_air_blowers": {
+      "canonical": "hot_air_blowers",
+      "domain": "equipment",
+      "confidence": 0.92,
+      "unit": "",
+      "category": "heating_system",
+      "translations": {
+        "fr": ["souffleurs air chaud", "ventilateurs chauffants", "pulsé air chaud"],
+        "en": ["hot air blowers", "forced air heaters", "warm air blowers"],
+        "es": ["sopladores aire caliente", "calentadores aire forzado"],
+        "de": ["heißluftgebläse", "warmluftgebläse", "luftheizer"],
+        "it": ["soffiatori aria calda", "riscaldatori aria forzata"],
+        "pt": ["sopradores ar quente", "aquecedores ar forçado"],
+        "nl": ["heteluchtblazer", "warmluchtventilator", "luchtverwarmer"],
+        "pl": ["dmuchawy gorącego powietrza", "nagrzewnice powietrza"],
+        "hi": ["गर्म हवा ब्लोअर", "हॉट एयर ब्लोअर", "गर्म वायु पंखा"],
+        "zh": ["热风机", "暖风机", "热空气吹风机"],
+        "th": ["เครื่องเป่าลมร้อน", "พัดลมอบอุ่น"],
+        "id": ["blower udara panas", "kipas udara hangat", "pemanas udara"]
+      }
+    }
+  },
+
+  "substrate_materials": {
+    "litter": {
+      "canonical": "litter",
+      "domain": "management",
+      "confidence": 0.96,
+      "unit": "",
+      "category": "substrate",
+      "translations": {
+        "fr": ["litière", "paillis", "substrat sol", "couverture sol"],
+        "en": ["litter", "bedding", "floor covering", "substrate"],
+        "es": ["cama", "yacija", "sustrato suelo", "material cama"],
+        "de": ["einstreu", "bodenmaterial", "stroh", "unterlage"],
+        "it": ["lettiera", "lettiere", "substrato", "materiale lettiera"],
+        "pt": ["cama", "substrato", "material cama", "cobertura solo"],
+        "nl": ["strooisel", "bodembedekking", "onderlaag"],
+        "pl": ["ściółka", "podściółka", "materiał podłogowy"],
+        "hi": ["कूड़ा", "बिछावन", "फर्श सामग्री", "आधार सामग्री"],
+        "zh": ["垫料", "垫草", "铺垫材料", "地面垫料"],
+        "th": ["เศษวัสดุรองพื้น", "วัสดุปูพื้น", "ขี้ฟาง"],
+        "id": ["sekam", "alas kandang", "bahan alas", "substrat"]
+      }
+    },
+
+    "wood_shavings": {
+      "canonical": "wood_shavings",
+      "domain": "management",
+      "confidence": 0.94,
+      "unit": "",
+      "category": "substrate",
+      "translations": {
+        "fr": ["copeaux bois", "copeaux", "sciure", "rognures bois"],
+        "en": ["wood shavings", "shavings", "wood chips", "sawdust"],
+        "es": ["virutas madera", "virutas", "aserrín", "viruta"],
+        "de": ["holzspäne", "sägespäne", "hobelspäne"],
+        "it": ["trucioli legno", "trucioli", "segatura"],
+        "pt": ["aparas madeira", "serragem", "aparas"],
+        "nl": ["houtkrullen", "schaafsel", "zaagsel"],
+        "pl": ["wióry drzewne", "trociny", "wiórki"],
+        "hi": ["लकड़ी के चिप्स", "लकड़ी का बुरादा", "काष्ठ चूर्ण"],
+        "zh": ["木屑", "刨花", "锯末", "木削"],
+        "th": ["เศษไม้", "ขี้กบ", "ขี้เลื่อย"],
+        "id": ["serutan kayu", "serbuk gergaji", "serpihan kayu"]
+      }
+    },
+
+    "rice_husks": {
+      "canonical": "rice_husks",
+      "domain": "management",
+      "confidence": 0.93,
+      "unit": "",
+      "category": "substrate",
+      "translations": {
+        "fr": ["balle de riz", "coques de riz", "enveloppes de riz"],
+        "en": ["rice husks", "rice hulls", "paddy husks", "rice chaff"],
+        "es": ["cáscara arroz", "cascarilla arroz", "cascabillo"],
+        "de": ["reisschalen", "reishülsen", "reisspelzen"],
+        "it": ["pula di riso", "lolla di riso", "bucce riso"],
+        "pt": ["casca arroz", "palha arroz", "cascas de arroz"],
+        "nl": ["rijstdoppen", "rijstkaf", "rijstschillen"],
+        "pl": ["łuski ryżowe", "plewy ryżowe", "otręby ryżowe"],
+        "hi": ["चावल की भूसी", "धान की भूसी", "चावल का छिलका"],
+        "zh": ["稻壳", "谷壳", "米糠壳"],
+        "th": ["แกลบ", "เปลือกข้าว", "ขี้แกลบ"],
+        "id": ["sekam padi", "kulit padi", "dedak padi"]
+      }
+    },
+
+    "straw": {
+      "canonical": "straw",
+      "domain": "management",
+      "confidence": 0.92,
+      "unit": "",
+      "category": "substrate",
+      "translations": {
+        "fr": ["paille", "paillis", "tiges sèches"],
+        "en": ["straw", "wheat straw", "barley straw", "oat straw"],
+        "es": ["paja", "paja trigo", "paja cebada"],
+        "de": ["stroh", "weizenstroh", "gerstenstroh"],
+        "it": ["paglia", "paglia grano", "paglia orzo"],
+        "pt": ["palha", "palha trigo", "palha cevada"],
+        "nl": ["stro", "tarwestro", "gerstestro"],
+        "pl": ["słoma", "słoma pszenna", "słoma jęczmienna"],
+        "hi": ["पुआल", "गेहूं का पुआल", "जौ का पुआल"],
+        "zh": ["稻草", "麦秸", "大麦秸"],
+        "th": ["ฟาง", "ฟางข้าวสาลี", "ฟางข้าวโพด"],
+        "id": ["jerami", "jerami gandum", "jerami padi"]
+      }
+    }
+  },
+
+  "additional_pathologies": {
+    "avian_influenza": {
+      "canonical": "avian_influenza",
+      "domain": "pathology",
+      "confidence": 0.98,
+      "category": "viral_disease",
+      "translations": {
+        "fr": ["grippe aviaire", "influenza aviaire", "h5n1", "h7n9", "ia"],
+        "en": ["avian influenza", "bird flu", "ai", "h5n1", "h7n9", "fowl plague"],
+        "es": ["gripe aviar", "influenza aviar", "peste aviar", "h5n1"],
+        "de": ["geflügelpest", "vogelgrippe", "aviäre influenza", "h5n1"],
+        "it": ["influenza aviaria", "peste aviaria", "h5n1", "ia"],
+        "pt": ["gripe aviária", "influenza aviária", "peste aviária", "h5n1"],
+        "nl": ["vogelgriep", "aviaire influenza", "h5n1", "ai"],
+        "pl": ["grypa ptaków", "grypa drobiu", "h5n1", "ptasia grypa"],
+        "hi": ["एवियन इन्फ्लूएंजा", "बर्ड फ्लू", "पक्षी फ्लू", "एच5एन1"],
+        "zh": ["禽流感", "鸟流感", "H5N1", "AI", "禽瘟"],
+        "th": ["โรคไข้หวัดนก", "อินฟลูเอนซ่าในสัตว์ปีก", "เอช5เอ็น1"],
+        "id": ["flu burung", "avian influenza", "h5n1", "ai"]
+      }
+    },
+
+    "mareks_disease": {
+      "canonical": "mareks_disease",
+      "domain": "pathology",
+      "confidence": 0.95,
+      "category": "viral_disease",
+      "translations": {
+        "fr": ["maladie de marek", "marek", "paralysie marek", "tumeurs lymphoïdes"],
+        "en": ["mareks disease", "marek disease", "md", "lymphoid tumors", "range paralysis"],
+        "es": ["enfermedad marek", "marek", "parálisis marek", "tumores linfoides"],
+        "de": ["marek-krankheit", "marek", "lymphome", "lähmung"],
+        "it": ["malattia marek", "marek", "linfomi", "paralisi"],
+        "pt": ["doença marek", "marek", "linfomas", "paralisia"],
+        "nl": ["marek ziekte", "marek", "lymfomen", "verlamming"],
+        "pl": ["choroba mareka", "marek", "chłoniaki", "paraliż"],
+        "hi": ["मारेक रोग", "मारेक", "लसीकिका ट्यूमर", "पक्षाघात"],
+        "zh": ["马立克氏病", "马立克病", "淋巴瘤", "麻痹"],
+        "th": ["โรคมาเร็ค", "มาเร็ค", "เนื้องอกต่อมน้ำเหลือง"],
+        "id": ["penyakit marek", "marek", "tumor limfoid", "kelumpuhan"]
+      }
+    },
+
+    "lameness": {
+      "canonical": "lameness",
+      "domain": "pathology",
+      "confidence": 0.94,
+      "category": "locomotor_disorder",
+      "translations": {
+        "fr": ["boiterie", "claudication", "problème locomoteur", "trouble locomotion"],
+        "en": ["lameness", "claudication", "locomotor problems", "gait abnormality"],
+        "es": ["cojera", "claudicación", "problemas locomotores", "renguera"],
+        "de": ["lahmheit", "gangstörung", "lokomotorische störungen"],
+        "it": ["zoppia", "claudicazione", "problemi locomotori"],
+        "pt": ["claudicação", "mancamento", "problemas locomotores"],
+        "nl": ["kreupelheid", "loopstoornissen", "bewegingsproblemen"],
+        "pl": ["kulawizna", "problemy lokomotoryczne", "zaburzenia chodu"],
+        "hi": ["लंगड़ाहट", "चलने की समस्या", "गति संबंधी विकार"],
+        "zh": ["跛行", "行走困难", "运动障碍", "腿部问题"],
+        "th": ["การเดินกะเผลก", "ปัญหาการเคลื่อนไหว", "การเดินผิดปกติ"],
+        "id": ["pincang", "gangguan gerak", "masalah lokomotor"]
+      }
+    },
+
+    "pododermatitis": {
+      "canonical": "pododermatitis",
+      "domain": "pathology",
+      "confidence": 0.93,
+      "category": "skin_disorder",
+      "translations": {
+        "fr": ["dermatite plantaire", "brûlure jarret", "dermatite pattes", "fhd"],
+        "en": ["pododermatitis", "footpad dermatitis", "hock burn", "fhd", "foot burn"],
+        "es": ["pododermatitis", "dermatitis plantar", "quemadura corvejón"],
+        "de": ["ballengeschwür", "fußballendermatitis", "sprunggelenkdermatitis"],
+        "it": ["pododermatite", "dermatite plantare", "bruciatura garretto"],
+        "pt": ["pododermatite", "dermatite plantar", "queimadura jarrete"],
+        "nl": ["voetbaldermatitis", "hakbrand", "pootproblemen"],
+        "pl": ["zapalenie opuszek", "dermatoza stóp", "oparzenia staw skokowy"],
+        "hi": ["पादांगुल शोथ", "पैर की जलन", "एड़ी जलन"],
+        "zh": ["足垫皮炎", "脚垫炎", "跗关节烧伤"],
+        "th": ["โรคอักเสบฝ่าเท้า", "แผลไหม้ข้อเท้า", "โรคผิวหนังเท้า"],
+        "id": ["pododermatitis", "radang telapak kaki", "luka bakar kaki"]
+      }
+    },
+
+    "crossbeak": {
+      "canonical": "crossbeak",
+      "domain": "pathology",
+      "confidence": 0.91,
+      "category": "congenital_defect",
+      "translations": {
+        "fr": ["bec croisé", "malformation bec", "bec dévié", "scissor beak"],
+        "en": ["crossbeak", "crossed beak", "scissor beak", "beak deformity"],
+        "es": ["pico cruzado", "deformidad pico", "pico desviado"],
+        "de": ["kreuzschnabel", "schnabeldeformation", "scherensnabel"],
+        "it": ["becco incrociato", "deformità becco", "becco storto"],
+        "pt": ["bico cruzado", "deformidade bico", "bico torto"],
+        "nl": ["kruissnavel", "snavelafwijking", "scheefsnavel"],
+        "pl": ["krzyżowy dziób", "deformacja dzioba", "krzywizna dzioba"],
+        "hi": ["टेढ़ी चोंच", "चोंच की विकृति", "क्रॉस बीक"],
+        "zh": ["交叉喙", "剪刀嘴", "喙畸形"],
+        "th": ["จะงอยปากคด", "ความผิดปกติจะงอยปาก"],
+        "id": ["paruh silang", "kelainan paruh", "paruh bengkok"]
+      }
+    }
+  },
+
+  "production_systems": {
+    "enriched_cage": {
+      "canonical": "enriched_cage",
+      "domain": "housing_system",
+      "confidence": 0.95,
+      "category": "layer_housing",
+      "translations": {
+        "fr": ["cage enrichie", "cage aménagée", "cage améliorée", "volière enrichie"],
+        "en": ["enriched cage", "furnished cage", "improved cage", "modified cage"],
+        "es": ["jaula enriquecida", "jaula mejorada", "jaula acondicionada"],
+        "de": ["ausgestalteter käfig", "angereicherte haltung", "verbesserter käfig"],
+        "it": ["gabbia arricchita", "gabbia modificata", "gabbia migliorata"],
+        "pt": ["gaiola enriquecida", "gaiola melhorada", "gaiola modificada"],
+        "nl": ["verrijkte kooi", "verbeterde kooi", "uitgebreide kooi"],
+        "pl": ["klatka wzbogacona", "klatka ulepszona", "klatka zmodyfikowana"],
+        "hi": ["समृद्ध पिंजरा", "सुधारा हुआ पिंजरा", "बेहतर पिंजरा"],
+        "zh": ["丰富笼", "改进笼", "强化笼", "福利笼"],
+        "th": ["กรงที่ปรับปรุง", "กรงแบบเสริมสิ่งอำนวยความสะดวก"],
+        "id": ["kandang diperkaya", "kandang yang ditingkatkan", "kandang modifikasi"]
+      }
+    },
+
+    "aviary_system": {
+      "canonical": "aviary_system",
+      "domain": "housing_system",
+      "confidence": 0.94,
+      "category": "layer_housing",
+      "translations": {
+        "fr": ["système volière", "volière", "élevage volière", "multi-perchoirs"],
+        "en": ["aviary system", "aviary housing", "multi-tier system", "free flight"],
+        "es": ["sistema aviario", "aviario", "sistema multi-nivel"],
+        "de": ["volierenhaltung", "voliere system", "mehretagensystem"],
+        "it": ["sistema voliera", "allevamento voliera", "sistema multi-livello"],
+        "pt": ["sistema aviário", "aviário", "sistema multi-nível"],
+        "nl": ["volièresysteem", "vrije uitloop systeem", "meerlaags systeem"],
+        "pl": ["system woliery", "system wielopoziomowy", "woliera"],
+        "hi": ["एवियरी सिस्टम", "पक्षी घर प्रणाली", "बहु-स्तरीय प्रणाली"],
+        "zh": ["鸟舍系统", "平养系统", "多层架养"],
+        "th": ["ระบบกรงนกขนาดใหญ่", "ระบบเลี้ยงแบบโรง"],
+        "id": ["sistem aviary", "kandang burung besar", "sistem multi-tingkat"]
+      }
+    },
+
+    "free_range": {
+      "canonical": "free_range",
+      "domain": "housing_system",
+      "confidence": 0.96,
+      "category": "outdoor_system",
+      "translations": {
+        "fr": ["plein air", "libre parcours", "élevage extensif", "parcours extérieur"],
+        "en": ["free range", "outdoor access", "pasture raised", "range system"],
+        "es": ["campero", "pastoreo", "aire libre", "extensivo"],
+        "de": ["freilandhaltung", "auslaufhaltung", "extensive haltung"],
+        "it": ["allevamento a terra", "pascolo libero", "ruspante", "estensivo"],
+        "pt": ["caipira", "criação extensiva", "pasto livre", "ao ar livre"],
+        "nl": ["vrije uitloop", "scharrelsysteem", "extensief houden"],
+        "pl": ["wolny wybieg", "system ekstensywny", "hodowla na pastwisku"],
+        "hi": ["खुला चारागाह", "मुक्त चराई", "व्यापक प्रणाली"],
+        "zh": ["放养", "自由放牧", "散养", "户外饲养"],
+        "th": ["เลี้ยงแบบปล่อยแพ", "ระบบแบบขยาย", "เลี้ยงกลางแจ้ง"],
+        "id": ["bebas jelajah", "sistem ekstensif", "umbaran luas"]
+      }
+    }
+  },
+
+  "biosecurity_health": {
+    "biosecurity": {
+      "canonical": "biosecurity",
+      "domain": "health_management",
+      "confidence": 0.98,
+      "category": "prevention_protocol",
+      "translations": {
+        "fr": ["biosécurité", "sécurité biologique", "all-in all-out", "vide sanitaire"],
+        "en": ["biosecurity", "biological security", "all-in all-out", "sanitization"],
+        "es": ["bioseguridad", "seguridad biológica", "todo dentro todo fuera"],
+        "de": ["biosicherheit", "biologische sicherheit", "rein-raus verfahren"],
+        "it": ["biosicurezza", "sicurezza biologica", "tutto dentro tutto fuori"],
+        "pt": ["biossegurança", "segurança biológica", "tudo dentro tudo fora"],
+        "nl": ["biosecurity", "biologische veiligheid", "all-in all-out"],
+        "pl": ["bioasekuracja", "bezpieczeństwo biologiczne", "system zamknięty"],
+        "hi": ["जैव सुरक्षा", "जैविक सुरक्षा", "सभी अंदर सभी बाहर"],
+        "zh": ["生物安全", "生物防护", "全进全出", "卫生防疫"],
+        "th": ["ความปลอดภัยทางชีวภาพ", "ระบบป้องกันโรค"],
+        "id": ["biosecurity", "keamanan biologis", "semua masuk semua keluar"]
+      }
+    },
+
+    "probiotics": {
+      "canonical": "probiotics",
+      "domain": "health_management",
+      "confidence": 0.94,
+      "category": "feed_additive",
+      "translations": {
+        "fr": ["probiotiques", "micro-organismes bénéfiques", "bactéries lactiques"],
+        "en": ["probiotics", "beneficial microorganisms", "live cultures", "gut health"],
+        "es": ["probióticos", "microorganismos beneficiosos", "cultivos vivos"],
+        "de": ["probiotika", "nützliche mikroorganismen", "darmbakterien"],
+        "it": ["probiotici", "microrganismi benefici", "culture vive"],
+        "pt": ["probióticos", "microrganismos benéficos", "culturas vivas"],
+        "nl": ["probiotica", "nuttige micro-organismen", "darmbacteriën"],
+        "pl": ["probiotyki", "korzystne mikroorganizmy", "bakterie kwasu mlekowego"],
+        "hi": ["प्रोबायोटिक्स", "लाभकारी सूक्ष्मजीव", "जीवित संस्कृति"],
+        "zh": ["益生菌", "有益微生物", "活菌培养物"],
+        "th": ["โปรไบโอติก", "จุลินทรีย์ที่มีประโยชน์"],
+        "id": ["probiotik", "mikroorganisme menguntungkan", "kultur hidup"]
+      }
+    },
+
+    "antibiotics": {
+      "canonical": "antibiotics",
+      "domain": "health_management",
+      "confidence": 0.95,
+      "category": "medication",
+      "translations": {
+        "fr": ["antibiotiques", "antimicrobiens", "thérapeutique", "agp"],
+        "en": ["antibiotics", "antimicrobials", "therapeutic", "agp", "growth promoters"],
+        "es": ["antibióticos", "antimicrobianos", "terapéuticos", "promotores"],
+        "de": ["antibiotika", "antimikrobielle", "therapeutika", "wachstumsförderer"],
+        "it": ["antibiotici", "antimicrobici", "terapeutici", "promotori crescita"],
+        "pt": ["antibióticos", "antimicrobianos", "terapêuticos", "promotores"],
+        "nl": ["antibiotica", "antimicrobiële", "therapeutisch", "groeibevorderaars"],
+        "pl": ["antybiotyki", "przeciwdrobnoustroje", "terapeutyczne"],
+        "hi": ["एंटीबायोटिक्स", "रोगाणुरोधी", "चिकित्सीय"],
+        "zh": ["抗生素", "抗菌药", "治疗药物", "促生长剂"],
+        "th": ["ยาปฏิชีวนะ", "สารต้านจุลชีพ", "ยารักษาโรค"],
+        "id": ["antibiotik", "antimikroba", "terapeutik", "pemacu pertumbuhan"]
+      }
+    },
+
+    "vaccine": {
+      "canonical": "vaccine",
+      "domain": "health_management",
+      "confidence": 0.97,
+      "category": "prevention",
+      "translations": {
+        "fr": ["vaccin", "vaccination", "immunisation", "prophylaxie"],
+        "en": ["vaccine", "vaccination", "immunization", "prophylaxis"],
+        "es": ["vacuna", "vacunación", "inmunización", "profilaxis"],
+        "de": ["impfstoff", "impfung", "immunisierung", "prophylaxe"],
+        "it": ["vaccino", "vaccinazione", "immunizzazione", "profilassi"],
+        "pt": ["vacina", "vacinação", "imunização", "profilaxia"],
+        "nl": ["vaccin", "vaccinatie", "immunisatie", "profylaxe"],
+        "pl": ["szczepionka", "szczepienie", "immunizacja", "profilaktyka"],
+        "hi": ["टीका", "टीकाकरण", "प्रतिरक्षण", "रोकथाम"],
+        "zh": ["疫苗", "免疫接种", "预防接种", "免疫"],
+        "th": ["วัคซีน", "การฉีดวัคซีน", "การสร้างภูมิคุ้มกัน"],
+        "id": ["vaksin", "vaksinasi", "imunisasi", "pencegahan"]
+      }
+    }
+  },
+
+  "egg_defects": {
+    "cracked_shell": {
+      "canonical": "cracked_shell",
+      "domain": "egg_quality",
+      "confidence": 0.93,
+      "category": "shell_defect",
+      "translations": {
+        "fr": ["coquille fissurée", "œuf fissuré", "fêlure coquille", "coquille cassée"],
+        "en": ["cracked shell", "shell crack", "cracked egg", "hair crack"],
+        "es": ["cáscara agrietada", "huevo rajado", "fisura cáscara"],
+        "de": ["schalenriss", "gesprungene schale", "haarriss"],
+        "it": ["guscio crepato", "crepa guscio", "uovo incrinato"],
+        "pt": ["casca rachada", "ovo trincado", "fissura casca"],
+        "nl": ["gebarsten schaal", "schaalbreuk", "haarscheurtje"],
+        "pl": ["pęknięta skorupa", "rysa skorupy", "uszkodzona skorupa"],
+        "hi": ["टूटा छिलका", "दरार छिलका", "फटा अंडा"],
+        "zh": ["破壳蛋", "裂纹蛋", "蛋壳裂缝"],
+        "th": ["เปลือกแตก", "รอยแตกเปลือก", "ไข่แตก"],
+        "id": ["cangkang retak", "telur pecah", "retakan cangkang"]
+      }
+    },
+
+    "soft_shelled_egg": {
+      "canonical": "soft_shelled_egg",
+      "domain": "egg_quality",
+      "confidence": 0.94,
+      "category": "shell_defect",
+      "translations": {
+        "fr": ["œuf mou", "coquille molle", "œuf sans coquille", "coquille souple"],
+        "en": ["soft shelled egg", "soft shell", "shell-less egg", "rubber egg"],
+        "es": ["huevo blando", "cáscara blanda", "huevo sin cáscara"],
+        "de": ["weichei", "weiche schale", "schalenloses ei"],
+        "it": ["uovo molle", "guscio molle", "uovo senza guscio"],
+        "pt": ["ovo mole", "casca mole", "ovo sem casca"],
+        "nl": ["zachtschalig ei", "ei zonder schaal", "rubberachtig ei"],
+        "pl": ["miękka skorupa", "jajo bez skorupy", "jajo gumowate"],
+        "hi": ["नरम छिलका अंडा", "बिना छिलका अंडा", "मुलायम अंडा"],
+        "zh": ["软壳蛋", "无壳蛋", "薄壳蛋"],
+        "th": ["ไข่เปลือกอ่อน", "ไข่ไม่มีเปลือก", "ไข่นิ่ม"],
+        "id": ["telur cangkang lunak", "telur tanpa cangkang", "telur lembek"]
+      }
+    },
+
+    "misshapen_egg": {
+      "canonical": "misshapen_egg",
+      "domain": "egg_quality",
+      "confidence": 0.92,
+      "category": "shape_defect",
+      "translations": {
+        "fr": ["œuf déformé", "malformation œuf", "œuf bizarre", "forme anormale"],
+        "en": ["misshapen egg", "deformed egg", "abnormal shape", "irregular egg"],
+        "es": ["huevo deforme", "forma anormal", "huevo irregular"],
+        "de": ["missgebildetes ei", "deformiertes ei", "abnorme form"],
+        "it": ["uovo deforme", "forma anomala", "uovo irregolare"],
+        "pt": ["ovo deformado", "forma anormal", "ovo irregular"],
+        "nl": ["misvormde ei", "abnormale vorm", "onregelmatig ei"],
+        "pl": ["zniekształcone jajo", "nieprawidłowy kształt", "deformacja jaja"],
+        "hi": ["विकृत अंडा", "असामान्य आकार", "टेढ़ा अंडा"],
+        "zh": ["畸形蛋", "异形蛋", "变形蛋"],
+        "th": ["ไข่ผิดรูป", "รูปร่างผิดปกติ", "ไข่บิดเบี้ยว"],
+        "id": ["telur cacat bentuk", "bentuk abnormal", "telur tidak beraturan"]
+      }
+    }
+  },
+
+  "genetic_lines": {
+
+  "genetic_lines": {
+    "ross_308": {
+      "canonical": "ross_308",
+      "domain": "broiler_genetics",
+      "confidence": 0.98,
+      "category": "commercial_broiler",
+      "translations": {
+        "fr": ["ross 308", "ross308", "ross-308", "r308", "ross", "ross 308 broiler"],
+        "en": ["ross 308", "ross308", "ross-308", "r308", "ross 308 broiler", "ross308 ap"],
+        "es": ["ross 308", "ross308", "pollo ross", "broiler ross"],
+        "de": ["ross 308", "ross308", "ross broiler", "r308"],
+        "it": ["ross 308", "ross308", "pollo ross", "broiler ross"],
+        "pt": ["ross 308", "ross308", "frango ross", "broiler ross"],
+        "nl": ["ross 308", "ross308", "ross broiler", "r308"],
+        "pl": ["ross 308", "ross308", "kurczak ross", "brojler ross"],
+        "hi": ["रॉस 308", "रॉस308", "रॉस ब्रॉयलर", "आर308"],
+        "zh": ["罗斯308", "Ross308", "罗斯肉鸡", "R308"],
+        "th": ["รอส 308", "รอส308", "ไก่รอส", "อาร์308"],
+        "id": ["ross 308", "ross308", "ayam ross", "broiler ross"]
+      }
+    },
+    
+    "ross_708": {
+      "canonical": "ross_708",
+      "domain": "broiler_genetics",
+      "confidence": 0.98,
+      "category": "commercial_broiler",
+      "translations": {
+        "fr": ["ross 708", "ross708", "ross-708", "r708", "ross 708 broiler"],
+        "en": ["ross 708", "ross708", "ross-708", "r708", "ross 708 broiler"],
+        "es": ["ross 708", "ross708", "pollo ross 708"],
+        "de": ["ross 708", "ross708", "r708"],
+        "it": ["ross 708", "ross708", "pollo ross 708"],
+        "pt": ["ross 708", "ross708", "frango ross 708"],
+        "nl": ["ross 708", "ross708", "r708"],
+        "pl": ["ross 708", "ross708", "kurczak ross 708"],
+        "hi": ["रॉस 708", "रॉस708", "आर708"],
+        "zh": ["罗斯708", "Ross708", "R708"],
+        "th": ["รอส 708", "รอส708", "อาร์708"],
+        "id": ["ross 708", "ross708", "r708"]
+      }
+    },
+    
+    "cobb_500": {
+      "canonical": "cobb_500",
+      "domain": "broiler_genetics",
+      "confidence": 0.98,
+      "category": "commercial_broiler",
+      "translations": {
+        "fr": ["cobb 500", "cobb500", "cobb-500", "c500", "cobb", "cobb 500 broiler"],
+        "en": ["cobb 500", "cobb500", "cobb-500", "c500", "cobb", "cobb 500 broiler"],
+        "es": ["cobb 500", "cobb500", "pollo cobb", "broiler cobb"],
+        "de": ["cobb 500", "cobb500", "cobb broiler", "c500"],
+        "it": ["cobb 500", "cobb500", "pollo cobb", "broiler cobb"],
+        "pt": ["cobb 500", "cobb500", "frango cobb", "broiler cobb"],
+        "nl": ["cobb 500", "cobb500", "cobb broiler", "c500"],
+        "pl": ["cobb 500", "cobb500", "kurczak cobb", "brojler cobb"],
+        "hi": ["कॉब 500", "कॉब500", "कॉब ब्रॉयलर", "सी500"],
+        "zh": ["科宝500", "Cobb500", "科宝肉鸡", "C500"],
+        "th": ["คอบ 500", "คอบ500", "ไก่คอบ", "ซี500"],
+        "id": ["cobb 500", "cobb500", "ayam cobb", "broiler cobb"]
+      }
+    },
+
+    "hubbard_classic": {
+      "canonical": "hubbard_classic",
+      "domain": "broiler_genetics",
+      "confidence": 0.95,
+      "category": "alternative_broiler",
+      "translations": {
+        "fr": ["hubbard classic", "classic", "hubbard-classic", "hclassic", "hubbard classique"],
+        "en": ["hubbard classic", "classic", "hubbard-classic", "hclassic", "hubbard"],
+        "es": ["hubbard classic", "clásico hubbard", "hubbard clásico"],
+        "de": ["hubbard classic", "hubbard klassik", "classic"],
+        "it": ["hubbard classic", "hubbard classico", "classic"],
+        "pt": ["hubbard classic", "hubbard clássico", "classic"],
+        "nl": ["hubbard classic", "hubbard klassiek", "classic"],
+        "pl": ["hubbard classic", "hubbard klasyczny", "classic"],
+        "hi": ["हबर्ड क्लासिक", "क्लासिक", "हबर्ड"],
+        "zh": ["哈伯德经典", "Classic", "哈伯德"],
+        "th": ["ฮับบาร์ด คลาสสิค", "คลาสสิค", "ฮับบาร์ด"],
+        "id": ["hubbard classic", "classic", "hubbard klasik"]
+      }
+    },
+
+    "freedom_ranger": {
+      "canonical": "freedom_ranger",
+      "domain": "broiler_genetics",
+      "confidence": 0.95,
+      "category": "alternative_broiler",
+      "translations": {
+        "fr": ["freedom ranger", "freedom", "ranger", "redbro", "freedom-ranger"],
+        "en": ["freedom ranger", "freedom", "ranger", "redbro", "freedom-ranger"],
+        "es": ["freedom ranger", "ranger libertad", "pollo campero"],
+        "de": ["freedom ranger", "freiland ranger", "ranger"],
+        "it": ["freedom ranger", "ranger libero", "pollo ruspante"],
+        "pt": ["freedom ranger", "ranger livre", "frango caipira"],
+        "nl": ["freedom ranger", "vrije ranger", "scharrelhaan"],
+        "pl": ["freedom ranger", "ranger wolny", "kurczak wiejski"],
+        "hi": ["फ्रीडम रेंजर", "रेंजर", "मुक्त रेंजर"],
+        "zh": ["自由放养鸡", "Freedom Ranger", "散养鸡"],
+        "th": ["ฟรีดอม เรนเจอร์", "เรนเจอร์", "ไก่เลี้ยงแบบธรรมชาติ"],
+        "id": ["freedom ranger", "ranger bebas", "ayam kampung"]
+      }
+    },
+
+    "isa_brown": {
+      "canonical": "isa_brown",
+      "domain": "layer_genetics", 
+      "confidence": 0.98,
+      "category": "commercial_layer",
+      "translations": {
+        "fr": ["isa brown", "isa", "isa-brown", "isa brown pondeuse", "isa brown layer"],
+        "en": ["isa brown", "isa", "isa-brown", "isa brown layer", "isa brown hen"],
+        "es": ["isa brown", "isa marrón", "gallina isa", "ponedora isa"],
+        "de": ["isa brown", "isa braun", "isa legehenne", "braune isa"],
+        "it": ["isa brown", "isa marrone", "gallina isa", "ovaiola isa"],
+        "pt": ["isa brown", "isa marrom", "galinha isa", "poedeira isa"],
+        "nl": ["isa brown", "isa bruin", "isa leghen", "bruine isa"],
+        "pl": ["isa brown", "isa brązowa", "kura isa", "nioska isa"],
+        "hi": ["आईएसए ब्राउन", "आईएसए", "आईएसए मुर्गी", "अंडा देने वाली आईएसए"],
+        "zh": ["伊莎褐", "ISA褐", "伊莎蛋鸡", "褐壳蛋鸡"],
+        "th": ["ไอเอสเอ บราวน์", "ไอเอสเอ", "ไก่ไอเอสเอ", "ไก่ไข่ไอเอสเอ"],
+        "id": ["isa brown", "isa coklat", "ayam isa", "petelur isa"]
+      }
+    },
+
+    "lohmann_brown": {
+      "canonical": "lohmann_brown",
+      "domain": "layer_genetics",
+      "confidence": 0.98, 
+      "category": "commercial_layer",
+      "translations": {
+        "fr": ["lohmann brown", "lohmann", "lohmann-brown", "lb", "lohmann brown layer"],
+        "en": ["lohmann brown", "lohmann", "lohmann-brown", "lb", "lohmann brown layer"],
+        "es": ["lohmann brown", "lohmann marrón", "gallina lohmann", "ponedora lohmann"],
+        "de": ["lohmann brown", "lohmann braun", "lohmann legehenne", "lb"],
+        "it": ["lohmann brown", "lohmann marrone", "gallina lohmann", "ovaiola lohmann"],
+        "pt": ["lohmann brown", "lohmann marrom", "galinha lohmann", "poedeira lohmann"],
+        "nl": ["lohmann brown", "lohmann bruin", "lohmann leghen", "lb"],
+        "pl": ["lohmann brown", "lohmann brązowa", "kura lohmann", "nioska lohmann"],
+        "hi": ["लोहमन ब्राउन", "लोहमन", "लोहमन मुर्गी", "एलबी"],
+        "zh": ["罗曼褐", "Lohmann褐", "罗曼蛋鸡", "LB"],
+        "th": ["โลห์มัน บราวน์", "โลห์มัน", "ไก่โลห์มัน", "แอลบี"],
+        "id": ["lohmann brown", "lohmann coklat", "ayam lohmann", "petelur lohmann"]
+      }
+    },
+
+    "hy_line": {
+      "canonical": "hy_line",
+      "domain": "layer_genetics",
+      "confidence": 0.97,
+      "category": "commercial_layer",
+      "translations": {
+        "fr": ["hy-line", "hyline", "hy line", "hl"],
+        "en": ["hy-line", "hyline", "hy line", "hl"],
+        "es": ["hy-line", "hyline", "hy line"],
+        "de": ["hy-line", "hyline", "hy line"],
+        "it": ["hy-line", "hyline", "hy line"],
+        "pt": ["hy-line", "hyline", "hy line"],
+        "nl": ["hy-line", "hyline", "hy line"],
+        "pl": ["hy-line", "hyline", "hy line"],
+        "hi": ["हाई-लाइन", "हाइलाइन", "एचएल"],
+        "zh": ["海兰", "Hy-Line", "HL"],
+        "th": ["ไฮ-ไลน์", "ไฮไลน์", "เอชแอล"],
+        "id": ["hy-line", "hyline", "hl"]
+      }
+    }
+  },
+
+  "site_types": {
+    "broiler_farm": {
+      "canonical": "broiler_farm",
+      "domain": "site_classification",
+      "confidence": 0.95,
+      "category": "production_site",
+      "translations": {
+        "fr": ["broiler", "poulet de chair", "poulets de chair", "chair", "élevage broiler"],
+        "en": ["broiler", "broiler farm", "meat chicken", "chicken farm", "poultry farm"],
+        "es": ["broiler", "pollo de engorde", "granja broiler", "pollo carne"],
+        "de": ["broiler", "masthähnchen", "hähnchenmast", "broiler farm"],
+        "it": ["broiler", "pollo da carne", "allevamento broiler", "polli carne"],
+        "pt": ["broiler", "frango de corte", "granja broiler", "frango carne"],
+        "nl": ["broiler", "vleeskuiken", "broilerhouderij", "vleeskip"],
+        "pl": ["broiler", "kurczak brojler", "ferma broiler", "kurczak mięsny"],
+        "hi": ["ब्रॉयलर", "मांस मुर्गा", "ब्रॉयलर फार्म", "मुर्गा पालन"],
+        "zh": ["肉鸡", "肉鸡场", "肉用鸡", "肉鸡养殖"],
+        "th": ["ไก่เนื้อ", "ฟาร์มไก่เนื้อ", "ไก่บรอยเลอร์", "เลี้ยงไก่เนื้อ"],
+        "id": ["broiler", "ayam pedaging", "peternakan broiler", "ayam potong"]
+      }
+    },
+
+    "layer_farm": {
+      "canonical": "layer_farm", 
+      "domain": "site_classification",
+      "confidence": 0.95,
+      "category": "production_site",
+      "translations": {
+        "fr": ["layer", "pondeuse", "pondeuses", "œufs", "oeufs", "élevage pondeuse"],
+        "en": ["layer", "layer farm", "egg farm", "laying hen", "hen house"],
+        "es": ["ponedora", "gallina ponedora", "granja huevos", "huevos"],
+        "de": ["legehenne", "eierproduktion", "legehennenhaltung", "hühnerei"],
+        "it": ["ovaiola", "galline ovaiole", "allevamento uova", "uova"],
+        "pt": ["poedeira", "galinha poedeira", "granja ovos", "ovos"],
+        "nl": ["leghen", "legkip", "eierproductie", "legbatterij"],
+        "pl": ["nioska", "kura nioska", "ferma jaj", "jaja"],
+        "hi": ["अंडा देने वाली मुर्गी", "लेयर", "अंडा फार्म", "मुर्गी पालन"],
+        "zh": ["蛋鸡", "蛋鸡场", "产蛋鸡", "鸡蛋生产"],
+        "th": ["ไก่ไข่", "ฟาร์มไก่ไข่", "ไก่วางไข่", "การผลิตไข่"],
+        "id": ["layer", "ayam petelur", "peternakan telur", "ayam bertelur"]
+      }
+    },
+
+    "breeder_farm": {
+      "canonical": "breeder_farm",
+      "domain": "site_classification",
+      "confidence": 0.95,
+      "category": "production_site",
+      "translations": {
+        "fr": ["reproducteur", "reproducteurs", "parents", "parent stock", "élevage reproducteur"],
+        "en": ["breeder farm", "breeding farm", "parent stock", "breeders", "breeding stock"],
+        "es": ["granja reproductores", "reproductores", "stock parental"],
+        "de": ["elterntierhalterung", "zuchttiere", "elterntiere"],
+        "it": ["riproduttori", "allevamento riproduttori", "genitori"],
+        "pt": ["reprodutores", "granja reprodução", "estoque parental"],
+        "nl": ["fokkerij", "ouderdieren", "broedstam"],
+        "pl": ["ferma rozpłodowa", "stado rodzicielskie", "rozpłodniki"],
+        "hi": ["प्रजनन फार्म", "मातृ स्टॉक", "प्रजनकर्ता"],
+        "zh": ["种鸡场", "父母代", "种鸡", "繁殖场"],
+        "th": ["ฟาร์มพ่อแม่พันธุ์", "ไก่พ่อแม่พันธุ์", "ฟาร์มเพาะพันธุ์"],
+        "id": ["peternakan indukan", "parent stock", "ternak pembiak"]
+      }
+    },
+
+    "hatchery": {
+      "canonical": "hatchery",
+      "domain": "site_classification",
+      "confidence": 0.95,
+      "category": "production_site", 
+      "translations": {
+        "fr": ["couvoir", "écloserie", "incubation", "hatchery"],
+        "en": ["hatchery", "incubation", "hatching facility"],
+        "es": ["incubadora", "planta incubación", "nacedora"],
+        "de": ["brüterei", "brutanlage", "kükenbrüterei"],
+        "it": ["incubatoio", "schiuditoio", "incubazione"],
+        "pt": ["incubatório", "chocadeira", "nascedouro"],
+        "nl": ["broederij", "uitkomsthal", "broedmachine"],
+        "pl": ["wylęgarnia", "inkubatorium", "lęgnia"],
+        "hi": ["हैचरी", "इन्क्यूबेशन", "अंडे सेने का स्थान"],
+        "zh": ["孵化场", "孵化厂", "孵化器"],
+        "th": ["โรงฟักไข่", "สถานฟักไข่", "เครื่องฟักไข่"],
+        "id": ["penetasan", "hatchery", "tempat penetas"]
+      }
+    },
+
+    "feed_mill": {
+      "canonical": "feed_mill",
+      "domain": "site_classification",
+      "confidence": 0.95,
+      "category": "support_site",
+      "translations": {
+        "fr": ["usine aliments", "fabrique aliment", "moulin", "feedmill"],
+        "en": ["feed mill", "feed factory", "mill", "feed plant"],
+        "es": ["fábrica piensos", "planta alimentos", "molino"],
+        "de": ["futtermühle", "futtermittelwerk", "futterfabrik"],
+        "it": ["mangimificio", "fabbrica mangimi", "mulino"],
+        "pt": ["fábrica ração", "moinho", "planta ração"],
+        "nl": ["voederfabriek", "mengvoederbedrijf", "molen"],
+        "pl": ["wytwórnia pasz", "mieszalnia", "młyn paszowy"],
+        "hi": ["फीड मिल", "आहार कारखाना", "चारा मिल"],
+        "zh": ["饲料厂", "饲料加工厂", "配合饲料厂"],
+        "th": ["โรงผลิตอาหารสัตว์", "โรงงานอาหार", "โรงสีอาหार"],
+        "id": ["pabrik pakan", "feed mill", "pabrik makanan ternak"]
+      }
+    }
+  },
+
+  "performance_metrics": {
+    "fcr_standardized": {
+      "canonical": "feed_conversion_ratio",
+      "domain": "performance", 
+      "confidence": 0.98,
+      "unit": "",
+      "category": "efficiency_metric",
+      "translations": {
+        "fr": ["fcr", "ic", "indice conversion", "indice consommation", "conversion alimentaire"],
+        "en": ["fcr", "feed conversion ratio", "feed conversion", "conversion ratio"],
+        "es": ["ic", "índice conversión", "conversión alimenticia", "fcr"],
+        "de": ["futterverwertung", "fcr", "futterkonversion", "umwandlungsrate"],
+        "it": ["indice conversione", "fcr", "conversione alimentare"],
+        "pt": ["conversão alimentar", "fcr", "índice conversão"],
+        "nl": ["voederconversie", "fcr", "voederefficiëntie"],
+        "pl": ["współczynnik konwersji", "fcr", "przelicznik paszowy"],
+        "hi": ["एफसीआर", "फीड रूपांतरण अनुपात", "आहार रूपांतरण"],
+        "zh": ["料肉比", "饲料转化率", "料重比", "FCR"],
+        "th": ["เอฟซีอาร์", "อัตราการแปลงอาหार", "ประสิทธิภาพอาหар"],
+        "id": ["fcr", "rasio konversi pakan", "konversi pakan"]
+      }
+    },
+
+    "adg": {
+      "canonical": "average_daily_gain",
+      "domain": "performance",
+      "confidence": 0.96,
+      "unit": "g/day",
+      "category": "growth_metric",
+      "translations": {
+        "fr": ["gmd", "gmq", "gain moyen quotidien", "gain journalier", "g/jour"],
+        "en": ["adg", "average daily gain", "daily gain", "g/day"],
+        "es": ["gmd", "ganancia media diaria", "ganancia diaria", "g/día"],
+        "de": ["tägliche zunahme", "tageszunahme", "adg", "g/tag"],
+        "it": ["accrescimento giornaliero", "adg", "guadagno giornaliero"],
+        "pt": ["ganho diário médio", "adg", "g/dia"],
+        "nl": ["dagelijkse groei", "adg", "gemiddelde daggroei"],
+        "pl": ["przyrost dzienny", "adg", "średni przyrost"],
+        "hi": ["औसत दैनिक वृद्धि", "एडीजी", "दैनिक लाभ"],
+        "zh": ["平均日增重", "日增重", "ADG", "克/天"],
+        "th": ["การเจริญเติบโตเฉลี่ยรายวัน", "เอดีจี"],
+        "id": ["pertambahan harian rata-rata", "adg", "g/hari"]
+      }
+    },
+
+    "feed_intake": {
+      "canonical": "feed_intake",
+      "domain": "performance",
+      "confidence": 0.96,
+      "unit": "g/bird/day",
+      "category": "intake_metric",
+      "translations": {
+        "fr": ["ingestion", "consommation aliment", "consommation d'aliment", "g/oiseau/j"],
+        "en": ["feed intake", "fi", "feed consumption", "g/bird/day"],
+        "es": ["consumo alimento", "ingesta alimento", "g/ave/día"],
+        "de": ["futteraufnahme", "fi", "futterverbrauch", "g/tier/tag"],
+        "it": ["consumo mangime", "ingestione", "g/capo/giorno"],
+        "pt": ["consumo ração", "ingestão", "g/ave/dia"],
+        "nl": ["voederopname", "voederverbruik", "g/dier/dag"],
+        "pl": ["spożycie paszy", "konsumpcja", "g/sztuka/dzień"],
+        "hi": ["आहार सेवन", "फीड खपत", "ग्राम/पक्षी/दिन"],
+        "zh": ["采食量", "日采食量", "克/只/天"],
+        "th": ["การกินอาหার", "ปริมาณอาหार", "กรัม/ตัว/วัน"],
+        "id": ["konsumsi pakan", "asupan pakan", "g/ekor/hari"]
+      }
+    },
+
+    "water_intake": {
+      "canonical": "water_intake",
+      "domain": "performance",
+      "confidence": 0.96,
+      "unit": "L/1000birds/day",
+      "category": "intake_metric",
+      "translations": {
+        "fr": ["consommation eau", "consommation d'eau", "l/1000/j", "ml/oiseau/j"],
+        "en": ["water intake", "water consumption", "l/1000/day", "ml/bird/day"],
+        "es": ["consumo agua", "ingesta agua", "l/1000/día"],
+        "de": ["wasseraufnahme", "wasserverbrauch", "l/1000/tag"],
+        "it": ["consumo acqua", "intake acqua", "l/1000/giorno"],
+        "pt": ["consumo água", "ingestão água", "l/1000/dia"],
+        "nl": ["wateropname", "waterverbruik", "l/1000/dag"],
+        "pl": ["spożycie wody", "konsumpcja wody", "l/1000/dzień"],
+        "hi": ["पानी का सेवन", "जल खपत", "लीटर/1000/दिन"],
+        "zh": ["饮水量", "耗水量", "升/1000只/天"],
+        "th": ["การดื่มน้ำ", "ปริมาณน้ำ", "ลิตร/1000ตัว/วัน"],
+        "id": ["konsumsi air", "asupan air", "l/1000/hari"]
+      }
+    },
+
+    "body_weight": {
+      "canonical": "body_weight",
+      "domain": "performance",
+      "confidence": 0.95,
+      "unit": "g",
+      "category": "growth_metric",
+      "translations": {
+        "fr": ["poids", "poids corporel", "poids vif", "poids moyen", "poids cible"],
+        "en": ["weight", "body weight", "live weight", "average weight", "target weight"],
+        "es": ["peso", "peso corporal", "peso vivo", "peso promedio", "peso objetivo"],
+        "de": ["gewicht", "körpergewicht", "lebendgewicht", "durchschnittsgewicht", "zielgewicht"],
+        "it": ["peso", "peso corporeo", "peso vivo", "peso medio", "peso target"],
+        "pt": ["peso", "peso corporal", "peso vivo", "peso médio", "peso alvo"],
+        "nl": ["gewicht", "lichaamsgewicht", "levend gewicht", "gemiddeld gewicht", "streefgewicht"],
+        "pl": ["waga", "masa ciała", "waga żywa", "średnia waga", "waga docelowa"],
+        "hi": ["वजन", "शारीरिक वजन", "जीवित वजन", "औसत वजन", "लक्षित वजन"],
+        "zh": ["重量", "体重", "活重", "平均重量", "目标重量"],
+        "th": ["น้ำหนัก", "น้ำหนักตัว", "น้ำหนักมีชีวิต", "น้ำหนักเฉลี่ย", "น้ำหนักเป้าหมาย"],
+        "id": ["berat", "berat badan", "berat hidup", "berat rata-rata", "berat target"]
+      }
+    },
+
+    "mortality": {
+      "canonical": "mortality",
+      "domain": "performance",
+      "confidence": 0.95,
+      "unit": "%",
+      "category": "health_metric", 
+      "translations": {
+        "fr": ["mortalité", "taux mortalité", "mort", "décès", "perte"],
+        "en": ["mortality", "mortality rate", "death", "death rate", "loss"],
+        "es": ["mortalidad", "tasa mortalidad", "muerte", "pérdida", "bajas"],
+        "de": ["sterblichkeit", "mortalitätsrate", "tod", "verluste", "ausfälle"],
+        "it": ["mortalità", "tasso mortalità", "morte", "perdite", "decessi"],
+        "pt": ["mortalidade", "taxa mortalidade", "morte", "perdas", "óbitos"],
+        "nl": ["sterfte", "sterftecijfer", "dood", "verliezen", "uitval"],
+        "pl": ["śmiertelność", "wskaźnik śmiertelności", "śmierć", "straty", "upadki"],
+        "hi": ["मृत्यु दर", "मृत्यु", "मौत", "हानि", "नुकसान"],
+        "zh": ["死亡率", "死亡", "损失", "淘汰率", "伤亡"],
+        "th": ["อัตราการตาย", "การตาย", "การสูญเสีย", "อัตราการรอด", "การล้ม"],
+        "id": ["mortalitas", "tingkat kematian", "kematian", "kerugian", "kehilangan"]
+      }
+    },
+
+    "egg_production": {
+      "canonical": "egg_production",
+      "domain": "performance",
+      "confidence": 0.95,
+      "unit": "%",
+      "category": "production_metric",
+      "translations": {
+        "fr": ["ponte", "production œufs", "taux ponte", "production œuf", "rendement ponte"],
+        "en": ["egg production", "laying rate", "production rate", "lay rate", "egg output"],
+        "es": ["producción huevos", "puesta", "tasa puesta", "producción huevo", "postura"],
+        "de": ["eierproduktion", "legeleistung", "legerate", "eierleistung", "eiablage"],
+        "it": ["produzione uova", "deposizione", "tasso deposizione", "ovodeposizione", "produttività"],
+        "pt": ["produção ovos", "postura", "taxa postura", "produção ovo", "oviposição"],
+        "nl": ["eierproductie", "legprestatie", "legpercentage", "eiproductie", "leggen"],
+        "pl": ["produkcja jaj", "nieśność", "wskaźnik nieśności", "wydajność jaj", "znoszenie"],
+        "hi": ["अंडा उत्पादन", "अंडे देना", "अंडा दर", "उत्पादन दर", "अंडा निकास"],
+        "zh": ["产蛋率", "产蛋", "蛋鸡产量", "产蛋性能", "下蛋率"],
+        "th": ["การผลิตไข่", "อัตราการออกไข่", "ประสิทธิภาพการไข่", "การวางไข่", "ผลผลิตไข่"],
+        "id": ["produksi telur", "bertelur", "tingkat bertelur", "produksi telur", "hasil telur"]
+      }
+    },
+
+    "uniformity": {
+      "canonical": "uniformity",
+      "domain": "performance",
+      "confidence": 0.95,
+      "unit": "%",
+      "category": "flock_quality",
+      "translations": {
+        "fr": ["homogénéité", "uniformité", "coefficient variation", "cv", "régularité"],
+        "en": ["uniformity", "coefficient of variation", "cv", "homogeneity", "evenness"],
+        "es": ["uniformidad", "homogeneidad", "coeficiente variación", "regularidad"],
+        "de": ["gleichmäßigkeit", "homogenität", "variationskoeffizient"],
+        "it": ["uniformità", "omogeneità", "coefficiente variazione"],
+        "pt": ["uniformidade", "homogeneidade", "coeficiente variação"],
+        "nl": ["uniformiteit", "gelijkmatigheid", "variatiecoëfficiënt"],
+        "pl": ["jednorodność", "uniformność", "współczynnik zmienności"],
+        "hi": ["एकरूपता", "समानता", "भिन्नता गुणांक"],
+        "zh": ["均匀度", "整齐度", "变异系数", "一致性"],
+        "th": ["ความสม่ำเสมอ", "ความเป็นเนื้อเดียวกัน"],
+        "id": ["keseragaman", "homogenitas", "koefisien variasi"]
+      }
+    },
+
+    "epef": {
+      "canonical": "epef",
+      "domain": "performance",
+      "confidence": 0.98,
+      "unit": "",
+      "category": "efficiency_index",
+      "translations": {
+        "fr": ["epef", "iep", "indice efficacité production", "indice performance", "efficacité"],
+        "en": ["epef", "production efficiency factor", "performance index", "efficiency index"],
+        "es": ["epef", "índice eficiencia producción", "factor eficiencia"],
+        "de": ["epef", "produktionseffizienzfaktor", "leistungsindex"],
+        "it": ["epef", "indice efficienza produzione", "fattore efficienza"],
+        "pt": ["epef", "fator eficiência produção", "índice eficiência"],
+        "nl": ["epef", "productie-efficiëntiefactor", "prestatie-index"],
+        "pl": ["epef", "wskaźnik efektywności produkcji", "indeks wydajności"],
+        "hi": ["ईपीईएफ", "उत्पादन दक्षता कारक", "प्रदर्शन सूचकांक"],
+        "zh": ["欧洲效益指数", "生产效率因子", "EPEF"],
+        "th": ["อีพีอีเอฟ", "ดัชนีประสิทธิภาพการผลิต"],
+        "id": ["epef", "faktor efisiensi produksi", "indeks performa"]
+      }
+    }
+  },
+
+  "nutrition_detailed": {
+    "crude_protein": {
+      "canonical": "crude_protein",
+      "domain": "nutrition",
+      "confidence": 0.98,
+      "unit": "%",
+      "category": "macronutrient",
+      "translations": {
+        "fr": ["protéines brutes", "pb", "protéines", "crude protein", "cp"],
+        "en": ["crude protein", "cp", "protein", "proteins", "raw protein"],
+        "es": ["proteína bruta", "pb", "proteína", "proteínas crudas"],
+        "de": ["rohprotein", "rp", "protein", "eiweiß"],
+        "it": ["proteina grezza", "pg", "proteine", "proteina"],
+        "pt": ["proteína bruta", "pb", "proteína", "proteínas"],
+        "nl": ["ruw eiwit", "re", "proteïne", "eiwit"],
+        "pl": ["białko surowe", "bs", "białko", "proteina"],
+        "hi": ["कच्चा प्रोटीन", "प्रोटीन", "कच्ची प्रोटीन"],
+        "zh": ["粗蛋白", "蛋白质", "蛋白", "CP"],
+        "th": ["โปรตีนหยาब", "โปรตีน", "ซีพี"],
+        "id": ["protein kasar", "protein", "pk"]
+      }
+    },
+
+    "metabolizable_energy": {
+      "canonical": "metabolizable_energy",
+      "domain": "nutrition",
+      "confidence": 0.98,
+      "unit": "kcal/kg",
+      "category": "energy_density",
+      "translations": {
+        "fr": ["énergie métabolisable", "em", "kcal/kg", "densité énergétique", "me"],
+        "en": ["metabolizable energy", "me", "kcal/kg", "energy density"],
+        "es": ["energía metabolizable", "em", "kcal/kg", "densidad energética"],
+        "de": ["umsetzbare energie", "me", "kcal/kg", "energiedichte"],
+        "it": ["energia metabolizzabile", "em", "kcal/kg", "densità energetica"],
+        "pt": ["energia metabolizável", "em", "kcal/kg", "densidade energética"],
+        "nl": ["metaboliseerbare energie", "me", "kcal/kg", "energiedichtheid"],
+        "pl": ["energia metaboliczna", "em", "kcal/kg", "gęstość energetyczna"],
+        "hi": ["मेटाबोलाइज़ेबल एनर्जी", "एमई", "केकैल/किग्रा"],
+        "zh": ["代谢能", "ME", "千卡/公斤", "能量密度"],
+        "th": ["พลังงานเมตะบอลิซึม", "เอ็มอี", "กิโลแคล/กิโลกรัม"],
+        "id": ["energi metabolis", "em", "kkal/kg", "kepadatan energi"]
+      }
+    },
+
+    "lysine": {
+      "canonical": "lysine",
+      "domain": "nutrition",
+      "confidence": 0.98,
+      "unit": "%",
+      "category": "amino_acid",
+      "translations": {
+        "fr": ["lysine", "lysine digestible", "lys", "lysine dig"],
+        "en": ["lysine", "digestible lysine", "lys", "lysine dig"],
+        "es": ["lisina", "lisina digestible", "lisina dig"],
+        "de": ["lysin", "verdauliches lysin", "lysin dig"],
+        "it": ["lisina", "lisina digeribile", "lisina dig"],
+        "pt": ["lisina", "lisina digestível", "lisina dig"],
+        "nl": ["lysine", "verteerbare lysine", "lysine dig"],
+        "pl": ["lizyna", "lizyna strawna", "lizyna dig"],
+        "hi": ["लाइसिन", "पाच्य लाइसिन", "लाइसिन डिग"],
+        "zh": ["赖氨酸", "可消化赖氨酸", "赖氨酸"],
+        "th": ["ไลซีน", "ไลซีนที่ย่อยได้", "ไลซีนดิก"],
+        "id": ["lisin", "lisin tercerna", "lisin dig"]
+      }
+    },
+
+    "methionine": {
+      "canonical": "methionine",
+      "domain": "nutrition",
+      "confidence": 0.98,
+      "unit": "%",
+      "category": "amino_acid",
+      "translations": {
+        "fr": ["méthionine", "met", "méthionine+cystéine", "met+cys", "tsaa"],
+        "en": ["methionine", "met", "methionine+cysteine", "met+cys", "tsaa"],
+        "es": ["metionina", "met", "metionina+cisteína", "met+cis"],
+        "de": ["methionin", "met", "methionin+cystin", "met+cys"],
+        "it": ["metionina", "met", "metionina+cistina", "met+cis"],
+        "pt": ["metionina", "met", "metionina+cistina", "met+cis"],
+        "nl": ["methionine", "met", "methionine+cysteine", "met+cys"],
+        "pl": ["metionina", "met", "metionina+cysteina", "met+cys"],
+        "hi": ["मेथियोनाइन", "मेट", "मेथियोनाइन+सिस्टीन"],
+        "zh": ["蛋氨酸", "甲硫氨酸", "蛋+胱氨酸", "含硫氨基酸"],
+        "th": ["เมไทโอนีน", "เมท", "เมไทโอนีน+ซิสทีน"],
+        "id": ["metionin", "met", "metionin+sistein"]
+      }
+    },
+
+    "calcium": {
+      "canonical": "calcium",
+      "domain": "nutrition",
+      "confidence": 0.98,
+      "unit": "%",
+      "category": "mineral",
+      "translations": {
+        "fr": ["calcium", "ca", "calcique", "chaux"],
+        "en": ["calcium", "ca", "lime", "calcium carbonate"],
+        "es": ["calcio", "ca", "carbonato cálcico"],
+        "de": ["kalzium", "calcium", "ca", "kalk"],
+        "it": ["calcio", "ca", "carbonato di calcio"],
+        "pt": ["cálcio", "ca", "carbonato de cálcio"],
+        "nl": ["calcium", "ca", "kalk", "calciumcarbonaat"],
+        "pl": ["wapń", "calcium", "ca", "węglan wapnia"],
+        "hi": ["कैल्शियम", "चूना", "कैल्शियम कार्बोनेट"],
+        "zh": ["钙", "石灰石", "碳酸钙", "Ca"],
+        "th": ["แคลเซียม", "ปูนขาว", "แคลเซียมคาร์บอเนต"],
+        "id": ["kalsium", "ca", "kapur", "kalsium karbonat"]
+      }
+    },
+
+    "phosphorus": {
+      "canonical": "phosphorus",
+      "domain": "nutrition",
+      "confidence": 0.98,
+      "unit": "%",
+      "category": "mineral",
+      "translations": {
+        "fr": ["phosphore", "p", "phosphore digestible", "p dig", "phosphore disponible"],
+        "en": ["phosphorus", "p", "digestible phosphorus", "p dig", "available phosphorus"],
+        "es": ["fósforo", "p", "fósforo digestible", "p dig", "fósforo disponible"],
+        "de": ["phosphor", "p", "verdaulicher phosphor", "p dig"],
+        "it": ["fosforo", "p", "fosforo digeribile", "p dig"],
+        "pt": ["fósforo", "p", "fósforo digestível", "p dig"],
+        "nl": ["fosfor", "p", "verteerbare fosfor", "p dig"],
+        "pl": ["fosfor", "p", "fosfor strawny", "p dig"],
+        "hi": ["फास्फोरस", "पी", "पाच्य फास्फोरस"],
+        "zh": ["磷", "可利用磷", "有效磷", "P"],
+        "th": ["ฟอสฟอรัส", "พี", "ฟอสฟอรัสที่ย่อยได้"],
+        "id": ["fosfor", "p", "fosfor tercerna"]
+      }
+    },
+
+    "digestible_phosphorus": {
+      "canonical": "digestible_phosphorus",
+      "domain": "nutrition",
+      "confidence": 0.97,
+      "unit": "%",
+      "category": "mineral",
+      "translations": {
+        "fr": ["phosphore digestible", "p dig", "dp", "phosphore disponible"],
+        "en": ["digestible phosphorus", "dp", "available phosphorus", "dig p"],
+        "es": ["fósforo digestible", "p dig", "dp", "fósforo disponible"],
+        "de": ["verdaulicher phosphor", "dp", "verfügbarer phosphor"],
+        "it": ["fosforo digeribile", "dp", "fosforo disponibile"],
+        "pt": ["fósforo digestível", "dp", "fósforo disponível"],
+        "nl": ["verteerbare fosfor", "dp", "beschikbare fosfor"],
+        "pl": ["fosfor strawny", "dp", "fosfor dostępny"],
+        "hi": ["पाच्य फास्फोरस", "डीपी", "उपलब्ध फास्फोरस"],
+        "zh": ["可消化磷", "有效磷", "DP", "可利用磷"],
+        "th": ["ฟอสฟอรัสที่ย่อยได้", "ดีพี", "ฟอสฟอรัสที่ใช้ได้"],
+        "id": ["fosfor tercerna", "dp", "fosfor tersedia"]
+      }
+    },
+
+    "electrolyte_balance": {
+      "canonical": "dietary_electrolyte_balance",
+      "domain": "nutrition",
+      "confidence": 0.94,
+      "unit": "mEq/kg",
+      "category": "diet_property",
+      "translations": {
+        "fr": ["équilibre électrolytique", "deb", "balance électrolytique"],
+        "en": ["dietary electrolyte balance", "deb", "electrolyte balance"],
+        "es": ["balance electrolítico", "deb", "equilibrio electrolítico"],
+        "de": ["elektrolytbalance", "deb", "elektrolytgleichgewicht"],
+        "it": ["bilancio elettrolitico", "deb", "equilibrio elettrolitico"],
+        "pt": ["balanço eletrolítico", "deb", "equilíbrio eletrolítico"],
+        "nl": ["elektrolytbalans", "deb", "elektrolytevenwicht"],
+        "pl": ["równowaga elektrolitowa", "deb", "balans elektrolitowy"],
+        "hi": ["आहार विद्युत संतुलन", "डीईबी", "इलेक्ट्रोलाइट संतुलन"],
+        "zh": ["日粮电解质平衡", "DEB", "电解质平衡"],
+        "th": ["สมดุลอิเล็กโทรไลต์", "ดีอีบี"],
+        "id": ["keseimbangan elektrolit", "deb", "balance elektrolit"]
+      }
+    },
+
+    "sodium": {
+      "canonical": "sodium",
+      "domain": "nutrition",
+      "confidence": 0.96,
+      "unit": "%",
+      "category": "mineral",
+      "translations": {
+        "fr": ["sodium", "na", "sel"],
+        "en": ["sodium", "na", "salt"],
+        "es": ["sodio", "na", "sal"],
+        "de": ["natrium", "na", "salz"],
+        "it": ["sodio", "na", "sale"],
+        "pt": ["sódio", "na", "sal"],
+        "nl": ["natrium", "na", "zout"],
+        "pl": ["sód", "na", "sól"],
+        "hi": ["सोडियम", "नमक", "एना"],
+        "zh": ["钠", "Na", "盐"],
+        "th": ["โซเดียม", "เกลือ", "เอ็นเอ"],
+        "id": ["natrium", "na", "garam"]
+      }
+    },
+
+    "chloride": {
+      "canonical": "chloride",
+      "domain": "nutrition",
+      "confidence": 0.95,
+      "unit": "%",
+      "category": "mineral",
+      "translations": {
+        "fr": ["chlorure", "cl", "chlore"],
+        "en": ["chloride", "cl", "chlorine"],
+        "es": ["cloruro", "cl", "cloro"],
+        "de": ["chlorid", "cl", "chlor"],
+        "it": ["cloruro", "cl", "cloro"],
+        "pt": ["cloreto", "cl", "cloro"],
+        "nl": ["chloride", "cl", "chloor"],
+        "pl": ["chlorek", "cl", "chlor"],
+        "hi": ["क्लोराइड", "सीएल", "क्लोरीन"],
+        "zh": ["氯化物", "Cl", "氯"],
+        "th": ["คลอไรด์", "ซีแอล", "คลอรีน"],
+        "id": ["klorida", "cl", "klorin"]
+      }
+    },
+
+    "potassium": {
+      "canonical": "potassium",
+      "domain": "nutrition",
+      "confidence": 0.96,
+      "unit": "%",
+      "category": "mineral",
+      "translations": {
+        "fr": ["potassium", "k", "potasse"],
+        "en": ["potassium", "k", "potash"],
+        "es": ["potasio", "k", "potasa"],
+        "de": ["kalium", "k", "kali"],
+        "it": ["potassio", "k", "potassa"],
+        "pt": ["potássio", "k", "potassa"],
+        "nl": ["kalium", "k", "potas"],
+        "pl": ["potas", "k", "potaz"],
+        "hi": ["पोटेशियम", "के", "पोटाश"],
+        "zh": ["钾", "K", "钾盐"],
+        "th": ["โพแทสเซียม", "เค", "โพแทช"],
+        "id": ["kalium", "k", "potash"]
+      }
+    }
+  },
+
+  "pathology_specific": {
+    "gumboro": {
+      "canonical": "gumboro",
+      "domain": "pathology",
+      "confidence": 0.95,
+      "category": "viral_disease",
+      "translations": {
+        "fr": ["gumboro", "maladie de gumboro", "bursite infectieuse", "ibdv"],
+        "en": ["gumboro", "gumboro disease", "infectious bursal disease", "ibdv", "ibd"],
+        "es": ["gumboro", "enfermedad gumboro", "bursitis infecciosa"],
+        "de": ["gumboro", "gumboro-krankheit", "infektiöse bursitis"],
+        "it": ["gumboro", "malattia di gumboro", "borsitis infettiva"],
+        "pt": ["gumboro", "doença de gumboro", "bursite infecciosa"],
+        "nl": ["gumboro", "gumboro ziekte", "infectieuze bursitis"],
+        "pl": ["gumboro", "choroba gumboro", "zakaźne zapalenie"],
+        "hi": ["गुंबोरो", "गुंबोरो रोग", "संक्रामक बर्सल रोग"],
+        "zh": ["法氏囊病", "甘保罗病", "传染性法氏囊病"],
+        "th": ["กัมโบโร", "โรคกัมโบโร", "โรคถุงฟาบริเซียส"],
+        "id": ["gumboro", "penyakit gumboro", "infectious bursal"]
+      }
+    },
+
+    "newcastle": {
+      "canonical": "newcastle",
+      "domain": "pathology",
+      "confidence": 0.95,
+      "category": "viral_disease",
+      "translations": {
+        "fr": ["newcastle", "maladie de newcastle", "pseudopeste aviaire", "ppa"],
+        "en": ["newcastle", "newcastle disease", "nd", "avian paramyxovirus"],
+        "es": ["newcastle", "enfermedad newcastle", "pseudopeste aviar"],
+        "de": ["newcastle", "newcastle-krankheit", "atypische geflügelpest"],
+        "it": ["newcastle", "malattia di newcastle", "pseudopeste aviaria"],
+        "pt": ["newcastle", "doença de newcastle", "pseudopeste aviária"],
+        "nl": ["newcastle", "newcastle ziekte", "pseudovogelpest"],
+        "pl": ["newcastle", "choroba newcastle", "pseudozachorka"],
+        "hi": ["न्यूकासल", "न्यूकासल रोग", "छद्म प्लेग"],
+        "zh": ["新城疫", "鸡新城疫", "亚洲鸡瘟"],
+        "th": ["นิวคาสเซิล", "โรคนิวคาสเซิล", "โรคไก่หวัด"],
+        "id": ["newcastle", "penyakit newcastle", "tetelo"]
+      }
+    },
+
+    "coccidiosis": {
+      "canonical": "coccidiosis",
+      "domain": "pathology",
+      "confidence": 0.95,
+      "category": "parasitic_disease",
+      "translations": {
+        "fr": ["coccidiose", "eimeria", "coccidies", "coccidiostat"],
+        "en": ["coccidiosis", "coccidia", "eimeria", "coccidiostat"],
+        "es": ["coccidiosis", "coccidias", "eimeria", "coccidiostato"],
+        "de": ["kokzidiose", "kokzidien", "eimeria", "kokzidiostatikum"],
+        "it": ["coccidiosi", "coccidi", "eimeria", "coccidiostatico"],
+        "pt": ["coccidiose", "coccídias", "eimeria", "coccidiostático"],
+        "nl": ["coccidiose", "coccidiën", "eimeria", "coccidiostaticum"],
+        "pl": ["kokcydioza", "kokcydia", "eimeria", "kokcydiostatyk"],
+        "hi": ["कॉक्सिडियोसिस", "कॉक्सिडिया", "एमेरिया"],
+        "zh": ["球虫病", "球虫", "艾美耳球虫", "抗球虫药"],
+        "th": ["โคคซิเดียโอซิส", "โคคซิเดีย", "เอเมอเรีย"],
+        "id": ["koksidiosis", "koksidia", "eimeria", "koksidiostat"]
+      }
+    },
+
+    "colibacillosis": {
+      "canonical": "colibacillosis",
+      "domain": "pathology",
+      "confidence": 0.95,
+      "category": "bacterial_disease",
+      "translations": {
+        "fr": ["colibacillose", "e.coli", "escherichia coli", "colibacilles"],
+        "en": ["colibacillosis", "e.coli", "escherichia coli", "e coli"],
+        "es": ["colibacilosis", "e.coli", "escherichia coli"],
+        "de": ["colibacillose", "e.coli", "escherichia coli"],
+        "it": ["colibacillosi", "e.coli", "escherichia coli"],
+        "pt": ["colibacilose", "e.coli", "escherichia coli"],
+        "nl": ["colibacillose", "e.coli", "escherichia coli"],
+        "pl": ["kolibacyloza", "e.coli", "escherichia coli"],
+        "hi": ["कोलीबैसिलोसिस", "ई.कोली", "इशरीशिया कोली"],
+        "zh": ["大肠杆菌病", "大肠埃希菌", "E.coli"],
+        "th": ["โคลิแบคซิลโลซิส", "อี.โคไล", "เชื้อแบคทีเรีย"],
+        "id": ["kolibacillosis", "e.coli", "escherichia coli"]
+      }
+    },
+
+    "necrotic_enteritis": {
+      "canonical": "necrotic_enteritis",
+      "domain": "pathology",
+      "confidence": 0.95,
+      "category": "bacterial_disease",
+      "translations": {
+        "fr": ["entérite nécrotique", "clostridium perfringens", "en", "nécrose intestinale"],
+        "en": ["necrotic enteritis", "clostridium perfringens", "ne", "intestinal necrosis"],
+        "es": ["enteritis necrótica", "clostridium perfringens", "necrosis intestinal"],
+        "de": ["nekrotische enteritis", "clostridium perfringens", "darmnekrose"],
+        "it": ["enterite necrotica", "clostridium perfringens", "necrosi intestinale"],
+        "pt": ["enterite necrótica", "clostridium perfringens", "necrose intestinal"],
+        "nl": ["necrotiserende enteritis", "clostridium perfringens", "darmnecrose"],
+        "pl": ["martwicze zapalenie", "clostridium perfringens", "martwica jelit"],
+        "hi": ["नेक्रोटिक एंटेराइटिस", "क्लोस्ट्रिडियम", "आंत्रशोथ"],
+        "zh": ["坏死性肠炎", "产气荚膜梭菌", "肠道坏死"],
+        "th": ["เนโครติกเอนเทอไรทิส", "คลอสตริเดียม", "ลำไส้อักเสบ"],
+        "id": ["enteritis nekrotik", "clostridium perfringens", "nekrosis usus"]
+      }
+    },
+
+    "eimeria_tenella": {
+      "canonical": "eimeria_tenella",
+      "domain": "pathology",
+      "confidence": 0.94,
+      "category": "specific_pathogen",
+      "translations": {
+        "fr": ["eimeria tenella", "coccidiose caecale", "coccidie caecale"],
+        "en": ["eimeria tenella", "cecal coccidiosis", "cecal coccidia"],
+        "es": ["eimeria tenella", "coccidiosis cecal", "coccidia cecal"],
+        "de": ["eimeria tenella", "blinddarmkokzidiose", "zäkalkokzidiose"],
+        "it": ["eimeria tenella", "coccidiosi cecale", "coccidi cecali"],
+        "pt": ["eimeria tenella", "coccidiose cecal", "coccidia cecal"],
+        "nl": ["eimeria tenella", "blindedarmcoccidiose", "cecale coccidiën"],
+        "pl": ["eimeria tenella", "kokcydioza kątnicza", "kokcydia kątnicza"],
+        "hi": ["एमेरिया टेनेला", "सीकल कॉक्सिडियोसिस"],
+        "zh": ["柔嫩艾美耳球虫", "盲肠球虫病"],
+        "th": ["เอเมอเรีย เทเนลลา", "โคคซิเดียลำไส้ใหญ่"],
+        "id": ["eimeria tenella", "koksidiosis sekum"]
+      }
+    },
+
+    "salmonella": {
+      "canonical": "salmonella",
+      "domain": "pathology",
+      "confidence": 0.95,
+      "category": "bacterial_disease",
+      "translations": {
+        "fr": ["salmonelle", "salmonellose", "paratyphoïde", "pullorum"],
+        "en": ["salmonella", "salmonellosis", "paratyphoid", "pullorum"],
+        "es": ["salmonela", "salmonelosis", "paratifoidea"],
+        "de": ["salmonellen", "salmonellose", "paratyphus"],
+        "it": ["salmonella", "salmonellosi", "paratifo"],
+        "pt": ["salmonela", "salmonelose", "paratifoide"],
+        "nl": ["salmonella", "salmonellose", "paratyfus"],
+        "pl": ["salmonella", "salmoneloza", "paratyfus"],
+        "hi": ["साल्मोनेला", "साल्मोनेलोसिस", "पैराटाइफाइड"],
+        "zh": ["沙门菌", "沙门氏菌病", "副伤寒"],
+        "th": ["ซัลโมเนลลา", "โรคซัลโมเนลลา", "พาราไทฟอยด์"],
+        "id": ["salmonella", "salmonellosis", "paratifoid"]
+      }
+    },
+
+    "mycoplasma": {
+      "canonical": "mycoplasma",
+      "domain": "pathology",
+      "confidence": 0.94,
+      "category": "bacterial_disease",
+      "translations": {
+        "fr": ["mycoplasme", "mycoplasmose", "maladie respiratoire chronique", "crd"],
+        "en": ["mycoplasma", "mycoplasmosis", "chronic respiratory disease", "crd"],
+        "es": ["micoplasma", "micoplasmosis", "enfermedad respiratoria crónica"],
+        "de": ["mykoplasmen", "mykoplasma", "chronische atemwegserkrankung"],
+        "it": ["micoplasma", "micoplasmosi", "malattia respiratoria cronica"],
+        "pt": ["micoplasma", "micoplasmose", "doença respiratória crônica"],
+        "nl": ["mycoplasma", "mycoplasmose", "chronische luchtwegziekte"],
+        "pl": ["mykoplazma", "mykoplazma", "chroniczna choroba oddechowa"],
+        "hi": ["माइकोप्लाज्मा", "माइकोप्लाज्मोसिस", "दीर्घकालिक श्वसन रोग"],
+        "zh": ["支原体", "支原体病", "慢性呼吸道病"],
+        "th": ["ไมโคพลาสมา", "โรคไมโคพลาสมา", "โรคระบบหายใจเรื้อรัง"],
+        "id": ["mycoplasma", "mycoplasmosis", "penyakit pernapasan kronis"]
+      }
+    },
+
+    "infectious_bronchitis": {
+      "canonical": "infectious_bronchitis_virus",
+      "domain": "pathology",
+      "confidence": 0.94,
+      "category": "viral_disease",
+      "translations": {
+        "fr": ["ibv", "bronchite infectieuse", "bi", "virus bronchite"],
+        "en": ["ibv", "infectious bronchitis", "ib", "bronchitis virus"],
+        "es": ["ibv", "bronquitis infecciosa", "bi", "virus bronquitis"],
+        "de": ["ibv", "infektiöse bronchitis", "ib", "bronchitisvirus"],
+        "it": ["ibv", "bronchite infettiva", "bi", "virus bronchite"],
+        "pt": ["ibv", "bronquite infecciosa", "bi", "vírus bronquite"],
+        "nl": ["ibv", "infectieuze bronchitis", "ib", "bronchitisvirus"],
+        "pl": ["ibv", "zakaźne zapalenie oskrzeli", "zzo"],
+        "hi": ["आईबीवी", "संक्रामक ब्रोंकाइटिस", "श्वसन संक्रमण"],
+        "zh": ["IBV", "传染性支气管炎", "支气管炎病毒"],
+        "th": ["ไอบีวี", "โรคหลอดลมอักเสบ", "ไวรัสหลอดลม"],
+        "id": ["ibv", "bronkitis infeksius", "virus bronkitis"]
+      }
+    }
+  },
+
+  "infrastructure_environment": {
+    "ventilation_rate": {
+      "canonical": "ventilation_rate",
+      "domain": "infrastructure",
+      "confidence": 0.98,
+      "unit": "m3/h/kg",
+      "category": "airflow_parameter",
+      "translations": {
+        "fr": ["débit ventilation", "taux ventilation", "m3/h/kg", "renouvellement air", "ventilation minimale"],
+        "en": ["ventilation rate", "airflow rate", "m3/h/kg", "air exchange", "minimum ventilation"],
+        "es": ["caudal ventilación", "tasa ventilación", "m3/h/kg", "renovación aire"],
+        "de": ["lüftungsrate", "luftdurchsatz", "m3/h/kg", "luftwechsel"],
+        "it": ["portata ventilazione", "tasso ventilazione", "m3/h/kg", "ricambio aria"],
+        "pt": ["taxa ventilação", "vazão ventilação", "m3/h/kg", "renovação ar"],
+        "nl": ["ventilatiedebiet", "luchtverversing", "m3/h/kg", "luchtwisseling"],
+        "pl": ["natężenie wentylacji", "wydajność wentylacji", "m3/h/kg"],
+        "hi": ["वेंटिलेशन दर", "वायु प्रवाह", "एम3/घ/किग्रा"],
+        "zh": ["通风率", "换气量", "立方米/小时/公斤", "最小通风"],
+        "th": ["อัตราการระบายอากาศ", "ลูบาศก์เมตร/ชม/กก"],
+        "id": ["tingkat ventilasi", "laju alir udara", "m3/j/kg"]
+      }
+    },
+
+    "static_pressure": {
+      "canonical": "static_pressure",
+      "domain": "infrastructure",
+      "confidence": 0.98,
+      "unit": "Pa",
+      "category": "airflow_parameter",
+      "translations": {
+        "fr": ["pression statique", "pa", "pascal", "dépression", "pression négative"],
+        "en": ["static pressure", "pa", "pascal", "negative pressure", "building pressure"],
+        "es": ["presión estática", "pa", "pascal", "depresión", "presión negativa"],
+        "de": ["statischer druck", "pa", "pascal", "unterdruck", "negativdruck"],
+        "it": ["pressione statica", "pa", "pascal", "depressione", "pressione negativa"],
+        "pt": ["pressão estática", "pa", "pascal", "depressão", "pressão negativa"],
+        "nl": ["statische druk", "pa", "pascal", "onderdruk", "negatieve druk"],
+        "pl": ["ciśnienie statyczne", "pa", "pascal", "podciśnienie"],
+        "hi": ["स्थैतिक दबाव", "पा", "पास्कल", "नकारात्मक दबाव"],
+        "zh": ["静压", "帕斯卡", "负压", "压差"],
+        "th": ["ความดันคงที่", "ปาสคาล", "ความดันลบ"],
+        "id": ["tekanan statis", "pa", "pascal", "tekanan negatif"]
+      }
+    },
+
+    "ammonia": {
+      "canonical": "ammonia",
+      "domain": "infrastructure",
+      "confidence": 0.98,
+      "unit": "ppm",
+      "category": "air_quality",
+      "translations": {
+        "fr": ["ammoniac", "nh3", "ammoniaque", "ppm", "concentration ammoniac"],
+        "en": ["ammonia", "nh3", "ppm", "ammonia concentration", "ammonia level"],
+        "es": ["amoníaco", "nh3", "ppm", "concentración amoníaco"],
+        "de": ["ammoniak", "nh3", "ppm", "ammoniakkonzentration"],
+        "it": ["ammoniaca", "nh3", "ppm", "concentrazione ammoniaca"],
+        "pt": ["amônia", "nh3", "ppm", "concentração amônia"],
+        "nl": ["ammoniak", "nh3", "ppm", "ammoniakconcentratie"],
+        "pl": ["amoniak", "nh3", "ppm", "stężenie amoniaku"],
+        "hi": ["अमोनिया", "एनएच3", "पीपीएम", "अमोनिया एकाग्रता"],
+        "zh": ["氨气", "NH3", "ppm", "氨气浓度"],
+        "th": ["แอมโมเนีย", "เอ็นเอช3", "พีพีเอ็ม"],
+        "id": ["amonia", "nh3", "ppm", "konsentrasi amonia"]
+      }
+    },
+
+    "co2_concentration": {
+      "canonical": "carbon_dioxide",
+      "domain": "infrastructure",
+      "confidence": 0.96,
+      "unit": "ppm",
+      "category": "air_quality",
+      "translations": {
+        "fr": ["co2", "dioxyde carbone", "gaz carbonique", "ppm co2", "concentration co2"],
+        "en": ["co2", "carbon dioxide", "ppm co2", "co2 concentration", "co2 level"],
+        "es": ["co2", "dióxido carbono", "ppm co2", "concentración co2"],
+        "de": ["co2", "kohlendioxid", "ppm co2", "co2-konzentration"],
+        "it": ["co2", "anidride carbonica", "ppm co2", "concentrazione co2"],
+        "pt": ["co2", "dióxido carbono", "ppm co2", "concentração co2"],
+        "nl": ["co2", "koolstofdioxide", "ppm co2", "co2-concentratie"],
+        "pl": ["co2", "dwutlenek węgla", "ppm co2", "stężenie co2"],
+        "hi": ["सीओ2", "कार्बन डाइऑक्साइड", "पीपीएम सीओ2"],
+        "zh": ["二氧化碳", "CO2", "ppm", "二氧化碳浓度"],
+        "th": ["ซีโอทู", "คาร์บอนไดออกไซด์", "พีพีเอ็ม"],
+        "id": ["co2", "karbon dioksida", "ppm co2", "konsentrasi co2"]
+      }
+    },
+
+    "relative_humidity": {
+      "canonical": "relative_humidity",
+      "domain": "infrastructure",
+      "confidence": 0.96,
+      "unit": "%RH",
+      "category": "air_quality",
+      "translations": {
+        "fr": ["humidité", "humidité relative", "%hr", "rh", "hygrométrie"],
+        "en": ["relative humidity", "rh", "%rh", "humidity"],
+        "es": ["humedad relativa", "hr", "%hr", "humedad"],
+        "de": ["relative luftfeuchtigkeit", "rh", "luftfeuchtigkeit"],
+        "it": ["umidità relativa", "ur", "umidità"],
+        "pt": ["umidade relativa", "ur", "umidade"],
+        "nl": ["relatieve vochtigheid", "rv", "luchtvochtigheid"],
+        "pl": ["wilgotność względna", "rh", "wilgotność"],
+        "hi": ["सापेक्ष आर्द्रता", "आरएच", "नमी"],
+        "zh": ["相对湿度", "RH", "湿度"],
+        "th": ["ความชื้นสัมพัทธ์", "อาร์เอช", "ความชื้น"],
+        "id": ["kelembaban relatif", "rh", "kelembaban"]
+      }
+    },
+
+    "feeder_space": {
+      "canonical": "feeder_space",
+      "domain": "infrastructure",
+      "confidence": 0.93,
+      "unit": "cm/bird",
+      "category": "equipment_capacity",
+      "translations": {
+        "fr": ["espace mangeoire", "cm/oiseau", "linéaire mangeoire", "place mangeoire"],
+        "en": ["feeder space", "cm/bird", "feeder length", "feeding space"],
+        "es": ["espacio comedero", "cm/ave", "longitud comedero"],
+        "de": ["futterplatz", "cm/tier", "futterlänge"],
+        "it": ["spazio mangiatoia", "cm/capo", "lunghezza mangiatoia"],
+        "pt": ["espaço comedouro", "cm/ave", "comprimento comedouro"],
+        "nl": ["voederruimte", "cm/dier", "voederlengte"],
+        "pl": ["miejsce przy karmiku", "cm/sztuka", "długość karmika"],
+        "hi": ["फीडर स्थान", "सेमी/पक्षी", "भोजन स्थान"],
+        "zh": ["采食位", "厘米/只", "料槽长度", "采食空间"],
+        "th": ["พื้นที่ให้อาหार", "เซม/ตัว", "ความยาวราอาหาร"],
+        "id": ["ruang pakan", "cm/ekor", "panjang tempat pakan"]
+      }
+    },
+
+    "drinker_flow_rate": {
+      "canonical": "drinker_flow_rate",
+      "domain": "infrastructure",
+      "confidence": 0.93,
+      "unit": "mL/min/nipple",
+      "category": "equipment_setting",
+      "translations": {
+        "fr": ["débit abreuvoir", "débit nipples", "ml/min/tétine", "pression eau"],
+        "en": ["drinker flow rate", "nipple flow", "ml/min/nipple", "water pressure"],
+        "es": ["caudal bebedero", "flujo nipple", "ml/min/tetina"],
+        "de": ["tränkendurchfluss", "nippeldurchfluss", "ml/min/nippel"],
+        "it": ["portata abbeveratoio", "flusso nipple", "ml/min/capezzolo"],
+        "pt": ["vazão bebedouro", "fluxo nipple", "ml/min/bico"],
+        "nl": ["drinkwaterdebiet", "nippeldebiet", "ml/min/nippel"],
+        "pl": ["przepływ pojnika", "wydajność smoczka", "ml/min/smoczek"],
+        "hi": ["पीने के पानी का प्रवाह", "निप्पल प्रवाह", "एमएल/मिनट"],
+        "zh": ["饮水器流速", "乳头流量", "毫升/分钟/个"],
+        "th": ["อัตราการไหลของน้ำ", "การไหลของหัวดูด", "มล/นาที"],
+        "id": ["laju alir minum", "aliran nipple", "ml/menit/nipple"]
+      }
+    },
+
+    "lighting_hours": {
+      "canonical": "photoperiod_hours",
+      "domain": "management",
+      "confidence": 0.94,
+      "unit": "h/day",
+      "category": "lighting",
+      "translations": {
+        "fr": ["durée éclairage", "photopériode", "heures lumière", "h/jour"],
+        "en": ["lighting hours", "photoperiod", "light hours", "h/day"],
+        "es": ["horas luz", "fotoperíodo", "duración iluminación", "h/día"],
+        "de": ["beleuchtungsdauer", "photoperiode", "lichtstunden"],
+        "it": ["ore luce", "fotoperiodo", "durata illuminazione"],
+        "pt": ["horas luz", "fotoperíodo", "duração iluminação"],
+        "nl": ["verlichtingsduur", "fotoperiode", "lichturen"],
+        "pl": ["długość oświetlenia", "fotoperiod", "godziny światła"],
+        "hi": ["प्रकाश घंटे", "फोटोपेरियड", "रोशनी की अवधि"],
+        "zh": ["光照时间", "光周期", "小时/天"],
+        "th": ["ชั่วโมงแสง", "โฟโตเพีเรียด", "ระยะเวลาแสง"],
+        "id": ["jam pencahayaan", "fotoperiod", "durasi cahaya"]
+      }
+    },
+
+    "light_intensity": {
+      "canonical": "light_intensity_lux",
+      "domain": "management", 
+      "confidence": 0.94,
+      "unit": "lux",
+      "category": "lighting",
+      "translations": {
+        "fr": ["intensité lumineuse", "lux", "éclairage", "luminosité"],
+        "en": ["light intensity", "lux", "illumination", "brightness"],
+        "es": ["intensidad luz", "lux", "iluminación", "luminosidad"],
+        "de": ["lichtstärke", "lux", "beleuchtungsstärke", "helligkeit"],
+        "it": ["intensità luce", "lux", "illuminazione", "luminosità"],
+        "pt": ["intensidade luz", "lux", "iluminação", "luminosidade"],
+        "nl": ["lichtsterkte", "lux", "verlichting", "helderheid"],
+        "pl": ["natężenie światła", "lux", "oświetlenie", "jasność"],
+        "hi": ["प्रकाश तीव्रता", "लक्स", "रोशनी", "चमक"],
+        "zh": ["光照强度", "勒克斯", "光照度", "亮度"],
+        "th": ["ความเข้มแสง", "ลักซ์", "การส่องสว่าง"],
+        "id": ["intensitas cahaya", "lux", "pencahayaan", "kecerahan"]
+      }
+    }
+  },
+
+  "welfare_management": {
+    "stocking_density": {
+      "canonical": "stocking_density",
+      "domain": "welfare",
+      "confidence": 0.98,
+      "unit": "kg/m2 or birds/m2",
+      "category": "housing_parameter",
+      "translations": {
+        "fr": ["densité d'élevage", "densité", "kg/m2", "oiseaux/m2", "charge"],
+        "en": ["stocking density", "density", "kg/m2", "birds/m2", "bird density"],
+        "es": ["densidad crianza", "densidad", "kg/m2", "aves/m2", "carga"],
+        "de": ["besatzdichte", "dichte", "kg/m2", "tiere/m2", "belegung"],
+        "it": ["densità allevamento", "densità", "kg/m2", "capi/m2"],
+        "pt": ["densidade criação", "densidade", "kg/m2", "aves/m2"],
+        "nl": ["bezettingsdichtheid", "dichtheid", "kg/m2", "dieren/m2"],
+        "pl": ["zagęszczenie", "gęstość", "kg/m2", "sztuk/m2"],
+        "hi": ["पशु घनत्व", "घनत्व", "किग्रा/म2", "पक्षी/म2"],
+        "zh": ["饲养密度", "密度", "公斤/平米", "只/平米"],
+        "th": ["ความหนาแน่น", "ความหนาแน่นการเลี้ยง", "กก/ตรม"],
+        "id": ["kepadatan ternak", "kepadatan", "kg/m2", "ekor/m2"]
+      }
+    },
+
+    "heat_stress": {
+      "canonical": "heat_stress",
+      "domain": "welfare",
+      "confidence": 0.95,
+      "unit": "°C",
+      "category": "environmental_stress",
+      "translations": {
+        "fr": ["stress thermique", "stress chaleur", "canicule", "coup de chaleur", "hyperthermie"],
+        "en": ["heat stress", "thermal stress", "hyperthermia", "heat stroke", "overheating"],
+        "es": ["estrés térmico", "estrés calor", "golpe calor", "hipertermia"],
+        "de": ["hitzestress", "wärmestress", "hyperthermie", "hitzschlag"],
+        "it": ["stress termico", "stress da calore", "ipertermia", "colpo calore"],
+        "pt": ["estresse térmico", "estresse calor", "hipertermia", "golpe calor"],
+        "nl": ["hittestress", "warmtestress", "hyperthermie", "oververhitting"],
+        "pl": ["stres cieplny", "stres termiczny", "przegrzanie", "hipertermia"],
+        "hi": ["गर्मी का तनाव", "तापीय तनाव", "अत्यधिक गर्मी"],
+        "zh": ["热应激", "高温应激", "热射病", "中暑"],
+        "th": ["ความเครียดจากความร้อน", "ภาวะร้อนจัด"],
+        "id": ["stres panas", "stres termal", "kepanasan", "hipertermia"]
+      }
+    },
+
+    "feather_pecking": {
+      "canonical": "feather_pecking",
+      "domain": "welfare",
+      "confidence": 0.95,
+      "category": "behavioral_problem",
+      "translations": {
+        "fr": ["picage", "picage plumes", "cannibalisme", "arrachage plumes"],
+        "en": ["feather pecking", "pecking", "cannibalism", "feather picking"],
+        "es": ["picoteo plumas", "canibalismo", "picaje", "arranque plumas"],
+        "de": ["federpicken", "kannibalismus", "gefiederpicken", "pickverhalten"],
+        "it": ["beccaggio piume", "cannibalismo", "spiumaggio", "picking"],
+        "pt": ["bicagem penas", "canibalismo", "arranque penas", "debicagem"],
+        "nl": ["verenpikken", "kannibalisme", "pikgedrag", "verenplukken"],
+        "pl": ["skubanie piór", "kanibalizm", "dziobanie", "wyrywanie piór"],
+        "hi": ["पंख नोचना", "नरभक्षण", "पंख चुगना"],
+        "zh": ["啄羽", "食羽癖", "同类相食", "羽毛啄食"],
+        "th": ["การจิกขน", "การกินพฤติกรรม", "การจิกกันเอง"],
+        "id": ["patuk bulu", "kanibalisme", "cabut bulu", "mematuk"]
+      }
+    }
+  },
+
+  "equipment_settings": {
+    "nipple_height": {
+      "canonical": "nipple_height",
+      "domain": "equipment",
+      "confidence": 0.92,
+      "unit": "cm",
+      "category": "drinker_setting",
+      "translations": {
+        "fr": ["hauteur nipples", "hauteur tétines", "réglage abreuvoirs", "cm hauteur"],
+        "en": ["nipple height", "drinker height", "waterer height", "cm height"],
+        "es": ["altura nipples", "altura bebederos", "altura tetinas"],
+        "de": ["nippelhöhe", "tränkenhöhe", "wasserhöhe"],
+        "it": ["altezza nipple", "altezza abbeveratoi", "altezza capezzoli"],
+        "pt": ["altura nipples", "altura bebedouros", "altura bicos"],
+        "nl": ["nippelhoogte", "drinkhoogte", "waterhoogte"],
+        "pl": ["wysokość smoczków", "wysokość pojników"],
+        "hi": ["निप्पल की ऊंचाई", "पानी की ऊंचाई"],
+        "zh": ["乳头高度", "饮水器高度", "厘米高度"],
+        "th": ["ความสูงหัวดูด", "ความสูงที่ดื่มน้ำ"],
+        "id": ["tinggi nipple", "tinggi tempat minum"]
+      }
+    },
+
+    "brooding_temperature": {
+      "canonical": "brooding_temperature_curve",
+      "domain": "equipment",
+      "confidence": 0.93,
+      "unit": "°C",
+      "category": "heating_program",
+      "translations": {
+        "fr": ["courbe température", "programme chauffage", "température élevage", "°c démarrage"],
+        "en": ["temperature curve", "heating program", "brooding temperature", "°c startup"],
+        "es": ["curva temperatura", "programa calefacción", "temperatura crianza"],
+        "de": ["temperaturkurve", "heizprogramm", "aufzuchttemperatur"],
+        "it": ["curva temperatura", "programma riscaldamento", "temperatura allevamento"],
+        "pt": ["curva temperatura", "programa aquecimento", "temperatura criação"],
+        "nl": ["temperatuurcurve", "verwarmingsprogramma", "opfoktemperatuur"],
+        "pl": ["krzywa temperatury", "program grzewczy", "temperatura odchowu"],
+        "hi": ["तापमान वक्र", "हीटिंग प्रोग्राम", "ब्रूडिंग तापमान"],
+        "zh": ["温度曲线", "加热程序", "育雏温度"],
+        "th": ["เส้นโค้งอุณหภูมิ", "โปรแกรมความร้อน"],
+        "id": ["kurva suhu", "program pemanas", "suhu brooding"]
+      }
+    },
+
+    "minimum_ventilation": {
+      "canonical": "minimum_ventilation_program",
+      "domain": "equipment",
+      "confidence": 0.94,
+      "unit": "m3/h/kg",
+      "category": "ventilation_program",
+      "translations": {
+        "fr": ["ventilation minimale", "programme ventilation", "débit minimum", "m3/h/kg"],
+        "en": ["minimum ventilation", "ventilation program", "minimum airflow", "m3/h/kg"],
+        "es": ["ventilación mínima", "programa ventilación", "caudal mínimo"],
+        "de": ["mindestlüftung", "lüftungsprogramm", "mindestluftrate"],
+        "it": ["ventilazione minima", "programma ventilazione", "portata minima"],
+        "pt": ["ventilação mínima", "programa ventilação", "vazão mínima"],
+        "nl": ["minimumventilatie", "ventilatieprogramma", "minimum debiet"],
+        "pl": ["wentylacja minimalna", "program wentylacji", "minimalny przepływ"],
+        "hi": ["न्यूनतम वेंटिलेशन", "वेंटिलेशन प्रोग्राम"],
+        "zh": ["最小通风", "通风程序", "最低通风量"],
+        "th": ["การระบายอากาศขั้นต่ำ", "โปรแกรมระบายอากาศ"],
+        "id": ["ventilasi minimum", "program ventilasi", "aliran minimum"]
+      }
+    },
+
+    "static_pressure_setpoints": {
+      "canonical": "static_pressure_setpoints",
+      "domain": "equipment",
+      "confidence": 0.92,
+      "unit": "Pa",
+      "category": "ventilation_setting",
+      "translations": {
+        "fr": ["consignes pression statique", "pression cible", "réglage pression", "pa cible"],
+        "en": ["static pressure setpoints", "target pressure", "pressure setting", "target pa"],
+        "es": ["puntos ajuste presión", "presión objetivo", "ajuste presión"],
+        "de": ["sollwerte statischer druck", "zieldruck", "druckeinstellung"],
+        "it": ["setpoint pressione statica", "pressione target", "regolazione pressione"],
+        "pt": ["setpoints pressão estática", "pressão alvo", "ajuste pressão"],
+        "nl": ["drukinstellingen", "doeldruk", "drukregelingen"],
+        "pl": ["nastawy ciśnienia", "ciśnienie docelowe", "regulacja ciśnienia"],
+        "hi": ["स्थिर दबाव सेटपॉइंट", "लक्ष्य दबाव", "दबाव सेटिंग"],
+        "zh": ["静压设定值", "目标压力", "压力设置"],
+        "th": ["จุดตั้งความดัน", "ความดันเป้าหมาย"],
+        "id": ["setpoint tekanan statis", "tekanan target", "pengaturan tekanan"]
+      }
+    },
+
+    "co2_maximum_ppm": {
+      "canonical": "co2_maximum_limit",
+      "domain": "equipment",
+      "confidence": 0.91,
+      "unit": "ppm",
+      "category": "air_quality_limit",
+      "translations": {
+        "fr": ["co2 maximum", "limite co2", "seuil co2", "ppm co2 max"],
+        "en": ["co2 maximum", "co2 limit", "co2 threshold", "maximum ppm co2"],
+        "es": ["co2 máximo", "límite co2", "umbral co2"],
+        "de": ["co2 maximum", "co2 grenzwert", "co2 schwelle"],
+        "it": ["co2 massimo", "limite co2", "soglia co2"],
+        "pt": ["co2 máximo", "limite co2", "limiar co2"],
+        "nl": ["co2 maximum", "co2 limiet", "co2 drempel"],
+        "pl": ["co2 maksimum", "limit co2", "próg co2"],
+        "hi": ["अधिकतम सीओ2", "सीओ2 सीमा", "सीओ2 थ्रेशहोल्ड"],
+        "zh": ["最大二氧化碳", "CO2限值", "CO2阈值"],
+        "th": ["ซีโอทูสูงสุด", "ขีดจำกัดซีโอทู"],
+        "id": ["co2 maksimum", "batas co2", "ambang co2"]
+      }
+    }
+  },
+
+  "reproduction_laying": {
+    "sexual_maturity": {
+      "canonical": "sexual_maturity",
+      "domain": "reproduction",
+      "confidence": 0.95,
+      "unit": "weeks",
+      "category": "physiological_stage",
+      "translations": {
+        "fr": ["maturité sexuelle", "âge première ponte", "photostimulation", "mise en ponte"],
+        "en": ["sexual maturity", "age at first egg", "photostimulation", "point of lay"],
+        "es": ["madurez sexual", "edad primera puesta", "fotoestimulación"],
+        "de": ["geschlechtsreife", "alter erste ei", "photostimulation"],
+        "it": ["maturità sessuale", "età prima deposizione", "fotostimolazione"],
+        "pt": ["maturidade sexual", "idade primeira postura", "fotoestimulação"],
+        "nl": ["geslachtsrijpheid", "leeftijd eerste ei", "photostimulatie"],
+        "pl": ["dojrzałość płciowa", "wiek pierwszego jaja", "fotostymulacja"],
+        "hi": ["यौन परिपक्वता", "पहला अंडा", "प्रकाश उत्तेजना"],
+        "zh": ["性成熟", "开产日龄", "光刺激", "见蛋日龄"],
+        "th": ["ความสุกทางเพศ", "อายุไข่ใบแรก", "การกระตุ้นด้วยแสง"],
+        "id": ["kematangan seksual", "umur telur pertama", "fotostimulasi"]
+      }
+    },
+
+    "laying_rate": {
+      "canonical": "laying_rate",
+      "domain": "reproduction",
+      "confidence": 0.98,
+      "unit": "%",
+      "category": "production_metric",
+      "translations": {
+        "fr": ["taux de ponte", "% ponte", "production", "ponte", "pourcentage ponte"],
+        "en": ["laying rate", "lay rate", "production rate", "% lay", "laying percentage"],
+        "es": ["tasa puesta", "% puesta", "producción", "postura"],
+        "de": ["legerate", "legeLeistung", "% legung", "eierproduktion"],
+        "it": ["tasso deposizione", "% deposizione", "produzione", "ovodeposizione"],
+        "pt": ["taxa postura", "% postura", "produção", "oviposição"],
+        "nl": ["legpercentage", "% leg", "legprestatie", "eierproductie"],
+        "pl": ["wskaźnik nieśności", "% nieśność", "produkcja jaj"],
+        "hi": ["अंडे देने की दर", "अंडा प्रतिशत", "उत्पादन दर"],
+        "zh": ["产蛋率", "产蛋百分比", "产蛋性能", "下蛋率"],
+        "th": ["อัตราการออกไข่", "เปอร์เซ็นต์การไข่", "ประสิทธิภาพการไข่", "การวางไข่", "ผลผลิตไข่"],
+        "id": ["tingkat bertelur", "% bertelur", "produksi telur"]
+      }
+    },
+
+    "egg_weight": {
+      "canonical": "egg_weight",
+      "domain": "reproduction",
+      "confidence": 0.98,
+      "unit": "g",
+      "category": "quality_metric",
+      "translations": {
+        "fr": ["poids œuf", "poids oeuf", "calibre œuf", "masse œuf", "poids moyen œuf"],
+        "en": ["egg weight", "egg mass", "average egg weight", "egg size", "egg caliber"],
+        "es": ["peso huevo", "masa huevo", "calibre huevo", "tamaño huevo"],
+        "de": ["eigewicht", "eimasse", "eigröße", "durchschnittsgewicht ei"],
+        "it": ["peso uovo", "massa uovo", "calibro uovo", "dimensione uovo"],
+        "pt": ["peso ovo", "massa ovo", "calibre ovo", "tamanho ovo"],
+        "nl": ["eigewicht", "eimassa", "eikaliber", "gemiddeld eigewicht"],
+        "pl": ["waga jaja", "masa jaja", "kaliber jaja", "średnia waga jaja"],
+        "hi": ["अंडे का वजन", "अंडे का द्रव्यमान", "अंडे का आकार"],
+        "zh": ["蛋重", "鸡蛋重量", "蛋的重量", "平均蛋重"],
+        "th": ["น้ำหนักไข่", "มวลไข่", "ขนาดไข่", "น้ำหนักเฉลี่ยไข่"],
+        "id": ["berat telur", "massa telur", "kaliber telur", "ukuran telur"]
+      }
+    },
+
+    "shell_quality": {
+      "canonical": "shell_quality",
+      "domain": "reproduction",
+      "confidence": 0.95,
+      "unit": "various",
+      "category": "quality_metric",
+      "translations": {
+        "fr": ["qualité coquille", "épaisseur coquille", "solidité coquille", "coquilles molles"],
+        "en": ["shell quality", "shell thickness", "shell strength", "soft shells", "thin shells"],
+        "es": ["calidad cáscara", "grosor cáscara", "resistencia cáscara", "cáscaras blandas"],
+        "de": ["schalenqualität", "schalendicke", "schalenfestigkeit", "weichschalig"],
+        "it": ["qualità guscio", "spessore guscio", "resistenza guscio", "gusci molli"],
+        "pt": ["qualidade casca", "espessura casca", "resistência casca", "cascas moles"],
+        "nl": ["schaalKwaliteit", "schaaldikte", "schaalsterkte", "dunne schaal"],
+        "pl": ["jakość skorupy", "grubość skorupy", "wytrzymałość skorupy"],
+        "hi": ["छिलके की गुणवत्ता", "छिलके की मोटाई", "नरम छिलका"],
+        "zh": ["蛋壳质量", "蛋壳厚度", "蛋壳强度", "软壳蛋"],
+        "th": ["คุณภาพเปลือกไข่", "ความหนาเปลือก", "เปลือกอ่อน"],
+        "id": ["kualitas cangkang", "ketebalan cangkang", "cangkang lunak"]
+      }
+    }
+  },
+
+  "phases": {
+    "starter": {
+      "canonical": "starter",
+      "domain": "feed_phase",
+      "confidence": 0.95,
+      "age_range": "0-10 days",
+      "translations": {
+        "fr": ["starter", "démarrage", "demarrage", "start", "phase 1", "pre-starter"],
+        "en": ["starter", "start", "starting phase", "phase 1", "pre-starter", "prestarter"],
+        "es": ["iniciador", "arranque", "inicio", "fase inicial", "pre-iniciador"],
+        "de": ["starter", "anfang", "startphase", "phase 1", "vor-starter"],
+        "it": ["starter", "avviamento", "inizio", "fase iniziale", "pre-starter"],
+        "pt": ["inicial", "arranque", "início", "fase inicial", "pré-inicial"],
+        "nl": ["starter", "begin", "startfase", "fase 1", "voor-starter"],
+        "pl": ["starter", "początek", "faza startowa", "faza 1", "przed-starter"],
+        "hi": ["स्टार्टर", "शुरुआत", "आरंभिक चरण", "चरण 1", "प्री-स्टार्टर"],
+        "zh": ["开食料", "起始阶段", "第一阶段", "前期料", "雏鸡料"],
+        "th": ["สตาร์ทเตอร์", "เริ่มต้น", "ระยะเริ่มต้น", "ระยะที่ 1", "ก่อนสตาร์ท"],
+        "id": ["starter", "pemula", "fase awal", "tahap 1", "pra-starter"]
+      }
+    },
+
+    "grower": {
+      "canonical": "grower",
+      "domain": "feed_phase",
+      "confidence": 0.95,
+      "age_range": "11-28 days",
+      "translations": {
+        "fr": ["grower", "croissance", "phase 2", "developer"],
+        "en": ["grower", "growing phase", "phase 2", "developer", "growth"],
+        "es": ["crecimiento", "engorde", "fase crecimiento", "fase 2"],
+        "de": ["mast", "wachstum", "wachstumsphase", "phase 2"],
+        "it": ["accrescimento", "crescita", "fase crescita", "fase 2"],
+        "pt": ["crescimento", "engorda", "fase crescimento", "fase 2"],
+        "nl": ["groei", "groeifase", "fase 2", "opfok"],
+        "pl": ["wzrost", "faza wzrostu", "odchów", "fase 2"],
+        "hi": ["ग्रोअर", "विकास चरण", "चरण 2", "बढ़ने वाला"],
+        "zh": ["生长料", "生长阶段", "第二阶段", "中期料"],
+        "th": ["โกรเวอร์", "ระยะเจริญเติบโต", "ระยะที่ 2", "การเจริญเติบโต"],
+        "id": ["grower", "pertumbuhan", "fase tumbuh", "tahap 2"]
+      }
+    },
+
+    "finisher": {
+      "canonical": "finisher",
+      "domain": "feed_phase",
+      "confidence": 0.95, 
+      "age_range": "29-42 days",
+      "translations": {
+        "fr": ["finisher", "finition", "finish", "phase 3"],
+        "en": ["finisher", "finishing phase", "finish", "phase 3", "final"],
+        "es": ["finalizador", "acabado", "fase final", "fase 3"],
+        "de": ["endmast", "finish", "endphase", "phase 3"],
+        "it": ["finissaggio", "fine", "fase finale", "fase 3"],
+        "pt": ["terminação", "acabamento", "fase final", "fase 3"],
+        "nl": ["afmest", "eindgase", "fase 3", "finish"],
+        "pl": ["finisher", "faza końcowa", "wykańczanie", "faza 3"],
+        "hi": ["फिनिशर", "समाप्ति चरण", "चरण 3", "अंतिम"],
+        "zh": ["育肥料", "育肥阶段", "第三阶段", "后期料"],
+        "th": ["ฟินิชเชอร์", "ระยะสุดท้าย", "ระยะที่ 3", "จบ"],
+        "id": ["finisher", "akhir", "fase akhir", "tahap 3"]
+      }
+    }
+  },
+
+  "taxonomy_classification": {
+    "commercial_strain": {
+      "canonical": "commercial_strain",
+      "domain": "taxonomy",
+      "confidence": 0.95,
+      "category": "breed_classification",
+      "translations": {
+        "fr": ["lignée commerciale", "souche", "strain", "lignée", "race"],
+        "en": ["commercial strain", "strain", "breed", "line", "variety"],
+        "es": ["línea comercial", "cepa", "raza", "estirpe"],
+        "de": ["zuchtlinie", "stamm", "linie", "rasse"],
+        "it": ["linea commerciale", "ceppo", "razza", "stirpe"],
+        "pt": ["linhagem comercial", "cepa", "raça", "estirpe"],
+        "nl": ["commerciële lijn", "stam", "ras", "linie"],
+        "pl": ["linia handlowa", "szczep", "rasa", "odmiana"],
+        "hi": ["व्यावसायिक नस्ल", "स्ट्रेन", "प्रजाति", "वंशावली"],
+        "zh": ["商业品系", "品种", "品系", "种系"],
+        "th": ["สายพันธุ์เชิงพาณิชย์", "สเตรน", "พันธุ์"],
+        "id": ["galur komersial", "strain", "ras", "varietas"]
+      }
+    },
+
+    "sex_class": {
+      "canonical": "sex_class",
+      "domain": "taxonomy",
+      "confidence": 0.94,
+      "category": "demography",
+      "translations": {
+        "fr": ["mâles", "femelles", "mixte", "straight-run", "sr"],
+        "en": ["male", "female", "mixed", "straight-run", "sr"],
+        "es": ["machos", "hembras", "mixto", "sin sexar"],
+        "de": ["männlich", "weiblich", "gemischt", "ungetrennt"],
+        "it": ["maschi", "femmine", "misto", "non sessato"],
+        "pt": ["machos", "fêmeas", "misto", "não sexado"],
+        "nl": ["mannen", "vrouwen", "gemengd", "ongekuind"],
+        "pl": ["samce", "samice", "mieszane", "nieselektowane"],
+        "hi": ["नर", "मादा", "मिश्रित", "अलग नहीं किया गया"],
+        "zh": ["公", "母", "混合", "未分性别"],
+        "th": ["เพศผู้", "เพศเมีย", "ผสม", "ไม่แยกเพศ"],
+        "id": ["jantan", "betina", "campuran", "tidak disortir"]
+      }
+    },
+
+    "age_brackets": {
+      "canonical": "age_brackets",
+      "domain": "taxonomy",
+      "confidence": 0.96,
+      "category": "age_classification",
+      "translations": {
+        "fr": ["0-10j", "11-35j", "36-42j", "phase 1", "phase 2", "phase 3"],
+        "en": ["0-10d", "11-35d", "36-42d", "phase 1", "phase 2", "phase 3"],
+        "es": ["0-10 días", "11-35 días", "36-42 días", "fase 1", "fase 2", "fase 3"],
+        "de": ["0-10 tage", "11-35 tage", "36-42 tage", "phase 1", "phase 2", "phase 3"],
+        "it": ["0-10 giorni", "11-35 giorni", "36-42 giorni", "fase 1", "fase 2", "fase 3"],
+        "pt": ["0-10 dias", "11-35 dias", "36-42 dias", "fase 1", "fase 2", "fase 3"],
+        "nl": ["0-10 dagen", "11-35 dagen", "36-42 dagen", "fase 1", "fase 2", "fase 3"],
+        "pl": ["0-10 dni", "11-35 dni", "36-42 dni", "faza 1", "faza 2", "faza 3"],
+        "hi": ["0-10 दिन", "11-35 दिन", "36-42 दिन", "चरण 1", "चरण 2", "चरण 3"],
+        "zh": ["0-10天", "11-35天", "36-42天", "第一阶段", "第二阶段", "第三阶段"],
+        "th": ["0-10 วัน", "11-35 วัน", "36-42 วัน", "ระยะ 1", "ระยะ 2", "ระยะ 3"],
+        "id": ["0-10 hari", "11-35 hari", "36-42 hari", "tahap 1", "tahap 2", "tahap 3"]
+      }
+    }
+  },
+
+  "question_patterns": {
+    "weight_query": {
+      "canonical": "weight_query",
+      "domain": "question_intent",
+      "confidence": 0.90,
+      "intent_type": "metric_query",
+      "translations": {
+        "fr": ["quel est le poids", "poids cible", "poids moyen", "combien pèse", "quel poids"],
+        "en": ["what is the weight", "target weight", "average weight", "how much does weigh", "what weight"],
+        "es": ["cuál es el peso", "peso objetivo", "peso promedio", "cuánto pesa", "qué peso"],
+        "de": ["wie ist das gewicht", "zielgewicht", "durchschnittsgewicht", "wie schwer", "welches gewicht"],
+        "it": ["qual è il peso", "peso target", "peso medio", "quanto pesa", "che peso"],
+        "pt": ["qual é o peso", "peso alvo", "peso médio", "quanto pesa", "que peso"],
+        "nl": ["wat is het gewicht", "streefgewicht", "gemiddeld gewicht", "hoeveel weegt", "welk gewicht"],
+        "pl": ["jaka jest waga", "waga docelowa", "średnia waga", "ile waży", "jaka waga"],
+        "hi": ["वजन क्या है", "लक्षित वजन", "औसत वजन", "कितना वजन", "क्या वजन"],
+        "zh": ["重量是多少", "目标重量", "平均重量", "重多少", "什么重量"],
+        "th": ["น้ำหนักคือเท่าไหร่", "น้ำหนักเป้าหมาย", "น้ำหนักเฉลี่ย", "หนักเท่าไหร่", "น้ำหนักอะไร"],
+        "id": ["berapa beratnya", "berat target", "berat rata-rata", "seberat apa", "berat berapa"]
+      }
+    },
+
+    "fcr_query": {
+      "canonical": "fcr_query",
+      "domain": "question_intent",
+      "confidence": 0.90,
+      "intent_type": "metric_query",
+      "translations": {
+        "fr": ["fcr optimal", "indice consommation", "conversion alimentaire", "ic moyen"],
+        "en": ["optimal fcr", "feed conversion", "conversion ratio", "average fcr"],
+        "es": ["fcr óptimo", "conversión alimenticia", "índice conversión"],
+        "de": ["optimale fcr", "futterverwertung", "futterkonversion"],
+        "it": ["fcr ottimale", "conversione alimentare", "indice conversione"],
+        "pt": ["fcr ótimo", "conversão alimentar", "índice conversão"],
+        "nl": ["optimale fcr", "voederconversie", "voederefficiëntie"],
+        "pl": ["optymalne fcr", "konwersja paszowa", "przelicznik"],
+        "hi": ["बेहतर एफसीआर", "फीड रूपांतरण", "आहार दक्षता"],
+        "zh": ["最佳料肉比", "饲料转化率", "料重比"],
+        "th": ["เอฟซีอาร์ที่เหมาะสม", "อัตราแปลงอาหาร"],
+        "id": ["fcr optimal", "konversi pakan", "rasio konversi"]
+      }
+    },
+
+    "water_query": {
+      "canonical": "water_query",
+      "domain": "question_intent",
+      "confidence": 0.88,
+      "intent_type": "metric_query",
+      "translations": {
+        "fr": ["consommation eau", "débit eau", "litres par jour", "ml par oiseau"],
+        "en": ["water consumption", "water intake", "liters per day", "ml per bird"],
+        "es": ["consumo agua", "ingesta agua", "litros por día"],
+        "de": ["wasserverbrauch", "wasseraufnahme", "liter pro tag"],
+        "it": ["consumo acqua", "intake acqua", "litri al giorno"],
+        "pt": ["consumo água", "ingestão água", "litros por dia"],
+        "nl": ["waterverbruik", "wateropname", "liter per dag"],
+        "pl": ["zużycie wody", "spożycie wody", "litry dziennie"],
+        "hi": ["पानी की खपत", "जल सेवन", "लीटर प्रति दिन"],
+        "zh": ["耗水量", "饮水量", "升/天"],
+        "th": ["การใช้น้ำ", "การดื่มน้ำ", "ลิตรต่อวัน"],
+        "id": ["konsumsi air", "asupan air", "liter per hari"]
+      }
+    },
+
+    "nutrient_requirement_query": {
+      "canonical": "nutrient_requirement_query",
+      "domain": "question_intent",
+      "confidence": 0.87,
+      "intent_type": "nutrition_query",
+      "translations": {
+        "fr": ["taux protéine", "niveau lysine", "besoin calcium", "teneur phosphore"],
+        "en": ["protein level", "lysine requirement", "calcium need", "phosphorus content"],
+        "es": ["nivel proteína", "requerimiento lisina", "necesidad calcio"],
+        "de": ["proteingehalt", "lysinbedarf", "kalziumbedarf"],
+        "it": ["livello proteine", "fabbisogno lisina", "necessità calcio"],
+        "pt": ["nível proteína", "exigência lisina", "necessidade cálcio"],
+        "nl": ["eiwitgehalte", "lysinebehoefte", "calciumbehoefte"],
+        "pl": ["poziom białka", "zapotrzebowanie lizyny", "potrzeba wapnia"],
+        "hi": ["प्रोटीन स्तर", "लाइसिन आवश्यकता", "कैल्शियम जरूरत"],
+        "zh": ["蛋白质水平", "赖氨酸需要量", "钙需求"],
+        "th": ["ระดับโปรตีน", "ความต้องการไลซีน", "ความจำเป็นแคลเซียม"],
+        "id": ["tingkat protein", "kebutuhan lisin", "kebutuhan kalsium"]
+      }
+    },
+
+    "environment_setpoint_query": {
+      "canonical": "environment_setpoint_query",
+      "domain": "question_intent",
+      "confidence": 0.88,
+      "intent_type": "setpoint_query",
+      "translations": {
+        "fr": ["température optimale", "humidité cible", "co2 maximum", "ventilation réglage"],
+        "en": ["optimal temperature", "target humidity", "maximum co2", "ventilation setting"],
+        "es": ["temperatura óptima", "humedad objetivo", "co2 máximo"],
+        "de": ["optimale temperatur", "ziel feuchtigkeit", "maximales co2"],
+        "it": ["temperatura ottimale", "umidità target", "co2 massimo"],
+        "pt": ["temperatura ótima", "umidade alvo", "co2 máximo"],
+        "nl": ["optimale temperatuur", "doel vochtigheid", "maximum co2"],
+        "pl": ["optymalna temperatura", "docelowa wilgotność", "maksymalne co2"],
+        "hi": ["बेहतर तापमान", "लक्षित आर्द्रता", "अधिकतम सीओ2"],
+        "zh": ["最适温度", "目标湿度", "最大二氧化碳"],
+        "th": ["อุณหภูมิที่เหมาะสม", "ความชื้นเป้าหมาย", "ซีโอทูสูงสุด"],
+        "id": ["suhu optimal", "kelembaban target", "co2 maksimum"]
+      }
+    },
+
+    "production_index_query": {
+      "canonical": "production_index_query",
+      "domain": "question_intent",
+      "confidence": 0.85,
+      "intent_type": "metric_query",
+      "translations": {
+        "fr": ["iep moyen", "epef normal", "indice efficacité", "performance globale"],
+        "en": ["average epef", "normal iep", "efficiency index", "overall performance"],
+        "es": ["epef promedio", "iep normal", "índice eficiencia"],
+        "de": ["durchschnittliche epef", "normale iep", "effizienzindex"],
+        "it": ["epef medio", "iep normale", "indice efficienza"],
+        "pt": ["epef médio", "iep normal", "índice eficiência"],
+        "nl": ["gemiddelde epef", "normale iep", "efficiëntie-index"],
+        "pl": ["średnia epef", "normalna iep", "wskaźnik wydajności"],
+        "hi": ["औसत ईपीईएफ", "सामान्य आईईपी", "दक्षता सूचकांक"],
+        "zh": ["平均EPEF", "正常IEP", "效率指数"],
+        "th": ["อีพีอีเอฟเฉลี่ย", "ไออีพีปกติ", "ดัชนีประสิทธิภาพ"],
+        "id": ["rata-rata epef", "iep normal", "indeks efisiensi"]
+      }
+    },
+
+    "vaccination_protocol_query": {
+      "canonical": "vaccination_protocol_query",
+      "domain": "question_intent",
+      "confidence": 0.84,
+      "intent_type": "protocol_query",
+      "translations": {
+        "fr": ["protocole vaccination", "schéma vaccinal", "programme vaccin", "planning vaccination"],
+        "en": ["vaccination protocol", "vaccine schedule", "vaccination program", "immunization plan"],
+        "es": ["protocolo vacunación", "esquema vacunal", "programa vacunas"],
+        "de": ["impfprotokoll", "impfschema", "impfprogramm"],
+        "it": ["protocollo vaccinale", "schema vaccinazioni", "programma vaccini"],
+        "pt": ["protocolo vacinação", "esquema vacinal", "programa vacinas"],
+        "nl": ["vaccinatieprotocol", "vaccinatieschema", "vaccinatieprogramma"],
+        "pl": ["protokół szczepień", "schemat szczepień", "program szczepień"],
+        "hi": ["टीकाकरण प्रोटोकॉल", "वैक्सीन कार्यक्रम", "टीकाकरण योजना"],
+        "zh": ["疫苗程序", "免疫计划", "疫苗方案"],
+        "th": ["โปรโตคอลการฉีดวัคซีน", "ตารางวัคซีน", "โปรแกรมวัคซีน"],
+        "id": ["protokol vaksinasi", "jadwal vaksin", "program vaksinasi"]
+      }
+    },
+
+    "space_equipment_query": {
+      "canonical": "space_equipment_query",
+      "domain": "question_intent",
+      "confidence": 0.83,
+      "intent_type": "equipment_query",
+      "translations": {
+        "fr": ["espace mangeoire", "réglage nipples", "hauteur abreuvoir", "cm par oiseau"],
+        "en": ["feeder space", "nipple setting", "drinker height", "cm per bird"],
+        "es": ["espacio comedero", "ajuste nipples", "altura bebedero"],
+        "de": ["futterplatz", "nipple einstellung", "tränkenhöhe"],
+        "it": ["spazio mangiatoia", "regolazione nipple", "altezza abbeveratoio"],
+        "pt": ["espaço comedouro", "ajuste nipples", "altura bebedouro"],
+        "nl": ["voederruimte", "nipple instelling", "drinkhoogte"],
+        "pl": ["miejsce karmika", "ustawienia smoczka", "wysokość pojnika"],
+        "hi": ["फीडर स्थान", "निप्पल सेटिंग", "पानी की ऊंचाई"],
+        "zh": ["采食位", "乳头设置", "饮水器高度"],
+        "th": ["พื้นที่ให้อาหาร", "การตั้งค่าหัวดูด", "ความสูงที่ดื่ม"],
+        "id": ["ruang pakan", "pengaturan nipple", "tinggi tempat minum"]
+      }
+    },
+
+    "problem_report": {
+      "canonical": "problem_report", 
+      "domain": "question_intent",
+      "confidence": 0.85,
+      "intent_type": "diagnosis_triage",
+      "translations": {
+        "fr": ["mes poulets", "j'observe", "mes poules", "problème avec", "mes oiseaux"],
+        "en": ["my chickens", "i observe", "my hens", "problem with", "my birds"],
+        "es": ["mis pollos", "observo", "mis gallinas", "problema con", "mis aves"],
+        "de": ["meine hühner", "ich beobachte", "meine hennen", "problem mit", "meine vögel"],
+        "it": ["i miei polli", "osservo", "le mie galline", "problema con", "i miei uccelli"],
+        "pt": ["minhas galinhas", "observo", "minhas galinhas", "problema com", "minhas aves"],
+        "nl": ["mijn kippen", "ik observeer", "mijn hennen", "probleem met", "mijn vogels"],
+        "pl": ["moje kurczaki", "obserwuję", "moje kury", "problem z", "moje ptaki"],
+        "hi": ["मेरे मुर्गे", "मैं देख रहा हूं", "मेरी मुर्गियां", "समस्या है", "मेरे पक्षी"],
+        "zh": ["我的鸡", "我观察到", "我的母鸡", "有问题", "我的鸟"],
+        "th": ["ไก่ของฉัน", "ฉันสังเกต", "แม่ไก่ของฉัน", "มีปัญหา", "นกของฉัน"],
+        "id": ["ayam saya", "saya amati", "ayam betina saya", "masalah dengan", "unggas saya"]
+      }
+    },
+
+    "health_diagnosis": {
+      "canonical": "health_diagnosis",
+      "domain": "question_intent",
+      "confidence": 0.85,
+      "intent_type": "diagnosis_triage",
+      "translations": {
+        "fr": ["quels symptômes", "diagnostic", "maladie", "qu'est-ce qui cause", "signes cliniques"],
+        "en": ["what symptoms", "diagnosis", "disease", "what causes", "clinical signs"],
+        "es": ["qué síntomas", "diagnóstico", "enfermedad", "qué causa", "signos clínicos"],
+        "de": ["welche symptome", "diagnose", "krankheit", "was verursacht"],
+        "it": ["che sintomi", "diagnosi", "malattia", "cosa causa", "segni clinici"],
+        "pt": ["que sintomas", "diagnóstico", "doença", "o que causa"],
+        "nl": ["welke symptomen", "diagnose", "ziekte", "wat veroorzaakt"],
+        "pl": ["jakie objawy", "diagnoza", "choroba", "co powoduje"],
+        "hi": ["कौन से लक्षण", "निदान", "बीमारी", "क्या कारण"],
+        "zh": ["什么症状", "诊断", "疾病", "什么原因", "临床症状"],
+        "th": ["อาการอะไร", "การวินิจฉัย", "โรค", "สาเหตุอะไร"],
+        "id": ["gejala apa", "diagnosis", "penyakit", "apa penyebab"]
+      }
+    },
+
+    "management_how": {
+      "canonical": "management_how",
+      "domain": "question_intent",
+      "confidence": 0.85,
+      "intent_type": "protocol_query",
+      "translations": {
+        "fr": ["comment gérer", "comment traiter", "que faire", "comment améliorer", "gestion de"],
+        "en": ["how to manage", "how to treat", "what to do", "how to improve", "management of"],
+        "es": ["cómo manejar", "cómo tratar", "qué hacer", "cómo mejorar"],
+        "de": ["wie verwalten", "wie behandeln", "was tun", "wie verbessern"],
+        "it": ["come gestire", "come trattare", "cosa fare", "come migliorare"],
+        "pt": ["como gerenciar", "como tratar", "o que fazer", "como melhorar"],
+        "nl": ["hoe beheren", "hoe behandelen", "wat doen", "hoe verbeteren"],
+        "pl": ["jak zarządzać", "jak leczyć", "co robić", "jak poprawić"],
+        "hi": ["कैसे प्रबंधित करें", "कैसे इलाज करें", "क्या करें"],
+        "zh": ["如何管理", "如何治疗", "怎么办", "如何改善"],
+        "th": ["จัดการอย่างไร", "รักษาอย่างไร", "ทำอย่างไร"],
+        "id": ["bagaimana mengelola", "bagaimana mengobati", "apa yang harus dilakukan"]
+      }
+    }
+  },
+
+  "units_measures": {
+    "days": {
+      "canonical": "days",
+      "domain": "time_unit",
+      "confidence": 0.99,
+      "unit_type": "temporal",
+      "translations": {
+        "fr": ["jours", "jour", "j", "d", "days"],
+        "en": ["days", "day", "d"],
+        "es": ["días", "día", "d"],
+        "de": ["tage", "tag", "t"],
+        "it": ["giorni", "giorno", "g"],
+        "pt": ["dias", "dia", "d"],
+        "nl": ["dagen", "dag", "d"],
+        "pl": ["dni", "dzień", "d"],
+        "hi": ["दिन", "दिनों", "द"],
+        "zh": ["天", "日", "d"],
+        "th": ["วัน", "ว", "d"],
+        "id": ["hari", "h", "d"]
+      }
+    },
+
+    "weeks": {
+      "canonical": "weeks",
+      "domain": "time_unit",
+      "confidence": 0.99,
+      "unit_type": "temporal",
+      "translations": {
+        "fr": ["semaines", "semaine", "sem", "s", "w"],
+        "en": ["weeks", "week", "wk", "w"],
+        "es": ["semanas", "semana", "sem", "s"],
+        "de": ["wochen", "woche", "w"],
+        "it": ["settimane", "settimana", "sett", "s"],
+        "pt": ["semanas", "semana", "sem", "s"],
+        "nl": ["weken", "week", "w"],
+        "pl": ["tygodnie", "tydzień", "tyg", "t"],
+        "hi": ["सप्ताह", "हफ्ते", "स"],
+        "zh": ["周", "星期", "周"],
+        "th": ["สัปดาห์", "อาทิตย์", "ส"],
+        "id": ["minggu", "pekan", "m"]
+      }
+    },
+
+    "grams": {
+      "canonical": "grams",
+      "domain": "weight_unit",
+      "confidence": 0.99,
+      "unit_type": "mass",
+      "translations": {
+        "fr": ["grammes", "gramme", "g"],
+        "en": ["grams", "gram", "g"],
+        "es": ["gramos", "gramo", "g"],
+        "de": ["gramm", "g"],
+        "it": ["grammi", "grammo", "g"],
+        "pt": ["gramas", "grama", "g"],
+        "nl": ["gram", "g"],
+        "pl": ["gramy", "gram", "g"],
+        "hi": ["ग्राम", "गैम", "ग"],
+        "zh": ["克", "g"],
+        "th": ["กรัม", "ก", "g"],
+        "id": ["gram", "g"]
+      }
+    },
+
+    "kilograms": {
+      "canonical": "kilograms",
+      "domain": "weight_unit",
+      "confidence": 0.99,
+      "unit_type": "mass",
+      "translations": {
+        "fr": ["kilogrammes", "kilogramme", "kg", "kilo"],
+        "en": ["kilograms", "kilogram", "kg", "kilo"],
+        "es": ["kilogramos", "kilogramo", "kg", "kilo"],
+        "de": ["kilogramm", "kg", "kilo"],
+        "it": ["chilogrammi", "chilogrammo", "kg", "chilo"],
+        "pt": ["quilogramas", "quilograma", "kg", "quilo"],
+        "nl": ["kilogram", "kg", "kilo"],
+        "pl": ["kilogramy", "kilogram", "kg"],
+        "hi": ["किलोग्राम", "किलो", "केजी"],
+        "zh": ["公斤", "千克", "kg"],
+        "th": ["กิโลกรัม", "กิโล", "กก"],
+        "id": ["kilogram", "kg", "kilo"]
+      }
+    },
+
+    "percentage": {
+      "canonical": "percentage",
+      "domain": "ratio_unit", 
+      "confidence": 0.99,
+      "unit_type": "ratio",
+      "translations": {
+        "fr": ["pourcentage", "pourcent", "%", "pc"],
+        "en": ["percentage", "percent", "%", "pct"],
+        "es": ["porcentaje", "por ciento", "%"],
+        "de": ["prozent", "prozentsatz", "%"],
+        "it": ["percentuale", "per cento", "%"],
+        "pt": ["porcentagem", "por cento", "%"],
+        "nl": ["percentage", "procent", "%"],
+        "pl": ["procent", "procenty", "%"],
+        "hi": ["प्रतिशत", "फीसदी", "%"],
+        "zh": ["百分比", "百分率", "%"],
+        "th": ["เปอร์เซ็นต์", "ร้อยละ", "%"],
+        "id": ["persentase", "persen", "%"]
+      }
+    },
+
+    "liters": {
+      "canonical": "liters",
+      "domain": "volume_unit",
+      "confidence": 0.99,
+      "unit_type": "volume",
+      "translations": {
+        "fr": ["litres", "litre", "l"],
+        "en": ["liters", "liter", "l", "litres", "litre"],
+        "es": ["litros", "litro", "l"],
+        "de": ["liter", "l"],
+        "it": ["litri", "litro", "l"],
+        "pt": ["litros", "litro", "l"],
+        "nl": ["liter", "l"],
+        "pl": ["litry", "litr", "l"],
+        "hi": ["लीटर", "ली"],
+        "zh": ["升", "公升", "l"],
+        "th": ["ลิตร", "ล"],
+        "id": ["liter", "l"]
+      }
+    },
+
+    "celsius": {
+      "canonical": "celsius",
+      "domain": "temperature_unit",
+      "confidence": 0.99,
+      "unit_type": "temperature",
+      "translations": {
+        "fr": ["celsius", "degrés celsius", "°c", "degrés"],
+        "en": ["celsius", "degrees celsius", "°c", "degrees"],
+        "es": ["celsius", "grados celsius", "°c", "grados"],
+        "de": ["celsius", "grad celsius", "°c", "grad"],
+        "it": ["celsius", "gradi celsius", "°c", "gradi"],
+        "pt": ["celsius", "graus celsius", "°c", "graus"],
+        "nl": ["celsius", "graden celsius", "°c", "graden"],
+        "pl": ["celsius", "stopnie celsjusza", "°c", "stopnie"],
+        "hi": ["सेल्सियस", "डिग्री सेल्सियस", "°c"],
+        "zh": ["摄氏度", "摄氏", "°c", "度"],
+        "th": ["เซลเซียส", "องศาเซลเซียส", "°c"],
+        "id": ["celsius", "derajat celsius", "°c"]
+      }
+    }
+  },
+
+  "health_symptoms": {
+    "respiratory": {
+      "canonical": "respiratory",
+      "domain": "health_signs",
+      "confidence": 0.90,
+      "category": "clinical_signs",
+      "translations": {
+        "fr": ["respiratoire", "toux", "dyspnée", "râles", "écoulement nasal"],
+        "en": ["respiratory", "cough", "dyspnea", "breathing", "nasal discharge"],
+        "es": ["respiratorio", "tos", "disnea", "respiración", "secreción nasal"],
+        "de": ["atemweg", "husten", "dyspnoe", "atmung", "nasenausfluss"],
+        "it": ["respiratorio", "tosse", "dispnea", "respirazione", "secrezione nasale"],
+        "pt": ["respiratório", "tosse", "dispneia", "respiração", "secreção nasal"],
+        "nl": ["ademhaling", "hoest", "dyspneu", "ademhaling", "neusuitvloeiing"],
+        "pl": ["oddechowy", "kaszel", "duszność", "oddychanie", "wyciek z nosa"],
+        "hi": ["श्वसन", "खांसी", "सांस लेने में कठिनाई", "नाक से स्राव"],
+        "zh": ["呼吸道", "咳嗽", "呼吸困难", "鼻分泌物"],
+        "th": ["ระบบหายใจ", "ไอ", "หายใจลำบาก", "น้ำมูกไหล"],
+        "id": ["pernapasan", "batuk", "sesak napas", "keluaran hidung"]
+      }
+    },
+
+    "digestive": {
+      "canonical": "digestive",
+      "domain": "health_signs",
+      "confidence": 0.90, 
+      "category": "clinical_signs",
+      "translations": {
+        "fr": ["digestif", "diarrhée", "vomissement", "anorexie", "perte appétit"],
+        "en": ["digestive", "diarrhea", "vomiting", "anorexia", "loss appetite"],
+        "es": ["digestivo", "diarrea", "vómito", "anorexia", "pérdida apetito"],
+        "de": ["verdauung", "durchfall", "erbrechen", "anorexie", "appetitverlust"],
+        "it": ["digestivo", "diarrea", "vomito", "anoressia", "perdita appetito"],
+        "pt": ["digestivo", "diarreia", "vômito", "anorexia", "perda apetite"],
+        "nl": ["vertering", "diarree", "braken", "anorexie", "verlies eetlust"],
+        "pl": ["trawienny", "biegunka", "wymioty", "anoreksja", "utrata apetytu"],
+        "hi": ["पाचन", "दस्त", "उल्टी", "भूख न लगना", "भूख की हानि"],
+        "zh": ["消化道", "腹泻", "呕吐", "厌食", "食欲不振"],
+        "th": ["ระบบย่อยอาหาร", "ท้องเสียอุจจาระร่วง", "อาเจียน", "เบื่อ", "เสียืนอาหาร"],
+        "id": ["pencernaan", "diare", "muntah", "anoreksia", "kehilangan nafsu makan"]
+      }
+    },
+
+    "nervous": {
+      "canonical": "nervous",
+      "domain": "health_signs",
+      "confidence": 0.88,
+      "category": "clinical_signs",
+      "translations": {
+        "fr": ["nerveux", "ataxie", "paralysie", "convulsions", "tremblements"],
+        "en": ["nervous", "ataxia", "paralysis", "convulsions", "tremors"],
+        "es": ["nervioso", "ataxia", "parálisis", "convulsiones", "temblores"],
+        "de": ["nervös", "ataxie", "lähmung", "krämpfe", "zittern"],
+        "it": ["nervoso", "atassia", "paralisi", "convulsioni", "tremori"],
+        "pt": ["nervoso", "ataxia", "paralisia", "convulsões", "tremores"],
+        "nl": ["zenuwstelsel", "ataxie", "verlamming", "stuipen", "trillingen"],
+        "pl": ["nerwowy", "ataksja", "paraliż", "drgawki", "drżenia"],
+        "hi": ["तंत्रिका", "असंयम", "पक्षाघात", "ऐंठन", "कांपना"],
+        "zh": ["神经系统", "共济失调", "麻痹", "抽搐", "震颤"],
+        "th": ["ระบบประสาท", "การเดินเซ", "อัมพาต", "ชัก", "สั่น"],
+        "id": ["saraf", "ataksia", "kelumpuhan", "kejang", "gemetar"]
+      }
+    },
+
+    "general": {
+      "canonical": "general",
+      "domain": "health_signs",
+      "confidence": 0.87,
+      "category": "clinical_signs",
+      "translations": {
+        "fr": ["général", "léthargie", "fièvre", "faiblesse", "abattement"],
+        "en": ["general", "lethargy", "fever", "weakness", "depression"],
+        "es": ["general", "letargo", "fiebre", "debilidad", "depresión"],
+        "de": ["allgemein", "lethargie", "fieber", "schwäche", "depression"],
+        "it": ["generale", "letargia", "febbre", "debolezza", "depressione"],
+        "pt": ["geral", "letargia", "febre", "fraqueza", "depressão"],
+        "nl": ["algemeen", "lethargie", "koorts", "zwakte", "depressie"],
+        "pl": ["ogólny", "letarg", "gorączka", "słabość", "depresja"],
+        "hi": ["सामान्य", "सुस्ती", "बुखार", "कमजोरी", "अवसाद"],
+        "zh": ["一般症状", "嗜睡", "发热", "虚弱", "精神沉郁"],
+        "th": ["ทั่วไป", "ซึม", "ไข้", "อ่อนแอ", "ซึมเศร้า"],
+        "id": ["umum", "lesu", "demam", "lemah", "depresi"]
+      }
+    }
+  }
+}
