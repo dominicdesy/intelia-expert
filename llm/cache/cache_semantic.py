@@ -2,6 +2,7 @@
 """
 cache_semantic.py - Module de cache sémantique intelligent
 Gestion de l'extraction de mots-clés, normalisation et cache sémantique
+VERSION CORRIGÉE: Sérialisation JSON pour LanguageDetectionResult
 """
 
 import os
@@ -15,14 +16,21 @@ from typing import Dict, List, Optional, Any, Set
 logger = logging.getLogger(__name__)
 
 
-def clean_language_detection_result(obj):
-    """Nettoie les objets LanguageDetectionResult avant mise en cache"""
-    if (
+def safe_serialize_for_json(obj: Any) -> Any:
+    """Convertit récursivement les objets en types JSON-safe"""
+    if obj is None:
+        return None
+    elif isinstance(obj, (str, int, float, bool)):
+        return obj
+    elif hasattr(obj, "__dict__") and hasattr(obj, "to_dict"):
+        # Utiliser la méthode to_dict si disponible
+        return obj.to_dict()
+    elif (
         hasattr(obj, "language")
         and hasattr(obj, "confidence")
         and hasattr(obj, "source")
     ):
-        # Remplacer LanguageDetectionResult par un dict simple
+        # Gestion spéciale pour LanguageDetectionResult
         return {
             "language": obj.language,
             "confidence": float(obj.confidence),
@@ -30,11 +38,16 @@ def clean_language_detection_result(obj):
             "processing_time_ms": getattr(obj, "processing_time_ms", 0),
         }
     elif isinstance(obj, dict):
-        return {k: clean_language_detection_result(v) for k, v in obj.items()}
+        return {k: safe_serialize_for_json(v) for k, v in obj.items()}
     elif isinstance(obj, (list, tuple)):
-        return [clean_language_detection_result(item) for item in obj]
+        return [safe_serialize_for_json(item) for item in obj]
     else:
-        return obj
+        # Fallback pour autres types
+        try:
+            json.dumps(obj)  # Test de sérialisation
+            return obj
+        except (TypeError, ValueError):
+            return str(obj)
 
 
 class SemanticCacheManager:
@@ -483,7 +496,7 @@ class SemanticCacheManager:
         use_semantic: bool = False,
         fallback_semantic: bool = False,
     ) -> str:
-        """Génère une clé avec support fallback sémantique"""
+        """Génère une clé avec support fallback sémantique - CORRIGÉ pour sérialisation"""
         if isinstance(data, str):
             # Cache sémantique STRICT
             if (
@@ -501,7 +514,8 @@ class SemanticCacheManager:
                     )
                     return f"intelia_rag:{prefix}:semantic:{hash_obj.hexdigest()}"
                 else:
-                    self.core.protection_stats["semantic_rejections"] += 1
+                    if hasattr(self.core, "protection_stats"):
+                        self.core.protection_stats["semantic_rejections"] += 1
 
             # Cache fallback sémantique
             if fallback_semantic and self.ENABLE_SEMANTIC_FALLBACK:
@@ -518,15 +532,17 @@ class SemanticCacheManager:
             # Cache normalisé standard
             content = self._normalize_text_extended(data)
         elif isinstance(data, dict):
-            # Normaliser les dictionnaires contenant des requêtes
-            normalized_dict = data.copy()
+            # CORRECTION: Nettoyer le dictionnaire avec safe_serialize_for_json
+            normalized_dict = safe_serialize_for_json(data.copy())
             if "query" in normalized_dict:
                 normalized_dict["query"] = self._normalize_text_extended(
                     normalized_dict["query"]
                 )
             content = json.dumps(normalized_dict, sort_keys=True, separators=(",", ":"))
         else:
-            content = str(data)
+            # CORRECTION: Appliquer safe_serialize_for_json pour tous les autres types
+            safe_data = safe_serialize_for_json(data)
+            content = json.dumps(safe_data, sort_keys=True, separators=(",", ":"))
 
         hash_obj = hashlib.md5(content.encode("utf-8"))
         return f"intelia_rag:{prefix}:simple:{hash_obj.hexdigest()}"
@@ -726,13 +742,13 @@ class SemanticCacheManager:
     async def set_response(
         self, query: str, context_hash: str, response: str, language: str = "fr"
     ):
-        """Met en cache avec support fallback sémantique"""
+        """Met en cache avec support fallback sémantique - CORRIGÉ pour sérialisation"""
         if not self.core._is_initialized():
             return
 
         try:
-            # Nettoyer les données avant stockage
-            cache_data = clean_language_detection_result(
+            # CORRECTION: Nettoyer les données avec safe_serialize_for_json
+            cache_data = safe_serialize_for_json(
                 {
                     "query": query,
                     "context_hash": context_hash,
@@ -834,7 +850,7 @@ class SemanticCacheManager:
         return None
 
     async def set_intent_result(self, query: str, intent_result: Any):
-        """Met en cache un résultat d'analyse d'intention"""
+        """Met en cache un résultat d'analyse d'intention - CORRIGÉ pour sérialisation"""
         if not self.core._is_initialized():
             return
 
@@ -853,8 +869,8 @@ class SemanticCacheManager:
             else:
                 data = intent_result
 
-            # Nettoyer les données avant stockage
-            data = clean_language_detection_result(data)
+            # CORRECTION: Nettoyer les données avec safe_serialize_for_json
+            data = safe_serialize_for_json(data)
 
             serialized = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
             compressed = self.core._compress_data(serialized)

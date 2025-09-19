@@ -305,15 +305,15 @@ jobs:
               
               success=false
               for attempt in {1..3}; do
-                # Suppression directe sans verification prealable
-                if doctl registry repository delete-tag "$repo" "$tag" --force 2>/dev/null; then
+                # Suppression directe avec confirmation automatique
+                if echo "y" | doctl registry repository delete-tag "$repo" "$tag" --force 2>/dev/null; then
                   echo "   Supprime avec succes"
                   ((deleted++))
                   success=true
                   break
                 else
                   echo "   Echec tentative $attempt - erreur:"
-                  # Afficher l'erreur pour diagnostic
+                  # Essayer aussi sans echo pour voir l'erreur
                   doctl registry repository delete-tag "$repo" "$tag" --force 2>&1 || true
                   sleep 2
                 fi
