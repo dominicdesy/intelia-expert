@@ -12,7 +12,6 @@ import json
 import os
 import re
 import asyncio
-import concurrent.futures
 from typing import Dict, List, Tuple, Set
 from dataclasses import dataclass
 from enum import Enum
@@ -58,9 +57,6 @@ class MultilingualOODDetector:
         self.domain_vocabulary = self._build_domain_vocabulary()
         self.openai_client = openai_client
         self.translation_cache = {}
-
-        # CORRECTION 1: Pool d'exécuteurs pour éviter les conflits d'event loop
-        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
         # Langues supportées
         self.supported_languages = [
@@ -391,15 +387,16 @@ class MultilingualOODDetector:
         Utilise un executor séparé au lieu de créer de nouveaux loops
         """
         try:
-            # CORRECTION 3: Vérifier si un event loop existe déjà
+            # CORRECTION CRITIQUE: Détecter si on est dans un contexte async
             try:
-                loop = asyncio.get_running_loop()
-                # Si on est déjà dans un event loop, utiliser run_coroutine_threadsafe
-                future = asyncio.run_coroutine_threadsafe(
-                    self._calculate_ood_score_async(query, intent_result, language),
-                    loop,
+                asyncio.get_running_loop()
+                # Si on est déjà dans un event loop, utiliser la version entièrement synchrone
+                logger.debug(
+                    "Event loop détecté, utilisation fallback synchrone direct"
                 )
-                return future.result(timeout=10.0)
+                return self._calculate_ood_score_fallback_sync(
+                    query, intent_result, language
+                )
             except RuntimeError:
                 # Pas d'event loop en cours, on peut utiliser asyncio.run
                 return asyncio.run(
@@ -594,44 +591,26 @@ class MultilingualOODDetector:
 
     async def _translate_to_french_safe(self, query: str, source_lang: str) -> str:
         """
-        CORRECTION 5: Traduction sécurisée qui évite les conflits d'event loop
+        CORRECTION FINALE: Traduction sécurisée qui évite tous les conflits d'event loop
         """
         # Vérification du cache
         cache_key = f"{source_lang}:{hash(query)}"
         if cache_key in self.translation_cache:
             return self.translation_cache[cache_key]
 
-        # Traduction via OpenAI si client disponible
-        if self.openai_client:
-            try:
-                # Utiliser l'executor pour éviter les conflits d'event loop
-                response = await asyncio.get_event_loop().run_in_executor(
-                    self._executor, self._translate_sync_wrapper, query, source_lang
-                )
+        # CORRECTION: Si pas de client OpenAI, utiliser fallback immédiatement
+        if not self.openai_client:
+            logger.debug("Pas de client OpenAI disponible, utilisation fallback")
+            return self._simple_translation_fallback(query, source_lang)
 
-                if response and len(response) > 0 and len(response) < len(query) * 3:
-                    self.translation_cache[cache_key] = response
-                    logger.debug(
-                        f"Traduction OpenAI [{source_lang}->fr]: '{query}' -> '{response}'"
-                    )
-                    return response
-
-            except Exception as e:
-                logger.warning(f"Erreur traduction OpenAI: {e}")
-
-        # Fallback avec traduction basique par patterns
-        return self._simple_translation_fallback(query, source_lang)
-
-    def _translate_sync_wrapper(self, query: str, source_lang: str) -> str:
-        """Wrapper synchrone pour la traduction OpenAI"""
+        # CORRECTION: Traduction async sécurisée
         try:
-            # CORRECTION CRITIQUE: Utiliser un client synchrone au lieu d'async
-            import openai
+            # Vérifier que le client est bien async
+            if not hasattr(self.openai_client, "chat"):
+                logger.warning("Client OpenAI invalide, utilisation fallback")
+                return self._simple_translation_fallback(query, source_lang)
 
-            # Créer un client synchrone temporaire pour cette opération
-            sync_client = openai.OpenAI(api_key=self.openai_client.api_key)
-
-            response = sync_client.chat.completions.create(
+            response = await self.openai_client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {
@@ -645,10 +624,24 @@ class MultilingualOODDetector:
                 max_tokens=150,
                 temperature=0,
             )
-            return response.choices[0].message.content.strip()
+
+            translated = response.choices[0].message.content.strip()
+
+            # Validation basique de la traduction
+            if len(translated) > 0 and len(translated) < len(query) * 3:
+                self.translation_cache[cache_key] = translated
+                logger.debug(
+                    f"Traduction OpenAI [{source_lang}->fr]: '{query}' -> '{translated}'"
+                )
+                return translated
+            else:
+                logger.warning(f"Traduction OpenAI suspecte pour: {query}")
+
         except Exception as e:
-            logger.error(f"Erreur traduction sync: {e}")
-            return ""
+            logger.warning(f"Erreur traduction OpenAI async: {e}")
+
+        # Fallback avec traduction basique par patterns
+        return self._simple_translation_fallback(query, source_lang)
 
     def _simple_translation_fallback(self, query: str, source_lang: str) -> str:
         """Traduction basique par patterns pour les cas d'urgence"""
@@ -1060,10 +1053,11 @@ class MultilingualOODDetector:
         }
 
     def __del__(self):
-        """Nettoyage des ressources"""
+        """Nettoyage des ressources - VERSION SIMPLIFIEE"""
         try:
-            if hasattr(self, "_executor"):
-                self._executor.shutdown(wait=False)
+            # Nettoyage basique du cache
+            if hasattr(self, "translation_cache"):
+                self.translation_cache.clear()
         except Exception:
             pass
 
