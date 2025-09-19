@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
 
 """
-
 main.py - Intelia Expert Backend - ARCHITECTURE MODULAIRE PURE
 Point d'entrée minimaliste avec délégation complète aux modules
-
 """
 
 

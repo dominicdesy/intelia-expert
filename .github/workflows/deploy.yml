@@ -202,186 +202,31 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Verify doctl authentication
-        run: |
-          doctl auth list
-          doctl registry repository list
+      - name: Log in to DigitalOcean Container Registry
+        run: doctl registry login --expiry-seconds 1200
 
-      - name: Simple cleanup - Keep 8 most recent images
-        shell: bash
-        run: |
-          KEEP_IMAGES=8
-          REPOSITORIES=("intelia-frontend" "intelia-backend" "intelia-llm")
-          
-          echo "Nettoyage simple: garder les $KEEP_IMAGES plus recents par repository"
-          
-          for repo in "${REPOSITORIES[@]}"; do
-            echo ""
-            echo "Traitement de $repo..."
-            
-            echo "Recuperation de la liste des images..."
-            if ! doctl registry repository list-tags "$repo" --output json > "/tmp/${repo}.json" 2>/dev/null; then
-              echo "Repository $repo introuvable"
-              continue
-            fi
-            
-            echo "DEBUG - Contenu JSON:"
-            head -10 "/tmp/${repo}.json"
-            
-            if command -v jq >/dev/null 2>&1; then
-              cat "/tmp/${repo}.json" | jq -r '.[] | "\(.tag) \(.updated_at)"' > "/tmp/${repo}_clean.txt" 2>/dev/null
-            else
-              echo "jq non disponible, utilisation parsing manuel"
-              grep -o '"tag":"[^"]*"' "/tmp/${repo}.json" | cut -d'"' -f4 > "/tmp/${repo}_tags_only.txt"
-              grep -o '"updated_at":"[^"]*"' "/tmp/${repo}.json" | cut -d'"' -f4 > "/tmp/${repo}_dates_only.txt"
-              paste "/tmp/${repo}_tags_only.txt" "/tmp/${repo}_dates_only.txt" > "/tmp/${repo}_clean.txt"
-              rm -f "/tmp/${repo}_tags_only.txt" "/tmp/${repo}_dates_only.txt"
-            fi
-            
-            total_images=$(cat "/tmp/${repo}_clean.txt" | wc -l)
-            
-            echo "Total des images valides: $total_images"
-            
-            echo "DEBUG - Premiers tags nettoyes:"
-            head -5 "/tmp/${repo}_clean.txt"
-            
-            if [ "$total_images" -le "$KEEP_IMAGES" ]; then
-              echo "Pas de nettoyage necessaire pour $repo ($total_images <= $KEEP_IMAGES)"
-              continue
-            fi
-            
-            PROTECTED_TAGS="latest|main|buildcache|prod|stable"
-            
-            sort -k2,2 "/tmp/${repo}_clean.txt" | \
-            head -n $((total_images - KEEP_IMAGES)) | \
-            awk '{print $1}' | \
-            grep -v "^[[:space:]]*$" | \
-            grep -vE "^($PROTECTED_TAGS)$" > "/tmp/${repo}_to_delete.txt"
-            
-            to_delete=$(cat "/tmp/${repo}_to_delete.txt" | wc -l)
-            to_keep=$((total_images - to_delete))
-            
-            echo "A garder: $to_keep, A supprimer: $to_delete"
-            
-            if [ "$to_delete" -eq 0 ]; then
-              echo "Rien a supprimer pour $repo"
-              continue
-            fi
-            
-            echo "Tags a supprimer:"
-            cat "/tmp/${repo}_to_delete.txt"
-            
-            echo "Debut de la suppression..."
-            deleted=0
-            failed=0
-            
-            while IFS= read -r tag; do
-              tag=$(echo "$tag" | tr -d '\r\n' | xargs)
-              
-              if [ -z "$tag" ] || [ "$tag" = "Tag" ] || [ "$tag" = "tag" ] || [ "$tag" = "null" ]; then
-                echo "Tag invalide ignore: '$tag'"
-                continue
-              fi
-              
-              echo "Suppression: $tag"
-              
-              success=false
-              for attempt in {1..3}; do
-                if doctl registry repository delete-tag "$repo" "$tag" --force --interactive=false 2>/dev/null; then
-                  echo "   Supprime avec succes"
-                  ((deleted++))
-                  success=true
-                  break
-                else
-                  echo "   Echec tentative $attempt - erreur:"
-                  doctl registry repository delete-tag "$repo" "$tag" --force --interactive=false 2>&1 || true
-                  sleep 2
-                fi
-              done
-              
-              if [ "$success" = false ]; then
-                ((failed++))
-                echo "   ECHEC FINAL pour tag: $tag"
-              fi
-              
-              sleep 1
-              
-            done < "/tmp/${repo}_to_delete.txt"
-            
-            echo "Resume $repo:"
-            echo "   Supprimes: $deleted"
-            echo "   Echecs: $failed"
-            echo "   Images restantes: ~$((total_images - deleted))"
-            
-            if [ "$failed" -gt 0 ] && [ "$deleted" -eq 0 ]; then
-              echo "   ATTENTION: Aucune suppression reussie pour $repo"
-            elif [ "$failed" -gt 0 ]; then
-              echo "   INFO: Quelques echecs, mais $deleted suppressions reussies"
-            fi
-            
-            rm -f "/tmp/${repo}"_*.txt "/tmp/${repo}.json"
-            
-            echo "Traitement termine pour $repo"
-          done
-          
-          echo ""
-          echo "Nettoyage termine pour tous les repositories!"
+      - name: Cleanup intelia-frontend registry
+        uses: raisedadead/action-docr-cleanup@v1
+        with:
+          repository_name: 'intelia-frontend'
+          days: '1'
+          keep_last: '8'
 
-      - name: Cleanup orphaned manifests
-        shell: bash
-        run: |
-          REPOSITORIES=("intelia-frontend" "intelia-backend" "intelia-llm")
-          
-          echo ""
-          echo "Nettoyage des manifests orphelins..."
-          
-          for repo in "${REPOSITORIES[@]}"; do
-            echo "Verification des manifests orphelins pour $repo..."
-            
-            if doctl registry repository list-manifests "$repo" --format "Digest,Tags" --no-header 2>/dev/null > "/tmp/${repo}_manifests.txt"; then
-              
-              orphan_count=$(grep -E "^sha256:[a-f0-9]+[[:space:]]*$" "/tmp/${repo}_manifests.txt" | wc -l || echo "0")
-              
-              if [ "$orphan_count" -gt 0 ]; then
-                echo "Manifests orphelins trouves: $orphan_count"
-                
-                if [ "$orphan_count" -le 15 ]; then
-                  grep -E "^sha256:[a-f0-9]+[[:space:]]*$" "/tmp/${repo}_manifests.txt" | \
-                  awk '{print $1}' > "/tmp/${repo}_orphans.txt"
-                  
-                  manifest_deleted=0
-                  while IFS= read -r digest; do
-                    digest=$(echo "$digest" | tr -d '\r\n' | xargs)
-                    if [ -z "$digest" ]; then continue; fi
-                    
-                    echo "Suppression manifest orphelin: ${digest:0:25}..."
-                    
-                    if doctl registry repository delete-manifest "$repo" "$digest" --force 2>/dev/null; then
-                      echo "   Supprime"
-                      ((manifest_deleted++))
-                    else
-                      echo "   Echec"
-                    fi
-                    
-                    sleep 0.5
-                    
-                  done < "/tmp/${repo}_orphans.txt" || true
-                  
-                  echo "Manifests supprimes: $manifest_deleted"
-                else
-                  echo "Trop de manifests orphelins ($orphan_count) - suppression manuelle recommandee"
-                fi
-              else
-                echo "Pas de manifests orphelins"
-              fi
-              
-              rm -f "/tmp/${repo}_manifests.txt" "/tmp/${repo}_orphans.txt"
-            else
-              echo "Impossible de lister les manifests pour $repo"
-            fi
-          done || true
+      - name: Cleanup intelia-backend registry
+        uses: raisedadead/action-docr-cleanup@v1
+        with:
+          repository_name: 'intelia-backend'
+          days: '1'
+          keep_last: '8'
 
-      - name: Final status and cleanup
+      - name: Cleanup intelia-llm registry
+        uses: raisedadead/action-docr-cleanup@v1
+        with:
+          repository_name: 'intelia-llm'
+          days: '1'
+          keep_last: '8'
+
+      - name: Final status
         run: |
           echo ""
           echo "ETAT FINAL DU REGISTRY:"
@@ -391,14 +236,6 @@ jobs:
             count=$(doctl registry repository list-tags "$repo" --format "Tag" --no-header 2>/dev/null | wc -l || echo "?")
             echo "$repo: $count images"
           done
-          
-          echo ""
-          echo "Declenchement du garbage collection..."
-          if doctl registry garbage-collection start --include-untagged-manifests 2>/dev/null; then
-            echo "Garbage collection demarre (liberation d'espace en cours)"
-          else
-            echo "Garbage collection deja en cours ou non necessaire"
-          fi
           
           echo ""
           echo "Nettoyage complet termine!"
