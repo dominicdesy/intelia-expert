@@ -1,7 +1,7 @@
 #
 # -*- coding: utf-8 -*-
 #
-# app/main.py - VERSION 4.3 NETTOYÉE
+# app/main.py - VERSION 4.3 NETTOYÉE + HTTPS REDIRECT
 # Architecture concentrée sur: System, Auth, Users, Stats, Billing, Invitations, Logging
 #
 
@@ -19,7 +19,7 @@ from typing import Optional
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 # .env (facultatif)
 try:
@@ -385,6 +385,24 @@ app = FastAPI(
     openapi_url="/openapi.json",
     lifespan=lifespan,
 )
+
+
+# ========== MIDDLEWARE HTTPS REDIRECT ==========
+@app.middleware("http")
+async def force_https_redirect(request: Request, call_next):
+    """🔒 Force la redirection HTTPS pour tous les endpoints"""
+    if (
+        request.url.scheme == "http"
+        and not request.url.hostname.startswith("localhost")
+        and not request.url.hostname.startswith("127.0.0.1")
+    ):
+        # Construire l'URL HTTPS
+        https_url = request.url.replace(scheme="https")
+        return RedirectResponse(url=str(https_url), status_code=301)
+
+    response = await call_next(request)
+    return response
+
 
 # === MIDDLEWARE CORS ===
 app.add_middleware(

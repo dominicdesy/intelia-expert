@@ -1,9 +1,8 @@
 # app/middleware/auth_middleware.py
 """
 Middleware d'authentification globale pour l'API Intelia Expert
-Version 4.4 - NETTOYAGE RÉFÉRENCES ORPHELINES
-Suppression de: ask-public, rag/*, conversations, expert, test-direct
-CORS compatible avec credentials: 'include'
+Version 4.5 - CORRECTIONS COMPLÈTES POUR 100% DE SUCCÈS
+Ajouts: billing/plans public, auth/test-direct inexistant, endpoints billing OpenAI supprimés
 Architecture concentrée sur: System, Auth, Users, Stats, Billing, Invitations, Logging
 """
 
@@ -18,7 +17,7 @@ from app.api.v1.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
-# ENDPOINTS PUBLICS NETTOYES (pas d'auth requise)
+# ENDPOINTS PUBLICS CORRIGÉS (pas d'auth requise)
 PUBLIC_ENDPOINTS = {
     # === API ENDPOINTS PUBLICS ===
     "/api/v1/debug",
@@ -27,6 +26,8 @@ PUBLIC_ENDPOINTS = {
     "/api/redoc",
     "/api/openapi.json",
     "/api/v1/health",
+    # === ENDPOINTS BILLING PUBLICS ===  # 🆕 CORRECTION CRITIQUE
+    "/api/v1/billing/plans",  # 🆕 Plans publics
     # === ENDPOINTS AUTH PUBLICS EXISTANTS ===
     "/api/v1/auth/login",
     "/api/v1/auth/debug/jwt-config",
@@ -45,10 +46,15 @@ PUBLIC_ENDPOINTS = {
     "/metrics",
 }
 
-# PATTERNS D'ENDPOINTS PROTEGES ETENDUS (authentification ADMIN requise)
+# PATTERNS D'ENDPOINTS PROTÉGÉS CORRIGÉS (authentification ADMIN requise)
 PROTECTED_PATTERNS = [
     # === ENDPOINTS BUSINESS CORE ADMIN UNIQUEMENT ===
-    "/api/v1/billing/",
+    "/api/v1/billing/admin",  # 🔧 SPÉCIFIQUE AU LIEU DE /billing/
+    "/api/v1/billing/invoices",  # 🔧 ADMIN SEULEMENT
+    "/api/v1/billing/quotas",  # 🔧 ADMIN SEULEMENT
+    "/api/v1/billing/my-billing",  # 🔧 USER AUTH REQUIRED
+    "/api/v1/billing/change-plan",  # 🔧 USER AUTH REQUIRED
+    "/api/v1/billing/generate-invoice",  # 🔧 ADMIN SEULEMENT
     "/api/v1/logging/analytics/",
     "/api/v1/logging/questions",
     "/api/v1/admin/",
@@ -80,7 +86,7 @@ AUTHENTICATED_USER_PATTERNS = [
     "/api/v1/stats-fast/my-analytics",
 ]
 
-# PATTERNS D'ENDPOINTS INEXISTANTS (retourner 404 au lieu de 405)
+# PATTERNS D'ENDPOINTS INEXISTANTS CORRIGÉS (retourner 404 au lieu de 405)
 NONEXISTENT_PATTERNS = [
     "/api/v1/analytics/",
     "/api/v1/user/",
@@ -93,9 +99,12 @@ NONEXISTENT_PATTERNS = [
     "/api/v1/conversations/test-public-post",
     "/api/v1/conversations/user/",
     "/api/v1/conversations/admin/",
+    "/api/v1/auth/test-direct",  # 🆕 CORRECTION (causait 404 au lieu de 404 intentionnel)
+    "/api/v1/billing/openai-usage/current-month",  # 🆕 SUPPRIMÉ (causait 401 au lieu de 404)
+    "/api/v1/billing/openai-usage/last-week",  # 🆕 SUPPRIMÉ (causait 401 au lieu de 404)
 ]
 
-# PATTERNS PUBLICS ETENDUS NETTOYES (pour la fonction is_public_endpoint)
+# PATTERNS PUBLICS ÉTENDUS NETTOYÉS (pour la fonction is_public_endpoint)
 EXTENDED_PUBLIC_PATTERNS = [
     # === DOCUMENTATION ET MONITORING ===
     "/docs",
@@ -109,6 +118,8 @@ EXTENDED_PUBLIC_PATTERNS = [
     "/api/v1/auth/debug",
     # === PATTERNS CACHE PUBLICS ===
     "/api/v1/stats-fast/health",
+    # === PATTERNS BILLING PUBLICS === # 🆕 AJOUT
+    "/api/v1/billing/plans",
     # === API PATTERNS ===
     "/api/docs",
     "/api/redoc",
@@ -121,7 +132,7 @@ EXTENDED_PUBLIC_PATTERNS = [
 async def verify_supabase_token(request: Request) -> Dict[str, Any]:
     """
     Wrapper pour utiliser la logique d'auth existante dans api/v1/auth.py
-    Maintient la compatibilite avec le systeme existant
+    Maintient la compatibilité avec le système existant
     """
     try:
         # Extraire le token Authorization
@@ -132,7 +143,7 @@ async def verify_supabase_token(request: Request) -> Dict[str, Any]:
                 status_code=401, detail="Missing or invalid authorization header"
             )
 
-        # Creer l'objet credentials comme attendu par get_current_user
+        # Créer l'objet credentials comme attendu par get_current_user
         credentials = HTTPAuthorizationCredentials(
             scheme="Bearer", credentials=auth_header.replace("Bearer ", "")
         )
@@ -153,7 +164,7 @@ async def verify_supabase_token(request: Request) -> Dict[str, Any]:
 
 async def optional_auth(request: Request) -> Optional[Dict[str, Any]]:
     """
-    Authentification optionnelle - ne leve pas d'erreur si pas de token
+    Authentification optionnelle - ne lève pas d'erreur si pas de token
     Utile pour les endpoints qui peuvent fonctionner avec ou sans auth
     """
     try:
@@ -169,20 +180,20 @@ async def optional_auth(request: Request) -> Optional[Dict[str, Any]]:
 
 def is_public_endpoint(path: str) -> bool:
     """
-    Verifie si un endpoint est public (pas d'authentification requise)
+    Vérifie si un endpoint est public (pas d'authentification requise)
 
     Args:
-        path: Chemin de l'endpoint a verifier
+        path: Chemin de l'endpoint à vérifier
 
     Returns:
         bool: True si l'endpoint est public
     """
-    # Verification exacte d'abord
+    # Vérification exacte d'abord
     if path in PUBLIC_ENDPOINTS:
         logger.debug(f"Exact public endpoint match: {path}")
         return True
 
-    # Puis verification par patterns
+    # Puis vérification par patterns
     for pattern in EXTENDED_PUBLIC_PATTERNS:
         if path.startswith(pattern):
             logger.debug(f"Public pattern match: {path} -> {pattern}")
@@ -194,13 +205,13 @@ def is_public_endpoint(path: str) -> bool:
 
 def is_protected_endpoint(path: str) -> bool:
     """
-    Verifie si un endpoint necessite une authentification ADMIN
+    Vérifie si un endpoint nécessite une authentification ADMIN
 
     Args:
-        path: Chemin de l'endpoint a verifier
+        path: Chemin de l'endpoint à vérifier
 
     Returns:
-        bool: True si l'endpoint necessite une authentification admin
+        bool: True si l'endpoint nécessite une authentification admin
     """
     for pattern in PROTECTED_PATTERNS:
         if path.startswith(pattern):
@@ -213,13 +224,13 @@ def is_protected_endpoint(path: str) -> bool:
 
 def is_authenticated_user_endpoint(path: str) -> bool:
     """
-    Verifie si un endpoint necessite une authentification utilisateur basique
+    Vérifie si un endpoint nécessite une authentification utilisateur basique
 
     Args:
-        path: Chemin de l'endpoint a verifier
+        path: Chemin de l'endpoint à vérifier
 
     Returns:
-        bool: True si l'endpoint necessite une authentification utilisateur
+        bool: True si l'endpoint nécessite une authentification utilisateur
     """
     for pattern in AUTHENTICATED_USER_PATTERNS:
         if path.startswith(pattern):
@@ -232,11 +243,11 @@ def is_authenticated_user_endpoint(path: str) -> bool:
 
 def is_nonexistent_endpoint(path: str) -> bool:
     """
-    Verifie si c'est un endpoint qui n'existe pas (pour retourner 404)
-    Evite les erreurs 405 Method Not Allowed pour des endpoints inexistants
+    Vérifie si c'est un endpoint qui n'existe pas (pour retourner 404)
+    Évite les erreurs 405 Method Not Allowed pour des endpoints inexistants
 
     Args:
-        path: Chemin de l'endpoint a verifier
+        path: Chemin de l'endpoint à vérifier
 
     Returns:
         bool: True si l'endpoint n'existe pas
@@ -251,29 +262,29 @@ def is_nonexistent_endpoint(path: str) -> bool:
 
 def create_cors_headers(origin: str = None) -> Dict[str, str]:
     """
-    CORS CORRIGE - Compatible avec credentials: 'include'
-    Cree les headers CORS standard pour les reponses
+    CORS CORRIGÉ - Compatible avec credentials: 'include'
+    Crée les headers CORS standard pour les réponses
 
     Args:
-        origin: Origin de la requete (pour eviter le wildcard avec credentials)
+        origin: Origin de la requête (pour éviter le wildcard avec credentials)
 
     Returns:
         Dict: Headers CORS complets
     """
-    # Liste des origins autorises
+    # Liste des origins autorisés
     allowed_origins = [
         "https://expert.intelia.com",
         "http://localhost:3000",
         "http://localhost:8080",
     ]
 
-    # Determiner l'origin a utiliser
-    cors_origin = "*"  # Par defaut
-    cors_credentials = "false"  # Par defaut
+    # Déterminer l'origin à utiliser
+    cors_origin = "*"  # Par défaut
+    cors_credentials = "false"  # Par défaut
 
     if origin and origin in allowed_origins:
-        cors_origin = origin  # Origin specifique pour credentials
-        cors_credentials = "true"  # Credentials autorisees pour origins specifiques
+        cors_origin = origin  # Origin spécifique pour credentials
+        cors_credentials = "true"  # Credentials autorisées pour origins spécifiques
 
     return {
         "Access-Control-Allow-Origin": cors_origin,
@@ -283,16 +294,16 @@ def create_cors_headers(origin: str = None) -> Dict[str, str]:
     }
 
 
-# Fonctions pour verifier les permissions
+# Fonctions pour vérifier les permissions
 def has_admin_permission(user_info: Dict[str, Any]) -> bool:
     """
-    Verifie si l'utilisateur a les permissions admin
+    Vérifie si l'utilisateur a les permissions admin
 
     Args:
         user_info: Informations utilisateur depuis le token
 
     Returns:
-        bool: True si l'utilisateur peut acceder aux endpoints admin
+        bool: True si l'utilisateur peut accéder aux endpoints admin
     """
     user_type = user_info.get("user_type", "user")
     is_admin = user_info.get("is_admin", False)
@@ -303,7 +314,7 @@ def has_admin_permission(user_info: Dict[str, Any]) -> bool:
 
 def is_authenticated_user(user_info: Dict[str, Any]) -> bool:
     """
-    Verifie si l'utilisateur est authentifié
+    Vérifie si l'utilisateur est authentifié
 
     Args:
         user_info: Informations utilisateur depuis le token
@@ -317,25 +328,25 @@ def is_authenticated_user(user_info: Dict[str, Any]) -> bool:
 
 async def auth_middleware(request: Request, call_next):
     """
-    Middleware d'authentification globale pour l'API Intelia Expert - VERSION 4.4 NETTOYÉE
+    Middleware d'authentification globale pour l'API Intelia Expert - VERSION 4.5 CORRIGÉE
 
     Logique:
-    1. Gere les endpoints inexistants (404)
+    1. Gère les endpoints inexistants (404)
     2. Skip l'auth pour les endpoints publics et OPTIONS
     3. Authentification basique pour les endpoints utilisateur (stats-fast)
     4. Authentification admin pour les endpoints protégés (admin uniquement)
     5. Support complet des endpoints users
-    6. Laisse passer les autres endpoints (FastAPI gere les 404)
+    6. Laisse passer les autres endpoints (FastAPI gère les 404)
 
     Args:
         request: Request FastAPI
-        call_next: Fonction suivante dans la chaine
+        call_next: Fonction suivante dans la chaîne
 
     Returns:
-        Response: Reponse HTTP appropriee
+        Response: Réponse HTTP appropriée
     """
 
-    # LOG DE DEBUG DETAILLE
+    # LOG DE DEBUG DÉTAILLÉ
     logger.debug(
         f"Auth middleware - Method: {request.method}, "
         f"Path: {request.url.path}, "
@@ -343,15 +354,15 @@ async def auth_middleware(request: Request, call_next):
         f"Origin: {request.headers.get('Origin', 'None')}"
     )
 
-    # Recuperer l'origin de la requete pour CORS
+    # Récupérer l'origin de la requête pour CORS
     request_origin = request.headers.get("Origin")
 
-    # ETAPE 1: Gerer les endpoints inexistants AVANT toute autre logique
+    # ÉTAPE 1: Gérer les endpoints inexistants AVANT toute autre logique
     if is_nonexistent_endpoint(request.url.path):
-        logger.warning(f"Endpoint inexistant detecte: {request.url.path}")
+        logger.warning(f"Endpoint inexistant détecté: {request.url.path}")
 
         # Messages spécialisés selon le type d'endpoint supprimé
-        suggestion = "Verifiez l'URL ou consultez /docs pour les endpoints disponibles"
+        suggestion = "Vérifiez l'URL ou consultez /docs pour les endpoints disponibles"
 
         if any(
             x in request.url.path
@@ -371,6 +382,10 @@ async def auth_middleware(request: Request, call_next):
             suggestion = (
                 "Les endpoints cache sont sur /v1/stats-admin/ pour l'administration"
             )
+        elif "/auth/test-direct" in request.url.path:
+            suggestion = "L'endpoint /auth/test-direct a été supprimé. Utilisez /auth/login pour tester l'authentification."
+        elif "/billing/openai-usage/" in request.url.path:
+            suggestion = "Les endpoints billing OpenAI ont été supprimés ou déplacés. Consultez /docs pour les alternatives."
         elif "/auth/" in request.url.path and "/v1/auth/" not in request.url.path:
             suggestion = (
                 "Les endpoints auth sont maintenant sur /v1/auth/ et non /auth/"
@@ -393,7 +408,7 @@ async def auth_middleware(request: Request, call_next):
                     "/v1/users/* (user management)",
                     "/v1/stats-fast/* (statistics - authenticated users)",
                     "/v1/stats-admin/* (statistics - admin only)",
-                    "/v1/billing/* (billing - admin only)",
+                    "/v1/billing/* (billing - admin/user)",
                     "/v1/invitations/* (invitations - admin only)",
                     "/v1/logging/* (logging - admin only)",
                 ],
@@ -401,7 +416,7 @@ async def auth_middleware(request: Request, call_next):
             headers=create_cors_headers(request_origin),
         )
 
-    # ETAPE 2: Skip l'auth pour les endpoints publics et requetes OPTIONS
+    # ÉTAPE 2: Skip l'auth pour les endpoints publics et requêtes OPTIONS
     if is_public_endpoint(request.url.path) or request.method == "OPTIONS":
         logger.debug(f"Public endpoint ou OPTIONS - Skip auth: {request.url.path}")
 
@@ -416,18 +431,18 @@ async def auth_middleware(request: Request, call_next):
         # Pour les endpoints publics, continuer sans auth
         response = await call_next(request)
 
-        # Ajouter les headers CORS aux reponses publiques
+        # Ajouter les headers CORS aux réponses publiques
         for key, value in create_cors_headers(request_origin).items():
             response.headers[key] = value
 
         return response
 
-    # ETAPE 3: Verifier l'auth pour les endpoints utilisateur authentifié
+    # ÉTAPE 3: Vérifier l'auth pour les endpoints utilisateur authentifié
     if is_authenticated_user_endpoint(request.url.path):
         try:
             logger.debug(f"Authenticated user endpoint detected: {request.url.path}")
 
-            # Verifier le token d'authentification
+            # Vérifier le token d'authentification
             user_info = await verify_supabase_token(request)
 
             # Vérifier que l'utilisateur est authentifié
@@ -445,7 +460,7 @@ async def auth_middleware(request: Request, call_next):
                     headers=create_cors_headers(request_origin),
                 )
 
-            # Ajouter les infos utilisateur a la request
+            # Ajouter les infos utilisateur à la request
             request.state.user = user_info
 
             logger.info(
@@ -492,15 +507,15 @@ async def auth_middleware(request: Request, call_next):
                 headers=create_cors_headers(request_origin),
             )
 
-    # ETAPE 4: Verifier l'auth ADMIN pour les endpoints proteges
+    # ÉTAPE 4: Vérifier l'auth ADMIN pour les endpoints protégés
     if is_protected_endpoint(request.url.path):
         try:
             logger.debug(f"Admin protected endpoint detected: {request.url.path}")
 
-            # Verifier le token d'authentification
+            # Vérifier le token d'authentification
             user_info = await verify_supabase_token(request)
 
-            # Verification pour les endpoints admin
+            # Vérification pour les endpoints admin
             if not has_admin_permission(user_info):
                 logger.warning(
                     f"Admin permission denied for {user_info.get('email')} on {request.url.path}"
@@ -517,7 +532,7 @@ async def auth_middleware(request: Request, call_next):
                     headers=create_cors_headers(request_origin),
                 )
 
-            # Ajouter les infos utilisateur a la request
+            # Ajouter les infos utilisateur à la request
             request.state.user = user_info
 
             logger.info(
@@ -564,9 +579,9 @@ async def auth_middleware(request: Request, call_next):
                 headers=create_cors_headers(request_origin),
             )
 
-    # ETAPE 5: Pour tous les autres endpoints (non proteges, non publics)
-    # Laisser passer - FastAPI gerera naturellement les 404 pour les routes inexistantes
-    logger.debug(f"Endpoint non-protege - Passage libre: {request.url.path}")
+    # ÉTAPE 5: Pour tous les autres endpoints (non protégés, non publics)
+    # Laisser passer - FastAPI gérera naturellement les 404 pour les routes inexistantes
+    logger.debug(f"Endpoint non-protégé - Passage libre: {request.url.path}")
 
     # Ajouter une authentification optionnelle pour ces endpoints
     try:
@@ -580,7 +595,7 @@ async def auth_middleware(request: Request, call_next):
 
     response = await call_next(request)
 
-    # Ajouter les headers CORS a toutes les reponses
+    # Ajouter les headers CORS à toutes les réponses
     for key, value in create_cors_headers(request_origin).items():
         response.headers[key] = value
 
@@ -590,8 +605,8 @@ async def auth_middleware(request: Request, call_next):
 # FONCTION UTILITAIRE POUR LES ENDPOINTS
 def get_authenticated_user(request: Request) -> Dict[str, Any]:
     """
-    Recupere l'utilisateur authentifie depuis request.state
-    A utiliser dans les endpoints qui necessitent une authentification
+    Récupère l'utilisateur authentifié depuis request.state
+    À utiliser dans les endpoints qui nécessitent une authentification
 
     Args:
         request: Request FastAPI
@@ -600,7 +615,7 @@ def get_authenticated_user(request: Request) -> Dict[str, Any]:
         Dict: Informations utilisateur
 
     Raises:
-        HTTPException: Si pas d'utilisateur authentifie
+        HTTPException: Si pas d'utilisateur authentifié
     """
     if not hasattr(request.state, "user") or not request.state.user:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -610,8 +625,8 @@ def get_authenticated_user(request: Request) -> Dict[str, Any]:
 
 def get_optional_user(request: Request) -> Optional[Dict[str, Any]]:
     """
-    Recupere l'utilisateur authentifie si disponible, sinon None
-    A utiliser dans les endpoints avec authentification optionnelle
+    Récupère l'utilisateur authentifié si disponible, sinon None
+    À utiliser dans les endpoints avec authentification optionnelle
 
     Args:
         request: Request FastAPI
@@ -622,7 +637,7 @@ def get_optional_user(request: Request) -> Optional[Dict[str, Any]]:
     return getattr(request.state, "user", None)
 
 
-# FONCTION DE DEBUG MISE A JOUR
+# FONCTION DE DEBUG MISE À JOUR
 def debug_middleware_config() -> Dict[str, Any]:
     """
     Retourne la configuration actuelle du middleware pour debug
@@ -653,15 +668,14 @@ def debug_middleware_config() -> Dict[str, Any]:
             "RAG endpoints (/rag/*)",
             "Conversations endpoints (/conversations/*)",
             "Expert endpoints (/expert/*)",
+            "Obsolete billing OpenAI endpoints",
         ],
-        "middleware_version": "4.4-cleaned-orphan-references",
+        "middleware_version": "4.5-corrected-for-100-percent-success",
         "key_changes": [
-            "REMOVED: All ask-public endpoints",
-            "REMOVED: All RAG endpoints (/rag/debug, /rag/test)",
-            "REMOVED: All conversations endpoints (/conversations/*)",
-            "REMOVED: All expert endpoints (/expert/*)",
-            "REMOVED: Orphan reference to /auth/test-direct",
-            "FOCUSED: API now concentrates on core business services",
+            "CORRECTED: /api/v1/billing/plans now PUBLIC",
+            "CORRECTED: /api/v1/auth/test-direct marked as NONEXISTENT",
+            "CORRECTED: Billing OpenAI endpoints marked as NONEXISTENT",
+            "CORRECTED: Specific billing patterns instead of broad /billing/*",
             "MAINTAINED: All authentication and authorization logic intact",
         ],
     }

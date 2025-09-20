@@ -791,14 +791,17 @@ def generate_invoice(
 
 @router.get("/plans")
 def available_plans() -> Dict[str, Any]:
-    """Liste des plans disponibles"""
+    """Liste des plans disponibles - ENDPOINT PUBLIC"""
+    # ✅ CORRECTION: Suppression de get_current_user = Depends(...)
+    # Cet endpoint doit être accessible sans authentification
 
     billing = get_billing_manager()
-    return {"plans": billing.plans}
-
-
-# Ajoutez cette fonction dans backend/app/api/v1/billing.py
-# À placer après les autres endpoints existants
+    return {
+        "plans": billing.plans,
+        "currency": "EUR",
+        "public": True,
+        "description": "Plans de facturation disponibles",
+    }
 
 
 @router.get("/admin")
@@ -1031,40 +1034,3 @@ def increment_quota_usage(
         billing.increment_usage_after_question(user_email, success, cost_usd)
     except Exception as e:
         logger.error(f"❌ Erreur increment quota: {e}")
-
-
-# ========== INTÉGRATION DANS EXPERT.PY ==========
-"""
-Dans expert.py, modifier _ask_internal() comme suit:
-
-def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    try:
-        user_email = current_user.get('email') if current_user else None
-        
-        # 1. VÉRIFICATION QUOTA AVANT TRAITEMENT
-        if user_email:
-            quota_allowed, quota_details = check_quota_middleware(user_email)
-            
-            if not quota_allowed:
-                return {
-                    "type": "quota_exceeded",
-                    "message": quota_details.get("message", "Quota mensuel dépassé"),
-                    "quota_details": quota_details,
-                    "session_id": payload.session_id or "default"
-                }
-        
-        # 2. TRAITEMENT NORMAL
-        result = handle(...)
-        
-        # 3. INCRÉMENT USAGE APRÈS SUCCÈS
-        if user_email:
-            increment_quota_usage(user_email, success=True, cost_usd=0.0)
-        
-        return result
-        
-    except Exception as e:
-        # 4. INCRÉMENT USAGE MÊME EN CAS D'ERREUR
-        if user_email:
-            increment_quota_usage(user_email, success=False, cost_usd=0.0)
-        raise
-"""
