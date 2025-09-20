@@ -1,9 +1,9 @@
-# app/api/v1/__init__.py - VERSION 5.4 CORRIGÉE
+# app/api/v1/__init__.py - VERSION 5.5 CORRIGÉE
 # CONSERVATION INTÉGRALE DU CODE ORIGINAL + CORRECTIONS ERREURS IMPORT
 # Support des routers de cache statistiques ultra-rapides
 # NOUVEAU: Support du router users pour gestion profils
 # SUPPRESSION: auth_invitations router (fonctionnalités intégrées dans invitations)
-# CORRECTION: billing_openai et expert désactivés temporairement
+# CORRECTION: billing_openai RÉACTIVÉ, expert désactivé
 
 from fastapi import APIRouter
 import logging
@@ -245,10 +245,17 @@ except Exception as e:
     logger.error("ERREUR import billing router: %s", e)
     billing_router = None
 
-# CORRECTION: Billing OpenAI router - DÉSACTIVÉ TEMPORAIREMENT
-# Le module utils est manquant, donc on désactive temporairement
-billing_openai_router = None
-logger.info("Billing OpenAI router désactivé temporairement (module utils manquant)")
+# Billing OpenAI router - RÉACTIVÉ
+try:
+    from .billing_openai import router as billing_openai_router
+
+    logger.info(
+        "Billing OpenAI router importe avec %d routes",
+        len(billing_openai_router.routes),
+    )
+except Exception as e:
+    logger.error("ERREUR import billing_openai router: %s", e)
+    billing_openai_router = None
 
 # CORRECTION: Expert router - DÉSACTIVÉ (SERVICE EXTERNALISÉ)
 # Expert et expert_service ne doivent plus être utilisés selon votre indication
@@ -384,9 +391,15 @@ if billing_router:
     router.include_router(billing_router, tags=["Billing"])
     logger.info("Billing router monte")
 
-# CORRECTION: Billing OpenAI - NON MONTÉ (désactivé)
-# billing_openai_router est None, donc ne sera pas monté
-logger.info("Billing OpenAI router NON MONTE - temporairement désactivé")
+# Billing OpenAI - RÉACTIVÉ
+if billing_openai_router:
+    router.include_router(
+        billing_openai_router, prefix="/billing", tags=["Billing-OpenAI"]
+    )
+    logger.info("Billing OpenAI router monte avec succes!")
+    logger.info("Billing OpenAI router maintenant disponible sur /v1/billing/openai-*")
+else:
+    logger.error("Billing OpenAI router NON MONTE - echec import")
 
 # Conversations (conditionnel)
 if CONVERSATIONS_AVAILABLE and conversations_router:
@@ -460,6 +473,23 @@ if stats_route_count > 0:
 else:
     logger.info("Aucune route stats cache detectee - systeme non encore deploye")
 
+# Debug des routes billing OpenAI specifiquement
+billing_openai_route_count = len(
+    [r for r in router.routes if "/billing/openai" in r.path]
+)
+logger.info("Routes billing OpenAI detectees: %d", billing_openai_route_count)
+
+if billing_openai_route_count > 0:
+    billing_openai_routes_debug = [
+        f"{r.path} ({', '.join(r.methods)})"
+        for r in router.routes
+        if "/billing/openai" in r.path
+    ]
+    logger.info("Routes billing OpenAI disponibles: %s", billing_openai_routes_debug)
+    logger.info("Systeme billing OpenAI ACTIF!")
+else:
+    logger.info("Aucune route billing OpenAI detectee")
+
 # Recapitulatif systeme cache ET users
 system_status = {
     "users": USERS_AVAILABLE,
@@ -470,7 +500,7 @@ system_status = {
     "users_routes": users_route_count,
     "cache_routes": stats_route_count,
     "invitations_unified": invitations_route_count > 0,
-    "billing_openai_disabled": True,
+    "billing_openai_enabled": billing_openai_route_count > 0,
     "expert_disabled": True,
 }
 logger.info("Status systemes: %s", system_status)
@@ -495,9 +525,6 @@ logger.info(
 logger.info(
     "Architecture simplifiee: un seul service pour toutes les fonctions d'invitation"
 )
-logger.info(
-    "CORRECTIONS APPLIQUÉES: billing_openai et expert temporairement désactivés"
-)
-logger.info("PROCHAINES ÉTAPES: Créer module utils pour billing_openai si nécessaire")
+logger.info("CORRECTIONS APPLIQUÉES: billing_openai RÉACTIVÉ, expert désactivé")
 
 __all__ = ["router"]
