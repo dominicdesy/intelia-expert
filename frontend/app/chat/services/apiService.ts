@@ -251,7 +251,7 @@ async function streamAIResponseInternal(
   });
 
   // Headers SSE complets avec Cache-Control
-  const response = await fetch("/api/chat", {
+  const response = await fetch("/api/chat/stream", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

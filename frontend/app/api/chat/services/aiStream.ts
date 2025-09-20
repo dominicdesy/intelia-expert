@@ -41,7 +41,7 @@ export async function streamAIResponse(
   });
 
   try {
-    const res = await fetch("/api/chat", {
+    const res = await fetch("/api/chat/stream", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -358,7 +358,7 @@ export function getErrorMessage(error: any): string {
 export const aiStreamDebug = {
   logConfig: () => {
     console.group("[aiStream] Configuration");
-    console.log("Endpoint:", "/api/chat");
+    console.log("Endpoint:", "/api/chat/stream");
     console.log("Mode:", "SSE (Server-Sent Events)");
     console.log("Encoding:", "UTF-8");
     console.log("Parser:", "Tolérant aux coupures + Support Agent");
