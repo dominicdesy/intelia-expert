@@ -17,9 +17,16 @@ import type {
   DeltaEvent,
   FinalEvent,
   ErrorEvent,
-  EndEvent,
 } from "../../../types";
 
+// Définition locale du type EndEvent en attendant la mise à jour de types/index.ts
+type EndEvent = {
+  type: "end";
+  total_time?: number;
+  confidence?: number;
+  documents_used?: number;
+  source?: string;
+};
 
 // Configuration API pour le backend métier (stats, billing, etc.)
 const getApiConfig = () => {

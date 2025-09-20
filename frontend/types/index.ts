@@ -84,6 +84,14 @@ export type ErrorEvent = {
   message?: string;
 };
 
+export type EndEvent = {
+  type: "end";
+  total_time?: number;
+  confidence?: number;
+  documents_used?: number;
+  source?: string;
+};
+
 export type StreamEvent =
   | DeltaEvent
   | FinalEvent
@@ -94,7 +102,8 @@ export type StreamEvent =
   | AgentProgressEvent
   | AgentEndEvent
   | AgentErrorEvent
-  | ProactiveFollowupEvent;
+  | ProactiveFollowupEvent
+  | EndEvent;
 
 // ==================== INTERFACE MESSAGE ÉTENDUE AVEC CONCISION ET RESPONSE_VERSIONS ====================
 
