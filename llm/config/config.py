@@ -147,6 +147,7 @@ STARTUP_TIMEOUT = int(os.getenv("STARTUP_TIMEOUT", "30"))
 TENANT_TTL = int(os.getenv("TENANT_TTL", "3600"))
 MAX_TENANTS = int(os.getenv("MAX_TENANTS", "100"))
 STREAM_CHUNK_LEN = int(os.getenv("STREAM_CHUNK_LEN", "8"))
+MAX_REQUEST_SIZE = int(os.getenv("MAX_REQUEST_SIZE", "16384"))  # 16KB par défaut
 ENABLE_METRICS_LOGGING = os.getenv("ENABLE_METRICS_LOGGING", "true").lower() == "true"
 
 # ===== ENTITY_CONTEXTS - CONFIGURATION CRITIQUE =====
@@ -487,6 +488,7 @@ __all__ = [
     "TENANT_TTL",
     "MAX_TENANTS",
     "STREAM_CHUNK_LEN",
+    "MAX_REQUEST_SIZE",
     "ENABLE_METRICS_LOGGING",
     # Entity contexts
     "ENTITY_CONTEXTS",

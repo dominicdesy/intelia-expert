@@ -53,7 +53,7 @@ DEFAULT_LANGUAGE = "fr"
 FALLBACK_LANGUAGE = "en"
 
 # Dictionnaire universel
-UNIVERSAL_DICT_PATH = os.getenv("UNIVERSAL_DICT_PATH", "config/universal_terms.json")
+UNIVERSAL_DICT_PATH = os.getenv("UNIVERSAL_DICT_PATH", "config")
 
 # Google Translation API
 GOOGLE_TRANSLATE_API_KEY = os.getenv("GOOGLE_TRANSLATE_API_KEY")
