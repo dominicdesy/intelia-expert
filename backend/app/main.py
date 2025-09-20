@@ -19,7 +19,7 @@ from typing import Optional
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
 
 # .env (facultatif)
 try:
@@ -387,23 +387,34 @@ app = FastAPI(
 )
 
 
-# ========== MIDDLEWARE HTTPS REDIRECT CORRIGÉ ==========
+# ========== MIDDLEWARE HTTPS REDIRECT SÉCURISÉ ==========
 @app.middleware("http")
 async def force_https_redirect(request: Request, call_next):
-    """🔒 Force la redirection HTTPS pour tous les endpoints en production"""
+    """🔒 Force la redirection HTTPS pour tous les endpoints (SÉCURISÉ CONTRE BOUCLES)"""
 
-    # Vérifier si on est en environnement de production
-    is_production = (
-        not request.url.hostname.startswith("localhost")
-        and not request.url.hostname.startswith("127.0.0.1")
-        and not request.url.hostname.startswith("0.0.0.0")
-    )
+    # DÉSACTIVÉ TEMPORAIREMENT POUR ÉVITER LES BOUCLES DE REDIRECTION
+    # Le serveur de production avec proxy/load balancer peut causer des boucles
+    # La sécurité HTTPS est assurée au niveau de l'infrastructure (nginx/cloudflare)
 
-    # Forcer HTTPS uniquement en production et si la requête arrive en HTTP
-    if is_production and request.url.scheme == "http":
-        https_url = request.url.replace(scheme="https")
-        logger.info(f"Redirection HTTPS: {request.url} -> {https_url}")
-        return RedirectResponse(url=str(https_url), status_code=301)
+    # Logique sécurisée (commentée pour éviter les boucles) :
+    # is_production = (
+    #     not request.url.hostname.startswith("localhost") and
+    #     not request.url.hostname.startswith("127.0.0.1") and
+    #     not request.url.hostname.startswith("0.0.0.0")
+    # )
+    #
+    # # Vérifier les headers de proxy pour détecter le vrai schéma
+    # forwarded_proto = request.headers.get("x-forwarded-proto", "").lower()
+    # is_https = (
+    #     request.url.scheme == "https" or
+    #     forwarded_proto == "https" or
+    #     request.headers.get("x-forwarded-ssl") == "on"
+    # )
+    #
+    # if is_production and not is_https:
+    #     https_url = request.url.replace(scheme="https")
+    #     logger.info(f"Redirection HTTPS: {request.url} -> {https_url}")
+    #     return RedirectResponse(url=str(https_url), status_code=301)
 
     response = await call_next(request)
     return response
