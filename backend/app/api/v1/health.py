@@ -34,6 +34,20 @@ async def health():
     )
 
 
+# CORRECTION: Ajouter endpoint sans slash pour compatibilité
+@router.get("", response_model=HealthResponse)
+async def health_no_slash():
+    """
+    Simple health check endpoint (sans slash final).
+    Permet l'accès via /api/v1/health ET /api/v1/health/
+    """
+    return HealthResponse(
+        status="running",
+        version=os.getenv("API_VERSION", "1.0"),
+        timestamp=datetime.utcnow().isoformat(),
+    )
+
+
 @router.get("/detailed", response_model=DetailedHealthResponse)
 async def detailed_health():
     """
