@@ -17,8 +17,7 @@ export const dynamic = 'force-dynamic'
  *   - Exemple local:           http://localhost:8000/llm/chat/stream
  */
 const LLM_STREAM_URL =
-  process.env.LLM_STREAM_URL ?? 'https://expert.intelia.com/llm/chat/stream'
-
+  process.env.LLM_STREAM_URL ?? 'http://localhost:8000/llm/chat/stream'
 
 /**
  * En-têtes SSE conseillés pour éviter tout buffering intermédiaire.
