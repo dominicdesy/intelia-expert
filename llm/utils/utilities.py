@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 utilities.py - Fonctions utilitaires multilingues
-Version 2.2 - CORRECTION CRITIQUE: Export FAST_LANGDETECT_AVAILABLE
+Version 2.3 - AJOUT: Support variable d'environnement DISABLE_WHERE_FILTER
 CORRECTION: Respect PEP 8 avec imports en haut + gestion conditionnelle
 """
 
@@ -616,7 +616,7 @@ def get_out_of_domain_message(language: str = None) -> str:
         "it": "Mi specializzo in avicoltura e produzione di polli. Posso aiutare con: Prestazioni (FCR, peso, crescita), Nutrizione (programmi alimentari), Ambiente (temperatura, ventilazione), Salute (prevenzione, vaccinazione), e Gestione tecnica. Fatemi una domanda specifica!",
         "pt": "Especializo-me na avicultura e produção de frangos. Posso ajudar com: Desempenho (FCR, peso, crescimento), Nutrição (programas alimentares), Ambiente (temperatura, ventilação), Saúde (prevenção, vacinação), e Gestão técnica. Faça-me uma pergunta específica!",
         "nl": "Ik specialiseer me in pluimveehouderij en vleeskuikenproductie. Ik kan helpen met: Prestaties (FCR, gewicht, groei), Voeding (voerprogramma's), Omgeving (temperatuur, ventilatie), Gezondheid (preventie, vaccinatie), en Technisch beheer. Stel me een specifieke vraag!",
-        "pl": "Specjalizuję się w hodowli drobiu i produkcji kurcząt. Mogę pomóc z: Wydajność (FCR, waga, wzrost), Żywienie (programy żywieniowe), Środowisko (temperatura, wentylacja), Zdrowie (profilaktyka, szczepienia), i Zarządzanie techniczne. Zadaj mi konkretne pytanie!",
+        "pl": "Specjalizuję się w hodowli drobiu i produkcji kurczят. Mogę pomóc z: Wydajność (FCR, waga, wzrost), Żywienie (programy żywieniowe), Środowisko (temperatura, wentylacja), Zdrowie (profilaktyka, szczepienia), i Zarządzanie techniczne. Zadaj mi konkretne pytanie!",
         "hi": "मैं मुर्गीपालन और ब्रॉयलर उत्पादन में विशेषज्ञता रखता हूं। मैं इनमें मदद कर सकता हूं: प्रदर्शन (FCR, वजन, वृद्धि), पोषण (आहार कार्यक्रम), पर्यावरण (तापमान, वेंटिलेशन), स्वास्थ्य (रोकथाम, टीकाकरण), और तकनीकी प्रबंधन। मुझसे कोई विशिष्ट प्रश्न पूछें!",
         "zh": "我专门从事家禽养殖和肉鸡生产。我可以帮助: 性能 (FCR, 体重, 生长), 营养 (饲养计划), 环境 (温度, 通风), 健康 (预防, 疫苗接种), 和技术管理。请问我一个具体问题！",
         "th": "ฉันเชี่ยวชาญด้านการเลี้ยงสัตว์ปีกและการผลิตไก่เนื้อ ฉันสามารถช่วยได้ในเรื่อง: ประสิทธิภาพ (FCR, น้ำหนัก, การเจริญเติบโต), โภชนาการ (โปรแกรมการให้อาหาร), สิ่งแวดล้อม (อุณหภูมิ, การระบายอากาศ), สุขภาพ (การป้องกัน, การฉีดวัคซีน), และการจัดการทางเทคนิค กรุณาถามคำถามเฉพาะจง!",
@@ -915,8 +915,34 @@ def get_all_metrics_json(
     return data
 
 
+# ============================================================================
+# 🔧 NOUVELLE FONCTION: build_where_filter avec support variable d'environnement
+# ============================================================================
+
+
 def build_where_filter(intent_result) -> Dict:
-    """Construire where filter par entités"""
+    """
+    Construire where filter par entités avec support désactivation via variable d'environnement
+
+    NOUVEAU: Supporte la variable d'environnement DISABLE_WHERE_FILTER=true pour désactiver
+    complètement le filtrage WHERE, utile pour diagnostiquer les problèmes de récupération.
+    """
+
+    # 🔧 NOUVEAU: Vérifier variable d'environnement pour désactiver le filtre
+    disable_where_filter = os.getenv("DISABLE_WHERE_FILTER", "false").lower() in [
+        "true",
+        "1",
+        "yes",
+        "on",
+    ]
+
+    if disable_where_filter:
+        logger.debug(
+            "WHERE filter désactivé par variable d'environnement DISABLE_WHERE_FILTER"
+        )
+        return None
+
+    # Logique originale maintenue
     if not intent_result or not hasattr(intent_result, "detected_entities"):
         return None
 
@@ -1265,7 +1291,7 @@ __all__ = [
     "METRICS",
     "MetricsCollector",
     "get_all_metrics_json",
-    # Weaviate
+    # Weaviate - MODIFIÉ avec support DISABLE_WHERE_FILTER
     "build_where_filter",
     # Intent processing
     "create_intent_processor",
