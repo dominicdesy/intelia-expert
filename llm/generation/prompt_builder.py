@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 prompt_builder.py - Constructeur de prompts spécialisés
+Version corrigée - Instructions améliorées pour lecture des tableaux
 """
 
 from typing import Dict, Optional, Any
@@ -114,10 +115,14 @@ class PromptBuilder:
     def _build_metric_prompt(
         self, entities: Dict[str, str], intent_result: IntentResult
     ) -> str:
-        """Prompt spécialisé pour les métriques avec contexte cache"""
+        """Prompt spécialisé pour les métriques avec contexte cache - CORRIGÉ"""
         base_prompt = """Tu es un expert en performances avicoles. 
 Fournis des données précises avec références aux standards de l'industrie.
-Inclus les valeurs cibles, les plages normales et les facteurs d'influence."""
+Inclus les valeurs cibles, les plages normales et les facteurs d'influence.
+
+ATTENTION CRITIQUE: Examine soigneusement tous les tableaux de données. 
+Les valeurs numériques avec des âges correspondent souvent exactement aux questions posées.
+Si tu vois un tableau avec des colonnes "Age" ou "Days", cherche la valeur correspondante."""
 
         if "metrics" in entities:
             metrics_list = [
@@ -137,42 +142,53 @@ Inclus les valeurs cibles, les plages normales et les facteurs d'influence."""
     def _build_environment_prompt(
         self, entities: Dict[str, str], intent_result: IntentResult
     ) -> str:
-        """Prompt pour l'environnement d'élevage"""
+        """Prompt pour l'environnement d'élevage - CORRIGÉ"""
         return """Tu es un expert en ambiance et climat d'élevage avicole.
 Fournis des paramètres techniques précis, des courbes de température,
 et des recommandations de réglage selon l'âge et la saison.
-Inclus les plages optimales et les ajustements selon les conditions."""
+Inclus les plages optimales et les ajustements selon les conditions.
+
+IMPORTANT: Si tu trouves des tableaux avec des paramètres d'environnement, utilise ces données précises."""
 
     def _build_diagnosis_prompt(
         self, entities: Dict[str, str], intent_result: IntentResult
     ) -> str:
-        """Prompt pour le diagnostic"""
+        """Prompt pour le diagnostic - CORRIGÉ"""
         return """Tu es un vétérinaire spécialisé en aviculture.
 Utilise une approche méthodique de diagnostic différentiel,
 considère l'épidémiologie et propose des examens complémentaires.
-Fournis des diagnostics différentiels et des plans d'action."""
+Fournis des diagnostics différentiels et des plans d'action.
+
+IMPORTANT: Examine tous les tableaux de symptômes ou données diagnostiques pour des réponses précises."""
 
     def _build_economics_prompt(
         self, entities: Dict[str, str], intent_result: IntentResult
     ) -> str:
-        """Prompt pour l'économie"""
+        """Prompt pour l'économie - CORRIGÉ"""
         return """Tu es un expert en économie de l'élevage avicole.
 Fournis des analyses de coûts détaillées, des calculs de rentabilité
 et des comparaisons avec les standards du marché.
-Inclus les facteurs de variation et les optimisations possibles."""
+Inclus les facteurs de variation et les optimisations possibles.
+
+IMPORTANT: Utilise les données chiffrées des tableaux économiques si disponibles."""
 
     def _build_protocol_prompt(
         self, entities: Dict[str, str], intent_result: IntentResult
     ) -> str:
-        """Prompt pour les protocoles"""
+        """Prompt pour les protocoles - CORRIGÉ"""
         return """Tu es un expert en protocoles vétérinaires et biosécurité avicole.
 Fournis des protocoles détaillés, des calendriers de vaccination
 et des mesures de prévention spécifiques.
-Inclus les adaptations selon l'âge et le type d'élevage."""
+Inclus les adaptations selon l'âge et le type d'élevage.
+
+IMPORTANT: Si tu vois des tableaux de protocoles ou calendriers, utilise ces données précises."""
 
     def _build_general_prompt(
         self, entities: Dict[str, str], intent_result: IntentResult
     ) -> str:
+        """Prompt général - CORRIGÉ"""
         return """Tu es un expert avicole polyvalent.
 Réponds de manière factuelle et concise, puis propose des pistes de suivi (mesures, documents de référence, contacts).
-Si nécessaire, demande 1-2 précisions pour personnaliser la réponse."""
+Si nécessaire, demande 1-2 précisions pour personnaliser la réponse.
+
+IMPORTANT: Examine attentivement tous les tableaux de données pour des réponses précises et chiffrées."""

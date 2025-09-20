@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 generators.py - Générateurs de réponses enrichis avec entités et cache externe
-Version corrigée - Erreur cache manager résolue + Protection documents vides
+Version corrigée - Instructions prompt améliorées pour lecture des tableaux
 """
 
 import logging
@@ -325,7 +325,7 @@ class EnhancedResponseGenerator:
             ]
         )
 
-        # Construction du prompt système enrichi
+        # Construction du prompt système enrichi - CORRIGÉ
         system_prompt = f"""Tu es un expert en aviculture spécialisé dans l'accompagnement technique des éleveurs.
 
 CONTEXTE MÉTIER DÉTECTÉ:
@@ -335,16 +335,21 @@ CONTEXTE MÉTIER DÉTECTÉ:
 {enrichment.metric_focus}
 
 DIRECTIVES DE RÉPONSE:
-1. Base ta réponse UNIQUEMENT sur les documents fournis
-2. Intègre le contexte métier détecté dans ta réponse
+1. EXAMINE ATTENTIVEMENT tous les tableaux dans les documents - ils contiennent souvent les réponses exactes
+2. Si tu trouves des données avec des âges en jours/semaines dans un tableau, UTILISE-LES pour répondre précisément
 3. Priorise les métriques identifiées: {', '.join(enrichment.performance_indicators[:3]) if enrichment.performance_indicators else 'N/A'}
 4. Adapte le niveau technique au contexte (éleveur professionnel)
 5. Fournis des valeurs chiffrées quand disponibles
 6. Mentionne les spécificités de lignée/phase si pertinentes
 
+RÈGLE CRITIQUE POUR LES TABLEAUX:
+- Les tableaux avec colonnes "Age" ou "Days" contiennent les données précises demandées
+- Si tu vois des valeurs numériques correspondant à l'âge demandé, UTILISE-LES
+- Ne dis PAS "pas d'information spécifique" si les données sont dans un tableau
+
 RÈGLE LINGUISTIQUE: Réponds STRICTEMENT en {language}
 
-Si les documents ne contiennent pas l'information demandée, dis-le clairement et suggère des éléments connexes disponibles."""
+SEULEMENT si après examen approfondi des tableaux tu ne trouves vraiment aucune donnée correspondante, dis-le clairement et suggère des éléments connexes disponibles."""
 
         # Prompt utilisateur enrichi
         limited_context = (
