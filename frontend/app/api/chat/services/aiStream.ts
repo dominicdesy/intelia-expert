@@ -27,7 +27,7 @@ export type ChatStreamBody = {
 
 /**
  * Service principal pour le streaming AI via SSE
- * Gère la communication avec l'endpoint /api/chat
+ * Gère la communication avec l'endpoint /llm/chat
  */
 export async function streamAIResponse(
   body: ChatStreamBody,
@@ -41,7 +41,7 @@ export async function streamAIResponse(
   });
 
   try {
-    const res = await fetch("/api/chat", {
+    const res = await fetch("/llm/chat", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -358,7 +358,7 @@ export function getErrorMessage(error: any): string {
 export const aiStreamDebug = {
   logConfig: () => {
     console.group("[aiStream] Configuration");
-    console.log("Endpoint:", "/api/chat");
+    console.log("Endpoint:", "/llm/chat");
     console.log("Mode:", "SSE (Server-Sent Events)");
     console.log("Encoding:", "UTF-8");
     console.log("Parser:", "Tolérant aux coupures + Support Agent");

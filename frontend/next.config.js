@@ -136,17 +136,19 @@ const nextConfig = {
     return [];
   },
 
-  // Rewrites - URLs corrigées vers expert.intelia.com
+  // ✅ CORRECTION PRINCIPALE: Rewrites corrigés pour éviter les conflits
   async rewrites() {
     return [
+      // ✅ GARDÉ: Rewrite spécifique pour les endpoints expert
       {
         source: "/api/expert/:path*",
         destination: "https://expert.intelia.com/api/expert/:path*",
       },
-      {
-        source: "/api/:path*",
-        destination: "https://expert.intelia.com/api/:path*",
-      },
+      // ❌ SUPPRIMÉ: Le rewrite problématique qui interceptait TOUTES les routes /api/*
+      // {
+      //   source: "/api/:path*",
+      //   destination: "https://expert.intelia.com/api/:path*",
+      // },
     ];
   },
 };

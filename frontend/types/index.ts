@@ -982,6 +982,7 @@ const getApiConfig = () => {
       BASE_URL: "https://expert.intelia.com", // Fallback développement
       TIMEOUT: 30000,
       LOGGING_BASE_URL: "https://expert.intelia.com/api/v1",
+      LLM_BASE_URL: "https://expert.intelia.com/llm", // ✅ NOUVEAU: URL directe LLM
     };
   }
 
@@ -992,6 +993,7 @@ const getApiConfig = () => {
     BASE_URL: cleanBaseUrl, // URL de base nettoyée
     TIMEOUT: 30000,
     LOGGING_BASE_URL: `${cleanBaseUrl}/api/${version}`, // Construction correcte
+    LLM_BASE_URL: `${cleanBaseUrl}/llm`, // ✅ NOUVEAU: URL directe LLM
   };
 };
 
