@@ -1,4 +1,4 @@
-// app/chat/services/apiService.ts - VERSION AGENT: Streaming LLM + Agent Callbacks + CODE ORIGINAL CONSERVÉ
+// app/chat/services/apiService.ts - VERSION MODIFIÉE: Nouvelle architecture conversations
 
 import { getSupabaseClient } from '@/lib/supabase/singleton'
 
@@ -30,7 +30,8 @@ const getApiConfig = () => {
   return finalUrl
 }
 
-const API_BASE_URL = getApiConfig()
+// MODIFICATION: URL API corrigée
+const API_BASE_URL = 'https://expert.intelia.com/api/v1'
 
 // FIX: Stockage direct des session IDs sans dépendance externe
 function storeRecentSessionId(sessionId: string): void {
@@ -527,7 +528,7 @@ export const generateAIResponse = async (
       agent_sources: agentMetadata.sources_used
     })
 
-    // Enregistrement de la conversation via le backend métier
+    // MODIFICATION: Utilisation de la nouvelle structure de sauvegarde
     try {
       await saveConversationToBackend(finalConversationId, finalQuestion, finalResponse, user.id, agentMetadata)
     } catch (saveError) {
@@ -592,9 +593,8 @@ export const generateAIResponse = async (
 }
 
 /**
- * Sauvegarde de la conversation via le backend métier
- * Utilise l'ancien endpoint pour maintenir la compatibilité des stats/billing
- * MODIFIÉ: Ajout support agent_metadata
+ * MODIFIÉ: Sauvegarde pour nouvelle architecture
+ * Utilise le nouvel endpoint /conversations/save
  */
 async function saveConversationToBackend(
   conversationId: string,
@@ -617,10 +617,17 @@ async function saveConversationToBackend(
       metadata: {
         mode: 'streaming',
         backend: 'llm_backend_agent',
-        // NOUVEAU: Support agent_metadata
+        // Support agent_metadata
         ...(agentMetadata && { agent_metadata: agentMetadata })
       }
     }
+
+    console.log('[apiService] Sauvegarde vers nouvelle architecture:', {
+      conversation_id: conversationId.substring(0, 8) + '...',
+      user_id: userId,
+      question_length: question.length,
+      response_length: response.length
+    })
 
     const response_save = await fetch(`${API_BASE_URL}/conversations/save`, {
       method: 'POST',
@@ -634,7 +641,11 @@ async function saveConversationToBackend(
       throw new Error(`Erreur sauvegarde: ${response_save.status}`)
     }
 
-    console.log('[apiService] Conversation sauvegardée avec succès')
+    const result = await response_save.json()
+    console.log('[apiService] Conversation sauvegardée avec succès:', {
+      status: result.status,
+      action: result.action
+    })
 
   } catch (error) {
     console.error('[apiService] Erreur lors de la sauvegarde:', error)
@@ -724,17 +735,17 @@ export const generateAIResponsePublic = async (
   }
 }
 
-// ===== FONCTIONS MÉTIER CONSERVÉES INTÉGRALEMENT (backend Digital Ocean) =====
+// ===== FONCTIONS MÉTIER MODIFIÉES POUR NOUVELLE ARCHITECTURE =====
 
 /**
- * Chargement des conversations utilisateur (backend métier)
+ * MODIFIÉ: Chargement des conversations utilisateur (nouvelle architecture)
  */
 export const loadUserConversations = async (userId: string): Promise<any> => {
   if (!userId) {
     throw new Error('User ID requis')
   }
 
-  console.log('[apiService] Chargement conversations:', userId)
+  console.log('[apiService] Chargement conversations (nouvelle architecture):', userId)
 
   try {
     const headers = await getAuthHeaders()
@@ -753,12 +764,13 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
         throw new Error('Session expirée. Veuillez vous reconnecter.')
       }
       
-      if (response.status === 405 || response.status === 404) {
+      if (response.status === 404) {
         return {
-          count: 0,
-          conversations: [],
+          status: 'success',
           user_id: userId,
-          note: "Fonctionnalité en cours de développement"
+          conversations: [],
+          total_count: 0,
+          message: 'Aucune conversation trouvée'
         }
       }
       
@@ -766,9 +778,10 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
     }
 
     const data = await response.json()
-    console.log('[apiService] Conversations chargées:', {
-      count: data.count,
-      conversations: data.conversations?.length || 0
+    console.log('[apiService] Conversations chargées (nouvelle architecture):', {
+      total_count: data.total_count,
+      conversations_count: data.conversations?.length || 0,
+      source: data.source
     })
 
     return data
@@ -778,10 +791,11 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
     
     if (error instanceof Error && error.message.includes('Failed to fetch')) {
       return {
-        count: 0,
-        conversations: [],
+        status: 'error',
         user_id: userId,
-        note: "Erreur de connexion - réessayez plus tard"
+        conversations: [],
+        total_count: 0,
+        message: "Erreur de connexion - réessayez plus tard"
       }
     }
     
@@ -790,7 +804,7 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
 }
 
 /**
- * ENVOI DE FEEDBACK (backend métier)
+ * MODIFIÉ: Envoi de feedback (nouvelle architecture)
  */
 export const sendFeedback = async (
   conversationId: string,
@@ -801,21 +815,21 @@ export const sendFeedback = async (
     throw new Error('ID de conversation requis')
   }
 
-  console.log('[apiService] Envoi feedback:', feedback)
+  console.log('[apiService] Envoi feedback (nouvelle architecture):', feedback)
 
   try {
-    const requestBody = {
-      conversation_id: conversationId,
-      rating: feedback === 1 ? 'positive' : 'negative',
-      ...(comment && { comment: comment.trim() })
+    const headers = await getAuthHeaders()
+    
+    // Utiliser l'endpoint de mise à jour des conversations
+    const payload = {
+      feedback: feedback,
+      ...(comment && { feedback_comment: comment.trim() })
     }
 
-    const headers = await getAuthHeaders()
-
-    const response = await fetch(`${API_BASE_URL}/expert/feedback`, {
-      method: 'POST',
+    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/feedback`, {
+      method: 'PATCH',
       headers,
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(payload)
     })
 
     if (!response.ok) {
@@ -829,7 +843,7 @@ export const sendFeedback = async (
       throw new Error(`Erreur envoi feedback: ${response.status}`)
     }
 
-    console.log('[apiService] Feedback envoyé avec succès')
+    console.log('[apiService] Feedback envoyé avec succès (nouvelle architecture)')
 
   } catch (error) {
     console.error('[apiService] Erreur feedback:', error)
@@ -838,14 +852,14 @@ export const sendFeedback = async (
 }
 
 /**
- * SUPPRESSION DE CONVERSATION (backend métier)
+ * MODIFIÉ: Suppression de conversation (nouvelle architecture)
  */
 export const deleteConversation = async (conversationId: string): Promise<void> => {
   if (!conversationId) {
     throw new Error('ID de conversation requis')
   }
 
-  console.log('[apiService] Suppression conversation:', conversationId)
+  console.log('[apiService] Suppression conversation (nouvelle architecture):', conversationId)
 
   try {
     const headers = await getAuthHeaders()
@@ -872,7 +886,7 @@ export const deleteConversation = async (conversationId: string): Promise<void> 
     }
 
     const result = await response.json()
-    console.log('[apiService] Conversation supprimée:', result.message || 'Succès')
+    console.log('[apiService] Conversation supprimée (nouvelle architecture):', result.message || 'Succès')
 
   } catch (error) {
     console.error('[apiService] Erreur suppression conversation:', error)
@@ -881,14 +895,14 @@ export const deleteConversation = async (conversationId: string): Promise<void> 
 }
 
 /**
- * SUPPRESSION DE TOUTES LES CONVERSATIONS (backend métier)
+ * MODIFIÉ: Suppression de toutes les conversations (nouvelle architecture)
  */
 export const clearAllUserConversations = async (userId: string): Promise<void> => {
   if (!userId) {
     throw new Error('User ID requis')
   }
 
-  console.log('[apiService] Suppression toutes conversations:', userId)
+  console.log('[apiService] Suppression toutes conversations (nouvelle architecture):', userId)
 
   try {
     const headers = await getAuthHeaders()
@@ -910,7 +924,7 @@ export const clearAllUserConversations = async (userId: string): Promise<void> =
     }
 
     const result = await response.json()
-    console.log('[apiService] Toutes conversations supprimées:', {
+    console.log('[apiService] Toutes conversations supprimées (nouvelle architecture):', {
       message: result.message,
       deleted_count: result.deleted_count || 0
     })
@@ -921,9 +935,8 @@ export const clearAllUserConversations = async (userId: string): Promise<void> =
   }
 }
 
-/**
- * SUGGESTIONS DE SUJETS (backend métier)
- */
+// ===== FONCTIONS UTILITAIRES CONSERVÉES =====
+
 export const getTopicSuggestions = async (language: string = 'fr'): Promise<string[]> => {
   console.log('[apiService] Récupération suggestions sujets:', language)
 
@@ -967,12 +980,9 @@ export const getTopicSuggestions = async (language: string = 'fr'): Promise<stri
   }
 }
 
-/**
- * HEALTH CHECK (backend métier)
- */
 export const checkAPIHealth = async (): Promise<boolean> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/system/health`, {
+    const response = await fetch(`${API_BASE_URL}/conversations/health`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -981,7 +991,7 @@ export const checkAPIHealth = async (): Promise<boolean> => {
     })
 
     const isHealthy = response.ok
-    console.log('[apiService] API Health:', isHealthy ? 'OK' : 'KO')
+    console.log('[apiService] API Health (nouvelle architecture):', isHealthy ? 'OK' : 'KO')
     
     return isHealthy
 
@@ -991,9 +1001,6 @@ export const checkAPIHealth = async (): Promise<boolean> => {
   }
 }
 
-/**
- * NOUVEAU: Health check LLM Agent
- */
 export const checkLLMHealth = async (): Promise<any> => {
   try {
     const response = await fetch('/llm/health/complete', {
@@ -1018,9 +1025,6 @@ export const checkLLMHealth = async (): Promise<any> => {
   }
 }
 
-/**
- * NOUVEAU: Diagnostic LLM Agent
- */
 export const runLLMDiagnostic = async (): Promise<any> => {
   try {
     const response = await fetch('/llm/diagnostic', {
@@ -1044,8 +1048,6 @@ export const runLLMDiagnostic = async (): Promise<any> => {
     return { success: false, error: error.message }
   }
 }
-
-// ===== FONCTIONS UTILITAIRES CONSERVÉES =====
 
 export const buildClarificationEntities = (
   clarificationAnswers: Record<string, string>,
