@@ -77,57 +77,40 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
                 if hasattr(weaviate_client, "collections"):
                     # Weaviate v4
                     result["weaviate_version"] = "v4"
+                    collections = await asyncio.get_event_loop().run_in_executor(
+                        None, lambda: list(weaviate_client.collections.list_all())
+                    )
 
-                    # CORRECTION: Récupérer les noms des collections d'abord
-                    try:
-                        collections_dict = (
-                            await asyncio.get_event_loop().run_in_executor(
-                                None, lambda: weaviate_client.collections.list_all()
+                    for collection in collections:
+                        try:
+                            count_result = (
+                                await asyncio.get_event_loop().run_in_executor(
+                                    None,
+                                    lambda: collection.aggregate.over_all(
+                                        total_count=True
+                                    ),
+                                )
                             )
-                        )
+                            doc_count = getattr(count_result, "total_count", 0)
 
-                        # Traiter selon le type de retour
-                        if isinstance(collections_dict, dict):
-                            collection_names = list(collections_dict.keys())
-                        else:
-                            # Si c'est déjà une liste de noms
-                            collection_names = list(collections_dict)
+                            result["collections"][collection.name] = {
+                                "document_count": doc_count,
+                                "name": collection.name,
+                            }
+                            result["total_documents"] += doc_count
 
-                        for collection_name in collection_names:
-                            try:
-                                # Récupérer l'objet collection
-                                collection = weaviate_client.collections.get(
-                                    collection_name
-                                )
-
-                                count_result = (
-                                    await asyncio.get_event_loop().run_in_executor(
-                                        None,
-                                        lambda: collection.aggregate.over_all(
-                                            total_count=True
-                                        ),
-                                    )
-                                )
-                                doc_count = getattr(count_result, "total_count", 0)
-
-                                result["collections"][collection_name] = {
-                                    "document_count": doc_count,
-                                    "name": collection_name,
-                                }
-                                result["total_documents"] += doc_count
-
-                            except Exception as e:
-                                result["collections"][collection_name] = {
-                                    "error": str(e),
-                                    "document_count": 0,
-                                }
-                                result["issues"].append(
-                                    f"Erreur collection {collection_name}: {e}"
-                                )
-
-                    except Exception as e:
-                        result["issues"].append(f"Erreur récupération collections: {e}")
-                        result["weaviate_version"] = "v4-error"
+                        except Exception as e:
+                            result["collections"][collection.name] = {
+                                "error": str(e),
+                                "document_count": 0,
+                            }
+                            result["issues"].append(
+                                f"Erreur collection {collection.name}: {e}"
+                            )
+                else:
+                    # Weaviate v3 fallback
+                    result["weaviate_version"] = "v3"
+                    result["issues"].append("Support v3 limité pour ce diagnostic")
 
                 # Vérifications de santé
                 if result["total_documents"] == 0:
