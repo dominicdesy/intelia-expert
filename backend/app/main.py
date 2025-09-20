@@ -532,6 +532,7 @@ except ImportError as e:
     routers_to_load = [
         ("auth", "", "auth"),
         ("system", "", "system"),
+        ("health", "", "health"),  # 🔧 AJOUT DU ROUTER HEALTH MANQUANT
         ("users", "", "users"),
         ("invitations", "", "invitations"),
         ("logging", "", "logging"),
