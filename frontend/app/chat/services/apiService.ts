@@ -1,4 +1,4 @@
-// app/chat/services/apiService.ts - VERSION MODIFIÉE: Nouvelle architecture conversations
+// app/chat/services/apiService.ts - VERSION CORRIGÉE: Nouvelle architecture conversations
 
 import { getSupabaseClient } from "@/lib/supabase/singleton";
 
@@ -222,9 +222,15 @@ interface EnhancedAIResponse {
   agent_metadata?: AgentMetadata;
 }
 
+// ✅ CORRECTION 1: Interface pour le résultat de streaming
+interface StreamResult {
+  response: string;
+  agentMetadata: AgentMetadata;
+}
+
 /**
  * FONCTION STREAMING SSE AGENT - VERSION ENRICHIE COMPLÈTE
- * Gère l'appel vers /api/chat avec support complet des événements Agent
+ * Gère l'appel vers /llm/chat avec support complet des événements Agent
  */
 async function streamAIResponseInternal(
   tenant_id: string,
@@ -233,7 +239,7 @@ async function streamAIResponseInternal(
   conversation_id: string,
   user_context?: any,
   callbacks?: StreamCallbacks,
-): Promise<string> {
+): Promise<StreamResult> {
   const payload = {
     tenant_id,
     lang,
@@ -242,7 +248,7 @@ async function streamAIResponseInternal(
     user_context,
   };
 
-  console.log("[apiService] Streaming Agent vers /api/chat:", {
+  console.log("[apiService] Streaming Agent vers /llm/chat:", {
     tenant_id,
     lang,
     message_preview: message.substring(0, 50) + "...",
@@ -421,6 +427,20 @@ async function streamAIResponseInternal(
               callbacks?.onAgentError?.(agentErrorEvent.error);
               break;
 
+            // ✅ CORRECTION 2: Gestion de l'événement "end"
+            case "end":
+              const endEvent = event as any;
+              console.log("[apiService] Stream terminé (end event):", endEvent);
+              // Extraire les métadonnées de fin si disponibles
+              if (endEvent.documents_used !== undefined) {
+                agentMetadata.sources_used = endEvent.documents_used;
+              }
+              if (endEvent.confidence !== undefined) {
+                // Stocker la confidence finale pour référence
+                (agentMetadata as any).final_confidence = endEvent.confidence;
+              }
+              break;
+
             // ÉVÉNEMENTS LEGACY MAINTENUS
             case "delta":
               const deltaEvent = event as DeltaEvent;
@@ -478,10 +498,11 @@ async function streamAIResponseInternal(
     }
   }
 
-  // Attacher les métadonnées Agent à la réponse
-  (finalAnswer as any).__agentMetadata = agentMetadata;
-
-  return finalAnswer;
+  // ✅ CORRECTION 3: Retourner un objet au lieu d'essayer d'attacher des propriétés à une string
+  return {
+    response: finalAnswer,
+    agentMetadata: agentMetadata,
+  };
 }
 
 /**
@@ -558,8 +579,8 @@ export const generateAIResponse = async (
       }
     }
 
-    // Appel au service de streaming Agent avec callbacks enrichis
-    const finalResponse = await streamAIResponseInternal(
+    // ✅ CORRECTION 4: Appel au service de streaming Agent avec gestion correcte du résultat
+    const streamResult = await streamAIResponseInternal(
       tenant_id,
       language,
       finalQuestion,
@@ -574,15 +595,8 @@ export const generateAIResponse = async (
       callbacks, // PROPAGATION DES CALLBACKS AGENT
     );
 
-    // Récupération des métadonnées Agent
-    const agentMetadata = (finalResponse as any).__agentMetadata || {
-      complexity: "simple",
-      sub_queries_count: 0,
-      synthesis_method: "direct",
-      sources_used: 0,
-      processing_time: 0,
-      decisions: [],
-    };
+    const finalResponse = streamResult.response;
+    const agentMetadata = streamResult.agentMetadata;
 
     console.log("[apiService] Streaming Agent terminé:", {
       final_length: finalResponse.length,
@@ -752,7 +766,8 @@ export const generateAIResponsePublic = async (
   });
 
   try {
-    const finalResponse = await streamAIResponseInternal(
+    // ✅ CORRECTION 5: Même correction pour la fonction publique
+    const streamResult = await streamAIResponseInternal(
       "ten_public",
       language,
       question.trim(),
@@ -761,15 +776,8 @@ export const generateAIResponsePublic = async (
       callbacks, // PROPAGATION DES CALLBACKS AGENT
     );
 
-    // Récupération des métadonnées Agent
-    const agentMetadata = (finalResponse as any).__agentMetadata || {
-      complexity: "simple",
-      sub_queries_count: 0,
-      synthesis_method: "direct",
-      sources_used: 0,
-      processing_time: 0,
-      decisions: [],
-    };
+    const finalResponse = streamResult.response;
+    const agentMetadata = streamResult.agentMetadata;
 
     // FIX: Stockage du session ID
     storeRecentSessionId(finalConversationId);
