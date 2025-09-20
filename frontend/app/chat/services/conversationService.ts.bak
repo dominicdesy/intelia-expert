@@ -6,9 +6,8 @@ import {
   ConversationDetailResponse,
   ConversationGroupingOptions,
   Message,
-  ConversationData,
-  AgentMetadata  // NOUVEAU: Import pour support Agent
-} from '@/types'
+  ConversationData
+} from '../../../types'
 
 // Import critique: Utiliser loadUserConversations d'apiService au lieu de dupliquer la logique
 import { loadUserConversations, sendFeedback, deleteConversation } from './apiService'
@@ -654,9 +653,6 @@ export class ConversationService {
     return workingEndpoints
   }
 
-  /**
-   * MODIFIÉ: Transformation avec support Agent metadata
-   */
   transformToConversationWithMessages(conversationData: any): ConversationWithMessages {
     const messages: Message[] = []
     
@@ -685,12 +681,7 @@ export class ConversationService {
             feedback: i === responses.length - 1 && conversationData.feedback === 1 ? 'positive' 
                     : i === responses.length - 1 && conversationData.feedback === -1 ? 'negative' 
                     : null,
-            feedbackComment: i === responses.length - 1 ? conversationData.feedback_comment : undefined,
-            
-            // NOUVEAU: Support agent_metadata
-            ...(conversationData.agent_metadata && { 
-              agent_metadata: conversationData.agent_metadata 
-            })
+            feedbackComment: i === responses.length - 1 ? conversationData.feedback_comment : undefined
           })
         }
       }
@@ -717,9 +708,7 @@ export class ConversationService {
     }
   }
 
-  /**
-   * MODIFIÉ: Sauvegarde avec support Agent metadata
-   */
+  // Invalidation du cache après sauvegarde
   async saveConversation(data: ConversationData): Promise<void> {
     if (!this.loggingEnabled) {
       console.log('Logging désactivé - conversation non sauvegardée:', data.conversation_id)
@@ -742,14 +731,7 @@ export class ConversationService {
           confidence_score: data.confidence_score,
           response_time_ms: data.response_time_ms,
           language: data.language || 'fr',
-          rag_used: data.rag_used !== undefined ? data.rag_used : true,
-          
-          // NOUVEAU: Support agent_metadata
-          ...(data.agent_metadata && { 
-            agent_metadata: data.agent_metadata,
-            processing_complexity: data.agent_metadata.complexity,
-            sources_used: data.agent_metadata.sources_used 
-          })
+          rag_used: data.rag_used !== undefined ? data.rag_used : true
         })
       })
 
