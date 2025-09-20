@@ -1,67 +1,72 @@
-import React, { useState } from 'react'
-import { useTranslation } from '@/lib/languages/i18n'
-import { ThumbUpIcon, ThumbDownIcon } from '../../utils/icons'
+import React, { useState } from "react";
+import { useTranslation } from "@/lib/languages/i18n";
+import { ThumbUpIcon, ThumbDownIcon } from "../../utils/icons";
 
 interface FeedbackModalProps {
-  isOpen: boolean
-  onClose: () => void
-  onSubmit: (feedback: 'positive' | 'negative', comment?: string) => Promise<void>
-  feedbackType: 'positive' | 'negative'
-  isSubmitting?: boolean
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (
+    feedback: "positive" | "negative",
+    comment?: string,
+  ) => Promise<void>;
+  feedbackType: "positive" | "negative";
+  isSubmitting?: boolean;
 }
 
-export const FeedbackModal = ({ 
-  isOpen, 
-  onClose, 
-  onSubmit, 
-  feedbackType, 
-  isSubmitting = false 
+export const FeedbackModal = ({
+  isOpen,
+  onClose,
+  onSubmit,
+  feedbackType,
+  isSubmitting = false,
 }: FeedbackModalProps) => {
-  const { t } = useTranslation()
-  const [comment, setComment] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const { t } = useTranslation();
+  const [comment, setComment] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   const handleSubmit = async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      await onSubmit(feedbackType, comment.trim() || undefined)
-      setComment('')
-      onClose() // ✅ Fermer la modal après succès
+      await onSubmit(feedbackType, comment.trim() || undefined);
+      setComment("");
+      onClose(); // ✅ Fermer la modal après succès
     } catch (error) {
-      console.error(t('feedback.sendError'), error)
+      console.error(t("feedback.sendError"), error);
       // ✅ CORRECTION: Fermer la modal même en cas d'erreur
-      setComment('')
-      onClose()
+      setComment("");
+      onClose();
       // Ne pas afficher d'alert ici, laisser la fonction parent gérer
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleCancel = () => {
-    setComment('')
-    onClose()
-  }
+    setComment("");
+    onClose();
+  };
 
-  const isPositive = feedbackType === 'positive'
-  const title = isPositive ? t('feedback.positiveTitle') : t('feedback.negativeTitle')
-  const placeholder = isPositive 
-    ? t('feedback.positivePlaceholder')
-    : t('feedback.negativePlaceholder')
+  const isPositive = feedbackType === "positive";
+  const title = isPositive
+    ? t("feedback.positiveTitle")
+    : t("feedback.negativeTitle");
+  const placeholder = isPositive
+    ? t("feedback.positivePlaceholder")
+    : t("feedback.negativePlaceholder");
 
   return (
     <>
       {/* Overlay */}
-      <div 
-        className="fixed inset-0 bg-black bg-opacity-50 z-50" 
+      <div
+        className="fixed inset-0 bg-black bg-opacity-50 z-50"
         onClick={handleCancel}
       />
-      
+
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div 
+        <div
           className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4"
           onClick={(e) => e.stopPropagation()}
         >
@@ -86,23 +91,33 @@ export const FeedbackModal = ({
                 )}
                 <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
               </div>
-              
+
               <button
                 onClick={handleCancel}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
                 disabled={isLoading}
-                aria-label={t('modal.close')}
-                title={t('modal.close')}
+                aria-label={t("modal.close")}
+                title={t("modal.close")}
               >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
 
             {/* Description */}
             <p className="text-sm text-gray-600 mb-4">
-              {t('feedback.description')}
+              {t("feedback.description")}
             </p>
 
             {/* Textarea de commentaire */}
@@ -118,11 +133,11 @@ export const FeedbackModal = ({
               />
               <div className="flex justify-between items-center mt-2">
                 <div className="text-xs text-gray-400">
-                  {`${t('feedback.characterCount')}: ${comment.length}/500`}
+                  {`${t("feedback.characterCount")}: ${comment.length}/500`}
                 </div>
                 {comment.length > 450 && (
                   <div className="text-xs text-orange-500">
-                    {t('feedback.limitWarning')}
+                    {t("feedback.limitWarning")}
                   </div>
                 )}
               </div>
@@ -131,13 +146,15 @@ export const FeedbackModal = ({
             {/* Note de confidentialité */}
             <div className="mb-6">
               <p className="text-xs text-gray-500 leading-relaxed">
-                {t('feedback.privacyNotice')}{' '}
-                <button 
+                {t("feedback.privacyNotice")}{" "}
+                <button
                   type="button"
                   className="text-blue-600 hover:text-blue-700 underline font-medium"
-                  onClick={() => window.open('https://intelia.com/privacy-policy/', '_blank')}
+                  onClick={() =>
+                    window.open("https://intelia.com/privacy-policy/", "_blank")
+                  }
                 >
-                  {t('feedback.learnMore')}
+                  {t("feedback.learnMore")}
                 </button>
               </p>
             </div>
@@ -151,9 +168,9 @@ export const FeedbackModal = ({
                 disabled={isLoading}
                 className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {t('modal.cancel')}
+                {t("modal.cancel")}
               </button>
-              
+
               <button
                 onClick={handleSubmit}
                 disabled={isLoading}
@@ -162,10 +179,10 @@ export const FeedbackModal = ({
                 {isLoading ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>{t('feedback.sending')}</span>
+                    <span>{t("feedback.sending")}</span>
                   </>
                 ) : (
-                  <span>{t('feedback.send')}</span>
+                  <span>{t("feedback.send")}</span>
                 )}
               </button>
             </div>
@@ -173,5 +190,5 @@ export const FeedbackModal = ({
         </div>
       </div>
     </>
-  )
-}
+  );
+};

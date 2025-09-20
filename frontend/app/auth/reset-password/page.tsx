@@ -1,188 +1,252 @@
-'use client'
+"use client";
 
-import { useState, useEffect, Suspense } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useAuthStore } from '@/lib/stores/auth'
-import { useTranslation, availableLanguages } from '@/lib/languages/i18n'
+import { useState, useEffect, Suspense } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuthStore } from "@/lib/stores/auth";
+import { useTranslation, availableLanguages } from "@/lib/languages/i18n";
 
 // ==================== VALIDATION MOT DE PASSE INTERNATIONALISÉE ====================
-const validatePassword = (password: string, t: (key: string) => string): string[] => {
-  const errors: string[] = []
-  
+const validatePassword = (
+  password: string,
+  t: (key: string) => string,
+): string[] => {
+  const errors: string[] = [];
+
   if (!password || password.trim().length === 0) {
-    errors.push(t('validation.required.password'))
-    return errors
+    errors.push(t("validation.required.password"));
+    return errors;
   }
-  
+
   if (password.length < 8) {
-    errors.push(t('validation.password.minLength'))
+    errors.push(t("validation.password.minLength"));
   }
-  
+
   if (password.length > 128) {
-    errors.push(t('resetPassword.validation.maxLength'))
+    errors.push(t("resetPassword.validation.maxLength"));
   }
-  
+
   if (!/[a-zA-Z]/.test(password)) {
-    errors.push(t('resetPassword.validation.letterRequired'))
+    errors.push(t("resetPassword.validation.letterRequired"));
   }
-  
+
   if (!/\d/.test(password)) {
-    errors.push(t('validation.password.number'))
+    errors.push(t("validation.password.number"));
   }
-  
+
   const commonPasswords = [
-    'password', '12345678', 'qwerty123', 'abc123456', 
-    'password1', 'password123', '123456789', 'motdepasse',
-    'azerty123', '11111111', '00000000'
-  ]
-  if (commonPasswords.some(common => 
-    password.toLowerCase().includes(common.toLowerCase())
-  )) {
-    errors.push(t('resetPassword.validation.tooCommon'))
+    "password",
+    "12345678",
+    "qwerty123",
+    "abc123456",
+    "password1",
+    "password123",
+    "123456789",
+    "motdepasse",
+    "azerty123",
+    "11111111",
+    "00000000",
+  ];
+  if (
+    commonPasswords.some((common) =>
+      password.toLowerCase().includes(common.toLowerCase()),
+    )
+  ) {
+    errors.push(t("resetPassword.validation.tooCommon"));
   }
-  
+
   if (/(.)\1{3,}/.test(password)) {
-    errors.push(t('resetPassword.validation.tooRepetitive'))
+    errors.push(t("resetPassword.validation.tooRepetitive"));
   }
-  
+
   const sequentialPatterns = [
-    '12345678', '87654321', 'abcdefgh', 'zyxwvuts',
-    'qwertyui', 'asdfghjk', 'zxcvbnm'
-  ]
-  if (sequentialPatterns.some(pattern => 
-    password.toLowerCase().includes(pattern)
-  )) {
-    errors.push(t('resetPassword.validation.avoidSequences'))
+    "12345678",
+    "87654321",
+    "abcdefgh",
+    "zyxwvuts",
+    "qwertyui",
+    "asdfghjk",
+    "zxcvbnm",
+  ];
+  if (
+    sequentialPatterns.some((pattern) =>
+      password.toLowerCase().includes(pattern),
+    )
+  ) {
+    errors.push(t("resetPassword.validation.avoidSequences"));
   }
-  
-  return errors
-}
+
+  return errors;
+};
 
 // ==================== LOGO INTELIA ====================
 const InteliaLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
-  <img 
-    src="/images/favicon.png" 
-    alt="Intelia Logo" 
-    className={className}
-  />
-)
+  <img src="/images/favicon.png" alt="Intelia Logo" className={className} />
+);
 
 // ==================== ICONES ====================
 const EyeIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+  <svg
+    className={className}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+    />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+    />
   </svg>
-)
+);
 
 const EyeSlashIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.34 6.34m6.822 10.565l-3.536-3.536" />
+  <svg
+    className={className}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.34 6.34m6.822 10.565l-3.536-3.536"
+    />
   </svg>
-)
+);
 
 // ==================== INDICATEUR DE FORCE INTERNATIONALISÉ ====================
-const PasswordStrengthIndicator: React.FC<{ password: string; t: (key: string) => string }> = ({ password, t }) => {
-  const validation = { errors: validatePassword(password, t) }
-  
-  const requirements = [
-    { test: password.length >= 8, label: t('validation.password.minLength') },
-    { test: /[a-zA-Z]/.test(password), label: t('resetPassword.requirements.hasLetter') },
-    { test: /\d/.test(password), label: t('validation.password.number') },
-    { test: !/(.)\\1{3,}/.test(password), label: t('resetPassword.requirements.noRepetition') },
-    { test: password.length <= 128, label: t('resetPassword.requirements.reasonableLength') }
-  ]
+const PasswordStrengthIndicator: React.FC<{
+  password: string;
+  t: (key: string) => string;
+}> = ({ password, t }) => {
+  const validation = { errors: validatePassword(password, t) };
 
-  const passedRequirements = requirements.filter(req => req.test).length
-  const strength = passedRequirements / requirements.length
-  
+  const requirements = [
+    { test: password.length >= 8, label: t("validation.password.minLength") },
+    {
+      test: /[a-zA-Z]/.test(password),
+      label: t("resetPassword.requirements.hasLetter"),
+    },
+    { test: /\d/.test(password), label: t("validation.password.number") },
+    {
+      test: !/(.)\\1{3,}/.test(password),
+      label: t("resetPassword.requirements.noRepetition"),
+    },
+    {
+      test: password.length <= 128,
+      label: t("resetPassword.requirements.reasonableLength"),
+    },
+  ];
+
+  const passedRequirements = requirements.filter((req) => req.test).length;
+  const strength = passedRequirements / requirements.length;
+
   const getStrengthColor = () => {
-    if (strength < 0.4) return 'bg-red-500'
-    if (strength < 0.7) return 'bg-yellow-500'
-    if (strength < 0.9) return 'bg-blue-500'
-    return 'bg-green-500'
-  }
-  
+    if (strength < 0.4) return "bg-red-500";
+    if (strength < 0.7) return "bg-yellow-500";
+    if (strength < 0.9) return "bg-blue-500";
+    return "bg-green-500";
+  };
+
   const getStrengthLabel = () => {
-    if (strength < 0.4) return t('resetPassword.strength.weak')
-    if (strength < 0.7) return t('resetPassword.strength.medium')
-    if (strength < 0.9) return t('resetPassword.strength.good')
-    return t('resetPassword.strength.excellent')
-  }
+    if (strength < 0.4) return t("resetPassword.strength.weak");
+    if (strength < 0.7) return t("resetPassword.strength.medium");
+    if (strength < 0.9) return t("resetPassword.strength.good");
+    return t("resetPassword.strength.excellent");
+  };
 
   return (
     <div className="mt-3 p-3 bg-gray-50 rounded-lg">
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs font-medium text-gray-700">
-          {t('resetPassword.passwordStrength')}
+          {t("resetPassword.passwordStrength")}
         </p>
-        <span className={`text-xs font-medium ${
-          strength < 0.4 ? 'text-red-600' :
-          strength < 0.7 ? 'text-yellow-600' :
-          strength < 0.9 ? 'text-blue-600' : 'text-green-600'
-        }`}>
+        <span
+          className={`text-xs font-medium ${
+            strength < 0.4
+              ? "text-red-600"
+              : strength < 0.7
+                ? "text-yellow-600"
+                : strength < 0.9
+                  ? "text-blue-600"
+                  : "text-green-600"
+          }`}
+        >
           {getStrengthLabel()}
         </span>
       </div>
-      
+
       <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
-        <div 
+        <div
           className={`h-2 rounded-full transition-all duration-300 ${getStrengthColor()}`}
           style={{ width: `${strength * 100}%` }}
         ></div>
       </div>
-      
+
       <div className="grid grid-cols-1 gap-1 text-xs">
         {requirements.map((req, index) => (
           <div
             key={index}
-            className={`flex items-center ${req.test ? 'text-green-600' : 'text-gray-400'}`}
+            className={`flex items-center ${req.test ? "text-green-600" : "text-gray-400"}`}
           >
-            <span className="mr-2 text-sm">{req.test ? '✅' : '⭕'}</span>
+            <span className="mr-2 text-sm">{req.test ? "✅" : "⭕"}</span>
             <span>{req.label}</span>
           </div>
         ))}
-        
+
         {validation.errors.map((error, index) => (
-          <div key={`error-${index}`} className="flex items-center text-red-600">
+          <div
+            key={`error-${index}`}
+            className="flex items-center text-red-600"
+          >
             <span className="mr-2 text-sm">❌</span>
             <span>{error}</span>
           </div>
         ))}
       </div>
-      
+
       {strength < 1 && (
         <div className="mt-3 pt-2 border-t border-gray-200">
-          <p className="text-xs text-gray-600 font-medium mb-1">{t('resetPassword.tips')}:</p>
+          <p className="text-xs text-gray-600 font-medium mb-1">
+            {t("resetPassword.tips")}:
+          </p>
           <ul className="text-xs text-gray-600 space-y-1">
             {password.length < 12 && (
-              <li>• {t('resetPassword.tip.longerPassword')}</li>
+              <li>• {t("resetPassword.tip.longerPassword")}</li>
             )}
             {!/[A-Z]/.test(password) && !/[a-z]/.test(password) && (
-              <li>• {t('resetPassword.tip.mixCase')}</li>
+              <li>• {t("resetPassword.tip.mixCase")}</li>
             )}
             {!/[!@#$%^&*()_+=\[\]{};':"|,.<>?-]/.test(password) && (
-              <li>• {t('resetPassword.tip.specialChars')}</li>
+              <li>• {t("resetPassword.tip.specialChars")}</li>
             )}
           </ul>
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
 // ==================== COMPOSANT CHAMP MOT DE PASSE ====================
 interface PasswordFieldProps {
-  value: string
-  onChange: (value: string) => void
-  placeholder: string
-  label: string
-  disabled?: boolean
-  showStrength?: boolean
-  confirmValue?: string
-  isConfirmField?: boolean
-  t: (key: string) => string
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  label: string;
+  disabled?: boolean;
+  showStrength?: boolean;
+  confirmValue?: string;
+  isConfirmField?: boolean;
+  t: (key: string) => string;
 }
 
 const PasswordField: React.FC<PasswordFieldProps> = ({
@@ -194,10 +258,10 @@ const PasswordField: React.FC<PasswordFieldProps> = ({
   showStrength = false,
   confirmValue,
   isConfirmField = false,
-  t
+  t,
 }) => {
-  const [showPassword, setShowPassword] = useState(false)
-  
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -226,43 +290,63 @@ const PasswordField: React.FC<PasswordFieldProps> = ({
           )}
         </button>
       </div>
-      
+
       {showStrength && value && (
         <PasswordStrengthIndicator password={value} t={t} />
       )}
-      
+
       {isConfirmField && value && confirmValue && (
         <div className="mt-1 text-xs">
           {confirmValue === value ? (
             <span className="text-green-600 flex items-center">
-              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <svg
+                className="w-3 h-3 mr-1"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
-              {t('validation.password.match')}
+              {t("validation.password.match")}
             </span>
           ) : (
             <span className="text-red-600 flex items-center">
-              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="w-3 h-3 mr-1"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
-              {t('validation.password.mismatch')}
+              {t("validation.password.mismatch")}
             </span>
           )}
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
 // ==================== PAGE SUCCES ====================
 const SuccessPage = ({ t }: { t: (key: string) => string }) => {
   useEffect(() => {
     const timer = setTimeout(() => {
-      window.location.href = 'https://expert.intelia.com/'
-    }, 3000)
-    
-    return () => clearTimeout(timer)
-  }, [])
+      window.location.href = "https://expert.intelia.com/";
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-6">
@@ -270,10 +354,10 @@ const SuccessPage = ({ t }: { t: (key: string) => string }) => {
         <div className="bg-white p-8 rounded-lg shadow-lg border border-gray-200">
           <div className="text-6xl mb-4">✅</div>
           <h1 className="text-2xl font-bold text-gray-900 mb-4">
-            {t('success.passwordChanged')}
+            {t("success.passwordChanged")}
           </h1>
           <p className="text-gray-600 mb-6 leading-relaxed">
-            {t('resetPassword.success.description')}
+            {t("resetPassword.success.description")}
           </p>
           <div className="flex justify-center mb-4">
             <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full"></div>
@@ -282,13 +366,13 @@ const SuccessPage = ({ t }: { t: (key: string) => string }) => {
             href="https://expert.intelia.com/"
             className="inline-block text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
           >
-            {t('resetPassword.success.goToSite')}
+            {t("resetPassword.success.goToSite")}
           </a>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
 // ==================== PAGE ERREUR TOKEN ====================
 const InvalidTokenPage = ({ t }: { t: (key: string) => string }) => {
@@ -298,158 +382,163 @@ const InvalidTokenPage = ({ t }: { t: (key: string) => string }) => {
         <div className="bg-white p-8 rounded-lg shadow-lg border border-gray-200">
           <div className="text-6xl mb-4">⚠️</div>
           <h1 className="text-2xl font-bold text-gray-900 mb-4">
-            {t('resetPassword.invalidToken.title')}
+            {t("resetPassword.invalidToken.title")}
           </h1>
           <p className="text-gray-600 mb-6 leading-relaxed">
-            {t('resetPassword.invalidToken.description')}
+            {t("resetPassword.invalidToken.description")}
           </p>
           <div className="space-y-3">
             <a
               href="https://expert.intelia.com/forgot-password"
               className="block w-full py-2 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
             >
-              {t('resetPassword.invalidToken.requestNew')}
+              {t("resetPassword.invalidToken.requestNew")}
             </a>
             <a
               href="https://expert.intelia.com/"
               className="block text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
             >
-              {t('resetPassword.invalidToken.backToSite')}
+              {t("resetPassword.invalidToken.backToSite")}
             </a>
           </div>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
 // ==================== PAGE CONTENU PRINCIPAL ====================
 function ResetPasswordPageContent() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const { isAuthenticated, user } = useAuthStore()
-  const { t, changeLanguage } = useTranslation()
-  
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { isAuthenticated, user } = useAuthStore();
+  const { t, changeLanguage } = useTranslation();
+
   const [formData, setFormData] = useState({
-    newPassword: '',
-    confirmPassword: ''
-  })
-  const [isLoading, setIsLoading] = useState(false)
-  const [errors, setErrors] = useState<string[]>([])
-  const [success, setSuccess] = useState(false)
-  const [tokenValid, setTokenValid] = useState<boolean | null>(null)
-  const [token, setToken] = useState<string | null>(null)
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [success, setSuccess] = useState(false);
+  const [tokenValid, setTokenValid] = useState<boolean | null>(null);
+  const [token, setToken] = useState<string | null>(null);
 
   // 🌍 DÉTECTION DE LANGUE DEPUIS L'URL
   useEffect(() => {
-    const langParam = searchParams.get('lang')
-    if (langParam && availableLanguages.some(l => l.code === langParam)) {
-      console.log('[ResetPassword] Changement de langue détecté:', langParam)
-      changeLanguage(langParam)
+    const langParam = searchParams.get("lang");
+    if (langParam && availableLanguages.some((l) => l.code === langParam)) {
+      console.log("[ResetPassword] Changement de langue détecté:", langParam);
+      changeLanguage(langParam);
     }
-  }, [searchParams, changeLanguage])
+  }, [searchParams, changeLanguage]);
 
   // Extraction du token (conservé identique)
   useEffect(() => {
     const extractTokenFromUrl = () => {
-      const resetToken = searchParams.get('token')
-      const accessTokenQuery = searchParams.get('access_token')
-      
-      let accessTokenHash = null
-      if (typeof window !== 'undefined') {
-        const hash = window.location.hash.substring(1)
-        const hashParams = new URLSearchParams(hash)
-        accessTokenHash = hashParams.get('access_token')
+      const resetToken = searchParams.get("token");
+      const accessTokenQuery = searchParams.get("access_token");
+
+      let accessTokenHash = null;
+      if (typeof window !== "undefined") {
+        const hash = window.location.hash.substring(1);
+        const hashParams = new URLSearchParams(hash);
+        accessTokenHash = hashParams.get("access_token");
       }
-      
-      return resetToken || accessTokenQuery || accessTokenHash
-    }
 
-    const finalToken = extractTokenFromUrl()
-    console.log('[ResetPassword] Token détecté:', finalToken ? 'Présent' : 'Absent')
-    
+      return resetToken || accessTokenQuery || accessTokenHash;
+    };
+
+    const finalToken = extractTokenFromUrl();
+    console.log(
+      "[ResetPassword] Token détecté:",
+      finalToken ? "Présent" : "Absent",
+    );
+
     if (!finalToken) {
-      setTokenValid(false)
-      return
+      setTokenValid(false);
+      return;
     }
 
-    setToken(finalToken)
-    setTokenValid(true)
-  }, [searchParams])
+    setToken(finalToken);
+    setTokenValid(true);
+  }, [searchParams]);
 
   // Redirection si déjà connecté
   useEffect(() => {
     if (isAuthenticated && user) {
-      router.push('/chat')
+      router.push("/chat");
     }
-  }, [isAuthenticated, user, router])
+  }, [isAuthenticated, user, router]);
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors.length > 0) {
-      setErrors([])
+      setErrors([]);
     }
-  }
+  };
 
   const handleSubmit = async () => {
-    const validationErrors: string[] = []
-    
+    const validationErrors: string[] = [];
+
     if (!formData.newPassword) {
-      validationErrors.push(t('validation.required.password'))
+      validationErrors.push(t("validation.required.password"));
     }
     if (!formData.confirmPassword) {
-      validationErrors.push(t('validation.required.confirmPassword'))
+      validationErrors.push(t("validation.required.confirmPassword"));
     }
     if (formData.newPassword !== formData.confirmPassword) {
-      validationErrors.push(t('validation.password.mismatch'))
+      validationErrors.push(t("validation.password.mismatch"));
     }
-    
-    const passwordValidationErrors = validatePassword(formData.newPassword, t)
-    validationErrors.push(...passwordValidationErrors)
-    
+
+    const passwordValidationErrors = validatePassword(formData.newPassword, t);
+    validationErrors.push(...passwordValidationErrors);
+
     if (validationErrors.length > 0) {
-      setErrors(validationErrors)
-      return
+      setErrors(validationErrors);
+      return;
     }
-    
-    setIsLoading(true)
-    setErrors([])
-    
+
+    setIsLoading(true);
+    setErrors([]);
+
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/v1/auth/confirm-reset-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/v1/auth/confirm-reset-password`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            token: token,
+            new_password: formData.newPassword,
+          }),
         },
-        body: JSON.stringify({
-          token: token,
-          new_password: formData.newPassword
-        })
-      })
+      );
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.detail || `Erreur ${response.status}`)
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Erreur ${response.status}`);
       }
 
-      setSuccess(true)
-      
+      setSuccess(true);
     } catch (error: any) {
-      console.error('[ResetPassword] Erreur:', error)
-      
-      if (error.message.includes('400')) {
-        setErrors([t('resetPassword.errors.tokenExpired')])
-      } else if (error.message.includes('429')) {
-        setErrors([t('resetPassword.errors.tooManyAttempts')])
-      } else if (error.message.includes('Failed to fetch')) {
-        setErrors([t('resetPassword.errors.connectionProblem')])
+      console.error("[ResetPassword] Erreur:", error);
+
+      if (error.message.includes("400")) {
+        setErrors([t("resetPassword.errors.tokenExpired")]);
+      } else if (error.message.includes("429")) {
+        setErrors([t("resetPassword.errors.tooManyAttempts")]);
+      } else if (error.message.includes("Failed to fetch")) {
+        setErrors([t("resetPassword.errors.connectionProblem")]);
       } else {
-        setErrors([error.message || t('resetPassword.errors.generic')])
+        setErrors([error.message || t("resetPassword.errors.generic")]);
       }
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const isFormValid = () => {
     return (
@@ -457,8 +546,8 @@ function ResetPasswordPageContent() {
       formData.confirmPassword &&
       formData.newPassword === formData.confirmPassword &&
       validatePassword(formData.newPassword, t).length === 0
-    )
-  }
+    );
+  };
 
   // États de chargement
   if (isAuthenticated && user) {
@@ -467,18 +556,18 @@ function ResetPasswordPageContent() {
         <div className="text-center">
           <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">{t('common.loading')}</p>
+          <p className="text-gray-600">{t("common.loading")}</p>
         </div>
       </div>
-    )
+    );
   }
 
   if (success) {
-    return <SuccessPage t={t} />
+    return <SuccessPage t={t} />;
   }
 
   if (tokenValid === false) {
-    return <InvalidTokenPage t={t} />
+    return <InvalidTokenPage t={t} />;
   }
 
   if (tokenValid === null) {
@@ -487,10 +576,10 @@ function ResetPasswordPageContent() {
         <div className="text-center">
           <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">{t('resetPassword.validatingLink')}</p>
+          <p className="text-gray-600">{t("resetPassword.validatingLink")}</p>
         </div>
       </div>
-    )
+    );
   }
 
   // Formulaire principal
@@ -503,10 +592,10 @@ function ResetPasswordPageContent() {
             <InteliaLogo className="w-12 h-12" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {t('resetPassword.title')}
+            {t("resetPassword.title")}
           </h1>
           <p className="text-gray-600 leading-relaxed">
-            {t('resetPassword.description')}
+            {t("resetPassword.description")}
           </p>
         </div>
 
@@ -529,9 +618,9 @@ function ResetPasswordPageContent() {
           <div className="space-y-6">
             <PasswordField
               value={formData.newPassword}
-              onChange={(value) => handleInputChange('newPassword', value)}
-              label={t('resetPassword.newPassword')}
-              placeholder={t('placeholder.createSecurePassword')}
+              onChange={(value) => handleInputChange("newPassword", value)}
+              label={t("resetPassword.newPassword")}
+              placeholder={t("placeholder.createSecurePassword")}
               showStrength={true}
               disabled={isLoading}
               t={t}
@@ -539,9 +628,9 @@ function ResetPasswordPageContent() {
 
             <PasswordField
               value={formData.confirmPassword}
-              onChange={(value) => handleInputChange('confirmPassword', value)}
-              label={t('resetPassword.confirmPassword')}
-              placeholder={t('placeholder.confirmNewPassword')}
+              onChange={(value) => handleInputChange("confirmPassword", value)}
+              label={t("resetPassword.confirmPassword")}
+              placeholder={t("placeholder.confirmNewPassword")}
               confirmValue={formData.newPassword}
               isConfirmField={true}
               disabled={isLoading}
@@ -557,10 +646,10 @@ function ResetPasswordPageContent() {
               {isLoading ? (
                 <div className="flex items-center justify-center space-x-2">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>{t('resetPassword.updating')}</span>
+                  <span>{t("resetPassword.updating")}</span>
                 </div>
               ) : (
-                t('resetPassword.updateButton')
+                t("resetPassword.updateButton")
               )}
             </button>
           </div>
@@ -572,57 +661,76 @@ function ResetPasswordPageContent() {
             href="/"
             className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
           >
-            <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            <svg
+              className="w-4 h-4 mr-1"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
             </svg>
-            {t('resetPassword.backToLogin')}
+            {t("resetPassword.backToLogin")}
           </Link>
         </div>
 
         {/* Information sécurité */}
         <div className="mt-6 text-center">
           <p className="text-xs text-gray-500 leading-relaxed">
-            🔒 {t('resetPassword.securityInfo')}
+            🔒 {t("resetPassword.securityInfo")}
           </p>
         </div>
 
         {/* Support */}
         <div className="mt-4 p-3 bg-gray-50 rounded-lg text-center">
           <p className="text-xs text-gray-600">
-            {t('resetPassword.needHelp')}{' '}
+            {t("resetPassword.needHelp")}{" "}
             <button
               type="button"
-              onClick={() => window.open('mailto:support@intelia.com?subject=Problème réinitialisation mot de passe', '_blank')}
+              onClick={() =>
+                window.open(
+                  "mailto:support@intelia.com?subject=Problème réinitialisation mot de passe",
+                  "_blank",
+                )
+              }
               className="text-blue-600 hover:underline font-medium transition-colors"
             >
-              {t('resetPassword.contactSupport')}
+              {t("resetPassword.contactSupport")}
             </button>
           </p>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ==================== EXPORT PRINCIPAL ====================
 export default function ResetPasswordPage() {
-  const { t } = useTranslation()
-  
+  const { t } = useTranslation();
+
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
-        <div className="text-center">
-          <img 
-            src="/images/favicon.png" 
-            alt="Intelia Logo" 
-            className="w-16 h-16 mx-auto mb-4"
-          />
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">{t ? t('common.loading') : 'Chargement...'}</p>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+          <div className="text-center">
+            <img
+              src="/images/favicon.png"
+              alt="Intelia Logo"
+              className="w-16 h-16 mx-auto mb-4"
+            />
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">
+              {t ? t("common.loading") : "Chargement..."}
+            </p>
+          </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <ResetPasswordPageContent />
     </Suspense>
-  )
+  );
 }

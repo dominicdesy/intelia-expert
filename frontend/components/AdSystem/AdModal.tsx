@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { X, ExternalLink, Star, Users, Clock } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { X, ExternalLink, Star, Users, Clock } from "lucide-react";
 
 interface AdData {
   id: string;
@@ -24,11 +24,11 @@ interface AdModalProps {
   onAdClick: (adId: string) => void;
 }
 
-export const AdModal: React.FC<AdModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  adData, 
-  onAdClick 
+export const AdModal: React.FC<AdModalProps> = ({
+  isOpen,
+  onClose,
+  adData,
+  onAdClick,
 }) => {
   const [timeLeft, setTimeLeft] = useState(15); // 15 secondes minimum
   const [canClose, setCanClose] = useState(false);
@@ -36,7 +36,7 @@ export const AdModal: React.FC<AdModalProps> = ({
   useEffect(() => {
     if (isOpen && timeLeft > 0) {
       const timer = setTimeout(() => {
-        setTimeLeft(prev => {
+        setTimeLeft((prev) => {
           if (prev <= 1) {
             setCanClose(true);
             return 0;
@@ -44,7 +44,7 @@ export const AdModal: React.FC<AdModalProps> = ({
           return prev - 1;
         });
       }, 1000);
-      
+
       return () => clearTimeout(timer);
     }
   }, [isOpen, timeLeft]);
@@ -58,7 +58,7 @@ export const AdModal: React.FC<AdModalProps> = ({
 
   const handleAdClick = () => {
     onAdClick(adData.id);
-    window.open(adData.ctaUrl, '_blank');
+    window.open(adData.ctaUrl, "_blank");
   };
 
   const handleClose = () => {
@@ -78,7 +78,7 @@ export const AdModal: React.FC<AdModalProps> = ({
             <Star className="w-5 h-5 text-yellow-300" />
             <span className="font-semibold">Recommandation Personnalisée</span>
           </div>
-          
+
           <div className="flex items-center space-x-3">
             {!canClose ? (
               <div className="flex items-center space-x-2 bg-white bg-opacity-20 px-3 py-1 rounded-full">
@@ -101,8 +101,8 @@ export const AdModal: React.FC<AdModalProps> = ({
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Image/Logo */}
             <div className="lg:w-1/3">
-              <img 
-                src={adData.imageUrl} 
+              <img
+                src={adData.imageUrl}
                 alt={adData.title}
                 className="w-full h-40 lg:h-full object-cover rounded-lg shadow-md"
               />
@@ -143,10 +143,15 @@ export const AdModal: React.FC<AdModalProps> = ({
 
               {/* Fonctionnalités */}
               <div className="space-y-2">
-                <h4 className="font-semibold text-gray-900">Fonctionnalités clés :</h4>
+                <h4 className="font-semibold text-gray-900">
+                  Fonctionnalités clés :
+                </h4>
                 <ul className="grid grid-cols-1 md:grid-cols-2 gap-1">
                   {adData.features.map((feature, index) => (
-                    <li key={index} className="flex items-center space-x-2 text-sm text-gray-600">
+                    <li
+                      key={index}
+                      className="flex items-center space-x-2 text-sm text-gray-600"
+                    >
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                       <span>{feature}</span>
                     </li>
@@ -169,7 +174,8 @@ export const AdModal: React.FC<AdModalProps> = ({
         {/* Footer */}
         <div className="px-6 py-3 bg-gray-50 border-t text-center">
           <p className="text-xs text-gray-500">
-            Publicité • {adData.company} • Basée sur votre utilisation d'Intelia Expert
+            Publicité • {adData.company} • Basée sur votre utilisation d'Intelia
+            Expert
           </p>
         </div>
       </div>

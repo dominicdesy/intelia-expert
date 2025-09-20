@@ -1,54 +1,55 @@
-import React from 'react'
+import React from "react";
 
 // Interface pour les statistiques d'invitations - COMPLÈTE
 interface InvitationStats {
-  total_invitations_sent: number
-  total_invitations_accepted: number
-  acceptance_rate: number
-  unique_inviters: number
+  total_invitations_sent: number;
+  total_invitations_accepted: number;
+  acceptance_rate: number;
+  unique_inviters: number;
   top_inviters: Array<{
-    inviter_email: string
-    inviter_name: string
-    invitations_sent: number
-    invitations_accepted: number
-    acceptance_rate: number
-  }>
+    inviter_email: string;
+    inviter_name: string;
+    invitations_sent: number;
+    invitations_accepted: number;
+    acceptance_rate: number;
+  }>;
   top_accepted: Array<{
-    inviter_email: string
-    inviter_name: string
-    invitations_accepted: number
-    invitations_sent: number
-    acceptance_rate: number
-  }>
+    inviter_email: string;
+    inviter_name: string;
+    invitations_accepted: number;
+    invitations_sent: number;
+    acceptance_rate: number;
+  }>;
 }
 
 // Props avec support du cache complet
 interface InvitationStatsProps {
-  invitationStats: InvitationStats | null
+  invitationStats: InvitationStats | null;
   cacheStatus?: {
-    is_available: boolean
-    last_update: string | null
-    cache_age_minutes: number
-    performance_gain: string
-    next_update: string | null
-  } | null
-  isLoading?: boolean
+    is_available: boolean;
+    last_update: string | null;
+    cache_age_minutes: number;
+    performance_gain: string;
+    next_update: string | null;
+  } | null;
+  isLoading?: boolean;
 }
 
 export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
   invitationStats,
   cacheStatus = null,
-  isLoading = false
+  isLoading = false,
 }) => {
-  
   // Affichage pendant le chargement
   if (isLoading) {
     return (
       <div className="bg-white border border-gray-200 p-8 text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">Chargement des statistiques d'invitations...</p>
+        <p className="text-gray-600">
+          Chargement des statistiques d'invitations...
+        </p>
       </div>
-    )
+    );
   }
 
   if (!invitationStats) {
@@ -59,7 +60,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
           <p>Statistiques d'invitations non disponibles</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -71,10 +72,12 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
         <div className="bg-white border border-gray-200 p-4">
           <div>
             <p className="text-sm text-gray-600 mb-1">Invitations Envoyées</p>
-            <p className="text-2xl font-semibold text-gray-900">{invitationStats.total_invitations_sent}</p>
+            <p className="text-2xl font-semibold text-gray-900">
+              {invitationStats.total_invitations_sent}
+            </p>
             {cacheStatus && (
               <p className="text-xs text-gray-400 mt-1">
-                {cacheStatus.is_available ? 'Cache' : 'Direct'}
+                {cacheStatus.is_available ? "Cache" : "Direct"}
               </p>
             )}
           </div>
@@ -83,9 +86,13 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
         <div className="bg-white border border-gray-200 p-4">
           <div>
             <p className="text-sm text-gray-600 mb-1">Invitations Acceptées</p>
-            <p className="text-2xl font-semibold text-green-600">{invitationStats.total_invitations_accepted}</p>
+            <p className="text-2xl font-semibold text-green-600">
+              {invitationStats.total_invitations_accepted}
+            </p>
             {cacheStatus && cacheStatus.is_available && (
-              <p className="text-xs text-green-500 mt-1">Données mises en cache</p>
+              <p className="text-xs text-green-500 mt-1">
+                Données mises en cache
+              </p>
             )}
           </div>
         </div>
@@ -93,7 +100,9 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
         <div className="bg-white border border-gray-200 p-4">
           <div>
             <p className="text-sm text-gray-600 mb-1">Utilisateurs Inviteurs</p>
-            <p className="text-2xl font-semibold text-gray-900">{invitationStats.unique_inviters}</p>
+            <p className="text-2xl font-semibold text-gray-900">
+              {invitationStats.unique_inviters}
+            </p>
             {!cacheStatus?.is_available && (
               <p className="text-xs text-amber-500 mt-1">Mode direct</p>
             )}
@@ -103,7 +112,9 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
         <div className="bg-white border border-gray-200 p-4">
           <div>
             <p className="text-sm text-gray-600 mb-1">Taux d'Acceptation</p>
-            <p className="text-2xl font-semibold text-blue-600">{invitationStats.acceptance_rate.toFixed(1)}%</p>
+            <p className="text-2xl font-semibold text-blue-600">
+              {invitationStats.acceptance_rate.toFixed(1)}%
+            </p>
             {cacheStatus?.is_available && (
               <p className="text-xs text-blue-500 mt-1">Optimisé</p>
             )}
@@ -117,14 +128,18 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
         <div className="bg-white border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200">
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-medium text-gray-900">Top 5 - Invitations Envoyées</h3>
+              <h3 className="text-base font-medium text-gray-900">
+                Top 5 - Invitations Envoyées
+              </h3>
               {cacheStatus && (
-                <span className={`text-xs px-2 py-1 rounded ${
-                  cacheStatus.is_available 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-gray-100 text-gray-800'
-                }`}>
-                  {cacheStatus.is_available ? 'Cache' : 'Direct'}
+                <span
+                  className={`text-xs px-2 py-1 rounded ${
+                    cacheStatus.is_available
+                      ? "bg-green-100 text-green-800"
+                      : "bg-gray-100 text-gray-800"
+                  }`}
+                >
+                  {cacheStatus.is_available ? "Cache" : "Direct"}
                 </span>
               )}
             </div>
@@ -133,53 +148,89 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
             <table className="min-w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rang</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Inviteur</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Envoyées</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Acceptées</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Taux</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Rang
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Inviteur
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Envoyées
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Acceptées
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Taux
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {invitationStats.top_inviters.slice(0, 5).map((inviter, index) => (
-                  <tr key={inviter.inviter_email || `inviter-${index}`} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 text-sm font-bold text-gray-900">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${
-                        index === 0 ? 'bg-yellow-500' :
-                        index === 1 ? 'bg-gray-400' :
-                        index === 2 ? 'bg-orange-600' :
-                        'bg-blue-500'
-                      }`}>
-                        {index + 1}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 text-sm text-gray-900 max-w-48">
-                      <div className="truncate" title={inviter.inviter_email}>
-                        <div className="font-medium">{inviter.inviter_name || 'Nom non disponible'}</div>
-                        <div className="text-xs text-gray-500">{inviter.inviter_email}</div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 text-sm font-medium text-blue-900">{inviter.invitations_sent}</td>
-                    <td className="px-4 py-2 text-sm text-green-600 font-medium">{inviter.invitations_accepted}</td>
-                    <td className="px-4 py-2">
-                      <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${
-                        inviter.acceptance_rate >= 70 ? 'bg-green-100 text-green-800' :
-                        inviter.acceptance_rate >= 40 ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {inviter.acceptance_rate.toFixed(0)}%
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {invitationStats.top_inviters
+                  .slice(0, 5)
+                  .map((inviter, index) => (
+                    <tr
+                      key={inviter.inviter_email || `inviter-${index}`}
+                      className="hover:bg-gray-50"
+                    >
+                      <td className="px-4 py-2 text-sm font-bold text-gray-900">
+                        <div
+                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${
+                            index === 0
+                              ? "bg-yellow-500"
+                              : index === 1
+                                ? "bg-gray-400"
+                                : index === 2
+                                  ? "bg-orange-600"
+                                  : "bg-blue-500"
+                          }`}
+                        >
+                          {index + 1}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900 max-w-48">
+                        <div className="truncate" title={inviter.inviter_email}>
+                          <div className="font-medium">
+                            {inviter.inviter_name || "Nom non disponible"}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {inviter.inviter_email}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-sm font-medium text-blue-900">
+                        {inviter.invitations_sent}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-green-600 font-medium">
+                        {inviter.invitations_accepted}
+                      </td>
+                      <td className="px-4 py-2">
+                        <span
+                          className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${
+                            inviter.acceptance_rate >= 70
+                              ? "bg-green-100 text-green-800"
+                              : inviter.acceptance_rate >= 40
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {inviter.acceptance_rate.toFixed(0)}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
                 {invitationStats.top_inviters.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                    <td
+                      colSpan={5}
+                      className="px-4 py-8 text-center text-gray-500"
+                    >
                       <div className="text-gray-400 text-2xl mb-2">📨</div>
                       <p>Aucun inviteur trouvé</p>
                       {cacheStatus && (
                         <p className="text-xs text-gray-400 mt-1">
-                          Mode {cacheStatus.is_available ? 'cache' : 'direct'} - Aucune donnée
+                          Mode {cacheStatus.is_available ? "cache" : "direct"} -
+                          Aucune donnée
                         </p>
                       )}
                     </td>
@@ -194,9 +245,13 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
         <div className="bg-white border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200">
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-medium text-gray-900">Top 5 - Invitations Acceptées</h3>
+              <h3 className="text-base font-medium text-gray-900">
+                Top 5 - Invitations Acceptées
+              </h3>
               {cacheStatus && cacheStatus.is_available && (
-                <span className="text-xs text-green-600">{cacheStatus.cache_age_minutes}min</span>
+                <span className="text-xs text-green-600">
+                  {cacheStatus.cache_age_minutes}min
+                </span>
               )}
             </div>
           </div>
@@ -204,58 +259,95 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
             <table className="min-w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rang</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Inviteur</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Acceptées</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Efficacité</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Rang
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Inviteur
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Acceptées
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Total
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Efficacité
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {invitationStats.top_accepted.slice(0, 5).map((inviter, index) => (
-                  <tr key={inviter.inviter_email || `accepted-${index}`} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 text-sm font-bold text-gray-900">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${
-                        index === 0 ? 'bg-green-500' :
-                        index === 1 ? 'bg-blue-500' :
-                        index === 2 ? 'bg-purple-500' :
-                        'bg-indigo-500'
-                      }`}>
-                        {index + 1}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 text-sm text-gray-900 max-w-48">
-                      <div className="truncate" title={inviter.inviter_email}>
-                        <div className="font-medium">{inviter.inviter_name || 'Nom non disponible'}</div>
-                        <div className="text-xs text-gray-500">{inviter.inviter_email}</div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 text-sm font-bold text-green-600 text-lg">{inviter.invitations_accepted}</td>
-                    <td className="px-4 py-2 text-sm text-gray-600">{inviter.invitations_sent}</td>
-                    <td className="px-4 py-2">
-                      <div className="flex items-center space-x-2">
-                        <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${
-                          inviter.acceptance_rate >= 70 ? 'bg-green-100 text-green-800' :
-                          inviter.acceptance_rate >= 40 ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {inviter.acceptance_rate.toFixed(0)}%
-                        </span>
-                        {inviter.acceptance_rate >= 80 && (
-                          <span className="text-green-600 text-sm">🏆</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {invitationStats.top_accepted
+                  .slice(0, 5)
+                  .map((inviter, index) => (
+                    <tr
+                      key={inviter.inviter_email || `accepted-${index}`}
+                      className="hover:bg-gray-50"
+                    >
+                      <td className="px-4 py-2 text-sm font-bold text-gray-900">
+                        <div
+                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${
+                            index === 0
+                              ? "bg-green-500"
+                              : index === 1
+                                ? "bg-blue-500"
+                                : index === 2
+                                  ? "bg-purple-500"
+                                  : "bg-indigo-500"
+                          }`}
+                        >
+                          {index + 1}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900 max-w-48">
+                        <div className="truncate" title={inviter.inviter_email}>
+                          <div className="font-medium">
+                            {inviter.inviter_name || "Nom non disponible"}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {inviter.inviter_email}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-sm font-bold text-green-600 text-lg">
+                        {inviter.invitations_accepted}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-600">
+                        {inviter.invitations_sent}
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="flex items-center space-x-2">
+                          <span
+                            className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${
+                              inviter.acceptance_rate >= 70
+                                ? "bg-green-100 text-green-800"
+                                : inviter.acceptance_rate >= 40
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-red-100 text-red-800"
+                            }`}
+                          >
+                            {inviter.acceptance_rate.toFixed(0)}%
+                          </span>
+                          {inviter.acceptance_rate >= 80 && (
+                            <span className="text-green-600 text-sm">🏆</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 {invitationStats.top_accepted.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                    <td
+                      colSpan={5}
+                      className="px-4 py-8 text-center text-gray-500"
+                    >
                       <div className="text-gray-400 text-2xl mb-2">✅</div>
                       <p>Aucune invitation acceptée</p>
                       {cacheStatus && (
                         <p className="text-xs text-gray-400 mt-1">
-                          Données {cacheStatus.is_available ? 'en cache' : 'directes'} - Aucun résultat
+                          Données{" "}
+                          {cacheStatus.is_available ? "en cache" : "directes"} -
+                          Aucun résultat
                         </p>
                       )}
                     </td>
@@ -267,13 +359,13 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
         </div>
       </div>
 
-
-
       {/* Section d'export complète avec informations cache */}
       <div className="bg-white border border-gray-200">
         <div className="px-4 py-3 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-medium text-gray-900">Export des Statistiques d'Invitations</h3>
+            <h3 className="text-base font-medium text-gray-900">
+              Export des Statistiques d'Invitations
+            </h3>
             {cacheStatus?.is_available && (
               <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
                 Données optimisées
@@ -283,15 +375,23 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
         </div>
         <div className="p-4">
           <div className="grid grid-cols-1 gap-4">
-            
             {/* Export CSV */}
             <div className="bg-white border border-gray-200 p-4 flex flex-col justify-between h-full">
               <div>
-                <h4 className="text-base font-medium text-gray-900 mb-1">Export CSV Complet</h4>
-                <p className="text-sm text-gray-600 mb-3">Toutes les statistiques au format CSV</p>
+                <h4 className="text-base font-medium text-gray-900 mb-1">
+                  Export CSV Complet
+                </h4>
+                <p className="text-sm text-gray-600 mb-3">
+                  Toutes les statistiques au format CSV
+                </p>
                 <div className="text-xs text-gray-500 mb-4">
                   <p>• Top inviteurs et statistiques détaillées</p>
-                  <p>• Données {cacheStatus?.is_available ? 'optimisées par cache' : 'en temps réel'}</p>
+                  <p>
+                    • Données{" "}
+                    {cacheStatus?.is_available
+                      ? "optimisées par cache"
+                      : "en temps réel"}
+                  </p>
                   {cacheStatus?.is_available && (
                     <p>• Exporté avec performance optimisée</p>
                   )}
@@ -300,51 +400,90 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
               <button
                 onClick={() => {
                   const csvData = [
-                    ['Métrique', 'Valeur', 'Source', 'Timestamp'],
-                    ['Total Invitations Envoyées', invitationStats.total_invitations_sent, cacheStatus?.is_available ? 'Cache' : 'Direct', new Date().toISOString()],
-                    ['Total Invitations Acceptées', invitationStats.total_invitations_accepted, cacheStatus?.is_available ? 'Cache' : 'Direct', new Date().toISOString()],
-                    ['Taux d\'Acceptation Global', `${invitationStats.acceptance_rate.toFixed(1)}%`, cacheStatus?.is_available ? 'Cache' : 'Direct', new Date().toISOString()],
-                    ['Nombre d\'Inviteurs Uniques', invitationStats.unique_inviters, cacheStatus?.is_available ? 'Cache' : 'Direct', new Date().toISOString()],
-                    ['Moyenne Invitations par Inviteur', invitationStats.unique_inviters > 0 ? (invitationStats.total_invitations_sent / invitationStats.unique_inviters).toFixed(1) : '0', cacheStatus?.is_available ? 'Cache' : 'Direct', new Date().toISOString()],
-                    ['', '', '', ''],
-                    ['Top Inviteurs (Envoyées)', '', '', ''],
-                    ['Rang', 'Nom', 'Email', 'Envoyées', 'Acceptées', 'Taux'],
+                    ["Métrique", "Valeur", "Source", "Timestamp"],
+                    [
+                      "Total Invitations Envoyées",
+                      invitationStats.total_invitations_sent,
+                      cacheStatus?.is_available ? "Cache" : "Direct",
+                      new Date().toISOString(),
+                    ],
+                    [
+                      "Total Invitations Acceptées",
+                      invitationStats.total_invitations_accepted,
+                      cacheStatus?.is_available ? "Cache" : "Direct",
+                      new Date().toISOString(),
+                    ],
+                    [
+                      "Taux d'Acceptation Global",
+                      `${invitationStats.acceptance_rate.toFixed(1)}%`,
+                      cacheStatus?.is_available ? "Cache" : "Direct",
+                      new Date().toISOString(),
+                    ],
+                    [
+                      "Nombre d'Inviteurs Uniques",
+                      invitationStats.unique_inviters,
+                      cacheStatus?.is_available ? "Cache" : "Direct",
+                      new Date().toISOString(),
+                    ],
+                    [
+                      "Moyenne Invitations par Inviteur",
+                      invitationStats.unique_inviters > 0
+                        ? (
+                            invitationStats.total_invitations_sent /
+                            invitationStats.unique_inviters
+                          ).toFixed(1)
+                        : "0",
+                      cacheStatus?.is_available ? "Cache" : "Direct",
+                      new Date().toISOString(),
+                    ],
+                    ["", "", "", ""],
+                    ["Top Inviteurs (Envoyées)", "", "", ""],
+                    ["Rang", "Nom", "Email", "Envoyées", "Acceptées", "Taux"],
                     ...invitationStats.top_inviters.map((inviter, index) => [
                       index + 1,
-                      inviter.inviter_name || 'N/A',
+                      inviter.inviter_name || "N/A",
                       inviter.inviter_email,
                       inviter.invitations_sent,
                       inviter.invitations_accepted,
-                      `${inviter.acceptance_rate.toFixed(1)}%`
+                      `${inviter.acceptance_rate.toFixed(1)}%`,
                     ]),
-                    ['', '', '', ''],
-                    ['Top Inviteurs (Acceptées)', '', '', ''],
-                    ['Rang', 'Nom', 'Email', 'Acceptées', 'Total', 'Efficacité'],
+                    ["", "", "", ""],
+                    ["Top Inviteurs (Acceptées)", "", "", ""],
+                    [
+                      "Rang",
+                      "Nom",
+                      "Email",
+                      "Acceptées",
+                      "Total",
+                      "Efficacité",
+                    ],
                     ...invitationStats.top_accepted.map((inviter, index) => [
                       index + 1,
-                      inviter.inviter_name || 'N/A',
+                      inviter.inviter_name || "N/A",
                       inviter.inviter_email,
                       inviter.invitations_accepted,
                       inviter.invitations_sent,
-                      `${inviter.acceptance_rate.toFixed(1)}%`
-                    ])
-                  ]
-                  
+                      `${inviter.acceptance_rate.toFixed(1)}%`,
+                    ]),
+                  ];
+
                   const csvContent = csvData
-                    .map(row => row.map(field => `"${field}"`).join(','))
-                    .join('\n')
-                  
-                  const bom = '\uFEFF'
-                  const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8' })
-                  const url = window.URL.createObjectURL(blob)
-                  
-                  const link = document.createElement('a')
-                  link.href = url
-                  link.download = `invitations_stats_${cacheStatus?.is_available ? 'cache' : 'direct'}_${new Date().toISOString().split('T')[0]}.csv`
-                  document.body.appendChild(link)
-                  link.click()
-                  document.body.removeChild(link)
-                  window.URL.revokeObjectURL(url)
+                    .map((row) => row.map((field) => `"${field}"`).join(","))
+                    .join("\n");
+
+                  const bom = "\uFEFF";
+                  const blob = new Blob([bom + csvContent], {
+                    type: "text/csv;charset=utf-8",
+                  });
+                  const url = window.URL.createObjectURL(blob);
+
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.download = `invitations_stats_${cacheStatus?.is_available ? "cache" : "direct"}_${new Date().toISOString().split("T")[0]}.csv`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  window.URL.revokeObjectURL(url);
                 }}
                 className="bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors inline-flex items-center space-x-2 w-fit"
               >
@@ -352,10 +491,9 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
                 <span>Exporter CSV</span>
               </button>
             </div>
-
           </div>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};

@@ -1,199 +1,240 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useCallback } from 'react'
-import { useChatStore } from '@/app/chat/hooks/useChatStore'
-import { useTranslation } from '@/lib/languages/i18n'
-import type { Conversation, Message } from '@/types'
+import { useState, useEffect, useCallback } from "react";
+import { useChatStore } from "@/app/chat/hooks/useChatStore";
+import { useTranslation } from "@/lib/languages/i18n";
+import type { Conversation, Message } from "@/types";
 
 // IcÃ´nes SVG
 const ChatBubbleLeftRightIcon = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.96 2.193-.34.027-.68.052-1.021.077-1.963.144-3.926.288-5.889.288-.427 0-.854-.003-1.28-.01V12.01c0-.3.12-.586.332-.796l5.25-5.25a2.25 2.25 0 113.182 3.182L14.5 15.5" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 15.488c-.884-.284-1.5-1.128-1.5-2.097V9.105c0-1.136.847-2.1 1.96-2.193.34-.027.68-.052 1.021-.077 1.963-.144 3.926-.288 5.889-.288.427 0 .854.003 1.28.01V12.01c0 .3-.12.586-.332.796l-5.25 5.25a2.25 2.25 0 11-3.182-3.182L9.5 8.5" />
+  <svg
+    className={className}
+    fill="none"
+    viewBox="0 0 24 24"
+    strokeWidth={1.5}
+    stroke="currentColor"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.96 2.193-.34.027-.68.052-1.021.077-1.963.144-3.926.288-5.889.288-.427 0-.854-.003-1.28-.01V12.01c0-.3.12-.586.332-.796l5.25-5.25a2.25 2.25 0 113.182 3.182L14.5 15.5"
+    />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M3.75 15.488c-.884-.284-1.5-1.128-1.5-2.097V9.105c0-1.136.847-2.1 1.96-2.193.34-.027.68-.052 1.021-.077 1.963-.144 3.926-.288 5.889-.288.427 0 .854.003 1.28.01V12.01c0 .3-.12.586-.332.796l-5.25 5.25a2.25 2.25 0 11-3.182-3.182L9.5 8.5"
+    />
   </svg>
-)
+);
 
 const TrashIcon = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+  <svg
+    className={className}
+    fill="none"
+    viewBox="0 0 24 24"
+    strokeWidth={1.5}
+    stroke="currentColor"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+    />
   </svg>
-)
+);
 
 const XMarkIcon = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+  <svg
+    className={className}
+    fill="none"
+    viewBox="0 0 24 24"
+    strokeWidth={1.5}
+    stroke="currentColor"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M6 18L18 6M6 6l12 12"
+    />
   </svg>
-)
+);
 
 interface ConversationSidebarProps {
-  isOpen: boolean
-  onClose: () => void
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-export default function ConversationSidebar({ isOpen, onClose }: ConversationSidebarProps) {
-  const { t } = useTranslation()
-  
-  // Utilisation du hook correct avec la bonne destructuration
-  const { conversationGroups } = useChatStore(state => ({ 
-    conversationGroups: state.conversationGroups 
-  }))
-  const { currentConversation } = useChatStore(state => ({
-    currentConversation: state.currentConversation
-  }))
-  const { loadConversation } = useChatStore(state => ({
-    loadConversation: state.loadConversation
-  }))
-  const { deleteConversation } = useChatStore(state => ({
-    deleteConversation: state.deleteConversation
-  }))
-  const { clearAllConversations } = useChatStore(state => ({
-    clearAllConversations: state.clearAllConversations
-  }))
-  const { createNewConversation } = useChatStore(state => ({
-    createNewConversation: state.createNewConversation
-  }))
+export default function ConversationSidebar({
+  isOpen,
+  onClose,
+}: ConversationSidebarProps) {
+  const { t } = useTranslation();
 
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
-  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  // Utilisation du hook correct avec la bonne destructuration
+  const { conversationGroups } = useChatStore((state) => ({
+    conversationGroups: state.conversationGroups,
+  }));
+  const { currentConversation } = useChatStore((state) => ({
+    currentConversation: state.currentConversation,
+  }));
+  const { loadConversation } = useChatStore((state) => ({
+    loadConversation: state.loadConversation,
+  }));
+  const { deleteConversation } = useChatStore((state) => ({
+    deleteConversation: state.deleteConversation,
+  }));
+  const { clearAllConversations } = useChatStore((state) => ({
+    clearAllConversations: state.clearAllConversations,
+  }));
+  const { createNewConversation } = useChatStore((state) => ({
+    createNewConversation: state.createNewConversation,
+  }));
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(
+    null,
+  );
+  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // PAS de useEffect automatique - seulement chargement manuel via les boutons
 
   // RÃ©cupÃ©rer toutes les conversations depuis les groupes
-  const allConversations = conversationGroups.flatMap(group => group.conversations)
+  const allConversations = conversationGroups.flatMap(
+    (group) => group.conversations,
+  );
 
   // GÃ©rer la sÃ©lection d'une conversation
   const handleSelectConversation = async (conversationId: string) => {
-    if (isLoading) return
-    
+    if (isLoading) return;
+
     try {
-      setIsLoading(true)
-      await loadConversation(conversationId)
-      onClose()
+      setIsLoading(true);
+      await loadConversation(conversationId);
+      onClose();
     } catch (error) {
-      console.error('Erreur lors du chargement de la conversation:', error)
+      console.error("Erreur lors du chargement de la conversation:", error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   // GÃ©rer la suppression d'une conversation
   const handleDeleteConversation = async (conversationId: string) => {
-    if (isLoading) return
+    if (isLoading) return;
 
     try {
-      setIsLoading(true)
-      await deleteConversation(conversationId)
-      setShowDeleteConfirm(null)
+      setIsLoading(true);
+      await deleteConversation(conversationId);
+      setShowDeleteConfirm(null);
     } catch (error) {
-      console.error('Erreur lors de la suppression:', error)
+      console.error("Erreur lors de la suppression:", error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   // GÃ©rer la suppression de toutes les conversations
   const handleClearAll = async () => {
-    if (isLoading) return
+    if (isLoading) return;
 
     try {
-      setIsLoading(true)
-      await clearAllConversations()
-      setShowClearAllConfirm(false)
+      setIsLoading(true);
+      await clearAllConversations();
+      setShowClearAllConfirm(false);
     } catch (error) {
-      console.error('Erreur lors de la suppression complÃ¨te:', error)
+      console.error("Erreur lors de la suppression complÃ¨te:", error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   // CrÃ©er une nouvelle conversation
   const handleNewConversation = () => {
-    if (isLoading) return
-    createNewConversation()
-    onClose()
-  }
+    if (isLoading) return;
+    createNewConversation();
+    onClose();
+  };
 
   // Formater la date de maniÃ¨re lisible
   const formatDate = (dateString: string): string => {
     try {
-      const date = new Date(dateString)
-      const now = new Date()
-      const diffInMilliseconds = now.getTime() - date.getTime()
-      const diffInDays = Math.floor(diffInMilliseconds / (1000 * 60 * 60 * 24))
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffInMilliseconds = now.getTime() - date.getTime();
+      const diffInDays = Math.floor(diffInMilliseconds / (1000 * 60 * 60 * 24));
 
       if (diffInDays === 0) {
-        return "Aujourd'hui"
+        return "Aujourd'hui";
       } else if (diffInDays === 1) {
-        return "Hier"
+        return "Hier";
       } else if (diffInDays < 7) {
-        return `Il y a ${diffInDays} jour${diffInDays > 1 ? 's' : ''}`
+        return `Il y a ${diffInDays} jour${diffInDays > 1 ? "s" : ""}`;
       } else if (diffInDays < 30) {
-        const weeks = Math.floor(diffInDays / 7)
-        return `Il y a ${weeks} semaine${weeks > 1 ? 's' : ''}`
+        const weeks = Math.floor(diffInDays / 7);
+        return `Il y a ${weeks} semaine${weeks > 1 ? "s" : ""}`;
       } else {
-        return date.toLocaleDateString('fr-FR', { 
-          day: 'numeric', 
-          month: 'short',
-          year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-        })
+        return date.toLocaleDateString("fr-FR", {
+          day: "numeric",
+          month: "short",
+          year:
+            date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+        });
       }
     } catch (error) {
-      console.error('Erreur de formatage de date:', error)
-      return 'Date inconnue'
+      console.error("Erreur de formatage de date:", error);
+      return "Date inconnue";
     }
-  }
+  };
 
   // GÃ©nÃ©rer un aperÃ§u en utilisant les vrais types
   const getConversationPreview = (conversation: Conversation): string => {
     try {
-      return conversation.title || conversation.preview || "Conversation sans titre"
+      return (
+        conversation.title || conversation.preview || "Conversation sans titre"
+      );
     } catch (error) {
-      console.error('Erreur lors de la gÃ©nÃ©ration de l\'aperÃ§u:', error)
-      return "Conversation"
+      console.error("Erreur lors de la gÃ©nÃ©ration de l'aperÃ§u:", error);
+      return "Conversation";
     }
-  }
+  };
 
   // Compter les messages avec les vrais types
   const getMessageCount = (conversation: Conversation): number => {
     try {
-      return conversation.message_count || 0
+      return conversation.message_count || 0;
     } catch (error) {
-      console.error('Erreur lors du comptage des messages:', error)
-      return 0
+      console.error("Erreur lors du comptage des messages:", error);
+      return 0;
     }
-  }
+  };
 
   // Ne pas afficher si fermé
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   return (
     <>
       {/* Overlay pour mobile */}
-      <div 
+      <div
         className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
         onClick={onClose}
         aria-hidden="true"
       />
-      
+
       {/* Conteneur principal de la sidebar */}
-      <div 
+      <div
         className={`fixed left-0 top-0 h-full w-80 bg-white shadow-lg z-50 transform transition-transform duration-300 ease-in-out ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+          isOpen ? "translate-x-0" : "-translate-x-full"
         } lg:relative lg:translate-x-0`}
         role="complementary"
-        aria-label={t('nav.conversationSidebar')}
+        aria-label={t("nav.conversationSidebar")}
       >
-        
         {/* En-tête */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Conversations
-          </h2>
+          <h2 className="text-lg font-semibold text-gray-900">Conversations</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-200 rounded-lg transition-colors lg:hidden"
-            aria-label={t('nav.closeSidebar')}
+            aria-label={t("nav.closeSidebar")}
           >
             <XMarkIcon className="w-5 h-5 text-gray-500" />
           </button>
@@ -227,18 +268,19 @@ export default function ConversationSidebar({ isOpen, onClose }: ConversationSid
           ) : (
             <div className="p-2 space-y-1">
               {allConversations.map((conversation) => {
-                const isCurrentConversation = currentConversation?.id === conversation.id
-                const messageCount = getMessageCount(conversation)
-                const preview = getConversationPreview(conversation)
-                const formattedDate = formatDate(conversation.updated_at)
+                const isCurrentConversation =
+                  currentConversation?.id === conversation.id;
+                const messageCount = getMessageCount(conversation);
+                const preview = getConversationPreview(conversation);
+                const formattedDate = formatDate(conversation.updated_at);
 
                 return (
                   <div
                     key={conversation.id}
                     className={`group relative rounded-lg border transition-all duration-200 ${
                       isCurrentConversation
-                        ? 'bg-blue-50 border-blue-200 shadow-sm'
-                        : 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                        ? "bg-blue-50 border-blue-200 shadow-sm"
+                        : "bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300"
                     }`}
                   >
                     {/* Bouton principal de la conversation */}
@@ -250,9 +292,13 @@ export default function ConversationSidebar({ isOpen, onClose }: ConversationSid
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0 pr-2">
-                          <h3 className={`text-sm font-medium truncate ${
-                            isCurrentConversation ? 'text-blue-900' : 'text-gray-900'
-                          }`}>
+                          <h3
+                            className={`text-sm font-medium truncate ${
+                              isCurrentConversation
+                                ? "text-blue-900"
+                                : "text-gray-900"
+                            }`}
+                          >
                             {preview}
                           </h3>
                           <div className="flex items-center justify-between mt-2">
@@ -260,7 +306,7 @@ export default function ConversationSidebar({ isOpen, onClose }: ConversationSid
                               {formattedDate}
                             </span>
                             <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">
-                              {messageCount} msg{messageCount > 1 ? 's' : ''}
+                              {messageCount} msg{messageCount > 1 ? "s" : ""}
                             </span>
                           </div>
                         </div>
@@ -271,14 +317,16 @@ export default function ConversationSidebar({ isOpen, onClose }: ConversationSid
                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                       <button
                         onClick={(e) => {
-                          e.stopPropagation()
+                          e.stopPropagation();
                           setShowDeleteConfirm(
-                            showDeleteConfirm === conversation.id ? null : conversation.id
-                          )
+                            showDeleteConfirm === conversation.id
+                              ? null
+                              : conversation.id,
+                          );
                         }}
                         disabled={isLoading}
                         className="p-1.5 hover:bg-red-100 rounded-md text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
-                        aria-label={t('history.deleteConversation')}
+                        aria-label={t("history.deleteConversation")}
                       >
                         <TrashIcon className="w-4 h-4" />
                       </button>
@@ -302,17 +350,19 @@ export default function ConversationSidebar({ isOpen, onClose }: ConversationSid
                             Annuler
                           </button>
                           <button
-                            onClick={() => handleDeleteConversation(conversation.id)}
+                            onClick={() =>
+                              handleDeleteConversation(conversation.id)
+                            }
                             disabled={isLoading}
                             className="flex-1 px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded transition-colors disabled:opacity-50"
                           >
-                            {isLoading ? 'Suppression...' : 'Supprimer'}
+                            {isLoading ? "Suppression..." : "Supprimer"}
                           </button>
                         </div>
                       </div>
                     )}
                   </div>
-                )
+                );
               })}
             </div>
           )}
@@ -338,7 +388,8 @@ export default function ConversationSidebar({ isOpen, onClose }: ConversationSid
                     Supprimer toutes les conversations ?
                   </h4>
                   <p className="text-xs text-gray-600">
-                    Cette action supprimera définitivement toutes vos conversations.
+                    Cette action supprimera définitivement toutes vos
+                    conversations.
                   </p>
                 </div>
                 <div className="flex space-x-2">
@@ -354,7 +405,7 @@ export default function ConversationSidebar({ isOpen, onClose }: ConversationSid
                     disabled={isLoading}
                     className="flex-1 px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50"
                   >
-                    {isLoading ? 'Suppression...' : 'Tout supprimer'}
+                    {isLoading ? "Suppression..." : "Tout supprimer"}
                   </button>
                 </div>
               </div>
@@ -363,5 +414,5 @@ export default function ConversationSidebar({ isOpen, onClose }: ConversationSid
         )}
       </div>
     </>
-  )
+  );
 }

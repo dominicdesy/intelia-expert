@@ -1,66 +1,68 @@
 // app/layout.tsx
 
-import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
-import './globals.css'
-import { AuthProvider } from '@/components/providers/AuthProvider'
-import { LanguageProvider } from '@/components/providers/LanguageProvider'
-import { AdProvider } from '@/components/AdSystem/AdProvider'
-import { Toaster } from 'react-hot-toast'
+import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { AuthProvider } from "@/components/providers/AuthProvider";
+import { LanguageProvider } from "@/components/providers/LanguageProvider";
+import { AdProvider } from "@/components/AdSystem/AdProvider";
+import { Toaster } from "react-hot-toast";
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ subsets: ["latin"] });
 
 // Export séparé pour le viewport (nouvelle méthode)
 export const viewport: Viewport = {
-  width: 'device-width',
+  width: "device-width",
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  viewportFit: 'cover'
-}
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
-  title: 'Intelia Expert - AI Advisor',
-  description: 'Assistant IA spécialisé pour les producteurs avicoles',
-  keywords: 'agriculture, IA, santé animale, nutrition, élevage, expert',
-  authors: [{ name: 'Intelia' }],
-  creator: 'Intelia',
-  publisher: 'Intelia',
+  title: "Intelia Expert - AI Advisor",
+  description: "Assistant IA spécialisé pour les producteurs avicoles",
+  keywords: "agriculture, IA, santé animale, nutrition, élevage, expert",
+  authors: [{ name: "Intelia" }],
+  creator: "Intelia",
+  publisher: "Intelia",
   formatDetection: {
     email: false,
     address: false,
     telephone: false,
   },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://intelia-expert.com'),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || "https://intelia-expert.com",
+  ),
   openGraph: {
-    title: 'Intelia Expert - Assistant IA Agriculture',
-    description: 'Assistant IA spécialisé en santé et nutrition animale',
-    url: 'https://intelia-expert.com',
-    siteName: 'Intelia Expert',
-    locale: 'fr_CA',
-    type: 'website',
+    title: "Intelia Expert - Assistant IA Agriculture",
+    description: "Assistant IA spécialisé en santé et nutrition animale",
+    url: "https://intelia-expert.com",
+    siteName: "Intelia Expert",
+    locale: "fr_CA",
+    type: "website",
   },
-  manifest: '/manifest.json',
+  manifest: "/manifest.json",
   icons: {
-    icon: '/images/favicon.png',
-    shortcut: '/images/favicon.png',
-    apple: '/images/favicon.png',
+    icon: "/images/favicon.png",
+    shortcut: "/images/favicon.png",
+    apple: "/images/favicon.png",
     other: [
       {
-        rel: 'icon',
-        type: 'image/png',
-        sizes: '32x32',
-        url: '/images/favicon.png',
+        rel: "icon",
+        type: "image/png",
+        sizes: "32x32",
+        url: "/images/favicon.png",
       },
       {
-        rel: 'icon',
-        type: 'image/png', 
-        sizes: '16x16',
-        url: '/images/favicon.png',
+        rel: "icon",
+        type: "image/png",
+        sizes: "16x16",
+        url: "/images/favicon.png",
       },
     ],
   },
-}
+};
 
 // Script anti-flash optimisé avec gestion correcte des event listeners
 const antiFlashScript = `
@@ -187,34 +189,33 @@ const antiFlashScript = `
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="fr" className="h-full">
       <head>
         {/* SCRIPT ANTI-FLASH - DOIT ÊTRE EN PREMIER */}
-        <script 
-          dangerouslySetInnerHTML={{ __html: antiFlashScript }} 
-        />
-        
+        <script dangerouslySetInnerHTML={{ __html: antiFlashScript }} />
+
         {/* Meta tags critiques pour iOS */}
-        <meta 
-          name="viewport" 
-          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" 
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
         />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
-        
+
         {/* Icons existants */}
         <link rel="icon" href="/images/favicon.png" type="image/png" />
         <link rel="apple-touch-icon" href="/images/favicon.png" />
         <meta name="theme-color" content="#2563eb" />
-        
+
         {/* CSS inline critique pour éviter FOUC mobile + ANTI-FLASH */}
-        <style dangerouslySetInnerHTML={{
-          __html: `
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
             /* === SOLUTION ANTI-FLASH === */
             /* IMPORTANT: Doit être en premier */
             html {
@@ -403,39 +404,46 @@ export default function RootLayout({
                 animation: none !important;
               }
             }
-          `
-        }} />
+          `,
+          }}
+        />
 
         <noscript>
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999999,
-            fontSize: '18px',
-            textAlign: 'center',
-            flexDirection: 'column',
-            gap: '1rem',
-            padding: '2rem'
-          }}>
-            <div style={{ fontSize: '24px', fontWeight: 600 }}>Intelia Expert</div>
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              color: "white",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 9999999,
+              fontSize: "18px",
+              textAlign: "center",
+              flexDirection: "column",
+              gap: "1rem",
+              padding: "2rem",
+            }}
+          >
+            <div style={{ fontSize: "24px", fontWeight: 600 }}>
+              Intelia Expert
+            </div>
             <div>JavaScript est requis pour utiliser cette application</div>
           </div>
         </noscript>
       </head>
-      <body className={`${inter.className} h-full antialiased mobile-safe-container`}>
+      <body
+        className={`${inter.className} h-full antialiased mobile-safe-container`}
+      >
         <AuthProvider>
           <LanguageProvider>
             <AdProvider>
               {children}
-              <Toaster 
+              <Toaster
                 position="top-center"
                 toastOptions={{
                   style: {
@@ -448,5 +456,5 @@ export default function RootLayout({
         </AuthProvider>
       </body>
     </html>
-  )
+  );
 }

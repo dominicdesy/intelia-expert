@@ -1,15 +1,15 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from "react";
 
 interface ClientOnlyProps {
-  children: React.ReactNode
-  fallback?: React.ReactNode
-  className?: string
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
+  className?: string;
 }
 
-export default function ClientOnly({ 
-  children, 
+export default function ClientOnly({
+  children,
   fallback = (
     <div className="animate-pulse bg-gray-200 rounded h-4 w-full">
       <div className="flex items-center justify-center h-full">
@@ -17,21 +17,17 @@ export default function ClientOnly({
       </div>
     </div>
   ),
-  className 
+  className,
 }: ClientOnlyProps) {
-  const [hasMounted, setHasMounted] = useState(false)
+  const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
-    setHasMounted(true)
-  }, [])
+    setHasMounted(true);
+  }, []);
 
   if (!hasMounted) {
-    return (
-      <div className={className}>
-        {fallback}
-      </div>
-    )
+    return <div className={className}>{fallback}</div>;
   }
 
-  return <div className={className}>{children}</div>
+  return <div className={className}>{children}</div>;
 }

@@ -1,6 +1,10 @@
 // app/chat/hooks/useChatStream.ts
 import { useCallback, useMemo, useRef, useState } from "react";
-import { streamAIResponse, getErrorMessage, type ChatStreamBody } from "../services/aiStream";
+import {
+  streamAIResponse,
+  getErrorMessage,
+  type ChatStreamBody,
+} from "../services/aiStream";
 
 export interface ChatStreamState {
   isStreaming: boolean;
@@ -23,123 +27,125 @@ export type UseChatStreamReturn = ChatStreamState & ChatStreamActions;
  * Fournit état et actions pour l'interface de chat
  */
 export function useChatStream(
-  tenant_id: string, 
-  lang: string = 'fr'
+  tenant_id: string,
+  lang: string = "fr",
 ): UseChatStreamReturn {
-  
   // État du streaming
   const [isStreaming, setIsStreaming] = useState(false);
   const [partial, setPartial] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(true);
-  
+
   // Référence pour l'abort controller
   const abortRef = useRef<AbortController | null>(null);
-  
+
   // Référence pour éviter les appels multiples
   const processingRef = useRef(false);
 
   /**
    * Fonction principale pour envoyer un message et streamer la réponse
    */
-  const send = useCallback(async (
-    message: string, 
-    options: Partial<ChatStreamBody> = {}
-  ): Promise<string> => {
-    
-    // Éviter les appels multiples simultanés
-    if (processingRef.current || isStreaming) {
-      console.warn('[useChatStream] Tentative d\'envoi multiple ignorée');
-      return "";
-    }
+  const send = useCallback(
+    async (
+      message: string,
+      options: Partial<ChatStreamBody> = {},
+    ): Promise<string> => {
+      // Éviter les appels multiples simultanés
+      if (processingRef.current || isStreaming) {
+        console.warn("[useChatStream] Tentative d'envoi multiple ignorée");
+        return "";
+      }
 
-    // Validation
-    if (!message?.trim()) {
-      setError("Message vide");
-      return "";
-    }
+      // Validation
+      if (!message?.trim()) {
+        setError("Message vide");
+        return "";
+      }
 
-    if (!tenant_id) {
-      setError("Tenant ID manquant");
-      return "";
-    }
+      if (!tenant_id) {
+        setError("Tenant ID manquant");
+        return "";
+      }
 
-    // Initialisation
-    processingRef.current = true;
-    setPartial("");
-    setError(null);
-    setIsStreaming(true);
-    setIsConnected(true);
-    
-    // Nouvel AbortController pour ce stream
-    abortRef.current = new AbortController();
-    
-    const requestBody: ChatStreamBody = {
-      tenant_id,
-      lang,
-      message: message.trim(),
-      ...options // Merge avec les options additionnelles
-    };
+      // Initialisation
+      processingRef.current = true;
+      setPartial("");
+      setError(null);
+      setIsStreaming(true);
+      setIsConnected(true);
 
-    console.log('[useChatStream] Démarrage stream:', {
-      tenant_id,
-      lang,
-      message_length: message.length,
-      has_options: Object.keys(options).length > 0
-    });
+      // Nouvel AbortController pour ce stream
+      abortRef.current = new AbortController();
 
-    try {
-      const finalResponse = await streamAIResponse(
-        requestBody,
-        (deltaText: string) => {
-          // Callback pour chaque delta reçu
-          setPartial(prev => prev + deltaText);
-          setIsConnected(true);
-        },
-        abortRef.current.signal
-      );
+      const requestBody: ChatStreamBody = {
+        tenant_id,
+        lang,
+        message: message.trim(),
+        ...options, // Merge avec les options additionnelles
+      };
 
-      console.log('[useChatStream] Stream terminé:', {
-        final_length: finalResponse.length,
-        partial_length: partial.length
+      console.log("[useChatStream] Démarrage stream:", {
+        tenant_id,
+        lang,
+        message_length: message.length,
+        has_options: Object.keys(options).length > 0,
       });
 
-      return finalResponse;
-      
-    } catch (streamError: any) {
-      console.error('[useChatStream] Erreur stream:', streamError);
-      
-      // Gestion spéciale pour l'arrêt volontaire
-      if (streamError?.name === 'AbortError' || abortRef.current?.signal.aborted) {
-        console.log('[useChatStream] Stream arrêté par l\'utilisateur');
-        return partial; // Retourne ce qui a été reçu jusqu'ici
+      try {
+        const finalResponse = await streamAIResponse(
+          requestBody,
+          (deltaText: string) => {
+            // Callback pour chaque delta reçu
+            setPartial((prev) => prev + deltaText);
+            setIsConnected(true);
+          },
+          abortRef.current.signal,
+        );
+
+        console.log("[useChatStream] Stream terminé:", {
+          final_length: finalResponse.length,
+          partial_length: partial.length,
+        });
+
+        return finalResponse;
+      } catch (streamError: any) {
+        console.error("[useChatStream] Erreur stream:", streamError);
+
+        // Gestion spéciale pour l'arrêt volontaire
+        if (
+          streamError?.name === "AbortError" ||
+          abortRef.current?.signal.aborted
+        ) {
+          console.log("[useChatStream] Stream arrêté par l'utilisateur");
+          return partial; // Retourne ce qui a été reçu jusqu'ici
+        }
+
+        // Gestion des erreurs réseau/connexion
+        if (streamError?.message?.includes("fetch")) {
+          setIsConnected(false);
+          setError("Problème de connexion. Vérifiez votre réseau.");
+        } else {
+          setError(getErrorMessage(streamError));
+        }
+
+        // En cas d'erreur, retourne le partiel si disponible
+        return partial || "";
+      } finally {
+        // Nettoyage
+        setIsStreaming(false);
+        processingRef.current = false;
+        abortRef.current = null;
       }
-      
-      // Gestion des erreurs réseau/connexion
-      if (streamError?.message?.includes('fetch')) {
-        setIsConnected(false);
-        setError("Problème de connexion. Vérifiez votre réseau.");
-      } else {
-        setError(getErrorMessage(streamError));
-      }
-      
-      // En cas d'erreur, retourne le partiel si disponible
-      return partial || "";
-      
-    } finally {
-      // Nettoyage
-      setIsStreaming(false);
-      processingRef.current = false;
-      abortRef.current = null;
-    }
-  }, [tenant_id, lang, isStreaming, partial]);
+    },
+    [tenant_id, lang, isStreaming, partial],
+  );
 
   /**
    * Arrête le streaming en cours
    */
   const stop = useCallback(() => {
     if (abortRef.current && !abortRef.current.signal.aborted) {
-      console.log('[useChatStream] Arrêt du stream demandé');
+      console.log("[useChatStream] Arrêt du stream demandé");
       abortRef.current.abort();
     }
   }, []);
@@ -157,7 +163,7 @@ export function useChatStream(
   const reset = useCallback(() => {
     // Arrêter le stream en cours s'il y en a un
     stop();
-    
+
     // Reset de tous les états
     setPartial("");
     setError(null);
@@ -176,37 +182,31 @@ export function useChatStream(
   }, []);
 
   // Retour memoïsé pour éviter les re-renders inutiles
-  return useMemo(() => ({
-    // État
-    isStreaming,
-    partial,
-    error,
-    isConnected,
-    
-    // Actions
-    send,
-    stop,
-    clearError,
-    reset,
-  }), [
-    isStreaming, 
-    partial, 
-    error, 
-    isConnected, 
-    send, 
-    stop, 
-    clearError, 
-    reset
-  ]);
+  return useMemo(
+    () => ({
+      // État
+      isStreaming,
+      partial,
+      error,
+      isConnected,
+
+      // Actions
+      send,
+      stop,
+      clearError,
+      reset,
+    }),
+    [isStreaming, partial, error, isConnected, send, stop, clearError, reset],
+  );
 }
 
 /**
  * Hook simplifié pour des cas d'usage basiques
  * Masque la complexité de la gestion d'erreurs
  */
-export function useSimpleChatStream(tenant_id: string, lang: string = 'fr') {
+export function useSimpleChatStream(tenant_id: string, lang: string = "fr") {
   const stream = useChatStream(tenant_id, lang);
-  
+
   return {
     isLoading: stream.isStreaming,
     response: stream.partial,
@@ -231,40 +231,69 @@ export function useChatStreamWithStore<T>(
   messageFactory: {
     createUserMessage: (content: string) => T;
     createAssistantMessage: (content: string, isPartial?: boolean) => T;
-  }
+  },
 ) {
   const stream = useChatStream(tenant_id, lang);
-  
-  const sendWithStore = useCallback(async (message: string) => {
-    // Ajouter le message utilisateur au store
-    store.addMessage(messageFactory.createUserMessage(message));
-    
-    // Ajouter un message assistant vide qui sera mis à jour
-    store.addMessage(messageFactory.createAssistantMessage("", true));
-    store.setLoading(true);
-    
-    try {
-      const finalResponse = await stream.send(message);
-      
-      // Mettre à jour avec la réponse finale
-      store.updateLastMessage(
-        messageFactory.createAssistantMessage(finalResponse || stream.partial)
-      );
-      
-    } catch (error) {
-      // En cas d'erreur, garder le partiel si disponible
-      const content = stream.partial || "Erreur lors de la génération.";
-      store.updateLastMessage(
-        messageFactory.createAssistantMessage(content)
-      );
-    } finally {
-      store.setLoading(false);
-    }
-  }, [stream, store, messageFactory]);
-  
+
+  const sendWithStore = useCallback(
+    async (message: string) => {
+      // Ajouter le message utilisateur au store
+      store.addMessage(messageFactory.createUserMessage(message));
+
+      // Ajouter un message assistant vide qui sera mis à jour
+      store.addMessage(messageFactory.createAssistantMessage("", true));
+      store.setLoading(true);
+
+      try {
+        const finalResponse = await stream.send(message);
+
+        // Mettre à jour avec la réponse finale
+        store.updateLastMessage(
+          messageFactory.createAssistantMessage(
+            finalResponse || stream.partial,
+          ),
+        );
+      } catch (error) {
+        // En cas d'erreur, garder le partiel si disponible
+        const content = stream.partial || "Erreur lors de la génération.";
+        store.updateLastMessage(messageFactory.createAssistantMessage(content));
+      } finally {
+        store.setLoading(false);
+      }
+    },
+    [stream, store, messageFactory],
+  );
+
   return {
     ...stream,
     sendWithStore,
+  };
+}
+
+/**
+ * Hook pour tester la connexion
+ * ✅ CORRECTION: Maintenant c'est un vrai hook React
+ */
+export function useTestConnection(tenant_id: string, lang: string = "fr") {
+  const stream = useChatStream(tenant_id, lang);
+
+  const testConnection = useCallback(async (): Promise<boolean> => {
+    console.log("[useChatStream] Test de connexion...");
+
+    try {
+      const result = await stream.send("Test");
+      console.log("[useChatStream] Test réussi:", result.length, "caractères");
+      return true;
+    } catch (error) {
+      console.error("[useChatStream] Test échoué:", error);
+      return false;
+    }
+  }, [stream]);
+
+  return {
+    testConnection,
+    isTestingConnection: stream.isStreaming,
+    connectionError: stream.error,
   };
 }
 
@@ -273,25 +302,36 @@ export function useChatStreamWithStore<T>(
  */
 export const chatStreamDebug = {
   logState: (stream: UseChatStreamReturn) => {
-    console.group('[useChatStream] État actuel');
-    console.log('isStreaming:', stream.isStreaming);
-    console.log('partial length:', stream.partial.length);
-    console.log('has error:', !!stream.error);
-    console.log('is connected:', stream.isConnected);
+    console.group("[useChatStream] État actuel");
+    console.log("isStreaming:", stream.isStreaming);
+    console.log("partial length:", stream.partial.length);
+    console.log("has error:", !!stream.error);
+    console.log("is connected:", stream.isConnected);
     console.groupEnd();
   },
-  
-  testConnection: async (tenant_id: string, lang: string = 'fr') => {
-    console.log('[useChatStream] Test de connexion...');
-    const { send, stop } = useChatStream(tenant_id, lang);
-    
+
+  // ✅ CORRECTION: Fonction non-hook pour les tests simples
+  testConnectionSimple: async (
+    tenant_id: string,
+    lang: string = "fr",
+  ): Promise<boolean> => {
+    console.log("[useChatStream] Test de connexion simple...");
+
     try {
-      const result = await send("Test");
-      console.log('[useChatStream] Test réussi:', result.length, 'caractères');
+      // Utiliser directement streamAIResponse sans hooks
+      const result = await streamAIResponse(
+        { tenant_id, lang, message: "Test" },
+        () => {}, // callback vide
+      );
+      console.log(
+        "[useChatStream] Test simple réussi:",
+        result.length,
+        "caractères",
+      );
       return true;
     } catch (error) {
-      console.error('[useChatStream] Test échoué:', error);
+      console.error("[useChatStream] Test simple échoué:", error);
       return false;
     }
-  }
+  },
 };

@@ -1,226 +1,258 @@
 // lib/api/client.ts - CLIENT API CORRIGÉ avec gestion d'erreurs harmonisée
 
 interface APIResponse<T = any> {
-  success: boolean
-  data?: T
+  success: boolean;
+  data?: T;
   error?: {
-    message: string
-    status?: number
-    details?: any
-  }
+    message: string;
+    status?: number;
+    details?: any;
+  };
 }
 
 export class APIClient {
-  private baseURL: string
-  private headers: Record<string, string>
+  private baseURL: string;
+  private headers: Record<string, string>;
 
   constructor() {
     // Correction: Utiliser la variable d'environnement DigitalOcean sans ajouter /api
-	this.baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert.intelia.com/api'
-    
+    this.baseURL =
+      process.env.NEXT_PUBLIC_API_BASE_URL || "https://expert.intelia.com/api";
+
     this.headers = {
-      'Content-Type': 'application/json',
-      'Origin': 'https://expert.intelia.com',
-    }
-    
-    console.log('[APIClient] Initialisé avec baseURL:', this.baseURL)
+      "Content-Type": "application/json",
+      Origin: "https://expert.intelia.com",
+    };
+
+    console.log("[APIClient] Initialisé avec baseURL:", this.baseURL);
   }
 
   // CORRECTION CRITIQUE: Construction URL propre
   private buildURL(endpoint: string): string {
     // Enlever leading slash si présent
-    const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint
-    
+    const cleanEndpoint = endpoint.startsWith("/")
+      ? endpoint.slice(1)
+      : endpoint;
+
     // IMPORTANT: Enlever /api s'il est déjà présent dans baseURL
-    const cleanBaseUrl = this.baseURL.replace(/\/api\/?$/, '')
-    
+    const cleanBaseUrl = this.baseURL.replace(/\/api\/?$/, "");
+
     // Construire l'URL avec /api/v1 une seule fois
-    const version = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
-    const fullUrl = `${cleanBaseUrl}/api/${version}/${cleanEndpoint}`
-    
-    console.log('[APIClient] URL construite:', fullUrl)
-    return fullUrl
+    const version = process.env.NEXT_PUBLIC_API_VERSION || "v1";
+    const fullUrl = `${cleanBaseUrl}/api/${version}/${cleanEndpoint}`;
+
+    console.log("[APIClient] URL construite:", fullUrl);
+    return fullUrl;
   }
 
   // Méthode de base pour les requêtes avec gestion d'erreurs améliorée
   private async request<T>(
-    endpoint: string, 
-    options: RequestInit = {}, 
-    useAuth: boolean = false
+    endpoint: string,
+    options: RequestInit = {},
+    useAuth: boolean = false,
   ): Promise<APIResponse<T>> {
     try {
-      const url = this.buildURL(endpoint)
-      console.log(`[APIClient] URL construite: ${url}`)
+      const url = this.buildURL(endpoint);
+      console.log(`[APIClient] URL construite: ${url}`);
 
       const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...((options.headers as Record<string, string>) || {})
-      }
+        "Content-Type": "application/json",
+        ...((options.headers as Record<string, string>) || {}),
+      };
 
       if (useAuth) {
-        const token = await this.getAuthToken()
+        const token = await this.getAuthToken();
         if (token) {
-          headers['Authorization'] = `Bearer ${token}`
-          console.log('[APIClient] Token ajouté à la requête')
+          headers["Authorization"] = `Bearer ${token}`;
+          console.log("[APIClient] Token ajouté à la requête");
         } else {
-          console.warn('[APIClient] Aucun token disponible pour requête authentifiée')
+          console.warn(
+            "[APIClient] Aucun token disponible pour requête authentifiée",
+          );
         }
       }
 
       const config: RequestInit = {
         ...options,
         headers,
-        credentials: 'include'
-      }
+        credentials: "include",
+      };
 
-      console.log(`[APIClient] Requête: ${options.method || 'GET'} ${url}`)
+      console.log(`[APIClient] Requête: ${options.method || "GET"} ${url}`);
 
-      const response = await fetch(url, config)
-      
+      const response = await fetch(url, config);
+
       // Logging détaillé du statut
-      console.log(`[APIClient] Réponse: ${response.status} ${response.statusText}`)
+      console.log(
+        `[APIClient] Réponse: ${response.status} ${response.statusText}`,
+      );
 
       // Gestion spécifique des erreurs HTTP
       if (!response.ok) {
-        let errorDetails: any = null
-        let errorMessage = `Request failed with status ${response.status}`
-        
+        let errorDetails: any = null;
+        let errorMessage = `Request failed with status ${response.status}`;
+
         try {
           // Essayer de lire le corps de la réponse pour plus de détails
-          const contentType = response.headers.get('content-type')
-          
-          if (contentType?.includes('application/json')) {
-            errorDetails = await response.json()
-            console.log('[APIClient] Détails erreur JSON:', errorDetails)
-            
+          const contentType = response.headers.get("content-type");
+
+          if (contentType?.includes("application/json")) {
+            errorDetails = await response.json();
+            console.log("[APIClient] Détails erreur JSON:", errorDetails);
+
             // Extraire le message d'erreur du backend
             if (errorDetails.detail) {
-              errorMessage = errorDetails.detail
+              errorMessage = errorDetails.detail;
             } else if (errorDetails.message) {
-              errorMessage = errorDetails.message
+              errorMessage = errorDetails.message;
             } else if (errorDetails.error) {
-              errorMessage = errorDetails.error
+              errorMessage = errorDetails.error;
             }
           } else {
             // Si ce n'est pas du JSON, lire comme texte
-            const textError = await response.text()
-            console.log('[APIClient] Détails erreur texte:', textError)
+            const textError = await response.text();
+            console.log("[APIClient] Détails erreur texte:", textError);
             if (textError && textError.trim()) {
-              errorMessage = textError
+              errorMessage = textError;
             }
           }
         } catch (parseError) {
-          console.warn('[APIClient] Impossible de parser la réponse d\'erreur:', parseError)
+          console.warn(
+            "[APIClient] Impossible de parser la réponse d'erreur:",
+            parseError,
+          );
         }
 
         // Messages d'erreurs spécifiques par code de statut
-        let friendlyMessage = errorMessage
-        
+        let friendlyMessage = errorMessage;
+
         switch (response.status) {
           case 400:
-            if (!errorMessage || errorMessage === `Request failed with status ${response.status}`) {
-              friendlyMessage = 'Données de requête invalides'
+            if (
+              !errorMessage ||
+              errorMessage === `Request failed with status ${response.status}`
+            ) {
+              friendlyMessage = "Données de requête invalides";
             }
-            break
+            break;
           case 401:
-            if (!errorMessage || errorMessage === `Request failed with status ${response.status}`) {
-              friendlyMessage = 'Non autorisé - vérifiez vos identifiants'
+            if (
+              !errorMessage ||
+              errorMessage === `Request failed with status ${response.status}`
+            ) {
+              friendlyMessage = "Non autorisé - vérifiez vos identifiants";
             }
-            break
+            break;
           case 403:
-            if (!errorMessage || errorMessage === `Request failed with status ${response.status}`) {
-              friendlyMessage = 'Accès refusé'
+            if (
+              !errorMessage ||
+              errorMessage === `Request failed with status ${response.status}`
+            ) {
+              friendlyMessage = "Accès refusé";
             }
-            break
+            break;
           case 404:
-            if (!errorMessage || errorMessage === `Request failed with status ${response.status}`) {
-              friendlyMessage = 'Service non trouvé'
+            if (
+              !errorMessage ||
+              errorMessage === `Request failed with status ${response.status}`
+            ) {
+              friendlyMessage = "Service non trouvé";
             }
-            break
+            break;
           case 429:
-            if (!errorMessage || errorMessage === `Request failed with status ${response.status}`) {
-              friendlyMessage = 'Trop de requêtes - veuillez ralentir'
+            if (
+              !errorMessage ||
+              errorMessage === `Request failed with status ${response.status}`
+            ) {
+              friendlyMessage = "Trop de requêtes - veuillez ralentir";
             }
-            break
+            break;
           case 500:
-            if (!errorMessage || errorMessage === `Request failed with status ${response.status}`) {
-              friendlyMessage = 'Erreur interne du serveur'
+            if (
+              !errorMessage ||
+              errorMessage === `Request failed with status ${response.status}`
+            ) {
+              friendlyMessage = "Erreur interne du serveur";
             }
-            break
+            break;
           case 502:
-            friendlyMessage = 'Passerelle défaillante - serveur temporairement indisponible'
-            break
+            friendlyMessage =
+              "Passerelle défaillante - serveur temporairement indisponible";
+            break;
           case 503:
-            friendlyMessage = 'Service temporairement indisponible'
-            break
+            friendlyMessage = "Service temporairement indisponible";
+            break;
           case 504:
-            friendlyMessage = 'Délai de connexion dépassé'
-            break
+            friendlyMessage = "Délai de connexion dépassé";
+            break;
           default:
-            if (!errorMessage || errorMessage === `Request failed with status ${response.status}`) {
-              friendlyMessage = `Erreur HTTP ${response.status}`
+            if (
+              !errorMessage ||
+              errorMessage === `Request failed with status ${response.status}`
+            ) {
+              friendlyMessage = `Erreur HTTP ${response.status}`;
             }
         }
 
-        console.error(`[APIClient] HTTP ${response.status}:`, friendlyMessage)
+        console.error(`[APIClient] HTTP ${response.status}:`, friendlyMessage);
 
         // Créer un objet d'erreur enrichi
-        const apiError = new Error(friendlyMessage)
-        ;(apiError as any).status = response.status
-        ;(apiError as any).statusText = response.statusText
-        ;(apiError as any).details = errorDetails
-        ;(apiError as any).originalMessage = errorMessage
-        
+        const apiError = new Error(friendlyMessage);
+        (apiError as any).status = response.status;
+        (apiError as any).statusText = response.statusText;
+        (apiError as any).details = errorDetails;
+        (apiError as any).originalMessage = errorMessage;
+
         return {
           success: false,
           data: null as T,
           error: {
             message: friendlyMessage,
             status: response.status,
-            details: errorDetails
-          }
-        }
+            details: errorDetails,
+          },
+        };
       }
 
       // Gestion de la réponse réussie améliorée
-      let data: T
+      let data: T;
       try {
-        const contentType = response.headers.get('content-type')
-        
-        if (contentType?.includes('application/json')) {
-          data = await response.json()
-          console.log('[APIClient] Réponse JSON parsée avec succès')
+        const contentType = response.headers.get("content-type");
+
+        if (contentType?.includes("application/json")) {
+          data = await response.json();
+          console.log("[APIClient] Réponse JSON parsée avec succès");
         } else {
           // Si ce n'est pas du JSON, retourner comme texte
-          const textData = await response.text()
-          data = (textData as unknown) as T
-          console.log('[APIClient] Réponse texte reçue')
+          const textData = await response.text();
+          data = textData as unknown as T;
+          console.log("[APIClient] Réponse texte reçue");
         }
       } catch (parseError) {
-        console.error('[APIClient] Erreur parsing réponse:', parseError)
-        throw new Error('Erreur de traitement de la réponse du serveur')
+        console.error("[APIClient] Erreur parsing réponse:", parseError);
+        throw new Error("Erreur de traitement de la réponse du serveur");
       }
 
       return {
         success: true,
         data,
-        error: null
-      }
-
+        error: null,
+      };
     } catch (error: any) {
-      console.error('[APIClient] Erreur requête:', error)
+      console.error("[APIClient] Erreur requête:", error);
 
       // Gestion des erreurs réseau
-      let errorMessage = 'Erreur de connexion'
-      
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        errorMessage = 'Impossible de contacter le serveur - vérifiez votre connexion internet'
-      } else if (error.name === 'AbortError') {
-        errorMessage = 'Requête annulée'
-      } else if (error.message.includes('timeout')) {
-        errorMessage = 'Délai de connexion dépassé'
+      let errorMessage = "Erreur de connexion";
+
+      if (error.name === "TypeError" && error.message.includes("fetch")) {
+        errorMessage =
+          "Impossible de contacter le serveur - vérifiez votre connexion internet";
+      } else if (error.name === "AbortError") {
+        errorMessage = "Requête annulée";
+      } else if (error.message.includes("timeout")) {
+        errorMessage = "Délai de connexion dépassé";
       } else if (error.message) {
-        errorMessage = error.message
+        errorMessage = error.message;
       }
 
       return {
@@ -229,87 +261,95 @@ export class APIClient {
         error: {
           message: errorMessage,
           status: error.status || 0,
-          details: error
-        }
-      }
+          details: error,
+        },
+      };
     }
   }
 
   // Méthodes GET
   async get<T>(endpoint: string): Promise<APIResponse<T>> {
-    return this.request<T>(endpoint, { method: 'GET' })
+    return this.request<T>(endpoint, { method: "GET" });
   }
 
   async getSecure<T>(endpoint: string): Promise<APIResponse<T>> {
-    return this.request<T>(endpoint, { method: 'GET' }, true)
+    return this.request<T>(endpoint, { method: "GET" }, true);
   }
 
   // Méthodes POST
   async post<T>(endpoint: string, data?: any): Promise<APIResponse<T>> {
     return this.request<T>(endpoint, {
-      method: 'POST',
-      body: data ? JSON.stringify(data) : undefined
-    })
+      method: "POST",
+      body: data ? JSON.stringify(data) : undefined,
+    });
   }
 
   async postSecure<T>(endpoint: string, data?: any): Promise<APIResponse<T>> {
-    return this.request<T>(endpoint, {
-      method: 'POST',
-      body: data ? JSON.stringify(data) : undefined
-    }, true)
+    return this.request<T>(
+      endpoint,
+      {
+        method: "POST",
+        body: data ? JSON.stringify(data) : undefined,
+      },
+      true,
+    );
   }
 
   // Méthodes PUT
   async put<T>(endpoint: string, data?: any): Promise<APIResponse<T>> {
     return this.request<T>(endpoint, {
-      method: 'PUT',
-      body: data ? JSON.stringify(data) : undefined
-    })
+      method: "PUT",
+      body: data ? JSON.stringify(data) : undefined,
+    });
   }
 
   async putSecure<T>(endpoint: string, data?: any): Promise<APIResponse<T>> {
-    return this.request<T>(endpoint, {
-      method: 'PUT',
-      body: data ? JSON.stringify(data) : undefined
-    }, true)
+    return this.request<T>(
+      endpoint,
+      {
+        method: "PUT",
+        body: data ? JSON.stringify(data) : undefined,
+      },
+      true,
+    );
   }
 
   // Méthodes DELETE
   async delete<T>(endpoint: string): Promise<APIResponse<T>> {
-    return this.request<T>(endpoint, { method: 'DELETE' })
+    return this.request<T>(endpoint, { method: "DELETE" });
   }
 
   async deleteSecure<T>(endpoint: string): Promise<APIResponse<T>> {
-    return this.request<T>(endpoint, { method: 'DELETE' }, true)
+    return this.request<T>(endpoint, { method: "DELETE" }, true);
   }
 
   // Récupération du token d'authentification
   private async getAuthToken(): Promise<string | null> {
     try {
-      const authData = localStorage.getItem('intelia-expert-auth')
+      const authData = localStorage.getItem("intelia-expert-auth");
       if (!authData) {
-        console.warn('[APIClient] Aucun token d\'authentification trouvé')
-        return null
+        console.warn("[APIClient] Aucun token d'authentification trouvé");
+        return null;
       }
-      
-      const parsed = JSON.parse(authData)
-      const token = parsed.access_token
-      
+
+      const parsed = JSON.parse(authData);
+      const token = parsed.access_token;
+
       if (!token) {
-        console.warn('[APIClient] Token invalide dans localStorage')
-        return null
+        console.warn("[APIClient] Token invalide dans localStorage");
+        return null;
       }
-      
-      return token
+
+      return token;
     } catch (error) {
-      console.error('[APIClient] Erreur récupération token:', error)
-      return null
+      console.error("[APIClient] Erreur récupération token:", error);
+      return null;
     }
   }
 }
 
 // Export: Instance unique exportée
-export const apiClient = new APIClient()
+export const apiClient = new APIClient();
 
 // Export par défaut de la classe pour les cas spéciaux si nécessaire
-export default APIClient
+export default APIClient;

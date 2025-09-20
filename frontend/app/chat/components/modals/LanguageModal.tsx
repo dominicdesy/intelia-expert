@@ -1,157 +1,193 @@
 // LanguageModal.tsx - Sans reload forcé, utilise la synchronisation i18n
 
-import React, { useState, useEffect, useRef } from 'react'
-import { useTranslation, availableLanguages, getLanguageByCode } from '@/lib/languages/i18n'
-import { useAuthStore } from '@/lib/stores/auth'
-import { CheckIcon } from '../../utils/icons'
+import React, { useState, useEffect, useRef } from "react";
+import {
+  useTranslation,
+  availableLanguages,
+  getLanguageByCode,
+} from "@/lib/languages/i18n";
+import { useAuthStore } from "@/lib/stores/auth";
+import { CheckIcon } from "../../utils/icons";
 
 export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
-  const { t, changeLanguage, currentLanguage } = useTranslation()
-  const { updateProfile } = useAuthStore()
-  const [isUpdating, setIsUpdating] = useState(false)
-  const overlayRef = useRef<HTMLDivElement>(null)
-  const contentRef = useRef<HTMLDivElement>(null)
-  
+  const { t, changeLanguage, currentLanguage } = useTranslation();
+  const { updateProfile } = useAuthStore();
+  const [isUpdating, setIsUpdating] = useState(false);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
   // Forcer les styles au montage
   useEffect(() => {
-    const overlay = overlayRef.current
-    
+    const overlay = overlayRef.current;
+
     if (overlay) {
-      overlay.style.setProperty('width', '100vw', 'important')
-      overlay.style.setProperty('height', '100vh', 'important')
-      overlay.style.setProperty('top', '0', 'important')
-      overlay.style.setProperty('left', '0', 'important')
-      overlay.style.setProperty('right', '0', 'important')
-      overlay.style.setProperty('bottom', '0', 'important')
-      overlay.style.setProperty('background-color', 'rgba(0, 0, 0, 0.5)', 'important')
-      overlay.style.setProperty('backdrop-filter', 'blur(2px)', 'important')
-      overlay.style.setProperty('animation', 'fadeIn 0.2s ease-out', 'important')
-      overlay.style.setProperty('display', 'flex', 'important')
-      overlay.style.setProperty('align-items', 'center', 'important')
-      overlay.style.setProperty('justify-content', 'center', 'important')
-      overlay.style.setProperty('padding', '16px', 'important')
-      
-      const content = overlay.querySelector('.modal-content') as HTMLElement
+      overlay.style.setProperty("width", "100vw", "important");
+      overlay.style.setProperty("height", "100vh", "important");
+      overlay.style.setProperty("top", "0", "important");
+      overlay.style.setProperty("left", "0", "important");
+      overlay.style.setProperty("right", "0", "important");
+      overlay.style.setProperty("bottom", "0", "important");
+      overlay.style.setProperty(
+        "background-color",
+        "rgba(0, 0, 0, 0.5)",
+        "important",
+      );
+      overlay.style.setProperty("backdrop-filter", "blur(2px)", "important");
+      overlay.style.setProperty(
+        "animation",
+        "fadeIn 0.2s ease-out",
+        "important",
+      );
+      overlay.style.setProperty("display", "flex", "important");
+      overlay.style.setProperty("align-items", "center", "important");
+      overlay.style.setProperty("justify-content", "center", "important");
+      overlay.style.setProperty("padding", "16px", "important");
+
+      const content = overlay.querySelector(".modal-content") as HTMLElement;
       if (content) {
-        content.style.setProperty('animation', 'modalSlideIn 0.3s ease-out', 'important')
-        content.style.setProperty('width', '95vw', 'important')
-        content.style.setProperty('max-width', '800px', 'important')
-        content.style.setProperty('max-height', '85vh', 'important')
-        content.style.setProperty('min-width', '320px', 'important')
-        content.style.setProperty('background-color', 'white', 'important')
+        content.style.setProperty(
+          "animation",
+          "modalSlideIn 0.3s ease-out",
+          "important",
+        );
+        content.style.setProperty("width", "95vw", "important");
+        content.style.setProperty("max-width", "800px", "important");
+        content.style.setProperty("max-height", "85vh", "important");
+        content.style.setProperty("min-width", "320px", "important");
+        content.style.setProperty("background-color", "white", "important");
       }
     }
-  }, [])
+  }, []);
 
   const handleLanguageChange = async (languageCode: string) => {
-    if (languageCode === currentLanguage || isUpdating) return
+    if (languageCode === currentLanguage || isUpdating) return;
 
-    setIsUpdating(true)
-    
+    setIsUpdating(true);
+
     try {
-      console.log('[LanguageModal] Changement langue:', currentLanguage, '→', languageCode)
-      
+      console.log(
+        "[LanguageModal] Changement langue:",
+        currentLanguage,
+        "→",
+        languageCode,
+      );
+
       // 1. Changer dans l'interface via le hook
-      await changeLanguage(languageCode)
-      console.log('[LanguageModal] Langue changée via hook')
-      
+      await changeLanguage(languageCode);
+      console.log("[LanguageModal] Langue changée via hook");
+
       // 2. Attendre que la synchronisation se fasse
-      await new Promise(resolve => setTimeout(resolve, 300))
-      
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
       // 3. Émettre un événement pour forcer la synchronisation globale
-      window.dispatchEvent(new CustomEvent('languageChanged', { 
-        detail: { language: languageCode } 
-      }))
-      
-      console.log('[LanguageModal] Synchronisation terminée')
-      
+      window.dispatchEvent(
+        new CustomEvent("languageChanged", {
+          detail: { language: languageCode },
+        }),
+      );
+
+      console.log("[LanguageModal] Synchronisation terminée");
+
       // 4. Fermer la modal
-      onClose()
-      
+      onClose();
     } catch (error) {
-      console.error('[LanguageModal] Erreur changement:', error)
+      console.error("[LanguageModal] Erreur changement:", error);
     } finally {
-      setIsUpdating(false)
+      setIsUpdating(false);
     }
-  }
+  };
 
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget && !isUpdating) {
-      onClose()
+      onClose();
     }
-  }
+  };
 
-  const currentLangConfig = getLanguageByCode(currentLanguage)
+  const currentLangConfig = getLanguageByCode(currentLanguage);
 
   return (
     <>
       <style jsx>{`
         @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
         }
-        
+
         @keyframes modalSlideIn {
-          from { 
-            opacity: 0; 
-            transform: translateY(-20px) scale(0.95); 
+          from {
+            opacity: 0;
+            transform: translateY(-20px) scale(0.95);
           }
-          to { 
-            opacity: 1; 
-            transform: translateY(0) scale(1); 
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
           }
         }
-        
+
         .modal-content {
           background-color: white !important;
         }
       `}</style>
 
-      <div 
+      <div
         ref={overlayRef}
         className="fixed inset-0 z-50"
         style={{
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          backdropFilter: 'blur(2px)'
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          backdropFilter: "blur(2px)",
         }}
         onClick={handleOverlayClick}
       >
-        <div 
+        <div
           ref={contentRef}
           className="modal-content bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-          style={{ backgroundColor: 'white' }}
+          style={{ backgroundColor: "white" }}
         >
           <div className="p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-900">
-                {t('language.title')}
+                {t("language.title")}
               </h2>
               <button
                 onClick={onClose}
                 className="text-gray-400 hover:text-gray-600 transition-colors hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"
                 disabled={isUpdating}
-                aria-label={t('modal.close')}
-                title={t('modal.close')}
+                aria-label={t("modal.close")}
+                title={t("modal.close")}
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
 
             {/* Description */}
-            <p className="text-gray-600 mb-6">
-              {t('language.description')}
-            </p>
+            <p className="text-gray-600 mb-6">{t("language.description")}</p>
 
             {/* Langue actuelle */}
             {currentLangConfig && (
               <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="flex items-center">
-                  <span className="text-2xl mr-3">{currentLangConfig.flag}</span>
+                  <span className="text-2xl mr-3">
+                    {currentLangConfig.flag}
+                  </span>
                   <div>
                     <div className="font-semibold text-blue-900">
-                      {t('language.current')}: {currentLangConfig.nativeName}
+                      {t("language.current")}: {currentLangConfig.nativeName}
                     </div>
                     <div className="text-sm font-bold text-gray-500">
                       {currentLangConfig.code.toUpperCase()}
@@ -165,11 +201,26 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
             {isUpdating && (
               <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-400 text-blue-700">
                 <div className="flex items-center">
-                  <svg className="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <svg
+                    className="animate-spin h-5 w-5 mr-2"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
                   </svg>
-                  <span>{t('language.updating')}</span>
+                  <span>{t("language.updating")}</span>
                 </div>
               </div>
             )}
@@ -182,13 +233,17 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
                   onClick={() => !isUpdating && handleLanguageChange(lang.code)}
                   className={`
                     relative p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 hover:shadow-md
-                    ${currentLanguage === lang.code 
-                      ? 'border-blue-500 bg-blue-50 shadow-md' 
-                      : 'border-gray-200 hover:border-blue-300 bg-white'
+                    ${
+                      currentLanguage === lang.code
+                        ? "border-blue-500 bg-blue-50 shadow-md"
+                        : "border-gray-200 hover:border-blue-300 bg-white"
                     }
-                    ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-50'}
+                    ${isUpdating ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-50"}
                   `}
-                  style={{ backgroundColor: currentLanguage === lang.code ? '#eff6ff' : 'white' }}
+                  style={{
+                    backgroundColor:
+                      currentLanguage === lang.code ? "#eff6ff" : "white",
+                  }}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
@@ -203,7 +258,7 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
                         </div>
                       </div>
                     </div>
-                    
+
                     {currentLanguage === lang.code && (
                       <div className="flex items-center text-blue-600">
                         <CheckIcon className="w-5 h-5" />
@@ -221,12 +276,12 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
                 className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
                 disabled={isUpdating}
               >
-                {t('modal.close')}
+                {t("modal.close")}
               </button>
             </div>
           </div>
         </div>
       </div>
     </>
-  )
-}
+  );
+};
