@@ -25,9 +25,13 @@ PUBLIC_ENDPOINTS = {
     "/api/docs",
     "/api/redoc",
     "/api/openapi.json",
-    "/api/v1/health",
-    # === ENDPOINTS BILLING PUBLICS ===  # 🆕 CORRECTION CRITIQUE
-    "/api/v1/billing/plans",  # 🆕 Plans publics
+    "/api/v1/health",  # ✅ HEALTH BASIC DÉJÀ PRÉSENT
+    # === ENDPOINTS HEALTH ADDITIONNELS === # 🆕 AJOUT CRITIQUE
+    "/api/v1/health/ready",  # 🆕 Health ready
+    "/api/v1/health/live",  # 🆕 Health live
+    "/api/v1/health/complete",  # 🆕 Health complete
+    # === ENDPOINTS BILLING PUBLICS ===
+    "/api/v1/billing/plans",  # ✅ Plans publics
     # === ENDPOINTS AUTH PUBLICS EXISTANTS ===
     "/api/v1/auth/login",
     "/api/v1/auth/debug/jwt-config",
@@ -42,7 +46,9 @@ PUBLIC_ENDPOINTS = {
     "/docs",
     "/redoc",
     "/openapi.json",
-    "/health",
+    "/health",  # 🆕 Health sans prefix
+    "/health/ready",  # 🆕 Health ready sans prefix
+    "/health/live",  # 🆕 Health live sans prefix
     "/metrics",
 }
 
