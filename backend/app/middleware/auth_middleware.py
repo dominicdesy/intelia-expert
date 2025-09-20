@@ -1,8 +1,8 @@
 # app/middleware/auth_middleware.py
 """
 Middleware d'authentification globale pour l'API Intelia Expert
-Version 4.3 - NETTOYAGE ENDPOINTS SUPPRIMÉS
-Suppression de: ask-public, rag/*, conversations, expert
+Version 4.4 - NETTOYAGE RÉFÉRENCES ORPHELINES
+Suppression de: ask-public, rag/*, conversations, expert, test-direct
 CORS compatible avec credentials: 'include'
 Architecture concentrée sur: System, Auth, Users, Stats, Billing, Invitations, Logging
 """
@@ -27,10 +27,9 @@ PUBLIC_ENDPOINTS = {
     "/api/redoc",
     "/api/openapi.json",
     "/api/v1/health",
-    # === ENDPOINTS AUTH PUBLICS CORRIGES - VRAIS ENDPOINTS ===
+    # === ENDPOINTS AUTH PUBLICS EXISTANTS ===
     "/api/v1/auth/login",
     "/api/v1/auth/debug/jwt-config",
-    "/api/v1/auth/test-direct",
     # === ENDPOINTS CACHE PUBLICS (health check) ===
     "/api/v1/stats-fast/health",
     # === SYSTEM ENDPOINTS ===
@@ -108,7 +107,6 @@ EXTENDED_PUBLIC_PATTERNS = [
     # === AUTH PUBLICS PATTERNS ===
     "/api/v1/auth/login",
     "/api/v1/auth/debug",
-    "/api/v1/auth/test-direct",
     # === PATTERNS CACHE PUBLICS ===
     "/api/v1/stats-fast/health",
     # === API PATTERNS ===
@@ -319,10 +317,10 @@ def is_authenticated_user(user_info: Dict[str, Any]) -> bool:
 
 async def auth_middleware(request: Request, call_next):
     """
-    Middleware d'authentification globale pour l'API Intelia Expert - VERSION 4.3 NETTOYÉE
+    Middleware d'authentification globale pour l'API Intelia Expert - VERSION 4.4 NETTOYÉE
 
     Logique:
-    1. Gere les endpoints inexistants (404) - Inclut maintenant ask-public, rag, conversations, expert
+    1. Gere les endpoints inexistants (404)
     2. Skip l'auth pour les endpoints publics et OPTIONS
     3. Authentification basique pour les endpoints utilisateur (stats-fast)
     4. Authentification admin pour les endpoints protégés (admin uniquement)
@@ -656,12 +654,13 @@ def debug_middleware_config() -> Dict[str, Any]:
             "Conversations endpoints (/conversations/*)",
             "Expert endpoints (/expert/*)",
         ],
-        "middleware_version": "4.3-cleaned-endpoints",
+        "middleware_version": "4.4-cleaned-orphan-references",
         "key_changes": [
             "REMOVED: All ask-public endpoints",
             "REMOVED: All RAG endpoints (/rag/debug, /rag/test)",
             "REMOVED: All conversations endpoints (/conversations/*)",
             "REMOVED: All expert endpoints (/expert/*)",
+            "REMOVED: Orphan reference to /auth/test-direct",
             "FOCUSED: API now concentrates on core business services",
             "MAINTAINED: All authentication and authorization logic intact",
         ],

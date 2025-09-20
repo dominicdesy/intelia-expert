@@ -1,9 +1,9 @@
-# app/api/v1/__init__.py - VERSION 5.5 CORRIGÉE
-# CONSERVATION INTÉGRALE DU CODE ORIGINAL + CORRECTIONS ERREURS IMPORT
+# app/api/v1/__init__.py - VERSION 5.6 NETTOYÉE
+# SUPPRESSION COMPLÈTE DES RÉFÉRENCES EXPERT
 # Support des routers de cache statistiques ultra-rapides
-# NOUVEAU: Support du router users pour gestion profils
+# Support du router users pour gestion profils
 # SUPPRESSION: auth_invitations router (fonctionnalités intégrées dans invitations)
-# CORRECTION: billing_openai RÉACTIVÉ, expert désactivé
+# CORRECTION: billing_openai RÉACTIVÉ, expert COMPLÈTEMENT SUPPRIMÉ
 
 from fastapi import APIRouter
 import logging
@@ -56,7 +56,7 @@ except Exception as e:
     logger.error("Traceback complet auth: %s", traceback.format_exc())
     auth_router = None
 
-# NOUVEAU: Users router - GESTION PROFILS
+# Users router - GESTION PROFILS
 USERS_AVAILABLE = False
 try:
     logger.info("Tentative import users router...")
@@ -104,7 +104,7 @@ try:
     except ImportError as aiohttp_error:
         logger.error("❌ aiohttp MANQUANT: %s", aiohttp_error)
 
-    # Test import auth - CORRECTION: utilisation d'importlib pour test de disponibilité
+    # Test import auth - utilisation d'importlib pour test de disponibilité
     try:
         import importlib.util
 
@@ -116,7 +116,7 @@ try:
     except Exception as auth_error:
         logger.error("❌ erreur test auth module: %s", auth_error)
 
-    # Test import stats_cache - CORRECTION: utilisation d'importlib pour test de disponibilité
+    # Test import stats_cache - utilisation d'importlib pour test de disponibilité
     try:
         stats_cache_spec = importlib.util.find_spec(".stats_cache", package=__name__)
         if stats_cache_spec is not None:
@@ -257,11 +257,6 @@ except Exception as e:
     logger.error("ERREUR import billing_openai router: %s", e)
     billing_openai_router = None
 
-# CORRECTION: Expert router - DÉSACTIVÉ (SERVICE EXTERNALISÉ)
-# Expert et expert_service ne doivent plus être utilisés selon votre indication
-expert_router = None
-logger.info("Expert router désactivé (service externalisé vers expert.intelia.com)")
-
 # Conversations router (conditionnel)
 try:
     from .conversations import router as conversations_router
@@ -307,7 +302,7 @@ if auth_router:
 else:
     logger.error("Auth router NON MONTE - import a echoue")
 
-# NOUVEAU: Users router - AVEC DEBUG COMPLET
+# Users router - AVEC DEBUG COMPLET
 if USERS_AVAILABLE and users_router:
     try:
         router.include_router(users_router, tags=["Users"])
@@ -408,10 +403,6 @@ if CONVERSATIONS_AVAILABLE and conversations_router:
     )
     logger.info("Conversations router monte")
 
-# CORRECTION: Expert - NON MONTÉ (désactivé)
-# expert_router est None, donc ne sera pas monté
-logger.info("Expert router NON MONTE - service externalisé")
-
 # Resume final
 total_routes = len(router.routes)
 logger.info("Router v1 cree avec %d routes au total", total_routes)
@@ -428,7 +419,7 @@ if auth_route_count > 0:
 else:
     logger.error("AUCUNE route auth detectee dans le router final!")
 
-# NOUVEAU: Debug des routes users specifiquement
+# Debug des routes users specifiquement
 users_route_count = len([r for r in router.routes if "/users" in r.path])
 logger.info("Routes users detectees: %d", users_route_count)
 
@@ -490,7 +481,7 @@ if billing_openai_route_count > 0:
 else:
     logger.info("Aucune route billing OpenAI detectee")
 
-# Recapitulatif systeme cache ET users
+# Recapitulatif systeme
 system_status = {
     "users": USERS_AVAILABLE,
     "stats_fast": STATS_FAST_AVAILABLE,
@@ -501,7 +492,6 @@ system_status = {
     "cache_routes": stats_route_count,
     "invitations_unified": invitations_route_count > 0,
     "billing_openai_enabled": billing_openai_route_count > 0,
-    "expert_disabled": True,
 }
 logger.info("Status systemes: %s", system_status)
 
@@ -525,6 +515,6 @@ logger.info(
 logger.info(
     "Architecture simplifiee: un seul service pour toutes les fonctions d'invitation"
 )
-logger.info("CORRECTIONS APPLIQUÉES: billing_openai RÉACTIVÉ, expert désactivé")
+logger.info("CORRECTIONS APPLIQUÉES: billing_openai RÉACTIVÉ")
 
 __all__ = ["router"]

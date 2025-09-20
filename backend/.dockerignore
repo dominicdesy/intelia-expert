@@ -24,4 +24,5 @@ logs/
 # Fichiers temporaires
 *.tmp
 *.swp
+*.bak
 trigger.txt
