@@ -951,9 +951,9 @@ const getApiConfig = () => {
   if (!baseUrl) {
     console.error('NEXT_PUBLIC_API_BASE_URL environment variable missing')
     return {
-      BASE_URL: 'http://localhost:8000', // Fallback développement
-      TIMEOUT: 30000,
-      LOGGING_BASE_URL: 'http://localhost:8000/api/v1'
+      BASE_URL: 'https://expert.intelia.com', // Fallback développement
+	  TIMEOUT: 30000,
+      LOGGING_BASE_URL: 'https://expert.intelia.com/api/v1'
     }
   }
   
