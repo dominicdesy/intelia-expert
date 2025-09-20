@@ -1,10 +1,10 @@
 # app/middleware/auth_middleware.py
 """
 Middleware d'authentification globale pour l'API Intelia Expert
-Version 4.2 - CORRECTION DES PERMISSIONS UTILISATEUR
-Support des endpoints conversations et expert pour utilisateurs authentifiés
+Version 4.3 - NETTOYAGE ENDPOINTS SUPPRIMÉS
+Suppression de: ask-public, rag/*, conversations, expert
 CORS compatible avec credentials: 'include'
-CORRECTION: Conversations et expert/ask maintenant accessibles aux utilisateurs authentifiés
+Architecture concentrée sur: System, Auth, Users, Stats, Billing, Invitations, Logging
 """
 
 from fastapi import HTTPException, Request
@@ -18,190 +18,85 @@ from app.api.v1.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
-# ENDPOINTS PUBLICS ETENDUS AVEC CACHE (pas d'auth requise)
+# ENDPOINTS PUBLICS NETTOYES (pas d'auth requise)
 PUBLIC_ENDPOINTS = {
     # === API ENDPOINTS PUBLICS ===
-    "/api/ask-public",
-    "/api/v1/ask-public",
-    "/api/v1/system-status",
     "/api/v1/debug",
-    "/api/rag/debug",
-    "/api/rag/test",
-    "/api/cors-test",
     "/api/",
     "/api/docs",
     "/api/redoc",
     "/api/openapi.json",
     "/api/v1/health",
     # === ENDPOINTS AUTH PUBLICS CORRIGES - VRAIS ENDPOINTS ===
-    "/api/v1/auth/login",  # VRAI endpoint backend
-    "/api/v1/auth/debug/jwt-config",  # VRAI endpoint backend
-    "/api/v1/auth/test-direct",  # VRAI endpoint backend
+    "/api/v1/auth/login",
+    "/api/v1/auth/debug/jwt-config",
+    "/api/v1/auth/test-direct",
     # === ENDPOINTS CACHE PUBLICS (health check) ===
-    "/api/v1/stats-fast/health",  # Health check du cache
-    "/api/v1/stats/test",  # Test du systeme cache (si montes dans main.py)
-    # === AUTH TEMPORAIRE (auth-temp) ===
-    "/api/auth-temp/login",  # Auth temp
-    "/api/auth-temp/me",  # Auth temp
-    "/api/auth-temp/test",  # Auth temp
+    "/api/v1/stats-fast/health",
     # === SYSTEM ENDPOINTS ===
-    "/api/v1/system/health",  # System health
-    "/api/v1/system/metrics",  # System metrics
-    "/api/v1/system/status",  # System status
-    "/api/deployment-debug",  # Deployment debug
-    # === CONVERSATIONS PUBLIQUES ===
-    "/api/v1/conversations/test-public",
-    "/api/v1/conversations/test-public-post",
-    # === EXPERT PUBLICS ===
-    "/api/v1/expert/ask-public",  # Questions expert publiques
+    "/api/v1/system/health",
+    "/api/v1/system/metrics",
+    "/api/v1/system/status",
     # === ENDPOINTS SANS PREFIX /api (compatibilite) ===
-    "/ask-public",
-    "/v1/ask-public",
-    "/system-status",
-    "/debug",
-    "/rag/debug",
-    "/rag/test",
-    "/cors-test",
     "/",
     "/docs",
     "/redoc",
     "/openapi.json",
     "/health",
-    "/metrics",  # Monitoring
-    "/admin/stats",  # Stats admin publiques
-    "/health/complete",  # Health check complet
-    "/deployment-debug",  # Debug deployment
-    # === CACHE ENDPOINTS PUBLICS SANS PREFIX ===
-    "/v1/stats-fast/health",  # Health check cache
-    "/v1/stats/test",  # Test cache
-    "/admin/cache/status",  # Status cache (si public dans main.py)
-    # === AUTH ENDPOINTS SANS PREFIX (compatibilite) ===
-    "/v1/auth/login",  # Version directe
-    "/v1/auth/debug/jwt-config",  # Version directe
-    "/v1/auth/test-direct",  # Version directe
-    "/auth-temp/login",  # Auth temp sans /api
-    "/auth-temp/me",  # Auth temp sans /api
-    "/auth-temp/test",  # Auth temp sans /api
-    # === CONVERSATIONS SANS PREFIX ===
-    "/v1/conversations/test-public",
-    "/v1/conversations/test-public-post",
-    # === EXPERT SANS PREFIX ===
-    "/v1/expert/ask-public",  # Questions expert publiques
+    "/metrics",
 }
 
 # PATTERNS D'ENDPOINTS PROTEGES ETENDUS (authentification ADMIN requise)
 PROTECTED_PATTERNS = [
     # === ENDPOINTS BUSINESS CORE ADMIN UNIQUEMENT ===
-    "/api/v1/billing/",  # Facturation
-    "/api/v1/logging/analytics/",  # Analytics
-    "/api/v1/logging/questions",  # Questions (ancien endpoint)
-    "/api/v1/conversations/admin/",  # ✅ MODIFIÉ - Administration conversations uniquement
-    # RETIRÉ: "/api/v1/conversations/", (trop large - maintenant dans AUTHENTICATED_USER_PATTERNS)
-    # RETIRÉ: "/api/v1/expert/ask",     (utilisateurs ont besoin - maintenant dans AUTHENTICATED_USER_PATTERNS)
-    "/api/v1/admin/",  # Administration
-    "/api/v1/invitations/",  # Invitations
-    # === NOUVEAU: ENDPOINTS USERS (AJOUTE) ===
-    "/api/v1/users/",  # Gestion profils utilisateur
-    "/api/v1/users/profile",  # Profil utilisateur specifique
-    "/api/v1/users/export",  # Export donnees utilisateur
-    "/api/v1/users/debug/",  # Debug endpoints users
-    # === ENDPOINTS CACHE PROTEGES - CORRECTION DES PERMISSIONS ===
-    # Note: stats-fast maintenant accessible aux utilisateurs authentifiés
-    # Seuls stats-admin restent super admin uniquement
-    "/api/v1/stats-admin/",  # Administration cache (super admin uniquement)
-    "/api/v1/stats-admin/force-update/",  # Force update cache (super admin)
-    "/api/v1/stats-admin/cache/",  # Controle cache (super admin)
-    "/api/v1/stats-admin/status",  # Status admin cache (super admin)
-    "/api/admin/cache/force-update",  # Force update dans main.py (super admin)
-    # === ENDPOINTS AUTH PROTEGES CORRIGES - VRAIS ENDPOINTS ===
-    "/api/v1/auth/me",  # Profil utilisateur (VRAI endpoint)
-    "/api/v1/auth/delete-data",  # Suppression donnees RGPD (VRAI endpoint)
-    # === AUTH TEMPORAIRE PROTEGE ===
-    "/api/auth-temp/me",  # Auth temp - profil
-    # === PATTERNS SANS PREFIX (compatibilite) ===
-    "/v1/billing/",
-    "/v1/logging/analytics/",
-    "/v1/logging/questions",  # Questions
-    "/v1/conversations/admin/",  # ✅ MODIFIÉ - Administration conversations uniquement
-    # RETIRÉ: "/v1/conversations/",    (maintenant dans AUTHENTICATED_USER_PATTERNS)
-    # RETIRÉ: "/v1/expert/ask",        (maintenant dans AUTHENTICATED_USER_PATTERNS)
-    "/v1/admin/",
-    "/v1/invitations/",
-    # === NOUVEAU: USERS SANS PREFIX (AJOUTE) ===
-    "/v1/users/",  # Gestion profils utilisateur
-    "/v1/users/profile",  # Profil utilisateur specifique
-    "/v1/users/export",  # Export donnees utilisateur
-    "/v1/users/debug/",  # Debug endpoints users
-    # === CACHE SANS PREFIX - CORRECTION ===
-    "/v1/stats-admin/",  # Admin cache uniquement
-    "/admin/cache/force-update",  # Force update direct
-    "/v1/auth/me",  # Sans /api
-    "/v1/auth/delete-data",  # Sans /api
-    "/auth-temp/me",  # Auth temp sans /api
+    "/api/v1/billing/",
+    "/api/v1/logging/analytics/",
+    "/api/v1/logging/questions",
+    "/api/v1/admin/",
+    "/api/v1/invitations/",
+    # === ENDPOINTS USERS ===
+    "/api/v1/users/",
+    "/api/v1/users/profile",
+    "/api/v1/users/export",
+    "/api/v1/users/debug/",
+    # === ENDPOINTS CACHE PROTEGES ===
+    "/api/v1/stats-admin/",
+    "/api/v1/stats-admin/force-update/",
+    "/api/v1/stats-admin/cache/",
+    "/api/v1/stats-admin/status",
+    # === ENDPOINTS AUTH PROTEGES ===
+    "/api/v1/auth/me",
+    "/api/v1/auth/delete-data",
 ]
 
-# NOUVEAU: PATTERNS POUR UTILISATEURS AUTHENTIFIÉS (niveau intermédiaire)
+# PATTERNS POUR UTILISATEURS AUTHENTIFIÉS (niveau intermédiaire)
 AUTHENTICATED_USER_PATTERNS = [
-    # === ENDPOINTS STATS-FAST - MAINTENANT ACCESSIBLE AUX USERS AUTHENTIFIÉS ===
-    "/api/v1/stats-fast/",  # Tous les endpoints stats-fast
-    "/api/v1/stats-fast/dashboard",  # Dashboard rapide
-    "/api/v1/stats-fast/questions",  # Questions rapides
-    "/api/v1/stats-fast/invitations",  # Invitations rapides
-    "/api/v1/stats-fast/openai-costs/",  # Coûts OpenAI
-    "/api/v1/stats-fast/performance",  # Performance
-    "/api/v1/stats-fast/my-analytics",  # Analytics personnelles
-    # === ✅ NOUVEAUX: ENDPOINTS CONVERSATIONS UTILISATEUR ===
-    "/api/v1/conversations/user/",  # Conversations personnelles
-    "/api/v1/conversations/",  # ✅ AJOUTÉ - Accès général avec vérif dans endpoint
-    # === ✅ NOUVEAUX: ENDPOINTS EXPERT ===
-    "/api/v1/expert/ask",  # ✅ AJOUTÉ - Questions expert
-    # === PATTERNS SANS PREFIX ===
-    "/v1/stats-fast/",  # Stats-fast sans /api
-    "/v1/stats-fast/dashboard",
-    "/v1/stats-fast/questions",
-    "/v1/stats-fast/invitations",
-    "/v1/stats-fast/openai-costs/",
-    "/v1/stats-fast/performance",
-    "/v1/stats-fast/my-analytics",
-    # === ✅ NOUVEAUX: PATTERNS SANS PREFIX ===
-    "/v1/conversations/user/",  # ✅ AJOUTÉ - Conversations utilisateur
-    "/v1/conversations/",  # ✅ AJOUTÉ - Accès général
-    "/v1/expert/ask",  # ✅ AJOUTÉ - Questions expert
-    # === AUTRES ENDPOINTS POUR UTILISATEURS AUTHENTIFIÉS ===
-    "/api/admin/stats",  # Stats basiques (pas admin cache)
+    # === ENDPOINTS STATS-FAST - ACCESSIBLE AUX USERS AUTHENTIFIÉS ===
+    "/api/v1/stats-fast/",
+    "/api/v1/stats-fast/dashboard",
+    "/api/v1/stats-fast/questions",
+    "/api/v1/stats-fast/invitations",
+    "/api/v1/stats-fast/openai-costs/",
+    "/api/v1/stats-fast/performance",
+    "/api/v1/stats-fast/my-analytics",
 ]
 
 # PATTERNS D'ENDPOINTS INEXISTANTS (retourner 404 au lieu de 405)
 NONEXISTENT_PATTERNS = [
-    "/api/v1/analytics/",  # N'existe pas
-    "/api/v1/user/",  # N'existe pas - utiliser /v1/users/
-    "/api/v1/profile/",  # N'existe pas (utiliser /v1/users/profile)
-    "/api/v1/account/",  # N'existe pas (utiliser /v1/users/profile)
-    # ANCIENS ENDPOINTS CACHE INCORRECTS
-    "/api/v1/stats/",  # Ancien - maintenant /v1/stats-fast/ et /v1/stats-admin/
-    "/api/v1/cache/",  # N'existe pas - utiliser /v1/stats-admin/
-    "/api/stats/",  # Ancien pattern
-    # ANCIENS ENDPOINTS AUTH INCORRECTS (n'existent plus)
-    "/api/auth/login",  # Ancien - maintenant /v1/auth/login
-    "/api/auth/register",  # Ancien - n'existe pas
-    "/api/auth/me",  # Ancien - maintenant /v1/auth/me
-    "/api/auth/debug/jwt-config",  # Ancien - maintenant /v1/auth/debug/jwt-config
-    # Patterns sans prefix
-    "/v1/analytics/",
-    "/v1/user/",  # Ancien - utiliser /v1/users/
-    "/v1/profile/",  # Ancien - utiliser /v1/users/profile
-    "/v1/account/",  # Ancien - utiliser /v1/users/profile
-    "/v1/stats/",  # Utiliser /v1/stats-fast/ ou /v1/stats-admin/
-    "/v1/cache/",  # Utiliser /v1/stats-admin/
-    "/stats/",  # Ancien
-    "/cache/",  # Ancien
-    "/auth/login",  # Ancien sans /api
-    "/auth/register",  # Ancien sans /api
-    "/auth/me",  # Ancien sans /api
-    "/auth/debug/jwt-config",  # Ancien sans /api
+    "/api/v1/analytics/",
+    "/api/v1/user/",
+    "/api/v1/profile/",
+    "/api/v1/account/",
+    "/api/v1/stats/",
+    "/api/v1/cache/",
+    "/api/v1/conversations/",
+    "/api/v1/conversations/test-public",
+    "/api/v1/conversations/test-public-post",
+    "/api/v1/conversations/user/",
+    "/api/v1/conversations/admin/",
 ]
 
-# PATTERNS PUBLICS ETENDUS AVEC CACHE (pour la fonction is_public_endpoint)
+# PATTERNS PUBLICS ETENDUS NETTOYES (pour la fonction is_public_endpoint)
 EXTENDED_PUBLIC_PATTERNS = [
     # === DOCUMENTATION ET MONITORING ===
     "/docs",
@@ -210,43 +105,18 @@ EXTENDED_PUBLIC_PATTERNS = [
     "/health",
     "/metrics",
     "/static/",
-    # === AUTH PUBLICS CORRIGES - PATTERNS ===
-    "/v1/auth/login",  # Pattern login
-    "/v1/auth/debug",  # Pattern debug
-    "/v1/auth/test-direct",  # Pattern test
-    "/auth-temp/",  # Pattern auth temporaire
+    # === AUTH PUBLICS PATTERNS ===
+    "/api/v1/auth/login",
+    "/api/v1/auth/debug",
+    "/api/v1/auth/test-direct",
     # === PATTERNS CACHE PUBLICS ===
-    "/v1/stats-fast/health",  # Health check cache
-    "/v1/stats/test",  # Test cache
-    "/admin/cache/status",  # Status cache public (si configure)
-    # === RAG ET TESTS ===
-    "/rag/",
-    "/cors-test",
+    "/api/v1/stats-fast/health",
     # === API PATTERNS ===
     "/api/docs",
     "/api/redoc",
     "/api/openapi.json",
-    "/api/v1/auth/login",  # Pattern login avec /api
-    "/api/v1/auth/debug",  # Pattern debug avec /api
-    "/api/v1/auth/test-direct",  # Pattern test avec /api
-    "/api/auth-temp/",  # Pattern auth temp avec /api
-    # === PATTERNS CACHE AVEC /API ===
-    "/api/v1/stats-fast/health",  # Health cache
-    "/api/v1/stats/test",  # Test cache
-    "/api/admin/cache/status",  # Status cache avec /api
-    "/api/rag/",
-    "/api/cors-test",
-    "/api/v1/system",  # Pattern system
+    "/api/v1/system",
     "/api/v1/debug",
-    "/api/v1/ask-public",
-    "/api/v1/conversations/test-public",
-    "/api/ask-public",
-    "/api/deployment-debug",
-    # === PATTERNS SANS VERSION ===
-    "/v1/conversations/test-public",
-    "/v1/ask-public",
-    "/ask-public",
-    "/deployment-debug",
 ]
 
 
@@ -345,7 +215,7 @@ def is_protected_endpoint(path: str) -> bool:
 
 def is_authenticated_user_endpoint(path: str) -> bool:
     """
-    NOUVEAU: Verifie si un endpoint necessite une authentification utilisateur basique
+    Verifie si un endpoint necessite une authentification utilisateur basique
 
     Args:
         path: Chemin de l'endpoint a verifier
@@ -415,10 +285,10 @@ def create_cors_headers(origin: str = None) -> Dict[str, str]:
     }
 
 
-# Fonctions pour verifier les permissions - CORRIGÉES
+# Fonctions pour verifier les permissions
 def has_admin_permission(user_info: Dict[str, Any]) -> bool:
     """
-    Verifie si l'utilisateur a les permissions admin (pour stats-admin uniquement)
+    Verifie si l'utilisateur a les permissions admin
 
     Args:
         user_info: Informations utilisateur depuis le token
@@ -435,7 +305,7 @@ def has_admin_permission(user_info: Dict[str, Any]) -> bool:
 
 def is_authenticated_user(user_info: Dict[str, Any]) -> bool:
     """
-    NOUVEAU: Verifie si l'utilisateur est authentifié (pour conversations et expert)
+    Verifie si l'utilisateur est authentifié
 
     Args:
         user_info: Informations utilisateur depuis le token
@@ -449,12 +319,12 @@ def is_authenticated_user(user_info: Dict[str, Any]) -> bool:
 
 async def auth_middleware(request: Request, call_next):
     """
-    Middleware d'authentification globale pour l'API Intelia Expert - VERSION 4.2 CORRIGÉE
+    Middleware d'authentification globale pour l'API Intelia Expert - VERSION 4.3 NETTOYÉE
 
-    Logique CORRIGÉE:
-    1. Gere les endpoints inexistants (404)
+    Logique:
+    1. Gere les endpoints inexistants (404) - Inclut maintenant ask-public, rag, conversations, expert
     2. Skip l'auth pour les endpoints publics et OPTIONS
-    3. Authentification basique pour les endpoints utilisateur (conversations, expert/ask)
+    3. Authentification basique pour les endpoints utilisateur (stats-fast)
     4. Authentification admin pour les endpoints protégés (admin uniquement)
     5. Support complet des endpoints users
     6. Laisse passer les autres endpoints (FastAPI gere les 404)
@@ -482,9 +352,22 @@ async def auth_middleware(request: Request, call_next):
     if is_nonexistent_endpoint(request.url.path):
         logger.warning(f"Endpoint inexistant detecte: {request.url.path}")
 
-        # Message special pour les anciens endpoints
+        # Messages spécialisés selon le type d'endpoint supprimé
         suggestion = "Verifiez l'URL ou consultez /docs pour les endpoints disponibles"
-        if "/stats/" in request.url.path and "/stats-fast/" not in request.url.path:
+
+        if any(
+            x in request.url.path
+            for x in ["/ask-public", "/rag/", "/conversations/", "/expert/"]
+        ):
+            if "/ask-public" in request.url.path:
+                suggestion = "Les endpoints ask-public ont été supprimés. Utilisez les endpoints system ou auth appropriés."
+            elif "/rag/" in request.url.path:
+                suggestion = "Les endpoints RAG ont été supprimés. Consultez /docs pour les alternatives."
+            elif "/conversations/" in request.url.path:
+                suggestion = "Les endpoints conversations ont été supprimés. L'API se concentre maintenant sur system, auth, users, stats, billing."
+            elif "/expert/" in request.url.path:
+                suggestion = "Les endpoints expert ont été supprimés. Le service expert est externalisé."
+        elif "/stats/" in request.url.path and "/stats-fast/" not in request.url.path:
             suggestion = "Les endpoints stats sont maintenant sur /v1/stats-fast/ (utilisateurs authentifiés) et /v1/stats-admin/ (admin uniquement)"
         elif "/cache/" in request.url.path:
             suggestion = (
@@ -494,11 +377,7 @@ async def auth_middleware(request: Request, call_next):
             suggestion = (
                 "Les endpoints auth sont maintenant sur /v1/auth/ et non /auth/"
             )
-        elif (
-            "/user/" in request.url.path
-            or "/profile/" in request.url.path
-            or "/account/" in request.url.path
-        ):
+        elif any(x in request.url.path for x in ["/user/", "/profile/", "/account/"]):
             suggestion = (
                 "Les endpoints utilisateur sont sur /v1/users/ (ex: /v1/users/profile)"
             )
@@ -510,14 +389,16 @@ async def auth_middleware(request: Request, call_next):
                 "error": "endpoint_not_found",
                 "path": request.url.path,
                 "suggestion": suggestion,
-                "available_stats_endpoints": (
-                    [
-                        "/v1/stats-fast/* (utilisateurs authentifiés)",
-                        "/v1/stats-admin/* (admin uniquement)",
-                    ]
-                    if "/stats" in request.url.path
-                    else None
-                ),
+                "available_endpoints": [
+                    "/v1/system/* (system endpoints)",
+                    "/v1/auth/* (authentication)",
+                    "/v1/users/* (user management)",
+                    "/v1/stats-fast/* (statistics - authenticated users)",
+                    "/v1/stats-admin/* (statistics - admin only)",
+                    "/v1/billing/* (billing - admin only)",
+                    "/v1/invitations/* (invitations - admin only)",
+                    "/v1/logging/* (logging - admin only)",
+                ],
             },
             headers=create_cors_headers(request_origin),
         )
@@ -543,7 +424,7 @@ async def auth_middleware(request: Request, call_next):
 
         return response
 
-    # ETAPE 3: NOUVEAU - Verifier l'auth pour les endpoints utilisateur authentifié (conversations, expert)
+    # ETAPE 3: Verifier l'auth pour les endpoints utilisateur authentifié
     if is_authenticated_user_endpoint(request.url.path):
         try:
             logger.debug(f"Authenticated user endpoint detected: {request.url.path}")
@@ -760,39 +641,28 @@ def debug_middleware_config() -> Dict[str, Any]:
         "sample_public_endpoints": list(PUBLIC_ENDPOINTS)[:10],
         "sample_protected_patterns": PROTECTED_PATTERNS[:10],
         "sample_authenticated_user_patterns": AUTHENTICATED_USER_PATTERNS[:10],
-        "users_endpoints": {
-            "protected_patterns": [
-                "/api/v1/users/",
-                "/api/v1/users/profile",
-                "/api/v1/users/export",
-                "/api/v1/users/debug/",
-            ]
-        },
-        "conversations_and_expert_endpoints": {
-            "authenticated_user_patterns": [
-                "/api/v1/conversations/user/",
-                "/api/v1/conversations/",
-                "/api/v1/expert/ask",
-            ]
-        },
-        "stats_endpoints": {
-            "authenticated_user_patterns": [
-                "/api/v1/stats-fast/",
-                "/api/v1/stats-fast/dashboard",
-                "/api/v1/stats-fast/questions",
-                "/api/v1/stats-fast/invitations",
-            ],
-            "admin_only_patterns": [
-                "/api/v1/stats-admin/",
-                "/api/admin/cache/force-update",
-            ],
-        },
-        "middleware_version": "4.2-fixed-conversations-expert-permissions",
+        "supported_services": [
+            "System (health, metrics, status)",
+            "Auth (login, JWT, OAuth)",
+            "Users (profiles, GDPR)",
+            "Stats (fast cache + admin)",
+            "Billing (invoicing + OpenAI)",
+            "Invitations (team management)",
+            "Logging/Analytics (usage tracking)",
+        ],
+        "removed_services": [
+            "ask-public endpoints",
+            "RAG endpoints (/rag/*)",
+            "Conversations endpoints (/conversations/*)",
+            "Expert endpoints (/expert/*)",
+        ],
+        "middleware_version": "4.3-cleaned-endpoints",
         "key_changes": [
-            "FIXED: conversations and expert/ask endpoints now accessible to authenticated users",
-            "SEPARATED: admin endpoints (/conversations/admin/) still require admin permissions",
-            "IMPROVED: Better endpoint classification for user vs admin access",
-            "MAINTAINED: Security checks within endpoints remain intact",
-            "ADDED: Support for expert/ask-public as public endpoint",
+            "REMOVED: All ask-public endpoints",
+            "REMOVED: All RAG endpoints (/rag/debug, /rag/test)",
+            "REMOVED: All conversations endpoints (/conversations/*)",
+            "REMOVED: All expert endpoints (/expert/*)",
+            "FOCUSED: API now concentrates on core business services",
+            "MAINTAINED: All authentication and authorization logic intact",
         ],
     }
