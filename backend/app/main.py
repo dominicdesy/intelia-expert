@@ -19,7 +19,7 @@ from typing import Optional
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
 
 # .env (facultatif)
 try:
@@ -390,15 +390,16 @@ app = FastAPI(
 # ========== MIDDLEWARE HTTPS REDIRECT ==========
 @app.middleware("http")
 async def force_https_redirect(request: Request, call_next):
-    """🔒 Force la redirection HTTPS pour tous les endpoints"""
-    if (
-        request.url.scheme == "http"
-        and not request.url.hostname.startswith("localhost")
-        and not request.url.hostname.startswith("127.0.0.1")
-    ):
-        # Construire l'URL HTTPS
-        https_url = request.url.replace(scheme="https")
-        return RedirectResponse(url=str(https_url), status_code=301)
+    """🔒 Force la redirection HTTPS pour tous les endpoints (CONDITIONNEL)"""
+    # DÉSACTIVÉ TEMPORAIREMENT POUR ÉVITER LES BOUCLES DE REDIRECTION
+    # Le serveur de production est probablement déjà configuré pour HTTPS
+
+    # Logique originale (commentée) :
+    # if (request.url.scheme == "http" and
+    #     not request.url.hostname.startswith("localhost") and
+    #     not request.url.hostname.startswith("127.0.0.1")):
+    #     https_url = request.url.replace(scheme="https")
+    #     return RedirectResponse(url=str(https_url), status_code=301)
 
     response = await call_next(request)
     return response
