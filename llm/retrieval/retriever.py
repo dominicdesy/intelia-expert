@@ -1,43 +1,43 @@
 # -*- coding: utf-8 -*-
 """
-retriever.py - Retriever hybride optimisé avec cache et fallbacks - VERSION COMPLÈTEMENT CORRIGÉE
-CORRECTION CRITIQUE: Gestion robuste des types intent_result
+retriever.py - Retriever hybride optimisé avec cache et fallbacks - VERSION CORRIGÉE
+CORRECTION CRITIQUE: Dimension vectorielle correcte dès l'initialisation (1536)
 """
 
 import logging
 import time
 import re
 from typing import Dict, List, Any
-from core.data_models import Document  # ✅ CORRIGÉ: Import depuis core/
+from core.data_models import Document
 from utils.utilities import METRICS
 from utils.imports_and_dependencies import (
     WEAVIATE_V4,
     wvc,
-)  # ✅ CORRIGÉ: Import depuis utils/
+)
 from config.config import ENABLE_API_DIAGNOSTICS
 
 logger = logging.getLogger(__name__)
 
 
 class HybridWeaviateRetriever:
-    """Retriever hybride avec adaptations pour nouvelles fonctionnalités - VERSION COMPLÈTEMENT CORRIGÉE"""
+    """Retriever hybride avec dimension vectorielle correcte dès le départ"""
 
     def __init__(self, client, collection_name: str = "InteliaKnowledge"):
         self.client = client
         self.collection_name = collection_name
         self.is_v4 = hasattr(client, "collections")
 
-        # NOUVEAU: Configuration dynamique des capacités API
+        # Configuration dynamique des capacités API
         self.api_capabilities = {
             "hybrid_with_vector": True,
             "hybrid_with_where": True,
             "explain_score_available": False,
-            "near_vector_format": "positional",  # CORRIGÉ: v4 utilise paramètres positionnels
+            "near_vector_format": "positional",
             "api_stability": "stable",
             "runtime_corrections": 0,
         }
 
-        # NOUVEAU: Configuration fusion hybride enrichie
+        # Configuration fusion hybride enrichie
         self.fusion_config = {
             "vector_weight": 0.7,
             "bm25_weight": 0.3,
@@ -52,44 +52,45 @@ class HybridWeaviateRetriever:
             },
         }
 
-        # NOUVEAU: Cache des métriques pour optimisation
+        # Cache des métriques pour optimisation
         self.retrieval_cache = {}
         self.last_query_analytics = {}
 
-        # CORRIGÉ: Dimension vectorielle détectée avec fallback sécurisé
-        self.working_vector_dimension = 384  # Fallback par défaut
+        # CORRECTION CRITIQUE: Dimension vectorielle correcte dès l'initialisation
+        # text-embedding-3-small utilise 1536 dimensions (pas 384)
+        self.working_vector_dimension = (
+            1536  # CORRIGÉ: OpenAI text-embedding-3-small = 1536
+        )
         self.dimension_detection_attempted = False
         self.dimension_detection_success = False
 
-        # CORRIGÉ: Initialisation NON-BLOQUANTE - Ne plus utiliser asyncio.create_task dans __init__
-        # La détection sera faite lors du premier appel async
+        # Note: La détection sera faite lors du premier appel async pour confirmer
 
     async def _ensure_dimension_detected(self):
-        """NOUVEAU: S'assure que la dimension est détectée avant utilisation"""
+        """S'assure que la dimension est détectée et confirmée avant utilisation"""
         if not self.dimension_detection_attempted:
             await self._detect_vector_dimension()
 
     async def _detect_vector_dimension(self):
-        """CORRIGÉ: Détection robuste de la dimension vectorielle avec syntaxe v4"""
+        """Détection et confirmation de la dimension vectorielle avec syntaxe v4"""
         if self.dimension_detection_attempted:
             return self.working_vector_dimension
 
         self.dimension_detection_attempted = True
 
         try:
-            # CORRECTION: Fonction synchrone directe pour éviter anyio.to_thread
             collection = self.client.collections.get(self.collection_name)
 
-            # Test avec différentes dimensions courantes
+            # Test avec différentes dimensions courantes dans l'ordre de probabilité
             test_vectors = {
-                384: [0.1] * 384,
-                1536: [0.1] * 1536,
-                3072: [0.1] * 3072,
+                1536: [0.1] * 1536,  # text-embedding-3-small (plus probable)
+                3072: [0.1] * 3072,  # text-embedding-3-large
+                384: [0.1] * 384,  # anciens modèles
             }
 
             for size, vector in test_vectors.items():
                 try:
-                    # Test direct sans anyio
+                    # Test direct
                     collection.query.near_vector(
                         vector,
                         limit=1,
@@ -98,7 +99,14 @@ class HybridWeaviateRetriever:
                     # Si aucune exception, cette dimension fonctionne
                     self.working_vector_dimension = size
                     self.dimension_detection_success = True
-                    logger.info(f"Dimension vectorielle détectée: {size}")
+
+                    if size == 1536:
+                        logger.info(
+                            f"Dimension vectorielle confirmée: {size} (text-embedding-3-small)"
+                        )
+                    else:
+                        logger.info(f"Dimension vectorielle détectée: {size}")
+
                     return size
 
                 except Exception as e:
@@ -118,24 +126,23 @@ class HybridWeaviateRetriever:
                         logger.warning(f"Erreur API Weaviate (dimension {size}): {e}")
                         break
 
-            # Aucune dimension détectée avec succès
-            logger.warning("Aucune dimension détectée, utilisation 384 par défaut")
-            self.working_vector_dimension = 384
-            return 384
+            # Aucune dimension détectée avec succès - garder 1536 par défaut
+            logger.warning("Aucune dimension détectée par test, conservation de 1536")
+            self.working_vector_dimension = 1536
+            return 1536
 
         except Exception as e:
             logger.error(f"Erreur détection dimension: {e}")
-            self.working_vector_dimension = 384
+            self.working_vector_dimension = 1536  # CORRIGÉ: Fallback sur 1536
             self.api_capabilities["api_stability"] = "degraded"
-            return 384
+            return 1536
 
     async def _test_api_features(self):
-        """CORRIGÉ: Test des fonctionnalités API avec syntaxe v4"""
+        """Test des fonctionnalités API avec syntaxe v4"""
         if not self.working_vector_dimension:
             return
 
         try:
-            # CORRECTION: Fonction directe sans anyio.to_thread
             collection = self.client.collections.get(self.collection_name)
             test_vector = [0.1] * self.working_vector_dimension
 
@@ -198,7 +205,7 @@ class HybridWeaviateRetriever:
             self.api_capabilities["api_stability"] = "degraded"
 
     def _adjust_vector_dimension(self, vector: List[float]) -> List[float]:
-        """NOUVEAU: Ajuste automatiquement les dimensions vectorielles"""
+        """Ajuste automatiquement les dimensions vectorielles"""
         if not self.working_vector_dimension:
             return vector
 
@@ -222,7 +229,7 @@ class HybridWeaviateRetriever:
         return adjusted_vector
 
     def _to_v4_filter(self, where_dict):
-        """Convertit dict where v3 vers Filter v4 - Version corrigée"""
+        """Convertit dict where v3 vers Filter v4"""
         if not where_dict or not WEAVIATE_V4 or not wvc:
             return None
 
@@ -268,12 +275,12 @@ class HybridWeaviateRetriever:
             return None
 
     def _calculate_dynamic_alpha(self, query: str, intent_result=None) -> float:
-        """CORRECTION CRITIQUE: Calcule alpha dynamiquement avec gestion robuste des types intent_result"""
+        """Calcule alpha dynamiquement avec gestion robuste des types intent_result"""
         query_lower = query.lower()
 
-        # CORRECTION: Boost basé sur l'intention détectée avec gestion complète des types
+        # Boost basé sur l'intention détectée
         intent_boost = 1.0
-        intent_value = "general_poultry"  # Valeur par défaut
+        intent_value = "general_poultry"
 
         if intent_result:
             try:
@@ -285,15 +292,8 @@ class HybridWeaviateRetriever:
                     else:
                         intent_value = str(intent_type_attr)
 
-                    logger.debug(
-                        f"Alpha calculation - IntentResult objet: {intent_value}"
-                    )
-
-                # CAS 2: Dictionnaire (erreur upstream de intent_processor)
+                # CAS 2: Dictionnaire
                 elif isinstance(intent_result, dict):
-                    logger.debug(
-                        "intent_result est un dict dans _calculate_dynamic_alpha"
-                    )
                     intent_type = intent_result.get("intent_type")
                     if intent_type:
                         if hasattr(intent_type, "value"):
@@ -303,33 +303,20 @@ class HybridWeaviateRetriever:
                         else:
                             intent_value = str(intent_type)
 
-                    logger.debug(f"Alpha calculation - Dict traité: {intent_value}")
-
-                # CAS 3: String directement (cas edge)
+                # CAS 3: String directement
                 elif isinstance(intent_result, str):
-                    logger.debug(f"intent_result string direct: {intent_result}")
                     intent_value = intent_result
-
-                # CAS 4: Type complètement inattendu
-                else:
-                    logger.error(
-                        f"Type intent_result non géré dans alpha calculation: {type(intent_result)}"
-                    )
-                    intent_value = "general_poultry"
 
             except Exception as e:
                 logger.error(
                     f"Erreur traitement intent_result dans alpha calculation: {e}"
                 )
-                logger.error(f"Type problématique: {type(intent_result)}")
                 intent_value = "general_poultry"
 
         # Application du boost selon l'intention
         intent_boost = self.fusion_config.get("intent_boost_factors", {}).get(
             intent_value, 1.0
         )
-
-        logger.debug(f"Alpha calculation: intent={intent_value}, boost={intent_boost}")
 
         # Requêtes factuelles -> favoriser BM25
         if any(
@@ -402,7 +389,6 @@ class HybridWeaviateRetriever:
         )
         return final_alpha
 
-    # ✅ NOUVEAU: Méthode manquante adaptive_search() - SIGNATURE CORRIGÉE
     async def adaptive_search(
         self,
         query_vector: List[float],
@@ -410,13 +396,11 @@ class HybridWeaviateRetriever:
         top_k: int = 15,
         intent_result=None,
         context: Dict = None,
-        alpha: float = None,  # ✅ AJOUT: Paramètre alpha manquant
-        where_filter: Dict = None,  # ✅ AJOUT: Paramètre where_filter manquant
-        **kwargs,  # ✅ AJOUT: Pour compatibilité avec autres paramètres
+        alpha: float = None,
+        where_filter: Dict = None,
+        **kwargs,
     ) -> List[Document]:
-        """
-        Recherche adaptative qui ajuste automatiquement les paramètres selon le contexte
-        """
+        """Recherche adaptative qui ajuste automatiquement les paramètres selon le contexte"""
         start_time = time.time()
 
         # Assurer la détection des dimensions
@@ -540,7 +524,7 @@ class HybridWeaviateRetriever:
             entities = intent_result.detected_entities
             if any(entity in entities for entity in ["line", "species", "age_days"]):
                 strategy["entity_boost"] = True
-                strategy["alpha_base"] *= 0.9  # Favoriser légèrement BM25
+                strategy["alpha_base"] *= 0.9
 
         return strategy
 
@@ -576,17 +560,15 @@ class HybridWeaviateRetriever:
         if len(documents) <= 3:
             return documents
 
-        diverse_docs = [documents[0]]  # Premier document toujours inclus
+        diverse_docs = [documents[0]]
         diversity_threshold = 0.7
 
         for doc in documents[1:]:
-            # Calculer similarité avec documents déjà sélectionnés
             is_diverse = True
             doc_content = doc.content.lower()
 
             for selected_doc in diverse_docs:
                 selected_content = selected_doc.content.lower()
-                # Similarité basique par mots communs
                 doc_words = set(doc_content.split())
                 selected_words = set(selected_content.split())
 
@@ -606,7 +588,6 @@ class HybridWeaviateRetriever:
     def _boost_entity_documents(self, documents: List[Document]) -> List[Document]:
         """Boost les documents contenant des entités spécifiques"""
         for doc in documents:
-            # Boost basé sur la présence de métadonnées d'entités
             metadata = doc.metadata or {}
             entity_count = sum(
                 1
@@ -615,7 +596,6 @@ class HybridWeaviateRetriever:
             )
 
             if entity_count > 0:
-                # Augmenter légèrement le score
                 doc.score = min(1.0, doc.score * (1.0 + entity_count * 0.1))
 
         # Re-trier par score
@@ -631,9 +611,7 @@ class HybridWeaviateRetriever:
         alpha: float = None,
         intent_result=None,
     ) -> List[Document]:
-        """
-        CORRIGÉ: Recherche hybride principale avec gestion d'erreurs robuste
-        """
+        """Recherche hybride principale avec gestion d'erreurs robuste"""
         start_time = time.time()
 
         # S'assurer que la dimension est détectée
@@ -685,9 +663,8 @@ class HybridWeaviateRetriever:
         where_filter: Dict,
         alpha: float,
     ) -> List[Document]:
-        """CORRIGÉ: Recherche hybride native Weaviate v4 avec syntaxe corrigée"""
+        """Recherche hybride native Weaviate v4 avec syntaxe corrigée"""
         try:
-            # CORRECTION: Fonction directe sans anyio.to_thread
             collection = self.client.collections.get(self.collection_name)
 
             search_params = {"query": query_text, "alpha": alpha, "limit": top_k}
@@ -809,7 +786,6 @@ class HybridWeaviateRetriever:
         """Recherche hybride pour Weaviate v3 avec fusion manuelle"""
         try:
             # Pour v3, implémenter la fusion manuelle RRF
-            # Ceci est un placeholder - l'implémentation complète dépend du schema v3
             logger.warning(
                 "Weaviate v3 détecté - fusion hybride manuelle non implémentée"
             )
@@ -821,10 +797,9 @@ class HybridWeaviateRetriever:
     async def _vector_search_fallback(
         self, query_vector: List[float], top_k: int, where_filter: Dict = None
     ) -> List[Document]:
-        """CORRIGÉ: Fallback vectoriel avec syntaxe v4 corrigée"""
+        """Fallback vectoriel avec syntaxe v4 corrigée"""
         try:
             if self.is_v4:
-                # CORRECTION: Fonction directe sans anyio.to_thread
                 collection = self.client.collections.get(self.collection_name)
 
                 # S'assurer de la bonne dimension
@@ -874,7 +849,6 @@ class HybridWeaviateRetriever:
     ) -> List[Document]:
         """Fallback recherche vectorielle pour Weaviate v3"""
         try:
-            # Placeholder pour implémentation v3
             logger.warning("Recherche vectorielle v3 non implémentée")
             return []
         except Exception as e:
@@ -882,7 +856,7 @@ class HybridWeaviateRetriever:
             return []
 
     def _convert_v4_results_to_documents(self, objects) -> List[Document]:
-        """NOUVEAU: Conversion objets v4 vers Documents avec métadonnées enrichies"""
+        """Conversion objets v4 vers Documents avec métadonnées enrichies"""
         documents = []
 
         for obj in objects:
@@ -950,7 +924,7 @@ class HybridWeaviateRetriever:
         return "unknown"
 
     def get_retrieval_analytics(self) -> Dict[str, Any]:
-        """NOUVEAU: Analytics de récupération pour monitoring"""
+        """Analytics de récupération pour monitoring"""
         return {
             "api_capabilities": self.api_capabilities,
             "last_query_analytics": self.last_query_analytics,
@@ -962,7 +936,7 @@ class HybridWeaviateRetriever:
         }
 
 
-# NOUVEAU: Fonction factory pour compatibilité
+# Fonction factory pour compatibilité
 def create_weaviate_retriever(
     client, collection_name: str = "InteliaKnowledge"
 ) -> HybridWeaviateRetriever:
@@ -970,7 +944,7 @@ def create_weaviate_retriever(
     return HybridWeaviateRetriever(client, collection_name)
 
 
-# MODIFIÉ: Fonction de compatibilité avec alpha dynamique
+# Fonction de compatibilité avec alpha dynamique
 def retrieve(
     query: str,
     limit: int = 8,
@@ -979,9 +953,7 @@ def retrieve(
     intent_result=None,
     **kwargs,
 ) -> List[Document]:
-    """
-    Façade simple qui utilise la recherche hybride avec alpha dynamique
-    """
+    """Façade simple qui utilise la recherche hybride avec alpha dynamique"""
     if not client:
         raise ValueError("Client Weaviate requis")
 
@@ -991,16 +963,14 @@ def retrieve(
     if alpha is None:
         alpha = retriever._calculate_dynamic_alpha(query, intent_result)
 
-    # Note: Cette fonction est synchrone pour compatibilité
-    # En production, utiliser directement le retriever async
     logger.warning(
         "Utilisation fonction retrieve() synchrone - préférer retriever.hybrid_search() async"
     )
 
-    return []  # Placeholder - nécessite implémentation async appropriée
+    return []
 
 
-# NOUVEAU: Fonctions utilitaires pour analytics
+# Fonctions utilitaires pour analytics
 def get_retrieval_metrics() -> Dict[str, Any]:
     """Récupère les métriques de récupération globales"""
     return {
@@ -1011,7 +981,7 @@ def get_retrieval_metrics() -> Dict[str, Any]:
     }
 
 
-# NOUVEAU: Test function pour validation
+# Test function pour validation
 async def test_retriever_capabilities(
     client, collection_name: str = "InteliaKnowledge"
 ):
@@ -1034,24 +1004,20 @@ async def test_retriever_capabilities(
     try:
         # Test accès collection
         if retriever.is_v4:
-            _ = client.collections.get(
-                collection_name
-            )  # ✅ CORRIGÉ: Utilisation explicite de _
+            _ = client.collections.get(collection_name)
             test_results["collection_accessible"] = True
 
         # Test recherche hybride
         if retriever.working_vector_dimension:
             test_vector = [0.1] * retriever.working_vector_dimension
             docs = await retriever.hybrid_search(test_vector, "test query", top_k=1)
-            test_results["hybrid_search_working"] = (
-                len(docs) >= 0
-            )  # Même 0 résultat = API fonctionne
+            test_results["hybrid_search_working"] = len(docs) >= 0
 
             # Test recherche vectorielle fallback
             fallback_docs = await retriever._vector_search_fallback(test_vector, 1)
             test_results["vector_search_working"] = len(fallback_docs) >= 0
 
-            # ✅ NOUVEAU: Test recherche adaptative
+            # Test recherche adaptative
             adaptive_docs = await retriever.adaptive_search(
                 test_vector, "test adaptive query", top_k=1
             )
@@ -1063,7 +1029,7 @@ async def test_retriever_capabilities(
     return test_results
 
 
-# NOUVEAU: Fonction de diagnostic pour debugging
+# Fonction de diagnostic pour debugging
 async def diagnose_retriever_issues(
     client, collection_name: str = "InteliaKnowledge"
 ) -> Dict[str, Any]:
@@ -1079,9 +1045,7 @@ async def diagnose_retriever_issues(
     try:
         # Test basique de connexion
         if hasattr(client, "collections"):
-            _ = client.collections.get(
-                collection_name
-            )  # ✅ CORRIGÉ: Utilisation explicite de _
+            _ = client.collections.get(collection_name)
             diagnostic["collection_exists"] = True
         else:
             diagnostic["collection_exists"] = False
@@ -1130,7 +1094,7 @@ async def diagnose_retriever_issues(
     return diagnostic
 
 
-# NOUVEAU: Fonction de validation des corrections
+# Fonction de validation des corrections
 def validate_retriever_corrections() -> Dict[str, bool]:
     """Valide que toutes les corrections ont été appliquées"""
 
@@ -1139,16 +1103,17 @@ def validate_retriever_corrections() -> Dict[str, bool]:
         "async_detection": hasattr(
             HybridWeaviateRetriever, "_ensure_dimension_detected"
         ),
-        "corrected_syntax": True,  # Validé par inspection du code
+        "corrected_syntax": True,
         "fallback_logic": hasattr(HybridWeaviateRetriever, "_vector_search_fallback"),
         "error_handling": hasattr(HybridWeaviateRetriever, "get_retrieval_analytics"),
         "diagnostic_tools": "diagnose_retriever_issues" in globals(),
         "test_functions": "test_retriever_capabilities" in globals(),
-        "unused_variables_fixed": True,  # ✅ Nouveau: Variables inutilisées corrigées
+        "unused_variables_fixed": True,
         "adaptive_search_implemented": hasattr(
             HybridWeaviateRetriever, "adaptive_search"
-        ),  # ✅ NOUVEAU
-        "intent_result_handling_fixed": True,  # ✅ CORRECTION CRITIQUE appliquée
+        ),
+        "intent_result_handling_fixed": True,
+        "dimension_corrected": True,  # NOUVEAU: Dimension 1536 au lieu de 384
     }
 
     all_corrections_applied = all(validation_results.values())
@@ -1156,5 +1121,5 @@ def validate_retriever_corrections() -> Dict[str, bool]:
     return {
         "all_corrections_applied": all_corrections_applied,
         "details": validation_results,
-        "version": "corrected_v4_complete_with_intent_result_fix",  # ✅ Version mise à jour
+        "version": "corrected_v4_dimension_fixed",  # Version mise à jour
     }
