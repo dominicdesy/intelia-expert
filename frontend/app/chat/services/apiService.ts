@@ -224,7 +224,7 @@ interface EnhancedAIResponse {
 
 /**
  * FONCTION STREAMING SSE AGENT - VERSION ENRICHIE COMPLÈTE
- * Gère l'appel vers /api/chat/stream avec support complet des événements Agent
+ * Gère l'appel vers /api/chat avec support complet des événements Agent
  */
 async function streamAIResponseInternal(
   tenant_id: string,
@@ -242,7 +242,7 @@ async function streamAIResponseInternal(
     user_context,
   };
 
-  console.log("[apiService] Streaming Agent vers /api/chat/stream:", {
+  console.log("[apiService] Streaming Agent vers /api/chat:", {
     tenant_id,
     lang,
     message_preview: message.substring(0, 50) + "...",
@@ -251,7 +251,7 @@ async function streamAIResponseInternal(
   });
 
   // Headers SSE complets avec Cache-Control
-  const response = await fetch("/api/chat/stream", {
+  const response = await fetch("/api/chat", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
