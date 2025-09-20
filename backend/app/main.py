@@ -1,7 +1,7 @@
 #
 # -*- coding: utf-8 -*-
 #
-# app/main.py - VERSION 4.3 NETTOYÉE + HTTPS REDIRECT
+# app/main.py - VERSION 4.3.1 CORRIGÉE - HTTPS FORCÉ + HEALTH ENDPOINTS PARFAITS
 # Architecture concentrée sur: System, Auth, Users, Stats, Billing, Invitations, Logging
 #
 
@@ -19,7 +19,7 @@ from typing import Optional
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 # .env (facultatif)
 try:
@@ -378,7 +378,7 @@ async def lifespan(app: FastAPI):
 # === FASTAPI APP ===
 app = FastAPI(
     title="Intelia Expert API",
-    version="4.3.0",
+    version="4.3.1",
     root_path="/api",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -387,19 +387,23 @@ app = FastAPI(
 )
 
 
-# ========== MIDDLEWARE HTTPS REDIRECT ==========
+# ========== MIDDLEWARE HTTPS REDIRECT CORRIGÉ ==========
 @app.middleware("http")
 async def force_https_redirect(request: Request, call_next):
-    """🔒 Force la redirection HTTPS pour tous les endpoints (CONDITIONNEL)"""
-    # DÉSACTIVÉ TEMPORAIREMENT POUR ÉVITER LES BOUCLES DE REDIRECTION
-    # Le serveur de production est probablement déjà configuré pour HTTPS
+    """🔒 Force la redirection HTTPS pour tous les endpoints en production"""
 
-    # Logique originale (commentée) :
-    # if (request.url.scheme == "http" and
-    #     not request.url.hostname.startswith("localhost") and
-    #     not request.url.hostname.startswith("127.0.0.1")):
-    #     https_url = request.url.replace(scheme="https")
-    #     return RedirectResponse(url=str(https_url), status_code=301)
+    # Vérifier si on est en environnement de production
+    is_production = (
+        not request.url.hostname.startswith("localhost")
+        and not request.url.hostname.startswith("127.0.0.1")
+        and not request.url.hostname.startswith("0.0.0.0")
+    )
+
+    # Forcer HTTPS uniquement en production et si la requête arrive en HTTP
+    if is_production and request.url.scheme == "http":
+        https_url = request.url.replace(scheme="https")
+        logger.info(f"Redirection HTTPS: {request.url} -> {https_url}")
+        return RedirectResponse(url=str(https_url), status_code=301)
 
     response = await call_next(request)
     return response
@@ -706,7 +710,7 @@ async def root():
     if uptime_hours < 2:  # Si moins de 2 heures de uptime
         return {
             "status": "running",
-            "version": "4.3.0",
+            "version": "4.3.1",
             "uptime_hours": round(uptime_hours, 2),
             "environment": os.getenv("ENV", "production"),
             "health": "ready",
@@ -721,7 +725,7 @@ async def root():
 
     return {
         "status": "running",
-        "version": "4.3.0",
+        "version": "4.3.1",
         "environment": os.getenv("ENV", "production"),
         "database": bool(getattr(app.state, "supabase", None)),
         "postgresql": bool(os.getenv("DATABASE_URL")),
@@ -739,7 +743,7 @@ async def root():
             "invitations",
             "logging",
         ],
-        "deployment_version": "v4.3.0-simplified-architecture",
+        "deployment_version": "v4.3.1-https-fixed-architecture",
     }
 
 
