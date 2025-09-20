@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
  * Construction dynamique de l'URL du streaming endpoint
  */
 const LLM_BACKEND_URL = process.env.NEXT_PUBLIC_LLM_BACKEND_URL ?? "https://expert.intelia.com/llm";
-const LLM_STREAM_URL = `${LLM_BACKEND_URL}/chat/stream`;
+const LLM_STREAM_URL = `${LLM_BACKEND_URL}/chat`;
 
 /**
  * En-têtes SSE conseillés pour éviter tout buffering intermédiaire.
