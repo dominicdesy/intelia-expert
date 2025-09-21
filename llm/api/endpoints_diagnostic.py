@@ -2,12 +2,13 @@
 """
 api/endpoints_diagnostic.py - Endpoints de diagnostic Weaviate et RAG
 Nouveaux endpoints pour diagnostiquer les problèmes de récupération
+VERSION CORRIGÉE - Problèmes de collections résolus
 """
 
 import time
 import asyncio
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
@@ -27,8 +28,66 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
         """Helper pour récupérer un service"""
         return services.get(name)
 
+    def get_collection_safely(weaviate_client, collection_name: str):
+        """Récupère une collection de manière sécurisée"""
+        try:
+            if hasattr(weaviate_client, "collections"):
+                return weaviate_client.collections.get(collection_name)
+            return None
+        except Exception as e:
+            logger.warning(f"Erreur récupération collection {collection_name}: {e}")
+            return None
+
+    async def get_collections_info(weaviate_client) -> Dict[str, Any]:
+        """Récupère les informations des collections de manière robuste"""
+        collections_info = {}
+        collection_names = []
+
+        try:
+            if not hasattr(weaviate_client, "collections"):
+                return {"error": "Weaviate v3 non supporté"}
+
+            # Récupérer la liste des collections
+            collections_data = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: weaviate_client.collections.list_all()
+            )
+
+            # Traiter selon le type de retour
+            if isinstance(collections_data, dict):
+                collection_names = list(collections_data.keys())
+            else:
+                collection_names = list(collections_data)
+
+            # Récupérer les infos de chaque collection
+            for collection_name in collection_names:
+                try:
+                    collection = weaviate_client.collections.get(collection_name)
+                    count_result = await asyncio.get_event_loop().run_in_executor(
+                        None,
+                        lambda c=collection: c.aggregate.over_all(total_count=True),
+                    )
+                    doc_count = getattr(count_result, "total_count", 0)
+
+                    collections_info[collection_name] = {
+                        "document_count": doc_count,
+                        "name": collection_name,
+                        "accessible": True,
+                    }
+
+                except Exception as e:
+                    collections_info[collection_name] = {
+                        "error": str(e),
+                        "document_count": 0,
+                        "accessible": False,
+                    }
+
+        except Exception as e:
+            return {"error": f"Erreur récupération collections: {e}"}
+
+        return collections_info
+
     # ========================================================================
-    # NOUVEAUX DIAGNOSTICS WEAVIATE - POUR RÉSOUDRE LE PROBLÈME ROSS 308
+    # DIAGNOSTICS WEAVIATE CORRIGÉS
     # ========================================================================
 
     @router.get(f"{BASE_PATH}/diagnostic/weaviate-status")
@@ -71,63 +130,21 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
 
                 if not is_ready:
                     result["issues"].append("Weaviate n'est pas ready")
-                    return result
+                    return safe_serialize_for_json(result)
 
-                # Récupérer les collections
-                if hasattr(weaviate_client, "collections"):
-                    # Weaviate v4
-                    result["weaviate_version"] = "v4"
+                # Récupérer les collections avec la fonction corrigée
+                result["weaviate_version"] = "v4"
+                collections_info = await get_collections_info(weaviate_client)
 
-                    # CORRECTION: Récupérer les noms des collections d'abord
-                    try:
-                        collections_dict = (
-                            await asyncio.get_event_loop().run_in_executor(
-                                None, lambda: weaviate_client.collections.list_all()
-                            )
-                        )
-
-                        # Traiter selon le type de retour
-                        if isinstance(collections_dict, dict):
-                            collection_names = list(collections_dict.keys())
-                        else:
-                            # Si c'est déjà une liste de noms
-                            collection_names = list(collections_dict)
-
-                        for collection_name in collection_names:
-                            try:
-                                # Récupérer l'objet collection
-                                collection = weaviate_client.collections.get(
-                                    collection_name
-                                )
-
-                                count_result = (
-                                    await asyncio.get_event_loop().run_in_executor(
-                                        None,
-                                        lambda: collection.aggregate.over_all(
-                                            total_count=True
-                                        ),
-                                    )
-                                )
-                                doc_count = getattr(count_result, "total_count", 0)
-
-                                result["collections"][collection_name] = {
-                                    "document_count": doc_count,
-                                    "name": collection_name,
-                                }
-                                result["total_documents"] += doc_count
-
-                            except Exception as e:
-                                result["collections"][collection_name] = {
-                                    "error": str(e),
-                                    "document_count": 0,
-                                }
-                                result["issues"].append(
-                                    f"Erreur collection {collection_name}: {e}"
-                                )
-
-                    except Exception as e:
-                        result["issues"].append(f"Erreur récupération collections: {e}")
-                        result["weaviate_version"] = "v4-error"
+                if "error" in collections_info:
+                    result["issues"].append(collections_info["error"])
+                    result["weaviate_version"] = "v4-error"
+                else:
+                    result["collections"] = collections_info
+                    result["total_documents"] = sum(
+                        info.get("document_count", 0)
+                        for info in collections_info.values()
+                    )
 
                 # Vérifications de santé
                 if result["total_documents"] == 0:
@@ -197,14 +214,14 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
                     }
                 else:
                     result["issues"].append("Échec génération embedding")
-                    return result
+                    return safe_serialize_for_json(result)
 
                 # Recherche hybride sans filtre WHERE
                 documents = await retriever.hybrid_search(
                     query_vector=embedding,
                     query_text=query,
                     top_k=limit,
-                    where_filter=None,  # Pas de filtre pour ce test
+                    where_filter=None,
                     alpha=0.5,
                 )
 
@@ -281,9 +298,12 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
 
     @router.get(f"{BASE_PATH}/diagnostic/document-metadata")
     async def document_metadata(
-        limit: int = Query(20, description="Nombre d'échantillons")
+        limit: int = Query(20, description="Nombre d'échantillons"),
+        collection_name: Optional[str] = Query(
+            None, description="Collection spécifique"
+        ),
     ):
-        """Analyse des métadonnées des documents pour diagnostiquer l'indexation"""
+        """Analyse des métadonnées des documents pour diagnostiquer l'indexation - VERSION CORRIGÉE"""
         try:
             health_monitor = get_service("health_monitor")
             if not health_monitor:
@@ -304,151 +324,182 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
                 "document_types_found": [],
                 "metadata_analysis": {},
                 "issues": [],
+                "collection_used": None,
             }
 
             try:
                 if hasattr(weaviate_client, "collections"):
-                    # Trouver la collection principale
-                    collections = await asyncio.get_event_loop().run_in_executor(
-                        None, lambda: list(weaviate_client.collections.list_all())
-                    )
+                    # Récupérer les informations des collections
+                    collections_info = await get_collections_info(weaviate_client)
 
-                    main_collection = None
-                    for collection in collections:
-                        try:
-                            count = await asyncio.get_event_loop().run_in_executor(
-                                None,
-                                lambda: collection.aggregate.over_all(total_count=True),
-                            )
-                            if hasattr(count, "total_count") and count.total_count > 10:
-                                main_collection = collection
-                                break
-                        except Exception:
-                            continue
+                    if "error" in collections_info:
+                        result["issues"].append(collections_info["error"])
+                        return safe_serialize_for_json(result)
 
-                    if main_collection:
-                        # Échantillonner des documents
-                        sample_docs = await asyncio.get_event_loop().run_in_executor(
-                            None,
-                            lambda: main_collection.query.fetch_objects(limit=limit),
+                    # Choisir la collection à analyser
+                    target_collection = None
+                    target_collection_name = None
+
+                    if collection_name:
+                        # Collection spécifiée par l'utilisateur
+                        target_collection = get_collection_safely(
+                            weaviate_client, collection_name
                         )
+                        target_collection_name = collection_name
+                    else:
+                        # Trouver la collection avec le plus de documents
+                        best_collection_name = None
+                        max_docs = 0
 
-                        if sample_docs and sample_docs.objects:
-                            for obj in sample_docs.objects:
-                                props = obj.properties or {}
+                        for coll_name, coll_info in collections_info.items():
+                            doc_count = coll_info.get("document_count", 0)
+                            if doc_count > max_docs:
+                                max_docs = doc_count
+                                best_collection_name = coll_name
 
-                                doc_analysis = {
-                                    "uuid": (
-                                        str(obj.uuid)
-                                        if hasattr(obj, "uuid")
-                                        else "unknown"
+                        if best_collection_name and max_docs > 0:
+                            target_collection = get_collection_safely(
+                                weaviate_client, best_collection_name
+                            )
+                            target_collection_name = best_collection_name
+
+                    result["collection_used"] = target_collection_name
+
+                    if target_collection:
+                        # Échantillonner des documents
+                        try:
+                            sample_docs = (
+                                await asyncio.get_event_loop().run_in_executor(
+                                    None,
+                                    lambda: target_collection.query.fetch_objects(
+                                        limit=limit
                                     ),
-                                    "genetic_line": props.get("geneticLine", "NOT_SET"),
-                                    "title": props.get("title", "NOT_SET"),
-                                    "document_type": props.get(
-                                        "documentType", "NOT_SET"
+                                )
+                            )
+
+                            if sample_docs and sample_docs.objects:
+                                for obj in sample_docs.objects:
+                                    props = obj.properties or {}
+
+                                    doc_analysis = {
+                                        "uuid": (
+                                            str(obj.uuid)
+                                            if hasattr(obj, "uuid")
+                                            else "unknown"
+                                        ),
+                                        "genetic_line": props.get(
+                                            "geneticLine", "NOT_SET"
+                                        ),
+                                        "title": props.get("title", "NOT_SET"),
+                                        "document_type": props.get(
+                                            "documentType", "NOT_SET"
+                                        ),
+                                        "category": props.get("category", "NOT_SET"),
+                                        "language": props.get("language", "NOT_SET"),
+                                        "has_performance_data": props.get(
+                                            "hasPerformanceData", False
+                                        ),
+                                        "content_length": len(props.get("content", "")),
+                                        "all_properties": list(props.keys()),
+                                    }
+
+                                    result["sample_documents"].append(doc_analysis)
+
+                                    # Collecter les valeurs uniques
+                                    gl = props.get("geneticLine")
+                                    if gl and gl not in result["genetic_lines_found"]:
+                                        result["genetic_lines_found"].append(gl)
+
+                                    dt = props.get("documentType")
+                                    if dt and dt not in result["document_types_found"]:
+                                        result["document_types_found"].append(dt)
+
+                                # Analyse des métadonnées
+                                result["metadata_analysis"] = {
+                                    "total_samples": len(result["sample_documents"]),
+                                    "genetic_lines_variety": len(
+                                        result["genetic_lines_found"]
                                     ),
-                                    "category": props.get("category", "NOT_SET"),
-                                    "language": props.get("language", "NOT_SET"),
-                                    "has_performance_data": props.get(
-                                        "hasPerformanceData", False
+                                    "document_types_variety": len(
+                                        result["document_types_found"]
                                     ),
-                                    "content_length": len(props.get("content", "")),
-                                    "all_properties": list(props.keys()),
+                                    "has_ross_308": any(
+                                        "ross" in str(gl).lower()
+                                        and "308" in str(gl).lower()
+                                        for gl in result["genetic_lines_found"]
+                                    ),
+                                    "has_performance_docs": any(
+                                        doc.get("has_performance_data", False)
+                                        for doc in result["sample_documents"]
+                                    ),
+                                    "missing_genetic_line": sum(
+                                        1
+                                        for doc in result["sample_documents"]
+                                        if doc["genetic_line"] == "NOT_SET"
+                                    ),
+                                    "empty_titles": sum(
+                                        1
+                                        for doc in result["sample_documents"]
+                                        if doc["title"] == "NOT_SET" or not doc["title"]
+                                    ),
+                                    "average_content_length": (
+                                        sum(
+                                            doc["content_length"]
+                                            for doc in result["sample_documents"]
+                                        )
+                                        / len(result["sample_documents"])
+                                        if result["sample_documents"]
+                                        else 0
+                                    ),
                                 }
 
-                                result["sample_documents"].append(doc_analysis)
+                                # Diagnostics spécifiques
+                                analysis = result["metadata_analysis"]
 
-                                # Collecter les valeurs uniques
-                                gl = props.get("geneticLine")
-                                if gl and gl not in result["genetic_lines_found"]:
-                                    result["genetic_lines_found"].append(gl)
-
-                                dt = props.get("documentType")
-                                if dt and dt not in result["document_types_found"]:
-                                    result["document_types_found"].append(dt)
-
-                            # Analyse des métadonnées
-                            result["metadata_analysis"] = {
-                                "total_samples": len(result["sample_documents"]),
-                                "genetic_lines_variety": len(
-                                    result["genetic_lines_found"]
-                                ),
-                                "document_types_variety": len(
-                                    result["document_types_found"]
-                                ),
-                                "has_ross_308": any(
-                                    "ross" in str(gl).lower()
-                                    and "308" in str(gl).lower()
-                                    for gl in result["genetic_lines_found"]
-                                ),
-                                "has_performance_docs": any(
-                                    doc.get("has_performance_data", False)
-                                    for doc in result["sample_documents"]
-                                ),
-                                "missing_genetic_line": sum(
-                                    1
-                                    for doc in result["sample_documents"]
-                                    if doc["genetic_line"] == "NOT_SET"
-                                ),
-                                "empty_titles": sum(
-                                    1
-                                    for doc in result["sample_documents"]
-                                    if doc["title"] == "NOT_SET" or not doc["title"]
-                                ),
-                                "average_content_length": (
-                                    sum(
-                                        doc["content_length"]
-                                        for doc in result["sample_documents"]
+                                if not analysis["has_ross_308"]:
+                                    result["issues"].append(
+                                        "CRITIQUE: Aucun document Ross 308 trouvé dans l'échantillon"
                                     )
-                                    / len(result["sample_documents"])
-                                    if result["sample_documents"]
-                                    else 0
-                                ),
-                            }
 
-                            # Diagnostics spécifiques
-                            analysis = result["metadata_analysis"]
+                                if not analysis["has_performance_docs"]:
+                                    result["issues"].append(
+                                        "ATTENTION: Aucun document de performance trouvé"
+                                    )
 
-                            if not analysis["has_ross_308"]:
+                                if (
+                                    analysis["missing_genetic_line"]
+                                    > len(result["sample_documents"]) * 0.1
+                                ):
+                                    result["issues"].append(
+                                        f"PROBLÈME: {analysis['missing_genetic_line']} documents sans geneticLine"
+                                    )
+
+                                if (
+                                    analysis["empty_titles"]
+                                    > len(result["sample_documents"]) * 0.1
+                                ):
+                                    result["issues"].append(
+                                        f"PROBLÈME: {analysis['empty_titles']} documents sans titre"
+                                    )
+
+                                if analysis["average_content_length"] < 100:
+                                    result["issues"].append(
+                                        "ATTENTION: Contenu des documents très court en moyenne"
+                                    )
+
+                            else:
                                 result["issues"].append(
-                                    "CRITIQUE: Aucun document Ross 308 trouvé dans l'échantillon"
+                                    "Impossible de récupérer des échantillons de documents"
                                 )
 
-                            if not analysis["has_performance_docs"]:
-                                result["issues"].append(
-                                    "ATTENTION: Aucun document de performance trouvé"
-                                )
-
-                            if (
-                                analysis["missing_genetic_line"]
-                                > len(result["sample_documents"]) * 0.1
-                            ):
-                                result["issues"].append(
-                                    f"PROBLÈME: {analysis['missing_genetic_line']} documents sans geneticLine"
-                                )
-
-                            if (
-                                analysis["empty_titles"]
-                                > len(result["sample_documents"]) * 0.1
-                            ):
-                                result["issues"].append(
-                                    f"PROBLÈME: {analysis['empty_titles']} documents sans titre"
-                                )
-
-                            if analysis["average_content_length"] < 100:
-                                result["issues"].append(
-                                    "ATTENTION: Contenu des documents très court en moyenne"
-                                )
-
-                        else:
+                        except Exception as e:
                             result["issues"].append(
-                                "Impossible de récupérer des échantillons de documents"
+                                f"Erreur échantillonnage documents: {e}"
                             )
+
                     else:
-                        result["issues"].append(
-                            "Aucune collection avec des documents trouvée"
-                        )
+                        result["issues"].append("Aucune collection accessible trouvée")
+
                 else:
                     result["issues"].append(
                         "API Weaviate v3 non supportée pour cette analyse"
@@ -466,11 +517,9 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
 
     @router.get(f"{BASE_PATH}/diagnostic/search-specific")
     async def search_specific_document(
-        document: str = Query(
-            ..., description="Terme spécifique à chercher (ex: Ross308, Performance)"
-        )
+        document: str = Query(..., description="Terme spécifique à chercher")
     ):
-        """Recherche un document spécifique pour diagnostiquer pourquoi il n'est pas trouvé"""
+        """Recherche un document spécifique pour diagnostiquer pourquoi il n'est pas trouvé - VERSION CORRIGÉE"""
         try:
             health_monitor = get_service("health_monitor")
             if not health_monitor:
@@ -488,7 +537,7 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
                 "recommendations": [],
             }
 
-            # Test 1: Recherche par contenu via embedding
+            # Test 1: Recherche par embedding
             try:
                 retriever = safe_get_attribute(rag_engine, "retriever")
                 embedder = safe_get_attribute(rag_engine, "embedder")
@@ -501,7 +550,7 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
                             query_text=document,
                             top_k=10,
                             where_filter=None,
-                            alpha=0.3,  # Plus vectoriel
+                            alpha=0.3,
                         )
 
                         result["tests_performed"].append("embedding_search")
@@ -523,14 +572,13 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
             # Test 2: Recherche BM25 pure
             try:
                 if retriever:
-                    # Recherche avec alpha=1 (BM25 pur)
-                    dummy_embedding = [0.0] * 1536  # Embedding dummy
+                    dummy_embedding = [0.0] * 1536
                     docs = await retriever.hybrid_search(
                         query_vector=dummy_embedding,
                         query_text=document,
                         top_k=10,
                         where_filter=None,
-                        alpha=1.0,  # BM25 pur
+                        alpha=1.0,
                     )
 
                     result["tests_performed"].append("bm25_search")
@@ -544,35 +592,73 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
             except Exception as e:
                 result["results"]["bm25_search"] = {"error": str(e)}
 
-            # Test 3: Recherche directe Weaviate avec Where
+            # Test 3: Recherche directe Weaviate avec Where - VERSION CORRIGÉE
             try:
                 weaviate_client = safe_get_attribute(rag_engine, "weaviate_client")
                 if weaviate_client and hasattr(weaviate_client, "collections"):
-                    collections = await asyncio.get_event_loop().run_in_executor(
-                        None, lambda: list(weaviate_client.collections.list_all())
-                    )
+                    collections_info = await get_collections_info(weaviate_client)
 
-                    if collections:
-                        main_collection = collections[
-                            0
-                        ]  # Prendre la première collection
-
-                        # Recherche avec WHERE sur le contenu
-                        docs = await asyncio.get_event_loop().run_in_executor(
-                            None,
-                            lambda: main_collection.query.fetch_objects(
-                                where=main_collection.query.Filter.by_property(
-                                    "content"
-                                ).like(f"*{document}*"),
-                                limit=5,
+                    if "error" not in collections_info and collections_info:
+                        # Prendre la première collection accessible
+                        collection_name = next(
+                            (
+                                name
+                                for name, info in collections_info.items()
+                                if info.get("accessible", False)
+                                and info.get("document_count", 0) > 0
                             ),
+                            None,
                         )
 
-                        result["tests_performed"].append("weaviate_where_search")
+                        if collection_name:
+                            collection = get_collection_safely(
+                                weaviate_client, collection_name
+                            )
+                            if collection:
+                                try:
+                                    docs = await asyncio.get_event_loop().run_in_executor(
+                                        None,
+                                        lambda: collection.query.fetch_objects(
+                                            where=collection.query.Filter.by_property(
+                                                "content"
+                                            ).like(f"*{document}*"),
+                                            limit=5,
+                                        ),
+                                    )
+
+                                    result["tests_performed"].append(
+                                        "weaviate_where_search"
+                                    )
+                                    result["results"]["weaviate_where_search"] = {
+                                        "documents_found": (
+                                            len(docs.objects)
+                                            if docs and hasattr(docs, "objects")
+                                            else 0
+                                        ),
+                                        "direct_match": (
+                                            len(docs.objects) > 0
+                                            if docs and hasattr(docs, "objects")
+                                            else False
+                                        ),
+                                        "collection_used": collection_name,
+                                    }
+                                except Exception as e:
+                                    result["results"]["weaviate_where_search"] = {
+                                        "error": str(e)
+                                    }
+                            else:
+                                result["results"]["weaviate_where_search"] = {
+                                    "error": "Collection inaccessible"
+                                }
+                        else:
+                            result["results"]["weaviate_where_search"] = {
+                                "error": "Aucune collection utilisable trouvée"
+                            }
+                    else:
                         result["results"]["weaviate_where_search"] = {
-                            "documents_found": len(docs.objects) if docs else 0,
-                            "direct_match": len(docs.objects) > 0 if docs else False,
+                            "error": "Erreur récupération collections"
                         }
+
             except Exception as e:
                 result["results"]["weaviate_where_search"] = {"error": str(e)}
 
@@ -591,7 +677,7 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
 
             if embedding_found == 0 and bm25_found == 0 and where_found == 0:
                 result["recommendations"].append(
-                    "CRITIQUE: Document introuvable par toutes les méthodes - possiblement absent de Weaviate"
+                    "CRITIQUE: Document introuvable par toutes les méthodes - possiblement absent"
                 )
             elif where_found > 0 and embedding_found == 0:
                 result["recommendations"].append(
@@ -613,7 +699,7 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
             return {"error": str(e), "timestamp": time.time()}
 
     # ========================================================================
-    # DIAGNOSTIC RAG COMPLET (Version Simplifiée)
+    # AUTRES ENDPOINTS INCHANGÉS
     # ========================================================================
 
     @router.get(f"{BASE_PATH}/diagnostic/rag")
@@ -622,7 +708,7 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
         start_time = time.time()
 
         result = {
-            "diagnostic_version": "2.1.0-modular",
+            "diagnostic_version": "2.2.0-modular-fixed",
             "timestamp": time.time(),
             "tests": [],
             "summary": {},
@@ -631,7 +717,6 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
         }
 
         try:
-            # Tests essentiels en parallèle
             test_tasks = [
                 _test_weaviate_basic(services),
                 _test_embedding_basic(services),
@@ -652,7 +737,6 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
                 else:
                     result["tests"].append(test_result)
 
-            # Analyse globale
             successful_tests = sum(
                 1 for test in result["tests"] if test.get("success", False)
             )
@@ -670,12 +754,10 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
                 ),
             }
 
-            # Collecter toutes les issues
             for test in result["tests"]:
                 if "issues" in test:
                     result["issues"].extend(test["issues"])
 
-            # Recommandations basées sur les résultats
             if result["summary"]["success_rate"] < 0.5:
                 result["recommendations"].append(
                     "CRITIQUE: Taux de réussite faible - vérifier la configuration Weaviate"
@@ -708,7 +790,6 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
             if not rag_engine:
                 return {"status": "error", "message": "RAG engine non disponible"}
 
-            # Test simple
             result = await rag_engine.generate_response(
                 query="poids Ross 308", tenant_id="quick_test"
             )
@@ -741,12 +822,12 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
 
 
 # ============================================================================
-# FONCTIONS D'AIDE POUR LES TESTS
+# FONCTIONS D'AIDE POUR LES TESTS - VERSIONS CORRIGÉES
 # ============================================================================
 
 
 async def _test_weaviate_basic(services: Dict) -> Dict:
-    """Test basique de connexion Weaviate"""
+    """Test basique de connexion Weaviate - VERSION CORRIGÉE"""
     result = {
         "name": "weaviate_connection",
         "success": False,
@@ -770,7 +851,6 @@ async def _test_weaviate_basic(services: Dict) -> Dict:
             result["issues"].append("Client Weaviate manquant")
             return result
 
-        # Test connexion
         is_ready = await asyncio.get_event_loop().run_in_executor(
             None, weaviate_client.is_ready
         )
@@ -779,19 +859,28 @@ async def _test_weaviate_basic(services: Dict) -> Dict:
             result["success"] = True
             result["details"]["is_ready"] = True
 
-            # Compter documents si possible
             try:
                 if hasattr(weaviate_client, "collections"):
-                    collections = await asyncio.get_event_loop().run_in_executor(
-                        None, lambda: list(weaviate_client.collections.list_all())
+                    collections_data = await asyncio.get_event_loop().run_in_executor(
+                        None, lambda: weaviate_client.collections.list_all()
                     )
 
+                    if isinstance(collections_data, dict):
+                        collection_names = list(collections_data.keys())
+                    else:
+                        collection_names = list(collections_data)
+
                     total_docs = 0
-                    for collection in collections:
+                    for collection_name in collection_names:
                         try:
+                            collection = weaviate_client.collections.get(
+                                collection_name
+                            )
                             count = await asyncio.get_event_loop().run_in_executor(
                                 None,
-                                lambda: collection.aggregate.over_all(total_count=True),
+                                lambda c=collection: c.aggregate.over_all(
+                                    total_count=True
+                                ),
                             )
                             total_docs += getattr(count, "total_count", 0)
                         except Exception:
@@ -800,6 +889,7 @@ async def _test_weaviate_basic(services: Dict) -> Dict:
                     result["details"]["total_documents"] = total_docs
                     if total_docs == 0:
                         result["issues"].append("Aucun document dans Weaviate")
+
             except Exception as e:
                 result["issues"].append(f"Erreur comptage documents: {e}")
         else:
@@ -836,7 +926,6 @@ async def _test_embedding_basic(services: Dict) -> Dict:
             result["issues"].append("Embedder manquant")
             return result
 
-        # Test embedding
         embedding = await embedder.get_embedding("test Ross 308")
         if embedding and len(embedding) > 0:
             result["success"] = True
@@ -877,7 +966,6 @@ async def _test_search_ross308(services: Dict) -> Dict:
             result["issues"].append("Retriever ou Embedder manquant")
             return result
 
-        # Test recherche Ross 308
         test_queries = [
             "Ross 308 performance objectives",
             "Ross 308 broiler weight table",
@@ -901,7 +989,6 @@ async def _test_search_ross308(services: Dict) -> Dict:
 
                     found_documents += len(docs)
 
-                    # Vérifier si on trouve des documents de performance
                     for doc in docs:
                         title = getattr(doc, "metadata", {}).get("title", "")
                         content = getattr(doc, "content", "")
