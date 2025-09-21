@@ -285,7 +285,14 @@ class IntelligentRRFFusion:
                     entities = {}
                     intent_confidence = 0.5
 
-                # CAS 4: Type complètement inattendu
+                # CAS 4: Booléen - CORRECTION PRINCIPALE
+                elif isinstance(intent_result, bool):
+                    logger.debug(f"intent_result booléen reçu: {intent_result}")
+                    entities = {}
+                    intent_confidence = 0.0 if not intent_result else 0.3
+                    intent_type_value = "general_poultry"
+
+                # CAS 5: Type complètement inattendu
                 else:
                     logger.error(f"Type intent_result non géré: {type(intent_result)}")
                     logger.error(
@@ -293,6 +300,7 @@ class IntelligentRRFFusion:
                     )
                     entities = {}
                     intent_confidence = 0.0
+                    intent_type_value = "general_poultry"
 
             except Exception as e:
                 logger.error(f"Erreur critique extraction intent_result: {e}")
