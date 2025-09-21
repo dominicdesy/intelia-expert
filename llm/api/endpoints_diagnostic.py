@@ -616,16 +616,12 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
                             )
                             if collection:
                                 try:
+                                    # Utiliser bm25 search au lieu de fetch_objects avec where
                                     docs = (
                                         await asyncio.get_event_loop().run_in_executor(
                                             None,
-                                            lambda: collection.query.fetch_objects(
-                                                where={
-                                                    "path": ["content"],
-                                                    "operator": "Like",
-                                                    "valueText": f"*{document}*",
-                                                },
-                                                limit=5,
+                                            lambda: collection.query.bm25(
+                                                query=document, limit=5
                                             ),
                                         )
                                     )
@@ -645,6 +641,7 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
                                             else False
                                         ),
                                         "collection_used": collection_name,
+                                        "search_method": "bm25_direct",
                                     }
                                 except Exception as e:
                                     result["results"]["weaviate_where_search"] = {
