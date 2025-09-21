@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-rag_engine.py - RAG Engine Enhanced avec LangSmith et RRF Intelligent
-Version corrigée pour éliminer l'erreur 'bool' object is not subscriptable
+rag_engine.py - RAG Engine Enhanced avec Système RAG JSON Intégré
+Version 4.0 - Intégration complète du pipeline JSON avicole
 """
 
 import os
@@ -10,12 +10,29 @@ import logging
 import time
 import numpy as np
 import httpx
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from collections import defaultdict
 from utils.utilities import validate_intent_result
 
 # CORRECTION CRITIQUE: Définir logger AVANT toute utilisation
 logger = logging.getLogger(__name__)
+
+# NOUVEAUX IMPORTS: Système RAG JSON
+try:
+    from rag.extractors.json_extractor import JSONExtractor
+    from rag.extractors.table_extractor import TableExtractor
+    from rag.extractors.genetic_line_extractor import GeneticLineExtractor
+    from rag.models.validation import JSONValidator, ValidationRequest
+    from rag.models.ingestion import IngestionPipeline, IngestionRequest
+    from rag.core.hybrid_search import HybridSearchEngine
+    from rag.core.document_processor import DocumentProcessor
+    from rag.core.cache_manager import EnhancedCacheManager
+
+    RAG_JSON_SYSTEM_AVAILABLE = True
+    logger.info("✅ Système RAG JSON importé avec succès")
+except ImportError as e:
+    RAG_JSON_SYSTEM_AVAILABLE = False
+    logger.warning(f"⚠️ Système RAG JSON non disponible: {e}")
 
 # CORRECTION: Imports explicites au lieu des star imports dangereux
 try:
@@ -150,12 +167,12 @@ except ImportError as e:
 
 
 class InteliaRAGEngine:
-    """RAG Engine principal avec LangSmith et RRF Intelligent"""
+    """RAG Engine principal avec système JSON avicole intégré"""
 
     def __init__(self, openai_client: AsyncOpenAI = None):
         self.openai_client = openai_client or self._build_openai_client()
 
-        # Composants principaux
+        # Composants principaux existants
         self.cache_manager = None
         self.embedder = None
         self.retriever = None
@@ -166,6 +183,16 @@ class InteliaRAGEngine:
         self.ood_detector = None
         self.guardrails = None
         self.weaviate_client = None
+
+        # === NOUVEAUX COMPOSANTS RAG JSON ===
+        self.json_extractor = None
+        self.table_extractor = None
+        self.genetic_line_extractor = None
+        self.json_validator = None
+        self.ingestion_pipeline = None
+        self.hybrid_search_engine = None
+        self.document_processor = None
+        self.enhanced_cache_manager = None
 
         # === NOUVEAU: LANGSMITH CLIENT ===
         self.langsmith_client = None
@@ -186,7 +213,7 @@ class InteliaRAGEngine:
         self.is_initialized = False
         self.degraded_mode = False
 
-        # Stats étendues avec LangSmith et RRF
+        # Stats étendues avec système JSON
         self.optimization_stats = {
             "cache_hits": 0,
             "cache_misses": 0,
@@ -212,7 +239,12 @@ class InteliaRAGEngine:
             "weaviate_capabilities": {},
             "dynamic_ood_threshold_adjustments": 0,
             "conversation_context_usage": 0,
-            # NOUVEAU: Stats cache
+            # NOUVEAU: Stats système JSON
+            "json_validations": 0,
+            "json_ingestions": 0,
+            "table_extractions": 0,
+            "genetic_line_detections": 0,
+            "performance_metrics_processed": 0,
             "cache_sets": 0,
         }
 
@@ -226,13 +258,11 @@ class InteliaRAGEngine:
             return AsyncOpenAI(api_key=OPENAI_API_KEY)
 
     async def initialize(self):
-        """Initialisation avec LangSmith et RRF Intelligent"""
+        """Initialisation complète avec système JSON intégré"""
         if self.is_initialized:
             return
 
-        logger.info(
-            "Initialisation RAG Engine Enhanced avec LangSmith + RRF Intelligent"
-        )
+        logger.info("🚀 Initialisation RAG Engine v4.0 avec système JSON avicole")
 
         if not OPENAI_AVAILABLE or not WEAVIATE_AVAILABLE:
             self.degraded_mode = True
@@ -241,165 +271,47 @@ class InteliaRAGEngine:
             return
 
         try:
-            logger.debug("Étape 1: Initialisation Cache Redis externe...")
-
-            # 1. Cache Redis externe avec protection renforcée
-            if CACHE_ENABLED and EXTERNAL_CACHE_AVAILABLE:
-                try:
-                    from cache.redis_cache_manager import RAGCacheManager
-
-                    self.cache_manager = RAGCacheManager()
-                    await self.cache_manager.initialize()
-                    if self.cache_manager.enabled:
-                        self.optimization_stats["external_cache_used"] = True
-                        logger.info("Cache Redis externe activé")
-                except ImportError as e:
-                    logger.warning(f"RAGCacheManager non disponible: {e}")
-                    self.cache_manager = None
-                except Exception as e:
-                    logger.warning(f"Cache Redis externe échoué: {e}")
-                    self.cache_manager = None
-
-            logger.debug("Étape 2: Connexion Weaviate...")
-
-            # 2. Connexion Weaviate CORRIGÉE
-            try:
-                await self._connect_weaviate()
-            except Exception as e:
-                logger.warning(f"Connexion Weaviate échouée: {e}")
-
-            logger.debug("Étape 3: Composants de base...")
-
-            # 3. Composants de base - CORRECTION CRITIQUE: Passer openai_client au détecteur OOD
-            try:
-                self.embedder = OpenAIEmbedder(self.openai_client, self.cache_manager)
-                self.memory = ConversationMemory(self.openai_client)
-                # CORRECTION: Passer le client OpenAI pour la traduction multilingue
-                self.ood_detector = EnhancedOODDetector(
-                    blocked_terms_path=None, openai_client=self.openai_client
+            # === ÉTAPE 1: SYSTÈME JSON AVICOLE ===
+            if RAG_JSON_SYSTEM_AVAILABLE:
+                await self._initialize_json_system()
+            else:
+                logger.warning(
+                    "⚠️ Système JSON non disponible, fonctionnalités limitées"
                 )
-                logger.debug("Composants de base initialisés")
-            except Exception as e:
-                logger.error(f"Erreur composants de base: {e}")
-                raise
 
-            logger.debug("Étape 4: Retriever hybride...")
+            # === ÉTAPE 2: CACHE SYSTÈME ===
+            logger.debug("Étape 2: Initialisation Cache Redis externe...")
+            await self._initialize_cache_system()
 
-            # 4. Retriever hybride avec RRF intelligent
-            if self.weaviate_client:
-                try:
-                    self.retriever = HybridWeaviateRetriever(self.weaviate_client)
+            # === ÉTAPE 3: CONNEXION WEAVIATE ===
+            logger.debug("Étape 3: Connexion Weaviate...")
+            await self._connect_weaviate()
 
-                    # === NOUVEAU: Initialisation RRF Intelligent ===
-                    if (
-                        INTELLIGENT_RRF_AVAILABLE
-                        and ENABLE_INTELLIGENT_RRF
-                        and self.cache_manager
-                        and self.cache_manager.enabled
-                    ):
-                        try:
-                            self.intelligent_rrf = IntelligentRRFFusion(
-                                redis_client=self.cache_manager.client,
-                                intent_processor=None,  # Sera défini plus tard
-                            )
-                            logger.info("RRF Intelligent initialisé")
-                            if hasattr(self.retriever, "set_intelligent_rrf"):
-                                self.retriever.set_intelligent_rrf(self.intelligent_rrf)
-                                logger.info("✅ RRF Intelligent lié au retriever")
-                        except Exception as e:
-                            logger.error(f"Erreur RRF Intelligent: {e}")
+            # === ÉTAPE 4: COMPOSANTS DE BASE ===
+            logger.debug("Étape 4: Composants de base...")
+            await self._initialize_base_components()
 
-                    # Diagnostic API Weaviate
-                    if ENABLE_API_DIAGNOSTICS:
-                        try:
-                            await self.retriever.diagnose_weaviate_api()
-                            self.optimization_stats["weaviate_capabilities"] = (
-                                self.retriever.api_capabilities.copy()
-                            )
-                        except Exception as e:
-                            logger.warning(f"Diagnostic Weaviate échoué: {e}")
+            # === ÉTAPE 5: RETRIEVER HYBRIDE ===
+            logger.debug("Étape 5: Retriever hybride...")
+            await self._initialize_hybrid_retriever()
 
-                except Exception as e:
-                    logger.warning(f"Retriever hybride échoué: {e}")
+            # === ÉTAPE 6: GÉNÉRATEUR DE RÉPONSES ===
+            logger.debug("Étape 6: Générateur de réponses...")
+            await self._initialize_generator()
 
-            logger.debug("Étape 5: Générateur de réponses...")
+            # === ÉTAPE 7: INTENT PROCESSOR ===
+            logger.debug("Étape 7: Intent processor...")
+            await self._initialize_intent_processor()
 
-            # 5. Générateur de réponses
-            try:
-                self.generator = EnhancedResponseGenerator(
-                    self.openai_client, self.cache_manager
-                )
-            except Exception as e:
-                logger.error(f"Erreur générateur: {e}")
-                raise
-
-            logger.debug("Étape 6: Intent processor...")
-
-            # 6. Intent processor avec gestion d'erreurs améliorée
-            try:
-                from processing.intent_processor import create_intent_processor
-                import os
-                from pathlib import Path
-
-                # Tentative de résolution du chemin de configuration
-                config_paths = [
-                    "config/intents.json",
-                    Path(__file__).parent.parent / "config" / "intents.json",
-                    Path.cwd() / "config" / "intents.json",
-                    os.path.join(
-                        os.path.dirname(__file__), "..", "config", "intents.json"
-                    ),
-                ]
-
-                config_found = None
-                for path in config_paths:
-                    path_obj = Path(path)
-                    if path_obj.exists():
-                        config_found = str(path_obj.resolve())
-                        logger.debug(f"Configuration intents trouvée: {config_found}")
-                        break
-
-                if config_found:
-                    self.intent_processor = create_intent_processor(config_found)
-                    logger.info(
-                        f"Intent processor initialisé avec configuration: {config_found}"
-                    )
-                else:
-                    logger.warning(
-                        f"Aucun fichier intents.json trouvé dans {[str(p) for p in config_paths]}"
-                    )
-                    logger.info("Utilisation de la configuration par défaut intégrée")
-                    self.intent_processor = create_intent_processor()
-
-                # Connecter RRF Intelligent à Intent Processor
-                if self.intelligent_rrf:
-                    self.intelligent_rrf.intent_processor = self.intent_processor
-
-                logger.info("Intent processor initialisé avec succès")
-
-            except Exception as e:
-                logger.warning(f"Intent processor non disponible: {e}")
-                # Continuer sans intent processor
-                self.intent_processor = None
-
-            # 7. Guardrails
+            # === ÉTAPE 8: GUARDRAILS ===
             if GUARDRAILS_AVAILABLE:
-                try:
-                    from security.advanced_guardrails import (
-                        create_response_guardrails,
-                    )
-
-                    self.guardrails = create_response_guardrails(
-                        self.openai_client, GUARDRAILS_LEVEL
-                    )
-                except Exception as e:
-                    logger.warning(f"Guardrails échoué: {e}")
+                await self._initialize_guardrails()
 
             self.is_initialized = True
-            logger.info("RAG Engine Enhanced initialisé avec succès")
+            logger.info("✅ RAG Engine v4.0 initialisé avec succès")
 
         except Exception as e:
-            logger.error(f"Erreur initialisation RAG Engine: {e}")
+            logger.error(f"❌ Erreur initialisation RAG Engine: {e}")
             logger.error(f"Type d'erreur: {type(e).__name__}")
             import traceback
 
@@ -407,164 +319,307 @@ class InteliaRAGEngine:
             self.degraded_mode = True
             self.is_initialized = True
 
-    async def _connect_weaviate(self):
-        """Connexion Weaviate corrigée avec authentification et configuration OpenAI"""
+    async def _initialize_json_system(self):
+        """Initialise le système RAG JSON complet"""
         try:
-            import weaviate
+            logger.info("🔧 Initialisation système RAG JSON...")
 
-            # Variables d'environnement Weaviate
-            weaviate_url = os.getenv(
-                "WEAVIATE_URL",
-                "https://xmlc4jvtu6hfw9zrrmnw.c0.us-east1.gcp.weaviate.cloud",
+            # Extracteurs spécialisés
+            self.json_extractor = JSONExtractor()
+            self.table_extractor = TableExtractor()
+            self.genetic_line_extractor = GeneticLineExtractor()
+
+            # Validateur JSON
+            self.json_validator = JSONValidator()
+
+            # Pipeline d'ingestion
+            self.ingestion_pipeline = IngestionPipeline(
+                json_extractor=self.json_extractor,
+                table_extractor=self.table_extractor,
+                genetic_line_extractor=self.genetic_line_extractor,
+                validator=self.json_validator,
             )
-            weaviate_api_key = os.getenv("WEAVIATE_API_KEY", "")
-            openai_api_key = os.getenv("OPENAI_API_KEY", "")
 
-            logger.info(f"Tentative de connexion Weaviate: {weaviate_url}")
-            logger.debug(
-                f"Weaviate API Key configurée: {'Oui' if weaviate_api_key else 'Non'}"
+            # Processeur de documents
+            self.document_processor = DocumentProcessor(
+                extractors={
+                    "json": self.json_extractor,
+                    "table": self.table_extractor,
+                    "genetic_line": self.genetic_line_extractor,
+                }
             )
-            logger.debug(
-                f"OpenAI API Key configurée: {'Oui' if openai_api_key else 'Non'}"
-            )
 
-            # CORRECTION CRITIQUE: Définir OPENAI_APIKEY pour Weaviate si pas déjà définie
-            if openai_api_key and "OPENAI_APIKEY" not in os.environ:
-                os.environ["OPENAI_APIKEY"] = openai_api_key
-                logger.debug(
-                    "Variable OPENAI_APIKEY définie pour compatibilité Weaviate"
-                )
-
-            # Pour une URL cloud Weaviate, utiliser connect_to_weaviate_cloud avec authentification
-            if "weaviate.cloud" in weaviate_url:
-                logger.debug(
-                    "Utilisation connexion cloud Weaviate avec authentification"
-                )
-
-                if weaviate_api_key:
-                    try:
-                        # NOUVEAU: Client v4 avec API Key et headers OpenAI
-                        import weaviate.classes as wvc_classes
-
-                        # Headers personnalisés pour OpenAI
-                        headers = {}
-                        if openai_api_key:
-                            headers["X-OpenAI-Api-Key"] = openai_api_key
-
-                        self.weaviate_client = weaviate.connect_to_weaviate_cloud(
-                            cluster_url=weaviate_url,
-                            auth_credentials=wvc_classes.init.Auth.api_key(
-                                weaviate_api_key
-                            ),
-                            headers=headers,
-                        )
-                        logger.info("Connexion Weaviate v4 avec API Key réussie")
-
-                    except ImportError:
-                        logger.warning("Weaviate v4 non disponible, utilisation v3")
-                        # Fallback vers client v3 avec authentification
-                        self.weaviate_client = weaviate.Client(
-                            url=weaviate_url,
-                            auth_client_secret=weaviate.AuthApiKey(
-                                api_key=weaviate_api_key
-                            ),
-                            additional_headers=(
-                                {"X-OpenAI-Api-Key": openai_api_key}
-                                if openai_api_key
-                                else {}
-                            ),
-                        )
-                        logger.info("Connexion Weaviate v3 avec API Key réussie")
-
-                    except Exception as auth_error:
-                        logger.error(f"Erreur authentification Weaviate: {auth_error}")
-                        # Tentative fallback v3
-                        try:
-                            self.weaviate_client = weaviate.Client(
-                                url=weaviate_url,
-                                auth_client_secret=weaviate.AuthApiKey(
-                                    api_key=weaviate_api_key
-                                ),
-                                additional_headers=(
-                                    {"X-OpenAI-Api-Key": openai_api_key}
-                                    if openai_api_key
-                                    else {}
-                                ),
-                            )
-                            logger.info("Fallback Weaviate v3 avec API Key réussi")
-                        except Exception as fallback_error:
-                            logger.error(
-                                f"Fallback v3 également échoué: {fallback_error}"
-                            )
-                            self.weaviate_client = None
-                            return
-                else:
-                    logger.error(
-                        "WEAVIATE_API_KEY non configurée pour l'instance cloud"
-                    )
-                    self.weaviate_client = None
-                    return
-            else:
-                # Connexion locale sans authentification
-                host = weaviate_url.replace("http://", "").replace("https://", "")
-                self.weaviate_client = weaviate.connect_to_local(host=host)
-                logger.info("Connexion Weaviate locale configurée")
-
-            # Test de connexion avec timeout
-            if self.weaviate_client:
-                try:
-                    # Test asynchrone de la connexion
-                    ready = await asyncio.wait_for(
-                        asyncio.to_thread(lambda: self.weaviate_client.is_ready()),
-                        timeout=15.0,
-                    )
-
-                    if ready:
-                        logger.info(
-                            f"Connexion Weaviate opérationnelle: {weaviate_url}"
-                        )
-
-                        # CORRECTION: Test de capacités v4 compatible
-                        try:
-                            # Pour client v4, utiliser .collections au lieu de .schema
-                            if hasattr(self.weaviate_client, "collections"):
-                                await asyncio.to_thread(
-                                    lambda: list(
-                                        self.weaviate_client.collections.list_all()
-                                    )
-                                )
-                                logger.info(
-                                    "Permissions Weaviate vérifiées - accès collections OK"
-                                )
-                            else:
-                                # Fallback pour client v3
-                                await asyncio.to_thread(
-                                    lambda: self.weaviate_client.schema.get()
-                                )
-                                logger.info(
-                                    "Permissions Weaviate vérifiées - accès schéma OK"
-                                )
-
-                        except Exception as perm_error:
-                            logger.warning(
-                                f"Permissions limitées Weaviate: {perm_error}"
-                            )
-                            # Continue quand même, certaines opérations peuvent fonctionner
-
-                    else:
-                        logger.error("Weaviate connecté mais pas prêt")
-                        self.weaviate_client = None
-
-                except asyncio.TimeoutError:
-                    logger.error("Timeout lors du test de connexion Weaviate (15s)")
-                    self.weaviate_client = None
-                except Exception as test_error:
-                    logger.error(f"Erreur test connexion Weaviate: {test_error}")
-                    self.weaviate_client = None
+            logger.info("✅ Système RAG JSON initialisé")
 
         except Exception as e:
-            logger.error(f"Erreur générale connexion Weaviate: {e}")
-            self.weaviate_client = None
+            logger.error(f"❌ Erreur initialisation système JSON: {e}")
+            raise
+
+    async def _initialize_cache_system(self):
+        """Initialise le système de cache amélioré"""
+        try:
+            if CACHE_ENABLED and EXTERNAL_CACHE_AVAILABLE:
+                # Cache Redis externe existant
+                try:
+                    from cache.redis_cache_manager import RAGCacheManager
+
+                    self.cache_manager = RAGCacheManager()
+                    await self.cache_manager.initialize()
+                    if self.cache_manager.enabled:
+                        self.optimization_stats["external_cache_used"] = True
+                        logger.info("✅ Cache Redis externe activé")
+                except ImportError as e:
+                    logger.warning(f"RAGCacheManager non disponible: {e}")
+                    self.cache_manager = None
+                except Exception as e:
+                    logger.warning(f"Cache Redis externe échoué: {e}")
+                    self.cache_manager = None
+
+                # Cache amélioré pour système JSON
+                if RAG_JSON_SYSTEM_AVAILABLE:
+                    try:
+                        self.enhanced_cache_manager = EnhancedCacheManager()
+                        await self.enhanced_cache_manager.initialize()
+                        logger.info("✅ Cache système JSON activé")
+                    except Exception as e:
+                        logger.warning(f"Cache système JSON échoué: {e}")
+                        self.enhanced_cache_manager = None
+
+        except Exception as e:
+            logger.error(f"Erreur initialisation cache: {e}")
+
+    async def _initialize_base_components(self):
+        """Initialise les composants de base"""
+        try:
+            self.embedder = OpenAIEmbedder(self.openai_client, self.cache_manager)
+            self.memory = ConversationMemory(self.openai_client)
+            # CORRECTION: Passer le client OpenAI pour la traduction multilingue
+            self.ood_detector = EnhancedOODDetector(
+                blocked_terms_path=None, openai_client=self.openai_client
+            )
+            logger.debug("✅ Composants de base initialisés")
+        except Exception as e:
+            logger.error(f"Erreur composants de base: {e}")
+            raise
+
+    async def _initialize_hybrid_retriever(self):
+        """Initialise le retriever hybride avec RRF intelligent"""
+        if self.weaviate_client:
+            try:
+                self.retriever = HybridWeaviateRetriever(self.weaviate_client)
+
+                # Moteur de recherche hybride pour système JSON
+                if RAG_JSON_SYSTEM_AVAILABLE:
+                    self.hybrid_search_engine = HybridSearchEngine(
+                        weaviate_client=self.weaviate_client,
+                        cache_manager=self.enhanced_cache_manager,
+                    )
+
+                # === RRF INTELLIGENT ===
+                if (
+                    INTELLIGENT_RRF_AVAILABLE
+                    and ENABLE_INTELLIGENT_RRF
+                    and self.cache_manager
+                    and self.cache_manager.enabled
+                ):
+                    try:
+                        self.intelligent_rrf = IntelligentRRFFusion(
+                            redis_client=self.cache_manager.client,
+                            intent_processor=None,  # Sera défini plus tard
+                        )
+                        logger.info("✅ RRF Intelligent initialisé")
+                        if hasattr(self.retriever, "set_intelligent_rrf"):
+                            self.retriever.set_intelligent_rrf(self.intelligent_rrf)
+                            logger.info("✅ RRF Intelligent lié au retriever")
+                    except Exception as e:
+                        logger.error(f"Erreur RRF Intelligent: {e}")
+
+                # Diagnostic API Weaviate
+                if ENABLE_API_DIAGNOSTICS:
+                    try:
+                        await self.retriever.diagnose_weaviate_api()
+                        self.optimization_stats["weaviate_capabilities"] = (
+                            self.retriever.api_capabilities.copy()
+                        )
+                    except Exception as e:
+                        logger.warning(f"Diagnostic Weaviate échoué: {e}")
+
+            except Exception as e:
+                logger.warning(f"Retriever hybride échoué: {e}")
+
+    async def _initialize_generator(self):
+        """Initialise le générateur de réponses"""
+        try:
+            self.generator = EnhancedResponseGenerator(
+                self.openai_client, self.cache_manager
+            )
+        except Exception as e:
+            logger.error(f"Erreur générateur: {e}")
+            raise
+
+    async def _initialize_intent_processor(self):
+        """Initialise l'intent processor"""
+        try:
+            from processing.intent_processor import create_intent_processor
+            import os
+            from pathlib import Path
+
+            # Tentative de résolution du chemin de configuration
+            config_paths = [
+                "config/intents.json",
+                Path(__file__).parent.parent / "config" / "intents.json",
+                Path.cwd() / "config" / "intents.json",
+                os.path.join(os.path.dirname(__file__), "..", "config", "intents.json"),
+            ]
+
+            config_found = None
+            for path in config_paths:
+                path_obj = Path(path)
+                if path_obj.exists():
+                    config_found = str(path_obj.resolve())
+                    logger.debug(f"Configuration intents trouvée: {config_found}")
+                    break
+
+            if config_found:
+                self.intent_processor = create_intent_processor(config_found)
+                logger.info(
+                    f"Intent processor initialisé avec configuration: {config_found}"
+                )
+            else:
+                logger.warning(
+                    f"Aucun fichier intents.json trouvé dans {[str(p) for p in config_paths]}"
+                )
+                logger.info("Utilisation de la configuration par défaut intégrée")
+                self.intent_processor = create_intent_processor()
+
+            # Connecter RRF Intelligent à Intent Processor
+            if self.intelligent_rrf:
+                self.intelligent_rrf.intent_processor = self.intent_processor
+
+            logger.info("✅ Intent processor initialisé avec succès")
+
+        except Exception as e:
+            logger.warning(f"Intent processor non disponible: {e}")
+            self.intent_processor = None
+
+    async def _initialize_guardrails(self):
+        """Initialise les guardrails"""
+        try:
+            from security.advanced_guardrails import (
+                create_response_guardrails,
+            )
+
+            self.guardrails = create_response_guardrails(
+                self.openai_client, GUARDRAILS_LEVEL
+            )
+        except Exception as e:
+            logger.warning(f"Guardrails échoué: {e}")
+
+    # === NOUVELLES MÉTHODES JSON ===
+
+    async def validate_json_document(
+        self, json_data: Dict[str, Any], strict_mode: bool = False
+    ) -> Dict[str, Any]:
+        """Valide un document JSON selon les schémas avicoles"""
+        if not RAG_JSON_SYSTEM_AVAILABLE or not self.json_validator:
+            return {"valid": False, "error": "Système JSON non disponible"}
+
+        try:
+            self.optimization_stats["json_validations"] += 1
+
+            validation_request = ValidationRequest(
+                json_data=json_data, strict_mode=strict_mode, auto_enrich=True
+            )
+
+            result = await self.json_validator.validate_document(validation_request)
+
+            logger.info(
+                f"Validation JSON: {'✅ Valide' if result.is_valid else '❌ Invalide'}"
+            )
+
+            return {
+                "valid": result.is_valid,
+                "enriched_data": result.enriched_data,
+                "metadata": result.metadata,
+                "errors": result.errors,
+                "warnings": result.warnings,
+            }
+
+        except Exception as e:
+            logger.error(f"Erreur validation JSON: {e}")
+            return {"valid": False, "error": str(e)}
+
+    async def ingest_json_documents(
+        self, json_files: List[Dict[str, Any]], batch_size: int = 5
+    ) -> Dict[str, Any]:
+        """Ingère des documents JSON dans le système"""
+        if not RAG_JSON_SYSTEM_AVAILABLE or not self.ingestion_pipeline:
+            return {"success": False, "error": "Système JSON non disponible"}
+
+        try:
+            self.optimization_stats["json_ingestions"] += 1
+
+            ingestion_request = IngestionRequest(
+                json_files=json_files, batch_size=batch_size, force_reprocess=False
+            )
+
+            result = await self.ingestion_pipeline.process_documents(ingestion_request)
+
+            logger.info(
+                f"Ingestion JSON: {result.processed_count}/{result.total_count} documents traités"
+            )
+
+            return {
+                "success": True,
+                "processed_count": result.processed_count,
+                "total_count": result.total_count,
+                "errors": result.errors,
+                "warnings": result.warnings,
+                "metadata": result.metadata,
+            }
+
+        except Exception as e:
+            logger.error(f"Erreur ingestion JSON: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def search_json_enhanced(
+        self,
+        query: str,
+        genetic_line: Optional[str] = None,
+        performance_metrics: Optional[List[str]] = None,
+        age_range: Optional[Dict[str, int]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Recherche avancée dans les documents JSON avec filtres avicoles"""
+        if not RAG_JSON_SYSTEM_AVAILABLE or not self.hybrid_search_engine:
+            logger.warning(
+                "Recherche JSON non disponible, utilisation du système classique"
+            )
+            return []
+
+        try:
+            # Construction des filtres avicoles
+            filters = {}
+            if genetic_line:
+                filters["genetic_line"] = genetic_line
+            if performance_metrics:
+                filters["performance_metrics"] = performance_metrics
+            if age_range:
+                filters["age_range"] = age_range
+
+            # Recherche hybride spécialisée
+            results = await self.hybrid_search_engine.search_with_filters(
+                query=query, filters=filters, top_k=RAG_SIMILARITY_TOP_K
+            )
+
+            logger.info(f"Recherche JSON: {len(results)} résultats trouvés")
+
+            return results
+
+        except Exception as e:
+            logger.error(f"Erreur recherche JSON: {e}")
+            return []
+
+    # === MÉTHODE PRINCIPALE MISE À JOUR ===
 
     async def generate_response(
         self,
@@ -573,16 +628,34 @@ class InteliaRAGEngine:
         conversation_context: List[Dict] = None,
         language: Optional[str] = None,
         explain_score: Optional[float] = None,
+        # NOUVEAUX PARAMÈTRES JSON
+        use_json_search: bool = True,
+        genetic_line_filter: Optional[str] = None,
+        performance_context: Optional[Dict[str, Any]] = None,
     ) -> RAGResult:
-        """Point d'entrée principal avec tracing LangSmith automatique"""
+        """Point d'entrée principal avec système JSON intégré"""
 
         if LANGSMITH_AVAILABLE and self.langsmith_client and LANGSMITH_ENABLED:
             return await self._generate_response_with_langsmith(
-                query, tenant_id, conversation_context, language, explain_score
+                query,
+                tenant_id,
+                conversation_context,
+                language,
+                explain_score,
+                use_json_search,
+                genetic_line_filter,
+                performance_context,
             )
         else:
             return await self._generate_response_core(
-                query, tenant_id, conversation_context, language, explain_score
+                query,
+                tenant_id,
+                conversation_context,
+                language,
+                explain_score,
+                use_json_search,
+                genetic_line_filter,
+                performance_context,
             )
 
     async def _generate_response_core(
@@ -592,8 +665,11 @@ class InteliaRAGEngine:
         conversation_context: List[Dict],
         language: Optional[str],
         explain_score: Optional[float],
+        use_json_search: bool,
+        genetic_line_filter: Optional[str],
+        performance_context: Optional[Dict[str, Any]],
     ) -> RAGResult:
-        """Méthode core de génération avec cache optimisé"""
+        """Méthode core avec recherche JSON intégrée"""
 
         if self.degraded_mode:
             return RAGResult(
@@ -607,6 +683,43 @@ class InteliaRAGEngine:
             # Détection langue
             if not language:
                 language = detect_language_enhanced(query, default="fr")
+
+            # === RECHERCHE JSON PRIORITAIRE ===
+            json_results = []
+            if use_json_search and RAG_JSON_SYSTEM_AVAILABLE:
+                try:
+                    json_results = await self.search_json_enhanced(
+                        query=query,
+                        genetic_line=genetic_line_filter,
+                        performance_metrics=(
+                            performance_context.get("metrics")
+                            if performance_context
+                            else None
+                        ),
+                        age_range=(
+                            performance_context.get("age_range")
+                            if performance_context
+                            else None
+                        ),
+                    )
+
+                    if json_results:
+                        logger.info(f"🎯 Résultats JSON trouvés: {len(json_results)}")
+
+                        # Si on a de bons résultats JSON, les utiliser directement
+                        if len(json_results) >= 3:
+                            return await self._generate_response_from_json_results(
+                                query,
+                                json_results,
+                                language,
+                                conversation_context,
+                                start_time,
+                            )
+                except Exception as e:
+                    logger.warning(f"Erreur recherche JSON: {e}")
+
+            # === FALLBACK VERS RECHERCHE CLASSIQUE ===
+            logger.info("📚 Utilisation recherche classique (fallback ou complément)")
 
             # NOUVEAU: Vérification cache AVANT traitement
             cache_key = None
@@ -893,11 +1006,12 @@ class InteliaRAGEngine:
                 dependencies_status = {}
 
             metadata = {
-                "approach": "enhanced_rag_langsmith_intelligent_rrf",
+                "approach": "enhanced_rag_v4_json_integrated",
                 "optimizations_enabled": {
                     "external_redis_cache": self.optimization_stats[
                         "external_cache_used"
                     ],
+                    "json_system": RAG_JSON_SYSTEM_AVAILABLE,
                     "semantic_cache": (
                         getattr(self.cache_manager, "ENABLE_SEMANTIC_CACHE", False)
                         if self.cache_manager
@@ -912,6 +1026,12 @@ class InteliaRAGEngine:
                     "advanced_guardrails": GUARDRAILS_AVAILABLE,
                     "api_diagnostics": ENABLE_API_DIAGNOSTICS,
                     "dynamic_ood_thresholds": True,
+                },
+                "json_system": {
+                    "used": bool(json_results),
+                    "results_count": len(json_results),
+                    "genetic_line_filter": genetic_line_filter,
+                    "performance_context": bool(performance_context),
                 },
                 "langsmith": {
                     "enabled": LANGSMITH_ENABLED,
@@ -1005,6 +1125,81 @@ class InteliaRAGEngine:
                 metadata={"error": str(e), "processing_time": time.time() - start_time},
             )
 
+    async def _generate_response_from_json_results(
+        self,
+        query: str,
+        json_results: List[Dict[str, Any]],
+        language: str,
+        conversation_context: List[Dict],
+        start_time: float,
+    ) -> RAGResult:
+        """Génère une réponse basée sur les résultats JSON"""
+        try:
+            # Génération de la réponse avec le générateur existant
+            if self.generator:
+                # Conversion des résultats JSON en Documents pour compatibilité
+                documents = []
+                for result in json_results:
+                    doc = Document(
+                        content=result.get("content", ""),
+                        metadata=result.get("metadata", {}),
+                        score=result.get("score", 0.8),
+                    )
+                    documents.append(doc)
+
+                conversation_context_str = ""
+                if conversation_context:
+                    recent_context = conversation_context[-MAX_CONVERSATION_CONTEXT:]
+                    conversation_context_str = "\n".join(
+                        [
+                            f"Q: {ctx.get('question', '')}\nR: {ctx.get('answer', '')[:200]}..."
+                            for ctx in recent_context
+                        ]
+                    )
+
+                response_text = await self.generator.generate_response(
+                    query,
+                    documents,
+                    conversation_context_str,
+                    language,
+                    None,  # intent_result
+                )
+
+                return RAGResult(
+                    source=RAGSource.RAG_SUCCESS,
+                    answer=response_text,
+                    confidence=0.9,  # Confiance élevée pour résultats JSON
+                    metadata={
+                        "json_system_used": True,
+                        "json_results_count": len(json_results),
+                        "genetic_lines_detected": list(
+                            set(
+                                r.get("metadata", {}).get("genetic_line")
+                                for r in json_results
+                                if r.get("metadata", {}).get("genetic_line")
+                            )
+                        ),
+                        "processing_time": time.time() - start_time,
+                        "system_version": "4.0_json_primary",
+                    },
+                )
+            else:
+                # Fallback simple si pas de générateur
+                return RAGResult(
+                    source=RAGSource.RAG_SUCCESS,
+                    answer=f"Résultats trouvés dans la base de données avicole: {len(json_results)} documents pertinents.",
+                    confidence=0.7,
+                    metadata={
+                        "json_system_used": True,
+                        "fallback_simple": True,
+                        "processing_time": time.time() - start_time,
+                    },
+                )
+
+        except Exception as e:
+            logger.error(f"Erreur génération réponse JSON: {e}")
+            raise
+
     async def _generate_response_with_langsmith(
         self,
         query: str,
@@ -1012,29 +1207,42 @@ class InteliaRAGEngine:
         conversation_context: List[Dict],
         language: Optional[str],
         explain_score: Optional[float],
+        use_json_search: bool,
+        genetic_line_filter: Optional[str],
+        performance_context: Optional[Dict[str, Any]],
     ) -> RAGResult:
-        """Génération de réponse avec tracing LangSmith complet"""
+        """Génération de réponse avec tracing LangSmith et JSON"""
 
         start_time = time.time()
         self.optimization_stats["langsmith_traces"] += 1
 
         try:
-            # Traçage contexte aviculture
+            # Traçage contexte aviculture avec JSON
             langsmith_metadata = {
                 "tenant_id": tenant_id,
                 "query_length": len(query),
                 "has_conversation_context": bool(conversation_context),
                 "language_target": language,
-                "system": "intelia_aviculture_rag",
-                "version": "enhanced_with_langsmith",
+                "system": "intelia_aviculture_rag_v4",
+                "version": "json_integrated_langsmith",
+                "json_search_enabled": use_json_search,
+                "genetic_line_filter": genetic_line_filter,
+                "performance_context": bool(performance_context),
             }
 
-            # Traitement core
+            # Traitement core avec JSON
             result = await self._generate_response_core(
-                query, tenant_id, conversation_context, language, explain_score
+                query,
+                tenant_id,
+                conversation_context,
+                language,
+                explain_score,
+                use_json_search,
+                genetic_line_filter,
+                performance_context,
             )
 
-            # Enrichissement métadonnées LangSmith avec données aviculture
+            # Enrichissement métadonnées LangSmith avec données JSON
             if hasattr(result, "metadata") and result.metadata:
                 detected_entities = result.metadata.get("detected_entities", {})
 
@@ -1051,12 +1259,12 @@ class InteliaRAGEngine:
                             "intent_confidence", 0.0
                         ),
                         "documents_used": result.metadata.get("documents_used", 0),
-                        "hybrid_search_used": result.metadata.get(
-                            "hybrid_search_used", False
+                        "json_system_used": result.metadata.get("json_system", {}).get(
+                            "used", False
                         ),
-                        "intelligent_rrf_used": result.metadata.get(
-                            "intelligent_rrf_used", False
-                        ),
+                        "json_results_count": result.metadata.get(
+                            "json_system", {}
+                        ).get("results_count", 0),
                         "processing_time": time.time() - start_time,
                         "confidence_score": result.confidence,
                     }
@@ -1065,9 +1273,7 @@ class InteliaRAGEngine:
             # Log métadonnées dans LangSmith
             if self.langsmith_client:
                 try:
-                    # Log spécialisé pour alertes
                     await self._log_langsmith_alerts(query, result, langsmith_metadata)
-
                 except Exception as e:
                     logger.warning(f"Erreur logging LangSmith: {e}")
                     self.optimization_stats["langsmith_errors"] += 1
@@ -1079,62 +1285,17 @@ class InteliaRAGEngine:
             logger.error(f"Erreur LangSmith tracing: {e}")
             # Fallback sans LangSmith
             return await self._generate_response_core(
-                query, tenant_id, conversation_context, language, explain_score
+                query,
+                tenant_id,
+                conversation_context,
+                language,
+                explain_score,
+                use_json_search,
+                genetic_line_filter,
+                performance_context,
             )
 
-    async def _log_langsmith_alerts(
-        self, query: str, result: RAGResult, metadata: Dict
-    ):
-        """Log des alertes spécialisées aviculture dans LangSmith"""
-
-        alerts = []
-
-        if not result.answer:
-            return
-
-        # Détection valeurs aberrantes aviculture
-        answer_lower = result.answer.lower()
-
-        # FCR aberrant
-        import re
-
-        fcr_matches = re.findall(r"fcr[:\s]*(\d+[.,]\d*)", answer_lower)
-        for fcr_str in fcr_matches:
-            try:
-                fcr_value = float(fcr_str.replace(",", "."))
-                if fcr_value > 3.0 or fcr_value < 0.8:
-                    alerts.append(f"FCR_ABERRANT: {fcr_value}")
-            except ValueError:
-                continue
-
-        # Mortalité aberrante
-        mort_matches = re.findall(r"mortalité[:\s]*(\d+)[%\s]", answer_lower)
-        for mort_str in mort_matches:
-            try:
-                mort_value = float(mort_str)
-                if mort_value > 20:
-                    alerts.append(f"MORTALITE_ELEVEE: {mort_value}%")
-            except ValueError:
-                continue
-
-        # Poids aberrant
-        poids_matches = re.findall(r"poids[:\s]*(\d+)\s*g", answer_lower)
-        for poids_str in poids_matches:
-            try:
-                poids_value = float(poids_str)
-                if poids_value > 5000 or poids_value < 10:
-                    alerts.append(f"POIDS_ABERRANT: {poids_value}g")
-            except ValueError:
-                continue
-
-        # Log alertes si détectées
-        if alerts:
-            logger.warning(f"Alertes aviculture détectées: {alerts}")
-            metadata["alerts_aviculture"] = alerts
-
-        # Confiance faible
-        if result.confidence < 0.3:
-            alerts.append(f"CONFIANCE_FAIBLE: {result.confidence:.2f}")
+    # === MÉTHODES CRITIQUES CONSERVÉES ===
 
     async def _enhanced_hybrid_search_with_rrf(
         self,
@@ -1377,8 +1538,221 @@ class InteliaRAGEngine:
         )
         return min(0.95, max(0.1, final_confidence))
 
+    async def _connect_weaviate(self):
+        """Connexion Weaviate corrigée avec authentification et configuration OpenAI"""
+        try:
+            import weaviate
+
+            # Variables d'environnement Weaviate
+            weaviate_url = os.getenv(
+                "WEAVIATE_URL",
+                "https://xmlc4jvtu6hfw9zrrmnw.c0.us-east1.gcp.weaviate.cloud",
+            )
+            weaviate_api_key = os.getenv("WEAVIATE_API_KEY", "")
+            openai_api_key = os.getenv("OPENAI_API_KEY", "")
+
+            logger.info(f"Tentative de connexion Weaviate: {weaviate_url}")
+            logger.debug(
+                f"Weaviate API Key configurée: {'Oui' if weaviate_api_key else 'Non'}"
+            )
+            logger.debug(
+                f"OpenAI API Key configurée: {'Oui' if openai_api_key else 'Non'}"
+            )
+
+            # CORRECTION CRITIQUE: Définir OPENAI_APIKEY pour Weaviate si pas déjà définie
+            if openai_api_key and "OPENAI_APIKEY" not in os.environ:
+                os.environ["OPENAI_APIKEY"] = openai_api_key
+                logger.debug(
+                    "Variable OPENAI_APIKEY définie pour compatibilité Weaviate"
+                )
+
+            # Pour une URL cloud Weaviate, utiliser connect_to_weaviate_cloud avec authentification
+            if "weaviate.cloud" in weaviate_url:
+                logger.debug(
+                    "Utilisation connexion cloud Weaviate avec authentification"
+                )
+
+                if weaviate_api_key:
+                    try:
+                        # NOUVEAU: Client v4 avec API Key et headers OpenAI
+                        import weaviate.classes as wvc_classes
+
+                        # Headers personnalisés pour OpenAI
+                        headers = {}
+                        if openai_api_key:
+                            headers["X-OpenAI-Api-Key"] = openai_api_key
+
+                        self.weaviate_client = weaviate.connect_to_weaviate_cloud(
+                            cluster_url=weaviate_url,
+                            auth_credentials=wvc_classes.init.Auth.api_key(
+                                weaviate_api_key
+                            ),
+                            headers=headers,
+                        )
+                        logger.info("Connexion Weaviate v4 avec API Key réussie")
+
+                    except ImportError:
+                        logger.warning("Weaviate v4 non disponible, utilisation v3")
+                        # Fallback vers client v3 avec authentification
+                        self.weaviate_client = weaviate.Client(
+                            url=weaviate_url,
+                            auth_client_secret=weaviate.AuthApiKey(
+                                api_key=weaviate_api_key
+                            ),
+                            additional_headers=(
+                                {"X-OpenAI-Api-Key": openai_api_key}
+                                if openai_api_key
+                                else {}
+                            ),
+                        )
+                        logger.info("Connexion Weaviate v3 avec API Key réussie")
+
+                    except Exception as auth_error:
+                        logger.error(f"Erreur authentification Weaviate: {auth_error}")
+                        # Tentative fallback v3
+                        try:
+                            self.weaviate_client = weaviate.Client(
+                                url=weaviate_url,
+                                auth_client_secret=weaviate.AuthApiKey(
+                                    api_key=weaviate_api_key
+                                ),
+                                additional_headers=(
+                                    {"X-OpenAI-Api-Key": openai_api_key}
+                                    if openai_api_key
+                                    else {}
+                                ),
+                            )
+                            logger.info("Fallback Weaviate v3 avec API Key réussi")
+                        except Exception as fallback_error:
+                            logger.error(
+                                f"Fallback v3 également échoué: {fallback_error}"
+                            )
+                            self.weaviate_client = None
+                            return
+                else:
+                    logger.error(
+                        "WEAVIATE_API_KEY non configurée pour l'instance cloud"
+                    )
+                    self.weaviate_client = None
+                    return
+            else:
+                # Connexion locale sans authentification
+                host = weaviate_url.replace("http://", "").replace("https://", "")
+                self.weaviate_client = weaviate.connect_to_local(host=host)
+                logger.info("Connexion Weaviate locale configurée")
+
+            # Test de connexion avec timeout
+            if self.weaviate_client:
+                try:
+                    # Test asynchrone de la connexion
+                    ready = await asyncio.wait_for(
+                        asyncio.to_thread(lambda: self.weaviate_client.is_ready()),
+                        timeout=15.0,
+                    )
+
+                    if ready:
+                        logger.info(
+                            f"Connexion Weaviate opérationnelle: {weaviate_url}"
+                        )
+
+                        # CORRECTION: Test de capacités v4 compatible
+                        try:
+                            # Pour client v4, utiliser .collections au lieu de .schema
+                            if hasattr(self.weaviate_client, "collections"):
+                                await asyncio.to_thread(
+                                    lambda: list(
+                                        self.weaviate_client.collections.list_all()
+                                    )
+                                )
+                                logger.info(
+                                    "Permissions Weaviate vérifiées - accès collections OK"
+                                )
+                            else:
+                                # Fallback pour client v3
+                                await asyncio.to_thread(
+                                    lambda: self.weaviate_client.schema.get()
+                                )
+                                logger.info(
+                                    "Permissions Weaviate vérifiées - accès schéma OK"
+                                )
+
+                        except Exception as perm_error:
+                            logger.warning(
+                                f"Permissions limitées Weaviate: {perm_error}"
+                            )
+                            # Continue quand même, certaines opérations peuvent fonctionner
+
+                    else:
+                        logger.error("Weaviate connecté mais pas prêt")
+                        self.weaviate_client = None
+
+                except asyncio.TimeoutError:
+                    logger.error("Timeout lors du test de connexion Weaviate (15s)")
+                    self.weaviate_client = None
+                except Exception as test_error:
+                    logger.error(f"Erreur test connexion Weaviate: {test_error}")
+                    self.weaviate_client = None
+
+        except Exception as e:
+            logger.error(f"Erreur générale connexion Weaviate: {e}")
+            self.weaviate_client = None
+
+    async def _log_langsmith_alerts(
+        self, query: str, result: RAGResult, metadata: Dict
+    ):
+        """Log des alertes spécialisées aviculture dans LangSmith"""
+
+        alerts = []
+
+        if not result.answer:
+            return
+
+        # Détection valeurs aberrantes aviculture
+        answer_lower = result.answer.lower()
+
+        # FCR aberrant
+        import re
+
+        fcr_matches = re.findall(r"fcr[:\s]*(\d+[.,]\d*)", answer_lower)
+        for fcr_str in fcr_matches:
+            try:
+                fcr_value = float(fcr_str.replace(",", "."))
+                if fcr_value > 3.0 or fcr_value < 0.8:
+                    alerts.append(f"FCR_ABERRANT: {fcr_value}")
+            except ValueError:
+                continue
+
+        # Mortalité aberrante
+        mort_matches = re.findall(r"mortalité[:\s]*(\d+)[%\s]", answer_lower)
+        for mort_str in mort_matches:
+            try:
+                mort_value = float(mort_str)
+                if mort_value > 20:
+                    alerts.append(f"MORTALITE_ELEVEE: {mort_value}%")
+            except ValueError:
+                continue
+
+        # Poids aberrant
+        poids_matches = re.findall(r"poids[:\s]*(\d+)\s*g", answer_lower)
+        for poids_str in poids_matches:
+            try:
+                poids_value = float(poids_str)
+                if poids_value > 5000 or poids_value < 10:
+                    alerts.append(f"POIDS_ABERRANT: {poids_value}g")
+            except ValueError:
+                continue
+
+        # Log alertes si détectées
+        if alerts:
+            logger.warning(f"Alertes aviculture détectées: {alerts}")
+            metadata["alerts_aviculture"] = alerts
+
+        # Confiance faible
+        if result.confidence < 0.3:
+            alerts.append(f"CONFIANCE_FAIBLE: {result.confidence:.2f}")
+
     def get_status(self) -> Dict:
-        """Status enrichi avec LangSmith et RRF intelligent"""
+        """Status enrichi avec système JSON intégré"""
         try:
             weaviate_connected = False
             api_capabilities = {}
@@ -1401,10 +1775,41 @@ class InteliaRAGEngine:
                 "rag_enabled": RAG_ENABLED,
                 "initialized": self.is_initialized,
                 "degraded_mode": self.degraded_mode,
-                "approach": "enhanced_rag_langsmith_intelligent_rrf",
+                "approach": "enhanced_rag_v4_json_integrated",
+                "json_system": {
+                    "available": RAG_JSON_SYSTEM_AVAILABLE,
+                    "components": {
+                        "json_extractor": bool(self.json_extractor),
+                        "table_extractor": bool(self.table_extractor),
+                        "genetic_line_extractor": bool(self.genetic_line_extractor),
+                        "json_validator": bool(self.json_validator),
+                        "ingestion_pipeline": bool(self.ingestion_pipeline),
+                        "hybrid_search_engine": bool(self.hybrid_search_engine),
+                        "document_processor": bool(self.document_processor),
+                        "enhanced_cache_manager": bool(self.enhanced_cache_manager),
+                    },
+                    "stats": {
+                        "json_validations": self.optimization_stats["json_validations"],
+                        "json_ingestions": self.optimization_stats["json_ingestions"],
+                        "table_extractions": self.optimization_stats[
+                            "table_extractions"
+                        ],
+                        "genetic_line_detections": self.optimization_stats[
+                            "genetic_line_detections"
+                        ],
+                        "performance_metrics_processed": self.optimization_stats[
+                            "performance_metrics_processed"
+                        ],
+                    },
+                },
                 "optimizations": {
                     "external_cache_enabled": (
                         self.cache_manager.enabled if self.cache_manager else False
+                    ),
+                    "enhanced_cache_enabled": (
+                        self.enhanced_cache_manager.enabled
+                        if self.enhanced_cache_manager
+                        else False
                     ),
                     "hybrid_search_enabled": HYBRID_SEARCH_ENABLED,
                     "intelligent_rrf_enabled": ENABLE_INTELLIGENT_RRF,

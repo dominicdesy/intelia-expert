@@ -1,4 +1,404 @@
-// types/index.ts - VERSION COMPLÈTE AVEC SUPPORT AGENT LLM + TOUT LE CONTENU ORIGINAL
+// types/index.ts - VERSION COMPLÈTE AVEC SUPPORT RAG JSON + TOUT LE CONTENU ORIGINAL
+
+// ==================== NOUVEAUX TYPES RAG JSON AVICOLE ====================
+
+// Types pour les données avicoles structurées
+export interface GeneticLineData {
+  line: 'ross308' | 'ross308ap' | 'cobb500' | 'cobb700' | 'hubbard' | 'aviagen' | 'other';
+  variant?: string;
+  region?: 'global' | 'na' | 'eu' | 'asia' | 'latam' | 'mena';
+  standard?: string;
+}
+
+export interface PerformanceMetric {
+  type: 'weight' | 'fcr' | 'mortality' | 'egg_production' | 'feed_intake' | 'growth_rate';
+  value: number;
+  unit: string;
+  age_days?: number;
+  sex?: 'male' | 'female' | 'mixed';
+  confidence?: number;
+}
+
+export interface AvicultureDocument {
+  id: string;
+  title: string;
+  text: string;
+  metadata: {
+    genetic_line?: GeneticLineData;
+    document_type: 'performance_guide' | 'feeding_guide' | 'management_guide' | 'health_guide' | 'technical_data';
+    effective_date?: string;
+    language: string;
+    region?: string;
+    source?: string;
+  };
+  tables?: PerformanceTable[];
+  figures?: DocumentFigure[];
+  performance_records?: PerformanceMetric[];
+}
+
+export interface PerformanceTable {
+  id?: string;
+  title: string;
+  headers: string[];
+  rows: string[][];
+  metadata?: {
+    genetic_line?: string;
+    age_range?: { min: number; max: number };
+    sex?: 'male' | 'female' | 'mixed';
+    metric_types?: string[];
+  };
+}
+
+export interface DocumentFigure {
+  id?: string;
+  title: string;
+  description?: string;
+  url?: string;
+  caption?: string;
+  metadata?: {
+    figure_type: 'chart' | 'table' | 'image' | 'diagram';
+    genetic_line?: string;
+    metrics?: string[];
+  };
+}
+
+// Types pour la validation JSON
+export interface JSONValidationRequest {
+  json_data: AvicultureDocument;
+  strict_mode?: boolean;
+  auto_enrich?: boolean;
+  validate_performance_data?: boolean;
+}
+
+export interface JSONValidationResult {
+  is_valid: boolean;
+  enriched_data?: AvicultureDocument;
+  errors: ValidationError[];
+  warnings: ValidationWarning[];
+  metadata: {
+    validation_version: string;
+    processing_time_ms: number;
+    genetic_lines_detected: string[];
+    performance_metrics_count: number;
+    tables_processed: number;
+    figures_processed: number;
+  };
+}
+
+export interface ValidationError {
+  field: string;
+  code: string;
+  message: string;
+  severity: 'error' | 'warning' | 'info';
+  suggestions?: string[];
+}
+
+export interface ValidationWarning {
+  field: string;
+  code: string;
+  message: string;
+  auto_fix_applied?: boolean;
+  original_value?: any;
+  corrected_value?: any;
+}
+
+// Types pour l'ingestion JSON
+export interface JSONIngestionRequest {
+  json_files: AvicultureDocument[];
+  batch_size?: number;
+  force_reprocess?: boolean;
+  validation_config?: {
+    strict_mode: boolean;
+    auto_enrich: boolean;
+    skip_invalid: boolean;
+    validate_performance_data: boolean;
+  };
+}
+
+export interface JSONIngestionResult {
+  success: boolean;
+  processed_count: number;
+  total_count: number;
+  errors: IngestionError[];
+  warnings: IngestionWarning[];
+  metadata: {
+    processing_time_ms: number;
+    genetic_lines_processed: string[];
+    performance_records_created: number;
+    documents_indexed: number;
+    batch_size_used: number;
+  };
+}
+
+export interface IngestionError {
+  document_index: number;
+  document_title?: string;
+  error_code: string;
+  error_message: string;
+  details?: any;
+}
+
+export interface IngestionWarning {
+  document_index: number;
+  document_title?: string;
+  warning_code: string;
+  warning_message: string;
+  auto_corrected?: boolean;
+}
+
+// Types pour la recherche JSON avancée
+export interface JSONSearchRequest {
+  query: string;
+  filters?: {
+    genetic_line?: string | string[];
+    document_type?: string | string[];
+    performance_metrics?: string | string[];
+    age_range?: { min: number; max: number };
+    sex?: 'male' | 'female' | 'mixed';
+    region?: string | string[];
+    language?: string;
+    effective_date_range?: { start: string; end: string };
+  };
+  search_config?: {
+    use_semantic_search: boolean;
+    use_bm25_search: boolean;
+    hybrid_alpha?: number;
+    top_k?: number;
+    confidence_threshold?: number;
+    include_performance_data: boolean;
+    include_tables: boolean;
+    include_figures: boolean;
+  };
+}
+
+export interface JSONSearchResult {
+  success: boolean;
+  results: AvicultureSearchResult[];
+  total_found: number;
+  search_metadata: {
+    query_processed: string;
+    search_type: 'semantic' | 'bm25' | 'hybrid';
+    processing_time_ms: number;
+    filters_applied: string[];
+    genetic_lines_searched: string[];
+    performance_data_included: boolean;
+  };
+}
+
+export interface AvicultureSearchResult {
+  document: AvicultureDocument;
+  score: number;
+  relevance_explanation?: string;
+  matched_sections?: {
+    text_matches: string[];
+    table_matches: PerformanceTable[];
+    figure_matches: DocumentFigure[];
+    performance_matches: PerformanceMetric[];
+  };
+}
+
+// Types pour l'API Chat étendue avec JSON
+export interface JSONEnhancedChatRequest {
+  message: string;
+  language?: string;
+  tenant_id?: string;
+  // Paramètres JSON spécifiques
+  genetic_line_filter?: string;
+  use_json_search?: boolean;
+  performance_context?: {
+    metrics?: string[];
+    age_range?: { min: number; max: number };
+    sex?: 'male' | 'female' | 'mixed';
+    focus_areas?: string[];
+  };
+  response_preferences?: {
+    include_performance_data: boolean;
+    include_tables: boolean;
+    include_figures: boolean;
+    detailed_explanations: boolean;
+  };
+}
+
+export interface JSONEnhancedChatResponse {
+  question: string;
+  response: string;
+  conversation_id: string;
+  rag_used: boolean;
+  rag_score?: number;
+  timestamp: string;
+  language: string;
+  response_time_ms: number;
+  mode: string;
+  user?: string;
+  logged: boolean;
+  
+  // Métadonnées JSON spécifiques
+  json_system_metadata?: {
+    json_search_used: boolean;
+    json_results_count: number;
+    genetic_lines_detected: string[];
+    performance_data_included: boolean;
+    tables_included: number;
+    figures_included: number;
+    confidence_score: number;
+  };
+  
+  // Sources de données avicoles
+  aviculture_sources?: {
+    documents_used: AvicultureDocument[];
+    performance_metrics: PerformanceMetric[];
+    tables_referenced: PerformanceTable[];
+    figures_referenced: DocumentFigure[];
+  };
+  
+  // Recommandations basées sur les données
+  recommendations?: {
+    next_questions: string[];
+    related_topics: string[];
+    performance_insights: string[];
+    best_practices: string[];
+  };
+}
+
+// Types pour les extracteurs spécialisés
+export interface TableExtractionResult {
+  success: boolean;
+  tables: PerformanceTable[];
+  metadata: {
+    extraction_method: string;
+    confidence_score: number;
+    processing_time_ms: number;
+    errors: string[];
+    warnings: string[];
+  };
+}
+
+export interface GeneticLineExtractionResult {
+  success: boolean;
+  genetic_lines: GeneticLineData[];
+  confidence_scores: Record<string, number>;
+  metadata: {
+    extraction_method: string;
+    processing_time_ms: number;
+    ambiguous_references: string[];
+    auto_corrections: Array<{
+      original: string;
+      corrected: string;
+      confidence: number;
+    }>;
+  };
+}
+
+export interface PerformanceExtractionResult {
+  success: boolean;
+  performance_metrics: PerformanceMetric[];
+  metadata: {
+    extraction_method: string;
+    total_metrics_found: number;
+    validated_metrics: number;
+    processing_time_ms: number;
+    unit_conversions: Array<{
+      original_unit: string;
+      converted_unit: string;
+      conversion_factor: number;
+    }>;
+  };
+}
+
+// ==================== TYPES EXISTANTS ÉTENDUS ====================
+
+// Extension de ExpertApiResponse pour support JSON
+export interface ExpertApiResponse {
+  question: string;
+  response: string;
+  full_text?: string;
+  conversation_id: string;
+  rag_used: boolean;
+  rag_score?: number;
+  timestamp: string;
+  language: string;
+  response_time_ms: number;
+  mode: string;
+  user?: string;
+  logged: boolean;
+  validation_passed?: boolean;
+  validation_confidence?: number;
+  
+  // CHAMPS POUR CLARIFICATION
+  is_clarification_request?: boolean;
+  clarification_questions?: string[];
+  
+  // CHAMPS POUR VERSIONS BACKEND
+  response_versions?: {
+    ultra_concise: string;
+    concise: string;
+    standard: string;
+    detailed: string;
+  };
+  
+  // AGENT METADATA
+  agent_metadata?: AgentMetadata;
+  
+  // NOUVEAU: MÉTADONNÉES JSON
+  json_system_metadata?: {
+    json_search_used: boolean;
+    json_results_count: number;
+    genetic_lines_detected: string[];
+    performance_data_included: boolean;
+    extraction_stats: {
+      tables_processed: number;
+      figures_processed: number;
+      performance_metrics: number;
+    };
+  };
+}
+
+// Extension de Message pour support JSON
+export interface Message {
+  id: string;
+  content: string;
+  isUser: boolean;
+  timestamp: Date;
+  feedback?: "positive" | "negative" | null;
+  conversation_id?: string;
+  feedbackComment?: string;
+
+  // CHAMPS POUR CLARIFICATION
+  is_clarification_request?: boolean;
+  is_clarification_response?: boolean;
+  clarification_questions?: string[];
+  clarification_answers?: Record<string, string>;
+  original_question?: string;
+  clarification_entities?: Record<string, any>;
+
+  // CHAMPS POUR CONCISION BACKEND
+  response_versions?: {
+    ultra_concise: string;
+    concise: string;
+    standard: string;
+    detailed: string;
+  };
+
+  // AGENT METADATA
+  agent_metadata?: AgentMetadata;
+
+  // NOUVEAU: MÉTADONNÉES JSON AVICOLE
+  json_metadata?: {
+    genetic_lines_mentioned: string[];
+    performance_metrics_discussed: PerformanceMetric[];
+    tables_referenced: PerformanceTable[];
+    figures_referenced: DocumentFigure[];
+    aviculture_topics: string[];
+  };
+
+  // Champs pour compatibilité
+  originalResponse?: string;
+  processedResponse?: string;
+  concisionLevel?: ConcisionLevel;
+  role?: "user" | "assistant";
+  sources?: DocumentSource[];
+  metadata?: MessageMetadata;
+}
 
 // ==================== NOUVEAUX TYPES AGENT LLM ====================
 
@@ -18,20 +418,46 @@ export interface StreamCallbacks {
   onError?: (error: any) => void;
   onFollowup?: (msg: string) => void;
 
-  // 🆕 NOUVEAUX CALLBACKS AGENT
+  // NOUVEAUX CALLBACKS AGENT
   onAgentStart?: (complexity: string, subQueries: number) => void;
   onAgentThinking?: (decisions: string[]) => void;
   onChunk?: (content: string, confidence: number, source?: string) => void;
   onAgentEnd?: (synthesisMethod: string, sourcesUsed: number) => void;
   onAgentError?: (error: string) => void;
   onAgentProgress?: (step: string, progress: number) => void;
+  
+  // NOUVEAUX CALLBACKS JSON
+  onJSONSearchStart?: (filters: any) => void;
+  onJSONResults?: (results: AvicultureSearchResult[]) => void;
+  onPerformanceData?: (metrics: PerformanceMetric[]) => void;
+  onGeneticLineDetected?: (lines: string[]) => void;
 }
 
-// Types d'événements SSE Agent
+// Types d'événements SSE Agent étendus avec JSON
 export type AgentStartEvent = {
   type: "agent_start";
   complexity: string;
   sub_queries_count: number;
+};
+
+export type JSONSearchStartEvent = {
+  type: "json_search_start";
+  filters: Record<string, any>;
+  genetic_lines: string[];
+};
+
+export type JSONResultsEvent = {
+  type: "json_results";
+  results_count: number;
+  genetic_lines_found: string[];
+  performance_data_included: boolean;
+};
+
+export type PerformanceDataEvent = {
+  type: "performance_data";
+  metrics: PerformanceMetric[];
+  tables_count: number;
+  figures_count: number;
 };
 
 export type AgentThinkingEvent = {
@@ -103,50 +529,360 @@ export type StreamEvent =
   | AgentEndEvent
   | AgentErrorEvent
   | ProactiveFollowupEvent
+  | JSONSearchStartEvent
+  | JSONResultsEvent
+  | PerformanceDataEvent
   | EndEvent;
 
-// ==================== INTERFACE MESSAGE ÉTENDUE AVEC CONCISION ET RESPONSE_VERSIONS ====================
+// ==================== NOUVEAUX ENDPOINTS JSON ====================
 
-export interface Message {
-  id: string;
-  content: string;
-  isUser: boolean;
-  timestamp: Date;
-  feedback?: "positive" | "negative" | null;
-  conversation_id?: string;
-  feedbackComment?: string; // Commentaire associé au feedback
+export const JSON_ENDPOINTS = {
+  // Validation et ingestion
+  VALIDATE_JSON: "/json/validate",
+  INGEST_JSON: "/json/ingest",
+  UPLOAD_JSON: "/json/upload",
+  
+  // Recherche avancée
+  SEARCH_JSON: "/json/search",
+  SEARCH_PERFORMANCE: "/json/search/performance",
+  SEARCH_BY_GENETIC_LINE: "/json/search/genetic-line",
+  
+  // Extraction spécialisée
+  EXTRACT_TABLES: "/json/extract/tables",
+  EXTRACT_GENETIC_LINES: "/json/extract/genetic-lines",
+  EXTRACT_PERFORMANCE: "/json/extract/performance",
+  
+  // Analytics et monitoring
+  JSON_SYSTEM_STATUS: "/json/status",
+  JSON_ANALYTICS: "/json/analytics",
+  JSON_HEALTH_CHECK: "/json/health",
+  
+  // Chat étendu
+  CHAT_WITH_JSON: "/chat/json-enhanced",
+  EXPERT_CHAT_JSON: "/chat/expert-json",
+  
+  // Tests spécialisés
+  TEST_JSON_SYSTEM: "/chat/test-json-system",
+  TEST_GENETIC_LINES: "/chat/test-genetic-lines",
+  TEST_PERFORMANCE_DATA: "/chat/test-performance-data",
+} as const;
 
-  // CHAMPS POUR CLARIFICATION
-  is_clarification_request?: boolean; // Pour les messages du bot qui demandent des clarifications
-  is_clarification_response?: boolean; // Pour les messages utilisateur qui répondent aux clarifications
-  clarification_questions?: string[]; // Questions de clarification du bot
-  clarification_answers?: Record<string, string>; // Réponses de clarification de l'utilisateur (optionnel)
-  original_question?: string; // Question originale avant clarification
-  clarification_entities?: Record<string, any>; // Entités extraites des réponses de clarification
+// ==================== CONFIGURATION JSON SYSTEM ====================
 
-  // NOUVEAU: Champs pour le système de concision backend
-  response_versions?: {
-    ultra_concise: string;
-    concise: string;
-    standard: string;
-    detailed: string;
-  };
+export const JSON_SYSTEM_CONFIG = {
+  // Types de documents supportés
+  DOCUMENT_TYPES: {
+    PERFORMANCE_GUIDE: "performance_guide",
+    FEEDING_GUIDE: "feeding_guide", 
+    MANAGEMENT_GUIDE: "management_guide",
+    HEALTH_GUIDE: "health_guide",
+    TECHNICAL_DATA: "technical_data",
+  },
+  
+  // Lignées génétiques supportées
+  GENETIC_LINES: {
+    ROSS308: "ross308",
+    ROSS308AP: "ross308ap", 
+    COBB500: "cobb500",
+    COBB700: "cobb700",
+    HUBBARD: "hubbard",
+    AVIAGEN: "aviagen",
+    OTHER: "other",
+  },
+  
+  // Métriques de performance
+  PERFORMANCE_METRICS: {
+    WEIGHT: "weight",
+    FCR: "fcr",
+    MORTALITY: "mortality", 
+    EGG_PRODUCTION: "egg_production",
+    FEED_INTAKE: "feed_intake",
+    GROWTH_RATE: "growth_rate",
+  },
+  
+  // Unités standardisées
+  UNITS: {
+    WEIGHT: ["g", "kg", "lb", "oz"],
+    TEMPERATURE: ["°C", "°F", "K"],
+    VOLUME: ["ml", "l", "gal", "fl oz"],
+    PERCENTAGE: ["%", "percent"],
+    RATIO: ["ratio", ":1", "to 1"],
+  },
+  
+  // Configuration de validation
+  VALIDATION: {
+    MAX_DOCUMENT_SIZE_MB: 10,
+    MAX_TABLES_PER_DOCUMENT: 50,
+    MAX_FIGURES_PER_DOCUMENT: 20,
+    MAX_PERFORMANCE_RECORDS: 1000,
+    REQUIRED_FIELDS: ["title", "text", "metadata"],
+    OPTIONAL_FIELDS: ["tables", "figures", "performance_records"],
+  },
+  
+  // Configuration de recherche
+  SEARCH: {
+    DEFAULT_TOP_K: 10,
+    MAX_TOP_K: 50,
+    DEFAULT_CONFIDENCE_THRESHOLD: 0.7,
+    HYBRID_ALPHA_DEFAULT: 0.5,
+    ENABLE_SEMANTIC_SEARCH: true,
+    ENABLE_BM25_SEARCH: true,
+    ENABLE_HYBRID_SEARCH: true,
+  },
+  
+  // Configuration de cache
+  CACHE: {
+    VALIDATION_CACHE_TTL: 3600, // 1 heure
+    SEARCH_CACHE_TTL: 1800, // 30 minutes
+    EXTRACTION_CACHE_TTL: 7200, // 2 heures
+    MAX_CACHED_DOCUMENTS: 1000,
+  },
+} as const;
 
-  // 🆕 AGENT METADATA
-  agent_metadata?: AgentMetadata;
+// ==================== UTILITAIRES JSON SYSTEM ====================
 
-  // Champs pour compatibilité (peuvent être supprimés plus tard)
-  originalResponse?: string; // Réponse originale avant concision
-  processedResponse?: string; // Réponse après traitement de concision
-  concisionLevel?: ConcisionLevel; // Niveau de concision appliqué
+export const JSONSystemUtils = {
+  // Validation des données avicoles
+  validateGeneticLine: (line: string): boolean => {
+    return Object.values(JSON_SYSTEM_CONFIG.GENETIC_LINES).includes(line);
+  },
+  
+  validatePerformanceMetric: (metric: PerformanceMetric): ValidationError[] => {
+    const errors: ValidationError[] = [];
+    
+    if (!metric.type || !Object.values(JSON_SYSTEM_CONFIG.PERFORMANCE_METRICS).includes(metric.type)) {
+      errors.push({
+        field: "type",
+        code: "INVALID_METRIC_TYPE",
+        message: `Type de métrique invalide: ${metric.type}`,
+        severity: "error",
+      });
+    }
+    
+    if (typeof metric.value !== "number" || metric.value < 0) {
+      errors.push({
+        field: "value", 
+        code: "INVALID_METRIC_VALUE",
+        message: "Valeur métrique doit être un nombre positif",
+        severity: "error",
+      });
+    }
+    
+    if (!metric.unit || typeof metric.unit !== "string") {
+      errors.push({
+        field: "unit",
+        code: "MISSING_UNIT",
+        message: "Unité requise pour la métrique",
+        severity: "error",
+      });
+    }
+    
+    return errors;
+  },
+  
+  // Normalisation des unités
+  normalizeUnit: (value: number, fromUnit: string, toUnit: string): number => {
+    const conversionTable: Record<string, Record<string, number>> = {
+      // Poids
+      "g": { "kg": 0.001, "lb": 0.00220462, "oz": 0.035274 },
+      "kg": { "g": 1000, "lb": 2.20462, "oz": 35.274 },
+      "lb": { "g": 453.592, "kg": 0.453592, "oz": 16 },
+      "oz": { "g": 28.3495, "kg": 0.0283495, "lb": 0.0625 },
+      
+      // Température
+      "°C": { "°F": (c: number) => (c * 9/5) + 32, "K": (c: number) => c + 273.15 },
+      "°F": { "°C": (f: number) => (f - 32) * 5/9, "K": (f: number) => ((f - 32) * 5/9) + 273.15 },
+      "K": { "°C": (k: number) => k - 273.15, "°F": (k: number) => ((k - 273.15) * 9/5) + 32 },
+    };
+    
+    if (fromUnit === toUnit) return value;
+    
+    const conversion = conversionTable[fromUnit]?.[toUnit];
+    if (typeof conversion === "number") {
+      return value * conversion;
+    } else if (typeof conversion === "function") {
+      return conversion(value);
+    }
+    
+    return value; // Pas de conversion disponible
+  },
+  
+  // Détection automatique de lignée génétique
+  detectGeneticLine: (text: string): { line: string; confidence: number }[] => {
+    const patterns = {
+      ross308: /ross\s*308/gi,
+      ross308ap: /ross\s*308\s*ap/gi,
+      cobb500: /cobb\s*500/gi,
+      cobb700: /cobb\s*700/gi,
+      hubbard: /hubbard/gi,
+      aviagen: /aviagen/gi,
+    };
+    
+    const detections: { line: string; confidence: number }[] = [];
+    
+    Object.entries(patterns).forEach(([line, pattern]) => {
+      const matches = text.match(pattern);
+      if (matches) {
+        const confidence = Math.min(0.95, 0.5 + (matches.length * 0.1));
+        detections.push({ line, confidence });
+      }
+    });
+    
+    return detections.sort((a, b) => b.confidence - a.confidence);
+  },
+  
+  // Extraction de métriques de performance du texte
+  extractPerformanceMetrics: (text: string): PerformanceMetric[] => {
+    const metrics: PerformanceMetric[] = [];
+    
+    // Patterns pour différentes métriques
+    const patterns = {
+      weight: /(\d+(?:\.\d+)?)\s*(g|kg|lb|oz)(?:\s*(?:at|à)\s*(\d+)\s*(?:days?|jours?))?/gi,
+      fcr: /fcr\s*:?\s*(\d+(?:\.\d+)?)/gi,
+      mortality: /mortalit[éy]\s*:?\s*(\d+(?:\.\d+)?)\s*%?/gi,
+    };
+    
+    // Extraction poids
+    let match;
+    while ((match = patterns.weight.exec(text)) !== null) {
+      metrics.push({
+        type: "weight",
+        value: parseFloat(match[1]),
+        unit: match[2],
+        age_days: match[3] ? parseInt(match[3]) : undefined,
+      });
+    }
+    
+    // Extraction FCR
+    patterns.fcr.lastIndex = 0;
+    while ((match = patterns.fcr.exec(text)) !== null) {
+      metrics.push({
+        type: "fcr",
+        value: parseFloat(match[1]),
+        unit: "ratio",
+      });
+    }
+    
+    // Extraction mortalité
+    patterns.mortality.lastIndex = 0;
+    while ((match = patterns.mortality.exec(text)) !== null) {
+      metrics.push({
+        type: "mortality",
+        value: parseFloat(match[1]),
+        unit: "%",
+      });
+    }
+    
+    return metrics;
+  },
+  
+  // Validation de document avicole complet
+  validateAvicultureDocument: (doc: AvicultureDocument): JSONValidationResult => {
+    const errors: ValidationError[] = [];
+    const warnings: ValidationWarning[] = [];
+    
+    // Validation des champs requis
+    if (!doc.title || doc.title.trim().length < 5) {
+      errors.push({
+        field: "title",
+        code: "INVALID_TITLE",
+        message: "Titre requis (minimum 5 caractères)",
+        severity: "error",
+      });
+    }
+    
+    if (!doc.text || doc.text.trim().length < 50) {
+      errors.push({
+        field: "text", 
+        code: "INVALID_TEXT",
+        message: "Texte requis (minimum 50 caractères)",
+        severity: "error",
+      });
+    }
+    
+    if (!doc.metadata || !doc.metadata.document_type) {
+      errors.push({
+        field: "metadata.document_type",
+        code: "MISSING_DOCUMENT_TYPE",
+        message: "Type de document requis",
+        severity: "error",
+      });
+    }
+    
+    // Validation des métriques de performance
+    if (doc.performance_records) {
+      doc.performance_records.forEach((metric, index) => {
+        const metricErrors = JSONSystemUtils.validatePerformanceMetric(metric);
+        errors.push(...metricErrors.map(error => ({
+          ...error,
+          field: `performance_records[${index}].${error.field}`,
+        })));
+      });
+    }
+    
+    // Détection automatique de lignée génétique
+    const detectedLines = JSONSystemUtils.detectGeneticLine(doc.text);
+    
+    return {
+      is_valid: errors.length === 0,
+      errors,
+      warnings,
+      metadata: {
+        validation_version: "4.0",
+        processing_time_ms: 0, // À remplir par le processeur
+        genetic_lines_detected: detectedLines.map(d => d.line),
+        performance_metrics_count: doc.performance_records?.length || 0,
+        tables_processed: doc.tables?.length || 0,
+        figures_processed: doc.figures?.length || 0,
+      },
+    };
+  },
+  
+  // Formatage pour affichage
+  formatPerformanceMetric: (metric: PerformanceMetric): string => {
+    const ageStr = metric.age_days ? ` à ${metric.age_days} jours` : "";
+    const sexStr = metric.sex ? ` (${metric.sex})` : "";
+    return `${metric.value}${metric.unit}${ageStr}${sexStr}`;
+  },
+  
+  formatGeneticLine: (line: string): string => {
+    const formatMap: Record<string, string> = {
+      ross308: "Ross 308",
+      ross308ap: "Ross 308 AP",
+      cobb500: "Cobb 500", 
+      cobb700: "Cobb 700",
+      hubbard: "Hubbard",
+      aviagen: "Aviagen",
+      other: "Autre",
+    };
+    return formatMap[line] || line;
+  },
+  
+  // Debug et logging
+  debugValidationResult: (result: JSONValidationResult): void => {
+    console.group("🔍 [JSON Validation] Résultat");
+    console.log(`Statut: ${result.is_valid ? "✅ Valide" : "❌ Invalide"}`);
+    console.log(`Erreurs: ${result.errors.length}`);
+    console.log(`Avertissements: ${result.warnings.length}`);
+    console.log(`Lignées détectées: ${result.metadata.genetic_lines_detected.join(", ")}`);
+    console.log(`Métriques: ${result.metadata.performance_metrics_count}`);
+    
+    if (result.errors.length > 0) {
+      console.group("Erreurs:");
+      result.errors.forEach(error => {
+        console.error(`${error.field}: ${error.message}`);
+      });
+      console.groupEnd();
+    }
+    
+    console.groupEnd();
+  },
+} as const;
 
-  // COMPATIBILITY: Champs du petit fichier
-  role?: "user" | "assistant";
-  sources?: DocumentSource[];
-  metadata?: MessageMetadata;
-}
+// ==================== TYPES EXISTANTS CONSERVÉS (SUITE) ====================
 
-// ==================== NOUVEAUX TYPES POUR SESSION TRACKING ====================
+// Continuer avec tous les types existants du fichier original...
+// (Le reste du contenu original reste identique)
 
 export interface UserSession {
   id?: number;
@@ -234,8 +970,6 @@ export interface SessionStore {
   resetSession: () => void;
 }
 
-// ==================== NOUVEAUX TYPES POUR AD SYSTEM ====================
-
 export interface AdData {
   id: string;
   title: string;
@@ -297,19 +1031,17 @@ export interface AdEventData {
   };
 }
 
-// ==================== TYPES POUR CONCISION BACKEND ====================
-
 export enum ConcisionLevel {
-  ULTRA_CONCISE = "ultra_concise", // Réponse minimale
-  CONCISE = "concise", // Réponse courte
-  STANDARD = "standard", // Réponse normale
-  DETAILED = "detailed", // Réponse complète
+  ULTRA_CONCISE = "ultra_concise",
+  CONCISE = "concise",
+  STANDARD = "standard", 
+  DETAILED = "detailed",
 }
 
 export interface ConcisionConfig {
   level: ConcisionLevel;
-  autoDetect: boolean; // Détection automatique selon le type de question
-  userPreference: boolean; // Sauvegarder préférence utilisateur
+  autoDetect: boolean;
+  userPreference: boolean;
 }
 
 export interface ConcisionControlProps {
@@ -317,14 +1049,12 @@ export interface ConcisionControlProps {
   compact?: boolean;
 }
 
-// NOUVEAU: Interface pour sélection de versions backend
 export interface ResponseVersionSelection {
   selectedVersion: string;
   availableVersions: Record<string, string>;
   selectedLevel: ConcisionLevel;
 }
 
-// Interface pour traitement legacy (compatibilité)
 export interface ResponseProcessingResult {
   processedContent: string;
   originalContent: string;
@@ -332,52 +1062,25 @@ export interface ResponseProcessingResult {
   wasProcessed: boolean;
 }
 
-// ==================== TYPES EXISTANTS CONSERVÉS ====================
-
-export interface ExpertApiResponse {
-  question: string;
-  response: string;
-  full_text?: string; // plein texte non tronqué (si fourni par l'API)
-  conversation_id: string;
-  rag_used: boolean;
-  rag_score?: number;
-  timestamp: string;
-  language: string;
-  response_time_ms: number;
-  mode: string;
-  user?: string;
-  logged: boolean;
-  validation_passed?: boolean;
-  validation_confidence?: number;
-  // CHAMPS POUR CLARIFICATION
-  is_clarification_request?: boolean;
-  clarification_questions?: string[];
-  // NOUVEAU: Champs pour versions backend
-  response_versions?: {
-    ultra_concise: string;
-    concise: string;
-    standard: string;
-    detailed: string;
-  };
-  // 🆕 AGENT METADATA
-  agent_metadata?: AgentMetadata;
-}
-
-// INTERFACE ConversationData ÉTENDUE AVEC FEEDBACK
 export interface ConversationData {
   user_id: string;
   question: string;
   response: string;
-  full_text?: string; // plein texte non tronqué (si fourni par l'API)
+  full_text?: string;
   conversation_id: string;
   confidence_score?: number;
   response_time_ms?: number;
   language?: string;
   rag_used?: boolean;
-  feedback?: 1 | -1 | null; // Feedback numérique pour le backend
-  feedback_comment?: string; // Commentaire feedback
-  // 🆕 AGENT SUPPORT
+  feedback?: 1 | -1 | null;
+  feedback_comment?: string;
   agent_metadata?: AgentMetadata;
+  // NOUVEAU: Métadonnées JSON
+  json_metadata?: {
+    genetic_lines_mentioned: string[];
+    performance_metrics_discussed: PerformanceMetric[];
+    tables_referenced: PerformanceTable[];
+  };
 }
 
 export interface ConversationItem {
@@ -391,16 +1094,13 @@ export interface ConversationItem {
   updated_at: string;
   created_at: string;
   feedback?: number | null;
-  feedback_comment?: string; // Commentaire dans l'historique
+  feedback_comment?: string;
 }
 
-// ==================== TYPES POUR CONVERSATIONS STYLE CLAUDE.AI ====================
-
-// Structure complète d'une conversation
 export interface Conversation {
   id: string;
   title: string;
-  preview: string; // Premier message ou résumé
+  preview: string;
   message_count: number;
   created_at: string;
   updated_at: string;
@@ -408,23 +1108,19 @@ export interface Conversation {
   language?: string;
   last_message_preview?: string;
   status?: "active" | "archived";
-  // COMPATIBILITY: Champs du petit fichier
   user_id?: string;
   messages?: Message[];
 }
 
-// Conversation complète avec tous ses messages
 export interface ConversationWithMessages extends Conversation {
   messages: Message[];
 }
 
-// Structure pour l'historique groupé
 export interface ConversationGroup {
-  title: string; // "Aujourd'hui", "Hier", "Cette semaine", etc.
+  title: string;
   conversations: Conversation[];
 }
 
-// Réponse API pour l'historique
 export interface ConversationHistoryResponse {
   success: boolean;
   conversations: Conversation[];
@@ -434,14 +1130,12 @@ export interface ConversationHistoryResponse {
   timestamp: string;
 }
 
-// Réponse API pour une conversation complète
 export interface ConversationDetailResponse {
   success: boolean;
   conversation: ConversationWithMessages;
   timestamp: string;
 }
 
-// Options pour le groupement des conversations
 export interface ConversationGroupingOptions {
   groupBy: "date" | "topic" | "none";
   sortBy: "updated_at" | "created_at" | "message_count";
@@ -450,7 +1144,6 @@ export interface ConversationGroupingOptions {
   offset?: number;
 }
 
-// Statistiques de conversation
 export interface ConversationStats {
   total_conversations: number;
   total_messages: number;
@@ -460,9 +1153,6 @@ export interface ConversationStats {
   satisfaction_rate: number;
 }
 
-// ==================== TYPES POUR CLARIFICATIONS INLINE ====================
-
-// Interface simplifiée pour clarifications inline
 export interface ClarificationInlineProps {
   questions: string[];
   originalQuestion: string;
@@ -473,7 +1163,6 @@ export interface ClarificationInlineProps {
   conversationId?: string;
 }
 
-// Interface pour les réponses de clarification
 export interface ClarificationResponse {
   needs_clarification: boolean;
   questions?: string[];
@@ -482,7 +1171,6 @@ export interface ClarificationResponse {
   model_used?: string;
 }
 
-// Interface pour l'état des clarifications
 export interface ClarificationState {
   pendingClarification: ExpertApiResponse | null;
   isProcessingClarification: boolean;
@@ -495,15 +1183,13 @@ export interface ClarificationState {
   }>;
 }
 
-// ==================== TYPES UTILISATEUR AVEC CHAMPS TÉLÉPHONE ====================
-
 export interface User {
   id: string;
   email: string;
   name: string;
   firstName: string;
   lastName: string;
-  phone: string; // Champ existant - gardé pour compatibilité
+  phone: string;
   country: string;
   linkedinProfile: string;
   companyName: string;
@@ -514,12 +1200,10 @@ export interface User {
   created_at: string;
   plan: string;
 
-  // NOUVEAUX CHAMPS TÉLÉPHONE SÉPARÉS POUR SUPABASE
-  country_code?: string; // Code pays (ex: +1, +33, +32)
-  area_code?: string; // Code régional (ex: 514, 04, 2)
-  phone_number?: string; // Numéro principal (ex: 1234567, 12345678)
+  country_code?: string;
+  area_code?: string;
+  phone_number?: string;
 
-  // COMPATIBILITY: Champs du petit fichier
   full_name?: string;
   avatar_url?: string;
   consent_given?: boolean;
@@ -535,7 +1219,7 @@ export interface ProfileUpdateData {
   firstName: string;
   lastName: string;
   email: string;
-  phone?: string; // Maintenant optionnel pour éviter les conflits
+  phone?: string;
   country: string;
   linkedinProfile: string;
   companyName: string;
@@ -543,13 +1227,10 @@ export interface ProfileUpdateData {
   linkedinCorporate: string;
   language?: string;
 
-  // NOUVEAUX CHAMPS TÉLÉPHONE SÉPARÉS
   country_code?: string;
   area_code?: string;
   phone_number?: string;
 }
-
-// ==================== TYPES SPÉCIFIQUES AU COMPOSANT PHONE ====================
 
 export interface PhoneData {
   country_code: string;
@@ -565,22 +1246,17 @@ export interface PhoneValidationResult {
   isValidNumber: boolean;
 }
 
-// ==================== NOUVEAUX TYPES FEEDBACK ET COMMENTAIRES ====================
-
-// Interface pour les données feedback enrichies
 export interface FeedbackData {
   conversation_id: string;
   feedback: "positive" | "negative";
   comment?: string;
   timestamp: string;
   user_id?: string;
-  // COMPATIBILITY: Champs du petit fichier
   message_id?: string;
   rating?: "positive" | "negative";
   category?: "accuracy" | "relevance" | "completeness" | "other";
 }
 
-// Props pour la modal feedback
 export interface FeedbackModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -592,7 +1268,6 @@ export interface FeedbackModalProps {
   isSubmitting?: boolean;
 }
 
-// Interface pour les analytics feedback
 export interface FeedbackAnalytics {
   period_days: number;
   total_conversations: number;
@@ -614,7 +1289,6 @@ export interface FeedbackAnalytics {
   }>;
 }
 
-// Interface pour le rapport admin feedback
 export interface AdminFeedbackReport {
   period_days: number;
   generated_at: string;
@@ -660,7 +1334,6 @@ export interface AdminFeedbackReport {
   }>;
 }
 
-// Interface pour les statistiques utilisateur
 export interface UserFeedbackStats {
   user_id: string;
   total_conversations: number;
@@ -673,14 +1346,11 @@ export interface UserFeedbackStats {
   last_feedback_date?: string;
 }
 
-// ==================== TYPES HOOKS AVEC CONVERSATIONS ====================
-
-// INTERFACE AuthStore COMPLÈTE AVEC TOUTES LES PROPRIÉTÉS
 export interface AuthStore {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  hasHydrated: boolean; // Pour éviter l'erreur TypeScript
+  hasHydrated: boolean;
   logout: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   register: (
@@ -693,7 +1363,6 @@ export interface AuthStore {
   ) => Promise<{ success: boolean; error?: string }>;
   initializeSession: () => Promise<boolean>;
 
-  // NOUVEAU: Méthodes pour session tracking
   startSessionTracking: (sessionId: string) => void;
   endSessionTracking: (
     logoutType?: "manual" | "browser_close" | "timeout",
@@ -701,9 +1370,7 @@ export interface AuthStore {
   updateSessionActivity: () => Promise<void>;
 }
 
-// ChatStore pour gérer les conversations
 export interface ChatStore {
-  // PROPRIÉTÉS EXISTANTES
   conversations: ConversationItem[];
   isLoading: boolean;
   loadConversations: (userId: string) => Promise<void>;
@@ -716,7 +1383,6 @@ export interface ChatStore {
     response: string,
   ) => void;
 
-  // PROPRIÉTÉS POUR CONVERSATIONS STYLE CLAUDE.AI
   conversationGroups: ConversationGroup[];
   currentConversation: ConversationWithMessages | null;
   isLoadingHistory: boolean;
@@ -736,8 +1402,6 @@ export interface Translation {
   currentLanguage: string;
 }
 
-// ==================== TYPES COMPOSANTS ====================
-
 export interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -754,10 +1418,6 @@ export interface IconProps {
   className?: string;
 }
 
-// ============================================================================
-// LANGUAGE & INTERNATIONALIZATION - UNIFIÉ
-// ============================================================================
-
 export type Language = "fr" | "en" | "es" | "pt" | "de" | "nl" | "pl";
 
 export interface LanguageOption {
@@ -765,10 +1425,6 @@ export interface LanguageOption {
   name: string;
   flag: string;
 }
-
-// ============================================================================
-// PETIT FICHIER - TYPES EXPERT SYSTEM
-// ============================================================================
 
 export interface ExpertQuestion {
   content: string;
@@ -872,8 +1528,6 @@ export interface AppError {
   context?: string;
 }
 
-// ==================== TYPES API ====================
-
 export interface ApiError extends Error {
   status?: number;
 }
@@ -892,8 +1546,6 @@ export class TimeoutError extends Error {
   }
 }
 
-// ==================== TYPES MANQUANTS POUR useAuthStore ====================
-
 export interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
@@ -902,8 +1554,8 @@ export interface AuthState {
 }
 
 export interface BackendUserData {
-  id?: string; // Version gros fichier
-  user_id?: string; // Version petit fichier
+  id?: string;
+  user_id?: string;
   email: string;
   name?: string;
   full_name?: string;
@@ -935,10 +1587,8 @@ export interface BackendUserData {
 }
 
 export const mapBackendUserToUser = (backendUser: BackendUserData): User => {
-  // Récupérer l'ID (priorité user_id puis id)
   const userId = backendUser.user_id || backendUser.id || "";
 
-  // Récupérer le nom (priorité name, puis full_name, puis construction firstName+lastName)
   const userName =
     backendUser.name ||
     backendUser.full_name ||
@@ -963,7 +1613,6 @@ export const mapBackendUserToUser = (backendUser: BackendUserData): User => {
     created_at: backendUser.created_at || new Date().toISOString(),
     plan: backendUser.plan || "essential",
 
-    // Champs optionnels
     country_code: backendUser.country_code,
     area_code: backendUser.area_code,
     phone_number: backendUser.phone_number,
@@ -979,8 +1628,7 @@ export const mapBackendUserToUser = (backendUser: BackendUserData): User => {
   };
 };
 
-// ==================== CONSTANTES API SÉCURISÉES ====================
-// Configuration API dynamique depuis environnement
+// Configuration API mise à jour avec endpoints JSON
 const getApiConfig = () => {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   const version = process.env.NEXT_PUBLIC_API_VERSION || "v1";
@@ -988,27 +1636,27 @@ const getApiConfig = () => {
   if (!baseUrl) {
     console.error("NEXT_PUBLIC_API_BASE_URL environment variable missing");
     return {
-      BASE_URL: "https://expert.intelia.com", // Fallback développement
+      BASE_URL: "https://expert.intelia.com",
       TIMEOUT: 30000,
       LOGGING_BASE_URL: "https://expert.intelia.com/api/v1",
-      LLM_BASE_URL: "https://expert.intelia.com/llm", // ✅ NOUVEAU: URL directe LLM
+      LLM_BASE_URL: "https://expert.intelia.com/llm",
+      JSON_BASE_URL: "https://expert.intelia.com/api/v1", // NOUVEAU: URL JSON
     };
   }
 
-  // CORRECTION: Enlever /api s'il est déjà présent pour éviter /api/api/
   const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, "");
 
   return {
-    BASE_URL: cleanBaseUrl, // URL de base nettoyée
+    BASE_URL: cleanBaseUrl,
     TIMEOUT: 30000,
-    LOGGING_BASE_URL: `${cleanBaseUrl}/api/${version}`, // Construction correcte
-    LLM_BASE_URL: `${cleanBaseUrl}/llm`, // ✅ NOUVEAU: URL directe LLM
+    LOGGING_BASE_URL: `${cleanBaseUrl}/api/${version}`,
+    LLM_BASE_URL: `${cleanBaseUrl}/llm`,
+    JSON_BASE_URL: `${cleanBaseUrl}/api/${version}`, // NOUVEAU: URL JSON
   };
 };
 
 export const API_CONFIG = getApiConfig();
 
-// ENDPOINTS FEEDBACK
 export const FEEDBACK_ENDPOINTS = {
   SAVE_CONVERSATION: "/logging/conversation",
   UPDATE_FEEDBACK: "/logging/conversation/{id}/feedback",
@@ -1025,7 +1673,6 @@ export const FEEDBACK_ENDPOINTS = {
   TEST_COMMENT_SUPPORT: "/logging/test-comments",
 } as const;
 
-// NOUVEAU: ENDPOINTS SESSION TRACKING
 export const SESSION_ENDPOINTS = {
   HEARTBEAT: "/auth/heartbeat",
   LOGOUT: "/auth/logout",
@@ -1062,7 +1709,6 @@ export const PLAN_CONFIGS = {
   },
 } as const;
 
-// CONFIGURATION FEEDBACK
 export const FEEDBACK_CONFIG = {
   TYPES: {
     POSITIVE: {
@@ -1095,7 +1741,6 @@ export const FEEDBACK_CONFIG = {
   PRIVACY_POLICY_URL: "https://intelia.com/privacy-policy/",
 } as const;
 
-// CONFIGURATION DES CLARIFICATIONS
 export const CLARIFICATION_TEXTS = {
   fr: {
     title: "Informations supplémentaires requises",
@@ -1138,12 +1783,11 @@ export const CLARIFICATION_CONFIG = {
   MAX_QUESTIONS: 4,
   MIN_ANSWER_LENGTH: 0,
   MAX_ANSWER_LENGTH: 200,
-  REQUIRED_ANSWER_PERCENTAGE: 0.5, // 50% des questions doivent être répondues
+  REQUIRED_ANSWER_PERCENTAGE: 0.5,
   AUTO_SCROLL_DELAY: 300,
   VALIDATION_DEBOUNCE: 500,
 } as const;
 
-// NOUVELLE: CONFIGURATION POUR CONCISION BACKEND
 export const CONCISION_CONFIG = {
   LEVELS: {
     ULTRA_CONCISE: {
@@ -1181,25 +1825,21 @@ export const CONCISION_CONFIG = {
   STORAGE_KEY: "intelia_concision_level",
 } as const;
 
-// NOUVELLE: CONFIGURATION POUR AD SYSTEM
 export const AD_CONFIG = {
-  // Critères de déclenchement
   TRIGGERS: {
     MIN_SESSIONS: 2,
-    MIN_DURATION_PER_SESSION: 60, // 1 minute en secondes
-    COOLDOWN_PERIOD: 24, // 24 heures
-    CHECK_INTERVAL: 5 * 60 * 1000, // 5 minutes en ms
-    INITIAL_CHECK_DELAY: 3000, // 3 secondes après connexion
+    MIN_DURATION_PER_SESSION: 60,
+    COOLDOWN_PERIOD: 24,
+    CHECK_INTERVAL: 5 * 60 * 1000,
+    INITIAL_CHECK_DELAY: 3000,
   },
 
-  // Configuration de l'affichage
   DISPLAY: {
-    MIN_SHOW_TIME: 15, // 15 secondes minimum
-    FADE_DURATION: 200, // Animation en ms
-    Z_INDEX: 50, // z-index de la modal
+    MIN_SHOW_TIME: 15,
+    FADE_DURATION: 200,
+    Z_INDEX: 50,
   },
 
-  // Types de publicités disponibles
   AD_TYPES: {
     FARMING_TOOLS: {
       id: "farming-tools",
@@ -1227,24 +1867,21 @@ export const AD_CONFIG = {
     },
   },
 
-  // Configuration de stockage
   STORAGE: {
     LAST_AD_SHOWN_KEY: "lastAdShown",
     USER_PREFERENCES_KEY: "adPreferences",
     SESSION_TRACKING_KEY: "sessionTracking",
   },
 
-  // URLs et endpoints
   ENDPOINTS: {
     SESSION_ANALYTICS: "/analytics/my-sessions",
-    AD_EVENTS: "/logging/ad-events", // Optionnel
+    AD_EVENTS: "/logging/ad-events",
   },
 } as const;
 
-// NOUVELLE: CONFIGURATION POUR SESSION TRACKING
 export const SESSION_CONFIG = {
-  HEARTBEAT_INTERVAL: 2 * 60 * 1000, // 2 minutes en ms
-  SESSION_TIMEOUT: 30 * 60, // 30 minutes en secondes
+  HEARTBEAT_INTERVAL: 2 * 60 * 1000,
+  SESSION_TIMEOUT: 30 * 60,
   TRACK_IP_ADDRESS: true,
   TRACK_USER_AGENT: true,
   AUTO_CLEANUP_OLD_SESSIONS: true,
@@ -1259,7 +1896,6 @@ export const SESSION_CONFIG = {
   },
 } as const;
 
-// UTILITAIRES ANALYTICS
 export const ANALYTICS_UTILS = {
   calculateSatisfactionRate: (positive: number, negative: number): number => {
     const total = positive + negative;
@@ -1308,7 +1944,6 @@ export const ANALYTICS_UTILS = {
     }
   },
 
-  // NOUVEAU: Utilitaires pour sessions
   formatSessionDuration: (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -1333,7 +1968,6 @@ export const ANALYTICS_UTILS = {
   },
 } as const;
 
-// UTILITAIRES POUR CLARIFICATIONS
 export const ClarificationUtils = {
   isClarificationResponse: (response: ExpertApiResponse): boolean => {
     return (
@@ -1402,7 +2036,7 @@ export const ClarificationUtils = {
     const answeredCount = Object.values(answers).filter(
       (a) => a && a.trim().length > 0,
     ).length;
-    const requiredCount = Math.ceil(questions.length * 0.5); // Au moins 50% des questions
+    const requiredCount = Math.ceil(questions.length * 0.5);
 
     return {
       isValid: answeredCount >= requiredCount,
@@ -1412,18 +2046,15 @@ export const ClarificationUtils = {
   },
 } as const;
 
-// NOUVEAUX: UTILITAIRES POUR CONCISION BACKEND
 export const ConcisionUtils = {
   selectVersionFromResponse: (
     responseVersions: Record<string, string>,
     level: ConcisionLevel,
   ): string => {
-    // Retourner la version demandée si elle existe
     if (responseVersions[level]) {
       return responseVersions[level];
     }
 
-    // Fallback intelligent si version manquante
     const fallbackOrder: ConcisionLevel[] = [
       ConcisionLevel.DETAILED,
       ConcisionLevel.STANDARD,
@@ -1440,7 +2071,6 @@ export const ConcisionUtils = {
       }
     }
 
-    // Ultime fallback - première version disponible
     const firstAvailable = Object.values(responseVersions)[0];
     console.warn(
       "⚠️ [ConcisionUtils] Aucune version standard - utilisation première disponible",
@@ -1460,7 +2090,6 @@ export const ConcisionUtils = {
       ConcisionLevel.DETAILED,
     ];
 
-    // Vérifier qu'au moins une version est présente
     const hasAnyVersion = requiredLevels.some(
       (level) =>
         responseVersions[level] && typeof responseVersions[level] === "string",
@@ -1472,7 +2101,6 @@ export const ConcisionUtils = {
   detectOptimalLevel: (question: string): ConcisionLevel => {
     const questionLower = question.toLowerCase();
 
-    // Questions ultra-concises (poids, température, mesures simples)
     const ultraConciseKeywords = [
       "poids",
       "weight",
@@ -1497,7 +2125,6 @@ export const ConcisionUtils = {
       return ConcisionLevel.ULTRA_CONCISE;
     }
 
-    // Questions complexes (comment, pourquoi, procédures)
     const complexKeywords = [
       "comment",
       "how to",
@@ -1523,7 +2150,6 @@ export const ConcisionUtils = {
       return ConcisionLevel.DETAILED;
     }
 
-    // Par défaut: concis pour questions générales
     return ConcisionLevel.CONCISE;
   },
 
@@ -1588,20 +2214,16 @@ export const ConcisionUtils = {
   },
 } as const;
 
-// NOUVEAUX: UTILITAIRES POUR AD SYSTEM
 export const AdSystemUtils = {
-  // Vérifier l'éligibilité pour les publicités
   checkAdEligibility: (
     sessionStats: UserSessionStats,
     criteria: AdTriggerCriteria,
   ): boolean => {
-    // Vérifier les critères de sessions
     const meetsSessionCriteria =
       sessionStats.totalSessions >= criteria.MIN_SESSIONS;
     const meetsDurationCriteria =
       sessionStats.averageSessionDuration >= criteria.MIN_DURATION_PER_SESSION;
 
-    // Vérifier le cooldown
     const lastAdTime = sessionStats.lastAdShown
       ? new Date(sessionStats.lastAdShown)
       : null;
@@ -1614,9 +2236,7 @@ export const AdSystemUtils = {
     return meetsSessionCriteria && meetsDurationCriteria && cooldownExpired;
   },
 
-  // Générer une publicité personnalisée selon le profil utilisateur
   generatePersonalizedAd: (userProfile?: User): AdData => {
-    // Logic basique de personnalisation - en production, serait plus sophistiquée
     const baseAd: AdData = {
       id: "farming-pro-2024",
       title: "FarmPro Analytics",
@@ -1639,7 +2259,6 @@ export const AdSystemUtils = {
       ],
     };
 
-    // Personnalisation selon le type d'utilisateur
     if (userProfile?.user_type === "veterinary") {
       baseAd.title = "VetPro Clinical";
       baseAd.description =
@@ -1657,7 +2276,6 @@ export const AdSystemUtils = {
     return baseAd;
   },
 
-  // Valider les données de session
   validateSessionStats: (data: any): data is UserSessionStats => {
     return (
       typeof data === "object" &&
@@ -1668,7 +2286,6 @@ export const AdSystemUtils = {
     );
   },
 
-  // Logger les événements publicitaires (version locale)
   logAdEvent: (
     event: string,
     adId?: string,
@@ -1687,16 +2304,13 @@ export const AdSystemUtils = {
         : undefined,
     };
 
-    // Log local pour debug
     console.log("📊 [AdSystem] Event:", eventData);
 
-    // En production, pourrait envoyer à un service d'analytics
     try {
       const existingLogs = localStorage.getItem("adEventLogs");
       const logs = existingLogs ? JSON.parse(existingLogs) : [];
       logs.push(eventData);
 
-      // Garder seulement les 100 derniers événements
       if (logs.length > 100) {
         logs.splice(0, logs.length - 100);
       }
@@ -1707,7 +2321,6 @@ export const AdSystemUtils = {
     }
   },
 
-  // Calculer le temps restant avant la prochaine publicité
   getTimeUntilNextAd: (
     lastAdShown?: string,
     cooldownHours: number = 24,
@@ -1722,7 +2335,6 @@ export const AdSystemUtils = {
     return Math.max(0, cooldownMs - elapsed);
   },
 
-  // Formater le temps restant en format lisible
   formatTimeRemaining: (milliseconds: number): string => {
     const hours = Math.floor(milliseconds / (1000 * 60 * 60));
     const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
@@ -1737,14 +2349,11 @@ export const AdSystemUtils = {
   },
 } as const;
 
-// NOUVEAUX: UTILITAIRES POUR SESSION TRACKING
 export const SessionUtils = {
-  // Générer un ID de session unique
   generateSessionId: (): string => {
     return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   },
 
-  // Calculer la durée d'une session
   calculateSessionDuration: (
     loginTime: string,
     logoutTime?: string,
@@ -1754,26 +2363,21 @@ export const SessionUtils = {
     return Math.floor((end.getTime() - start.getTime()) / 1000);
   },
 
-  // Détecter le type de déconnexion selon le contexte
   detectLogoutType: (
     userAgent: string,
     sessionDuration: number,
   ): "manual" | "browser_close" | "timeout" => {
-    // Session très courte = probablement fermeture navigateur
     if (sessionDuration < 30) {
       return "browser_close";
     }
 
-    // Session très longue = probablement timeout
     if (sessionDuration > SESSION_CONFIG.SESSION_TIMEOUT) {
       return "timeout";
     }
 
-    // Par défaut: déconnexion manuelle
     return "manual";
   },
 
-  // Nettoyer les sessions expirées
   cleanupExpiredSessions: (sessions: UserSession[]): UserSession[] => {
     const cutoffDate = new Date();
     cutoffDate.setDate(
@@ -1786,7 +2390,6 @@ export const SessionUtils = {
     });
   },
 
-  // Valider les données de session
   validateSessionData: (session: any): session is UserSession => {
     return (
       typeof session === "object" &&
@@ -1798,7 +2401,6 @@ export const SessionUtils = {
     );
   },
 
-  // Grouper les sessions par période
   groupSessionsByPeriod: (
     sessions: UserSession[],
   ): Record<string, UserSession[]> => {
@@ -1836,7 +2438,6 @@ export const SessionUtils = {
   },
 } as const;
 
-// TYPE GUARDS POUR LA VALIDATION
 export const TypeGuards = {
   isFeedbackType: (value: any): value is "positive" | "negative" => {
     return (
@@ -1844,7 +2445,6 @@ export const TypeGuards = {
     );
   },
 
-  // NOUVEAU: Type guard pour ConcisionLevel
   isConcisionLevel: (value: any): value is ConcisionLevel => {
     return (
       typeof value === "string" &&
@@ -1852,7 +2452,6 @@ export const TypeGuards = {
     );
   },
 
-  // NOUVEAU: Type guard pour response_versions
   isValidResponseVersions: (value: any): value is Record<string, string> => {
     if (!value || typeof value !== "object") return false;
     return Object.values(ConcisionLevel).some(
@@ -1860,7 +2459,6 @@ export const TypeGuards = {
     );
   },
 
-  // NOUVEAU: Type guard pour AgentMetadata
   isValidAgentMetadata: (value: any): value is AgentMetadata => {
     return (
       typeof value === "object" &&
@@ -1872,7 +2470,67 @@ export const TypeGuards = {
     );
   },
 
-  // NOUVEAUX: Type guards pour Ad System
+  // NOUVEAUX TYPE GUARDS POUR JSON SYSTEM
+  isValidGeneticLineData: (value: any): value is GeneticLineData => {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      typeof value.line === "string" &&
+      Object.values(JSON_SYSTEM_CONFIG.GENETIC_LINES).includes(value.line)
+    );
+  },
+
+  isValidPerformanceMetric: (value: any): value is PerformanceMetric => {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      typeof value.type === "string" &&
+      Object.values(JSON_SYSTEM_CONFIG.PERFORMANCE_METRICS).includes(value.type) &&
+      typeof value.value === "number" &&
+      typeof value.unit === "string"
+    );
+  },
+
+  isValidAvicultureDocument: (value: any): value is AvicultureDocument => {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      typeof value.id === "string" &&
+      typeof value.title === "string" &&
+      typeof value.text === "string" &&
+      typeof value.metadata === "object" &&
+      value.metadata !== null
+    );
+  },
+
+  isValidJSONValidationResult: (value: any): value is JSONValidationResult => {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      typeof value.is_valid === "boolean" &&
+      Array.isArray(value.errors) &&
+      Array.isArray(value.warnings) &&
+      typeof value.metadata === "object"
+    );
+  },
+
+  isValidJSONSearchRequest: (value: any): value is JSONSearchRequest => {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      typeof value.query === "string"
+    );
+  },
+
+  isValidAvicultureSearchResult: (value: any): value is AvicultureSearchResult => {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      TypeGuards.isValidAvicultureDocument(value.document) &&
+      typeof value.score === "number"
+    );
+  },
+
   isValidAdData: (value: any): value is AdData => {
     return (
       typeof value === "object" &&
@@ -1901,7 +2559,6 @@ export const TypeGuards = {
     );
   },
 
-  // NOUVEAUX: Type guards pour Session Tracking
   isValidUserSession: (value: any): value is UserSession => {
     return SessionUtils.validateSessionData(value);
   },
@@ -1947,7 +2604,6 @@ export const TypeGuards = {
     );
   },
 
-  // TYPE GUARD POUR CONVERSATION DE BASE
   isValidConversation: (value: any): value is Conversation => {
     return (
       typeof value === "object" &&
@@ -1959,7 +2615,6 @@ export const TypeGuards = {
     );
   },
 
-  // Type guard pour ConversationWithMessages
   isValidConversationWithMessages: (
     value: any,
   ): value is ConversationWithMessages => {
@@ -1987,7 +2642,6 @@ export const TypeGuards = {
     );
   },
 
-  // Type guard pour clarifications
   isValidClarificationResponse: (
     value: any,
   ): value is ClarificationResponse => {
@@ -1998,12 +2652,10 @@ export const TypeGuards = {
     );
   },
 
-  // Type guard pour StreamCallbacks
   isValidStreamCallbacks: (value: any): value is StreamCallbacks => {
     return typeof value === "object" && value !== null;
   },
 
-  // Type guard pour StreamEvent
   isValidStreamEvent: (value: any): value is StreamEvent => {
     return (
       typeof value === "object" &&
@@ -2013,7 +2665,6 @@ export const TypeGuards = {
   },
 } as const;
 
-// CONFIGURATION DES CONVERSATIONS
 export const CONVERSATION_CONFIG = {
   GROUPING: {
     DEFAULT_OPTIONS: {
@@ -2031,20 +2682,19 @@ export const CONVERSATION_CONFIG = {
     },
   },
   UI: {
-    SIDEBAR_WIDTH: "w-96", // 384px
+    SIDEBAR_WIDTH: "w-96",
     MAX_TITLE_LENGTH: 60,
     MAX_PREVIEW_LENGTH: 150,
     MESSAGES_PER_PAGE: 50,
     AUTO_SCROLL_DELAY: 100,
   },
   CACHE: {
-    CONVERSATION_LIST_TTL: 5 * 60 * 1000, // 5 minutes
-    CONVERSATION_DETAIL_TTL: 10 * 60 * 1000, // 10 minutes
+    CONVERSATION_LIST_TTL: 5 * 60 * 1000,
+    CONVERSATION_DETAIL_TTL: 10 * 60 * 1000,
     MAX_CACHED_CONVERSATIONS: 100,
   },
 } as const;
 
-// UTILITAIRES POUR CONVERSATIONS
 export const CONVERSATION_UTILS = {
   generateTitle: (firstMessage: string): string => {
     const maxLength = CONVERSATION_CONFIG.UI.MAX_TITLE_LENGTH;
@@ -2144,12 +2794,10 @@ export const CONVERSATION_UTILS = {
       }
     });
 
-    // Retourner seulement les groupes non vides
     return groups.filter((group) => group.conversations.length > 0);
   },
 } as const;
 
-// NOUVEAUX: TYPES POUR LES RÉPONSES D'API AGENT
 export interface AgentApiResponse {
   status: "success" | "error";
   response?: string;
@@ -2172,7 +2820,6 @@ export interface LLMHealthResponse {
   timestamp: string;
 }
 
-// NOUVELLES CONSTANTES POUR AGENT LLM
 export const AGENT_CONFIG = {
   COMPLEXITY_LEVELS: {
     SIMPLE: "simple",
@@ -2190,11 +2837,10 @@ export const AGENT_CONFIG = {
     MAX_SUB_QUERIES: 5,
     CONFIDENCE_THRESHOLD: 0.7,
     SOURCES_LIMIT: 10,
-    PROCESSING_TIMEOUT: 30000, // 30 secondes
+    PROCESSING_TIMEOUT: 30000,
   },
 } as const;
 
-// NOUVEAUX: UTILITAIRES POUR AGENT
 export const AgentUtils = {
   formatComplexity: (complexity: string): string => {
     const complexityMap: Record<string, string> = {
@@ -2237,7 +2883,6 @@ export const AgentUtils = {
   },
 } as const;
 
-// CONSTANTES UI
 export const UI_CONSTANTS = {
   COLORS: {
     PRIMARY: "blue",
@@ -2267,12 +2912,11 @@ export const UI_CONSTANTS = {
   },
 } as const;
 
-// CONSTANTES DE VALIDATION
 export const VALIDATION_RULES = {
   FEEDBACK: {
     COMMENT_MIN_LENGTH: 0,
     COMMENT_MAX_LENGTH: 500,
-    REQUIRED_FIELDS: [] as string[], // Aucun champ requis pour le feedback
+    REQUIRED_FIELDS: [] as string[],
     ALLOWED_FEEDBACK_TYPES: ["positive", "negative"] as const,
   },
   PHONE: {
@@ -2280,7 +2924,6 @@ export const VALIDATION_RULES = {
     AREA_CODE_PATTERN: /^\d{1,4}$/,
     PHONE_NUMBER_PATTERN: /^\d{4,12}$/,
   },
-  // RÈGLES POUR CONVERSATIONS
   CONVERSATION: {
     TITLE_MAX_LENGTH: 60,
     PREVIEW_MAX_LENGTH: 150,
@@ -2288,53 +2931,62 @@ export const VALIDATION_RULES = {
     MAX_CONVERSATIONS_PER_USER: 1000,
     AUTO_DELETE_DAYS: 30,
   },
-  // RÈGLES POUR CLARIFICATIONS
   CLARIFICATION: {
     MIN_ANSWER_LENGTH: 0,
     MAX_ANSWER_LENGTH: 200,
     MAX_QUESTIONS: 4,
     REQUIRED_ANSWER_PERCENTAGE: 0.5,
   },
-  // NOUVELLES: RÈGLES POUR CONCISION
   CONCISION: {
     MIN_RESPONSE_LENGTH: 10,
     MAX_ULTRA_CONCISE_LENGTH: 50,
     MAX_CONCISE_LENGTH: 200,
     MAX_STANDARD_LENGTH: 500,
-    // Pas de limite pour DETAILED
     AUTO_DETECT_ENABLED: true,
   },
-  // NOUVELLES: RÈGLES POUR AD SYSTEM
   AD_SYSTEM: {
     MIN_SESSIONS_FOR_AD: 2,
-    MIN_SESSION_DURATION: 60, // secondes
+    MIN_SESSION_DURATION: 60,
     COOLDOWN_HOURS: 24,
-    MIN_DISPLAY_TIME: 15, // secondes
+    MIN_DISPLAY_TIME: 15,
     MAX_TITLE_LENGTH: 60,
     MAX_DESCRIPTION_LENGTH: 200,
     MAX_FEATURES_COUNT: 8,
   },
-  // NOUVELLES: RÈGLES POUR SESSION TRACKING
   SESSION_TRACKING: {
-    MIN_SESSION_DURATION: 5, // secondes
-    MAX_SESSION_DURATION: 8 * 60 * 60, // 8 heures
-    HEARTBEAT_TOLERANCE: 5 * 60, // 5 minutes de tolérance
+    MIN_SESSION_DURATION: 5,
+    MAX_SESSION_DURATION: 8 * 60 * 60,
+    HEARTBEAT_TOLERANCE: 5 * 60,
     MAX_SESSIONS_PER_DAY: 20,
     SESSION_ID_LENGTH: 32,
   },
-  // NOUVELLES: RÈGLES POUR AGENT LLM
   AGENT: {
-    MIN_PROCESSING_TIME: 100, // ms
-    MAX_PROCESSING_TIME: 60000, // 60 secondes
+    MIN_PROCESSING_TIME: 100,
+    MAX_PROCESSING_TIME: 60000,
     MAX_SUB_QUERIES: 10,
     MAX_SOURCES: 20,
     MAX_DECISIONS: 50,
     MIN_CONFIDENCE: 0.0,
     MAX_CONFIDENCE: 1.0,
   },
+  // NOUVEAU: RÈGLES POUR JSON SYSTEM
+  JSON_SYSTEM: {
+    MIN_TITLE_LENGTH: 5,
+    MAX_TITLE_LENGTH: 200,
+    MIN_TEXT_LENGTH: 50,
+    MAX_TEXT_LENGTH: 100000,
+    MAX_TABLES_PER_DOCUMENT: 50,
+    MAX_FIGURES_PER_DOCUMENT: 20,
+    MAX_PERFORMANCE_RECORDS: 1000,
+    MAX_DOCUMENT_SIZE_MB: 10,
+    REQUIRED_METADATA_FIELDS: ["document_type", "language"],
+    SUPPORTED_LANGUAGES: ["fr", "en", "es", "pt", "de"],
+    MAX_GENETIC_LINES_PER_DOCUMENT: 5,
+    MIN_CONFIDENCE_SCORE: 0.0,
+    MAX_CONFIDENCE_SCORE: 1.0,
+  },
 } as const;
 
-// MESSAGES D'ERREUR LOCALISÉS
 export const ERROR_MESSAGES = {
   FEEDBACK: {
     SUBMISSION_FAILED:
@@ -2347,7 +2999,6 @@ export const ERROR_MESSAGES = {
     SERVER_ERROR: "Erreur serveur. Veuillez réessayer plus tard.",
     TIMEOUT_ERROR: "Timeout - le serveur met trop de temps à répondre",
   },
-  // MESSAGES POUR CONVERSATIONS
   CONVERSATION: {
     LOAD_FAILED: "Erreur lors du chargement de la conversation",
     DELETE_FAILED: "Erreur lors de la suppression de la conversation",
@@ -2356,21 +3007,18 @@ export const ERROR_MESSAGES = {
     MESSAGE_TOO_LONG: `Le message ne peut pas dépasser ${VALIDATION_RULES.CONVERSATION.MESSAGE_MAX_LENGTH} caractères`,
     CREATION_FAILED: "Erreur lors de la création de la conversation",
   },
-  // MESSAGES POUR CLARIFICATIONS
   CLARIFICATION: {
     PROCESSING_FAILED: "Erreur lors du traitement des clarifications",
     INVALID_ANSWERS: "Réponses invalides. Veuillez vérifier vos réponses.",
     SUBMISSION_FAILED: "Erreur lors de l'envoi des clarifications",
     TIMEOUT: "Timeout lors du traitement des clarifications",
   },
-  // NOUVEAUX: MESSAGES POUR CONCISION
   CONCISION: {
     VERSION_NOT_FOUND: "Version de réponse non trouvée",
     INVALID_LEVEL: "Niveau de concision invalide",
     BACKEND_ERROR: "Erreur lors de la génération des versions de réponse",
     FALLBACK_USED: "Version de secours utilisée",
   },
-  // NOUVEAUX: MESSAGES POUR AD SYSTEM
   AD_SYSTEM: {
     LOAD_FAILED: "Erreur lors du chargement de la publicité",
     SESSION_CHECK_FAILED: "Erreur lors de la vérification de l'éligibilité",
@@ -2378,7 +3026,6 @@ export const ERROR_MESSAGES = {
     TRACKING_FAILED: "Erreur lors du suivi publicitaire",
     COOLDOWN_ACTIVE: "Publicité en période d'attente",
   },
-  // NOUVEAUX: MESSAGES POUR SESSION TRACKING
   SESSION_TRACKING: {
     START_FAILED: "Erreur lors du démarrage du tracking de session",
     HEARTBEAT_FAILED: "Erreur lors de la mise à jour de l'activité",
@@ -2386,13 +3033,30 @@ export const ERROR_MESSAGES = {
     INVALID_SESSION: "Session invalide ou expirée",
     ANALYTICS_FAILED: "Erreur lors du chargement des analytics de session",
   },
-  // NOUVEAUX: MESSAGES POUR AGENT LLM
   AGENT: {
     PROCESSING_FAILED: "Erreur lors du traitement par l'Agent",
     TIMEOUT: "L'Agent a mis trop de temps à répondre",
     COMPLEXITY_ERROR: "Erreur dans l'analyse de complexité",
     SYNTHESIS_FAILED: "Erreur lors de la synthèse des sources",
     INVALID_METADATA: "Métadonnées Agent invalides",
+  },
+  // NOUVEAUX: MESSAGES POUR JSON SYSTEM
+  JSON_SYSTEM: {
+    VALIDATION_FAILED: "Erreur lors de la validation du document JSON",
+    INVALID_DOCUMENT_STRUCTURE: "Structure de document invalide",
+    MISSING_REQUIRED_FIELDS: "Champs requis manquants",
+    INVALID_GENETIC_LINE: "Lignée génétique non reconnue",
+    INVALID_PERFORMANCE_METRIC: "Métrique de performance invalide",
+    EXTRACTION_FAILED: "Erreur lors de l'extraction des données",
+    SEARCH_FAILED: "Erreur lors de la recherche JSON",
+    UPLOAD_FAILED: "Erreur lors de l'upload des fichiers",
+    INGESTION_FAILED: "Erreur lors de l'ingestion des documents",
+    DOCUMENT_TOO_LARGE: `Document trop volumineux (max ${VALIDATION_RULES.JSON_SYSTEM.MAX_DOCUMENT_SIZE_MB}MB)`,
+    UNSUPPORTED_FORMAT: "Format de fichier non supporté",
+    INVALID_JSON_FORMAT: "Format JSON invalide",
+    PERFORMANCE_DATA_INVALID: "Données de performance invalides",
+    TABLE_EXTRACTION_FAILED: "Erreur lors de l'extraction des tableaux",
+    GENETIC_LINE_DETECTION_FAILED: "Erreur lors de la détection de lignée génétique",
   },
   GENERAL: {
     UNAUTHORIZED: "Session expirée - reconnexion nécessaire",
@@ -2402,7 +3066,6 @@ export const ERROR_MESSAGES = {
   },
 } as const;
 
-// TYPES POUR LES RÉPONSES D'API FEEDBACK
 export interface FeedbackApiResponse {
   status: "success" | "error";
   message: string;
@@ -2426,7 +3089,6 @@ export interface AnalyticsApiResponse {
   message: string;
 }
 
-// NOUVEAUX: TYPES POUR LES RÉPONSES D'API AD SYSTEM
 export interface AdEligibilityResponse {
   status: "success" | "error";
   qualifiesForAd: boolean;
@@ -2442,7 +3104,6 @@ export interface AdEventResponse {
   timestamp: string;
 }
 
-// NOUVEAUX: TYPES POUR LES RÉPONSES D'API SESSION TRACKING
 export interface SessionAnalyticsApiResponse {
   status: "success" | "error";
   data?: SessionAnalytics;
@@ -2461,7 +3122,48 @@ export interface SessionStatsApiResponse {
   timestamp: string;
 }
 
-// TYPES POUR LES PRÉFÉRENCES UTILISATEUR
+// NOUVEAUX: TYPES POUR LES RÉPONSES D'API JSON SYSTEM
+export interface JSONValidationApiResponse {
+  status: "success" | "error";
+  data?: JSONValidationResult;
+  error?: string;
+  timestamp: string;
+}
+
+export interface JSONIngestionApiResponse {
+  status: "success" | "error";
+  data?: JSONIngestionResult;
+  error?: string;
+  timestamp: string;
+}
+
+export interface JSONSearchApiResponse {
+  status: "success" | "error";
+  data?: JSONSearchResult;
+  error?: string;
+  timestamp: string;
+}
+
+export interface JSONSystemStatusResponse {
+  status: "healthy" | "degraded" | "unhealthy";
+  components: {
+    json_validator: boolean;
+    json_extractor: boolean;
+    table_extractor: boolean;
+    genetic_line_extractor: boolean;
+    ingestion_pipeline: boolean;
+    hybrid_search_engine: boolean;
+  };
+  statistics: {
+    documents_indexed: number;
+    genetic_lines_detected: number;
+    performance_metrics_processed: number;
+    tables_extracted: number;
+    figures_processed: number;
+  };
+  timestamp: string;
+}
+
 export interface UserPreferences {
   language: Language;
   concision_level: ConcisionLevel;
@@ -2472,6 +3174,13 @@ export interface UserPreferences {
   timezone: string;
   date_format: "dd/mm/yyyy" | "mm/dd/yyyy" | "yyyy-mm-dd";
   time_format: "12h" | "24h";
+  // NOUVEAU: Préférences JSON system
+  json_preferences?: {
+    auto_detect_genetic_lines: boolean;
+    include_performance_data: boolean;
+    preferred_search_type: "semantic" | "bm25" | "hybrid";
+    confidence_threshold: number;
+  };
 }
 
 export interface UserPreferencesUpdate {
@@ -2484,9 +3193,14 @@ export interface UserPreferencesUpdate {
   timezone?: string;
   date_format?: "dd/mm/yyyy" | "mm/dd/yyyy" | "yyyy-mm-dd";
   time_format?: "12h" | "24h";
+  json_preferences?: {
+    auto_detect_genetic_lines?: boolean;
+    include_performance_data?: boolean;
+    preferred_search_type?: "semantic" | "bm25" | "hybrid";
+    confidence_threshold?: number;
+  };
 }
 
-// TYPES POUR LES NOTIFICATIONS
 export interface NotificationData {
   id: string;
   type: "info" | "success" | "warning" | "error";
@@ -2507,11 +3221,10 @@ export interface NotificationSettings {
   maintenance_alerts: boolean;
 }
 
-// CONSTANTES DE CONFIGURATION GLOBALE
 export const APP_CONFIG = {
   NAME: "Intelia Expert",
-  VERSION: "2.1.0", // Incrémenté pour support Agent
-  DESCRIPTION: "Plateforme IA spécialisée en élevage avicole avec Agent LLM",
+  VERSION: "4.0.0", // Version JSON System
+  DESCRIPTION: "Plateforme IA spécialisée en élevage avicole avec système RAG JSON avancé",
   COMPANY: "Intelia",
   SUPPORT_EMAIL: "support@intelia.com",
   PRIVACY_URL: "https://intelia.com/privacy",
@@ -2525,11 +3238,18 @@ export const APP_CONFIG = {
     ENABLE_SESSION_TRACKING: true,
     ENABLE_CONVERSATIONS: true,
     ENABLE_ANALYTICS: true,
-    // 🆕 NOUVELLES FEATURES AGENT
     ENABLE_AGENT_LLM: true,
     ENABLE_AGENT_METADATA: true,
     ENABLE_PROACTIVE_FOLLOWUP: true,
     ENABLE_STREAMING_ENHANCED: true,
+    // NOUVELLES FEATURES JSON
+    ENABLE_JSON_SYSTEM: true,
+    ENABLE_JSON_VALIDATION: true,
+    ENABLE_JSON_INGESTION: true,
+    ENABLE_JSON_SEARCH: true,
+    ENABLE_PERFORMANCE_EXTRACTION: true,
+    ENABLE_GENETIC_LINE_DETECTION: true,
+    ENABLE_TABLE_EXTRACTION: true,
   },
 
   LIMITS: {
@@ -2538,12 +3258,14 @@ export const APP_CONFIG = {
     MAX_FEEDBACK_COMMENT_LENGTH: 500,
     SESSION_TIMEOUT_MINUTES: 30,
     HEARTBEAT_INTERVAL_MINUTES: 2,
-    // 🆕 LIMITES AGENT
-    MAX_AGENT_PROCESSING_TIME: 60000, // 60 secondes
+    MAX_AGENT_PROCESSING_TIME: 60000,
     MAX_AGENT_SUB_QUERIES: 5,
     MAX_AGENT_SOURCES: 10,
+    // NOUVELLES LIMITES JSON
+    MAX_JSON_DOCUMENT_SIZE_MB: 10,
+    MAX_JSON_FILES_PER_UPLOAD: 50,
+    MAX_JSON_BATCH_SIZE: 20,
+    MAX_JSON_SEARCH_RESULTS: 50,
+    MAX_PERFORMANCE_RECORDS_PER_DOCUMENT: 1000,
   },
 } as const;
-
-// Note: Les utilitaires sont déjà exportés via 'export const' dans leurs déclarations respectives
-// Pas besoin d'export supplémentaire ici
