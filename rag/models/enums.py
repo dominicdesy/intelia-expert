@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
+
 """
+
 rag/models/enums.py - Énumérations pour le système RAG avicole
 Version 1.0 - Fondations du système d'extraction JSON
+
 """
+
 
 from enum import Enum
 
