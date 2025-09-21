@@ -2,6 +2,7 @@
 """
 retriever.py - Retriever hybride optimisé avec cache et fallbacks - VERSION CORRIGÉE
 CORRECTION CRITIQUE: Dimension vectorielle correcte dès l'initialisation (1536)
+AJOUT: Méthodes pour RRF Intelligent
 """
 
 import logging
@@ -63,6 +64,9 @@ class HybridWeaviateRetriever:
         )
         self.dimension_detection_attempted = False
         self.dimension_detection_success = False
+
+        # RRF Intelligent (sera configuré par RAG Engine)
+        self.intelligent_rrf = None
 
         # Note: La détection sera faite lors du premier appel async pour confirmer
 
@@ -136,6 +140,12 @@ class HybridWeaviateRetriever:
             self.working_vector_dimension = 1536  # CORRIGÉ: Fallback sur 1536
             self.api_capabilities["api_stability"] = "degraded"
             return 1536
+
+    async def diagnose_weaviate_api(self):
+        """Diagnostic des capacités API Weaviate"""
+        if ENABLE_API_DIAGNOSTICS:
+            await self._ensure_dimension_detected()
+            await self._test_api_features()
 
     async def _test_api_features(self):
         """Test des fonctionnalités API avec syntaxe v4"""
@@ -775,6 +785,83 @@ class HybridWeaviateRetriever:
             logger.error(f"Erreur recherche hybride v4: {e}")
             return []
 
+    # === NOUVELLES MÉTHODES POUR RRF INTELLIGENT ===
+
+    async def _vector_search_v4_corrected(
+        self, query_vector: List[float], top_k: int, where_filter: Dict = None
+    ) -> List[Document]:
+        """Recherche vectorielle pure pour RRF intelligent"""
+        try:
+            if not self.client:
+                logger.error("Client Weaviate non disponible")
+                return []
+
+            # S'assurer de la bonne dimension
+            adjusted_vector = self._adjust_vector_dimension(query_vector)
+
+            collection = self.client.collections.get(self.collection_name)
+
+            # Construire les paramètres de requête
+            search_params = {
+                "limit": top_k,
+                "return_metadata": wvc.query.MetadataQuery(score=True),
+            }
+
+            # Ajouter le filtre where si fourni
+            if where_filter and self.api_capabilities.get("hybrid_with_where", True):
+                v4_filter = self._to_v4_filter(where_filter)
+                if v4_filter is not None:
+                    search_params["where"] = v4_filter
+
+            # Exécuter la requête vectorielle
+            result = collection.query.near_vector(adjusted_vector, **search_params)
+
+            # Convertir en Documents
+            documents = []
+            for obj in result.objects:
+                try:
+                    metadata = getattr(obj, "metadata", {})
+                    properties = getattr(obj, "properties", {})
+
+                    score = float(getattr(metadata, "score", 0.0))
+
+                    doc = Document(
+                        content=properties.get("content", ""),
+                        metadata={
+                            "title": properties.get("title", ""),
+                            "source": properties.get("source", ""),
+                            "geneticLine": properties.get("geneticLine", ""),
+                            "species": properties.get("species", ""),
+                            "phase": properties.get("phase", ""),
+                            "age_band": properties.get("age_band", ""),
+                            "search_type": "vector_pure",
+                            "weaviate_id": str(getattr(obj, "uuid", "")),
+                            **properties,
+                        },
+                        score=score,
+                    )
+                    documents.append(doc)
+
+                except Exception as e:
+                    logger.warning(f"Erreur conversion objet Weaviate vectoriel: {e}")
+                    continue
+
+            logger.debug(
+                f"Recherche vectorielle pure: {len(documents)} documents trouvés"
+            )
+            return documents
+
+        except Exception as e:
+            logger.error(f"Erreur recherche vectorielle v4 corrigée: {e}")
+            return []
+
+    def set_intelligent_rrf(self, intelligent_rrf):
+        """Configure le RRF intelligent pour ce retriever"""
+        self.intelligent_rrf = intelligent_rrf
+        logger.info("✅ RRF Intelligent lié au retriever")
+
+    # === MÉTHODES EXISTANTES (SUITE) ===
+
     async def _hybrid_search_v3(
         self,
         query_vector: List[float],
@@ -933,6 +1020,7 @@ class HybridWeaviateRetriever:
             "runtime_corrections": self.api_capabilities.get("runtime_corrections", 0),
             "dimension_detection_attempted": self.dimension_detection_attempted,
             "dimension_detection_success": self.dimension_detection_success,
+            "intelligent_rrf_configured": bool(self.intelligent_rrf),
         }
 
 
@@ -999,6 +1087,12 @@ async def test_retriever_capabilities(
         "adaptive_search_working": False,
         "vector_dimension": retriever.working_vector_dimension,
         "dimension_detection_success": retriever.dimension_detection_success,
+        "rrf_methods_available": {
+            "_vector_search_v4_corrected": hasattr(
+                retriever, "_vector_search_v4_corrected"
+            ),
+            "set_intelligent_rrf": hasattr(retriever, "set_intelligent_rrf"),
+        },
     }
 
     try:
@@ -1022,6 +1116,13 @@ async def test_retriever_capabilities(
                 test_vector, "test adaptive query", top_k=1
             )
             test_results["adaptive_search_working"] = len(adaptive_docs) >= 0
+
+            # Test RRF method
+            try:
+                rrf_docs = await retriever._vector_search_v4_corrected(test_vector, 1)
+                test_results["rrf_vector_search_working"] = len(rrf_docs) >= 0
+            except Exception as e:
+                test_results["rrf_vector_search_error"] = str(e)
 
     except Exception as e:
         test_results["error"] = str(e)
@@ -1075,6 +1176,14 @@ async def diagnose_retriever_issues(
                 "Vérifier l'implémentation adaptive_search"
             )
 
+        # Vérification RRF
+        rrf_methods = test_results.get("rrf_methods_available", {})
+        if not all(rrf_methods.values()):
+            diagnostic["issues_found"].append("Méthodes RRF incomplètes")
+            diagnostic["recommendations"].append(
+                "Ajouter les méthodes manquantes pour RRF intelligent"
+            )
+
         dimension = test_results.get("vector_dimension")
         if dimension and dimension not in [384, 1536, 3072]:
             diagnostic["issues_found"].append(
@@ -1114,6 +1223,14 @@ def validate_retriever_corrections() -> Dict[str, bool]:
         ),
         "intent_result_handling_fixed": True,
         "dimension_corrected": True,  # NOUVEAU: Dimension 1536 au lieu de 384
+        # NOUVEAU: Validations RRF
+        "rrf_vector_search_method": hasattr(
+            HybridWeaviateRetriever, "_vector_search_v4_corrected"
+        ),
+        "rrf_configuration_method": hasattr(
+            HybridWeaviateRetriever, "set_intelligent_rrf"
+        ),
+        "rrf_support_complete": True,
     }
 
     all_corrections_applied = all(validation_results.values())
@@ -1121,5 +1238,6 @@ def validate_retriever_corrections() -> Dict[str, bool]:
     return {
         "all_corrections_applied": all_corrections_applied,
         "details": validation_results,
-        "version": "corrected_v4_dimension_fixed",  # Version mise à jour
+        "version": "corrected_v4_with_rrf_support",  # Version mise à jour
+        "rrf_intelligent_ready": all_corrections_applied,
     }

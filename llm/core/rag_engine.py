@@ -1168,7 +1168,8 @@ class InteliaRAGEngine:
                 logger.warning(f"Intent_result invalide détecté: {type(intent_result)}")
 
             # Recherche vectorielle et BM25 séparément pour RRF intelligent
-            vector_results = await self.retriever._vector_search_v4_corrected(
+            # Utiliser la méthode fallback vectorielle existante
+            vector_results = await self.retriever._vector_search_fallback(
                 query_vector, top_k * 2, where_filter
             )
 
