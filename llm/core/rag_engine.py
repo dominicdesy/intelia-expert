@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 rag_engine.py - RAG Engine Enhanced avec LangSmith et RRF Intelligent
-Version corrigée pour compatibilité avec le nouveau ood_detector.py
+Version corrigée pour éliminer l'erreur 'bool' object is not subscriptable
 """
 
 import os
@@ -248,7 +248,6 @@ class InteliaRAGEngine:
                 try:
                     from cache.redis_cache_manager import RAGCacheManager
 
-                    # CORRECTION: Utiliser la factory function au lieu du constructeur direct
                     self.cache_manager = RAGCacheManager()
                     await self.cache_manager.initialize()
                     if self.cache_manager.enabled:
@@ -336,7 +335,7 @@ class InteliaRAGEngine:
 
             logger.debug("Étape 6: Intent processor...")
 
-            # 6. Intent processor avec gestion d'erreurs améliorée et résolution de chemin
+            # 6. Intent processor avec gestion d'erreurs améliorée
             try:
                 from processing.intent_processor import create_intent_processor
                 import os
@@ -1147,13 +1146,25 @@ class InteliaRAGEngine:
         original_query: str,
         intent_result,
     ) -> List[Document]:
-        """Recherche hybride utilisant le RRF intelligent - VERSION SÉCURISÉE"""
+        """Recherche hybride utilisant le RRF intelligent - VERSION SÉCURISÉE CORRIGÉE"""
 
         try:
-            # VALIDATION CRITIQUE: S'assurer qu'intent_result est utilisable
+            # VALIDATION CRITIQUE: S'assurer qu'intent_result est utilisable avec gestion robuste des types
             validated_intent = validate_intent_result(intent_result)
 
-            if not validated_intent["is_valid"] and intent_result is not None:
+            # CORRECTION PRINCIPALE: Gestion robuste du type de validated_intent
+            is_valid = False
+            if isinstance(validated_intent, dict):
+                is_valid = validated_intent.get("is_valid", False)
+            elif isinstance(validated_intent, bool):
+                is_valid = validated_intent
+            else:
+                logger.warning(
+                    f"Type inattendu pour validated_intent: {type(validated_intent)}"
+                )
+                is_valid = False
+
+            if not is_valid and intent_result is not None:
                 logger.warning(f"Intent_result invalide détecté: {type(intent_result)}")
 
             # Recherche vectorielle et BM25 séparément pour RRF intelligent
@@ -1170,84 +1181,158 @@ class InteliaRAGEngine:
             vector_dicts = [self._document_to_dict(doc) for doc in vector_results]
             bm25_dicts = [self._document_to_dict(doc) for doc in bm25_results]
 
-            # Contexte pour RRF intelligent
+            # Contexte pour RRF intelligent avec validation sécurisée
             query_context = {
                 "query": original_query,
                 "alpha": alpha,
                 "top_k": top_k,
-                "intent_validated": validated_intent["is_valid"],
+                "intent_validated": is_valid,
             }
 
-            # PASSAGE SÉCURISÉ: Passer intent_result original mais avec validation
+            # PASSAGE SÉCURISÉ: Passer intent_result original mais avec validation robuste
             try:
                 fused_results = await self.intelligent_rrf.enhanced_fusion(
                     vector_dicts, bm25_dicts, alpha, top_k, query_context, intent_result
                 )
+                logger.debug(
+                    f"RRF intelligent réussi avec {len(fused_results)} résultats"
+                )
+
             except Exception as rrf_error:
                 logger.error(f"Erreur RRF avec intent_result: {rrf_error}")
-                # Fallback: passer None au lieu d'un intent_result potentiellement défaillant
-                fused_results = await self.intelligent_rrf.enhanced_fusion(
-                    vector_dicts, bm25_dicts, alpha, top_k, query_context, None
-                )
+                logger.debug(f"Type intent_result problématique: {type(intent_result)}")
 
-            # Reconversion en Documents
+                # Fallback: passer None au lieu d'un intent_result potentiellement défaillant
+                try:
+                    fused_results = await self.intelligent_rrf.enhanced_fusion(
+                        vector_dicts, bm25_dicts, alpha, top_k, query_context, None
+                    )
+                    logger.warning(
+                        "RRF intelligent réussi en mode fallback (intent_result=None)"
+                    )
+
+                except Exception as fallback_error:
+                    logger.error(f"Erreur RRF même en fallback: {fallback_error}")
+                    # Dernière option: RRF classique
+                    fused_results = await self._classic_rrf_fallback(
+                        vector_dicts, bm25_dicts, alpha, top_k
+                    )
+                    logger.warning("Utilisé RRF classique en dernier recours")
+
+            # Reconversion en Documents avec validation des données
             final_documents = []
             for result_dict in fused_results:
-                doc = Document(
-                    content=result_dict.get("content", ""),
-                    metadata=result_dict.get("metadata", {}),
-                    score=result_dict.get("final_score", 0.0),
-                    explain_score=result_dict.get("explain_score"),
-                )
+                try:
+                    doc = Document(
+                        content=result_dict.get("content", ""),
+                        metadata=result_dict.get("metadata", {}),
+                        score=result_dict.get("final_score", 0.0),
+                        explain_score=result_dict.get("explain_score"),
+                    )
 
-                # Ajout métadonnées RRF intelligent
-                doc.metadata["intelligent_rrf_used"] = True
-                doc.metadata["rrf_method"] = result_dict.get("metadata", {}).get(
-                    "rrf_method", "intelligent"
-                )
-                doc.metadata["intent_validated"] = validated_intent["is_valid"]
+                    # Ajout métadonnées RRF intelligent avec validation
+                    if "metadata" not in doc.metadata:
+                        doc.metadata = {}
 
-                final_documents.append(doc)
+                    doc.metadata.update(
+                        {
+                            "intelligent_rrf_used": True,
+                            "rrf_method": result_dict.get("metadata", {}).get(
+                                "rrf_method", "intelligent"
+                            ),
+                            "intent_validated": is_valid,
+                            "intent_result_type": str(type(intent_result)),
+                            "rrf_processing_timestamp": time.time(),
+                        }
+                    )
 
+                    final_documents.append(doc)
+
+                except Exception as doc_error:
+                    logger.warning(f"Erreur conversion document: {doc_error}")
+                    continue
+
+            logger.info(
+                f"RRF intelligent terminé: {len(final_documents)} documents finaux"
+            )
             return final_documents
 
-        except Exception as e:
-            logger.error(f"Erreur RRF intelligent: {e}")
-            # Fallback vers recherche classique SANS intent_result
-            return await self.retriever.adaptive_search(
-                query_vector, query_text, top_k, where_filter, alpha=alpha
+        except Exception as global_error:
+            logger.error(f"Erreur globale dans RRF intelligent: {global_error}")
+            logger.error(
+                f"Type validated_intent: {type(validated_intent) if 'validated_intent' in locals() else 'non défini'}"
+            )
+            logger.error(
+                f"Type intent_result: {type(intent_result) if intent_result is not None else 'None'}"
             )
 
-    def _validate_intent_before_retrieval(self, intent_result) -> tuple[bool, any]:
-        """
-        Valide intent_result avant passage aux retrievers
-
-        Returns:
-            tuple: (is_safe_to_use, cleaned_intent_or_none)
-        """
-        if not intent_result:
-            return True, None
-
-        # Test basique de sécurité
-        try:
-            # Essayer d'accéder aux attributs critiques
-            if hasattr(intent_result, "intent_type"):
-                # C'est probablement un vrai objet IntentResult
-                return True, intent_result
-            elif isinstance(intent_result, dict):
-                # Dict détecté - ne pas passer aux retrievers
-                logger.warning(
-                    "Dict intent_result détecté - passage None aux retrievers"
+            # Fallback complet vers recherche classique
+            try:
+                classic_results = await self.retriever.adaptive_search(
+                    query_vector,
+                    query_text,
+                    top_k,
+                    where_filter,
+                    alpha=alpha,
                 )
-                return False, None
-            else:
-                # Type inattendu
-                logger.error(f"Type intent_result inattendu: {type(intent_result)}")
-                return False, None
+                logger.warning("Fallback vers recherche classique réussi")
+                return classic_results
+
+            except Exception as classic_error:
+                logger.error(f"Erreur même en recherche classique: {classic_error}")
+                return []
+
+    async def _classic_rrf_fallback(self, vector_dicts, bm25_dicts, alpha, top_k):
+        """Fallback RRF classique simple en cas d'erreur"""
+        try:
+            all_docs = {}
+            rrf_k = 60
+
+            # Traitement vectoriel
+            for i, doc_dict in enumerate(vector_dicts):
+                content_key = doc_dict.get("content", "")[:50]  # Clé simple
+                all_docs[content_key] = {
+                    "doc": doc_dict,
+                    "vector_rank": i + 1,
+                    "bm25_rank": None,
+                }
+
+            # Traitement BM25
+            for i, doc_dict in enumerate(bm25_dicts):
+                content_key = doc_dict.get("content", "")[:50]
+                if content_key in all_docs:
+                    all_docs[content_key]["bm25_rank"] = i + 1
+                else:
+                    all_docs[content_key] = {
+                        "doc": doc_dict,
+                        "vector_rank": None,
+                        "bm25_rank": i + 1,
+                    }
+
+            # Calcul RRF simple
+            final_results = []
+            for content_key, data in all_docs.items():
+                rrf_score = 0.0
+
+                if data["vector_rank"]:
+                    rrf_score += alpha / (rrf_k + data["vector_rank"])
+                if data["bm25_rank"]:
+                    rrf_score += (1 - alpha) / (rrf_k + data["bm25_rank"])
+
+                doc_dict = data["doc"].copy()
+                doc_dict["final_score"] = rrf_score * 10
+                doc_dict["metadata"] = doc_dict.get("metadata", {})
+                doc_dict["metadata"]["rrf_method"] = "classic_fallback"
+
+                final_results.append(doc_dict)
+
+            return sorted(final_results, key=lambda x: x["final_score"], reverse=True)[
+                :top_k
+            ]
 
         except Exception as e:
-            logger.error(f"Erreur validation intent_result: {e}")
-            return False, None
+            logger.error(f"Erreur même en RRF fallback: {e}")
+            return []
 
     def _document_to_dict(self, doc: Document) -> Dict:
         """Convertit un Document en dictionnaire pour RRF intelligent"""
