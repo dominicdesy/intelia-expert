@@ -113,7 +113,7 @@ jobs:
   build-llm:
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.llm-changed == 'true' || needs.detect-changes.outputs.rag-changed == 'true'
+    if: needs.detect-changes.outputs.llm-changed == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -127,7 +127,7 @@ jobs:
           username: doctl
           password: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Build & push LLM (includes RAG)
+      - name: Build & push LLM
         uses: docker/build-push-action@v6
         with:
           context: ./llm
@@ -140,11 +140,41 @@ jobs:
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache,mode=max
           build-args: BUILDKIT_INLINE_CACHE=1
 
+  build-rag:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.rag-changed == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DOCR
+        uses: docker/login-action@v3
+        with:
+          registry: registry.digitalocean.com
+          username: doctl
+          password: ${{ secrets.DOCR_ACCESS_TOKEN }}
+
+      - name: Build & push RAG
+        uses: docker/build-push-action@v6
+        with:
+          context: ./rag
+          push: true
+          tags: |
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-rag:latest
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-rag:main
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-rag:main-${{ github.sha }}
+          cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-rag:buildcache
+          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-rag:buildcache,mode=max
+          build-args: BUILDKIT_INLINE_CACHE=1
+
   deploy:
     name: Deploy to DigitalOcean App Platform
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-frontend, build-backend, build-llm]
-    if: always() && (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success' || needs.build-llm.result == 'success')
+    needs: [detect-changes, build-frontend, build-backend, build-llm, build-rag]
+    if: always() && (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success' || needs.build-llm.result == 'success' || needs.build-rag.result == 'success')
     steps:
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
@@ -197,7 +227,7 @@ jobs:
 
   summary:
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-frontend, build-backend, build-llm, deploy]
+    needs: [detect-changes, build-frontend, build-backend, build-llm, build-rag, deploy]
     if: always()
     steps:
       - name: Deployment Summary
@@ -236,8 +266,8 @@ jobs:
           fi
           
           if [[ "${{ needs.detect-changes.outputs.rag-changed }}" == "true" ]]; then
-            if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
-              echo "RAG: DEPLOYED (via LLM container)"
+            if [[ "${{ needs.build-rag.result }}" == "success" ]]; then
+              echo "RAG: DEPLOYED"
             else
               echo "RAG: FAILED"
             fi
