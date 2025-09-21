@@ -644,7 +644,8 @@ export const JSON_SYSTEM_CONFIG = {
 export const JSONSystemUtils = {
   // Validation des données avicoles
   validateGeneticLine: (line: string): boolean => {
-    return Object.values(JSON_SYSTEM_CONFIG.GENETIC_LINES).includes(line);
+    const validLines: string[] = Object.values(JSON_SYSTEM_CONFIG.GENETIC_LINES);
+    return validLines.includes(line);
   },
   
   validatePerformanceMetric: (metric: PerformanceMetric): ValidationError[] => {
@@ -682,7 +683,7 @@ export const JSONSystemUtils = {
   
   // Normalisation des unités
   normalizeUnit: (value: number, fromUnit: string, toUnit: string): number => {
-    const conversionTable: Record<string, Record<string, number>> = {
+    const conversionTable: Record<string, Record<string, number | ((val: number) => number)>> = {
       // Poids
       "g": { "kg": 0.001, "lb": 0.00220462, "oz": 0.035274 },
       "kg": { "g": 1000, "lb": 2.20462, "oz": 35.274 },
@@ -690,9 +691,18 @@ export const JSONSystemUtils = {
       "oz": { "g": 28.3495, "kg": 0.0283495, "lb": 0.0625 },
       
       // Température
-      "°C": { "°F": (c: number) => (c * 9/5) + 32, "K": (c: number) => c + 273.15 },
-      "°F": { "°C": (f: number) => (f - 32) * 5/9, "K": (f: number) => ((f - 32) * 5/9) + 273.15 },
-      "K": { "°C": (k: number) => k - 273.15, "°F": (k: number) => ((k - 273.15) * 9/5) + 32 },
+      "°C": { 
+        "°F": (c: number) => (c * 9/5) + 32, 
+        "K": (c: number) => c + 273.15 
+      },
+      "°F": { 
+        "°C": (f: number) => (f - 32) * 5/9, 
+        "K": (f: number) => ((f - 32) * 5/9) + 273.15 
+      },
+      "K": { 
+        "°C": (k: number) => k - 273.15, 
+        "°F": (k: number) => ((k - 273.15) * 9/5) + 32 
+      },
     };
     
     if (fromUnit === toUnit) return value;
