@@ -1,6 +1,6 @@
 # ===== REQUIREMENTS.TXT - INTELIA EXPERT BACKEND =====
-# Version 4.0 - Système RAG JSON Avicole Intégré (2025-09-21)
-# Nouvelles dépendances: PostgreSQL, validation JSON, extracteurs avicoles
+# Version 4.0 - Système RAG JSON Core (Dépendances Essentielles)
+# Version nettoyée sans optionnels pour Docker
 
 # === CORE FASTAPI - Versions stables ===
 fastapi==0.112.2
@@ -22,235 +22,172 @@ weaviate-client==4.16.10
 redis[hiredis]==5.0.1
 hiredis==2.3.2
 
-# === NOUVEAU: BASE DE DONNÉES POSTGRESQL ===
+# === BASE DE DONNÉES POSTGRESQL ===
 # Support PostgreSQL pour données structurées et performance records
 asyncpg==0.29.0
 psycopg2-binary==2.9.9
 sqlalchemy[asyncio]==2.0.23
 alembic==1.13.1
 
-# === NOUVEAU: VALIDATION ET SCHÉMAS JSON ===
+# === VALIDATION ET SCHÉMAS JSON ===
 # Validation avancée de documents JSON avicoles
 jsonschema==4.20.0
 jsonref==1.1.0
 json-flatten==0.3.1
-ujson==5.8.0  # Parser JSON ultra-rapide
-orjson==3.9.10  # Sérialisation JSON optimisée
+ujson==5.8.0
+orjson==3.9.10
 
-# === NOUVEAU: EXTRACTEURS AVICOLES SPÉCIALISÉS ===
-# Extraction de tables et données de performance
-tabula-py==2.8.2  # Extraction tables PDF
-pdfplumber==0.10.0  # Analyse structure PDF
-# camelot-py[cv]==0.11.0  # Extraction tables avancée (décommentez si nécessaire)
-python-docx==1.1.0  # Support documents Word
-openpyxl==3.1.2  # Déjà présent mais critique pour Excel
+# === EXTRACTEURS AVICOLES ESSENTIELS ===
+# Extraction de base sans dépendances lourdes
+pdfplumber==0.10.0
+python-docx==1.1.0
+openpyxl==3.1.2
 
-# === NOUVEAU: TRAITEMENT DONNÉES AVICOLES ===
+# === TRAITEMENT DONNÉES AVICOLES ===
 # Normalisation et validation données biologiques
-pint==0.23  # Conversion unités (grammes, kg, etc.)
-dateparser==1.2.0  # Parsing dates flexibles
-fuzzywuzzy[speedup]==0.18.0  # Matching flou lignées génétiques
-python-levenshtein==0.25.0  # Distance Levenshtein optimisée
+pint==0.23
+dateparser==1.2.0
+fuzzywuzzy[speedup]==0.18.0
+python-levenshtein==0.25.0
 
-# === NOUVEAU: INGESTION ET PIPELINE ===
-# Pipeline de traitement batch et streaming
-celery==5.3.4  # Traitement asynchrone
-kombu==5.3.4  # Message broker
-python-multipart==0.0.6  # Upload fichiers multiples
-aiofiles>=23.0.0  # Déjà présent mais critique
+# === INGESTION ET PIPELINE ===
+# Pipeline de traitement batch
+python-multipart==0.0.6
+aiofiles>=23.0.0
 
 # === CORRECTIONS BUGS PRODUCTION ===
-
 # Google Cloud Translation - VERSION CORRIGÉE API
 google-cloud-translate>=3.15.0,<4.0.0
 google-auth>=2.23.0
 google-auth-oauthlib>=1.0.0
 
-# Retry et résilience - Fix timeouts et erreurs réseau
+# Retry et résilience
 tenacity>=8.2.0
 backoff>=2.2.0
 
-# Utilitaires ML - Fix dimensions vectorielles
+# Utilitaires ML
 scikit-learn>=1.3.0,<1.5.0
 
-# Monitoring avancé - Diagnostic mémoire
+# Monitoring avancé
 memory-profiler>=0.61.0
 
-# === SUPPORT MULTILINGUE - FastText corrigé ===
+# === SUPPORT MULTILINGUE ===
 fasttext-langdetect>=1.0.3
-# Alternative si fasttext-langdetect indisponible:
-# fast-langdetect>=0.3.0
-
-# Cache intelligent multilingue
 cachetools>=5.3.0
 
-# === INTELLIGENCE MÉTIER - Versions testées ===
+# === INTELLIGENCE MÉTIER ===
 transformers==4.45.2
 torch>=2.0.0,<2.5.0
 
-# === TRAITEMENT TEXTE - Normalisation critique ===
+# === TRAITEMENT TEXTE ===
 unidecode==1.3.8
 
 # === RERANKING ET SIMILARITÉ ===
 sentence-transformers==3.1.1
 voyageai==0.2.3
 
-# === NOUVEAU: RECHERCHE HYBRIDE AVANCÉE ===
-# Optimisations recherche vectorielle + BM25
-rank-bm25==0.2.2  # Implémentation BM25 pure
-faiss-cpu==1.7.4  # Index vectoriels optimisés (CPU)
-# faiss-gpu==1.7.4  # Décommentez pour GPU
+# === RECHERCHE HYBRIDE ===
+rank-bm25==0.2.2
+faiss-cpu==1.7.4
 
-# === NOUVEAU: ANALYSE PERFORMANCE AVICOLE ===
-# Calculs statistiques et métriques métier
-statsmodels==0.14.1  # Analyses statistiques avancées
-lifelines==0.27.8  # Analyse survie (mortalité)
-pingouin==0.5.4  # Tests statistiques rapides
+# === ANALYSE PERFORMANCE AVICOLE ===
+statsmodels==0.14.1
+lifelines==0.27.8
+pingouin==0.5.4
 
-# === LANGSMITH MONITORING - Versions compatibles ===
+# === LANGSMITH MONITORING ===
 langchain-core==0.1.16
 langsmith>=0.0.83,<0.1.0
 
-# === UTILITAIRES BASE - Versions stables ===
+# === UTILITAIRES BASE ===
 numpy>=1.24.0,<2.0.0
 scipy>=1.11.0,<1.15.0
 pandas>=2.0.0,<3.0.0
 
-# === NOUVEAU: GESTION MÉTADONNÉES ET ENRICHISSEMENT ===
-# Enrichissement automatique métadonnées avicoles
-python-slugify==8.0.1  # Normalisation noms lignées
-nameparser==1.1.3  # Parsing noms complexes
-regex==2023.12.25  # Expressions régulières avancées
+# === GESTION MÉTADONNÉES ===
+python-slugify==8.0.1
+nameparser==1.1.3
+regex==2023.12.25
 
-# === SÉCURITÉ ET VALIDATION - Pydantic v2 ===
+# === SÉCURITÉ ET VALIDATION ===
 pydantic>=2.8.0,<3.0.0
 validators>=0.22.0
 bleach>=6.0.0
 
-# === NOUVEAU: CACHE INTELLIGENT AVICOLE ===
-# Cache spécialisé avec invalidation ciblée
-python-rocksdb==0.8.4  # Cache persistant hautes performances
-diskcache==5.6.3  # Cache disque intelligent
-pylru==1.2.1  # LRU cache optimisé
+# === CACHE INTELLIGENT ESSENTIEL ===
+diskcache==5.6.3
+pylru==1.2.1
 
 # === MONITORING ET LOGGING ===
 prometheus-client==0.20.0
 structlog==23.2.0
 
-# === NOUVEAU: OBSERVABILITÉ SYSTÈME JSON ===
-# Monitoring spécialisé pipeline JSON
-py-spy==0.3.14  # Profiling Python
-pyinstrument==4.6.2  # Profiling détaillé
-line-profiler==4.1.1  # Profiling ligne par ligne
-
 # === TESTS - Versions compatibles ===
 pytest==8.3.3
 pytest-asyncio==0.24.0
-pytest-postgresql==6.0.0  # Tests PostgreSQL
-pytest-benchmark==4.0.0  # Benchmarks performance
+pytest-postgresql==6.0.0
+pytest-benchmark==4.0.0
 
-# === NOUVEAU: TESTS SPÉCIALISÉS AVICOLE ===
-# Tests validation données biologiques
-hypothesis==6.92.1  # Tests génératifs
-factory-boy==3.3.0  # Factories test données
-faker==20.1.0  # Génération données test
+# === TESTS SPÉCIALISÉS AVICOLE ===
+hypothesis==6.92.1
+factory-boy==3.3.0
+faker==20.1.0
 
 # === OUTILS DÉVELOPPEMENT ===
 black==24.10.0
 flake8==7.1.1
-mypy==1.7.1  # Vérification types
-
-# === NOUVEAU: DÉVELOPPEMENT SYSTÈME JSON ===
-# Outils développement pipeline avicole
-pre-commit==3.6.0  # Hooks validation code
-jupyter==1.0.0  # Notebooks analyse données
-ipython==8.18.1  # REPL amélioré
+mypy==1.7.1
 
 # === ASYNC ET AGENTS ===
 dataclasses-json==0.6.7
 asyncio-throttle==1.0.2
 
-# === NOUVEAU: PARALLÉLISATION ET PERFORMANCE ===
-# Optimisations traitement batch
-concurrent-futures==3.1.1
-joblib==1.3.2  # Parallélisation intelligente
-dask[complete]==2023.12.1  # Traitement datasets volumineux
+# === PARALLÉLISATION ESSENTIELLE ===
+joblib==1.3.2
 
 # === COMPATIBILITÉ PYTHON 3.13 ===
 typing-extensions>=4.8.0
 
-# === CONTRAINTES SÉCURITÉ - Versions renforcées ===
+# === CONTRAINTES SÉCURITÉ ===
 urllib3>=2.0.0,<3.0.0
 certifi>=2023.7.22
 cryptography>=41.0.7
 requests>=2.31.0
 
-# === NOUVEAU: SÉCURITÉ DONNÉES AVICOLES ===
-# Protection données sensibles entreprise
-keyring==24.3.0  # Gestion clés sécurisées
-cryptography>=41.0.7  # Déjà présent, critique
-python-jose[cryptography]==3.3.0  # JWT tokens
+# === SÉCURITÉ DONNÉES AVICOLES ===
+keyring==24.3.0
+python-jose[cryptography]==3.3.0
 
 # === OPTIMISATIONS DÉPLOIEMENT ===
 brotli>=1.0.9
 zstandard>=0.22.0
 psutil>=5.9.0
 
-# === NOUVEAU: OPTIMISATIONS PRODUCTION JSON ===
-# Optimisations spécifiques déploiement
-gunicorn==21.2.0  # WSGI server production
-gevent==23.9.1  # Async I/O optimisé
-setproctitle==1.3.3  # Titres processus
-python-prctl==1.8.1  # Contrôle processus Linux
+# === OPTIMISATIONS PRODUCTION ===
+gunicorn==21.2.0
+gevent==23.9.1
+setproctitle==1.3.3
 
-# === NOUVEAU: GESTION CONFIGURATION AVANCÉE ===
-# Configuration système complexe
-dynaconf==3.2.4  # Configuration dynamique
-python-decouple==3.8  # Variables environnement
-click==8.1.7  # CLI administration
+# === GESTION CONFIGURATION ===
+dynaconf==3.2.4
+python-decouple==3.8
+click==8.1.7
 
-# === NOUVEAU: INTÉGRATIONS EXTERNES ===
-# Connecteurs services externes (optionnel)
-boto3==1.34.34  # AWS S3 (stockage fichiers)
-azure-storage-blob==12.19.0  # Azure Blob (alternative)
-minio==7.2.0  # MinIO (S3 compatible local)
-
-# === NOUVEAU: FORMATS DONNÉES SPÉCIALISÉS ===
-# Support formats spécifiques aviculture
-xmltodict==0.13.0  # XML vers dict
-pyyaml==6.0.1  # Configuration YAML
-toml==0.10.2  # Configuration TOML
-configparser==6.0.0  # INI files
+# === FORMATS DONNÉES SPÉCIALISÉS ===
+xmltodict==0.13.0
+pyyaml==6.0.1
+toml==0.10.2
+configparser==6.0.0
 
 # === CONTRAINTES FINALES ===
-# Assurer compatibilité versions critiques
-setuptools>=65.0.0  # Base packaging
-wheel>=0.42.0  # Distribution packages
-pip>=23.0.0  # Gestionnaire packages
-
-# === DÉPENDANCES OPTIONNELLES COMMENTÉES ===
-# Décommentez selon besoins spécifiques:
-
-# # Machine Learning avancé
-# torch-audio==2.1.2  # Traitement audio (annotations vocales)
-# torch-vision==0.16.2  # Traitement images (photos élevages)
-
-# # Base de données alternatives
-# motor==3.3.2  # MongoDB async (NoSQL alternative)
-# pymongo==4.6.1  # MongoDB sync
-
-# # Monitoring avancé
-# sentry-sdk[fastapi]==1.39.2  # Monitoring erreurs
-# newrelic==9.4.0  # APM monitoring
-
-# # GPU et calcul intensif
-# cupy==12.3.0  # NumPy GPU (CUDA)
-# rapids-singlecell==0.9.5  # GPU dataframes
+setuptools>=65.0.0
+wheel>=0.42.0
+pip>=23.0.0
 
 # === NOTES IMPORTANTES ===
-# 1. PostgreSQL requis pour données structurées performance
-# 2. Système JSON nécessite ujson/orjson pour performance
-# 3. Extracteurs PDF/Excel critiques pour ingestion
-# 4. Tests PostgreSQL requis pour CI/CD
-# 5. Monitoring recommandé pour production
-# 6. Cache RocksDB optionnel mais recommandé pour volume élevé
+# 1. Version core sans dépendances optionnelles problématiques
+# 2. PostgreSQL requis pour données structurées performance
+# 3. Système JSON avec extracteurs essentiels uniquement
+# 4. Tests inclus pour CI/CD
+# 5. Monitoring de base pour production
+# 6. Cache disk seulement (RocksDB retiré)
