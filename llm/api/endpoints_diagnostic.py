@@ -616,14 +616,18 @@ def create_diagnostic_endpoints(services: Dict[str, Any]) -> APIRouter:
                             )
                             if collection:
                                 try:
-                                    docs = await asyncio.get_event_loop().run_in_executor(
-                                        None,
-                                        lambda: collection.query.fetch_objects(
-                                            where=collection.query.Filter.by_property(
-                                                "content"
-                                            ).like(f"*{document}*"),
-                                            limit=5,
-                                        ),
+                                    docs = (
+                                        await asyncio.get_event_loop().run_in_executor(
+                                            None,
+                                            lambda: collection.query.fetch_objects(
+                                                where={
+                                                    "path": ["content"],
+                                                    "operator": "Like",
+                                                    "valueText": f"*{document}*",
+                                                },
+                                                limit=5,
+                                            ),
+                                        )
                                     )
 
                                     result["tests_performed"].append(
