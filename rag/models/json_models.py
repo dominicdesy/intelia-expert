@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
+
 """
+
 rag/models/json_models.py - Modèles pour les données JSON avicoles
 Version 1.0 - Structures de données pour l'ingestion et la validation
+
 """
 
 from typing import Dict, List, Optional, Any

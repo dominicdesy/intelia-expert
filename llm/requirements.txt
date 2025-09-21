@@ -33,7 +33,7 @@ alembic==1.13.1
 # Validation avancée de documents JSON avicoles
 jsonschema==4.20.0
 jsonref==1.1.0
-json-flatten==0.2.2
+json-flatten==0.3.1
 ujson==5.8.0  # Parser JSON ultra-rapide
 orjson==3.9.10  # Sérialisation JSON optimisée
 
@@ -41,7 +41,7 @@ orjson==3.9.10  # Sérialisation JSON optimisée
 # Extraction de tables et données de performance
 tabula-py==2.8.2  # Extraction tables PDF
 pdfplumber==0.10.0  # Analyse structure PDF
-camelot-py[cv]==0.11.0  # Extraction tables avancée
+# camelot-py[cv]==0.11.0  # Extraction tables avancée (décommentez si nécessaire)
 python-docx==1.1.0  # Support documents Word
 openpyxl==3.1.2  # Déjà présent mais critique pour Excel
 
