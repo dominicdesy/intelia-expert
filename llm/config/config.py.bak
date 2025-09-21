@@ -296,9 +296,11 @@ DO_APP_TIER = os.getenv("DO_APP_TIER", "basic")
 if DO_APP_TIER == "professional":
     RAG_SIMILARITY_TOP_K = 20
     RRF_CACHE_SIZE = 2000
+    ENABLE_INTELLIGENT_RRF = True
 elif DO_APP_TIER == "basic":
     RAG_SIMILARITY_TOP_K = 12
     RRF_CACHE_SIZE = 500
+    ENABLE_INTELLIGENT_RRF = False
 
 
 # ===== VALIDATION CONFIGURATION =====
