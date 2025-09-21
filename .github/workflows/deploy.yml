@@ -21,6 +21,7 @@ jobs:
       frontend-changed: ${{ steps.changes.outputs.frontend }}
       backend-changed: ${{ steps.changes.outputs.backend }}
       llm-changed: ${{ steps.changes.outputs.llm }}
+      rag-changed: ${{ steps.changes.outputs.rag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,12 +37,15 @@ jobs:
               - 'backend/**'
             llm:
               - 'llm/**'
+            rag:
+              - 'rag/**'
 
       - name: Show changes
         run: |
           echo "Frontend changed: ${{ steps.changes.outputs.frontend }}"
           echo "Backend changed: ${{ steps.changes.outputs.backend }}"
           echo "LLM changed: ${{ steps.changes.outputs.llm }}"
+          echo "RAG changed: ${{ steps.changes.outputs.rag }}"
 
   build-frontend:
     runs-on: ubuntu-latest
@@ -109,7 +113,7 @@ jobs:
   build-llm:
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.llm-changed == 'true'
+    if: needs.detect-changes.outputs.llm-changed == 'true' || needs.detect-changes.outputs.rag-changed == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -123,7 +127,7 @@ jobs:
           username: doctl
           password: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      - name: Build & push LLM
+      - name: Build & push LLM (includes RAG)
         uses: docker/build-push-action@v6
         with:
           context: ./llm
@@ -229,6 +233,16 @@ jobs:
             fi
           else
             echo "LLM: SKIPPED (no changes)"
+          fi
+          
+          if [[ "${{ needs.detect-changes.outputs.rag-changed }}" == "true" ]]; then
+            if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
+              echo "RAG: DEPLOYED (via LLM container)"
+            else
+              echo "RAG: FAILED"
+            fi
+          else
+            echo "RAG: SKIPPED (no changes)"
           fi
           
           echo ""
