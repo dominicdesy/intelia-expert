@@ -304,9 +304,6 @@ class InteliaRAGEngine:
                                 intent_processor=None,  # Sera défini plus tard
                             )
                             logger.info("RRF Intelligent initialisé")
-                            if hasattr(self.retriever, "set_intelligent_rrf"):
-                                self.retriever.set_intelligent_rrf(self.intelligent_rrf)
-                                logger.info("✅ RRF Intelligent lié au retriever")
                         except Exception as e:
                             logger.error(f"Erreur RRF Intelligent: {e}")
 
