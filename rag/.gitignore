@@ -1,0 +1,122 @@
+# .gitignore pour projet RAG
+# Exclut le répertoire documents et autres fichiers sensibles
+
+# RÉPERTOIRE DOCUMENTS - PRIORITÉ ABSOLUE
+documents/
+documents/**
+*.pdf
+*.docx
+*.xlsx
+
+# Variables d'environnement et secrets
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.*
+!.env.example
+
+# Dépendances Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Environnements virtuels
+env/
+venv/
+ENV/
+.venv/
+.ENV/
+
+# IDE et éditeurs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs et cache
+*.log
+logs/
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+.cache/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# Bases de données locales
+*.db
+*.sqlite
+*.sqlite3
+
+# Modèles ML volumineux
+models/
+checkpoints/
+*.pkl
+*.joblib
+*.h5
+*.hdf5
+*.model
+*.bin
+*.safetensors
+
+# Données de test et datasets
+data/
+datasets/
+test_data/
+
+# Fichiers temporaires
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Certificats et clés
+*.pem
+*.key
+*.crt
+*.cert
+
+# Node modules (si applicable)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Fichiers de configuration OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
