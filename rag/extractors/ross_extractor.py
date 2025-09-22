@@ -9,10 +9,26 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
 
-from .base_extractor import BaseExtractor
-from ..models.enums import GeneticLine, MetricType, Sex, Phase
-from ..models.extraction_models import PerformanceRecord
-
+# CORRECTION: Imports robustes avec fallbacks
+try:
+    from .base_extractor import BaseExtractor
+    from ..models.enums import GeneticLine, MetricType, Sex, Phase
+    from ..models.extraction_models import PerformanceRecord
+except ImportError:
+    try:
+        from base_extractor import BaseExtractor
+        from models.enums import GeneticLine, MetricType, Sex, Phase
+        from models.extraction_models import PerformanceRecord
+    except ImportError:
+        # Fallback avec définitions minimales depuis base_extractor corrigé
+        from base_extractor import BaseExtractor, GeneticLine, MetricType, Sex, PerformanceRecord
+        
+        class Phase:
+            STARTER = "starter"
+            GROWER = "grower"
+            FINISHER = "finisher"
+            WHOLE_CYCLE = "whole_cycle"
+            UNKNOWN = "unknown"
 
 @dataclass
 class TextTable:
