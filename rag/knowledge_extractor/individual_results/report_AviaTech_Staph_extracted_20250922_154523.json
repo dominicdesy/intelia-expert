@@ -1,0 +1,126 @@
+{
+  "timestamp": "2025-09-22T15:45:23.328419",
+  "source_file": "C:\\intelia_gpt\\intelia-expert\\rag\\documents\\Knowledge\\AviaTech_Staph_extracted.json",
+  "document_analysis": {
+    "genetic_line": "ross 308",
+    "document_type": "management_guide",
+    "species": "breeders",
+    "measurement_units": "unknown",
+    "target_audience": "veterinarians",
+    "table_types_expected": [],
+    "confidence_score": 0.9,
+    "raw_analysis": "{\n    \"genetic_line\": \"ross308\",\n    \"document_type\": \"management_guide\",\n    \"species\": \"breeders\",\n    \"measurement_units\": \"unknown\",\n    \"target_audience\": \"veterinarians\",\n    \"table_types_expected\": [],\n    \"confidence_score\": 0.9\n}"
+  },
+  "segmentation_summary": {
+    "total_segments": 12,
+    "avg_word_count": 262.5,
+    "segment_types": [
+      "pre_extracted_chunk"
+    ]
+  },
+  "injection_results": {
+    "success": [
+      {
+        "uuid": "0"
+      },
+      {
+        "uuid": "1"
+      },
+      {
+        "uuid": "2"
+      },
+      {
+        "uuid": "3"
+      },
+      {
+        "uuid": "4"
+      },
+      {
+        "uuid": "5"
+      },
+      {
+        "uuid": "6"
+      },
+      {
+        "uuid": "7"
+      },
+      {
+        "uuid": "8"
+      },
+      {
+        "uuid": "9"
+      },
+      {
+        "uuid": "10"
+      },
+      {
+        "uuid": "11"
+      }
+    ],
+    "errors": [],
+    "total_processed": 12,
+    "success_count": 12,
+    "error_count": 0
+  },
+  "validation_results": {
+    "conformity_score": 1.0,
+    "validations": {
+      "content_integrity": {
+        "total_chunks": 12,
+        "perfect_matches": 12,
+        "content_mismatches": 0,
+        "integrity_rate": 1.0,
+        "mismatch_details": []
+      },
+      "metadata_consistency": {
+        "total_validated": 12,
+        "consistent_chunks": 12,
+        "inconsistent_chunks": 0,
+        "consistency_rate": 1.0,
+        "inconsistency_details": []
+      },
+      "encoding_preservation": {
+        "chunks_with_encoding_issues": 0,
+        "total_accents_lost": 0,
+        "encoding_preservation_rate": 1.0,
+        "critical_encoding_loss": false
+      },
+      "genetic_line_preservation": {
+        "total_chunks": 12,
+        "correct_genetic_lines": 12,
+        "genetic_line_issues": 0,
+        "consistency_rate": 1.0,
+        "issue_details": []
+      }
+    },
+    "requires_correction": false,
+    "source_file": "C:\\intelia_gpt\\intelia-expert\\rag\\documents\\Knowledge\\AviaTech_Staph_extracted.json",
+    "validation_stats": {
+      "total_chunks": 12,
+      "method_1_success": 0,
+      "method_2_success": 0,
+      "method_3_success": 12,
+      "method_4_success": 0,
+      "method_5_success": 0,
+      "total_failures": 0,
+      "retrieval_details": []
+    },
+    "partial_success": true
+  },
+  "extraction_stats": {
+    "documents_processed": 0,
+    "chunks_created": 0,
+    "chunks_injected": 0,
+    "validation_failures": 0,
+    "corrections_applied": 0,
+    "errors": 0,
+    "start_time": "2025-09-22T15:44:59.157038"
+  },
+  "optimizations_applied": {
+    "advanced_llm_analysis": true,
+    "intent_based_enrichment": true,
+    "genetic_line_normalization": true,
+    "paginated_validation": true,
+    "quality_filtering_enhanced": true
+  }
+}

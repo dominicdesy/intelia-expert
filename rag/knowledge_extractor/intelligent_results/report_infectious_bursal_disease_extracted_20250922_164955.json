@@ -1,0 +1,98 @@
+{
+  "timestamp": "2025-09-22T16:49:55.954593",
+  "source_file": "C:\\intelia_gpt\\intelia-expert\\rag\\documents\\Knowledge\\infectious_bursal_disease_extracted.json",
+  "document_analysis": {
+    "genetic_line": "ross 308",
+    "document_type": "health_protocol",
+    "species": "broilers",
+    "measurement_units": "unknown",
+    "target_audience": "farmers|veterinarians",
+    "table_types_expected": [
+      "health_protocols"
+    ],
+    "confidence_score": 0.85,
+    "raw_analysis": "{\n    \"genetic_line\": \"Unknown\",\n    \"document_type\": \"health_protocol\",\n    \"species\": \"broilers\",\n    \"measurement_units\": \"unknown\",\n    \"target_audience\": \"farmers|veterinarians\",\n    \"table_types_expected\": [\"health_protocols\"],\n    \"confidence_score\": 0.85\n}"
+  },
+  "segmentation_summary": {
+    "total_segments": 10,
+    "avg_word_count": 230.9,
+    "segment_types": [
+      "pre_extracted_chunk"
+    ]
+  },
+  "injection_results": {
+    "success": [
+      {
+        "uuid": "0"
+      },
+      {
+        "uuid": "1"
+      },
+      {
+        "uuid": "2"
+      },
+      {
+        "uuid": "3"
+      },
+      {
+        "uuid": "4"
+      },
+      {
+        "uuid": "5"
+      },
+      {
+        "uuid": "6"
+      },
+      {
+        "uuid": "7"
+      },
+      {
+        "uuid": "8"
+      },
+      {
+        "uuid": "9"
+      }
+    ],
+    "errors": [],
+    "total_processed": 10,
+    "success_count": 10,
+    "error_count": 0
+  },
+  "validation_results": {
+    "conformity_score": 0.9,
+    "validations": {
+      "injection_success": true
+    },
+    "requires_correction": false,
+    "source_file": "C:\\intelia_gpt\\intelia-expert\\rag\\documents\\Knowledge\\infectious_bursal_disease_extracted.json",
+    "validation_stats": {
+      "total_chunks": 10,
+      "method_1_success": 0,
+      "method_2_success": 0,
+      "method_3_success": 9,
+      "method_4_success": 1,
+      "method_5_success": 0,
+      "total_failures": 0,
+      "retrieval_details": []
+    },
+    "partial_success": true,
+    "injection_based_validation": true
+  },
+  "extraction_stats": {
+    "documents_processed": 28,
+    "chunks_created": 1270,
+    "chunks_injected": 1264,
+    "validation_failures": 0,
+    "corrections_applied": 0,
+    "errors": 0,
+    "start_time": "2025-09-22T16:21:13.645802"
+  },
+  "optimizations_applied": {
+    "advanced_llm_analysis": true,
+    "intent_based_enrichment": true,
+    "genetic_line_normalization": true,
+    "paginated_validation": true,
+    "quality_filtering_enhanced": true,
+    "intelligent_caching": true
+  }
+}

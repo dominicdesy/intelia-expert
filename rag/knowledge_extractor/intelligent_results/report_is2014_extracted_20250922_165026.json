@@ -1,0 +1,81 @@
+{
+  "timestamp": "2025-09-22T16:50:26.225761",
+  "source_file": "C:\\intelia_gpt\\intelia-expert\\rag\\documents\\Knowledge\\is2014_extracted.json",
+  "document_analysis": {
+    "genetic_line": "lohmann brown",
+    "document_type": "management_guide",
+    "species": "broilers",
+    "measurement_units": "unknown",
+    "target_audience": "unknown",
+    "table_types_expected": [],
+    "confidence_score": 0.4,
+    "raw_analysis": "Fallback analysis from filename: is2014_extracted.json"
+  },
+  "segmentation_summary": {
+    "total_segments": 5,
+    "avg_word_count": 223.2,
+    "segment_types": [
+      "pre_extracted_chunk"
+    ]
+  },
+  "injection_results": {
+    "success": [
+      {
+        "uuid": "0"
+      },
+      {
+        "uuid": "1"
+      },
+      {
+        "uuid": "2"
+      },
+      {
+        "uuid": "3"
+      },
+      {
+        "uuid": "4"
+      }
+    ],
+    "errors": [],
+    "total_processed": 5,
+    "success_count": 5,
+    "error_count": 0
+  },
+  "validation_results": {
+    "conformity_score": 0.8,
+    "validations": {
+      "injection_success": true
+    },
+    "requires_correction": false,
+    "source_file": "C:\\intelia_gpt\\intelia-expert\\rag\\documents\\Knowledge\\is2014_extracted.json",
+    "validation_stats": {
+      "total_chunks": 5,
+      "method_1_success": 0,
+      "method_2_success": 0,
+      "method_3_success": 4,
+      "method_4_success": 1,
+      "method_5_success": 0,
+      "total_failures": 0,
+      "retrieval_details": []
+    },
+    "partial_success": true,
+    "injection_based_validation": true
+  },
+  "extraction_stats": {
+    "documents_processed": 29,
+    "chunks_created": 1280,
+    "chunks_injected": 1274,
+    "validation_failures": 0,
+    "corrections_applied": 0,
+    "errors": 0,
+    "start_time": "2025-09-22T16:21:13.645802"
+  },
+  "optimizations_applied": {
+    "advanced_llm_analysis": true,
+    "intent_based_enrichment": true,
+    "genetic_line_normalization": true,
+    "paginated_validation": true,
+    "quality_filtering_enhanced": true,
+    "intelligent_caching": true
+  }
+}

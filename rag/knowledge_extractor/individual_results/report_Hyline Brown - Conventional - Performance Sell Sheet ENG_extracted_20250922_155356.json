@@ -1,0 +1,95 @@
+{
+  "timestamp": "2025-09-22T15:53:56.039733",
+  "source_file": "C:\\intelia_gpt\\intelia-expert\\rag\\documents\\Knowledge\\Hyline Brown - Conventional - Performance Sell Sheet ENG_extracted.json",
+  "document_analysis": {
+    "genetic_line": "hy-line brown",
+    "document_type": "performance_guide",
+    "species": "layers",
+    "measurement_units": "metric",
+    "target_audience": "farmers",
+    "table_types_expected": [
+      "performance_tables"
+    ],
+    "confidence_score": 1.0,
+    "raw_analysis": "{\n    \"genetic_line\": \"Hy-Line Brown\",\n    \"document_type\": \"performance_guide\",\n    \"species\": \"layers\",\n    \"measurement_units\": \"metric\",\n    \"target_audience\": \"farmers\",\n    \"table_types_expected\": [\"performance_tables\"],\n    \"confidence_score\": 1.0\n}"
+  },
+  "segmentation_summary": {
+    "total_segments": 1,
+    "avg_word_count": 138.0,
+    "segment_types": [
+      "pre_extracted_chunk"
+    ]
+  },
+  "injection_results": {
+    "success": [
+      {
+        "uuid": "0"
+      }
+    ],
+    "errors": [],
+    "total_processed": 1,
+    "success_count": 1,
+    "error_count": 0
+  },
+  "validation_results": {
+    "conformity_score": 1.0,
+    "validations": {
+      "content_integrity": {
+        "total_chunks": 1,
+        "perfect_matches": 1,
+        "content_mismatches": 0,
+        "integrity_rate": 1.0,
+        "mismatch_details": []
+      },
+      "metadata_consistency": {
+        "total_validated": 1,
+        "consistent_chunks": 1,
+        "inconsistent_chunks": 0,
+        "consistency_rate": 1.0,
+        "inconsistency_details": []
+      },
+      "encoding_preservation": {
+        "chunks_with_encoding_issues": 0,
+        "total_accents_lost": 0,
+        "encoding_preservation_rate": 1.0,
+        "critical_encoding_loss": false
+      },
+      "genetic_line_preservation": {
+        "total_chunks": 1,
+        "correct_genetic_lines": 1,
+        "genetic_line_issues": 0,
+        "consistency_rate": 1.0,
+        "issue_details": []
+      }
+    },
+    "requires_correction": false,
+    "source_file": "C:\\intelia_gpt\\intelia-expert\\rag\\documents\\Knowledge\\Hyline Brown - Conventional - Performance Sell Sheet ENG_extracted.json",
+    "validation_stats": {
+      "total_chunks": 1,
+      "method_1_success": 0,
+      "method_2_success": 0,
+      "method_3_success": 1,
+      "method_4_success": 0,
+      "method_5_success": 0,
+      "total_failures": 0,
+      "retrieval_details": []
+    },
+    "partial_success": true
+  },
+  "extraction_stats": {
+    "documents_processed": 0,
+    "chunks_created": 0,
+    "chunks_injected": 0,
+    "validation_failures": 0,
+    "corrections_applied": 0,
+    "errors": 0,
+    "start_time": "2025-09-22T15:53:32.281048"
+  },
+  "optimizations_applied": {
+    "advanced_llm_analysis": true,
+    "intent_based_enrichment": true,
+    "genetic_line_normalization": true,
+    "paginated_validation": true,
+    "quality_filtering_enhanced": true
+  }
+}
