@@ -1,6 +1,6 @@
 """
 Enrichisseur de connaissances avec LLM et intents - VERSION CORRIGÉE
-Support complet des lignées génétiques multiples
+Support complet des lignées génétiques multiples - SANS TRONCATURE
 """
 
 import re
@@ -13,7 +13,7 @@ from core.intent_manager import IntentManager
 
 
 class KnowledgeEnricher:
-    """Enrichisseur de connaissances avec métadonnées avancées - VERSION MULTI-LIGNÉES"""
+    """Enrichisseur de connaissances avec métadonnées avancées - VERSION PRESERVEE"""
 
     def __init__(self, llm_client: LLMClient, intent_manager: IntentManager):
         self.llm_client = llm_client
@@ -23,8 +23,14 @@ class KnowledgeEnricher:
     def enrich_chunk(
         self, segment: Dict[str, Any], document_context: DocumentContext
     ) -> ChunkMetadata:
-        """Enrichit un segment avec métadonnées avancées"""
+        """Enrichit un segment avec métadonnées avancées - SANS PERTE DE CONTENU"""
         try:
+            # DIAGNOSTIC: Log taille avant enrichissement
+            original_size = len(segment["content"])
+            self.logger.debug(
+                f"DIAGNOSTIC: Chunk avant enrichissement: {original_size} caractères"
+            )
+
             # Analyse des intents avec contexte génétique
             intent_analysis = self.intent_manager.detect_intent_category(
                 segment["content"]
@@ -133,7 +139,7 @@ IMPORTANT: Consider the specific genetic line ({document_context.genetic_line}) 
 
             parsed_data = json.loads(response)
 
-            # Validation et nettoyage des données
+            # Validation et nettoyage des données SANS TRONCATURE
             cleaned_data = self._validate_and_clean_llm_response(parsed_data)
             return cleaned_data
 
@@ -142,7 +148,7 @@ IMPORTANT: Consider the specific genetic line ({document_context.genetic_line}) 
             return {}
 
     def _validate_and_clean_llm_response(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Valide et nettoie la réponse LLM"""
+        """Valide et nettoie la réponse LLM - CORRECTION: SANS TRONCATURE"""
 
         # Valeurs par défaut et validation
         valid_intent_categories = [
@@ -207,9 +213,8 @@ IMPORTANT: Consider the specific genetic line ({document_context.genetic_line}) 
             "confidence_score": self._validate_numeric_field(
                 data.get("confidence_score"), 0.0, 1.0, 0.5
             ),
-            "reasoning": str(data.get("reasoning", "LLM analysis"))[
-                :200
-            ],  # Limite longueur
+            # CORRECTION CRITIQUE: SUPPRESSION DE LA TRONCATURE
+            "reasoning": str(data.get("reasoning", "LLM analysis")),  # PLUS DE [:200]
         }
 
         return cleaned
@@ -225,16 +230,18 @@ IMPORTANT: Consider the specific genetic line ({document_context.genetic_line}) 
         return default
 
     def _validate_list_field(self, value: Any, default: List[str]) -> List[str]:
-        """Valide un champ liste"""
+        """Valide un champ liste - CORRECTION: SUPPRESSION DES TRONCATURES"""
         if isinstance(value, list):
-            # Filtre et nettoie les éléments de la liste
+            # Filtre et nettoie les éléments de la liste SANS TRONCATURE
             cleaned_list = []
             for item in value:
                 if isinstance(item, str) and item.strip():
-                    cleaned_item = item.strip()[:100]  # Limite longueur
+                    # CORRECTION: Suppression de la troncature [:100]
+                    cleaned_item = item.strip()
                     if cleaned_item not in cleaned_list:  # Évite doublons
                         cleaned_list.append(cleaned_item)
-            return cleaned_list[:10]  # Limite nombre d'éléments
+            # CORRECTION: Augmentation de la limite de 10 à 20 éléments
+            return cleaned_list[:20]
         return default
 
     def _validate_numeric_field(
@@ -289,7 +296,7 @@ IMPORTANT: Consider the specific genetic line ({document_context.genetic_line}) 
         )
 
     def _extract_actionable_items(self, content: str, genetic_line: str) -> List[str]:
-        """Extrait les éléments actionnables du contenu avec contexte génétique"""
+        """Extrait les éléments actionnables du contenu avec contexte génétique - SANS TRONCATURE"""
         actionable_patterns = [
             r"maintain\s+([^.]{10,80})",
             r"keep\s+([^.]{10,80})",
@@ -313,16 +320,17 @@ IMPORTANT: Consider the specific genetic line ({document_context.genetic_line}) 
             for match in matches:
                 clean_action = re.sub(r"[^a-zA-Z0-9\s\-\.]", "", match).strip()
                 if clean_action and len(clean_action) > 5:
-                    # Ajoute le contexte génétique si pertinent
+                    # CORRECTION: SUPPRESSION de la troncature [:45] et [:50]
                     if genetic_line and genetic_line.lower() != "unknown":
-                        contextualized_action = f"{clean_action[:45]}"
+                        contextualized_action = clean_action
                     else:
-                        contextualized_action = clean_action[:50]
+                        contextualized_action = clean_action
 
                     if contextualized_action not in actionable_items:
                         actionable_items.append(contextualized_action)
 
-        return actionable_items[:8]  # Limite à 8 items
+        # CORRECTION: Augmentation de la limite de 8 à 15 items
+        return actionable_items[:15]
 
     def _infer_content_type(self, content: str) -> str:
         """Infère le type de contenu avec détection améliorée"""

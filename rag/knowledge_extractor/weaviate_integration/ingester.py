@@ -322,9 +322,9 @@ class WeaviateIngester:
         return results
 
     def _validate_object_complete(self, obj: Dict[str, Any], chunk_id: str) -> bool:
-        """Validation complète d'un objet avant insertion"""
+        """Validation permissive d'un objet avant insertion - CORRECTION: Accepte plus de chunks"""
         try:
-            # Vérifications de base
+            # Vérifications de base SEULEMENT
             if not obj.get("content") or len(obj["content"].strip()) < 10:
                 self.logger.warning(f"Contenu insuffisant pour {chunk_id}")
                 return False
@@ -333,20 +333,18 @@ class WeaviateIngester:
                 self.logger.warning(f"chunk_id manquant pour {chunk_id}")
                 return False
 
-            # Vérifications métadonnées critiques
-            if not obj.get("genetic_line") or obj["genetic_line"] == "unknown":
-                self.logger.warning(
-                    f"genetic_line invalide pour {chunk_id}: '{obj.get('genetic_line')}'"
-                )
+            # CORRECTION: Validation assouplie - Accepter "unknown" et "general"
+            genetic_line = obj.get("genetic_line", "")
+            if not genetic_line:  # Seulement si complètement vide
+                self.logger.warning(f"genetic_line vide pour {chunk_id}")
                 return False
 
-            if not obj.get("intent_category") or obj["intent_category"] == "general":
-                self.logger.warning(
-                    f"intent_category invalide pour {chunk_id}: '{obj.get('intent_category')}'"
-                )
+            intent_category = obj.get("intent_category", "")
+            if not intent_category:  # Seulement si complètement vide
+                self.logger.warning(f"intent_category vide pour {chunk_id}")
                 return False
 
-            # Vérification types de données
+            # Vérification types de données (gardées)
             if not isinstance(obj.get("confidence_score", 0), (int, float)):
                 self.logger.warning(f"confidence_score invalide pour {chunk_id}")
                 return False
@@ -355,7 +353,7 @@ class WeaviateIngester:
                 self.logger.warning(f"word_count invalide pour {chunk_id}")
                 return False
 
-            # Vérification listes
+            # Vérification listes (gardées)
             for list_field in [
                 "age_applicability",
                 "applicable_metrics",

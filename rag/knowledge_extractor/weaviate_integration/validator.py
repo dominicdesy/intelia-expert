@@ -1,11 +1,13 @@
 """
 Validateur de conformité Weaviate avec seuils corrigés
 Version corrigée - Résout le problème de validation trop stricte
+CORRECTION FINALE: Supprime complètement l'usage du paramètre 'where' dans fetch_objects()
 """
 
 import logging
 import unicodedata
 import os
+from pathlib import Path
 from typing import Dict, List, Any
 from core.models import KnowledgeChunk
 
@@ -21,11 +23,11 @@ class ContentValidator:
     async def comprehensive_validation(
         self, original_chunks: List[KnowledgeChunk], source_file: str
     ) -> Dict[str, Any]:
-        """Validation complète avec seuils corrigés pour réduire les faux négatifs"""
+        """Validation complète CORRIGÉE - supprime la validation simplifiée trompeuse"""
 
         validation_stats = {
             "total_chunks": len(original_chunks),
-            "method_1_success": 0,  # fetch_objects standard
+            "method_1_success": 0,  # Filtrage par source_file
             "method_2_success": 0,  # Filter class
             "method_3_success": 0,  # Batch fetch
             "method_4_success": 0,  # GraphQL backup
@@ -35,12 +37,12 @@ class ContentValidator:
         }
 
         self.logger.info(
-            f"Validation démarrée: {validation_stats['total_chunks']} chunks"
+            f"Validation CORRIGÉE démarrée: {validation_stats['total_chunks']} chunks pour {Path(source_file).name}"
         )
 
-        # Tentative de récupération avec méthodes corrigées
-        injected_data = await self._fetch_with_dynamic_pagination(
-            original_chunks, validation_stats
+        # CORRECTION 1: Récupération avec filtrage par source_file
+        injected_data = await self._fetch_by_source_file_corrected(
+            original_chunks, source_file, validation_stats
         )
 
         if not injected_data:
@@ -52,32 +54,14 @@ class ContentValidator:
                 "error": "Impossible de récupérer les données injectées",
                 "requires_correction": True,
                 "validation_stats": validation_stats,
+                "source_file": source_file,
             }
 
         self.logger.info(
-            f"Récupérés: {len(injected_data)}/{validation_stats['total_chunks']}"
+            f"Récupérés: {len(injected_data)}/{validation_stats['total_chunks']} chunks"
         )
 
-        # CORRECTION 1: Validation rapide si injection réussie
-        injection_success_rate = len(injected_data) / len(original_chunks)
-
-        if injection_success_rate >= 0.90:  # 90% des chunks récupérés
-            self.logger.info(
-                f"Injection réussie à {injection_success_rate:.1%} - validation simplifiée"
-            )
-            return {
-                "conformity_score": max(
-                    0.80, injection_success_rate
-                ),  # Score minimum 80%
-                "validations": {"injection_success": True},
-                "requires_correction": False,  # Pas de correction nécessaire
-                "source_file": source_file,
-                "validation_stats": validation_stats,
-                "partial_success": True,
-                "injection_based_validation": True,
-            }
-
-        # Validations détaillées seulement si injection partiellement échouée
+        # CORRECTION 2: SUPPRIME la validation "simplifiée" - toujours faire validation complète
         validations = {
             "content_integrity": self._validate_content_integrity(
                 original_chunks, injected_data
@@ -91,18 +75,146 @@ class ContentValidator:
             "genetic_line_preservation": self._validate_genetic_line_consistency(
                 original_chunks, injected_data
             ),
+            "chunk_coverage": self._validate_chunk_coverage(
+                original_chunks, injected_data
+            ),
         }
 
-        # Score global avec pondération ajustée
+        # CORRECTION 3: Score basé sur couverture réelle, pas sur optimisme
         conformity_score = self._calculate_conformity_score_enhanced(validations)
 
         return {
             "conformity_score": conformity_score,
             "validations": validations,
-            "requires_correction": conformity_score < 0.60,  # CORRIGÉ: de 0.85 à 0.60
+            "requires_correction": conformity_score < 0.95,  # Seuil réaliste
             "source_file": source_file,
             "validation_stats": validation_stats,
-            "partial_success": conformity_score >= 0.50,  # CORRIGÉ: de 0.70 à 0.50
+            "chunk_coverage_ratio": (
+                len(injected_data) / len(original_chunks) if original_chunks else 0
+            ),
+        }
+
+    async def _fetch_by_source_file_corrected(
+        self,
+        original_chunks: List[KnowledgeChunk],
+        source_file: str,
+        stats: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        """CORRECTION FINALE: Récupération SANS paramètre where - filtre post-récupération"""
+
+        injected_data = []
+        source_file_name = Path(source_file).name
+
+        try:
+            collection = self.client.collections.get(self.collection_name)
+
+            # MÉTHODE 1 CORRIGÉE: Récupération complète puis filtrage en mémoire
+            self.logger.info(
+                f"Méthode 1 corrigée: Récupération complète puis filtrage par source_file = {source_file_name}"
+            )
+
+            try:
+                # Récupération de TOUS les objets (sans where) puis filtrage manuel
+                offset = 0
+                batch_size = 500  # Plus gros batch pour efficacité
+                file_chunks = []
+
+                while True:
+                    # CORRECTION: fetch_objects SANS paramètre where
+                    response = collection.query.fetch_objects(
+                        limit=batch_size,
+                        offset=offset,
+                        return_properties=[
+                            "chunk_id",
+                            "content",
+                            "source_file",
+                            "genetic_line",
+                            "intent_category",
+                            "confidence_score",
+                            "applicable_metrics",
+                            "technical_level",
+                            "detected_phase",
+                            "detected_bird_type",
+                            "detected_site_type",
+                            "actionable_recommendations",
+                            "followup_themes",
+                        ],
+                    )
+
+                    if not response.objects:
+                        break
+
+                    # FILTRAGE MANUEL post-récupération
+                    for obj in response.objects:
+                        chunk_data = self._extract_object_data_v4(obj)
+                        if chunk_data and chunk_data.get("source_file"):
+                            # Comparaison flexible du nom de fichier
+                            obj_source = Path(chunk_data["source_file"]).name
+                            if (
+                                obj_source == source_file_name
+                                or chunk_data["source_file"] == source_file_name
+                            ):
+                                file_chunks.append(chunk_data)
+
+                    if len(response.objects) < batch_size:
+                        break
+
+                    offset += batch_size
+
+                self.logger.info(
+                    f"Méthode 1 corrigée: {len(file_chunks)} chunks trouvés pour {source_file_name}"
+                )
+
+                if file_chunks:
+                    # Index pour recherche rapide
+                    chunks_by_id = {
+                        chunk["chunk_id"]: chunk
+                        for chunk in file_chunks
+                        if chunk.get("chunk_id")
+                    }
+
+                    # Matching avec chunks originaux
+                    for original_chunk in original_chunks:
+                        if original_chunk.chunk_id in chunks_by_id:
+                            injected_data.append(chunks_by_id[original_chunk.chunk_id])
+                            stats["method_1_success"] += 1
+                        else:
+                            stats["total_failures"] += 1
+
+                    return injected_data
+
+            except Exception as e:
+                self.logger.warning(f"Erreur méthode 1 corrigée: {e}")
+
+            # FALLBACK: Utilise les méthodes existantes si filtrage échoue
+            self.logger.info("Fallback vers méthodes existantes")
+            return await self._fetch_with_dynamic_pagination(original_chunks, stats)
+
+        except Exception as e:
+            self.logger.error(f"Erreur récupération: {e}")
+            return []
+
+    def _validate_chunk_coverage(
+        self, original_chunks: List[KnowledgeChunk], injected_data: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """NOUVELLE MÉTHODE: Validation de la couverture des chunks"""
+
+        original_ids = {chunk.chunk_id for chunk in original_chunks}
+        injected_ids = {
+            chunk["chunk_id"] for chunk in injected_data if chunk.get("chunk_id")
+        }
+
+        found_chunks = len(injected_ids & original_ids)
+        missing_chunks = original_ids - injected_ids
+
+        coverage_rate = found_chunks / len(original_chunks) if original_chunks else 0
+
+        return {
+            "total_original_chunks": len(original_chunks),
+            "found_chunks": found_chunks,
+            "missing_chunks_count": len(missing_chunks),
+            "coverage_rate": coverage_rate,
+            "missing_chunk_ids": list(missing_chunks)[:10],
         }
 
     async def _fetch_with_dynamic_pagination(
@@ -179,6 +291,7 @@ class ContentValidator:
             collection = self.client.collections.get(self.collection_name)
 
             self.logger.info(f"Récupération simple avec limite {limit}")
+            # CORRECTION: fetch_objects SANS paramètre where
             response = collection.query.fetch_objects(limit=limit)
 
             if not response or not hasattr(response, "objects"):
@@ -236,6 +349,7 @@ class ContentValidator:
                     f"Pagination batch {iteration + 1}: offset={offset}, limit={batch_size}"
                 )
 
+                # CORRECTION: fetch_objects SANS paramètre where
                 response = collection.query.fetch_objects(
                     limit=batch_size, offset=offset
                 )
@@ -363,6 +477,9 @@ class ContentValidator:
                 return {
                     "content": props.get("content", ""),
                     "chunk_id": props.get("chunk_id", ""),
+                    "source_file": props.get(
+                        "source_file", ""
+                    ),  # AJOUTÉ pour le filtrage
                     "genetic_line": props.get("genetic_line", ""),
                     "intent_category": props.get("intent_category", ""),
                     "confidence_score": props.get("confidence_score", 0.0),
@@ -685,25 +802,30 @@ class ContentValidator:
     def _calculate_conformity_score_enhanced(
         self, validations: Dict[str, Any]
     ) -> float:
-        """Calcule le score de conformité global avec pondération ajustée"""
+        """Calcule le score de conformité global avec pondération CORRIGÉE"""
         scores = []
         weights = []
 
-        # CORRECTION 8: Pondération ajustée pour privilégier l'injection
-        # Score d'intégrité (poids 50% - augmenté)
+        # CORRECTION 8: Pondération qui privilégie la couverture réelle
+        # Score de couverture des chunks (poids 40% - NOUVEAU prioritaire)
+        if "chunk_coverage" in validations:
+            scores.append(validations["chunk_coverage"]["coverage_rate"])
+            weights.append(0.4)
+
+        # Score d'intégrité (poids 30% - réduit)
         if "content_integrity" in validations:
             scores.append(validations["content_integrity"]["integrity_rate"])
-            weights.append(0.5)
-
-        # Score cohérence métadonnées (poids 30% - réduit)
-        if "metadata_consistency" in validations:
-            scores.append(validations["metadata_consistency"]["consistency_rate"])
             weights.append(0.3)
 
-        # Score lignée génétique (poids 15%)
+        # Score cohérence métadonnées (poids 20% - réduit)
+        if "metadata_consistency" in validations:
+            scores.append(validations["metadata_consistency"]["consistency_rate"])
+            weights.append(0.2)
+
+        # Score lignée génétique (poids 5%)
         if "genetic_line_preservation" in validations:
             scores.append(validations["genetic_line_preservation"]["consistency_rate"])
-            weights.append(0.15)
+            weights.append(0.05)
 
         # Score préservation encodage (poids 5% - réduit)
         if "encoding_preservation" in validations:
