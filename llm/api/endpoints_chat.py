@@ -13,7 +13,7 @@ import json
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Request, HTTPException, File, UploadFile, Form
 from fastapi.responses import StreamingResponse, JSONResponse
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from config.config import BASE_PATH, MAX_REQUEST_SIZE, STREAM_CHUNK_LEN
 from utils.utilities import (
@@ -46,8 +46,8 @@ class JSONValidationRequest(BaseModel):
         True, description="Enrichissement automatique des métadonnées"
     )
 
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "json_data": {
                     "title": "Ross 308 Performance Guide",
@@ -59,6 +59,7 @@ class JSONValidationRequest(BaseModel):
                 "auto_enrich": True,
             }
         }
+    }
 
 
 class IngestionRequest(BaseModel):
@@ -70,7 +71,8 @@ class IngestionRequest(BaseModel):
         False, description="Forcer le retraitement des fichiers existants"
     )
 
-    @validator("json_files")
+    @field_validator("json_files")
+    @classmethod
     def validate_json_files(cls, v):
         if len(v) > 100:
             raise ValueError("Maximum 100 fichiers par lot")
@@ -84,13 +86,13 @@ class ExpertQueryRequest(BaseModel):
         ..., min_length=5, max_length=500, description="Question de l'utilisateur"
     )
     language: str = Field(
-        "fr", regex="^(fr|en|es|zh|ar)$", description="Langue de la réponse"
+        "fr", pattern="^(fr|en|es|zh|ar)$", description="Langue de la réponse"
     )
     genetic_line: Optional[str] = Field(None, description="Lignée génétique spécifique")
     user_id: Optional[str] = Field(None, description="Identifiant utilisateur")
     context: Optional[Dict[str, Any]] = Field(None, description="Contexte additionnel")
     response_format: str = Field(
-        "detailed", regex="^(ultra_concise|concise|standard|detailed)$"
+        "detailed", pattern="^(ultra_concise|concise|standard|detailed)$"
     )
     # NOUVEAUX PARAMÈTRES JSON
     use_json_search: bool = Field(
@@ -103,8 +105,8 @@ class ExpertQueryRequest(BaseModel):
         None, description="Plage d'âge en jours"
     )
 
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "question": "Quel est le poids cible à 35 jours pour du Ross 308 mâle?",
                 "language": "fr",
@@ -114,6 +116,7 @@ class ExpertQueryRequest(BaseModel):
                 "age_range": {"min": 30, "max": 40},
             }
         }
+    }
 
 
 class ChatRequest(BaseModel):
