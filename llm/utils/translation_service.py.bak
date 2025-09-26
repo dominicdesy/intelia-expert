@@ -4,64 +4,16 @@ translation_service.py - Service de traduction universel hybride
 Combine dictionnaire local + Google Translate avec cache intelligent
 Version avec chargement dynamique des dictionnaires par langue
 CORRECTION: Gestion variable d'environnement pour clé API Google
-CORRECTION CRITIQUE: Ajout exclusion des termes techniques avicoles
 """
 
 import json
 import logging
 import time
-import re
 from typing import Dict, List, Optional, Set, Any
 from dataclasses import dataclass
 from pathlib import Path
 from cachetools import TTLCache
 import threading
-
-# CORRECTION CRITIQUE: Liste d'exclusion pour termes techniques
-TECHNICAL_TERMS_EXCLUSION = {
-    # Termes de données/fichiers techniques
-    "weight_curves", "growth_curves", "fcr_curves", "mortality_curves",
-    "performance_data", "breeding_data", "nutrition_data", "feed_data",
-    
-    # Identifiants lignées génétiques
-    "ross308", "ross_308", "cobb500", "cobb_500", "hubbard_flex", 
-    "isa_brown", "dekalb_white", "novogen_brown", "bovans_white",
-    
-    # Termes techniques avicoles (ne pas traduire)
-    "broiler_performance", "layer_performance", "breeder_performance",
-    "feed_conversion_ratio", "average_daily_gain", "body_weight_gain",
-    "egg_production_rate", "fertility_rate", "hatchability_rate",
-    "livability_rate", "uniformity_index", "european_production_index",
-    
-    # Identifiants de métriques
-    "epef", "eef", "fcr", "adg", "bwg", "epr", "fr", "hr", "lr", "ui", "epi",
-    
-    # Noms de fichiers/extensions techniques
-    "xlsx", "json", "csv", "pdf", "docx", "txt", "xml",
-    "broiler_objectives", "layer_standards", "breeder_targets",
-    
-    # Codes et références techniques
-    "ap_male", "ap_female", "straight_run", "parent_stock", "ps",
-    "commercial_strain", "genetic_line", "selection_line",
-    
-    # Termes SQL/base de données
-    "database", "table", "query", "insert", "update", "select", "join",
-    "postgresql", "weaviate", "redis", "cache", "index", "schema",
-}
-
-# CORRECTION: Termes partiels à exclure
-TECHNICAL_PARTIAL_EXCLUSIONS = {
-    # Préfixes techniques
-    "ross", "cobb", "hubbard", "isa", "dekalb", "novogen", "bovans",
-    "aviagen", "hendrix", "petersons", "grimaud", "group",
-    
-    # Suffixes techniques  
-    "_data", "_curves", "_performance", "_objectives", "_standards",
-    "_targets", "_index", "_ratio", "_rate", "_gain", "_weight",
-    
-    # Codes produits
-    "308", "500", "flex", "brown", "white", "plus", "max", "elite",
-}
 
 # Import conditionnel Google Cloud Translate
 try:
@@ -84,12 +36,11 @@ class TranslationResult:
     """Résultat d'une traduction avec métadonnées"""
 
     text: str
-    source: str  # "local", "google", "fallback", "excluded"
+    source: str  # "local", "google", "fallback"
     confidence: float
     language: str
     cached: bool = False
     processing_time_ms: int = 0
-    exclusion_reason: Optional[str] = None  # NOUVEAU
 
 
 @dataclass
@@ -102,9 +53,6 @@ class CacheStats:
     local_hits: int = 0
     cache_size: int = 0
     hit_rate: float = 0.0
-    # NOUVEAU: Statistiques exclusions
-    technical_terms_excluded: int = 0
-    terms_translated: int = 0
 
 
 class UniversalTranslationService:
@@ -112,7 +60,6 @@ class UniversalTranslationService:
     Service de traduction hybride avec dictionnaire local + Google Translate
     Architecture à 3 niveaux: Cache → Dictionnaire local → Google API
     Chargement dynamique des dictionnaires par langue
-    NOUVEAU: Exclusion automatique des termes techniques
     """
 
     def __init__(
@@ -124,7 +71,6 @@ class UniversalTranslationService:
         cache_ttl: int = 86400,
         enable_google_fallback: bool = False,
         confidence_threshold: float = 0.7,
-        enable_technical_exclusion: bool = True,  # NOUVEAU
     ):
 
         self.dict_path = Path(dict_path)
@@ -134,7 +80,6 @@ class UniversalTranslationService:
             enable_google_fallback and GOOGLE_TRANSLATE_AVAILABLE
         )
         self.confidence_threshold = confidence_threshold
-        self.enable_technical_exclusion = enable_technical_exclusion  # NOUVEAU
 
         # Cache 2-niveaux
         self._memory_cache = TTLCache(maxsize=cache_size, ttl=cache_ttl)
@@ -153,39 +98,6 @@ class UniversalTranslationService:
 
         # Validation initiale
         self._validate_setup()
-
-    def _is_technical_term(self, term: str) -> tuple[bool, str]:
-        """CORRECTION CRITIQUE: Vérifie si un terme est technique et ne doit PAS être traduit"""
-        
-        if not self.enable_technical_exclusion:
-            return False, ""
-            
-        term_lower = term.lower().strip()
-        
-        # 1. Exclusion exacte
-        if term_lower in TECHNICAL_TERMS_EXCLUSION:
-            return True, f"exact_match: {term_lower}"
-            
-        # 2. Exclusion partielle
-        for partial in TECHNICAL_PARTIAL_EXCLUSIONS:
-            if partial in term_lower:
-                return True, f"partial_match: {partial}"
-                
-        # 3. Patterns spéciaux avicoles
-        
-        # Format "lignée + nombre" (ex: "ross308", "cobb500")
-        if re.match(r'^[a-z]+\d+$', term_lower):
-            return True, "genetic_line_pattern"
-            
-        # Format "mot_technique" (ex: "feed_conversion", "body_weight")
-        if '_' in term_lower and any(part in TECHNICAL_TERMS_EXCLUSION for part in term_lower.split('_')):
-            return True, "technical_compound"
-            
-        # Codes courts techniques (2-4 lettres majuscules)
-        if re.match(r'^[A-Z]{2,4}$', term) and len(term) <= 4:
-            return True, "technical_code"
-
-        return False, ""
 
     def _validate_setup(self) -> None:
         """CORRECTION: Valide la configuration initiale avec gestion variable d'environnement"""
@@ -218,7 +130,7 @@ class UniversalTranslationService:
                     self.enable_google_fallback = False
 
         logger.info(
-            f"Service traduction initialisé - Répertoire: {self.dict_path}, Google: {self.enable_google_fallback}, Exclusions techniques: {self.enable_technical_exclusion}"
+            f"Service traduction initialisé - Répertoire: {self.dict_path}, Google: {self.enable_google_fallback}"
         )
 
     def _load_language_dictionary(self, language: str) -> Dict[str, Any]:
@@ -425,10 +337,6 @@ class UniversalTranslationService:
                 self.stats.local_hits += 1
             elif source == "google":
                 self.stats.google_calls += 1
-            elif source == "excluded":  # NOUVEAU
-                self.stats.technical_terms_excluded += 1
-            else:
-                self.stats.terms_translated += 1
 
             self.stats.cache_size = len(self._memory_cache)
             total_requests = self.stats.hits + self.stats.misses
@@ -591,32 +499,17 @@ class UniversalTranslationService:
         domain: Optional[str] = None,
     ) -> TranslationResult:
         """
-        Traduit un terme avec logique de fallback intelligente et exclusion technique
-        1. Vérification exclusion technique (NOUVEAU)
-        2. Cache mémoire
-        3. Dictionnaire local (chargement dynamique par langue)
-        4. Google Translate (si activé)
-        5. Fallback (terme original)
+        Traduit un terme avec logique de fallback intelligente
+        1. Cache mémoire
+        2. Dictionnaire local (chargement dynamique par langue)
+        3. Google Translate (si activé)
+        4. Fallback (terme original)
         """
 
         # Validation entrée
         if not term or not term.strip():
             return TranslationResult(
                 text="", source="fallback", confidence=0.0, language=target_language
-            )
-
-        # CORRECTION CRITIQUE: Vérifier exclusion technique EN PREMIER
-        is_technical, exclusion_reason = self._is_technical_term(term)
-        if is_technical:
-            self._update_stats("excluded")
-            logger.debug(f"Terme technique exclu de la traduction: '{term}' (raison: {exclusion_reason})")
-            
-            return TranslationResult(
-                text=term,  # Retourner le terme original non traduit
-                source="excluded",
-                confidence=1.0,  # Confiance maximale pour exclusion
-                language=source_language or "en",  # Garder langue source
-                exclusion_reason=exclusion_reason,
             )
 
         if target_language not in self.supported_languages:
@@ -628,12 +521,12 @@ class UniversalTranslationService:
         # Clé de cache
         cache_key = f"{term.lower()}:{target_language}:{source_language or 'auto'}:{domain or 'general'}"
 
-        # 2. Vérification cache
+        # 1. Vérification cache
         cached_result = self._get_from_cache(cache_key)
         if cached_result:
             return cached_result
 
-        # 3. Recherche dictionnaire local (avec chargement dynamique)
+        # 2. Recherche dictionnaire local (avec chargement dynamique)
         local_result = self._search_local_dictionary(
             term, target_language, source_language, domain
         )
@@ -642,7 +535,7 @@ class UniversalTranslationService:
             self._update_stats("local")
             return local_result
 
-        # 4. Google Translate fallback
+        # 3. Google Translate fallback
         if self.enable_google_fallback:
             google_result = self._translate_with_google(
                 term, target_language, source_language
@@ -651,7 +544,7 @@ class UniversalTranslationService:
                 self._cache_result(cache_key, google_result)
                 return google_result
 
-        # 5. Fallback - terme original avec score minimal
+        # 4. Fallback - terme original avec score minimal
         fallback_result = TranslationResult(
             text=term, source="fallback", confidence=0.3, language=target_language
         )
@@ -733,7 +626,7 @@ class UniversalTranslationService:
         return results
 
     def get_cache_stats(self) -> CacheStats:
-        """Retourne les statistiques du cache avec exclusions techniques"""
+        """Retourne les statistiques du cache"""
         with self._stats_lock:
             return CacheStats(
                 hits=self.stats.hits,
@@ -742,31 +635,7 @@ class UniversalTranslationService:
                 local_hits=self.stats.local_hits,
                 cache_size=self.stats.cache_size,
                 hit_rate=self.stats.hit_rate,
-                technical_terms_excluded=self.stats.technical_terms_excluded,
-                terms_translated=self.stats.terms_translated,
             )
-
-    def get_exclusion_stats(self) -> Dict[str, Any]:
-        """NOUVEAU: Statistiques détaillées des exclusions techniques"""
-        with self._stats_lock:
-            total_processed = (self.stats.hits + self.stats.misses + 
-                             self.stats.technical_terms_excluded)
-            
-            return {
-                "technical_terms_excluded": self.stats.technical_terms_excluded,
-                "terms_translated": self.stats.terms_translated,
-                "total_processed": total_processed,
-                "exclusion_rate_pct": round(
-                    self.stats.technical_terms_excluded / max(1, total_processed) * 100, 2
-                ),
-                "translation_rate_pct": round(
-                    self.stats.terms_translated / max(1, total_processed) * 100, 2
-                ),
-                "cache_hit_rate_pct": round(
-                    self.stats.hits / max(1, total_processed) * 100, 2
-                ),
-                "technical_exclusion_enabled": self.enable_technical_exclusion,
-            }
 
     def clear_cache(self) -> None:
         """Vide le cache mémoire"""
@@ -874,9 +743,8 @@ def create_translation_service(
     cache_size: int = 10000,
     cache_ttl: int = 86400,
     confidence_threshold: float = 0.7,
-    enable_technical_exclusion: bool = True,  # NOUVEAU
 ) -> UniversalTranslationService:
-    """Factory pour créer le service de traduction avec exclusion technique"""
+    """Factory pour créer le service de traduction"""
     return UniversalTranslationService(
         dict_path=dict_path,
         supported_languages=supported_languages,
@@ -885,7 +753,6 @@ def create_translation_service(
         cache_ttl=cache_ttl,
         enable_google_fallback=enable_google_fallback,
         confidence_threshold=confidence_threshold,
-        enable_technical_exclusion=enable_technical_exclusion,
     )
 
 
@@ -900,7 +767,7 @@ def get_translation_service() -> Optional[UniversalTranslationService]:
 
 
 def init_global_translation_service(**kwargs) -> UniversalTranslationService:
-    """Initialise le service global de traduction avec exclusion technique"""
+    """Initialise le service global de traduction"""
     global _global_translation_service
 
     with _service_lock:
@@ -908,17 +775,3 @@ def init_global_translation_service(**kwargs) -> UniversalTranslationService:
             _global_translation_service = create_translation_service(**kwargs)
 
         return _global_translation_service
-
-
-# CORRECTION CRITIQUE: Fonction utilitaire pour éviter la traduction des termes techniques
-def should_translate_term(term: str) -> bool:
-    """Vérifie rapidement si un terme doit être traduit ou préservé"""
-    
-    temp_service = UniversalTranslationService(
-        dict_path="", 
-        supported_languages={"fr", "en"},
-        enable_technical_exclusion=True
-    )
-    
-    is_technical, _ = temp_service._is_technical_term(term)
-    return not is_technical

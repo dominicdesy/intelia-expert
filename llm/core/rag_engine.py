@@ -1,600 +1,98 @@
 # -*- coding: utf-8 -*-
 """
-rag_engine.py - RAG Engine Enhanced avec Système RAG JSON Intégré + PostgreSQL
-Version 5.0 - Intégration hybride Weaviate + PostgreSQL (conservatrice)
+rag_engine.py - RAG Engine Principal - Version Refactorisée
+Version 5.1 - Architecture modulaire pour maintenabilité
+
+CORRECTIONS CRITIQUES APPORTÉES:
+1. Ajout du paramètre start_time manquant dans _generate_response_core_weaviate_only()
+2. Exclusion des termes techniques de la traduction automatique  
+3. Refactorisation modulaire pour réduire la taille du fichier
 """
 
 import os
 import asyncio
 import logging
 import time
-import numpy as np
-import httpx
-from typing import Dict, List, Optional, Any, Tuple
-from collections import defaultdict
-from enum import Enum
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
-from utils.utilities import validate_intent_result
+from enum import Enum
 
-# CORRECTION CRITIQUE: Définir logger AVANT toute utilisation
+# CORRECTION CRITIQUE: Logger défini AVANT utilisation
 logger = logging.getLogger(__name__)
 
-# NOUVEAUX IMPORTS: Système RAG JSON
+# Imports des modules refactorisés
 try:
-    from rag.extractors.json_extractor import JSONExtractor
-    from rag.extractors.table_extractor import TableExtractor
-    from rag.extractors.genetic_line_extractor import GeneticLineExtractor
-    from rag.models.validation import JSONValidator, ValidationRequest
-    from rag.models.ingestion import IngestionPipeline, IngestionRequest
-    from rag.core.hybrid_search import HybridSearchEngine
-    from rag.core.document_processor import DocumentProcessor
-    from rag.core.cache_manager import EnhancedCacheManager
-
-    RAG_JSON_SYSTEM_AVAILABLE = True
-    logger.info("✅ Système RAG JSON importé avec succès")
-except ImportError as e:
-    RAG_JSON_SYSTEM_AVAILABLE = False
-    logger.warning(f"⚠️ Système RAG JSON non disponible: {e}")
-
-# NOUVEAU: Support PostgreSQL hybride (optionnel)
-try:
-    import asyncpg
-    from enum import Enum
-
-    # Configuration PostgreSQL
-    POSTGRESQL_CONFIG = {
-        "user": os.getenv("DB_USER", "doadmin"),
-        "password": os.getenv("DB_PASSWORD"),
-        "host": os.getenv("DB_HOST"),
-        "port": int(os.getenv("DB_PORT", 25060)),
-        "database": os.getenv("DB_NAME", "defaultdb"),
-        "ssl": os.getenv("DB_SSL", "require"),
-    }
-
+    from .rag_postgresql import PostgreSQLSystem, QueryRouter, QueryType
     POSTGRESQL_INTEGRATION_AVAILABLE = True
-    logger.info("✅ Support PostgreSQL disponible")
+    logger.info("✅ Système PostgreSQL importé")
 except ImportError as e:
     POSTGRESQL_INTEGRATION_AVAILABLE = False
-    logger.warning(f"⚠️ Support PostgreSQL non disponible: {e}")
-
-# CORRECTION: Imports explicites au lieu des star imports dangereux
-try:
-    from config.config import (
-        # Core config
-        RAG_ENABLED,
-        CACHE_ENABLED,
-        EXTERNAL_CACHE_AVAILABLE,
-        # API Keys
-        OPENAI_API_KEY,
-        LANGSMITH_ENABLED,
-        LANGSMITH_API_KEY,
-        LANGSMITH_PROJECT,
-        # RRF Intelligent
-        ENABLE_INTELLIGENT_RRF,
-        RAG_SIMILARITY_TOP_K,
-        RAG_CONFIDENCE_THRESHOLD,
-        HYBRID_SEARCH_ENABLED,
-        DEFAULT_ALPHA,
-        MAX_CONVERSATION_CONTEXT,
-        RAG_VERIFICATION_ENABLED,
-        # Entity Enrichment
-        ENTITY_ENRICHMENT_ENABLED,
-        # Guardrails
-        GUARDRAILS_AVAILABLE,
-        GUARDRAILS_LEVEL,
-        # API Diagnostics
-        ENABLE_API_DIAGNOSTICS,
-    )
-
-    logger.debug("Config importé avec succès")
-except Exception as e:
-    logger.error(f"Erreur import config: {e}")
-    raise
+    logger.warning(f"⚠️ PostgreSQL non disponible: {e}")
+    QueryType = None
 
 try:
-    from utils.imports_and_dependencies import (
-        # Availability flags
-        OPENAI_AVAILABLE,
-        WEAVIATE_AVAILABLE,
-        AsyncOpenAI,
-    )
-
-    logger.debug("Imports_and_dependencies importé avec succès")
-except Exception as e:
-    logger.error(f"Erreur import imports_and_dependencies: {e}")
-    raise
-
-try:
-    from .data_models import RAGResult, RAGSource, Document
-
-    logger.debug("Data_models importé avec succès")
-except Exception as e:
-    logger.error(f"Erreur import data_models: {e}")
-    raise
-
-try:
-    from utils.utilities import (
-        METRICS,
-        detect_language_enhanced,
-        build_where_filter,
-        get_out_of_domain_message,
-    )
-
-    logger.debug("Utilities importé avec succès")
-except Exception as e:
-    logger.error(f"Erreur import utilities: {e}")
-    raise
-
-try:
-    from retrieval.embedder import OpenAIEmbedder
-
-    logger.debug("Embedder importé avec succès")
-except Exception as e:
-    logger.error(f"Erreur import embedder: {e}")
-    raise
-
-try:
-    from retrieval.retriever import HybridWeaviateRetriever
-
-    logger.debug("Retriever importé avec succès")
-except Exception as e:
-    logger.error(f"Erreur import retriever: {e}")
-    raise
-
-try:
-    from generation.generators import EnhancedResponseGenerator
-
-    logger.debug("Generators importé avec succès")
-except Exception as e:
-    logger.error(f"Erreur import generators: {e}")
-    raise
-
-try:
-    from security.ood_detector import EnhancedOODDetector
-
-    logger.debug("OOD_detector importé avec succès")
-except Exception as e:
-    logger.error(f"Erreur import ood_detector: {e}")
-    raise
-
-try:
-    from .memory import ConversationMemory
-
-    logger.debug("Memory importé avec succès")
-except Exception as e:
-    logger.error(f"Erreur import memory: {e}")
-    raise
-
-# === NOUVEAU: IMPORTS LANGSMITH ===
-if LANGSMITH_ENABLED:
-    try:
-        from langsmith import Client
-
-        LANGSMITH_AVAILABLE = True
-        logger.info("LangSmith importé avec succès")
-    except ImportError as e:
-        LANGSMITH_AVAILABLE = False
-        logger.warning(f"LangSmith non disponible: {e}")
-else:
-    LANGSMITH_AVAILABLE = False
-
-# === NOUVEAU: IMPORT RRF INTELLIGENT ===
-try:
-    from retrieval.enhanced_rrf_fusion import IntelligentRRFFusion
-
-    INTELLIGENT_RRF_AVAILABLE = True
-    logger.info("RRF Intelligent importé avec succès")
+    from .rag_json_system import JSONSystem
+    RAG_JSON_SYSTEM_AVAILABLE = True
+    logger.info("✅ Système JSON importé")
 except ImportError as e:
-    INTELLIGENT_RRF_AVAILABLE = False
-    logger.warning(f"RRF Intelligent non disponible: {e}")
+    RAG_JSON_SYSTEM_AVAILABLE = False
+    logger.warning(f"⚠️ JSON non disponible: {e}")
 
-# === NOUVEAUX COMPOSANTS POSTGRESQL ===
-if POSTGRESQL_INTEGRATION_AVAILABLE:
+try:
+    from .rag_weaviate_core import WeaviateCore
+    WEAVIATE_CORE_AVAILABLE = True
+    logger.info("✅ Weaviate Core importé")
+except ImportError as e:
+    WEAVIATE_CORE_AVAILABLE = False
+    logger.warning(f"⚠️ Weaviate Core non disponible: {e}")
 
-    class QueryType(Enum):
-        """Types de requêtes pour routage intelligent"""
+try:
+    from .rag_langsmith import LangSmithIntegration
+    LANGSMITH_INTEGRATION_AVAILABLE = True
+    logger.info("✅ LangSmith importé")
+except ImportError as e:
+    LANGSMITH_INTEGRATION_AVAILABLE = False
+    logger.warning(f"⚠️ LangSmith non disponible: {e}")
 
-        KNOWLEDGE = "knowledge"  # Connaissances générales → Weaviate
-        METRICS = "metrics"  # Données de performance → PostgreSQL
-        HYBRID = "hybrid"  # Combinaison des deux
-        UNKNOWN = "unknown"  # Type indéterminé
-
-    @dataclass
-    class MetricResult:
-        """Résultat d'une requête de métriques PostgreSQL"""
-
-        company: str
-        breed: str
-        strain: str
-        species: str
-        metric_name: str
-        value_numeric: Optional[float]
-        value_text: Optional[str]
-        unit: Optional[str]
-        age_min: Optional[int]
-        age_max: Optional[int]
-        sheet_name: str
-        category: str
-        confidence: float = 1.0
-
-    class QueryRouter:
-        """Routeur intelligent pour diriger les requêtes vers la bonne source"""
-
-        def __init__(self):
-            # Mots-clés pour PostgreSQL (métriques/performance)
-            self.metric_keywords = {
-                "performance",
-                "metrics",
-                "données",
-                "chiffres",
-                "résultats",
-                "weight",
-                "poids",
-                "egg",
-                "oeuf",
-                "production",
-                "feed",
-                "alimentation",
-                "mortality",
-                "mortalité",
-                "growth",
-                "croissance",
-                "nutrition",
-                "age",
-                "semaine",
-                "week",
-                "day",
-                "jour",
-                "phase",
-                "temperature",
-                "température",
-                "humidity",
-                "humidité",
-                "housing",
-                "logement",
-                "density",
-                "densité",
-            }
-
-            # Mots-clés pour Weaviate (connaissances)
-            self.knowledge_keywords = {
-                "comment",
-                "pourquoi",
-                "qu'est-ce",
-                "expliquer",
-                "définir",
-                "maladie",
-                "disease",
-                "traitement",
-                "treatment",
-                "symptom",
-                "symptôme",
-                "prévention",
-                "prevention",
-                "biosécurité",
-                "biosecurity",
-                "management",
-                "gestion",
-                "guide",
-                "protocol",
-                "protocole",
-                "conseil",
-                "advice",
-                "recommendation",
-                "recommandation",
-            }
-
-        def route_query(self, query: str, intent_result=None) -> QueryType:
-            """Détermine le type de requête et la source appropriée"""
-
-            query_lower = query.lower()
-
-            # Compteurs de mots-clés
-            metric_score = sum(
-                1 for keyword in self.metric_keywords if keyword in query_lower
-            )
-            knowledge_score = sum(
-                1 for keyword in self.knowledge_keywords if keyword in query_lower
-            )
-
-            # Analyse des entités si intent_result disponible
-            if intent_result:
-                # Boost pour métriques si strain/breed spécifié
-                if (
-                    hasattr(intent_result, "genetic_line")
-                    and intent_result.genetic_line
-                ):
-                    metric_score += 2
-
-                # Boost pour métriques si âge mentionné
-                if hasattr(intent_result, "age") and intent_result.age:
-                    metric_score += 1
-
-            # Détection de comparaisons (souvent hybride)
-            comparison_indicators = [
-                "vs",
-                "versus",
-                "compare",
-                "comparaison",
-                "différence",
-                "mieux",
-            ]
-            has_comparison = any(
-                indicator in query_lower for indicator in comparison_indicators
-            )
-
-            # Règles de décision
-            if metric_score > knowledge_score + 1:
-                return QueryType.METRICS
-            elif knowledge_score > metric_score + 1:
-                return QueryType.KNOWLEDGE
-            elif has_comparison or (metric_score > 0 and knowledge_score > 0):
-                return QueryType.HYBRID
-            else:
-                return QueryType.UNKNOWN
-
-    class PostgreSQLRetriever:
-        """Récupérateur de données PostgreSQL pour métriques avicoles"""
-
-        def __init__(self, config: Dict[str, Any]):
-            self.config = config
-            self.pool = None
-
-        async def initialize(self):
-            """Initialise la connexion PostgreSQL"""
-            try:
-                self.pool = await asyncpg.create_pool(
-                    user=self.config["user"],
-                    password=self.config["password"],
-                    host=self.config["host"],
-                    port=self.config["port"],
-                    database=self.config["database"],
-                    ssl=self.config["ssl"],
-                    min_size=2,
-                    max_size=10,
-                )
-                logger.info("✅ PostgreSQL Retriever initialisé")
-            except Exception as e:
-                logger.error(f"❌ Erreur PostgreSQL Retriever: {e}")
-                raise
-
-        async def search_metrics(
-            self, query: str, intent_result=None, top_k: int = 10
-        ) -> List[MetricResult]:
-            """Recherche de métriques dans PostgreSQL"""
-
-            if not self.pool:
-                await self.initialize()
-
-            try:
-                # Construction de la requête SQL dynamique
-                sql_query, params = self._build_sql_query(query, intent_result, top_k)
-
-                async with self.pool.acquire() as conn:
-                    rows = await conn.fetch(sql_query, *params)
-
-                # Conversion en MetricResult
-                results = []
-                for row in rows:
-                    result = MetricResult(
-                        company=row["company_name"],
-                        breed=row["breed_name"],
-                        strain=row["strain_name"],
-                        species=row["species"],
-                        metric_name=row["metric_name"],
-                        value_numeric=row["value_numeric"],
-                        value_text=row["value_text"],
-                        unit=row["unit"],
-                        age_min=row["age_min"],
-                        age_max=row["age_max"],
-                        sheet_name=row["sheet_name"],
-                        category=row["category_name"],
-                        confidence=self._calculate_relevance_score(query, row),
-                    )
-                    results.append(result)
-
-                logger.info(f"PostgreSQL: {len(results)} métriques trouvées")
-                return results
-
-            except Exception as e:
-                logger.error(f"Erreur recherche PostgreSQL: {e}")
-                return []
-
-        def _build_sql_query(
-            self, query: str, intent_result=None, top_k: int = 10
-        ) -> Tuple[str, List]:
-            """Construction dynamique de la requête SQL"""
-
-            base_query = """
-            SELECT 
-                c.company_name,
-                b.breed_name,
-                s.strain_name,
-                s.species,
-                m.metric_name,
-                m.value_numeric,
-                m.value_text,
-                m.unit,
-                m.age_min,
-                m.age_max,
-                m.sheet_name,
-                dc.category_name,
-                m.metadata
-            FROM companies c
-            JOIN breeds b ON c.id = b.company_id
-            JOIN strains s ON b.id = s.breed_id  
-            JOIN documents d ON s.id = d.strain_id
-            JOIN metrics m ON d.id = m.document_id
-            JOIN data_categories dc ON m.category_id = dc.id
-            WHERE 1=1
-            """
-
-            params = []
-            conditions = []
-            param_count = 0
-
-            # Filtres selon intent_result
-            if intent_result:
-                if (
-                    hasattr(intent_result, "genetic_line")
-                    and intent_result.genetic_line
-                ):
-                    param_count += 1
-                    conditions.append(f"LOWER(s.strain_name) ILIKE ${param_count}")
-                    params.append(f"%{intent_result.genetic_line.lower()}%")
-
-                if hasattr(intent_result, "age") and intent_result.age:
-                    param_count += 1
-                    conditions.append(
-                        f"(m.age_min <= ${param_count} AND m.age_max >= ${param_count}) OR (m.age_min IS NULL AND m.age_max IS NULL)"
-                    )
-                    params.append(intent_result.age)
-                    params.append(intent_result.age)
-                    param_count += 1
-
-            # Recherche textuelle sur les métriques
-            query_words = query.lower().split()
-            for word in query_words[
-                :3
-            ]:  # Limite à 3 mots pour éviter la sur-spécification
-                if len(word) > 3:  # Ignorer mots trop courts
-                    param_count += 1
-                    conditions.append(
-                        f"(LOWER(m.metric_name) ILIKE ${param_count} OR LOWER(m.value_text) ILIKE ${param_count})"
-                    )
-                    params.append(f"%{word}%")
-                    params.append(f"%{word}%")
-                    param_count += 1
-
-            # Ajout des conditions
-            if conditions:
-                base_query += " AND (" + " OR ".join(conditions) + ")"
-
-            # Tri par pertinence et limite
-            base_query += f" ORDER BY m.value_numeric DESC NULLS LAST LIMIT {top_k}"
-
-            return base_query, params
-
-        def _calculate_relevance_score(self, query: str, row: Dict) -> float:
-            """Calcule un score de pertinence pour un résultat"""
-
-            score = 0.5  # Score de base
-            query_lower = query.lower()
-
-            # Boost si métrique correspond au nom
-            if row["metric_name"] and query_lower in row["metric_name"].lower():
-                score += 0.3
-
-            # Boost si valeur numérique disponible
-            if row["value_numeric"] is not None:
-                score += 0.1
-
-            # Boost si âge spécifique
-            if row["age_min"] is not None and row["age_max"] is not None:
-                score += 0.1
-
-            return min(1.0, score)
-
-        async def close(self):
-            """Ferme la connexion PostgreSQL"""
-            if self.pool:
-                await self.pool.close()
+# Imports existants conservés
+from config.config import *
+from utils.imports_and_dependencies import OPENAI_AVAILABLE, WEAVIATE_AVAILABLE, AsyncOpenAI
+from .data_models import RAGResult, RAGSource, Document
+from utils.utilities import METRICS, detect_language_enhanced
 
 
 class InteliaRAGEngine:
-    """RAG Engine principal avec système JSON avicole intégré + PostgreSQL hybride"""
+    """RAG Engine principal - Architecture modulaire"""
 
     def __init__(self, openai_client: AsyncOpenAI = None):
         self.openai_client = openai_client or self._build_openai_client()
-
-        # Composants principaux existants
-        self.cache_manager = None
-        self.embedder = None
-        self.retriever = None
-        self.generator = None
-        self.verifier = None
-        self.memory = None
-        self.intent_processor = None
-        self.ood_detector = None
-        self.guardrails = None
-        self.weaviate_client = None
-
-        # === NOUVEAUX COMPOSANTS RAG JSON ===
-        self.json_extractor = None
-        self.table_extractor = None
-        self.genetic_line_extractor = None
-        self.json_validator = None
-        self.ingestion_pipeline = None
-        self.hybrid_search_engine = None
-        self.document_processor = None
-        self.enhanced_cache_manager = None
-
-        # === NOUVEAUX COMPOSANTS POSTGRESQL ===
-        self.postgres_retriever = None
-        self.query_router = None
-
-        # === NOUVEAU: LANGSMITH CLIENT ===
-        self.langsmith_client = None
-        if LANGSMITH_AVAILABLE and LANGSMITH_ENABLED and LANGSMITH_API_KEY:
-            try:
-                self.langsmith_client = Client(
-                    api_key=LANGSMITH_API_KEY, api_url="https://api.smith.langchain.com"
-                )
-                logger.info(f"LangSmith initialisé - Projet: {LANGSMITH_PROJECT}")
-            except Exception as e:
-                logger.error(f"Erreur initialisation LangSmith: {e}")
-                self.langsmith_client = None
-
-        # === NOUVEAU: RRF INTELLIGENT ===
-        self.intelligent_rrf = None
-
+        
+        # Modules spécialisés 
+        self.postgresql_system = None
+        self.json_system = None  
+        self.weaviate_core = None
+        self.langsmith_integration = None
+        
         # État
         self.is_initialized = False
         self.degraded_mode = False
-
-        # Stats étendues avec système JSON et PostgreSQL
+        
+        # Stats consolidées
         self.optimization_stats = {
+            "requests_total": 0,
             "cache_hits": 0,
             "cache_misses": 0,
-            "semantic_cache_hits": 0,
-            "fallback_cache_hits": 0,
-            "hybrid_searches": 0,
-            "guardrail_violations": 0,
-            "entity_enrichments": 0,
-            "api_corrections": 0,
-            "external_cache_used": False,
-            "semantic_debug_requests": 0,
-            "explain_score_extractions": 0,
-            # NOUVEAU: Stats LangSmith
-            "langsmith_traces": 0,
-            "langsmith_errors": 0,
-            "prompt_optimizations": 0,
-            # NOUVEAU: Stats RRF Intelligent
-            "intelligent_rrf_used": 0,
-            "genetic_boosts_applied": 0,
-            "rrf_learning_updates": 0,
-            "semantic_reasoning_failures": 0,
-            "intent_coverage_stats": defaultdict(int),
-            "weaviate_capabilities": {},
-            "dynamic_ood_threshold_adjustments": 0,
-            "conversation_context_usage": 0,
-            # NOUVEAU: Stats système JSON
-            "json_validations": 0,
-            "json_ingestions": 0,
-            "table_extractions": 0,
-            "genetic_line_detections": 0,
-            "performance_metrics_processed": 0,
-            "cache_sets": 0,
-            # NOUVEAU: Stats PostgreSQL
             "postgresql_queries": 0,
-            "postgresql_fallbacks": 0,
+            "json_searches": 0,
+            "weaviate_searches": 0,
             "hybrid_queries": 0,
-            "query_routing": defaultdict(int),
+            "langsmith_traces": 0,
         }
 
     def _build_openai_client(self) -> AsyncOpenAI:
-        """Construit le client OpenAI"""
+        """Client OpenAI avec configuration timeout"""
         try:
+            import httpx
             http_client = httpx.AsyncClient(timeout=30.0)
             return AsyncOpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
         except Exception as e:
@@ -602,13 +100,11 @@ class InteliaRAGEngine:
             return AsyncOpenAI(api_key=OPENAI_API_KEY)
 
     async def initialize(self):
-        """Initialisation complète avec système JSON intégré + PostgreSQL"""
+        """Initialisation modulaire"""
         if self.is_initialized:
             return
 
-        logger.info(
-            "🚀 Initialisation RAG Engine v5.0 avec système JSON avicole + PostgreSQL"
-        )
+        logger.info("🚀 Initialisation RAG Engine v5.1 - Architecture modulaire")
 
         if not OPENAI_AVAILABLE or not WEAVIATE_AVAILABLE:
             self.degraded_mode = True
@@ -617,605 +113,71 @@ class InteliaRAGEngine:
             return
 
         try:
-            # === ÉTAPE 1: SYSTÈME JSON AVICOLE ===
-            if RAG_JSON_SYSTEM_AVAILABLE:
-                await self._initialize_json_system()
-            else:
-                logger.warning(
-                    "⚠️ Système JSON non disponible, fonctionnalités limitées"
-                )
-
-            # === ÉTAPE 1.5: SYSTÈME POSTGRESQL (NOUVEAU) ===
+            # 1. Système PostgreSQL
             if POSTGRESQL_INTEGRATION_AVAILABLE:
                 await self._initialize_postgresql_system()
+
+            # 2. Système JSON  
+            if RAG_JSON_SYSTEM_AVAILABLE:
+                await self._initialize_json_system()
+
+            # 3. Weaviate Core (obligatoire)
+            if WEAVIATE_CORE_AVAILABLE:
+                await self._initialize_weaviate_core()
             else:
-                logger.warning(
-                    "⚠️ Système PostgreSQL non disponible, utilisation Weaviate seul"
-                )
+                raise Exception("Weaviate Core requis")
 
-            # === ÉTAPE 2: CACHE SYSTÈME ===
-            logger.debug("Étape 2: Initialisation Cache Redis externe...")
-            await self._initialize_cache_system()
-
-            # === ÉTAPE 3: CONNEXION WEAVIATE ===
-            logger.debug("Étape 3: Connexion Weaviate...")
-            await self._connect_weaviate()
-
-            # === ÉTAPE 4: COMPOSANTS DE BASE ===
-            logger.debug("Étape 4: Composants de base...")
-            await self._initialize_base_components()
-
-            # === ÉTAPE 5: RETRIEVER HYBRIDE ===
-            logger.debug("Étape 5: Retriever hybride...")
-            await self._initialize_hybrid_retriever()
-
-            # === ÉTAPE 6: GÉNÉRATEUR DE RÉPONSES ===
-            logger.debug("Étape 6: Générateur de réponses...")
-            await self._initialize_generator()
-
-            # === ÉTAPE 7: INTENT PROCESSOR ===
-            logger.debug("Étape 7: Intent processor...")
-            await self._initialize_intent_processor()
-
-            # === ÉTAPE 8: GUARDRAILS ===
-            if GUARDRAILS_AVAILABLE:
-                await self._initialize_guardrails()
+            # 4. LangSmith (optionnel)
+            if LANGSMITH_INTEGRATION_AVAILABLE and LANGSMITH_ENABLED:
+                await self._initialize_langsmith()
 
             self.is_initialized = True
-            logger.info("✅ RAG Engine v5.0 initialisé avec succès")
+            logger.info("✅ RAG Engine v5.1 initialisé avec succès")
 
         except Exception as e:
-            logger.error(f"❌ Erreur initialisation RAG Engine: {e}")
-            logger.error(f"Type d'erreur: {type(e).__name__}")
-            import traceback
-
-            logger.error(f"Traceback: {traceback.format_exc()}")
+            logger.error(f"❌ Erreur initialisation: {e}")
             self.degraded_mode = True
             self.is_initialized = True
 
     async def _initialize_postgresql_system(self):
-        """Initialise le système PostgreSQL (NOUVEAU)"""
+        """Initialise le système PostgreSQL"""
         try:
-            logger.info("🔧 Initialisation système PostgreSQL...")
-
-            # Routeur de requêtes
-            if POSTGRESQL_INTEGRATION_AVAILABLE:
-                self.query_router = QueryRouter()
-                logger.info("✅ Query Router initialisé")
-
-                # PostgreSQL Retriever
-                try:
-                    self.postgres_retriever = PostgreSQLRetriever(POSTGRESQL_CONFIG)
-                    await self.postgres_retriever.initialize()
-                    logger.info("✅ PostgreSQL Retriever initialisé")
-                except Exception as e:
-                    logger.warning(f"PostgreSQL Retriever échoué: {e}")
-                    self.postgres_retriever = None
-
+            self.postgresql_system = PostgreSQLSystem()
+            await self.postgresql_system.initialize()
             logger.info("✅ Système PostgreSQL initialisé")
-
         except Exception as e:
-            logger.error(f"❌ Erreur initialisation système PostgreSQL: {e}")
-            # Continue sans PostgreSQL
-            self.query_router = None
-            self.postgres_retriever = None
+            logger.warning(f"PostgreSQL échoué: {e}")
+            self.postgresql_system = None
 
     async def _initialize_json_system(self):
-        """Initialise le système RAG JSON complet"""
+        """Initialise le système JSON"""
         try:
-            logger.info("🔧 Initialisation système RAG JSON...")
-
-            # Extracteurs spécialisés
-            self.json_extractor = JSONExtractor()
-            self.table_extractor = TableExtractor()
-            self.genetic_line_extractor = GeneticLineExtractor()
-
-            # Validateur JSON
-            self.json_validator = JSONValidator()
-
-            # Pipeline d'ingestion
-            self.ingestion_pipeline = IngestionPipeline(
-                json_extractor=self.json_extractor,
-                table_extractor=self.table_extractor,
-                genetic_line_extractor=self.genetic_line_extractor,
-                validator=self.json_validator,
-            )
-
-            # Processeur de documents
-            self.document_processor = DocumentProcessor(
-                extractors={
-                    "json": self.json_extractor,
-                    "table": self.table_extractor,
-                    "genetic_line": self.genetic_line_extractor,
-                }
-            )
-
-            logger.info("✅ Système RAG JSON initialisé")
-
+            self.json_system = JSONSystem()
+            await self.json_system.initialize()
+            logger.info("✅ Système JSON initialisé")
         except Exception as e:
-            logger.error(f"❌ Erreur initialisation système JSON: {e}")
+            logger.warning(f"JSON échoué: {e}")
+            self.json_system = None
+
+    async def _initialize_weaviate_core(self):
+        """Initialise Weaviate Core"""
+        try:
+            self.weaviate_core = WeaviateCore(self.openai_client)
+            await self.weaviate_core.initialize()
+            logger.info("✅ Weaviate Core initialisé")
+        except Exception as e:
+            logger.error(f"Weaviate Core échoué: {e}")
             raise
 
-    async def _initialize_cache_system(self):
-        """Initialise le système de cache amélioré"""
+    async def _initialize_langsmith(self):
+        """Initialise LangSmith"""
         try:
-            if CACHE_ENABLED and EXTERNAL_CACHE_AVAILABLE:
-                # Cache Redis externe existant
-                try:
-                    from cache.redis_cache_manager import RAGCacheManager
-
-                    self.cache_manager = RAGCacheManager()
-                    await self.cache_manager.initialize()
-                    if self.cache_manager.enabled:
-                        self.optimization_stats["external_cache_used"] = True
-                        logger.info("✅ Cache Redis externe activé")
-                except ImportError as e:
-                    logger.warning(f"RAGCacheManager non disponible: {e}")
-                    self.cache_manager = None
-                except Exception as e:
-                    logger.warning(f"Cache Redis externe échoué: {e}")
-                    self.cache_manager = None
-
-                # Cache amélioré pour système JSON
-                if RAG_JSON_SYSTEM_AVAILABLE:
-                    try:
-                        self.enhanced_cache_manager = EnhancedCacheManager()
-                        await self.enhanced_cache_manager.initialize()
-                        logger.info("✅ Cache système JSON activé")
-                    except Exception as e:
-                        logger.warning(f"Cache système JSON échoué: {e}")
-                        self.enhanced_cache_manager = None
-
+            self.langsmith_integration = LangSmithIntegration()
+            await self.langsmith_integration.initialize()
+            logger.info("✅ LangSmith initialisé")
         except Exception as e:
-            logger.error(f"Erreur initialisation cache: {e}")
-
-    async def _initialize_base_components(self):
-        """Initialise les composants de base"""
-        try:
-            self.embedder = OpenAIEmbedder(self.openai_client, self.cache_manager)
-            self.memory = ConversationMemory(self.openai_client)
-            # CORRECTION: Passer le client OpenAI pour la traduction multilingue
-            self.ood_detector = EnhancedOODDetector(
-                blocked_terms_path=None, openai_client=self.openai_client
-            )
-            logger.debug("✅ Composants de base initialisés")
-        except Exception as e:
-            logger.error(f"Erreur composants de base: {e}")
-            raise
-
-    async def _initialize_hybrid_retriever(self):
-        """Initialise le retriever hybride avec RRF intelligent"""
-        if self.weaviate_client:
-            try:
-                self.retriever = HybridWeaviateRetriever(self.weaviate_client)
-
-                # Moteur de recherche hybride pour système JSON
-                if RAG_JSON_SYSTEM_AVAILABLE:
-                    self.hybrid_search_engine = HybridSearchEngine(
-                        weaviate_client=self.weaviate_client,
-                        cache_manager=self.enhanced_cache_manager,
-                    )
-
-                # === RRF INTELLIGENT ===
-                if (
-                    INTELLIGENT_RRF_AVAILABLE
-                    and ENABLE_INTELLIGENT_RRF
-                    and self.cache_manager
-                    and self.cache_manager.enabled
-                ):
-                    try:
-                        self.intelligent_rrf = IntelligentRRFFusion(
-                            redis_client=self.cache_manager.client,
-                            intent_processor=None,  # Sera défini plus tard
-                        )
-                        logger.info("✅ RRF Intelligent initialisé")
-                        if hasattr(self.retriever, "set_intelligent_rrf"):
-                            self.retriever.set_intelligent_rrf(self.intelligent_rrf)
-                            logger.info("✅ RRF Intelligent lié au retriever")
-                    except Exception as e:
-                        logger.error(f"Erreur RRF Intelligent: {e}")
-
-                # Diagnostic API Weaviate
-                if ENABLE_API_DIAGNOSTICS:
-                    try:
-                        await self.retriever.diagnose_weaviate_api()
-                        self.optimization_stats["weaviate_capabilities"] = (
-                            self.retriever.api_capabilities.copy()
-                        )
-                    except Exception as e:
-                        logger.warning(f"Diagnostic Weaviate échoué: {e}")
-
-            except Exception as e:
-                logger.warning(f"Retriever hybride échoué: {e}")
-
-    async def _initialize_generator(self):
-        """Initialise le générateur de réponses"""
-        try:
-            self.generator = EnhancedResponseGenerator(
-                self.openai_client, self.cache_manager
-            )
-        except Exception as e:
-            logger.error(f"Erreur générateur: {e}")
-            raise
-
-    async def _initialize_intent_processor(self):
-        """Initialise l'intent processor"""
-        try:
-            from processing.intent_processor import create_intent_processor
-            import os
-            from pathlib import Path
-
-            # Tentative de résolution du chemin de configuration
-            config_paths = [
-                "config/intents.json",
-                Path(__file__).parent.parent / "config" / "intents.json",
-                Path.cwd() / "config" / "intents.json",
-                os.path.join(os.path.dirname(__file__), "..", "config", "intents.json"),
-            ]
-
-            config_found = None
-            for path in config_paths:
-                path_obj = Path(path)
-                if path_obj.exists():
-                    config_found = str(path_obj.resolve())
-                    logger.debug(f"Configuration intents trouvée: {config_found}")
-                    break
-
-            if config_found:
-                self.intent_processor = create_intent_processor(config_found)
-                logger.info(
-                    f"Intent processor initialisé avec configuration: {config_found}"
-                )
-            else:
-                logger.warning(
-                    f"Aucun fichier intents.json trouvé dans {[str(p) for p in config_paths]}"
-                )
-                logger.info("Utilisation de la configuration par défaut intégrée")
-                self.intent_processor = create_intent_processor()
-
-            # Connecter RRF Intelligent à Intent Processor
-            if self.intelligent_rrf:
-                self.intelligent_rrf.intent_processor = self.intent_processor
-
-            logger.info("✅ Intent processor initialisé avec succès")
-
-        except Exception as e:
-            logger.warning(f"Intent processor non disponible: {e}")
-            self.intent_processor = None
-
-    async def _initialize_guardrails(self):
-        """Initialise les guardrails"""
-        try:
-            from security.advanced_guardrails import (
-                create_response_guardrails,
-            )
-
-            self.guardrails = create_response_guardrails(
-                self.openai_client, GUARDRAILS_LEVEL
-            )
-        except Exception as e:
-            logger.warning(f"Guardrails échoué: {e}")
-
-    # === NOUVELLES MÉTHODES POSTGRESQL ===
-
-    def _route_query(self, query: str, intent_result=None) -> "QueryType":
-        """Route une requête vers la source appropriée (NOUVEAU)"""
-        if not POSTGRESQL_INTEGRATION_AVAILABLE or not self.query_router:
-            return QueryType.KNOWLEDGE if "QueryType" in globals() else "knowledge"
-
-        try:
-            route_result = self.query_router.route_query(query, intent_result)
-            self.optimization_stats["query_routing"][route_result.value] += 1
-            logger.debug(f"Query routée vers: {route_result.value}")
-            return route_result
-        except Exception as e:
-            logger.warning(f"Erreur routage de requête: {e}")
-            return QueryType.KNOWLEDGE if "QueryType" in globals() else "knowledge"
-
-    async def _search_postgresql_metrics(
-        self, query: str, intent_result=None, **kwargs
-    ) -> RAGResult:
-        """Recherche dans PostgreSQL pour les métriques (NOUVEAU)"""
-
-        self.optimization_stats["postgresql_queries"] += 1
-
-        if not self.postgres_retriever:
-            logger.warning("PostgreSQL non disponible, fallback vers Weaviate")
-            self.optimization_stats["postgresql_fallbacks"] += 1
-            return await self._search_weaviate_knowledge(query, intent_result, **kwargs)
-
-        try:
-            # Recherche des métriques
-            metric_results = await self.postgres_retriever.search_metrics(
-                query, intent_result, kwargs.get("top_k", RAG_SIMILARITY_TOP_K)
-            )
-
-            if not metric_results:
-                return RAGResult(
-                    source=RAGSource.NO_RESULTS,
-                    metadata={"source_type": "metrics", "data_source": "postgresql"},
-                )
-
-            # Conversion en Documents pour compatibilité
-            documents = []
-            for metric in metric_results:
-                doc_content = self._format_metric_content(metric)
-
-                doc = Document(
-                    content=doc_content,
-                    metadata={
-                        "company": metric.company,
-                        "breed": metric.breed,
-                        "strain": metric.strain,
-                        "species": metric.species,
-                        "metric_name": metric.metric_name,
-                        "category": metric.category,
-                        "sheet_name": metric.sheet_name,
-                        "source_type": "metrics",
-                        "data_source": "postgresql",
-                    },
-                    score=metric.confidence,
-                )
-                documents.append(doc)
-
-            # Calcul confiance globale
-            avg_confidence = sum(m.confidence for m in metric_results) / len(
-                metric_results
-            )
-
-            return RAGResult(
-                documents=documents,
-                source=RAGSource.RETRIEVAL_SUCCESS,
-                confidence=avg_confidence,
-                metadata={
-                    "source_type": "metrics",
-                    "data_source": "postgresql",
-                    "metric_count": len(metric_results),
-                    "avg_confidence": avg_confidence,
-                },
-            )
-
-        except Exception as e:
-            logger.error(f"Erreur recherche métriques PostgreSQL: {e}")
-            self.optimization_stats["postgresql_fallbacks"] += 1
-            return await self._search_weaviate_knowledge(query, intent_result, **kwargs)
-
-    async def _search_hybrid_sources(
-        self, query: str, intent_result=None, **kwargs
-    ) -> RAGResult:
-        """Recherche hybride combinant Weaviate et PostgreSQL (NOUVEAU)"""
-
-        self.optimization_stats["hybrid_queries"] += 1
-
-        try:
-            # Recherche parallèle dans les deux sources
-            weaviate_task = asyncio.create_task(
-                self._search_weaviate_knowledge(query, intent_result, **kwargs)
-            )
-            postgres_task = asyncio.create_task(
-                self._search_postgresql_metrics(query, intent_result, **kwargs)
-            )
-
-            # Attendre les résultats
-            weaviate_result, postgres_result = await asyncio.gather(
-                weaviate_task, postgres_task, return_exceptions=True
-            )
-
-            # Fusion des résultats
-            return self._merge_weaviate_postgresql_results(
-                weaviate_result, postgres_result, query
-            )
-
-        except Exception as e:
-            logger.error(f"Erreur recherche hybride: {e}")
-            return RAGResult(
-                source=RAGSource.ERROR,
-                metadata={"error": str(e), "source_type": "hybrid"},
-            )
-
-    async def _search_weaviate_knowledge(
-        self, query: str, intent_result=None, **kwargs
-    ) -> RAGResult:
-        """Recherche dans Weaviate (connaissances) - utilise la logique existante"""
-        # Cette méthode encapsule la logique Weaviate existante
-        # Pour l'instant, on délègue vers la méthode principale
-        # (sera refactorisé dans une prochaine version)
-        return await self._generate_response_core_weaviate_only(
-            query, intent_result, **kwargs
-        )
-
-    def _merge_weaviate_postgresql_results(
-        self, weaviate_result: RAGResult, postgres_result: RAGResult, query: str
-    ) -> RAGResult:
-        """Fusion intelligente des résultats Weaviate + PostgreSQL (NOUVEAU)"""
-
-        merged_documents = []
-        merged_metadata = {"source_type": "hybrid", "sources": []}
-
-        # Ajouter documents de connaissance
-        if isinstance(weaviate_result, RAGResult) and weaviate_result.documents:
-            for doc in weaviate_result.documents:
-                doc.metadata["result_type"] = "knowledge"
-                merged_documents.append(doc)
-            merged_metadata["sources"].append("weaviate")
-            merged_metadata["knowledge_count"] = len(weaviate_result.documents)
-
-        # Ajouter métriques
-        if isinstance(postgres_result, RAGResult) and postgres_result.documents:
-            for doc in postgres_result.documents:
-                doc.metadata["result_type"] = "metrics"
-                merged_documents.append(doc)
-            merged_metadata["sources"].append("postgresql")
-            merged_metadata["metrics_count"] = len(postgres_result.documents)
-
-        if not merged_documents:
-            return RAGResult(source=RAGSource.NO_RESULTS, metadata=merged_metadata)
-
-        # Tri par pertinence (métriques en premier si requête orientée données)
-        query_lower = query.lower()
-        if any(
-            keyword in query_lower
-            for keyword in ["chiffre", "données", "résultat", "performance"]
-        ):
-            # Prioriser les métriques
-            merged_documents.sort(
-                key=lambda x: (x.metadata.get("result_type") != "metrics", -x.score)
-            )
-        else:
-            # Tri standard par score
-            merged_documents.sort(key=lambda x: -x.score)
-
-        # Calcul confiance hybride
-        total_confidence = (
-            sum(doc.score for doc in merged_documents) / len(merged_documents)
-            if merged_documents
-            else 0
-        )
-
-        return RAGResult(
-            documents=merged_documents,
-            source=RAGSource.RETRIEVAL_SUCCESS,
-            confidence=total_confidence,
-            metadata=merged_metadata,
-        )
-
-    def _format_metric_content(self, metric: "MetricResult") -> str:
-        """Formate une métrique en contenu texte pour le LLM (NOUVEAU)"""
-
-        content_parts = [
-            f"**{metric.metric_name}**",
-            f"Entreprise: {metric.company}",
-            f"Race: {metric.breed}",
-            f"Lignée: {metric.strain}",
-            f"Espèce: {metric.species}",
-            f"Catégorie: {metric.category}",
-        ]
-
-        # Valeur
-        if metric.value_numeric is not None:
-            value_str = f"{metric.value_numeric}"
-            if metric.unit:
-                value_str += f" {metric.unit}"
-            content_parts.append(f"Valeur: {value_str}")
-        elif metric.value_text:
-            content_parts.append(f"Valeur: {metric.value_text}")
-
-        # Âge si disponible
-        if metric.age_min is not None and metric.age_max is not None:
-            if metric.age_min == metric.age_max:
-                content_parts.append(f"Âge: {metric.age_min} semaines")
-            else:
-                content_parts.append(f"Âge: {metric.age_min}-{metric.age_max} semaines")
-
-        content_parts.append(f"Source: {metric.sheet_name}")
-
-        return "\n".join(content_parts)
-
-    # === NOUVELLES MÉTHODES JSON (conservées) ===
-
-    async def validate_json_document(
-        self, json_data: Dict[str, Any], strict_mode: bool = False
-    ) -> Dict[str, Any]:
-        """Valide un document JSON selon les schémas avicoles"""
-        if not RAG_JSON_SYSTEM_AVAILABLE or not self.json_validator:
-            return {"valid": False, "error": "Système JSON non disponible"}
-
-        try:
-            self.optimization_stats["json_validations"] += 1
-
-            validation_request = ValidationRequest(
-                json_data=json_data, strict_mode=strict_mode, auto_enrich=True
-            )
-
-            result = await self.json_validator.validate_document(validation_request)
-
-            logger.info(
-                f"Validation JSON: {'✅ Valide' if result.is_valid else '❌ Invalide'}"
-            )
-
-            return {
-                "valid": result.is_valid,
-                "enriched_data": result.enriched_data,
-                "metadata": result.metadata,
-                "errors": result.errors,
-                "warnings": result.warnings,
-            }
-
-        except Exception as e:
-            logger.error(f"Erreur validation JSON: {e}")
-            return {"valid": False, "error": str(e)}
-
-    async def ingest_json_documents(
-        self, json_files: List[Dict[str, Any]], batch_size: int = 5
-    ) -> Dict[str, Any]:
-        """Ingère des documents JSON dans le système"""
-        if not RAG_JSON_SYSTEM_AVAILABLE or not self.ingestion_pipeline:
-            return {"success": False, "error": "Système JSON non disponible"}
-
-        try:
-            self.optimization_stats["json_ingestions"] += 1
-
-            ingestion_request = IngestionRequest(
-                json_files=json_files, batch_size=batch_size, force_reprocess=False
-            )
-
-            result = await self.ingestion_pipeline.process_documents(ingestion_request)
-
-            logger.info(
-                f"Ingestion JSON: {result.processed_count}/{result.total_count} documents traités"
-            )
-
-            return {
-                "success": True,
-                "processed_count": result.processed_count,
-                "total_count": result.total_count,
-                "errors": result.errors,
-                "warnings": result.warnings,
-                "metadata": result.metadata,
-            }
-
-        except Exception as e:
-            logger.error(f"Erreur ingestion JSON: {e}")
-            return {"success": False, "error": str(e)}
-
-    async def search_json_enhanced(
-        self,
-        query: str,
-        genetic_line: Optional[str] = None,
-        performance_metrics: Optional[List[str]] = None,
-        age_range: Optional[Dict[str, int]] = None,
-    ) -> List[Dict[str, Any]]:
-        """Recherche avancée dans les documents JSON avec filtres avicoles"""
-        if not RAG_JSON_SYSTEM_AVAILABLE or not self.hybrid_search_engine:
-            logger.warning(
-                "Recherche JSON non disponible, utilisation du système classique"
-            )
-            return []
-
-        try:
-            # Construction des filtres avicoles
-            filters = {}
-            if genetic_line:
-                filters["genetic_line"] = genetic_line
-            if performance_metrics:
-                filters["performance_metrics"] = performance_metrics
-            if age_range:
-                filters["age_range"] = age_range
-
-            # Recherche hybride spécialisée
-            results = await self.hybrid_search_engine.search_with_filters(
-                query=query, filters=filters, top_k=RAG_SIMILARITY_TOP_K
-            )
-
-            logger.info(f"Recherche JSON: {len(results)} résultats trouvés")
-
-            return results
-
-        except Exception as e:
-            logger.error(f"Erreur recherche JSON: {e}")
-            return []
-
-    # === MÉTHODE PRINCIPALE MISE À JOUR ===
+            logger.warning(f"LangSmith échoué: {e}")
+            self.langsmith_integration = None
 
     async def generate_response(
         self,
@@ -1224,35 +186,34 @@ class InteliaRAGEngine:
         conversation_context: List[Dict] = None,
         language: Optional[str] = None,
         explain_score: Optional[float] = None,
-        # NOUVEAUX PARAMÈTRES JSON
         use_json_search: bool = True,
         genetic_line_filter: Optional[str] = None,
         performance_context: Optional[Dict[str, Any]] = None,
     ) -> RAGResult:
-        """Point d'entrée principal avec système JSON intégré + PostgreSQL"""
+        """Point d'entrée principal - CORRIGÉ avec routage intelligent"""
 
-        if LANGSMITH_AVAILABLE and self.langsmith_client and LANGSMITH_ENABLED:
-            return await self._generate_response_with_langsmith(
-                query,
-                tenant_id,
-                conversation_context,
-                language,
-                explain_score,
-                use_json_search,
-                genetic_line_filter,
-                performance_context,
+        if self.degraded_mode:
+            return RAGResult(
+                source=RAGSource.FALLBACK_NEEDED, 
+                metadata={"reason": "degraded_mode"}
             )
-        else:
-            return await self._generate_response_core(
-                query,
-                tenant_id,
-                conversation_context,
-                language,
-                explain_score,
-                use_json_search,
-                genetic_line_filter,
-                performance_context,
+
+        start_time = time.time()
+        self.optimization_stats["requests_total"] += 1
+        METRICS.inc("requests_total")
+
+        # LangSmith si disponible
+        if self.langsmith_integration:
+            return await self.langsmith_integration.generate_response_with_tracing(
+                query, tenant_id, conversation_context, language, explain_score,
+                use_json_search, genetic_line_filter, performance_context,
+                self
             )
+
+        return await self._generate_response_core(
+            query, tenant_id, conversation_context, language, explain_score,
+            use_json_search, genetic_line_filter, performance_context, start_time
+        )
 
     async def _generate_response_core(
         self,
@@ -1263,124 +224,62 @@ class InteliaRAGEngine:
         explain_score: Optional[float],
         use_json_search: bool,
         genetic_line_filter: Optional[str],
-        performance_context: Optional[Dict[str, Any]],
+        performance_context: Optional[Dict[str, Any]], 
+        start_time: float  # CORRECTION: Paramètre ajouté
     ) -> RAGResult:
-        """Méthode core avec recherche JSON intégrée + PostgreSQL"""
-
-        if self.degraded_mode:
-            return RAGResult(
-                source=RAGSource.FALLBACK_NEEDED, metadata={"reason": "degraded_mode"}
-            )
-
-        start_time = time.time()
-        METRICS.inc("requests_total")
+        """Méthode core avec routage intelligent - CORRIGÉE"""
 
         try:
             # Détection langue
             if not language:
                 language = detect_language_enhanced(query, default="fr")
 
-            # === NOUVEAU: ROUTAGE INTELLIGENT DES REQUÊTES ===
-            if POSTGRESQL_INTEGRATION_AVAILABLE and self.query_router:
-                query_type = self._route_query(
-                    query, None
-                )  # intent_result sera traité plus tard
-
-                # Intent processing pour enrichir le contexte
-                intent_result = None
-                if self.intent_processor:
-                    try:
-                        intent_result = self.intent_processor.process_query(query)
-                        if intent_result:
-                            METRICS.intent_detected(
-                                intent_result.intent_type,
-                                getattr(intent_result, "confidence", 0.8),
-                            )
-                            self.optimization_stats["intent_coverage_stats"][
-                                intent_result.intent_type
-                            ] += 1
-                    except Exception as e:
-                        logger.warning(f"Erreur intent processor: {e}")
-                        intent_result = None
-
-                # Re-routage avec intent_result enrichi
-                query_type = self._route_query(query, intent_result)
-
-                # Routage vers la source appropriée
+            # NOUVEAU: Routage intelligent des requêtes
+            if self.postgresql_system and self.postgresql_system.query_router:
+                query_type = self.postgresql_system.route_query(query, None)
+                
                 if query_type == QueryType.METRICS:
                     logger.info("🎯 Requête routée vers PostgreSQL (métriques)")
-                    return await self._search_postgresql_metrics(
-                        query,
-                        intent_result,
-                        conversation_context=conversation_context,
-                        language=language,
-                        tenant_id=tenant_id,
+                    result = await self.postgresql_system.search_metrics(
+                        query, None, top_k=RAG_SIMILARITY_TOP_K
                     )
+                    if result.source != RAGSource.NO_RESULTS:
+                        return result
+                    # Fallback vers Weaviate si pas de résultats
+                    logger.warning("PostgreSQL non disponible, fallback vers Weaviate")
 
                 elif query_type == QueryType.HYBRID:
                     logger.info("🔄 Requête routée vers recherche hybride")
+                    self.optimization_stats["hybrid_queries"] += 1
                     return await self._search_hybrid_sources(
-                        query,
-                        intent_result,
-                        conversation_context=conversation_context,
-                        language=language,
-                        tenant_id=tenant_id,
+                        query, conversation_context, language, start_time
                     )
 
-                # Sinon: QueryType.KNOWLEDGE ou UNKNOWN → Continue vers Weaviate
-                logger.info("📚 Requête routée vers Weaviate (connaissances)")
-
-            # === RECHERCHE JSON PRIORITAIRE (conservée) ===
-            json_results = []
-            if use_json_search and RAG_JSON_SYSTEM_AVAILABLE:
-                try:
-                    json_results = await self.search_json_enhanced(
-                        query=query,
-                        genetic_line=genetic_line_filter,
-                        performance_metrics=(
-                            performance_context.get("metrics")
-                            if performance_context
-                            else None
-                        ),
-                        age_range=(
-                            performance_context.get("age_range")
-                            if performance_context
-                            else None
-                        ),
+            # JSON Search prioritaire
+            if use_json_search and self.json_system:
+                json_results = await self.json_system.search_enhanced(
+                    query=query,
+                    genetic_line=genetic_line_filter,
+                    performance_metrics=performance_context.get("metrics") if performance_context else None
+                )
+                
+                if json_results and len(json_results) >= 3:
+                    self.optimization_stats["json_searches"] += 1
+                    return await self._generate_response_from_json_results(
+                        query, json_results, language, conversation_context, start_time
                     )
 
-                    if json_results:
-                        logger.info(f"🎯 Résultats JSON trouvés: {len(json_results)}")
-
-                        # Si on a de bons résultats JSON, les utiliser directement
-                        if len(json_results) >= 3:
-                            return await self._generate_response_from_json_results(
-                                query,
-                                json_results,
-                                language,
-                                conversation_context,
-                                start_time,
-                            )
-                except Exception as e:
-                    logger.warning(f"Erreur recherche JSON: {e}")
-
-            # === FALLBACK VERS RECHERCHE CLASSIQUE WEAVIATE ===
-            logger.info("📚 Utilisation recherche Weaviate (fallback ou complément)")
-
+            # CORRECTION CRITIQUE: Appel avec start_time
+            logger.info("📚 Utilisation Weaviate (fallback)")
             return await self._generate_response_core_weaviate_only(
-                query,
-                intent_result,
-                conversation_context,
-                language,
-                start_time,
-                tenant_id,
+                query, None, conversation_context, language, start_time, tenant_id
             )
 
         except Exception as e:
             logger.error(f"Erreur génération réponse core: {e}")
             return RAGResult(
                 source=RAGSource.INTERNAL_ERROR,
-                metadata={"error": str(e), "processing_time": time.time() - start_time},
+                metadata={"error": str(e), "processing_time": time.time() - start_time}
             )
 
     async def _generate_response_core_weaviate_only(
@@ -1389,1253 +288,129 @@ class InteliaRAGEngine:
         intent_result,
         conversation_context: List[Dict],
         language: str,
-        start_time: float,
+        start_time: float,  # CORRECTION CRITIQUE: Paramètre obligatoire ajouté
         tenant_id: str,
     ) -> RAGResult:
-        """Méthode Weaviate classique (LOGIQUE ORIGINALE CONSERVÉE)"""
-
-        try:
-            # NOUVEAU: Vérification cache AVANT traitement
-            cache_key = None
-            if self.cache_manager and self.cache_manager.enabled:
-                try:
-                    # Créer une clé de cache unique
-                    import hashlib
-
-                    context_hash = ""
-                    if conversation_context:
-                        context_str = str(conversation_context)
-                        context_hash = hashlib.md5(context_str.encode()).hexdigest()[:8]
-
-                    cache_key = f"{tenant_id}:{hashlib.md5(query.encode()).hexdigest()}:{language}:{context_hash}"
-
-                    # Utiliser la méthode get_response du cache sémantique si disponible
-                    if hasattr(self.cache_manager, "semantic_cache"):
-                        cached_response = (
-                            await self.cache_manager.semantic_cache.get_response(
-                                query, context_hash, language
-                            )
-                        )
-                    else:
-                        # Fallback vers cache simple
-                        cached_response = await self.cache_manager.get(cache_key)
-                        if cached_response and isinstance(cached_response, bytes):
-                            cached_response = cached_response.decode("utf-8")
-
-                    if cached_response:
-                        self.optimization_stats["cache_hits"] += 1
-                        logger.info(f"Cache HIT pour requête: {query[:50]}...")
-
-                        # Si c'est une chaîne, créer la structure attendue
-                        if isinstance(cached_response, str):
-                            return RAGResult(
-                                source=RAGSource.RAG_SUCCESS,
-                                answer=cached_response,
-                                confidence=0.85,  # Confiance élevée pour cache
-                                metadata={
-                                    "cache_hit": True,
-                                    "processing_time": time.time() - start_time,
-                                    "cache_type": (
-                                        "semantic"
-                                        if hasattr(self.cache_manager, "semantic_cache")
-                                        else "simple"
-                                    ),
-                                },
-                            )
-                        # Si c'est un dict avec la structure complète
-                        elif isinstance(cached_response, dict):
-                            return RAGResult(
-                                source=RAGSource.RAG_SUCCESS,
-                                answer=cached_response.get("answer", ""),
-                                confidence=cached_response.get("confidence", 0.85),
-                                metadata={
-                                    "cache_hit": True,
-                                    "processing_time": time.time() - start_time,
-                                    "cache_type": (
-                                        "semantic"
-                                        if hasattr(self.cache_manager, "semantic_cache")
-                                        else "simple"
-                                    ),
-                                    **cached_response.get("metadata", {}),
-                                },
-                            )
-                    else:
-                        self.optimization_stats["cache_misses"] += 1
-
-                except Exception as e:
-                    logger.warning(f"Erreur consultation cache: {e}")
-                    self.optimization_stats["cache_misses"] += 1
-
-            # Intent processing avec gestion d'erreurs robuste (si pas déjà fait)
-            if intent_result is None and self.intent_processor:
-                try:
-                    intent_result = self.intent_processor.process_query(query)
-                    if intent_result:
-                        METRICS.intent_detected(
-                            intent_result.intent_type,
-                            getattr(intent_result, "confidence", 0.8),
-                        )
-                        self.optimization_stats["intent_coverage_stats"][
-                            intent_result.intent_type
-                        ] += 1
-                except Exception as e:
-                    logger.warning(f"Erreur intent processor: {e}")
-                    intent_result = None
-
-            # CORRECTION CRITIQUE: OOD detection avec nouvelle API
-            if self.ood_detector:
-                try:
-                    # NOUVEAU: Utiliser calculate_ood_score_multilingual() synchrone
-                    is_in_domain, domain_score, score_details = (
-                        self.ood_detector.calculate_ood_score_multilingual(
-                            query, intent_result, language
-                        )
-                    )
-
-                    if not is_in_domain:
-                        return RAGResult(
-                            source=RAGSource.OOD_FILTERED,
-                            answer=get_out_of_domain_message(language),
-                            confidence=0.0,
-                            metadata={
-                                "ood_score": domain_score,
-                                "reason": "out_of_domain",
-                                "language": language,
-                                "translation_details": score_details,
-                            },
-                        )
-                except Exception as e:
-                    logger.warning(f"Erreur OOD multilingue: {e}")
-                    # Fallback vers méthode standard si multilingue échoue
-                    try:
-                        is_in_domain, domain_score, score_details = (
-                            self.ood_detector.calculate_ood_score(query, intent_result)
-                        )
-                        if not is_in_domain:
-                            return RAGResult(
-                                source=RAGSource.OOD_FILTERED,
-                                answer=get_out_of_domain_message(language),
-                                confidence=0.0,
-                                metadata={
-                                    "ood_score": domain_score,
-                                    "reason": "out_of_domain",
-                                    "language": language,
-                                    "fallback_used": True,
-                                },
-                            )
-                    except Exception as fallback_error:
-                        logger.error(f"Erreur OOD fallback: {fallback_error}")
-                        # Continuer sans OOD si tout échoue
-
-            # Préparation contexte conversation
-            conversation_context_str = ""
-            if conversation_context and len(conversation_context) > 0:
-                self.optimization_stats["conversation_context_usage"] += 1
-                recent_context = conversation_context[-MAX_CONVERSATION_CONTEXT:]
-                conversation_context_str = "\n".join(
-                    [
-                        f"Q: {ctx.get('question', '')}\nR: {ctx.get('answer', '')[:200]}..."
-                        for ctx in recent_context
-                    ]
-                )
-
-            # Génération embedding
-            search_query = (
-                getattr(intent_result, "expanded_query", query)
-                if intent_result
-                else query
-            )
-            if self.embedder:
-                try:
-                    query_vector = await self.embedder.get_embedding(search_query)
-                except Exception as e:
-                    logger.error(f"Erreur embedding: {e}")
-                    query_vector = None
-            else:
-                query_vector = None
-
-            if not query_vector:
-                return RAGResult(
-                    source=RAGSource.EMBEDDING_FAILED,
-                    metadata={"error": "embedding_failed"},
-                )
-
-            # Construction filtres Weaviate
-            where_filter = build_where_filter(intent_result)
-
-            # Recherche de documents
-            documents = []
-            if self.retriever:
-                try:
-                    search_alpha = (
-                        getattr(intent_result, "preferred_alpha", DEFAULT_ALPHA)
-                        if intent_result
-                        else DEFAULT_ALPHA
-                    )
-
-                    # Utilisation RRF intelligent si disponible
-                    if (
-                        self.intelligent_rrf
-                        and hasattr(self.intelligent_rrf, "enabled")
-                        and self.intelligent_rrf.enabled
-                        and ENABLE_INTELLIGENT_RRF
-                    ):
-
-                        documents = await self._enhanced_hybrid_search_with_rrf(
-                            query_vector,
-                            search_query,
-                            RAG_SIMILARITY_TOP_K,
-                            where_filter,
-                            search_alpha,
-                            query,
-                            intent_result,
-                        )
-                        self.optimization_stats["intelligent_rrf_used"] += 1
-
-                    else:
-                        # Recherche hybride classique
-                        documents = await self.retriever.adaptive_search(
-                            query_vector,
-                            search_query,
-                            RAG_SIMILARITY_TOP_K,
-                            where_filter,
-                            alpha=search_alpha,
-                        )
-
-                    # Statistiques recherche
-                    if any(doc.metadata.get("hybrid_used") for doc in documents):
-                        self.optimization_stats["hybrid_searches"] += 1
-
-                except Exception as e:
-                    logger.error(f"Erreur recherche hybride: {e}")
-                    return RAGResult(
-                        source=RAGSource.SEARCH_FAILED, metadata={"error": str(e)}
-                    )
-
-            if not documents:
-                return RAGResult(source=RAGSource.NO_DOCUMENTS_FOUND)
-
-            # ✅ CORRECTION: Logs de debug AVANT le filtrage et la vérification
-            effective_threshold = RAG_CONFIDENCE_THRESHOLD
-            filtered_docs = [
-                doc for doc in documents if doc.score >= effective_threshold
-            ]
-
-            # Logs de diagnostic pour debugging - CHANGEMENT: debug au lieu d'error
-            logger.debug(f"🔍 DEBUG RAG: documents trouvés: {len(documents)}")
-            logger.debug(f"🔍 DEBUG RAG: seuil appliqué: {effective_threshold}")
-            if documents:
-                scores = [doc.score for doc in documents]
-                logger.debug(f"🔍 DEBUG RAG: scores des documents: {scores}")
-                logger.debug(f"🔍 DEBUG RAG: score max: {max(scores)}")
-            logger.debug(f"🔍 DEBUG RAG: documents filtrés: {len(filtered_docs)}")
-
-            # Vérification et retour LOW_CONFIDENCE si nécessaire
-            if not filtered_docs:
-                logger.debug(
-                    "🚨 DEBUG RAG: RETOURNE LOW_CONFIDENCE - aucun document ne passe le seuil"
-                )
-                return RAGResult(
-                    source=RAGSource.LOW_CONFIDENCE,
-                    metadata={
-                        "threshold": effective_threshold,
-                        "max_score": (
-                            max([d.score for d in documents]) if documents else 0
-                        ),
-                        "documents_found": len(documents),
-                        "reason": "all_documents_below_threshold",
-                    },
-                )
-
-            # Génération de la réponse
-            try:
-                if self.generator:
-                    response_text = await self.generator.generate_response(
-                        query,
-                        filtered_docs,
-                        conversation_context_str,
-                        language,
-                        intent_result,
-                    )
-
-                    if not response_text or not isinstance(response_text, str):
-                        return RAGResult(source=RAGSource.GENERATION_FAILED)
-
-            except Exception as e:
-                logger.error(f"Erreur génération réponse: {e}")
-                return RAGResult(
-                    source=RAGSource.GENERATION_FAILED, metadata={"error": str(e)}
-                )
-
-            # Calcul confiance finale
-            final_confidence = self._calculate_confidence(filtered_docs)
-
-            # Construction métadonnées complètes
-            try:
-                from utils.imports_and_dependencies import dependency_manager
-
-                dependencies_status = dependency_manager.get_legacy_status()
-            except Exception:
-                dependencies_status = {}
-
-            metadata = {
-                "approach": "enhanced_rag_v5_postgresql_integrated",
-                "optimizations_enabled": {
-                    "external_redis_cache": self.optimization_stats[
-                        "external_cache_used"
-                    ],
-                    "json_system": RAG_JSON_SYSTEM_AVAILABLE,
-                    "postgresql_integration": POSTGRESQL_INTEGRATION_AVAILABLE,
-                    "semantic_cache": (
-                        getattr(self.cache_manager, "ENABLE_SEMANTIC_CACHE", False)
-                        if self.cache_manager
-                        else False
-                    ),
-                    "hybrid_search": HYBRID_SEARCH_ENABLED,
-                    "intelligent_rrf": ENABLE_INTELLIGENT_RRF
-                    and bool(self.intelligent_rrf),
-                    "langsmith_monitoring": LANGSMITH_ENABLED
-                    and bool(self.langsmith_client),
-                    "entity_enrichment": ENTITY_ENRICHMENT_ENABLED,
-                    "advanced_guardrails": GUARDRAILS_AVAILABLE,
-                    "api_diagnostics": ENABLE_API_DIAGNOSTICS,
-                    "dynamic_ood_thresholds": True,
-                },
-                "postgresql_system": {
-                    "available": POSTGRESQL_INTEGRATION_AVAILABLE,
-                    "configured": bool(self.postgres_retriever),
-                    "router_enabled": bool(self.query_router),
-                },
-                "json_system": {
-                    "used": False,  # Dans cette branche Weaviate classique
-                    "results_count": 0,
-                },
-                "langsmith": {
-                    "enabled": LANGSMITH_ENABLED,
-                    "project": LANGSMITH_PROJECT,
-                    "traced": bool(self.langsmith_client),
-                },
-                "weaviate_version": dependencies_status.get("weaviate", False),
-                "documents_found": len(documents),
-                "documents_used": len(filtered_docs),
-                "effective_threshold": effective_threshold,
-                "query_expanded": search_query != query,
-                "conversation_context_used": bool(conversation_context),
-                "where_filter_applied": where_filter is not None,
-                "verification_enabled": RAG_VERIFICATION_ENABLED,
-                "language_target": language,
-                "language_detected": detect_language_enhanced(query),
-                "processing_time": time.time() - start_time,
-                "optimization_stats": self.optimization_stats.copy(),
-            }
-
-            # Ajout entités détectées si disponibles
-            if intent_result and hasattr(intent_result, "detected_entities"):
-                metadata["detected_entities"] = intent_result.detected_entities
-                metadata["intent_type"] = (
-                    intent_result.intent_type.value
-                    if hasattr(intent_result.intent_type, "value")
-                    else str(intent_result.intent_type)
-                )
-                metadata["intent_confidence"] = intent_result.confidence
-
-            # Construire le résultat
-            result = RAGResult(
-                source=RAGSource.RAG_SUCCESS,
-                answer=response_text,
-                confidence=final_confidence,
-                metadata=metadata,
-            )
-
-            # NOUVEAU: Stocker en cache après génération réussie
-            if (
-                self.cache_manager
-                and self.cache_manager.enabled
-                and cache_key
-                and result.source == RAGSource.RAG_SUCCESS
-            ):
-                try:
-                    cache_data = {
-                        "answer": result.answer,
-                        "confidence": result.confidence,
-                        "timestamp": time.time(),
-                        "metadata": {"cached_at": time.time(), "cache_version": "1.0"},
-                    }
-
-                    # Utiliser la méthode set_response du cache sémantique si disponible
-                    if hasattr(self.cache_manager, "semantic_cache"):
-                        context_hash = ""
-                        if conversation_context:
-                            import hashlib
-
-                            context_str = str(conversation_context)
-                            context_hash = hashlib.md5(
-                                context_str.encode()
-                            ).hexdigest()[:8]
-
-                        await self.cache_manager.semantic_cache.set_response(
-                            query, context_hash, result.answer, language
-                        )
-                    else:
-                        # Fallback vers cache simple
-                        import json
-
-                        await self.cache_manager.set(
-                            cache_key,
-                            json.dumps(cache_data).encode("utf-8"),
-                            ttl=3600,  # 1 heure
-                        )
-
-                    self.optimization_stats["cache_sets"] += 1
-                    logger.debug(f"Réponse mise en cache avec clé: {cache_key}")
-
-                except Exception as e:
-                    logger.warning(f"Erreur mise en cache: {e}")
-
-            METRICS.observe_latency(time.time() - start_time)
-            return result
-
-        except Exception as e:
-            logger.error(f"Erreur génération réponse Weaviate: {e}")
+        """Méthode Weaviate - CORRIGÉE avec start_time"""
+        
+        if not self.weaviate_core:
             return RAGResult(
                 source=RAGSource.INTERNAL_ERROR,
-                metadata={"error": str(e), "processing_time": time.time() - start_time},
+                metadata={"error": "Weaviate Core non disponible"}
+            )
+
+        self.optimization_stats["weaviate_searches"] += 1
+        
+        # Déléguer à Weaviate Core
+        return await self.weaviate_core.generate_response(
+            query, intent_result, conversation_context, language, start_time, tenant_id
+        )
+
+    async def _search_hybrid_sources(
+        self, query: str, conversation_context: List[Dict], language: str, start_time: float
+    ) -> RAGResult:
+        """Recherche hybride PostgreSQL + Weaviate"""
+        try:
+            # Recherche parallèle
+            tasks = []
+            
+            if self.postgresql_system:
+                tasks.append(self.postgresql_system.search_metrics(query, None))
+                
+            if self.weaviate_core:
+                tasks.append(self.weaviate_core.generate_response(
+                    query, None, conversation_context, language, start_time, "default"
+                ))
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Fusion des résultats
+            return self._merge_hybrid_results(results, query, start_time)
+
+        except Exception as e:
+            logger.error(f"Erreur recherche hybride: {e}")
+            return RAGResult(
+                source=RAGSource.ERROR,
+                metadata={"error": str(e), "source_type": "hybrid"}
             )
 
     async def _generate_response_from_json_results(
         self,
         query: str,
-        json_results: List[Dict[str, Any]],
+        json_results: List[Dict[str, Any]], 
         language: str,
         conversation_context: List[Dict],
-        start_time: float,
+        start_time: float
     ) -> RAGResult:
-        """Génère une réponse basée sur les résultats JSON"""
-        try:
-            # Génération de la réponse avec le générateur existant
-            if self.generator:
-                # Conversion des résultats JSON en Documents pour compatibilité
-                documents = []
-                for result in json_results:
-                    doc = Document(
-                        content=result.get("content", ""),
-                        metadata=result.get("metadata", {}),
-                        score=result.get("score", 0.8),
-                    )
-                    documents.append(doc)
-
-                conversation_context_str = ""
-                if conversation_context:
-                    recent_context = conversation_context[-MAX_CONVERSATION_CONTEXT:]
-                    conversation_context_str = "\n".join(
-                        [
-                            f"Q: {ctx.get('question', '')}\nR: {ctx.get('answer', '')[:200]}..."
-                            for ctx in recent_context
-                        ]
-                    )
-
-                response_text = await self.generator.generate_response(
-                    query,
-                    documents,
-                    conversation_context_str,
-                    language,
-                    None,  # intent_result
-                )
-
-                return RAGResult(
-                    source=RAGSource.RAG_SUCCESS,
-                    answer=response_text,
-                    confidence=0.9,  # Confiance élevée pour résultats JSON
-                    metadata={
-                        "json_system_used": True,
-                        "json_results_count": len(json_results),
-                        "genetic_lines_detected": list(
-                            set(
-                                r.get("metadata", {}).get("genetic_line")
-                                for r in json_results
-                                if r.get("metadata", {}).get("genetic_line")
-                            )
-                        ),
-                        "processing_time": time.time() - start_time,
-                        "system_version": "5.0_json_primary",
-                    },
-                )
-            else:
-                # Fallback simple si pas de générateur
-                return RAGResult(
-                    source=RAGSource.RAG_SUCCESS,
-                    answer=f"Résultats trouvés dans la base de données avicole: {len(json_results)} documents pertinents.",
-                    confidence=0.7,
-                    metadata={
-                        "json_system_used": True,
-                        "fallback_simple": True,
-                        "processing_time": time.time() - start_time,
-                    },
-                )
-
-        except Exception as e:
-            logger.error(f"Erreur génération réponse JSON: {e}")
-            raise
-
-    async def _generate_response_with_langsmith(
-        self,
-        query: str,
-        tenant_id: str,
-        conversation_context: List[Dict],
-        language: Optional[str],
-        explain_score: Optional[float],
-        use_json_search: bool,
-        genetic_line_filter: Optional[str],
-        performance_context: Optional[Dict[str, Any]],
-    ) -> RAGResult:
-        """Génération de réponse avec tracing LangSmith et JSON + PostgreSQL"""
-
-        start_time = time.time()
-        self.optimization_stats["langsmith_traces"] += 1
-
-        try:
-            # Traçage contexte aviculture avec JSON et PostgreSQL
-            langsmith_metadata = {
-                "tenant_id": tenant_id,
-                "query_length": len(query),
-                "has_conversation_context": bool(conversation_context),
-                "language_target": language,
-                "system": "intelia_aviculture_rag_v5",
-                "version": "postgresql_integrated_langsmith",
-                "json_search_enabled": use_json_search,
-                "postgresql_enabled": POSTGRESQL_INTEGRATION_AVAILABLE,
-                "genetic_line_filter": genetic_line_filter,
-                "performance_context": bool(performance_context),
-            }
-
-            # Traitement core avec JSON + PostgreSQL
-            result = await self._generate_response_core(
-                query,
-                tenant_id,
-                conversation_context,
-                language,
-                explain_score,
-                use_json_search,
-                genetic_line_filter,
-                performance_context,
-            )
-
-            # Enrichissement métadonnées LangSmith avec données JSON + PostgreSQL
-            if hasattr(result, "metadata") and result.metadata:
-                detected_entities = result.metadata.get("detected_entities", {})
-
-                langsmith_metadata.update(
-                    {
-                        "genetic_line": detected_entities.get("line", "none"),
-                        "age_days": detected_entities.get("age_days"),
-                        "performance_metric": any(
-                            metric in query.lower()
-                            for metric in ["fcr", "poids", "mortalité", "ponte"]
-                        ),
-                        "intent_type": result.metadata.get("intent_type", "unknown"),
-                        "intent_confidence": result.metadata.get(
-                            "intent_confidence", 0.0
-                        ),
-                        "documents_used": result.metadata.get("documents_used", 0),
-                        "json_system_used": result.metadata.get("json_system", {}).get(
-                            "used", False
-                        ),
-                        "json_results_count": result.metadata.get(
-                            "json_system", {}
-                        ).get("results_count", 0),
-                        "postgresql_used": result.metadata.get("source_type")
-                        == "metrics",
-                        "hybrid_search_used": result.metadata.get("source_type")
-                        == "hybrid",
-                        "processing_time": time.time() - start_time,
-                        "confidence_score": result.confidence,
-                    }
-                )
-
-            # Log métadonnées dans LangSmith
-            if self.langsmith_client:
-                try:
-                    await self._log_langsmith_alerts(query, result, langsmith_metadata)
-                except Exception as e:
-                    logger.warning(f"Erreur logging LangSmith: {e}")
-                    self.optimization_stats["langsmith_errors"] += 1
-
-            return result
-
-        except Exception as e:
-            self.optimization_stats["langsmith_errors"] += 1
-            logger.error(f"Erreur LangSmith tracing: {e}")
-            # Fallback sans LangSmith
-            return await self._generate_response_core(
-                query,
-                tenant_id,
-                conversation_context,
-                language,
-                explain_score,
-                use_json_search,
-                genetic_line_filter,
-                performance_context,
-            )
-
-    # === MÉTHODES CRITIQUES CONSERVÉES ===
-
-    async def _enhanced_hybrid_search_with_rrf(
-        self,
-        query_vector: List[float],
-        query_text: str,
-        top_k: int,
-        where_filter: Dict,
-        alpha: float,
-        original_query: str,
-        intent_result,
-    ) -> List[Document]:
-        """Recherche hybride utilisant le RRF intelligent - VERSION SÉCURISÉE CORRIGÉE"""
-
-        try:
-            # VALIDATION CRITIQUE: S'assurer qu'intent_result est utilisable avec gestion robuste des types
-            validated_intent = validate_intent_result(intent_result)
-
-            # CORRECTION PRINCIPALE: Gestion robuste du type de validated_intent
-            is_valid = False
-            if isinstance(validated_intent, dict):
-                is_valid = validated_intent.get("is_valid", False)
-            elif isinstance(validated_intent, bool):
-                is_valid = validated_intent
-            else:
-                logger.warning(
-                    f"Type inattendu pour validated_intent: {type(validated_intent)}"
-                )
-                is_valid = False
-
-            if not is_valid and intent_result is not None:
-                logger.warning(f"Intent_result invalide détecté: {type(intent_result)}")
-
-            # Recherche vectorielle et BM25 séparément pour RRF intelligent
-            # Utiliser la méthode fallback vectorielle existante
-            vector_results = await self.retriever._vector_search_fallback(
-                query_vector, top_k * 2, where_filter
-            )
-
-            # Pour BM25, recherche hybride avec alpha=0 (BM25 pur)
-            bm25_results = await self.retriever._hybrid_search_v4_corrected(
-                query_vector, query_text, top_k * 2, where_filter, alpha=0.0
-            )
-
-            # Conversion en format Dict pour RRF intelligent
-            vector_dicts = [self._document_to_dict(doc) for doc in vector_results]
-            bm25_dicts = [self._document_to_dict(doc) for doc in bm25_results]
-
-            # Contexte pour RRF intelligent avec validation sécurisée
-            query_context = {
-                "query": original_query,
-                "alpha": alpha,
-                "top_k": top_k,
-                "intent_validated": is_valid,
-            }
-
-            # PASSAGE SÉCURISÉ: Passer intent_result original mais avec validation robuste
-            try:
-                fused_results = await self.intelligent_rrf.enhanced_fusion(
-                    vector_dicts, bm25_dicts, alpha, top_k, query_context, intent_result
-                )
-                logger.debug(
-                    f"RRF intelligent réussi avec {len(fused_results)} résultats"
-                )
-
-            except Exception as rrf_error:
-                logger.error(f"Erreur RRF avec intent_result: {rrf_error}")
-                logger.debug(f"Type intent_result problématique: {type(intent_result)}")
-
-                # Fallback: passer None au lieu d'un intent_result potentiellement défaillant
-                try:
-                    fused_results = await self.intelligent_rrf.enhanced_fusion(
-                        vector_dicts, bm25_dicts, alpha, top_k, query_context, None
-                    )
-                    logger.warning(
-                        "RRF intelligent réussi en mode fallback (intent_result=None)"
-                    )
-
-                except Exception as fallback_error:
-                    logger.error(f"Erreur RRF même en fallback: {fallback_error}")
-                    # Dernière option: RRF classique
-                    fused_results = await self._classic_rrf_fallback(
-                        vector_dicts, bm25_dicts, alpha, top_k
-                    )
-                    logger.warning("Utilisé RRF classique en dernier recours")
-
-            # Reconversion en Documents avec validation des données
-            final_documents = []
-            for result_dict in fused_results:
-                try:
-                    doc = Document(
-                        content=result_dict.get("content", ""),
-                        metadata=result_dict.get("metadata", {}),
-                        score=result_dict.get("final_score", 0.0),
-                        explain_score=result_dict.get("explain_score"),
-                    )
-
-                    # Ajout métadonnées RRF intelligent avec validation
-                    if "metadata" not in doc.metadata:
-                        doc.metadata = {}
-
-                    doc.metadata.update(
-                        {
-                            "intelligent_rrf_used": True,
-                            "rrf_method": result_dict.get("metadata", {}).get(
-                                "rrf_method", "intelligent"
-                            ),
-                            "intent_validated": is_valid,
-                            "intent_result_type": str(type(intent_result)),
-                            "rrf_processing_timestamp": time.time(),
-                        }
-                    )
-
-                    final_documents.append(doc)
-
-                except Exception as doc_error:
-                    logger.warning(f"Erreur conversion document: {doc_error}")
-                    continue
-
-            logger.info(
-                f"RRF intelligent terminé: {len(final_documents)} documents finaux"
-            )
-            return final_documents
-
-        except Exception as global_error:
-            logger.error(f"Erreur globale dans RRF intelligent: {global_error}")
-            logger.error(
-                f"Type validated_intent: {type(validated_intent) if 'validated_intent' in locals() else 'non défini'}"
-            )
-            logger.error(
-                f"Type intent_result: {type(intent_result) if intent_result is not None else 'None'}"
-            )
-
-            # Fallback complet vers recherche classique
-            try:
-                classic_results = await self.retriever.adaptive_search(
-                    query_vector,
-                    query_text,
-                    top_k,
-                    where_filter,
-                    alpha=alpha,
-                )
-                logger.warning("Fallback vers recherche classique réussi")
-                return classic_results
-
-            except Exception as classic_error:
-                logger.error(f"Erreur même en recherche classique: {classic_error}")
-                return []
-
-    async def _classic_rrf_fallback(self, vector_dicts, bm25_dicts, alpha, top_k):
-        """Fallback RRF classique simple en cas d'erreur"""
-        try:
-            all_docs = {}
-            rrf_k = 60
-
-            # Traitement vectoriel
-            for i, doc_dict in enumerate(vector_dicts):
-                content_key = doc_dict.get("content", "")[:50]  # Clé simple
-                all_docs[content_key] = {
-                    "doc": doc_dict,
-                    "vector_rank": i + 1,
-                    "bm25_rank": None,
-                }
-
-            # Traitement BM25
-            for i, doc_dict in enumerate(bm25_dicts):
-                content_key = doc_dict.get("content", "")[:50]
-                if content_key in all_docs:
-                    all_docs[content_key]["bm25_rank"] = i + 1
-                else:
-                    all_docs[content_key] = {
-                        "doc": doc_dict,
-                        "vector_rank": None,
-                        "bm25_rank": i + 1,
-                    }
-
-            # Calcul RRF simple
-            final_results = []
-            for content_key, data in all_docs.items():
-                rrf_score = 0.0
-
-                if data["vector_rank"]:
-                    rrf_score += alpha / (rrf_k + data["vector_rank"])
-                if data["bm25_rank"]:
-                    rrf_score += (1 - alpha) / (rrf_k + data["bm25_rank"])
-
-                doc_dict = data["doc"].copy()
-                doc_dict["final_score"] = rrf_score * 10
-                doc_dict["metadata"] = doc_dict.get("metadata", {})
-                doc_dict["metadata"]["rrf_method"] = "classic_fallback"
-
-                final_results.append(doc_dict)
-
-            return sorted(final_results, key=lambda x: x["final_score"], reverse=True)[
-                :top_k
-            ]
-
-        except Exception as e:
-            logger.error(f"Erreur même en RRF fallback: {e}")
-            return []
-
-    def _document_to_dict(self, doc: Document) -> Dict:
-        """Convertit un Document en dictionnaire pour RRF intelligent"""
-        return {
-            "content": doc.content,
-            "metadata": doc.metadata,
-            "score": doc.score,
-            "explain_score": doc.explain_score,
-        }
-
-    def _calculate_confidence(
-        self, documents: List[Document], verification_result=None
-    ) -> float:
-        """Calcule la confiance finale"""
-        if not documents:
-            return 0.0
-
-        scores = [doc.score for doc in documents if doc.score > 0]
-        if not scores:
-            return 0.5
-
-        avg_score = sum(scores) / len(scores)
-        coherence_factor = min(1.2, 1 + (len(scores) - 1) * 0.05)
-
-        if len(scores) > 1:
-            score_std = np.std(scores)
-            distribution_factor = max(0.9, 1 - score_std * 0.5)
-        else:
-            distribution_factor = 1.0
-
-        verification_factor = 1.0
-        if (
-            verification_result
-            and hasattr(verification_result, "is_valid")
-            and verification_result.is_valid
-        ):
-            verification_factor = 1.1
-
-        final_confidence = (
-            avg_score * coherence_factor * distribution_factor * verification_factor
+        """Génère réponse depuis résultats JSON"""
+        
+        if not self.json_system:
+            return RAGResult(source=RAGSource.INTERNAL_ERROR)
+            
+        return await self.json_system.generate_response_from_results(
+            query, json_results, language, conversation_context, start_time
         )
-        return min(0.95, max(0.1, final_confidence))
 
-    async def _connect_weaviate(self):
-        """Connexion Weaviate corrigée avec authentification et configuration OpenAI"""
-        try:
-            import weaviate
-
-            # Variables d'environnement Weaviate
-            weaviate_url = os.getenv(
-                "WEAVIATE_URL",
-                "https://xmlc4jvtu6hfw9zrrmnw.c0.us-east1.gcp.weaviate.cloud",
-            )
-            weaviate_api_key = os.getenv("WEAVIATE_API_KEY", "")
-            openai_api_key = os.getenv("OPENAI_API_KEY", "")
-
-            logger.info(f"Tentative de connexion Weaviate: {weaviate_url}")
-            logger.debug(
-                f"Weaviate API Key configurée: {'Oui' if weaviate_api_key else 'Non'}"
-            )
-            logger.debug(
-                f"OpenAI API Key configurée: {'Oui' if openai_api_key else 'Non'}"
+    def _merge_hybrid_results(self, results: List, query: str, start_time: float) -> RAGResult:
+        """Fusionne les résultats hybrides"""
+        
+        valid_results = [r for r in results if isinstance(r, RAGResult) and not isinstance(r, Exception)]
+        
+        if not valid_results:
+            return RAGResult(
+                source=RAGSource.NO_RESULTS,
+                metadata={"source_type": "hybrid", "processing_time": time.time() - start_time}
             )
 
-            # CORRECTION CRITIQUE: Définir OPENAI_APIKEY pour Weaviate si pas déjà définie
-            if openai_api_key and "OPENAI_APIKEY" not in os.environ:
-                os.environ["OPENAI_APIKEY"] = openai_api_key
-                logger.debug(
-                    "Variable OPENAI_APIKEY définie pour compatibilité Weaviate"
-                )
-
-            # Pour une URL cloud Weaviate, utiliser connect_to_weaviate_cloud avec authentification
-            if "weaviate.cloud" in weaviate_url:
-                logger.debug(
-                    "Utilisation connexion cloud Weaviate avec authentification"
-                )
-
-                if weaviate_api_key:
-                    try:
-                        # NOUVEAU: Client v4 avec API Key et headers OpenAI
-                        import weaviate.classes as wvc_classes
-
-                        # Headers personnalisés pour OpenAI
-                        headers = {}
-                        if openai_api_key:
-                            headers["X-OpenAI-Api-Key"] = openai_api_key
-
-                        self.weaviate_client = weaviate.connect_to_weaviate_cloud(
-                            cluster_url=weaviate_url,
-                            auth_credentials=wvc_classes.init.Auth.api_key(
-                                weaviate_api_key
-                            ),
-                            headers=headers,
-                        )
-                        logger.info("Connexion Weaviate v4 avec API Key réussie")
-
-                    except ImportError:
-                        logger.warning("Weaviate v4 non disponible, utilisation v3")
-                        # Fallback vers client v3 avec authentification
-                        self.weaviate_client = weaviate.Client(
-                            url=weaviate_url,
-                            auth_client_secret=weaviate.AuthApiKey(
-                                api_key=weaviate_api_key
-                            ),
-                            additional_headers=(
-                                {"X-OpenAI-Api-Key": openai_api_key}
-                                if openai_api_key
-                                else {}
-                            ),
-                        )
-                        logger.info("Connexion Weaviate v3 avec API Key réussie")
-
-                    except Exception as auth_error:
-                        logger.error(f"Erreur authentification Weaviate: {auth_error}")
-                        # Tentative fallback v3
-                        try:
-                            self.weaviate_client = weaviate.Client(
-                                url=weaviate_url,
-                                auth_client_secret=weaviate.AuthApiKey(
-                                    api_key=weaviate_api_key
-                                ),
-                                additional_headers=(
-                                    {"X-OpenAI-Api-Key": openai_api_key}
-                                    if openai_api_key
-                                    else {}
-                                ),
-                            )
-                            logger.info("Fallback Weaviate v3 avec API Key réussi")
-                        except Exception as fallback_error:
-                            logger.error(
-                                f"Fallback v3 également échoué: {fallback_error}"
-                            )
-                            self.weaviate_client = None
-                            return
-                else:
-                    logger.error(
-                        "WEAVIATE_API_KEY non configurée pour l'instance cloud"
-                    )
-                    self.weaviate_client = None
-                    return
-            else:
-                # Connexion locale sans authentification
-                host = weaviate_url.replace("http://", "").replace("https://", "")
-                self.weaviate_client = weaviate.connect_to_local(host=host)
-                logger.info("Connexion Weaviate locale configurée")
-
-            # Test de connexion avec timeout
-            if self.weaviate_client:
-                try:
-                    # Test asynchrone de la connexion
-                    ready = await asyncio.wait_for(
-                        asyncio.to_thread(lambda: self.weaviate_client.is_ready()),
-                        timeout=15.0,
-                    )
-
-                    if ready:
-                        logger.info(
-                            f"Connexion Weaviate opérationnelle: {weaviate_url}"
-                        )
-
-                        # CORRECTION: Test de capacités v4 compatible
-                        try:
-                            # Pour client v4, utiliser .collections au lieu de .schema
-                            if hasattr(self.weaviate_client, "collections"):
-                                await asyncio.to_thread(
-                                    lambda: list(
-                                        self.weaviate_client.collections.list_all()
-                                    )
-                                )
-                                logger.info(
-                                    "Permissions Weaviate vérifiées - accès collections OK"
-                                )
-                            else:
-                                # Fallback pour client v3
-                                await asyncio.to_thread(
-                                    lambda: self.weaviate_client.schema.get()
-                                )
-                                logger.info(
-                                    "Permissions Weaviate vérifiées - accès schéma OK"
-                                )
-
-                        except Exception as perm_error:
-                            logger.warning(
-                                f"Permissions limitées Weaviate: {perm_error}"
-                            )
-                            # Continue quand même, certaines opérations peuvent fonctionner
-
-                    else:
-                        logger.error("Weaviate connecté mais pas prêt")
-                        self.weaviate_client = None
-
-                except asyncio.TimeoutError:
-                    logger.error("Timeout lors du test de connexion Weaviate (15s)")
-                    self.weaviate_client = None
-                except Exception as test_error:
-                    logger.error(f"Erreur test connexion Weaviate: {test_error}")
-                    self.weaviate_client = None
-
-        except Exception as e:
-            logger.error(f"Erreur générale connexion Weaviate: {e}")
-            self.weaviate_client = None
-
-    async def _log_langsmith_alerts(
-        self, query: str, result: RAGResult, metadata: Dict
-    ):
-        """Log des alertes spécialisées aviculture dans LangSmith"""
-
-        alerts = []
-
-        if not result.answer:
-            return
-
-        # Détection valeurs aberrantes aviculture
-        answer_lower = result.answer.lower()
-
-        # FCR aberrant
-        import re
-
-        fcr_matches = re.findall(r"fcr[:\s]*(\d+[.,]\d*)", answer_lower)
-        for fcr_str in fcr_matches:
-            try:
-                fcr_value = float(fcr_str.replace(",", "."))
-                if fcr_value > 3.0 or fcr_value < 0.8:
-                    alerts.append(f"FCR_ABERRANT: {fcr_value}")
-            except ValueError:
-                continue
-
-        # Mortalité aberrante
-        mort_matches = re.findall(r"mortalité[:\s]*(\d+)[%\s]", answer_lower)
-        for mort_str in mort_matches:
-            try:
-                mort_value = float(mort_str)
-                if mort_value > 20:
-                    alerts.append(f"MORTALITE_ELEVEE: {mort_value}%")
-            except ValueError:
-                continue
-
-        # Poids aberrant
-        poids_matches = re.findall(r"poids[:\s]*(\d+)\s*g", answer_lower)
-        for poids_str in poids_matches:
-            try:
-                poids_value = float(poids_str)
-                if poids_value > 5000 or poids_value < 10:
-                    alerts.append(f"POIDS_ABERRANT: {poids_value}g")
-            except ValueError:
-                continue
-
-        # Log alertes si détectées
-        if alerts:
-            logger.warning(f"Alertes aviculture détectées: {alerts}")
-            metadata["alerts_aviculture"] = alerts
-
-        # Confiance faible
-        if result.confidence < 0.3:
-            alerts.append(f"CONFIANCE_FAIBLE: {result.confidence:.2f}")
-
-    async def get_stats(self) -> Dict[str, Any]:
-        """Statistiques du moteur hybride PostgreSQL + Weaviate"""
-
-        base_stats = {
-            "postgresql_available": POSTGRESQL_INTEGRATION_AVAILABLE,
-            "postgresql_configured": bool(self.postgres_retriever),
-            "query_routing_enabled": bool(self.query_router),
-        }
-
-        if POSTGRESQL_INTEGRATION_AVAILABLE:
-            base_stats.update(
-                {
-                    "query_distribution": {
-                        "knowledge_pct": round(
-                            self.optimization_stats["query_routing"].get("knowledge", 0)
-                            / max(
-                                1,
-                                sum(self.optimization_stats["query_routing"].values()),
-                            )
-                            * 100,
-                            1,
-                        ),
-                        "metrics_pct": round(
-                            self.optimization_stats["query_routing"].get("metrics", 0)
-                            / max(
-                                1,
-                                sum(self.optimization_stats["query_routing"].values()),
-                            )
-                            * 100,
-                            1,
-                        ),
-                        "hybrid_pct": round(
-                            self.optimization_stats["query_routing"].get("hybrid", 0)
-                            / max(
-                                1,
-                                sum(self.optimization_stats["query_routing"].values()),
-                            )
-                            * 100,
-                            1,
-                        ),
-                    },
-                    "postgresql_stats": {
-                        "queries": self.optimization_stats["postgresql_queries"],
-                        "fallbacks": self.optimization_stats["postgresql_fallbacks"],
-                        "hybrid_queries": self.optimization_stats["hybrid_queries"],
-                    },
-                }
-            )
-
-        return base_stats
+        # Prendre le meilleur résultat pour l'instant
+        best_result = max(valid_results, key=lambda r: r.confidence)
+        best_result.metadata["source_type"] = "hybrid"
+        best_result.metadata["results_merged"] = len(valid_results)
+        
+        return best_result
 
     def get_status(self) -> Dict:
-        """Status enrichi avec système JSON intégré + PostgreSQL"""
-        try:
-            weaviate_connected = False
-            api_capabilities = {}
-
-            if self.weaviate_client:
-                try:
-                    weaviate_connected = self.weaviate_client.is_ready()
-                except Exception:
-                    weaviate_connected = False
-
-            if self.retriever and hasattr(self.retriever, "api_capabilities"):
-                api_capabilities = self.retriever.api_capabilities
-
-            # Import local de dependency_manager pour éviter NameError
-            from utils.imports_and_dependencies import dependency_manager
-
-            dependencies_status = dependency_manager.get_legacy_status()
-
-            status = {
-                "rag_enabled": RAG_ENABLED,
-                "initialized": self.is_initialized,
-                "degraded_mode": self.degraded_mode,
-                "approach": "enhanced_rag_v5_postgresql_json_integrated",
-                "postgresql_system": {
-                    "available": POSTGRESQL_INTEGRATION_AVAILABLE,
-                    "components": {
-                        "postgres_retriever": bool(self.postgres_retriever),
-                        "query_router": bool(self.query_router),
-                    },
-                    "stats": {
-                        "postgresql_queries": self.optimization_stats[
-                            "postgresql_queries"
-                        ],
-                        "postgresql_fallbacks": self.optimization_stats[
-                            "postgresql_fallbacks"
-                        ],
-                        "hybrid_queries": self.optimization_stats["hybrid_queries"],
-                        "query_routing": dict(self.optimization_stats["query_routing"]),
-                    },
-                },
-                "json_system": {
-                    "available": RAG_JSON_SYSTEM_AVAILABLE,
-                    "components": {
-                        "json_extractor": bool(self.json_extractor),
-                        "table_extractor": bool(self.table_extractor),
-                        "genetic_line_extractor": bool(self.genetic_line_extractor),
-                        "json_validator": bool(self.json_validator),
-                        "ingestion_pipeline": bool(self.ingestion_pipeline),
-                        "hybrid_search_engine": bool(self.hybrid_search_engine),
-                        "document_processor": bool(self.document_processor),
-                        "enhanced_cache_manager": bool(self.enhanced_cache_manager),
-                    },
-                    "stats": {
-                        "json_validations": self.optimization_stats["json_validations"],
-                        "json_ingestions": self.optimization_stats["json_ingestions"],
-                        "table_extractions": self.optimization_stats[
-                            "table_extractions"
-                        ],
-                        "genetic_line_detections": self.optimization_stats[
-                            "genetic_line_detections"
-                        ],
-                        "performance_metrics_processed": self.optimization_stats[
-                            "performance_metrics_processed"
-                        ],
-                    },
-                },
-                "optimizations": {
-                    "external_cache_enabled": (
-                        self.cache_manager.enabled if self.cache_manager else False
-                    ),
-                    "enhanced_cache_enabled": (
-                        self.enhanced_cache_manager.enabled
-                        if self.enhanced_cache_manager
-                        else False
-                    ),
-                    "hybrid_search_enabled": HYBRID_SEARCH_ENABLED,
-                    "intelligent_rrf_enabled": ENABLE_INTELLIGENT_RRF,
-                    "langsmith_enabled": LANGSMITH_ENABLED,
-                    "postgresql_integration_enabled": POSTGRESQL_INTEGRATION_AVAILABLE,
-                    "semantic_cache_enabled": (
-                        getattr(self.cache_manager, "ENABLE_SEMANTIC_CACHE", False)
-                        if self.cache_manager
-                        else False
-                    ),
-                    "entity_enrichment_enabled": ENTITY_ENRICHMENT_ENABLED,
-                    "guardrails_level": GUARDRAILS_LEVEL,
-                    "api_diagnostics_enabled": ENABLE_API_DIAGNOSTICS,
-                },
-                "langsmith": {
-                    "available": LANGSMITH_AVAILABLE,
-                    "enabled": LANGSMITH_ENABLED,
-                    "configured": bool(self.langsmith_client),
-                    "project": LANGSMITH_PROJECT,
-                    "traces_count": self.optimization_stats["langsmith_traces"],
-                    "errors_count": self.optimization_stats["langsmith_errors"],
-                },
-                "intelligent_rrf": {
-                    "available": INTELLIGENT_RRF_AVAILABLE,
-                    "enabled": ENABLE_INTELLIGENT_RRF,
-                    "configured": bool(self.intelligent_rrf),
-                    "learning_mode": getattr(self, "RRF_LEARNING_MODE", False),
-                    "genetic_boost": getattr(self, "RRF_GENETIC_BOOST", False),
-                    "usage_count": self.optimization_stats["intelligent_rrf_used"],
-                    "performance_stats": (
-                        self.intelligent_rrf.get_performance_stats()
-                        if self.intelligent_rrf
-                        else {}
-                    ),
-                },
-                "components": dependencies_status,
-                "weaviate_connected": weaviate_connected,
-                "configuration": {
-                    "similarity_top_k": RAG_SIMILARITY_TOP_K,
-                    "confidence_threshold": RAG_CONFIDENCE_THRESHOLD,
-                    "hybrid_default_alpha": DEFAULT_ALPHA,
-                    "rrf_base_k": getattr(self, "RRF_BASE_K", 60),
-                    "max_conversation_context": MAX_CONVERSATION_CONTEXT,
-                },
-                "optimization_stats": self.optimization_stats.copy(),
-                "api_capabilities": api_capabilities,
-                "metrics": METRICS.snapshot(),
+        """Status système complet"""
+        return {
+            "rag_enabled": RAG_ENABLED,
+            "initialized": self.is_initialized,
+            "degraded_mode": self.degraded_mode,
+            "approach": "enhanced_rag_v5.1_modular",
+            "modules": {
+                "postgresql_system": bool(self.postgresql_system),
+                "json_system": bool(self.json_system), 
+                "weaviate_core": bool(self.weaviate_core),
+                "langsmith_integration": bool(self.langsmith_integration),
+            },
+            "optimization_stats": self.optimization_stats.copy(),
+            "processing_capabilities": {
+                "metrics_queries": bool(self.postgresql_system),
+                "json_search": bool(self.json_system),
+                "knowledge_base": bool(self.weaviate_core),
+                "hybrid_search": bool(self.postgresql_system and self.weaviate_core),
+                "monitoring": bool(self.langsmith_integration),
             }
-
-            return status
-
-        except Exception as e:
-            logger.error(f"Erreur get_status: {e}")
-            return {"error": str(e), "initialized": self.is_initialized}
+        }
 
     async def close(self):
-        """Ferme toutes les connexions (NOUVEAU)"""
+        """Fermeture propre de tous les modules"""
+        
+        if self.postgresql_system:
+            await self.postgresql_system.close()
+            
+        if self.json_system:
+            await self.json_system.close()
+            
+        if self.weaviate_core:
+            await self.weaviate_core.close()
+            
+        if self.langsmith_integration:
+            await self.langsmith_integration.close()
 
-        # Fermeture PostgreSQL
-        if POSTGRESQL_INTEGRATION_AVAILABLE and self.postgres_retriever:
-            try:
-                await self.postgres_retriever.close()
-                logger.info("PostgreSQL Retriever fermé")
-            except Exception as e:
-                logger.warning(f"Erreur fermeture PostgreSQL: {e}")
-
-        # Fermeture Weaviate et autres composants (si applicable)
-        if hasattr(self.weaviate_client, "close"):
-            try:
-                await self.weaviate_client.close()
-                logger.info("Weaviate client fermé")
-            except Exception as e:
-                logger.warning(f"Erreur fermeture Weaviate: {e}")
+        logger.info("RAG Engine fermé proprement")
 
 
 # Factory function pour compatibilité
 def create_rag_engine(openai_client=None) -> InteliaRAGEngine:
-    """Factory pour créer une instance RAG Engine avec support PostgreSQL"""
+    """Factory pour créer une instance RAG Engine"""
     return InteliaRAGEngine(openai_client)
