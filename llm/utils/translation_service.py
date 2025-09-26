@@ -4,138 +4,18 @@ translation_service.py - Service de traduction universel hybride
 Combine dictionnaire local + Google Translate avec cache intelligent
 Version avec chargement dynamique des dictionnaires par langue
 CORRECTION: Gestion variable d'environnement pour clé API Google
-CORRECTION CRITIQUE: Ajout exclusion des termes techniques avicoles
+CORRECTION CRITIQUE: Chargement des exclusions techniques depuis JSON au lieu de constantes hardcodées
 """
 
 import json
 import logging
 import time
 import re
-from typing import Dict, List, Optional, Set, Any
+from typing import Dict, List, Optional, Set, Any, Tuple
 from dataclasses import dataclass
 from pathlib import Path
 from cachetools import TTLCache
 import threading
-
-# CORRECTION CRITIQUE: Liste d'exclusion pour termes techniques
-TECHNICAL_TERMS_EXCLUSION = {
-    # Termes de données/fichiers techniques
-    "weight_curves",
-    "growth_curves",
-    "fcr_curves",
-    "mortality_curves",
-    "performance_data",
-    "breeding_data",
-    "nutrition_data",
-    "feed_data",
-    # Identifiants lignées génétiques
-    "ross308",
-    "ross_308",
-    "cobb500",
-    "cobb_500",
-    "hubbard_flex",
-    "isa_brown",
-    "dekalb_white",
-    "novogen_brown",
-    "bovans_white",
-    # Termes techniques avicoles (ne pas traduire)
-    "broiler_performance",
-    "layer_performance",
-    "breeder_performance",
-    "feed_conversion_ratio",
-    "average_daily_gain",
-    "body_weight_gain",
-    "egg_production_rate",
-    "fertility_rate",
-    "hatchability_rate",
-    "livability_rate",
-    "uniformity_index",
-    "european_production_index",
-    # Identifiants de métriques
-    "epef",
-    "eef",
-    "fcr",
-    "adg",
-    "bwg",
-    "epr",
-    "fr",
-    "hr",
-    "lr",
-    "ui",
-    "epi",
-    # Noms de fichiers/extensions techniques
-    "xlsx",
-    "json",
-    "csv",
-    "pdf",
-    "docx",
-    "txt",
-    "xml",
-    "broiler_objectives",
-    "layer_standards",
-    "breeder_targets",
-    # Codes et références techniques
-    "ap_male",
-    "ap_female",
-    "straight_run",
-    "parent_stock",
-    "ps",
-    "commercial_strain",
-    "genetic_line",
-    "selection_line",
-    # Termes SQL/base de données
-    "database",
-    "table",
-    "query",
-    "insert",
-    "update",
-    "select",
-    "join",
-    "postgresql",
-    "weaviate",
-    "redis",
-    "cache",
-    "index",
-    "schema",
-}
-
-# CORRECTION: Termes partiels à exclure
-TECHNICAL_PARTIAL_EXCLUSIONS = {
-    # Préfixes techniques
-    "ross",
-    "cobb",
-    "hubbard",
-    "isa",
-    "dekalb",
-    "novogen",
-    "bovans",
-    "aviagen",
-    "hendrix",
-    "petersons",
-    "grimaud",
-    "group",
-    # Suffixes techniques
-    "_data",
-    "_curves",
-    "_performance",
-    "_objectives",
-    "_standards",
-    "_targets",
-    "_index",
-    "_ratio",
-    "_rate",
-    "_gain",
-    "_weight",
-    # Codes produits
-    "308",
-    "500",
-    "flex",
-    "brown",
-    "white",
-    "plus",
-    "max",
-    "elite",
-}
 
 # Import conditionnel Google Cloud Translate
 try:
@@ -151,6 +31,7 @@ logger = logging.getLogger(__name__)
 # Constantes pour le chargement dynamique
 FALLBACK_LANGUAGE = "en"
 DICTIONARY_PREFIX = "universal_terms"
+EXCLUSIONS_FILENAME = "technical_exclusions.json"
 
 
 @dataclass
@@ -163,7 +44,7 @@ class TranslationResult:
     language: str
     cached: bool = False
     processing_time_ms: int = 0
-    exclusion_reason: Optional[str] = None  # NOUVEAU
+    exclusion_reason: Optional[str] = None
 
 
 @dataclass
@@ -176,7 +57,6 @@ class CacheStats:
     local_hits: int = 0
     cache_size: int = 0
     hit_rate: float = 0.0
-    # NOUVEAU: Statistiques exclusions
     technical_terms_excluded: int = 0
     terms_translated: int = 0
 
@@ -186,7 +66,7 @@ class UniversalTranslationService:
     Service de traduction hybride avec dictionnaire local + Google Translate
     Architecture à 3 niveaux: Cache → Dictionnaire local → Google API
     Chargement dynamique des dictionnaires par langue
-    NOUVEAU: Exclusion automatique des termes techniques
+    NOUVEAU: Exclusion automatique des termes techniques depuis fichier JSON externe
     """
 
     def __init__(
@@ -198,7 +78,7 @@ class UniversalTranslationService:
         cache_ttl: int = 86400,
         enable_google_fallback: bool = False,
         confidence_threshold: float = 0.7,
-        enable_technical_exclusion: bool = True,  # NOUVEAU
+        enable_technical_exclusion: bool = True,
     ):
 
         self.dict_path = Path(dict_path)
@@ -208,7 +88,10 @@ class UniversalTranslationService:
             enable_google_fallback and GOOGLE_TRANSLATE_AVAILABLE
         )
         self.confidence_threshold = confidence_threshold
-        self.enable_technical_exclusion = enable_technical_exclusion  # NOUVEAU
+        self.enable_technical_exclusion = enable_technical_exclusion
+
+        # NOUVEAU: Charger les exclusions depuis JSON
+        self.exclusions = self._load_technical_exclusions()
 
         # Cache 2-niveaux
         self._memory_cache = TTLCache(maxsize=cache_size, ttl=cache_ttl)
@@ -228,34 +111,206 @@ class UniversalTranslationService:
         # Validation initiale
         self._validate_setup()
 
-    def _is_technical_term(self, term: str) -> tuple[bool, str]:
-        """CORRECTION CRITIQUE: Vérifie si un terme est technique et ne doit PAS être traduit"""
+    def _load_technical_exclusions(self) -> Dict[str, Set[str]]:
+        """
+        NOUVELLE MÉTHODE: Charge les exclusions techniques depuis JSON
+        Retourne un dictionnaire avec différentes catégories d'exclusions
+        """
+        exclusions_file = self.dict_path / EXCLUSIONS_FILENAME
 
+        if not exclusions_file.exists():
+            logger.warning(
+                f"Fichier {EXCLUSIONS_FILENAME} non trouvé: {exclusions_file}, "
+                "utilisation des exclusions par défaut"
+            )
+            return self._get_default_exclusions()
+
+        try:
+            with open(exclusions_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+                exclusions = {
+                    "exact": set(data.get("exact_terms", [])),
+                    "partial": set(data.get("partial_terms", [])),
+                    "extensions": set(data.get("file_extensions", [])),
+                    "database": set(data.get("database_terms", [])),
+                    "api": set(data.get("api_technical", [])),
+                }
+
+                logger.info(
+                    f"Exclusions chargées depuis JSON: {len(exclusions['exact'])} termes exacts, "
+                    f"{len(exclusions['partial'])} termes partiels, "
+                    f"{len(exclusions['extensions'])} extensions, "
+                    f"{len(exclusions['database'])} termes DB, "
+                    f"{len(exclusions['api'])} termes API"
+                )
+
+                return exclusions
+
+        except Exception as e:
+            logger.error(f"Erreur chargement exclusions depuis JSON: {e}")
+            return self._get_default_exclusions()
+
+    def _get_default_exclusions(self) -> Dict[str, Set[str]]:
+        """Exclusions minimales par défaut si le fichier JSON est absent"""
+        logger.info("Utilisation des exclusions par défaut (fallback)")
+        return {
+            "exact": {
+                # Termes de données/fichiers techniques
+                "weight_curves",
+                "growth_curves",
+                "fcr_curves",
+                "mortality_curves",
+                "performance_data",
+                "breeding_data",
+                "nutrition_data",
+                "feed_data",
+                # Identifiants lignées génétiques
+                "ross308",
+                "ross_308",
+                "cobb500",
+                "cobb_500",
+                "hubbard_flex",
+                "isa_brown",
+                "dekalb_white",
+                "novogen_brown",
+                "bovans_white",
+                # Termes techniques avicoles
+                "broiler_performance",
+                "layer_performance",
+                "breeder_performance",
+                "feed_conversion_ratio",
+                "average_daily_gain",
+                "body_weight_gain",
+                "egg_production_rate",
+                "fertility_rate",
+                "hatchability_rate",
+                "livability_rate",
+                "uniformity_index",
+                "european_production_index",
+                # Identifiants de métriques
+                "epef",
+                "eef",
+                "fcr",
+                "adg",
+                "bwg",
+                "epr",
+                "fr",
+                "hr",
+                "lr",
+                "ui",
+                "epi",
+                # Noms de fichiers/extensions techniques
+                "broiler_objectives",
+                "layer_standards",
+                "breeder_targets",
+                # Codes et références techniques
+                "ap_male",
+                "ap_female",
+                "straight_run",
+                "parent_stock",
+                "ps",
+                "commercial_strain",
+                "genetic_line",
+                "selection_line",
+            },
+            "partial": {
+                # Préfixes techniques
+                "ross",
+                "cobb",
+                "hubbard",
+                "isa",
+                "dekalb",
+                "novogen",
+                "bovans",
+                "aviagen",
+                "hendrix",
+                "petersons",
+                "grimaud",
+                "group",
+                # Suffixes techniques
+                "_data",
+                "_curves",
+                "_performance",
+                "_objectives",
+                "_standards",
+                "_targets",
+                "_index",
+                "_ratio",
+                "_rate",
+                "_gain",
+                "_weight",
+                # Codes produits
+                "308",
+                "500",
+                "flex",
+                "brown",
+                "white",
+                "plus",
+                "max",
+                "elite",
+            },
+            "extensions": {"xlsx", "json", "csv", "pdf", "docx", "txt", "xml"},
+            "database": {
+                "database",
+                "table",
+                "query",
+                "insert",
+                "update",
+                "select",
+                "join",
+                "postgresql",
+                "weaviate",
+                "redis",
+                "cache",
+                "index",
+                "schema",
+            },
+            "api": {"api", "endpoint", "rest", "token"},
+        }
+
+    def _is_technical_term(self, term: str) -> Tuple[bool, str]:
+        """
+        MÉTHODE MODIFIÉE: Vérifie si un terme est technique et ne doit PAS être traduit
+        Utilise les exclusions chargées depuis JSON au lieu des constantes
+        """
         if not self.enable_technical_exclusion:
             return False, ""
 
         term_lower = term.lower().strip()
 
         # 1. Exclusion exacte
-        if term_lower in TECHNICAL_TERMS_EXCLUSION:
+        if term_lower in self.exclusions["exact"]:
             return True, f"exact_match: {term_lower}"
 
         # 2. Exclusion partielle
-        for partial in TECHNICAL_PARTIAL_EXCLUSIONS:
+        for partial in self.exclusions["partial"]:
             if partial in term_lower:
                 return True, f"partial_match: {partial}"
 
-        # 3. Patterns spéciaux avicoles
+        # 3. Extensions de fichiers
+        if term_lower in self.exclusions["extensions"]:
+            return True, "file_extension"
+
+        # 4. Termes de base de données
+        if term_lower in self.exclusions["database"]:
+            return True, "database_term"
+
+        # 5. Termes API
+        if term_lower in self.exclusions["api"]:
+            return True, "api_term"
+
+        # 6. Patterns spéciaux avicoles
 
         # Format "lignée + nombre" (ex: "ross308", "cobb500")
         if re.match(r"^[a-z]+\d+$", term_lower):
             return True, "genetic_line_pattern"
 
         # Format "mot_technique" (ex: "feed_conversion", "body_weight")
-        if "_" in term_lower and any(
-            part in TECHNICAL_TERMS_EXCLUSION for part in term_lower.split("_")
-        ):
-            return True, "technical_compound"
+        if "_" in term_lower:
+            parts = term_lower.split("_")
+            if any(part in self.exclusions["exact"] for part in parts):
+                return True, "technical_compound"
 
         # Codes courts techniques (2-4 lettres majuscules)
         if re.match(r"^[A-Z]{2,4}$", term) and len(term) <= 4:
@@ -501,7 +556,7 @@ class UniversalTranslationService:
                 self.stats.local_hits += 1
             elif source == "google":
                 self.stats.google_calls += 1
-            elif source == "excluded":  # NOUVEAU
+            elif source == "excluded":
                 self.stats.technical_terms_excluded += 1
             else:
                 self.stats.terms_translated += 1
@@ -760,6 +815,19 @@ class UniversalTranslationService:
 
         return results
 
+    def reload_exclusions(self) -> bool:
+        """
+        NOUVELLE MÉTHODE: Recharge les exclusions depuis le fichier JSON
+        Utile après modification du fichier technical_exclusions.json
+        """
+        try:
+            self.exclusions = self._load_technical_exclusions()
+            logger.info("Exclusions techniques rechargées avec succès depuis JSON")
+            return True
+        except Exception as e:
+            logger.error(f"Erreur rechargement exclusions: {e}")
+            return False
+
     def get_domain_terms(self, domain: str, language: str) -> List[str]:
         """Récupère tous les termes d'un domaine pour une langue"""
         lang_dict = self._get_language_dictionary(language)
@@ -956,7 +1024,7 @@ def create_translation_service(
     cache_size: int = 10000,
     cache_ttl: int = 86400,
     confidence_threshold: float = 0.7,
-    enable_technical_exclusion: bool = True,  # NOUVEAU
+    enable_technical_exclusion: bool = True,
 ) -> UniversalTranslationService:
     """Factory pour créer le service de traduction avec exclusion technique"""
     return UniversalTranslationService(

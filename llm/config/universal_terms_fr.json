@@ -1,8 +1,26 @@
 {
+  "_comment": "FICHIER: universal_terms_fr.json - VERSION ENRICHIE",
+  
   "metadata": {
     "language": "fr",
-    "version": "2.1.0"
+    "version": "2.1.0",
+    "last_updated": "2025-01-15",
+    "total_terms": 365
   },
+  
+  "messages": {
+    "out_of_domain": "Intelia Expert est un système expert spécialisé en production avicole et ne peut traiter les questions hors de ce domaine. Je suis là pour vous accompagner sur tous les aspects de l'élevage de volailles. Comment puis-je vous aider en aviculture ?",
+    "error_generic": "Une erreur s'est produite lors du traitement de votre demande. Veuillez réessayer.",
+    "welcome": "Bonjour ! Je suis Intelia Expert, votre assistant spécialisé en aviculture. Comment puis-je vous aider aujourd'hui ?",
+    "clarification_needed": "Pouvez-vous préciser votre question pour que je puisse vous fournir une réponse plus précise ?",
+    "no_results": "Je n'ai pas trouvé d'informations pertinentes pour répondre à votre question. Pouvez-vous reformuler ?",
+    "processing": "Je traite votre demande, veuillez patienter...",
+    "farewell": "Au revoir ! N'hésitez pas à revenir si vous avez d'autres questions sur l'aviculture.",
+    "error_connection": "Erreur de connexion au système. Veuillez vérifier votre connexion.",
+    "error_timeout": "La requête a pris trop de temps. Veuillez réessayer.",
+    "success_generic": "Opération effectuée avec succès."
+  },
+
   "equipment_types": {
     "chain_feeder": ["mangeoire chaîne", "chaîne d'alimentation", "distributeur chaîne", "feedchain"],
     "pan_feeder": ["mangeoire assiette", "assiette d'alimentation", "plateau repas"],
@@ -14,12 +32,14 @@
     "radiant_heaters": ["radiateurs radiants", "chauffage radiant", "tubes radiants", "radiant"],
     "hot_air_blowers": ["souffleurs air chaud", "ventilateurs chauffants", "pulsé air chaud"]
   },
+  
   "substrate_materials": {
     "litter": ["litière", "paillis", "substrat sol", "couverture sol"],
     "wood_shavings": ["copeaux bois", "copeaux", "sciure", "rognures bois"],
     "rice_husks": ["balle de riz", "coques de riz", "enveloppes de riz"],
     "straw": ["paille", "paillis", "tiges sèches"]
   },
+  
   "additional_pathologies": {
     "avian_influenza": ["grippe aviaire", "influenza aviaire", "h5n1", "h7n9", "ia"],
     "mareks_disease": ["maladie de marek", "marek", "paralysie marek", "tumeurs lymphoïdes"],
@@ -27,22 +47,26 @@
     "pododermatitis": ["dermatite plantaire", "brûlure jarret", "dermatite pattes", "fhd"],
     "crossbeak": ["bec croisé", "malformation bec", "bec dévié", "scissor beak"]
   },
+  
   "production_systems": {
     "enriched_cage": ["cage enrichie", "cage aménagée", "cage améliorée", "volière enrichie"],
     "aviary_system": ["système volière", "volière", "élevage volière", "multi-perchoirs"],
     "free_range": ["plein air", "libre parcours", "élevage extensif", "parcours extérieur"]
   },
+  
   "biosecurity_health": {
     "biosecurity": ["biosécurité", "sécurité biologique", "all-in all-out", "vide sanitaire"],
     "probiotics": ["probiotiques", "micro-organismes bénéfiques", "bactéries lactiques"],
     "antibiotics": ["antibiotiques", "antimicrobiens", "thérapeutique", "agp"],
     "vaccine": ["vaccin", "vaccination", "immunisation", "prophylaxie"]
   },
+  
   "egg_defects": {
     "cracked_shell": ["coquille fissurée", "œuf fissuré", "fêlure coquille", "coquille cassée"],
     "soft_shelled_egg": ["œuf mou", "coquille molle", "œuf sans coquille", "coquille souple"],
     "misshapen_egg": ["œuf déformé", "malformation œuf", "œuf bizarre", "forme anormale"]
   },
+  
   "genetic_lines": {
     "ross_308": ["ross 308", "ross308", "ross-308", "r308", "ross", "ross 308 broiler"],
     "ross_708": ["ross 708", "ross708", "ross-708", "r708", "ross 708 broiler"],
@@ -53,6 +77,7 @@
     "lohmann_brown": ["lohmann brown", "lohmann", "lohmann-brown", "lb", "lohmann brown layer"],
     "hy_line": ["hy-line", "hyline", "hy line", "hl"]
   },
+  
   "site_types": {
     "broiler_farm": ["broiler", "poulet de chair", "poulets de chair", "chair", "élevage broiler"],
     "layer_farm": ["layer", "pondeuse", "pondeuses", "œufs", "oeufs", "élevage pondeuse"],
@@ -60,6 +85,7 @@
     "hatchery": ["couvoir", "écloserie", "incubation", "hatchery"],
     "feed_mill": ["usine aliments", "fabrique aliment", "moulin", "feedmill"]
   },
+  
   "performance_metrics": {
     "feed_conversion_ratio": ["fcr", "ic", "indice conversion", "indice consommation", "conversion alimentaire"],
     "average_daily_gain": ["gmd", "gmq", "gain moyen quotidien", "gain journalier", "g/jour"],
@@ -71,6 +97,7 @@
     "uniformity": ["homogénéité", "uniformité", "coefficient variation", "cv", "régularité"],
     "epef": ["epef", "iep", "indice efficacité production", "indice performance", "efficacité"]
   },
+  
   "nutrition_detailed": {
     "crude_protein": ["protéines brutes", "pb", "protéines", "crude protein", "cp"],
     "metabolizable_energy": ["énergie métabolisable", "em", "kcal/kg", "densité énergétique", "me"],
@@ -84,6 +111,7 @@
     "chloride": ["chlorure", "cl", "chlore"],
     "potassium": ["potassium", "k", "potasse"]
   },
+  
   "pathology_specific": {
     "gumboro": ["gumboro", "maladie de gumboro", "bursite infectieuse", "ibdv"],
     "newcastle": ["newcastle", "maladie de newcastle", "pseudopeste aviaire", "ppa"],
@@ -95,6 +123,7 @@
     "mycoplasma": ["mycoplasme", "mycoplasmose", "maladie respiratoire chronique", "crd"],
     "infectious_bronchitis_virus": ["ibv", "bronchite infectieuse", "bi", "virus bronchite"]
   },
+  
   "infrastructure_environment": {
     "ventilation_rate": ["débit ventilation", "taux ventilation", "m3/h/kg", "renouvellement air", "ventilation minimale"],
     "static_pressure": ["pression statique", "pa", "pascal", "dépression", "pression négative"],
@@ -106,11 +135,13 @@
     "lighting_hours": ["durée éclairage", "photopériode", "heures lumière", "h/jour"],
     "light_intensity": ["intensité lumineuse", "lux", "éclairage", "luminosité"]
   },
+  
   "welfare_management": {
     "stocking_density": ["densité d'élevage", "densité", "kg/m2", "oiseaux/m2", "charge"],
     "heat_stress": ["stress thermique", "stress chaleur", "canicule", "coup de chaleur", "hyperthermie"],
     "feather_pecking": ["picage", "picage plumes", "cannibalisme", "arrachage plumes"]
   },
+  
   "equipment_settings": {
     "nipple_height": ["hauteur nipples", "hauteur tétines", "réglage abreuvoirs", "cm hauteur"],
     "brooding_temperature": ["courbe température", "programme chauffage", "température élevage", "°c démarrage"],
@@ -118,22 +149,26 @@
     "static_pressure_setpoints": ["consignes pression statique", "pression cible", "réglage pression", "pa cible"],
     "co2_maximum_ppm": ["co2 maximum", "limite co2", "seuil co2", "ppm co2 max"]
   },
+  
   "reproduction_laying": {
     "sexual_maturity": ["maturité sexuelle", "âge première ponte", "photostimulation", "mise en ponte"],
     "laying_rate": ["taux de ponte", "% ponte", "production", "ponte", "pourcentage ponte"],
     "egg_weight": ["poids œuf", "poids oeuf", "calibre œuf", "masse œuf", "poids moyen œuf"],
     "shell_quality": ["qualité coquille", "épaisseur coquille", "solidité coquille", "coquilles molles"]
   },
+  
   "phases": {
     "starter": ["starter", "démarrage", "demarrage", "start", "phase 1", "pre-starter"],
     "grower": ["grower", "croissance", "phase 2", "developer"],
     "finisher": ["finisher", "finition", "finish", "phase 3"]
   },
+  
   "taxonomy_classification": {
     "commercial_strain": ["lignée commerciale", "souche", "strain", "lignée", "race"],
     "sex_class": ["mâles", "femelles", "mixte", "straight-run", "sr"],
     "age_brackets": ["0-10j", "11-35j", "36-42j", "phase 1", "phase 2", "phase 3"]
   },
+  
   "question_patterns": {
     "weight_query": ["quel est le poids", "poids cible", "poids moyen", "combien pèse", "quel poids"],
     "fcr_query": ["fcr optimal", "indice consommation", "conversion alimentaire", "ic moyen"],
@@ -147,6 +182,7 @@
     "health_diagnosis": ["quels symptômes", "diagnostic", "maladie", "qu'est-ce qui cause", "signes cliniques"],
     "management_how": ["comment gérer", "comment traiter", "que faire", "comment améliorer", "gestion de"]
   },
+  
   "units_measures": {
     "days": ["jours", "jour", "j", "d", "days"],
     "weeks": ["semaines", "semaine", "sem", "s", "w"],
@@ -156,6 +192,7 @@
     "liters": ["litres", "litre", "l"],
     "celsius": ["celsius", "degrés celsius", "°c", "degrés"]
   },
+  
   "health_symptoms": {
     "respiratory": ["respiratoire", "toux", "dyspnée", "râles", "écoulement nasal"],
     "digestive": ["digestif", "diarrhée", "vomissement", "anorexie", "perte appétit"],

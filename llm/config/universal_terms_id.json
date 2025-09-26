@@ -1,8 +1,26 @@
 {
+  "_comment": "FICHIER: universal_terms_id.json - VERSION ENRICHIE",
+  
   "metadata": {
     "language": "id",
-    "version": "2.1.0"
+    "version": "2.1.0",
+    "last_updated": "2025-01-15",
+    "total_terms": 365
   },
+  
+  "messages": {
+    "out_of_domain": "Intelia Expert adalah sistem ahli yang mengkhususkan diri dalam produksi unggas dan tidak dapat menangani pertanyaan di luar domain ini. Saya di sini untuk mendukung Anda dalam semua aspek peternakan unggas. Bagaimana saya bisa membantu Anda dengan unggas?",
+    "error_generic": "Terjadi kesalahan saat memproses permintaan Anda. Silakan coba lagi.",
+    "welcome": "Halo! Saya Intelia Expert, asisten khusus Anda dalam peternakan unggas. Bagaimana saya bisa membantu Anda hari ini?",
+    "clarification_needed": "Bisakah Anda memperjelas pertanyaan Anda sehingga saya dapat memberikan jawaban yang lebih akurat?",
+    "no_results": "Saya tidak menemukan informasi yang relevan untuk menjawab pertanyaan Anda. Bisakah Anda merumuskan ulang?",
+    "processing": "Memproses permintaan Anda, harap tunggu...",
+    "farewell": "Selamat tinggal! Jangan ragu untuk kembali jika Anda memiliki lebih banyak pertanyaan tentang unggas.",
+    "error_connection": "Kesalahan koneksi ke sistem. Silakan periksa koneksi Anda.",
+    "error_timeout": "Permintaan memakan waktu terlalu lama. Silakan coba lagi.",
+    "success_generic": "Operasi berhasil diselesaikan."
+  },
+
   "equipment_types": {
     "chain_feeder": ["rantai pakan", "sistem pakan rantai", "feeder rantai", "chain feeder"],
     "pan_feeder": ["feeder panci", "panci pakan", "feeder bundar", "pan feeder"],
@@ -14,12 +32,14 @@
     "radiant_heaters": ["pemanas radiasi", "pemanasan radiant", "tabung radiant", "pemanas infrared"],
     "hot_air_blowers": ["blower udara panas", "kipas udara hangat", "pemanas udara", "blower panas"]
   },
+  
   "substrate_materials": {
     "litter": ["sekam", "alas kandang", "bahan alas", "substrat", "litter"],
     "wood_shavings": ["serutan kayu", "serbuk gergaji", "serpihan kayu", "gergaji kayu"],
     "rice_husks": ["sekam padi", "kulit padi", "dedak padi", "sekam"],
     "straw": ["jerami", "jerami gandum", "jerami padi", "jerami kering"]
   },
+  
   "additional_pathologies": {
     "avian_influenza": ["flu burung", "avian influenza", "AI", "H5N1", "influenza unggas"],
     "mareks_disease": ["penyakit marek", "marek disease", "tumor limfoid", "paralisis marek"],
@@ -27,22 +47,26 @@
     "pododermatitis": ["pododermatitis", "dermatitis kaki", "luka bakar hock", "radang telapak kaki"],
     "crossbeak": ["paruh silang", "kelainan paruh", "paruh bengkok", "crossbeak"]
   },
+  
   "production_systems": {
     "enriched_cage": ["kandang diperkaya", "kandang furnished", "kandang yang ditingkatkan"],
     "aviary_system": ["sistem aviary", "kandang aviary", "sistem multi-tingkat"],
     "free_range": ["free range", "akses luar", "sistem padang", "pemeliharaan lepas"]
   },
+  
   "biosecurity_health": {
     "biosecurity": ["biosekuritas", "keamanan biologis", "sanitasi", "all-in all-out"],
     "probiotics": ["probiotik", "mikroorganisme menguntungkan", "kultur hidup"],
     "antibiotics": ["antibiotik", "antimikroba", "terapi", "AGP", "growth promoter"],
     "vaccine": ["vaksin", "vaksinasi", "imunisasi", "profilaksis"]
   },
+  
   "egg_defects": {
     "cracked_shell": ["kerabang retak", "telur retak", "retakan kerabang", "crack telur"],
     "soft_shelled_egg": ["telur berkerabang lunak", "kerabang lembek", "telur tanpa kerabang"],
     "misshapen_egg": ["telur cacat bentuk", "telur abnormal", "bentuk tidak beraturan"]
   },
+  
   "genetic_lines": {
     "ross_308": ["ross 308", "ross308", "ross-308", "R308", "broiler ross"],
     "ross_708": ["ross 708", "ross708", "ross-708", "R708"],
@@ -53,6 +77,7 @@
     "lohmann_brown": ["lohmann brown", "lohmann", "lohmann-brown", "LB", "layer lohmann"],
     "hy_line": ["hy-line", "hyline", "hy line", "HL"]
   },
+  
   "site_types": {
     "broiler_farm": ["broiler", "farm broiler", "ayam pedaging", "peternakan ayam", "farm unggas"],
     "layer_farm": ["layer", "farm layer", "ayam petelur", "kandang layer", "peternakan telur"],
@@ -60,6 +85,7 @@
     "hatchery": ["hatchery", "penetasan", "tempat penetasan", "inkubasi"],
     "feed_mill": ["pabrik pakan", "feed mill", "mill", "pabrik feed"]
   },
+  
   "performance_metrics": {
     "feed_conversion_ratio": ["FCR", "konversi pakan", "rasio konversi", "feed conversion"],
     "average_daily_gain": ["ADG", "pertambahan harian", "gain harian", "g/hari"],
@@ -71,6 +97,7 @@
     "uniformity": ["uniformitas", "keseragaman", "koefisien variasi", "CV"],
     "epef": ["EPEF", "faktor efisiensi produksi", "indeks performa", "efficiency index"]
   },
+  
   "nutrition_detailed": {
     "crude_protein": ["protein kasar", "CP", "protein", "crude protein"],
     "metabolizable_energy": ["energi metabolis", "ME", "kcal/kg", "energi"],
@@ -84,6 +111,7 @@
     "chloride": ["klorida", "cl", "klorin", "chloride"],
     "potassium": ["kalium", "K", "potash", "potassium"]
   },
+  
   "pathology_specific": {
     "gumboro": ["gumboro", "penyakit gumboro", "infectious bursal disease", "IBDV", "IBD"],
     "newcastle": ["newcastle", "penyakit newcastle", "ND", "tetelo", "avian paramyxovirus"],
@@ -95,6 +123,7 @@
     "mycoplasma": ["mikoplasma", "mycoplasmosis", "chronic respiratory disease", "CRD"],
     "infectious_bronchitis_virus": ["IBV", "infectious bronchitis", "IB", "virus bronkitis"]
   },
+  
   "infrastructure_environment": {
     "ventilation_rate": ["laju ventilasi", "airflow rate", "m3/j/kg", "pertukaran udara", "ventilasi minimum"],
     "static_pressure": ["tekanan statis", "pa", "pascal", "tekanan negatif", "tekanan bangunan"],
@@ -106,11 +135,13 @@
     "lighting_hours": ["jam penerangan", "fotoperiod", "jam cahaya", "j/hari"],
     "light_intensity": ["intensitas cahaya", "lux", "pencahayaan", "brightness"]
   },
+  
   "welfare_management": {
     "stocking_density": ["kepadatan kandang", "densitas", "kg/m2", "ekor/m2", "kepadatan ayam"],
     "heat_stress": ["stress panas", "thermal stress", "hipertermia", "heat stroke", "kepanasan"],
     "feather_pecking": ["patuk bulu", "pecking", "kanibalisme", "patuk-patuk bulu"]
   },
+  
   "equipment_settings": {
     "nipple_height": ["tinggi nipple", "ketinggian minum", "tinggi waterer", "cm tinggi"],
     "brooding_temperature": ["kurva suhu", "program pemanasan", "suhu brooding", "°c start"],
@@ -118,22 +149,26 @@
     "static_pressure_setpoints": ["setpoint tekanan statis", "target pressure", "setting tekanan", "target pa"],
     "co2_maximum_ppm": ["co2 maksimum", "batas co2", "threshold co2", "maksimum ppm co2"]
   },
+  
   "reproduction_laying": {
     "sexual_maturity": ["kedewasaan seksual", "umur telur pertama", "fotostimulasi", "point of lay"],
     "laying_rate": ["tingkat bertelur", "lay rate", "rate produksi", "% lay", "persentase bertelur"],
     "egg_weight": ["berat telur", "massa telur", "berat rata-rata telur", "ukuran telur", "kaliber telur"],
     "shell_quality": ["kualitas kerabang", "ketebalan kerabang", "kekuatan kerabang", "kerabang tipis"]
   },
+  
   "phases": {
     "starter": ["starter", "start", "fase starter", "fase 1", "pre-starter", "prestarter"],
     "grower": ["grower", "fase pertumbuhan", "fase 2", "developer", "growth"],
     "finisher": ["finisher", "fase akhir", "finish", "fase 3", "final"]
   },
+  
   "taxonomy_classification": {
     "commercial_strain": ["strain komersial", "strain", "breed", "galur", "varietas"],
     "sex_class": ["jantan", "betina", "campuran", "straight-run", "sr"],
     "age_brackets": ["0-10h", "11-35h", "36-42h", "fase 1", "fase 2", "fase 3"]
   },
+  
   "question_patterns": {
     "weight_query": ["berapa beratnya", "berat target", "berat rata-rata", "seberapa berat", "berat berapa"],
     "fcr_query": ["FCR optimal", "konversi pakan", "rasio konversi", "FCR rata-rata"],
@@ -147,6 +182,7 @@
     "health_diagnosis": ["gejala apa", "diagnosis", "penyakit", "apa penyebab", "tanda klinis"],
     "management_how": ["bagaimana mengelola", "bagaimana mengobati", "apa yang harus dilakukan", "bagaimana memperbaiki"]
   },
+  
   "units_measures": {
     "days": ["hari", "h", "d"],
     "weeks": ["minggu", "pekan", "mg", "w"],
@@ -156,6 +192,7 @@
     "liters": ["liter", "lt", "l"],
     "celsius": ["celsius", "derajat celsius", "°c", "derajat"]
   },
+  
   "health_symptoms": {
     "respiratory": ["pernapasan", "batuk", "sesak napas", "gangguan napas", "discharge hidung"],
     "digestive": ["pencernaan", "diare", "muntah", "anoreksia", "kehilangan nafsu makan"],

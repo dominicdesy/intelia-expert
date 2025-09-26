@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 intent_classifier.py - Classificateur d'intentions multilingue
-Version 2.0 - Intégration complète avec le service de traduction universel
+Version 3.0 - Utilisation complète des dictionnaires universels (universal_terms_*.json)
+CORRECTION MAJEURE: Suppression du texte hardcodé, chargement depuis dictionnaires JSON
 """
 
 import re
@@ -9,11 +10,13 @@ import logging
 import os
 import json
 from typing import Dict, Set, Tuple, Optional, List
+from pathlib import Path
 
 # Imports configuration multilingue
 from config.config import (
     SUPPORTED_LANGUAGES,
     DEFAULT_LANGUAGE,
+    UNIVERSAL_DICT_PATH,
 )
 
 # Imports service traduction et utilitaires
@@ -26,8 +29,8 @@ logger = logging.getLogger(__name__)
 
 class MultilingualIntentClassifier:
     """
-    Classificateur d'intentions multilingue avec service de traduction intégré
-    Remplace les mots-clés hardcodés par une approche dynamique via dictionnaire universel
+    Classificateur d'intentions multilingue avec chargement dynamique depuis dictionnaires
+    NOUVELLE VERSION: Élimine tout le texte hardcodé en faveur des fichiers universal_terms_*.json
     """
 
     def __init__(
@@ -61,13 +64,17 @@ class MultilingualIntentClassifier:
         self.default_language = DEFAULT_LANGUAGE
         self.translation_service = get_translation_service()
 
+        # Chemin des dictionnaires universels
+        self.dict_path = Path(UNIVERSAL_DICT_PATH)
+
         # Cache pour optimiser les performances
         self.intent_keywords_cache = {}
         self.patterns_cache = {}
+        self.loaded_dictionaries = {}  # Cache des dictionnaires chargés
 
-        # Construction du vocabulaire multilingue
-        self.intent_keywords = self._build_multilingual_intent_keywords()
-        self.intent_patterns = self._build_multilingual_intent_patterns()
+        # Construction du vocabulaire multilingue DEPUIS LES DICTIONNAIRES
+        self.intent_keywords = self._build_multilingual_intent_keywords_from_dicts()
+        self.intent_patterns = self._build_multilingual_intent_patterns_from_dicts()
         self.intent_metrics = self._build_intent_metrics()
 
     def _get_default_weights(self) -> Dict[str, float]:
@@ -77,436 +84,215 @@ class MultilingualIntentClassifier:
             "entity": 5.0,
             "explain_bonus": 2.0,
             "regex": 2.5,
-            "translation_penalty": 0.8,  # Nouveau: pénalité pour termes traduits
-            "language_confidence_bonus": 1.2,  # Nouveau: bonus pour langue bien détectée
+            "translation_penalty": 0.8,
+            "language_confidence_bonus": 1.2,
         }
 
-    def _build_multilingual_intent_keywords(self) -> Dict[str, Dict[str, Set[str]]]:
+    # ===== NOUVELLES MÉTHODES: CHARGEMENT DEPUIS DICTIONNAIRES =====
+
+    def _load_dictionary_for_language(self, language: str) -> Dict:
         """
-        Construit les mots-clés par intention et par langue
+        Charge le dictionnaire universel pour une langue spécifique
+        Utilise un cache pour éviter les rechargements
+        """
+        if language in self.loaded_dictionaries:
+            return self.loaded_dictionaries[language]
+
+        dict_file = self.dict_path / f"universal_terms_{language}.json"
+
+        if not dict_file.exists():
+            logger.warning(f"Dictionnaire manquant pour {language}: {dict_file}")
+            return {}
+
+        try:
+            with open(dict_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                self.loaded_dictionaries[language] = data
+                logger.debug(
+                    f"Dictionnaire chargé pour {language}: {len(data)} domaines"
+                )
+                return data
+        except Exception as e:
+            logger.error(f"Erreur chargement dictionnaire {language}: {e}")
+            return {}
+
+    def _build_multilingual_intent_keywords_from_dicts(
+        self,
+    ) -> Dict[str, Dict[str, Set[str]]]:
+        """
+        Construit les mots-clés par intention et par langue DEPUIS LES DICTIONNAIRES
         Structure: {intent_type: {language: {keywords}}}
+
+        Mapping des intentions vers les domaines des dictionnaires:
+        - METRIC_QUERY -> performance_metrics, units_measures
+        - ENVIRONMENT_SETTING -> infrastructure_environment, equipment_settings
+        - PROTOCOL_QUERY -> biosecurity_health, pathology_specific
+        - DIAGNOSIS_TRIAGE -> health_symptoms, pathology_specific
+        - ECONOMICS_COST -> (termes économiques génériques)
         """
         keywords = {}
 
-        # Définition des termes de base par intention
-        base_keywords = {
-            IntentType.METRIC_QUERY.value: {
-                "fr": {
-                    "poids",
-                    "fcr",
-                    "conversion",
-                    "consommation",
-                    "eau",
-                    "performance",
-                    "production",
-                    "croissance",
-                    "optimal",
-                    "gramme",
-                    "kg",
-                    "litre",
-                    "pourcentage",
-                    "combien",
-                    "quelle",
-                    "indice",
-                    "ratio",
-                    "rendement",
-                    "objectif",
-                    "standard",
-                    "gain",
-                    "quotidien",
-                    "hebdomadaire",
-                    "cumul",
-                    "epef",
-                    "mortalité",
-                    "densité",
-                    "mangeoire",
-                    "abreuvoir",
-                },
-                "en": {
-                    "weight",
-                    "fcr",
-                    "conversion",
-                    "consumption",
-                    "water",
-                    "performance",
-                    "production",
-                    "growth",
-                    "optimal",
-                    "gram",
-                    "kg",
-                    "liter",
-                    "percentage",
-                    "how much",
-                    "what",
-                    "index",
-                    "ratio",
-                    "efficiency",
-                    "target",
-                    "standard",
-                    "gain",
-                    "daily",
-                    "weekly",
-                    "cumulative",
-                    "epef",
-                    "mortality",
-                    "density",
-                    "feeder",
-                    "nipple",
-                    "intake",
-                },
-            },
-            IntentType.ENVIRONMENT_SETTING.value: {
-                "fr": {
-                    "température",
-                    "ventilation",
-                    "climatisation",
-                    "chauffage",
-                    "humidité",
-                    "air",
-                    "climat",
-                    "ambiance",
-                    "réglage",
-                    "environnement",
-                    "conditions",
-                    "tunnel",
-                    "refroidissement",
-                    "entrée",
-                    "pression",
-                    "éclairage",
-                    "lux",
-                    "intensité",
-                    "heures",
-                    "photopériode",
-                    "co2",
-                    "nh3",
-                    "poussière",
-                },
-                "en": {
-                    "temperature",
-                    "ventilation",
-                    "air conditioning",
-                    "heating",
-                    "humidity",
-                    "air",
-                    "climate",
-                    "ambience",
-                    "setting",
-                    "environment",
-                    "conditions",
-                    "tunnel",
-                    "cooling",
-                    "inlet",
-                    "pressure",
-                    "lighting",
-                    "lux",
-                    "intensity",
-                    "hours",
-                    "photoperiod",
-                    "co2",
-                    "nh3",
-                    "dust",
-                },
-            },
-            IntentType.PROTOCOL_QUERY.value: {
-                "fr": {
-                    "vaccination",
-                    "protocole",
-                    "traitement",
-                    "biosécurité",
-                    "prévention",
-                    "vaccin",
-                    "programme",
-                    "planning",
-                    "sanitaire",
-                    "antibiotique",
-                    "médicament",
-                    "délai",
-                    "timing",
-                    "injection",
-                    "schedule",
-                },
-                "en": {
-                    "vaccination",
-                    "protocol",
-                    "treatment",
-                    "biosecurity",
-                    "prevention",
-                    "vaccine",
-                    "program",
-                    "schedule",
-                    "planning",
-                    "sanitary",
-                    "antibiotic",
-                    "medication",
-                    "withdrawal",
-                    "timing",
-                    "injection",
-                },
-            },
-            IntentType.DIAGNOSIS_TRIAGE.value: {
-                "fr": {
-                    "maladie",
-                    "symptôme",
-                    "diagnostic",
-                    "mortalité",
-                    "problème",
-                    "signes",
-                    "pathologie",
-                    "infection",
-                    "virus",
-                    "bactérie",
-                    "parasite",
-                    "malade",
-                    "santé",
-                    "clinique",
-                    "lésion",
-                    "autopsie",
-                    "nécropsie",
-                    "laboratoire",
-                    "analyses",
-                },
-                "en": {
-                    "disease",
-                    "symptom",
-                    "diagnosis",
-                    "mortality",
-                    "problem",
-                    "signs",
-                    "pathology",
-                    "infection",
-                    "virus",
-                    "bacteria",
-                    "parasite",
-                    "sick",
-                    "health",
-                    "clinical",
-                    "lesion",
-                    "postmortem",
-                    "necropsy",
-                    "lab",
-                    "analysis",
-                },
-            },
-            IntentType.ECONOMICS_COST.value: {
-                "fr": {
-                    "coût",
-                    "prix",
-                    "économique",
-                    "rentabilité",
-                    "marge",
-                    "budget",
-                    "finance",
-                    "euros",
-                    "investissement",
-                    "retour",
-                    "roi",
-                    "amortissement",
-                    "efficacité",
-                    "optimisation",
-                    "coût aliment",
-                    "coût énergie",
-                    "main-d'œuvre",
-                },
-                "en": {
-                    "cost",
-                    "price",
-                    "economic",
-                    "profitability",
-                    "margin",
-                    "budget",
-                    "finance",
-                    "dollars",
-                    "investment",
-                    "return",
-                    "roi",
-                    "amortization",
-                    "efficiency",
-                    "optimization",
-                    "feed cost",
-                    "energy cost",
-                    "labor",
-                },
-            },
+        # Mapping intention -> domaines dans les dictionnaires
+        intent_to_domains = {
+            IntentType.METRIC_QUERY.value: [
+                "performance_metrics",
+                "units_measures",
+                "nutrition_detailed",
+            ],
+            IntentType.ENVIRONMENT_SETTING.value: [
+                "infrastructure_environment",
+                "equipment_settings",
+                "equipment_types",
+            ],
+            IntentType.PROTOCOL_QUERY.value: [
+                "biosecurity_health",
+                "pathology_specific",
+                "reproduction_laying",
+            ],
+            IntentType.DIAGNOSIS_TRIAGE.value: [
+                "health_symptoms",
+                "pathology_specific",
+                "additional_pathologies",
+            ],
+            IntentType.ECONOMICS_COST.value: [
+                "performance_metrics",  # Inclut des métriques économiques
+            ],
         }
 
-        # Extension via service de traduction si disponible
-        if self.translation_service:
-            for intent_type, lang_keywords in base_keywords.items():
-                keywords[intent_type] = {}
+        # Construction pour chaque intention
+        for intent_type, domains in intent_to_domains.items():
+            keywords[intent_type] = {}
 
-                for language in self.supported_languages:
-                    if language in lang_keywords:
-                        # Utiliser les mots-clés définis
-                        keywords[intent_type][language] = lang_keywords[language]
-                    else:
-                        # Traduire depuis l'anglais ou le français
-                        source_lang = "en" if "en" in lang_keywords else "fr"
-                        source_keywords = lang_keywords[source_lang]
+            # Pour chaque langue supportée
+            for language in self.supported_languages:
+                dict_data = self._load_dictionary_for_language(language)
+                intent_keywords = set()
 
-                        translated_keywords = self._translate_keywords(
-                            source_keywords,
-                            source_lang,
-                            language,
-                            f"intent_{intent_type}",
-                        )
-                        keywords[intent_type][language] = translated_keywords
-        else:
-            # Fallback sans service de traduction
-            keywords = {
-                intent_type: lang_keywords
-                for intent_type, lang_keywords in base_keywords.items()
-            }
+                # Extraire les termes des domaines pertinents
+                for domain in domains:
+                    if domain in dict_data:
+                        domain_data = dict_data[domain]
+
+                        # Extraire tous les termes du domaine
+                        if isinstance(domain_data, dict):
+                            for category, terms in domain_data.items():
+                                if isinstance(terms, list):
+                                    intent_keywords.update(
+                                        term.lower() for term in terms
+                                    )
+                                elif isinstance(terms, str):
+                                    intent_keywords.add(terms.lower())
+                        elif isinstance(domain_data, list):
+                            intent_keywords.update(term.lower() for term in domain_data)
+
+                keywords[intent_type][language] = intent_keywords
+
+                logger.debug(
+                    f"Intent {intent_type} [{language}]: {len(intent_keywords)} mots-clés chargés"
+                )
+
+        # Ajout de mots-clés spécifiques pour les questions (depuis question_patterns si disponible)
+        self._enrich_keywords_with_question_patterns(keywords)
 
         logger.info(
-            f"Vocabulaire multilingue construit pour {len(keywords)} intentions, {len(self.supported_languages)} langues"
+            f"Vocabulaire multilingue construit depuis dictionnaires: "
+            f"{len(keywords)} intentions, {len(self.supported_languages)} langues"
         )
         return keywords
 
-    def _translate_keywords(
-        self, keywords: Set[str], source_lang: str, target_lang: str, domain: str
-    ) -> Set[str]:
-        """Traduit un ensemble de mots-clés vers une langue cible"""
-        if not self.translation_service:
-            return keywords  # Fallback: garder les mots-clés originaux
+    def _enrich_keywords_with_question_patterns(self, keywords: Dict) -> None:
+        """
+        Enrichit les mots-clés avec les patterns de questions depuis les dictionnaires
+        Cherche le domaine 'question_patterns' dans chaque dictionnaire
+        """
+        for language in self.supported_languages:
+            dict_data = self._load_dictionary_for_language(language)
 
-        cache_key = f"{domain}:{source_lang}:{target_lang}"
-        if cache_key in self.intent_keywords_cache:
-            return self.intent_keywords_cache[cache_key]
+            if "question_patterns" not in dict_data:
+                continue
 
-        translated_keywords = set()
+            question_data = dict_data["question_patterns"]
 
-        for keyword in keywords:
-            try:
-                result = self.translation_service.translate_term(
-                    keyword, target_lang, source_lang, domain
-                )
-                if (
-                    result.confidence >= 0.6
-                ):  # Seuil de confiance pour accepter la traduction
-                    translated_keywords.add(result.text.lower())
-                else:
-                    # Si traduction peu fiable, garder le terme original
-                    translated_keywords.add(keyword.lower())
-            except Exception as e:
-                logger.debug(
-                    f"Erreur traduction '{keyword}' {source_lang}->{target_lang}: {e}"
-                )
-                translated_keywords.add(keyword.lower())  # Fallback
+            # Ajouter les mots-clés de questions aux intentions appropriées
+            for intent_type in keywords.keys():
+                if intent_type in question_data:
+                    intent_question_data = question_data[intent_type]
 
-        self.intent_keywords_cache[cache_key] = translated_keywords
-        return translated_keywords
+                    # Extraire les mots-clés si présents
+                    if isinstance(intent_question_data, dict):
+                        if "keywords" in intent_question_data:
+                            question_keywords = intent_question_data["keywords"]
+                            if isinstance(question_keywords, list):
+                                keywords[intent_type][language].update(
+                                    kw.lower() for kw in question_keywords
+                                )
 
-    def _build_multilingual_intent_patterns(self) -> Dict[str, Dict[str, List[str]]]:
-        """Construit les patterns regex multilingues par intention"""
+    def _build_multilingual_intent_patterns_from_dicts(
+        self,
+    ) -> Dict[str, Dict[str, List[str]]]:
+        """
+        Construit les patterns regex multilingues DEPUIS LES DICTIONNAIRES
+        Cherche les regex_patterns dans le domaine 'question_patterns'
+        """
         patterns = {}
 
-        base_patterns = {
-            IntentType.METRIC_QUERY.value: {
-                "fr": [
-                    r"\b(?:combien|quelle?\s+(?:est|sont))\b",
-                    r"\b(?:poids|fcr)\s+(?:de|du|des|à|au)\b",
-                    r"\b\d+\s*(?:g|kg|%|litres?|jours?|semaines?)\b",
-                    r"\b(?:optimal|optimale|cible|objectif)\b",
-                    r"\b(?:quel|quelle)\s+(?:poids|fcr|consommation)\b",
-                ],
-                "en": [
-                    r"\b(?:how much|what\s+(?:is|are))\b",
-                    r"\b(?:weight|fcr)\s+(?:of|at|for)\b",
-                    r"\b\d+\s*(?:g|kg|%|liters?|days?|weeks?)\b",
-                    r"\b(?:optimal|target|goal)\b",
-                    r"\b(?:what|which)\s+(?:weight|fcr|consumption)\b",
-                ],
-            },
-            IntentType.ENVIRONMENT_SETTING.value: {
-                "fr": [
-                    r"\b(?:température|ventilation)\s+(?:optimale?|recommandée?)\b",
-                    r"\b(?:comment|comment)\s+(?:régler|ajuster|paramétrer)\b",
-                    r"\b(?:ambiance|climat|réglage|setting)\b",
-                    r"\b(?:degré|°c|celsius)\b",
-                ],
-                "en": [
-                    r"\b(?:temperature|ventilation)\s+(?:optimal|recommended)\b",
-                    r"\b(?:how to|how)\s+(?:set|adjust|configure)\b",
-                    r"\b(?:climate|setting|environment)\b",
-                    r"\b(?:degree|°c|celsius|°f|fahrenheit)\b",
-                ],
-            },
-            IntentType.DIAGNOSIS_TRIAGE.value: {
-                "fr": [
-                    r"\b(?:mes|nos)\s+(?:poulets?|poules?)\s+(?:sont|ont)\b",
-                    r"\b(?:symptômes?|signes?)\s+(?:de|d')\b",
-                    r"\b(?:diagnostic|problème|maladie)\b",
-                    r"\b(?:mortalité|décès|morts?)\b",
-                ],
-                "en": [
-                    r"\b(?:my|our)\s+(?:chickens?|birds?)\s+(?:are|have)\b",
-                    r"\b(?:symptoms?|signs?)\s+(?:of|from)\b",
-                    r"\b(?:diagnosis|problem|disease)\b",
-                    r"\b(?:mortality|death|dead)\b",
-                ],
-            },
-        }
+        # Mapping intention -> patterns
+        for intent_type in [e.value for e in IntentType]:
+            patterns[intent_type] = {}
 
-        # Extension automatique pour toutes les langues supportées via traduction
-        if self.translation_service:
-            for intent_type, lang_patterns in base_patterns.items():
-                patterns[intent_type] = {}
+            for language in self.supported_languages:
+                dict_data = self._load_dictionary_for_language(language)
+                intent_patterns = []
 
-                for language in self.supported_languages:
-                    if language in lang_patterns:
-                        patterns[intent_type][language] = lang_patterns[language]
-                    else:
-                        # Pour les langues non définies, adapter les patterns anglais
-                        if "en" in lang_patterns:
-                            adapted_patterns = self._adapt_patterns_for_language(
-                                lang_patterns["en"], language
-                            )
-                            patterns[intent_type][language] = adapted_patterns
-                        else:
-                            patterns[intent_type][language] = []
-        else:
-            patterns = base_patterns
+                # Chercher dans question_patterns
+                if "question_patterns" in dict_data:
+                    question_data = dict_data["question_patterns"]
+
+                    if intent_type in question_data:
+                        intent_question_data = question_data[intent_type]
+
+                        if isinstance(intent_question_data, dict):
+                            if "regex_patterns" in intent_question_data:
+                                regex_list = intent_question_data["regex_patterns"]
+                                if isinstance(regex_list, list):
+                                    intent_patterns.extend(regex_list)
+
+                # Si aucun pattern trouvé, utiliser des patterns génériques
+                if not intent_patterns:
+                    intent_patterns = self._get_fallback_patterns(intent_type, language)
+
+                patterns[intent_type][language] = intent_patterns
+
+                logger.debug(
+                    f"Patterns pour {intent_type} [{language}]: {len(intent_patterns)} patterns"
+                )
 
         return patterns
 
-    def _adapt_patterns_for_language(
-        self, base_patterns: List[str], target_language: str
-    ) -> List[str]:
-        """Adapte les patterns regex pour une langue cible"""
-        if target_language in ["es", "it", "pt"]:  # Langues latines
-            adapted = []
-            for pattern in base_patterns:
-                # Adaptations basiques pour langues latines
-                adapted_pattern = pattern
-                adapted_pattern = adapted_pattern.replace(
-                    "how much", "cuanto|quanto|quanto"
-                )
-                adapted_pattern = adapted_pattern.replace("what", "que|cosa|que")
-                adapted_pattern = adapted_pattern.replace("weight", "peso")
-                adapted_pattern = adapted_pattern.replace(
-                    "optimal", "optimal|ottimale|óptimo"
-                )
-                adapted.append(adapted_pattern)
-            return adapted
+    def _get_fallback_patterns(self, intent_type: str, language: str) -> List[str]:
+        """
+        Patterns regex génériques de fallback si non présents dans les dictionnaires
+        Patterns minimaux universels
+        """
+        # Patterns universels (nombres, unités, marques)
+        universal_patterns = [
+            r"\b\d+\s*(?:g|kg|%|ml|l)\b",  # Unités métriques
+            r"\b(?:cobb|ross|hubbard|isa)\b",  # Marques génétiques
+            r"\b\d+\s*(?:day|jour|dia|tag|día)\b",  # Âges
+        ]
 
-        elif target_language in ["de", "nl"]:  # Langues germaniques
-            adapted = []
-            for pattern in base_patterns:
-                adapted_pattern = pattern
-                adapted_pattern = adapted_pattern.replace("how much", "wieviel|hoeveel")
-                adapted_pattern = adapted_pattern.replace("what", "was|wat")
-                adapted_pattern = adapted_pattern.replace("weight", "gewicht")
-                adapted_pattern = adapted_pattern.replace("optimal", "optimal")
-                adapted.append(adapted_pattern)
-            return adapted
+        # Patterns spécifiques par intention (minimalistes)
+        if intent_type == IntentType.METRIC_QUERY.value:
+            if language in ["fr", "es", "it", "pt"]:
+                return universal_patterns + [
+                    r"\b(?:combien|cuanto|quanto|poids|peso)\b"
+                ]
+            elif language in ["en"]:
+                return universal_patterns + [r"\b(?:how much|what|weight|fcr)\b"]
+            elif language in ["de", "nl"]:
+                return universal_patterns + [r"\b(?:wieviel|hoeveel|gewicht)\b"]
 
-        else:
-            # Pour les autres langues, patterns universels (nombres, unités)
-            return [
-                r"\b\d+\s*(?:g|kg|%)\b",  # Unités universelles
-                r"\b(?:cobb|ross|hubbard)\b",  # Marques universelles
-                r"\b\d+\s*(?:day|jour|dia|tag|день)\b",  # Âges
-            ]
+        return universal_patterns
 
     def _build_intent_metrics(self) -> Dict[str, Set[str]]:
         """Construit l'association intentions -> métriques depuis la configuration"""
@@ -706,21 +492,195 @@ class MultilingualIntentClassifier:
                 entity_score += 0.6
 
         elif intent_type == IntentType.ECONOMICS_COST.value:
-            if any(word in text for word in ["coût", "cost", "prix", "econom"]):
+            # Utilise des patterns multilingues au lieu de texte hardcodé
+            economic_keywords = self._get_economic_keywords(text)
+            if economic_keywords:
                 entity_score += 0.6
             if "flock_size" in entities:
                 entity_score += 0.4
 
         elif intent_type == IntentType.DIAGNOSIS_TRIAGE.value:
-            if any(
-                word in text
-                for word in ["symptom", "symptôme", "maladie", "disease", "mort"]
-            ):
+            # Utilise des patterns multilingues au lieu de texte hardcodé
+            diagnostic_keywords = self._get_diagnostic_keywords(text)
+            if diagnostic_keywords:
                 entity_score += 0.8
             if "species" in entities:
                 entity_score += 0.3
 
         return entity_score * self.weights.get("entity", 5.0)
+
+    def _get_economic_keywords(self, text: str) -> bool:
+        """Détecte des mots-clés économiques de manière multilingue"""
+        # Chercher dans les dictionnaires chargés
+        for dict_data in self.loaded_dictionaries.values():
+            if "performance_metrics" in dict_data:
+                metrics = dict_data["performance_metrics"]
+                if isinstance(metrics, dict):
+                    for term in metrics.values():
+                        if isinstance(term, str) and "cost" in term.lower():
+                            if term.lower() in text.lower():
+                                return True
+        return False
+
+    def _get_diagnostic_keywords(self, text: str) -> bool:
+        """Détecte des mots-clés de diagnostic de manière multilingue"""
+        # Chercher dans les dictionnaires chargés
+        for dict_data in self.loaded_dictionaries.values():
+            if "health_symptoms" in dict_data:
+                symptoms = dict_data["health_symptoms"]
+                if isinstance(symptoms, list):
+                    for symptom in symptoms:
+                        if symptom.lower() in text.lower():
+                            return True
+        return False
+
+    def validate_dictionaries_completeness(self) -> Dict[str, any]:
+        """
+        Valide que tous les dictionnaires nécessaires sont chargés et complets
+        Retourne un rapport de validation
+        """
+        validation_report = {
+            "status": "ok",
+            "languages_found": [],
+            "languages_missing": [],
+            "domains_coverage": {},
+            "warnings": [],
+            "errors": [],
+        }
+
+        required_domains = [
+            "performance_metrics",
+            "units_measures",
+            "infrastructure_environment",
+            "equipment_settings",
+            "biosecurity_health",
+            "health_symptoms",
+        ]
+
+        for language in self.supported_languages:
+            dict_data = self._load_dictionary_for_language(language)
+
+            if not dict_data:
+                validation_report["languages_missing"].append(language)
+                validation_report["errors"].append(
+                    f"Dictionnaire manquant pour {language}"
+                )
+                continue
+
+            validation_report["languages_found"].append(language)
+
+            # Vérifier les domaines
+            missing_domains = []
+            for domain in required_domains:
+                if domain not in dict_data:
+                    missing_domains.append(domain)
+
+            if missing_domains:
+                validation_report["domains_coverage"][language] = {
+                    "complete": False,
+                    "missing_domains": missing_domains,
+                }
+                validation_report["warnings"].append(
+                    f"Langue {language}: domaines manquants {missing_domains}"
+                )
+            else:
+                validation_report["domains_coverage"][language] = {
+                    "complete": True,
+                    "missing_domains": [],
+                }
+
+        # Statut global
+        if validation_report["errors"]:
+            validation_report["status"] = "error"
+        elif validation_report["warnings"]:
+            validation_report["status"] = "warning"
+
+        return validation_report
+
+    def get_intent_keywords_for_language(
+        self, intent_type: str, language: str
+    ) -> Set[str]:
+        """
+        Retourne les mots-clés pour une intention et une langue spécifiques
+        Utile pour le debugging et les tests
+        """
+        if (
+            intent_type in self.intent_keywords
+            and language in self.intent_keywords[intent_type]
+        ):
+            return self.intent_keywords[intent_type][language]
+        return set()
+
+    def get_intent_patterns_for_language(
+        self, intent_type: str, language: str
+    ) -> List[str]:
+        """
+        Retourne les patterns regex pour une intention et une langue spécifiques
+        Utile pour le debugging et les tests
+        """
+        if (
+            intent_type in self.intent_patterns
+            and language in self.intent_patterns[intent_type]
+        ):
+            return self.intent_patterns[intent_type][language]
+        return []
+
+    def export_loaded_vocabulary(self, output_path: str = None) -> Dict:
+        """
+        Exporte tout le vocabulaire chargé pour inspection
+        Utile pour le debugging et la documentation
+        """
+        export_data = {
+            "metadata": {
+                "version": "3.0",
+                "total_languages": len(self.supported_languages),
+                "total_intents": len(self.intent_keywords),
+                "dictionaries_loaded": len(self.loaded_dictionaries),
+            },
+            "keywords_by_intent": {},
+            "patterns_by_intent": {},
+            "statistics": {},
+        }
+
+        # Export des mots-clés
+        for intent_type, lang_keywords in self.intent_keywords.items():
+            export_data["keywords_by_intent"][intent_type] = {}
+            for language, keywords in lang_keywords.items():
+                export_data["keywords_by_intent"][intent_type][language] = list(
+                    keywords
+                )
+
+        # Export des patterns
+        for intent_type, lang_patterns in self.intent_patterns.items():
+            export_data["patterns_by_intent"][intent_type] = {}
+            for language, patterns in lang_patterns.items():
+                export_data["patterns_by_intent"][intent_type][language] = patterns
+
+        # Statistiques par intention
+        for intent_type in self.intent_keywords.keys():
+            total_keywords = sum(
+                len(keywords) for keywords in self.intent_keywords[intent_type].values()
+            )
+            total_patterns = sum(
+                len(patterns) for patterns in self.intent_patterns[intent_type].values()
+            )
+
+            export_data["statistics"][intent_type] = {
+                "total_keywords": total_keywords,
+                "total_patterns": total_patterns,
+                "languages_coverage": len(self.intent_keywords[intent_type]),
+            }
+
+        # Sauvegarder si chemin fourni
+        if output_path:
+            try:
+                with open(output_path, "w", encoding="utf-8") as f:
+                    json.dump(export_data, f, indent=2, ensure_ascii=False)
+                logger.info(f"Vocabulaire exporté vers {output_path}")
+            except Exception as e:
+                logger.error(f"Erreur export vocabulaire: {e}")
+
+        return export_data
 
     def _calculate_metrics_score(
         self, entities: Dict[str, str], intent_type: str
@@ -769,20 +729,34 @@ class MultilingualIntentClassifier:
         """Vide le cache de traduction"""
         self.intent_keywords_cache.clear()
         self.patterns_cache.clear()
+        self.loaded_dictionaries.clear()
         logger.info("Cache de traduction vidé")
+
+    def reload_dictionaries(self) -> None:
+        """Recharge tous les dictionnaires depuis les fichiers"""
+        self.loaded_dictionaries.clear()
+        self.intent_keywords = self._build_multilingual_intent_keywords_from_dicts()
+        self.intent_patterns = self._build_multilingual_intent_patterns_from_dicts()
+        logger.info("Dictionnaires rechargés")
 
     def get_classifier_stats(self) -> Dict:
         """Retourne les statistiques du classificateur"""
         return {
-            "version": "multilingual_v2.0",
+            "version": "multilingual_v3.0_dict_based",
             "supported_languages": list(self.supported_languages),
             "intent_types": [intent.value for intent in IntentType],
             "translation_service_available": self.translation_service is not None,
+            "dictionaries_loaded": len(self.loaded_dictionaries),
             "cache_size": len(self.intent_keywords_cache),
             "total_keywords": sum(
                 len(lang_keywords)
                 for intent_keywords in self.intent_keywords.values()
                 for lang_keywords in intent_keywords.values()
+            ),
+            "total_patterns": sum(
+                len(lang_patterns)
+                for intent_patterns in self.intent_patterns.values()
+                for lang_patterns in intent_patterns.values()
             ),
             "weights": self.weights.copy(),
         }
@@ -804,6 +778,7 @@ class MultilingualIntentClassifier:
                 "language_confidence", 0.0
             ),
             "score_breakdown": breakdown,
+            "dictionaries_used": list(self.loaded_dictionaries.keys()),
         }
 
 

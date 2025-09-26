@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 utilities.py - Fonctions utilitaires multilingues
-Version 2.3 - AJOUT: Support variable d'environnement DISABLE_WHERE_FILTER
+Version 2.4 - MODIFIÉ: Integration config/messages.py pour centralisation messages
 CORRECTION: Respect PEP 8 avec imports en haut + gestion conditionnelle
 """
 
@@ -584,12 +584,15 @@ def get_universal_translation(
 
 
 # ============================================================================
-# FONCTIONS UTILITAIRES MULTILINGUES
+# FONCTIONS UTILITAIRES MULTILINGUES - MODIFIÉ: UTILISE config/messages.py
 # ============================================================================
 
 
 def get_out_of_domain_message(language: str = None) -> str:
-    """Message hors domaine traduit selon la langue détectée - LIT DEPUIS languages.json"""
+    """
+    Message hors domaine traduit - UTILISE config/messages.py
+    """
+    from config.messages import get_message
 
     if language is None:
         language = DEFAULT_LANGUAGE
@@ -597,41 +600,46 @@ def get_out_of_domain_message(language: str = None) -> str:
     # Normaliser le code de langue
     language = normalize_language_code(language)
 
-    # CORRECTION: Lire depuis le fichier languages.json
     try:
-        # Déterminer le chemin du fichier languages.json
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        config_dir = os.path.join(os.path.dirname(current_dir), "config")
-        languages_file = os.path.join(config_dir, "languages.json")
-
-        # Lire le fichier JSON
-        if os.path.exists(languages_file):
-            with open(languages_file, "r", encoding="utf-8") as f:
-                messages = json.load(f)
-
-            # Retourner le message dans la langue demandée
-            if language in messages:
-                return messages[language]
-
-            # Fallback sur 'default' si la langue n'existe pas
-            if "default" in messages:
-                return messages["default"]
-
-        logger.warning(f"Fichier languages.json introuvable: {languages_file}")
-
+        return get_message("out_of_domain", language)
     except Exception as e:
-        logger.warning(f"Erreur lecture languages.json: {e}")
+        logger.warning(f"Erreur récupération message OOD: {e}")
 
-    # Fallback ultime si le fichier n'existe pas ou erreur
-    fallback_messages = {
-        "fr": "Intelia Expert est un système expert spécialisé en production avicole et ne peut traiter les questions hors de ce domaine. Je suis là pour vous accompagner sur tous les aspects de l'élevage de volailles. Comment puis-je vous aider en aviculture ?",
-        "en": "Intelia Expert is an expert system specialized in poultry production and cannot assist with questions outside this domain. I am here to support you on all aspects of poultry farming. How can I help you with poultry?",
-        "es": "Intelia Expert es un sistema experto especializado en producción avícola y no puede atender preguntas fuera de este ámbito. Estoy aquí para acompañarle en todos los aspectos de la cría de aves. ¿Cómo puedo ayudarle en avicultura?",
-    }
+        # Fallback ultra-minimal
+        if language == "en":
+            return "I specialize in poultry farming. How can I help you?"
+        else:
+            return "Je me spécialise dans l'aviculture. Comment puis-je vous aider ?"
 
-    return fallback_messages.get(
-        language, fallback_messages.get(FALLBACK_LANGUAGE, fallback_messages["en"])
-    )
+
+def get_system_message(message_type: str, language: str = None, **kwargs) -> str:
+    """
+    Interface générique pour récupérer n'importe quel message système
+
+    Args:
+        message_type: Type de message (error_generic, welcome, clarification_needed, etc.)
+        language: Code langue
+        **kwargs: Variables pour interpolation
+
+    Returns:
+        Message traduit
+
+    Examples:
+        >>> get_system_message("welcome", "en", user_name="John")
+        >>> get_system_message("error_generic", "fr")
+    """
+    from config.messages import get_message
+
+    if language is None:
+        language = DEFAULT_LANGUAGE
+
+    language = normalize_language_code(language)
+
+    try:
+        return get_message(message_type, language, **kwargs)
+    except Exception as e:
+        logger.error(f"Erreur récupération message système: {e}")
+        return f"[System message: {message_type}]"
 
 
 def get_aviculture_response(message: str, language: str = None) -> str:
@@ -1264,13 +1272,13 @@ COMPREHENSIVE_TEST_QUERIES = [
     "FCR optimal pour poulet de chair Cobb 500 à 35 jours",
     "What is the optimal FCR for Ross 308 at 35 days?",
     "¿Cuál es el peso objetivo a 21 días para Ross 308?",
-    "Ross 308在35天时的最佳FCR是多少？",
+    "Ross 308在35天时的最佳FCR是多少?",
     "Ross 308 के लिए 35 दिन में अनुकूल FCR क्या है?",
     "อัตราแปลงอาหารที่เหมาะสมสำหรับ Ross 308 อายุ 35 วันคืออะไร?",
 ]
 
 # ============================================================================
-# EXPORTS
+# EXPORTS - MODIFIÉ: Ajout get_system_message
 # ============================================================================
 
 __all__ = [
@@ -1288,8 +1296,9 @@ __all__ = [
     "is_supported_language",
     "normalize_language_code",
     "get_universal_translation",
-    # Messages multilingues
+    # Messages multilingues - MODIFIÉ
     "get_out_of_domain_message",
+    "get_system_message",  # NOUVEAU
     "get_aviculture_response",
     # CORRECTION CRITIQUE: Ajout fonction manquante
     "validate_intent_result",
