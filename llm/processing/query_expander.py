@@ -1,16 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 query_expander.py - Expanseur de requêtes avec synonymes du domaine
-CORRIGÉ: Imports modulaires selon nouvelle architecture
+CORRIGÉ: Imports modulaires + logique sexe/as-hatched pour recherche élargie
 """
 
 import logging
 from typing import Dict, List, Any
 from functools import lru_cache
 import re
-
-# Imports modulaires corrigés
-# Note: LINE_ALIASES supprimé car inexistant dans config.py - définition locale
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +45,7 @@ def _normalize_age(age: str) -> str:
 
 
 class QueryExpander:
-    """Expanseur de requêtes avec synonymes du domaine - Version améliorée avec normalisation"""
+    """Expanseur de requêtes avec synonymes du domaine - Version améliorée avec normalisation et logique sexe/as-hatched"""
 
     def __init__(self, vocabulary_extractor):
         self.vocab_extractor = vocabulary_extractor
@@ -88,11 +85,16 @@ class QueryExpander:
                 "triggers": ["maladie", "disease", "symptom"],
                 "expansions": ["diagnosis", "treatment", "prevention", "pathology"],
             },
+            # NOUVEAU: Patterns pour expansion sexe/as-hatched
+            "sex_terms": {
+                "triggers": ["male", "mâle", "female", "femelle", "coq", "poule"],
+                "expansions": ["as-hatched", "mixed", "both sexes", "sexes mélangés"],
+            },
         }
 
     @lru_cache(maxsize=1000)
     def expand_query(self, query: str, max_expansions: int = 7) -> str:
-        """Enrichit une requête avec des synonymes et termes liés - Version améliorée avec normalisation"""
+        """Enrichit une requête avec des synonymes et termes liés - Version améliorée avec normalisation et logique sexe"""
         query_lower = query.lower()
         expansion_terms = set()
         expansion_quality = {"method": [], "terms_added": 0, "coverage_improved": False}
@@ -111,14 +113,20 @@ class QueryExpander:
                 ][:2]
                 expansion_terms.update(related_aliases)
 
-        # 2. Expansion par métriques détectées (nouveau)
+        # 2. NOUVEAU: Expansion sexe/as-hatched intelligente
+        sex_expansions = self._get_sex_expansions(query_lower)
+        if sex_expansions:
+            expansion_terms.update(sex_expansions)
+            expansion_quality["method"].append("sex_fallback_expansion")
+
+        # 3. Expansion par métriques détectées (existant)
         for metric_variant, metric_info in self.metrics_vocabulary.items():
             if metric_variant in query_lower:
                 # Ajouter d'autres variantes de la même métrique
                 expansion_terms.update(metric_info["variants"][:3])
                 expansion_quality["method"].append("metrics_expansion")
 
-        # 3. Expansion contextuelle par patterns (amélioré)
+        # 4. Expansion contextuelle par patterns (amélioré)
         for pattern_name, pattern_config in self.expansion_patterns.items():
             triggers = pattern_config["triggers"]
             if any(trigger in query_lower for trigger in triggers):
@@ -126,20 +134,20 @@ class QueryExpander:
                 expansion_terms.update(expansions)
                 expansion_quality["method"].append(f"pattern_{pattern_name}")
 
-        # 4. Expansion par défauts de topic (nouveau)
+        # 5. Expansion par défauts de topic (existant)
         for topic, default_site in self.topic_defaults.items():
             if topic in query_lower and default_site not in query_lower:
                 # Ajouter le contexte par défaut si manquant
                 expansion_terms.add(default_site.replace("_", " "))
                 expansion_quality["method"].append("topic_default")
 
-        # 5. Expansion nutritionnelle spécialisée (nouveau)
+        # 6. Expansion nutritionnelle spécialisée (existant)
         nutrition_expansions = self._get_nutrition_expansions(query_lower)
         if nutrition_expansions:
             expansion_terms.update(nutrition_expansions[:2])
             expansion_quality["method"].append("nutrition_specialized")
 
-        # 6. Nouveau: Expansion pour normalisation de clés cache
+        # 7. Expansion pour normalisation de clés cache (existant)
         cache_normalized_terms = self._get_cache_normalized_expansions(query_lower)
         if cache_normalized_terms:
             expansion_terms.update(cache_normalized_terms)
@@ -158,6 +166,99 @@ class QueryExpander:
             return expanded_query
 
         return query
+
+    def _get_sex_expansions(self, query_lower: str) -> List[str]:
+        """
+        NOUVELLE MÉTHODE: Gère l'expansion sexe/as-hatched
+
+        Logique:
+        1. Si sexe spécifique détecté -> ajouter aussi "as-hatched" pour élargir les résultats
+        2. Si aucun sexe détecté -> ajouter termes as-hatched par défaut
+        3. Si as-hatched déjà présent -> ajouter variantes
+        """
+        expansions = []
+
+        # Patterns de détection sexe
+        male_patterns = ["male", "mâle", "mâles", "masculin", "coq", "coqs", "rooster"]
+        female_patterns = [
+            "female",
+            "femelle",
+            "femelles",
+            "féminin",
+            "poule",
+            "poules",
+            "hen",
+        ]
+        as_hatched_patterns = [
+            "as-hatched",
+            "ashatched",
+            "mixed",
+            "mixte",
+            "mélangé",
+            "non sexé",
+        ]
+
+        # Détection de ce qui est présent dans la requête
+        has_male = any(pattern in query_lower for pattern in male_patterns)
+        has_female = any(pattern in query_lower for pattern in female_patterns)
+        has_as_hatched = any(pattern in query_lower for pattern in as_hatched_patterns)
+
+        if has_male:
+            # Si male spécifié, ajouter aussi as-hatched pour élargir
+            expansions.extend(["as-hatched", "mixed", "both sexes"])
+            logger.debug("Sexe male détecté, ajout termes as-hatched pour élargir")
+
+        elif has_female:
+            # Si female spécifié, ajouter aussi as-hatched pour élargir
+            expansions.extend(["as-hatched", "mixed", "both sexes"])
+            logger.debug("Sexe female détecté, ajout termes as-hatched pour élargir")
+
+        elif has_as_hatched:
+            # Si as-hatched déjà présent, ajouter variantes
+            expansions.extend(
+                ["mixed sex", "sexes mélangés", "straight run", "non sexé"]
+            )
+            logger.debug("As-hatched détecté, ajout variantes")
+
+        else:
+            # FALLBACK: Aucun sexe détecté -> ajouter as-hatched par défaut
+            expansions.extend(["as-hatched", "mixed", "straight run"])
+            logger.debug("Aucun sexe détecté, fallback as-hatched par défaut")
+
+        return expansions[:3]  # Limiter à 3 termes
+
+    def build_sex_aware_query_variants(self, entities: Dict[str, str]) -> List[str]:
+        """
+        NOUVELLE MÉTHODE: Construit des variantes de requête selon la logique sexe
+
+        Args:
+            entities: Entités extraites par EntityExtractor (incluant sex et sex_specified)
+
+        Returns:
+            Liste de variantes de requête pour couvrir les cas sexe/as-hatched
+        """
+        sex = entities.get("sex", "as_hatched")
+        sex_specified = entities.get("sex_specified", "false") == "true"
+
+        query_variants = []
+
+        if sex_specified and sex in ["male", "female"]:
+            # Sexe spécifique demandé
+            query_variants.append(f"sex:{sex}")
+            # Ajouter aussi as-hatched comme fallback
+            query_variants.append("sex:as_hatched")
+            query_variants.append("sex:mixed")
+
+        else:
+            # Pas de sexe spécifique ou as-hatched demandé
+            query_variants.append("sex:as_hatched")
+            query_variants.append("sex:mixed")
+            # Ajouter aussi les sexes spécifiques comme options
+            query_variants.append("sex:male")
+            query_variants.append("sex:female")
+
+        logger.debug(f"Variantes de requête sexe générées: {query_variants}")
+        return query_variants
 
     def _get_cache_normalized_expansions(self, query_lower: str) -> List[str]:
         """Génère des expansions pour améliorer la normalisation des clés cache"""
@@ -210,6 +311,7 @@ class QueryExpander:
             "normalization_applied": self._has_normalization_applied(
                 original_query, expanded_query
             ),
+            "sex_expansion_applied": self._has_sex_expansion_applied(expanded_query),
         }
 
     def _has_normalization_applied(self, original: str, expanded: str) -> bool:
@@ -219,10 +321,19 @@ class QueryExpander:
             indicator in expanded.lower() for indicator in normalization_indicators
         )
 
+    def _has_sex_expansion_applied(self, expanded_query: str) -> bool:
+        """NOUVEAU: Vérifie si l'expansion sexe/as-hatched a été appliquée"""
+        sex_expansion_indicators = ["as-hatched", "mixed", "both sexes", "straight run"]
+        return any(
+            indicator in expanded_query.lower()
+            for indicator in sex_expansion_indicators
+        )
+
 
 def get_cache_normalized_expansions(query: str) -> Dict[str, Any]:
     """
     Produit des expansions + une clé cache normalisée cohérente avec EntityExtractor/IntentProcessor.
+    MODIFIÉ: Inclut maintenant la logique sexe/as-hatched
     """
     q = query.strip()
     patterns = _build_expansion_patterns()
@@ -235,7 +346,18 @@ def get_cache_normalized_expansions(query: str) -> Dict[str, Any]:
             categories_hit.append(cat)
             expansions.extend(obj["expansions"])
 
-    # heuristique simple pour extraire (line/metric/age)
+    # Détection sexe pour normalisation cache
+    sex_detected = None
+    if any(term in q_low for term in ["male", "mâle", "coq"]):
+        sex_detected = "male"
+    elif any(term in q_low for term in ["female", "femelle", "poule"]):
+        sex_detected = "female"
+    elif any(term in q_low for term in ["as-hatched", "mixed", "mixte"]):
+        sex_detected = "as_hatched"
+    else:
+        sex_detected = "as_hatched"  # Fallback par défaut
+
+    # Heuristique simple pour extraire (line/metric/age)
     line = None
     if "ross" in q_low or "r308" in q_low:
         line = _normalize_line("ross308")
@@ -248,24 +370,31 @@ def get_cache_normalized_expansions(query: str) -> Dict[str, Any]:
     elif any(t in q_low for t in ["poids", "weight"]):
         metric = _normalize_metric("weight")
 
-    # âge (ex: 35j / 35 jours)
+    # Âge (ex: 35j / 35 jours)
     m = re.search(r"(\d{1,3})\s*(j|jours|jour|d|days?)", q_low)
     age = _normalize_age(m.group(1) + "j") if m else ""
 
+    # NOUVEAU: Inclure sexe dans la clé cache
     cache_key = (
-        ":".join([p for p in [line or "", metric or "", age or ""] if p]) or q_low
+        ":".join(
+            [p for p in [line or "", metric or "", age or "", sex_detected or ""] if p]
+        )
+        or q_low
     )
 
     return {
         "expansions": sorted(set(expansions)),
         "categories": categories_hit,
         "cache_key_normalized": cache_key,
+        "sex_detected": sex_detected,  # NOUVEAU
+        "sex_fallback_applied": sex_detected == "as_hatched",  # NOUVEAU
     }
 
 
 def _build_expansion_patterns() -> Dict[str, Dict[str, List[str]]]:
     """
     Retourne un mapping structuré {category: {trigger_terms: [...], expansions: [...]}}
+    MODIFIÉ: Inclut maintenant les patterns sexe
     """
     return {
         "weight": {
@@ -292,5 +421,25 @@ def _build_expansion_patterns() -> Dict[str, Dict[str, List[str]]]:
         "health": {
             "triggers": ["maladie", "disease", "symptom"],
             "expansions": ["diagnosis", "treatment", "prevention", "pathology"],
+        },
+        # NOUVEAU: Patterns pour sexe/as-hatched
+        "sex": {
+            "triggers": [
+                "male",
+                "mâle",
+                "female",
+                "femelle",
+                "coq",
+                "poule",
+                "as-hatched",
+                "mixed",
+            ],
+            "expansions": [
+                "as-hatched",
+                "mixed sex",
+                "both sexes",
+                "straight run",
+                "sexes mélangés",
+            ],
         },
     }

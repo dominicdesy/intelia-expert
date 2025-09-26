@@ -1,25 +1,18 @@
 # -*- coding: utf-8 -*-
 """
 entity_extractor.py - Extracteur d'entités métier pour l'aviculture
-CORRIGÉ: Imports modulaires selon nouvelle architecture
+CORRIGÉ: Imports modulaires selon nouvelle architecture + logique sexe/as-hatched
 """
 
 import re
 import logging
 from typing import Dict
 
-# Imports modulaires corrigés
-# Note: normalize_text et validate_numeric_range vérifiées présentes dans utils/utilities.py
-# from utils.utilities import normalize_text, validate_numeric_range
-
-# Suppression temporaire des imports non utilisés pour éviter les erreurs
-# Ces fonctions peuvent être ajoutées si nécessaires
-
 logger = logging.getLogger(__name__)
 
 
 class EntityExtractor:
-    """Extracteur d'entités métier - Version robuste avec normalisation cache"""
+    """Extracteur d'entités métier - Version robuste avec normalisation cache et gestion sexe/as-hatched"""
 
     def __init__(self, intents_config: dict):
         self.intents_config = intents_config
@@ -42,6 +35,61 @@ class EntityExtractor:
             re.IGNORECASE,
         )
 
+        # NOUVEAU: Patterns spécialisés pour détection sexe avec fallback as-hatched
+        self.sex_patterns = {
+            "male": [
+                "male",
+                "mâle",
+                "mâles",
+                "masculin",
+                "masculins",
+                "coq",
+                "coqs",
+                "rooster",
+                "roosters",
+                "cock",
+                "cocks",
+                "mâle broiler",
+                "male broiler",
+                "mâle poulet",
+                "male chicken",
+            ],
+            "female": [
+                "female",
+                "femelle",
+                "femelles",
+                "féminin",
+                "féminins",
+                "poule",
+                "poules",
+                "hen",
+                "hens",
+                "pullet",
+                "pullets",
+                "femelle broiler",
+                "female broiler",
+                "femelle poulet",
+                "female chicken",
+            ],
+            "as_hatched": [
+                "as-hatched",
+                "ashatched",
+                "as hatched",
+                "mixed",
+                "mixte",
+                "mélangé",
+                "non sexé",
+                "non-sexé",
+                "unsexed",
+                "straight run",
+                "straight-run",
+                "mixed sex",
+                "sexes mélangés",
+                "les deux sexes",
+                "both sexes",
+            ],
+        }
+
     def extract_entities(self, text: str) -> Dict[str, str]:
         """Extrait les entités métier avec validation renforcée et normalisation"""
         entities = {}
@@ -58,11 +106,13 @@ class EntityExtractor:
 
             # Nouvelles extractions
             entities.update(self._extract_bird_types(text_lower))
-            entities.update(self._extract_sex(text_lower))
             entities.update(self._extract_flock_size(text))
             entities.update(self._extract_environment_type(text_lower))
 
-            # Nouveau: Normalisation pour clés cache
+            # MODIFICATION MAJEURE: Nouvelle logique sexe avec fallback as-hatched
+            entities.update(self._extract_sex_with_fallback(text_lower))
+
+            # Normalisation pour clés cache
             entities = self._normalize_entities_for_cache(entities)
 
             # Validation et nettoyage
@@ -72,6 +122,45 @@ class EntityExtractor:
             logger.error(f"Erreur extraction entités: {e}")
 
         return entities
+
+    def _extract_sex_with_fallback(self, text: str) -> Dict[str, str]:
+        """
+        NOUVELLE MÉTHODE: Extrait le sexe avec logique de fallback vers as-hatched
+
+        Logique:
+        1. Si sexe explicite détecté (male/female) -> retourner ce sexe
+        2. Si as-hatched/mixed détecté explicitement -> retourner as-hatched
+        3. Si AUCUN sexe détecté -> fallback automatique vers as-hatched
+        """
+
+        # 1. Recherche sexe explicite (male/female)
+        for sex_type in ["male", "female"]:
+            patterns = self.sex_patterns[sex_type]
+            if any(pattern in text for pattern in patterns):
+                logger.debug(f"Sexe explicite détecté: {sex_type}")
+                return {
+                    "sex": sex_type,
+                    "sex_specified": "true",
+                    "sex_detection_method": "explicit",
+                }
+
+        # 2. Recherche as-hatched/mixed explicite
+        as_hatched_patterns = self.sex_patterns["as_hatched"]
+        if any(pattern in text for pattern in as_hatched_patterns):
+            logger.debug("As-hatched explicite détecté")
+            return {
+                "sex": "as_hatched",
+                "sex_specified": "true",
+                "sex_detection_method": "explicit_mixed",
+            }
+
+        # 3. FALLBACK: Aucun sexe détecté -> défaut as-hatched
+        logger.debug("Aucun sexe détecté, fallback vers as-hatched")
+        return {
+            "sex": "as_hatched",
+            "sex_specified": "false",
+            "sex_detection_method": "fallback_default",
+        }
 
     def _normalize_entities_for_cache(self, entities: Dict[str, str]) -> Dict[str, str]:
         """Normalise les entités pour améliorer les clés de cache"""
@@ -98,17 +187,6 @@ class EntityExtractor:
                 alias.lower() in text for alias in aliases
             ):
                 return {"bird_type": canonical}
-        return {}
-
-    def _extract_sex(self, text: str) -> Dict[str, str]:
-        """Extrait le sexe des oiseaux"""
-        for canonical, aliases in (
-            self.intents_config.get("aliases", {}).get("sex", {}).items()
-        ):
-            if canonical.lower() in text or any(
-                alias.lower() in text for alias in aliases
-            ):
-                return {"sex": canonical}
         return {}
 
     def _extract_flock_size(self, text: str) -> Dict[str, str]:
@@ -187,7 +265,7 @@ class EntityExtractor:
                 if alias.lower() in text:
                     return {"line": canonical}
 
-            # 3. Nouveau: Correspondance par variantes normalisées
+            # 3. Correspondance par variantes normalisées
             canonical_normalized = re.sub(r"[\s\-\.]+", "", canonical_lower)
             if canonical_normalized in text.replace(" ", "").replace("-", ""):
                 return {"line": canonical}
