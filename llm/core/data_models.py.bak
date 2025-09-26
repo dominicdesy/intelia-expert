@@ -17,7 +17,6 @@ class RAGSource(Enum):
     RAG_SUCCESS = "rag_success"
     RAG_KNOWLEDGE = "rag_knowledge"  # Maintenu pour compatibilité
     RAG_VERIFIED = "rag_verified"
-    RETRIEVAL_SUCCESS = "retrieval_success"
 
     # Sources de fallback/filtrage
     FALLBACK_NEEDED = "fallback_needed"
