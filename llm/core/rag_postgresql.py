@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql.py - Système PostgreSQL pour métriques avicoles
-VERSION AMÉLIORÉE: Normalisation multilingue inspirée du PerfStore
+VERSION AMÉLIORÉE: Normalisation multilingue inspirée du PerfStore + Debug AttributeError
 """
 
 import os
@@ -593,28 +593,86 @@ class PostgreSQLSystem:
                     metadata={"source_type": "metrics", "data_source": "postgresql"},
                 )
 
-            # Conversion en Documents pour compatibilité
+            # Conversion en Documents pour compatibilité - AVEC DEBUG DÉTAILLÉ
             documents = []
-            for metric in metric_results:
-                doc_content = self._format_metric_content(metric)
+            logger.debug(f"DEBUG: Début conversion de {len(metric_results)} métriques")
 
-                doc = Document(
-                    content=doc_content,
+            for i, metric in enumerate(metric_results):
+                try:
+                    logger.debug(f"DEBUG: Traitement métrique {i}: {type(metric)}")
+
+                    # Vérification des attributs requis
+                    if not hasattr(metric, "company"):
+                        logger.error(f"DEBUG: Métrique {i} manque attribut 'company'")
+                        continue
+                    if not hasattr(metric, "metric_name"):
+                        logger.error(
+                            f"DEBUG: Métrique {i} manque attribut 'metric_name'"
+                        )
+                        continue
+
+                    logger.debug(
+                        f"DEBUG: Métrique {i} - company={metric.company}, name={metric.metric_name}"
+                    )
+
+                    # Appel sécurisé de _format_metric_content
+                    try:
+                        doc_content = self._format_metric_content(metric)
+                        logger.debug(f"DEBUG: doc_content créé pour métrique {i}")
+                    except Exception as format_error:
+                        logger.error(
+                            f"DEBUG: Erreur _format_metric_content pour métrique {i}: {format_error}"
+                        )
+                        continue
+
+                    # Création sécurisée du Document
+                    try:
+                        doc = Document(
+                            content=doc_content,
+                            metadata={
+                                "company": str(metric.company),
+                                "breed": str(metric.breed),
+                                "strain": str(metric.strain),
+                                "species": str(metric.species),
+                                "metric_name": str(metric.metric_name),
+                                "category": str(metric.category),
+                                "sheet_name": str(metric.sheet_name),
+                                "source_type": "metrics",
+                                "data_source": "postgresql",
+                                "normalized_search": True,
+                            },
+                            score=float(metric.confidence),
+                        )
+                        logger.debug(f"DEBUG: Document créé pour métrique {i}")
+                        documents.append(doc)
+
+                    except Exception as doc_error:
+                        logger.error(
+                            f"DEBUG: Erreur création Document pour métrique {i}: {doc_error}"
+                        )
+                        continue
+
+                except Exception as metric_error:
+                    logger.error(
+                        f"DEBUG: Erreur globale métrique {i}: {type(metric_error)} - {metric_error}"
+                    )
+                    logger.error(f"DEBUG: Métrique problématique: {metric}")
+                    continue
+
+            logger.debug(
+                f"DEBUG: Fin conversion: {len(documents)} documents créés sur {len(metric_results)} métriques"
+            )
+
+            if not documents:
+                logger.warning("Aucun document créé à partir des métriques trouvées")
+                return RAGResult(
+                    source=RAGSource.NO_RESULTS,
                     metadata={
-                        "company": metric.company,
-                        "breed": metric.breed,
-                        "strain": metric.strain,
-                        "species": metric.species,
-                        "metric_name": metric.metric_name,
-                        "category": metric.category,
-                        "sheet_name": metric.sheet_name,
                         "source_type": "metrics",
                         "data_source": "postgresql",
-                        "normalized_search": True,  # NOUVEAU: Indicateur de recherche normalisée
+                        "error": "Aucun document valide créé",
                     },
-                    score=metric.confidence,
                 )
-                documents.append(doc)
 
             # Calcul confiance globale avec boost pour normalisation
             avg_confidence = sum(m.confidence for m in metric_results) / len(
@@ -628,6 +686,8 @@ class PostgreSQLSystem:
             if normalized_concepts:
                 avg_confidence = min(1.0, avg_confidence + 0.1)
 
+            logger.info(f"PostgreSQL SUCCESS: {len(documents)} documents retournés")
+
             return RAGResult(
                 documents=documents,
                 source=RAGSource.RETRIEVAL_SUCCESS,
@@ -636,6 +696,7 @@ class PostgreSQLSystem:
                     "source_type": "metrics",
                     "data_source": "postgresql",
                     "metric_count": len(metric_results),
+                    "document_count": len(documents),
                     "avg_confidence": avg_confidence,
                     "multilingual_normalization": True,
                     "normalized_concepts": normalized_concepts[
@@ -645,9 +706,12 @@ class PostgreSQLSystem:
             )
 
         except Exception as e:
-            logger.error(f"Type d'exception: {type(e)}")
-            logger.error(f"Valeur exception: {e}")
-            logger.error(f"Erreur recherche métriques PostgreSQL: {e}")
+            logger.error(f"DEBUG: Type d'exception: {type(e)}")
+            logger.error(f"DEBUG: Valeur exception: {e}")
+            logger.error(f"DEBUG: Erreur recherche métriques PostgreSQL: {e}")
+            import traceback
+
+            logger.error(f"DEBUG: Stack trace: {traceback.format_exc()}")
             return RAGResult(
                 source=RAGSource.ERROR,
                 metadata={"error": str(e), "source_type": "metrics"},
@@ -655,33 +719,39 @@ class PostgreSQLSystem:
 
     def _format_metric_content(self, metric: MetricResult) -> str:
         """Formate une métrique en contenu texte pour le LLM"""
-        content_parts = [
-            f"**{metric.metric_name}**",
-            f"Entreprise: {metric.company}",
-            f"Race: {metric.breed}",
-            f"Lignée: {metric.strain}",
-            f"Espèce: {metric.species}",
-            f"Catégorie: {metric.category}",
-        ]
+        try:
+            content_parts = [
+                f"**{metric.metric_name}**",
+                f"Entreprise: {metric.company}",
+                f"Race: {metric.breed}",
+                f"Lignée: {metric.strain}",
+                f"Espèce: {metric.species}",
+                f"Catégorie: {metric.category}",
+            ]
 
-        # Valeur
-        if metric.value_numeric is not None:
-            value_str = f"{metric.value_numeric}"
-            if metric.unit:
-                value_str += f" {metric.unit}"
-            content_parts.append(f"Valeur: {value_str}")
-        elif metric.value_text:
-            content_parts.append(f"Valeur: {metric.value_text}")
+            # Valeur
+            if metric.value_numeric is not None:
+                value_str = f"{metric.value_numeric}"
+                if metric.unit:
+                    value_str += f" {metric.unit}"
+                content_parts.append(f"Valeur: {value_str}")
+            elif metric.value_text:
+                content_parts.append(f"Valeur: {metric.value_text}")
 
-        # Age si disponible
-        if metric.age_min is not None and metric.age_max is not None:
-            if metric.age_min == metric.age_max:
-                content_parts.append(f"Age: {metric.age_min} semaines")
-            else:
-                content_parts.append(f"Age: {metric.age_min}-{metric.age_max} semaines")
+            # Age si disponible
+            if metric.age_min is not None and metric.age_max is not None:
+                if metric.age_min == metric.age_max:
+                    content_parts.append(f"Age: {metric.age_min} semaines")
+                else:
+                    content_parts.append(
+                        f"Age: {metric.age_min}-{metric.age_max} semaines"
+                    )
 
-        content_parts.append(f"Source: {metric.sheet_name}")
-        return "\n".join(content_parts)
+            content_parts.append(f"Source: {metric.sheet_name}")
+            return "\n".join(content_parts)
+        except Exception as e:
+            logger.error(f"Erreur formatage métrique: {e}")
+            return f"Métrique: {getattr(metric, 'metric_name', 'Nom inconnu')}"
 
     async def close(self):
         """Ferme le système PostgreSQL"""
