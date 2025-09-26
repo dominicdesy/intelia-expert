@@ -690,7 +690,7 @@ class PostgreSQLSystem:
 
             return RAGResult(
                 documents=documents,
-                source=RAGSource.RETRIEVAL_SUCCESS,
+                source=RAGSource.RAG_SUCCESS,
                 confidence=avg_confidence,
                 metadata={
                     "source_type": "metrics",

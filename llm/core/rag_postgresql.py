@@ -689,8 +689,8 @@ class PostgreSQLSystem:
             logger.info(f"PostgreSQL SUCCESS: {len(documents)} documents retournés")
 
             return RAGResult(
-                documents=documents,
                 source=RAGSource.RAG_SUCCESS,
+                context_docs=documents,
                 confidence=avg_confidence,
                 metadata={
                     "source_type": "metrics",
