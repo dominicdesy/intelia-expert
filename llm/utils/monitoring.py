@@ -181,6 +181,9 @@ class SystemHealthMonitor:
             connectivity_status = await self._test_service_connectivity_corrected()
             validation_report["service_connectivity"] = connectivity_status
 
+            # Logging détaillé pour debugging
+            logger.debug(f"Résultats connectivité détaillés: {connectivity_status}")
+
             # Vérification connectivité critique
             if not connectivity_status.get("weaviate", False):
                 validation_report["warnings"].append(
@@ -452,7 +455,7 @@ class SystemHealthMonitor:
         if cache_core and getattr(cache_core, "initialized", False):
             redis_client = getattr(cache_core, "client", None)
 
-        # CORRECTION WEAVIATE: Accès correct selon l'architecture
+        # CORRECTION WEAVIATE: Accès correct selon l'architecture avec debug avancé
         rag_engine = self._critical_services.get("rag_engine_enhanced")
         if rag_engine:
             # OPTION 1: Weaviate directement dans RAG engine
@@ -472,14 +475,28 @@ class SystemHealthMonitor:
         # Logging pour debugging
         logger.debug(f"Redis client: {redis_client is not None}")
         logger.debug(f"Weaviate client: {weaviate_client is not None}")
+        if weaviate_client:
+            logger.debug(f"Type Weaviate client: {type(weaviate_client)}")
+            logger.debug(
+                f"Weaviate has collections: {hasattr(weaviate_client, 'collections')}"
+            )
+            logger.debug(
+                f"Weaviate has is_ready: {hasattr(weaviate_client, 'is_ready')}"
+            )
 
         try:
+            # Test direct de Weaviate pour debugging
+            weaviate_test_result = await self._debug_weaviate_connectivity(
+                weaviate_client
+            )
+            logger.debug(f"Test direct Weaviate: {weaviate_test_result}")
+
             connectivity = await asyncio.wait_for(
                 quick_connectivity_check(redis_client, weaviate_client), timeout=10.0
             )
 
             # Log détaillé du résultat
-            logger.debug(f"Résultat connectivité: {connectivity}")
+            logger.debug(f"Résultat quick_connectivity_check: {connectivity}")
 
             return connectivity
 
@@ -489,6 +506,58 @@ class SystemHealthMonitor:
         except Exception as e:
             logger.error(f"Erreur test connectivité: {e}")
             return {"redis": False, "weaviate": False, "error": str(e)}
+
+    async def _debug_weaviate_connectivity(self, weaviate_client) -> Dict[str, Any]:
+        """Debug avancé de la connectivité Weaviate"""
+        debug_result = {
+            "client_present": weaviate_client is not None,
+            "client_type": str(type(weaviate_client)) if weaviate_client else None,
+            "has_collections": False,
+            "has_is_ready": False,
+            "is_ready_result": None,
+            "is_ready_error": None,
+            "collections_test": None,
+            "collections_error": None,
+        }
+
+        if not weaviate_client:
+            return debug_result
+
+        debug_result["has_collections"] = hasattr(weaviate_client, "collections")
+        debug_result["has_is_ready"] = hasattr(weaviate_client, "is_ready")
+
+        try:
+            # Test is_ready
+            if hasattr(weaviate_client, "is_ready"):
+                is_ready = await asyncio.get_event_loop().run_in_executor(
+                    None, lambda: weaviate_client.is_ready()
+                )
+                debug_result["is_ready_result"] = is_ready
+
+                if not is_ready:
+                    debug_result["is_ready_error"] = "Weaviate not ready"
+                    return debug_result
+            else:
+                debug_result["is_ready_error"] = "No is_ready method"
+
+            # Test collections
+            if hasattr(weaviate_client, "collections"):
+                try:
+                    collections = await asyncio.get_event_loop().run_in_executor(
+                        None, lambda: list(weaviate_client.collections.list_all())
+                    )
+                    debug_result["collections_test"] = (
+                        f"Found {len(collections)} collections"
+                    )
+                except Exception as coll_e:
+                    debug_result["collections_error"] = str(coll_e)
+            else:
+                debug_result["collections_error"] = "No collections method"
+
+        except Exception as e:
+            debug_result["is_ready_error"] = str(e)
+
+        return debug_result
 
     async def get_health_status(self) -> Dict[str, Any]:
         """Health check enrichi avec sérialisation JSON sécurisée"""
