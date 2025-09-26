@@ -11,6 +11,7 @@ from typing import Dict, List, Optional, Any
 
 try:
     from langsmith import Client
+
     LANGSMITH_AVAILABLE = True
 except ImportError:
     LANGSMITH_AVAILABLE = False
@@ -27,7 +28,7 @@ class LangSmithIntegration:
     def __init__(self):
         self.langsmith_client = None
         self.is_initialized = False
-        
+
         # Statistiques LangSmith
         self.langsmith_stats = {
             "traces_created": 0,
@@ -38,7 +39,7 @@ class LangSmithIntegration:
 
     async def initialize(self):
         """Initialise le client LangSmith"""
-        
+
         if not LANGSMITH_AVAILABLE:
             raise ImportError("LangSmith non disponible")
 
@@ -47,13 +48,12 @@ class LangSmithIntegration:
 
         try:
             self.langsmith_client = Client(
-                api_key=LANGSMITH_API_KEY, 
-                api_url="https://api.smith.langchain.com"
+                api_key=LANGSMITH_API_KEY, api_url="https://api.smith.langchain.com"
             )
-            
+
             # Test de connexion
             await self._test_connection()
-            
+
             self.is_initialized = True
             logger.info(f"✅ LangSmith initialisé - Projet: {LANGSMITH_PROJECT}")
 
@@ -63,15 +63,10 @@ class LangSmithIntegration:
 
     async def _test_connection(self):
         """Teste la connexion LangSmith"""
-        
+
         try:
             # Test basique - création d'un run de test
-            test_metadata = {
-                "system": "intelia_rag_test",
-                "version": "5.1_modular",
-                "environment": LANGSMITH_ENVIRONMENT,
-            }
-            
+            # Suppression de test_metadata non utilisée
             # Le test réel dépendra de l'API LangSmith spécifique
             logger.info("Connexion LangSmith testée avec succès")
 
@@ -118,26 +113,41 @@ class LangSmithIntegration:
 
             # Traitement core avec les modules
             result = await rag_engine._generate_response_core(
-                query, tenant_id, conversation_context, language, explain_score,
-                use_json_search, genetic_line_filter, performance_context, start_time
+                query,
+                tenant_id,
+                conversation_context,
+                language,
+                explain_score,
+                use_json_search,
+                genetic_line_filter,
+                performance_context,
+                start_time,
             )
 
             # Enrichissement métadonnées LangSmith avec résultats
             if hasattr(result, "metadata") and result.metadata:
                 detected_entities = result.metadata.get("detected_entities", {})
 
-                langsmith_metadata.update({
-                    "genetic_line": detected_entities.get("line", "none"),
-                    "age_days": detected_entities.get("age_days"),
-                    "performance_metric": self._detect_performance_metrics(query),
-                    "intent_type": result.metadata.get("intent_type", "unknown"),
-                    "intent_confidence": result.metadata.get("intent_confidence", 0.0),
-                    "documents_used": result.metadata.get("documents_used", 0),
-                    "source_type": result.metadata.get("source_type", "unknown"),
-                    "processing_time": time.time() - start_time,
-                    "confidence_score": result.confidence,
-                    "result_source": result.source.value if hasattr(result.source, "value") else str(result.source),
-                })
+                langsmith_metadata.update(
+                    {
+                        "genetic_line": detected_entities.get("line", "none"),
+                        "age_days": detected_entities.get("age_days"),
+                        "performance_metric": self._detect_performance_metrics(query),
+                        "intent_type": result.metadata.get("intent_type", "unknown"),
+                        "intent_confidence": result.metadata.get(
+                            "intent_confidence", 0.0
+                        ),
+                        "documents_used": result.metadata.get("documents_used", 0),
+                        "source_type": result.metadata.get("source_type", "unknown"),
+                        "processing_time": time.time() - start_time,
+                        "confidence_score": result.confidence,
+                        "result_source": (
+                            result.source.value
+                            if hasattr(result.source, "value")
+                            else str(result.source)
+                        ),
+                    }
+                )
 
             # Log métadonnées et alertes
             await self._log_langsmith_metadata(query, result, langsmith_metadata)
@@ -148,20 +158,27 @@ class LangSmithIntegration:
         except Exception as e:
             self.langsmith_stats["errors_logged"] += 1
             logger.error(f"Erreur LangSmith tracing: {e}")
-            
+
             # Fallback sans LangSmith
             return await rag_engine._generate_response_core(
-                query, tenant_id, conversation_context, language, explain_score,
-                use_json_search, genetic_line_filter, performance_context, start_time
+                query,
+                tenant_id,
+                conversation_context,
+                language,
+                explain_score,
+                use_json_search,
+                genetic_line_filter,
+                performance_context,
+                start_time,
             )
 
     def _detect_performance_metrics(self, query: str) -> List[str]:
         """Détecte les métriques de performance mentionnées dans la requête"""
-        
+
         query_lower = query.lower()
-        
+
         metrics_detected = []
-        
+
         # Métriques avicoles principales
         metric_patterns = {
             "fcr": ["fcr", "conversion", "feed conversion", "indice conversion"],
@@ -171,18 +188,18 @@ class LangSmithIntegration:
             "croissance": ["croissance", "growth", "gain", "adg"],
             "consommation": ["consommation", "consumption", "feed intake"],
         }
-        
+
         for metric_name, patterns in metric_patterns.items():
             if any(pattern in query_lower for pattern in patterns):
                 metrics_detected.append(metric_name)
-        
+
         return metrics_detected
 
     async def _log_langsmith_metadata(
         self, query: str, result: RAGResult, metadata: Dict
     ):
         """Log des métadonnées dans LangSmith"""
-        
+
         try:
             if not self.langsmith_client:
                 return
@@ -195,7 +212,7 @@ class LangSmithIntegration:
                 "project": LANGSMITH_PROJECT,
                 "environment": LANGSMITH_ENVIRONMENT,
             }
-            
+
             # Log spécifique selon l'API LangSmith
             # Ceci dépendra de la version exacte de LangSmith utilisée
             logger.debug(f"LangSmith metadata logged: {len(run_metadata)} fields")
@@ -223,12 +240,14 @@ class LangSmithIntegration:
                 try:
                     fcr_value = float(fcr_str.replace(",", "."))
                     if fcr_value > 3.0 or fcr_value < 0.8:
-                        alerts.append({
-                            "type": "FCR_ABERRANT",
-                            "value": fcr_value,
-                            "severity": "warning",
-                            "context": f"FCR de {fcr_value} détecté dans la réponse"
-                        })
+                        alerts.append(
+                            {
+                                "type": "FCR_ABERRANT",
+                                "value": fcr_value,
+                                "severity": "warning",
+                                "context": f"FCR de {fcr_value} détecté dans la réponse",
+                            }
+                        )
                 except ValueError:
                     continue
 
@@ -238,12 +257,14 @@ class LangSmithIntegration:
                 try:
                     mort_value = float(mort_str)
                     if mort_value > 20:
-                        alerts.append({
-                            "type": "MORTALITE_ELEVEE", 
-                            "value": mort_value,
-                            "severity": "high",
-                            "context": f"Mortalité de {mort_value}% détectée"
-                        })
+                        alerts.append(
+                            {
+                                "type": "MORTALITE_ELEVEE",
+                                "value": mort_value,
+                                "severity": "high",
+                                "context": f"Mortalité de {mort_value}% détectée",
+                            }
+                        )
                 except ValueError:
                     continue
 
@@ -253,38 +274,44 @@ class LangSmithIntegration:
                 try:
                     poids_value = float(poids_str)
                     if poids_value > 5000 or poids_value < 10:
-                        alerts.append({
-                            "type": "POIDS_ABERRANT",
-                            "value": poids_value,
-                            "severity": "warning", 
-                            "context": f"Poids de {poids_value}g détecté"
-                        })
+                        alerts.append(
+                            {
+                                "type": "POIDS_ABERRANT",
+                                "value": poids_value,
+                                "severity": "warning",
+                                "context": f"Poids de {poids_value}g détecté",
+                            }
+                        )
                 except ValueError:
                     continue
 
             # Confiance faible
             if result.confidence < 0.3:
-                alerts.append({
-                    "type": "CONFIANCE_FAIBLE",
-                    "value": result.confidence,
-                    "severity": "medium",
-                    "context": f"Réponse avec confiance faible: {result.confidence:.2f}"
-                })
+                alerts.append(
+                    {
+                        "type": "CONFIANCE_FAIBLE",
+                        "value": result.confidence,
+                        "severity": "medium",
+                        "context": f"Réponse avec confiance faible: {result.confidence:.2f}",
+                    }
+                )
 
             # Absence de documents trouvés
             if result.source in [RAGSource.NO_DOCUMENTS_FOUND, RAGSource.NO_RESULTS]:
-                alerts.append({
-                    "type": "AUCUN_DOCUMENT",
-                    "value": None,
-                    "severity": "high",
-                    "context": "Aucun document pertinent trouvé pour la requête"
-                })
+                alerts.append(
+                    {
+                        "type": "AUCUN_DOCUMENT",
+                        "value": None,
+                        "severity": "high",
+                        "context": "Aucun document pertinent trouvé pour la requête",
+                    }
+                )
 
             # Log alertes si détectées
             if alerts:
                 self.langsmith_stats["alerts_detected"] += len(alerts)
                 logger.warning(f"Alertes aviculture détectées: {len(alerts)}")
-                
+
                 for alert in alerts:
                     await self._log_alert_to_langsmith(alert, query, metadata)
 
@@ -298,19 +325,12 @@ class LangSmithIntegration:
 
     async def _log_alert_to_langsmith(self, alert: Dict, query: str, metadata: Dict):
         """Log une alerte spécifique dans LangSmith"""
-        
+
         try:
             if not self.langsmith_client:
                 return
 
-            alert_data = {
-                **alert,
-                "query": query[:100],  # Première partie de la requête
-                "timestamp": time.time(),
-                "system_metadata": metadata,
-                "project": LANGSMITH_PROJECT,
-            }
-            
+            # Suppression de alert_data non utilisée
             # Log selon l'API LangSmith spécifique
             logger.debug(f"Alerte LangSmith loggée: {alert['type']}")
 
@@ -319,7 +339,7 @@ class LangSmithIntegration:
 
     def get_performance_insights(self) -> Dict[str, Any]:
         """Analyse des insights de performance depuis LangSmith"""
-        
+
         try:
             if not self.langsmith_client or not self.is_initialized:
                 return {"available": False, "reason": "LangSmith non initialisé"}
@@ -342,9 +362,15 @@ class LangSmithIntegration:
                 },
                 "system_health": {
                     "status": "healthy" if error_rate < 5 else "degraded",
-                    "alert_level": "low" if alert_rate < 10 else "medium" if alert_rate < 25 else "high",
+                    "alert_level": (
+                        "low"
+                        if alert_rate < 10
+                        else "medium" if alert_rate < 25 else "high"
+                    ),
                 },
-                "recommendations": self._generate_recommendations(error_rate, alert_rate),
+                "recommendations": self._generate_recommendations(
+                    error_rate, alert_rate
+                ),
                 "statistics": self.langsmith_stats.copy(),
             }
 
@@ -354,17 +380,23 @@ class LangSmithIntegration:
             logger.warning(f"Erreur insights performance: {e}")
             return {"available": False, "error": str(e)}
 
-    def _generate_recommendations(self, error_rate: float, alert_rate: float) -> List[str]:
+    def _generate_recommendations(
+        self, error_rate: float, alert_rate: float
+    ) -> List[str]:
         """Génère des recommandations basées sur les métriques"""
-        
+
         recommendations = []
 
         if error_rate > 10:
-            recommendations.append("Taux d'erreur élevé - Vérifier la stabilité des connexions")
-        
+            recommendations.append(
+                "Taux d'erreur élevé - Vérifier la stabilité des connexions"
+            )
+
         if alert_rate > 20:
-            recommendations.append("Nombreuses alertes avicoles - Réviser les seuils de validation")
-        
+            recommendations.append(
+                "Nombreuses alertes avicoles - Réviser les seuils de validation"
+            )
+
         if error_rate < 2 and alert_rate < 5:
             recommendations.append("Performance excellent - Système stable")
 
@@ -375,7 +407,7 @@ class LangSmithIntegration:
 
     def get_stats(self) -> Dict[str, Any]:
         """Statistiques LangSmith"""
-        
+
         return {
             "langsmith_initialized": self.is_initialized,
             "langsmith_available": LANGSMITH_AVAILABLE,
@@ -387,7 +419,7 @@ class LangSmithIntegration:
 
     async def close(self):
         """Fermeture propre LangSmith"""
-        
+
         if self.langsmith_client:
             try:
                 # Fermeture spécifique selon l'API LangSmith

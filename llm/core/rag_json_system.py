@@ -7,7 +7,6 @@ Extrait du fichier principal pour modularité
 import logging
 import time
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
 
 try:
     from rag.extractors.json_extractor import JSONExtractor
@@ -18,12 +17,13 @@ try:
     from rag.core.hybrid_search import HybridSearchEngine
     from rag.core.document_processor import DocumentProcessor
     from rag.core.cache_manager import EnhancedCacheManager
+
     JSON_EXTRACTORS_AVAILABLE = True
-except ImportError as e:
+except ImportError:
     JSON_EXTRACTORS_AVAILABLE = False
 
 from .data_models import RAGResult, RAGSource, Document
-from config.config import RAG_SIMILARITY_TOP_K, MAX_CONVERSATION_CONTEXT
+from config.config import RAG_SIMILARITY_TOP_K
 
 logger = logging.getLogger(__name__)
 
@@ -36,19 +36,19 @@ class JSONSystem:
         self.json_extractor = None
         self.table_extractor = None
         self.genetic_line_extractor = None
-        
+
         # Validateur et pipeline
         self.json_validator = None
         self.ingestion_pipeline = None
-        
+
         # Moteur de recherche hybride
         self.hybrid_search_engine = None
         self.document_processor = None
         self.enhanced_cache_manager = None
-        
+
         # État
         self.is_initialized = False
-        
+
         # Statistiques
         self.json_stats = {
             "validations": 0,
@@ -61,7 +61,7 @@ class JSONSystem:
 
     async def initialize(self):
         """Initialise le système JSON"""
-        
+
         if not JSON_EXTRACTORS_AVAILABLE:
             raise ImportError("Extracteurs JSON non disponibles")
 
@@ -125,7 +125,7 @@ class JSONSystem:
         self, json_data: Dict[str, Any], strict_mode: bool = False
     ) -> Dict[str, Any]:
         """Valide un document JSON selon les schémas avicoles"""
-        
+
         if not self.is_initialized or not self.json_validator:
             return {"valid": False, "error": "Système JSON non disponible"}
 
@@ -158,7 +158,7 @@ class JSONSystem:
         self, json_files: List[Dict[str, Any]], batch_size: int = 5
     ) -> Dict[str, Any]:
         """Ingère des documents JSON dans le système"""
-        
+
         if not self.is_initialized or not self.ingestion_pipeline:
             return {"success": False, "error": "Système JSON non disponible"}
 
@@ -196,7 +196,7 @@ class JSONSystem:
         age_range: Optional[Dict[str, int]] = None,
     ) -> List[Dict[str, Any]]:
         """Recherche avancée dans les documents JSON avec filtres avicoles"""
-        
+
         if not self.is_initialized or not self.hybrid_search_engine:
             logger.warning(
                 "Recherche JSON non disponible, utilisation du système classique"
@@ -237,7 +237,7 @@ class JSONSystem:
         start_time: float,
     ) -> RAGResult:
         """Génère une réponse basée sur les résultats JSON"""
-        
+
         try:
             # Conversion des résultats JSON en Documents pour compatibilité
             documents = []
@@ -250,7 +250,9 @@ class JSONSystem:
                 documents.append(doc)
 
             # Pour l'instant, génération simple - pourrait utiliser un générateur dédié
-            response_text = self._generate_simple_response_from_json(query, json_results)
+            response_text = self._generate_simple_response_from_json(
+                query, json_results
+            )
 
             return RAGResult(
                 source=RAGSource.RAG_SUCCESS,
@@ -275,41 +277,45 @@ class JSONSystem:
             logger.error(f"Erreur génération réponse JSON: {e}")
             return RAGResult(
                 source=RAGSource.GENERATION_FAILED,
-                metadata={"error": str(e), "json_system_used": True}
+                metadata={"error": str(e), "json_system_used": True},
             )
 
     def _generate_simple_response_from_json(
         self, query: str, json_results: List[Dict[str, Any]]
     ) -> str:
         """Génération simple de réponse depuis JSON (fallback)"""
-        
+
         if not json_results:
             return "Aucun résultat trouvé dans la base de données avicole."
 
         # Extraction des données pertinentes
         response_parts = []
-        
+
         for i, result in enumerate(json_results[:3], 1):  # Top 3 résultats
             content = result.get("content", "")
             metadata = result.get("metadata", {})
-            
+
             # Extraction info génétique si disponible
             genetic_info = ""
             if metadata.get("genetic_line"):
                 genetic_info = f" ({metadata['genetic_line']})"
-            
-            response_parts.append(f"**Résultat {i}**{genetic_info}:\n{content[:200]}...")
+
+            response_parts.append(
+                f"**Résultat {i}**{genetic_info}:\n{content[:200]}..."
+            )
 
         response = "\n\n".join(response_parts)
-        
+
         if len(json_results) > 3:
-            response += f"\n\n*Et {len(json_results) - 3} autres résultats disponibles.*"
+            response += (
+                f"\n\n*Et {len(json_results) - 3} autres résultats disponibles.*"
+            )
 
         return response
 
     def get_stats(self) -> Dict[str, Any]:
         """Statistiques du système JSON"""
-        
+
         return {
             "json_system_initialized": self.is_initialized,
             "extractors_available": JSON_EXTRACTORS_AVAILABLE,
@@ -328,7 +334,7 @@ class JSONSystem:
 
     async def close(self):
         """Fermeture propre du système JSON"""
-        
+
         if self.enhanced_cache_manager:
             try:
                 await self.enhanced_cache_manager.close()

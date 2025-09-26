@@ -5,24 +5,40 @@ Version 5.1 - Architecture modulaire pour maintenabilité
 
 CORRECTIONS CRITIQUES APPORTÉES:
 1. Ajout du paramètre start_time manquant dans _generate_response_core_weaviate_only()
-2. Exclusion des termes techniques de la traduction automatique  
+2. Exclusion des termes techniques de la traduction automatique
 3. Refactorisation modulaire pour réduire la taille du fichier
+4. Correction des imports et suppression des variables inutilisées
 """
 
-import os
 import asyncio
 import logging
 import time
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
-from enum import Enum
+
+# Imports standards placés en premier selon PEP 8
+from config.config import (
+    RAG_ENABLED,
+    OPENAI_API_KEY,
+    RAG_SIMILARITY_TOP_K,
+    LANGSMITH_ENABLED,
+)
+from utils.imports_and_dependencies import (
+    OPENAI_AVAILABLE,
+    WEAVIATE_AVAILABLE,
+    AsyncOpenAI,
+)
+from utils.utilities import METRICS, detect_language_enhanced
+
+# Import local des data models (avant les imports conditionnels)
+from .data_models import RAGResult, RAGSource
 
 # CORRECTION CRITIQUE: Logger défini AVANT utilisation
 logger = logging.getLogger(__name__)
 
-# Imports des modules refactorisés
+# Imports des modules refactorisés avec gestion d'erreur (après imports standards)
 try:
-    from .rag_postgresql import PostgreSQLSystem, QueryRouter, QueryType
+    from .rag_postgresql import PostgreSQLSystem, QueryType
+
     POSTGRESQL_INTEGRATION_AVAILABLE = True
     logger.info("✅ Système PostgreSQL importé")
 except ImportError as e:
@@ -32,6 +48,7 @@ except ImportError as e:
 
 try:
     from .rag_json_system import JSONSystem
+
     RAG_JSON_SYSTEM_AVAILABLE = True
     logger.info("✅ Système JSON importé")
 except ImportError as e:
@@ -40,6 +57,7 @@ except ImportError as e:
 
 try:
     from .rag_weaviate_core import WeaviateCore
+
     WEAVIATE_CORE_AVAILABLE = True
     logger.info("✅ Weaviate Core importé")
 except ImportError as e:
@@ -48,17 +66,12 @@ except ImportError as e:
 
 try:
     from .rag_langsmith import LangSmithIntegration
+
     LANGSMITH_INTEGRATION_AVAILABLE = True
     logger.info("✅ LangSmith importé")
 except ImportError as e:
     LANGSMITH_INTEGRATION_AVAILABLE = False
     logger.warning(f"⚠️ LangSmith non disponible: {e}")
-
-# Imports existants conservés
-from config.config import *
-from utils.imports_and_dependencies import OPENAI_AVAILABLE, WEAVIATE_AVAILABLE, AsyncOpenAI
-from .data_models import RAGResult, RAGSource, Document
-from utils.utilities import METRICS, detect_language_enhanced
 
 
 class InteliaRAGEngine:
@@ -66,17 +79,17 @@ class InteliaRAGEngine:
 
     def __init__(self, openai_client: AsyncOpenAI = None):
         self.openai_client = openai_client or self._build_openai_client()
-        
-        # Modules spécialisés 
+
+        # Modules spécialisés
         self.postgresql_system = None
-        self.json_system = None  
+        self.json_system = None
         self.weaviate_core = None
         self.langsmith_integration = None
-        
+
         # État
         self.is_initialized = False
         self.degraded_mode = False
-        
+
         # Stats consolidées
         self.optimization_stats = {
             "requests_total": 0,
@@ -93,6 +106,7 @@ class InteliaRAGEngine:
         """Client OpenAI avec configuration timeout"""
         try:
             import httpx
+
             http_client = httpx.AsyncClient(timeout=30.0)
             return AsyncOpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
         except Exception as e:
@@ -117,7 +131,7 @@ class InteliaRAGEngine:
             if POSTGRESQL_INTEGRATION_AVAILABLE:
                 await self._initialize_postgresql_system()
 
-            # 2. Système JSON  
+            # 2. Système JSON
             if RAG_JSON_SYSTEM_AVAILABLE:
                 await self._initialize_json_system()
 
@@ -194,8 +208,7 @@ class InteliaRAGEngine:
 
         if self.degraded_mode:
             return RAGResult(
-                source=RAGSource.FALLBACK_NEEDED, 
-                metadata={"reason": "degraded_mode"}
+                source=RAGSource.FALLBACK_NEEDED, metadata={"reason": "degraded_mode"}
             )
 
         start_time = time.time()
@@ -205,14 +218,27 @@ class InteliaRAGEngine:
         # LangSmith si disponible
         if self.langsmith_integration:
             return await self.langsmith_integration.generate_response_with_tracing(
-                query, tenant_id, conversation_context, language, explain_score,
-                use_json_search, genetic_line_filter, performance_context,
-                self
+                query,
+                tenant_id,
+                conversation_context,
+                language,
+                explain_score,
+                use_json_search,
+                genetic_line_filter,
+                performance_context,
+                self,
             )
 
         return await self._generate_response_core(
-            query, tenant_id, conversation_context, language, explain_score,
-            use_json_search, genetic_line_filter, performance_context, start_time
+            query,
+            tenant_id,
+            conversation_context,
+            language,
+            explain_score,
+            use_json_search,
+            genetic_line_filter,
+            performance_context,
+            start_time,
         )
 
     async def _generate_response_core(
@@ -224,8 +250,8 @@ class InteliaRAGEngine:
         explain_score: Optional[float],
         use_json_search: bool,
         genetic_line_filter: Optional[str],
-        performance_context: Optional[Dict[str, Any]], 
-        start_time: float  # CORRECTION: Paramètre ajouté
+        performance_context: Optional[Dict[str, Any]],
+        start_time: float,  # CORRECTION: Paramètre ajouté
     ) -> RAGResult:
         """Méthode core avec routage intelligent - CORRIGÉE"""
 
@@ -237,7 +263,7 @@ class InteliaRAGEngine:
             # NOUVEAU: Routage intelligent des requêtes
             if self.postgresql_system and self.postgresql_system.query_router:
                 query_type = self.postgresql_system.route_query(query, None)
-                
+
                 if query_type == QueryType.METRICS:
                     logger.info("🎯 Requête routée vers PostgreSQL (métriques)")
                     result = await self.postgresql_system.search_metrics(
@@ -260,9 +286,13 @@ class InteliaRAGEngine:
                 json_results = await self.json_system.search_enhanced(
                     query=query,
                     genetic_line=genetic_line_filter,
-                    performance_metrics=performance_context.get("metrics") if performance_context else None
+                    performance_metrics=(
+                        performance_context.get("metrics")
+                        if performance_context
+                        else None
+                    ),
                 )
-                
+
                 if json_results and len(json_results) >= 3:
                     self.optimization_stats["json_searches"] += 1
                     return await self._generate_response_from_json_results(
@@ -279,7 +309,7 @@ class InteliaRAGEngine:
             logger.error(f"Erreur génération réponse core: {e}")
             return RAGResult(
                 source=RAGSource.INTERNAL_ERROR,
-                metadata={"error": str(e), "processing_time": time.time() - start_time}
+                metadata={"error": str(e), "processing_time": time.time() - start_time},
             )
 
     async def _generate_response_core_weaviate_only(
@@ -292,38 +322,49 @@ class InteliaRAGEngine:
         tenant_id: str,
     ) -> RAGResult:
         """Méthode Weaviate - CORRIGÉE avec start_time"""
-        
+
         if not self.weaviate_core:
             return RAGResult(
                 source=RAGSource.INTERNAL_ERROR,
-                metadata={"error": "Weaviate Core non disponible"}
+                metadata={"error": "Weaviate Core non disponible"},
             )
 
         self.optimization_stats["weaviate_searches"] += 1
-        
+
         # Déléguer à Weaviate Core
         return await self.weaviate_core.generate_response(
             query, intent_result, conversation_context, language, start_time, tenant_id
         )
 
     async def _search_hybrid_sources(
-        self, query: str, conversation_context: List[Dict], language: str, start_time: float
+        self,
+        query: str,
+        conversation_context: List[Dict],
+        language: str,
+        start_time: float,
     ) -> RAGResult:
         """Recherche hybride PostgreSQL + Weaviate"""
         try:
             # Recherche parallèle
             tasks = []
-            
+
             if self.postgresql_system:
                 tasks.append(self.postgresql_system.search_metrics(query, None))
-                
+
             if self.weaviate_core:
-                tasks.append(self.weaviate_core.generate_response(
-                    query, None, conversation_context, language, start_time, "default"
-                ))
+                tasks.append(
+                    self.weaviate_core.generate_response(
+                        query,
+                        None,
+                        conversation_context,
+                        language,
+                        start_time,
+                        "default",
+                    )
+                )
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
-            
+
             # Fusion des résultats
             return self._merge_hybrid_results(results, query, start_time)
 
@@ -331,42 +372,51 @@ class InteliaRAGEngine:
             logger.error(f"Erreur recherche hybride: {e}")
             return RAGResult(
                 source=RAGSource.ERROR,
-                metadata={"error": str(e), "source_type": "hybrid"}
+                metadata={"error": str(e), "source_type": "hybrid"},
             )
 
     async def _generate_response_from_json_results(
         self,
         query: str,
-        json_results: List[Dict[str, Any]], 
+        json_results: List[Dict[str, Any]],
         language: str,
         conversation_context: List[Dict],
-        start_time: float
+        start_time: float,
     ) -> RAGResult:
         """Génère réponse depuis résultats JSON"""
-        
+
         if not self.json_system:
             return RAGResult(source=RAGSource.INTERNAL_ERROR)
-            
+
         return await self.json_system.generate_response_from_results(
             query, json_results, language, conversation_context, start_time
         )
 
-    def _merge_hybrid_results(self, results: List, query: str, start_time: float) -> RAGResult:
+    def _merge_hybrid_results(
+        self, results: List, query: str, start_time: float
+    ) -> RAGResult:
         """Fusionne les résultats hybrides"""
-        
-        valid_results = [r for r in results if isinstance(r, RAGResult) and not isinstance(r, Exception)]
-        
+
+        valid_results = [
+            r
+            for r in results
+            if isinstance(r, RAGResult) and not isinstance(r, Exception)
+        ]
+
         if not valid_results:
             return RAGResult(
                 source=RAGSource.NO_RESULTS,
-                metadata={"source_type": "hybrid", "processing_time": time.time() - start_time}
+                metadata={
+                    "source_type": "hybrid",
+                    "processing_time": time.time() - start_time,
+                },
             )
 
         # Prendre le meilleur résultat pour l'instant
         best_result = max(valid_results, key=lambda r: r.confidence)
         best_result.metadata["source_type"] = "hybrid"
         best_result.metadata["results_merged"] = len(valid_results)
-        
+
         return best_result
 
     def get_status(self) -> Dict:
@@ -378,7 +428,7 @@ class InteliaRAGEngine:
             "approach": "enhanced_rag_v5.1_modular",
             "modules": {
                 "postgresql_system": bool(self.postgresql_system),
-                "json_system": bool(self.json_system), 
+                "json_system": bool(self.json_system),
                 "weaviate_core": bool(self.weaviate_core),
                 "langsmith_integration": bool(self.langsmith_integration),
             },
@@ -389,21 +439,21 @@ class InteliaRAGEngine:
                 "knowledge_base": bool(self.weaviate_core),
                 "hybrid_search": bool(self.postgresql_system and self.weaviate_core),
                 "monitoring": bool(self.langsmith_integration),
-            }
+            },
         }
 
     async def close(self):
         """Fermeture propre de tous les modules"""
-        
+
         if self.postgresql_system:
             await self.postgresql_system.close()
-            
+
         if self.json_system:
             await self.json_system.close()
-            
+
         if self.weaviate_core:
             await self.weaviate_core.close()
-            
+
         if self.langsmith_integration:
             await self.langsmith_integration.close()
 

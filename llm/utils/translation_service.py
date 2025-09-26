@@ -20,47 +20,121 @@ import threading
 # CORRECTION CRITIQUE: Liste d'exclusion pour termes techniques
 TECHNICAL_TERMS_EXCLUSION = {
     # Termes de données/fichiers techniques
-    "weight_curves", "growth_curves", "fcr_curves", "mortality_curves",
-    "performance_data", "breeding_data", "nutrition_data", "feed_data",
-    
+    "weight_curves",
+    "growth_curves",
+    "fcr_curves",
+    "mortality_curves",
+    "performance_data",
+    "breeding_data",
+    "nutrition_data",
+    "feed_data",
     # Identifiants lignées génétiques
-    "ross308", "ross_308", "cobb500", "cobb_500", "hubbard_flex", 
-    "isa_brown", "dekalb_white", "novogen_brown", "bovans_white",
-    
+    "ross308",
+    "ross_308",
+    "cobb500",
+    "cobb_500",
+    "hubbard_flex",
+    "isa_brown",
+    "dekalb_white",
+    "novogen_brown",
+    "bovans_white",
     # Termes techniques avicoles (ne pas traduire)
-    "broiler_performance", "layer_performance", "breeder_performance",
-    "feed_conversion_ratio", "average_daily_gain", "body_weight_gain",
-    "egg_production_rate", "fertility_rate", "hatchability_rate",
-    "livability_rate", "uniformity_index", "european_production_index",
-    
+    "broiler_performance",
+    "layer_performance",
+    "breeder_performance",
+    "feed_conversion_ratio",
+    "average_daily_gain",
+    "body_weight_gain",
+    "egg_production_rate",
+    "fertility_rate",
+    "hatchability_rate",
+    "livability_rate",
+    "uniformity_index",
+    "european_production_index",
     # Identifiants de métriques
-    "epef", "eef", "fcr", "adg", "bwg", "epr", "fr", "hr", "lr", "ui", "epi",
-    
+    "epef",
+    "eef",
+    "fcr",
+    "adg",
+    "bwg",
+    "epr",
+    "fr",
+    "hr",
+    "lr",
+    "ui",
+    "epi",
     # Noms de fichiers/extensions techniques
-    "xlsx", "json", "csv", "pdf", "docx", "txt", "xml",
-    "broiler_objectives", "layer_standards", "breeder_targets",
-    
+    "xlsx",
+    "json",
+    "csv",
+    "pdf",
+    "docx",
+    "txt",
+    "xml",
+    "broiler_objectives",
+    "layer_standards",
+    "breeder_targets",
     # Codes et références techniques
-    "ap_male", "ap_female", "straight_run", "parent_stock", "ps",
-    "commercial_strain", "genetic_line", "selection_line",
-    
+    "ap_male",
+    "ap_female",
+    "straight_run",
+    "parent_stock",
+    "ps",
+    "commercial_strain",
+    "genetic_line",
+    "selection_line",
     # Termes SQL/base de données
-    "database", "table", "query", "insert", "update", "select", "join",
-    "postgresql", "weaviate", "redis", "cache", "index", "schema",
+    "database",
+    "table",
+    "query",
+    "insert",
+    "update",
+    "select",
+    "join",
+    "postgresql",
+    "weaviate",
+    "redis",
+    "cache",
+    "index",
+    "schema",
 }
 
 # CORRECTION: Termes partiels à exclure
 TECHNICAL_PARTIAL_EXCLUSIONS = {
     # Préfixes techniques
-    "ross", "cobb", "hubbard", "isa", "dekalb", "novogen", "bovans",
-    "aviagen", "hendrix", "petersons", "grimaud", "group",
-    
-    # Suffixes techniques  
-    "_data", "_curves", "_performance", "_objectives", "_standards",
-    "_targets", "_index", "_ratio", "_rate", "_gain", "_weight",
-    
+    "ross",
+    "cobb",
+    "hubbard",
+    "isa",
+    "dekalb",
+    "novogen",
+    "bovans",
+    "aviagen",
+    "hendrix",
+    "petersons",
+    "grimaud",
+    "group",
+    # Suffixes techniques
+    "_data",
+    "_curves",
+    "_performance",
+    "_objectives",
+    "_standards",
+    "_targets",
+    "_index",
+    "_ratio",
+    "_rate",
+    "_gain",
+    "_weight",
     # Codes produits
-    "308", "500", "flex", "brown", "white", "plus", "max", "elite",
+    "308",
+    "500",
+    "flex",
+    "brown",
+    "white",
+    "plus",
+    "max",
+    "elite",
 }
 
 # Import conditionnel Google Cloud Translate
@@ -156,33 +230,35 @@ class UniversalTranslationService:
 
     def _is_technical_term(self, term: str) -> tuple[bool, str]:
         """CORRECTION CRITIQUE: Vérifie si un terme est technique et ne doit PAS être traduit"""
-        
+
         if not self.enable_technical_exclusion:
             return False, ""
-            
+
         term_lower = term.lower().strip()
-        
+
         # 1. Exclusion exacte
         if term_lower in TECHNICAL_TERMS_EXCLUSION:
             return True, f"exact_match: {term_lower}"
-            
+
         # 2. Exclusion partielle
         for partial in TECHNICAL_PARTIAL_EXCLUSIONS:
             if partial in term_lower:
                 return True, f"partial_match: {partial}"
-                
+
         # 3. Patterns spéciaux avicoles
-        
+
         # Format "lignée + nombre" (ex: "ross308", "cobb500")
-        if re.match(r'^[a-z]+\d+$', term_lower):
+        if re.match(r"^[a-z]+\d+$", term_lower):
             return True, "genetic_line_pattern"
-            
+
         # Format "mot_technique" (ex: "feed_conversion", "body_weight")
-        if '_' in term_lower and any(part in TECHNICAL_TERMS_EXCLUSION for part in term_lower.split('_')):
+        if "_" in term_lower and any(
+            part in TECHNICAL_TERMS_EXCLUSION for part in term_lower.split("_")
+        ):
             return True, "technical_compound"
-            
+
         # Codes courts techniques (2-4 lettres majuscules)
-        if re.match(r'^[A-Z]{2,4}$', term) and len(term) <= 4:
+        if re.match(r"^[A-Z]{2,4}$", term) and len(term) <= 4:
             return True, "technical_code"
 
         return False, ""
@@ -609,8 +685,10 @@ class UniversalTranslationService:
         is_technical, exclusion_reason = self._is_technical_term(term)
         if is_technical:
             self._update_stats("excluded")
-            logger.debug(f"Terme technique exclu de la traduction: '{term}' (raison: {exclusion_reason})")
-            
+            logger.debug(
+                f"Terme technique exclu de la traduction: '{term}' (raison: {exclusion_reason})"
+            )
+
             return TranslationResult(
                 text=term,  # Retourner le terme original non traduit
                 source="excluded",
@@ -749,15 +827,19 @@ class UniversalTranslationService:
     def get_exclusion_stats(self) -> Dict[str, Any]:
         """NOUVEAU: Statistiques détaillées des exclusions techniques"""
         with self._stats_lock:
-            total_processed = (self.stats.hits + self.stats.misses + 
-                             self.stats.technical_terms_excluded)
-            
+            total_processed = (
+                self.stats.hits
+                + self.stats.misses
+                + self.stats.technical_terms_excluded
+            )
+
             return {
                 "technical_terms_excluded": self.stats.technical_terms_excluded,
                 "terms_translated": self.stats.terms_translated,
                 "total_processed": total_processed,
                 "exclusion_rate_pct": round(
-                    self.stats.technical_terms_excluded / max(1, total_processed) * 100, 2
+                    self.stats.technical_terms_excluded / max(1, total_processed) * 100,
+                    2,
                 ),
                 "translation_rate_pct": round(
                     self.stats.terms_translated / max(1, total_processed) * 100, 2
@@ -913,12 +995,10 @@ def init_global_translation_service(**kwargs) -> UniversalTranslationService:
 # CORRECTION CRITIQUE: Fonction utilitaire pour éviter la traduction des termes techniques
 def should_translate_term(term: str) -> bool:
     """Vérifie rapidement si un terme doit être traduit ou préservé"""
-    
+
     temp_service = UniversalTranslationService(
-        dict_path="", 
-        supported_languages={"fr", "en"},
-        enable_technical_exclusion=True
+        dict_path="", supported_languages={"fr", "en"}, enable_technical_exclusion=True
     )
-    
+
     is_technical, _ = temp_service._is_technical_term(term)
     return not is_technical

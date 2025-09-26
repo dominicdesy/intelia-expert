@@ -5,7 +5,6 @@ Extrait du fichier principal pour modularité
 """
 
 import os
-import asyncio
 import logging
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
@@ -13,6 +12,7 @@ from enum import Enum
 
 try:
     import asyncpg
+
     ASYNCPG_AVAILABLE = True
 except ImportError:
     ASYNCPG_AVAILABLE = False
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 POSTGRESQL_CONFIG = {
     "user": os.getenv("DB_USER", "doadmin"),
     "password": os.getenv("DB_PASSWORD"),
-    "host": os.getenv("DB_HOST"), 
+    "host": os.getenv("DB_HOST"),
     "port": int(os.getenv("DB_PORT", 25060)),
     "database": os.getenv("DB_NAME", "defaultdb"),
     "ssl": os.getenv("DB_SSL", "require"),
@@ -34,15 +34,17 @@ POSTGRESQL_CONFIG = {
 
 class QueryType(Enum):
     """Types de requêtes pour routage intelligent"""
+
     KNOWLEDGE = "knowledge"  # Connaissances générales → Weaviate
-    METRICS = "metrics"      # Données de performance → PostgreSQL  
-    HYBRID = "hybrid"        # Combinaison des deux
-    UNKNOWN = "unknown"      # Type indéterminé
+    METRICS = "metrics"  # Données de performance → PostgreSQL
+    HYBRID = "hybrid"  # Combinaison des deux
+    UNKNOWN = "unknown"  # Type indéterminé
 
 
 @dataclass
 class MetricResult:
     """Résultat d'une requête de métriques PostgreSQL"""
+
     company: str
     breed: str
     strain: str
@@ -64,45 +66,102 @@ class QueryRouter:
     def __init__(self):
         # Mots-clés pour PostgreSQL (métriques/performance)
         self.metric_keywords = {
-            "performance", "metrics", "données", "chiffres", "résultats",
-            "weight", "poids", "egg", "oeuf", "production", "feed", "alimentation", 
-            "mortality", "mortalité", "growth", "croissance", "nutrition",
-            "age", "semaine", "week", "day", "jour", "phase",
-            "temperature", "température", "humidity", "humidité",
-            "housing", "logement", "density", "densité",
+            "performance",
+            "metrics",
+            "données",
+            "chiffres",
+            "résultats",
+            "weight",
+            "poids",
+            "egg",
+            "oeuf",
+            "production",
+            "feed",
+            "alimentation",
+            "mortality",
+            "mortalité",
+            "growth",
+            "croissance",
+            "nutrition",
+            "age",
+            "semaine",
+            "week",
+            "day",
+            "jour",
+            "phase",
+            "temperature",
+            "température",
+            "humidity",
+            "humidité",
+            "housing",
+            "logement",
+            "density",
+            "densité",
         }
 
         # Mots-clés pour Weaviate (connaissances)
         self.knowledge_keywords = {
-            "comment", "pourquoi", "qu'est-ce", "expliquer", "définir",
-            "maladie", "disease", "traitement", "treatment", "symptom", "symptôme",
-            "prévention", "prevention", "biosécurité", "biosecurity",
-            "management", "gestion", "guide", "protocol", "protocole",
-            "conseil", "advice", "recommendation", "recommandation",
+            "comment",
+            "pourquoi",
+            "qu'est-ce",
+            "expliquer",
+            "définir",
+            "maladie",
+            "disease",
+            "traitement",
+            "treatment",
+            "symptom",
+            "symptôme",
+            "prévention",
+            "prevention",
+            "biosécurité",
+            "biosecurity",
+            "management",
+            "gestion",
+            "guide",
+            "protocol",
+            "protocole",
+            "conseil",
+            "advice",
+            "recommendation",
+            "recommandation",
         }
 
     def route_query(self, query: str, intent_result=None) -> QueryType:
         """Détermine le type de requête et la source appropriée"""
-        
+
         query_lower = query.lower()
 
         # Compteurs de mots-clés
-        metric_score = sum(1 for keyword in self.metric_keywords if keyword in query_lower)
-        knowledge_score = sum(1 for keyword in self.knowledge_keywords if keyword in query_lower)
+        metric_score = sum(
+            1 for keyword in self.metric_keywords if keyword in query_lower
+        )
+        knowledge_score = sum(
+            1 for keyword in self.knowledge_keywords if keyword in query_lower
+        )
 
         # Analyse des entités si intent_result disponible
         if intent_result:
             # Boost pour métriques si strain/breed spécifié
             if hasattr(intent_result, "genetic_line") and intent_result.genetic_line:
                 metric_score += 2
-                
+
             # Boost pour métriques si âge mentionné
             if hasattr(intent_result, "age") and intent_result.age:
                 metric_score += 1
 
         # Détection de comparaisons (souvent hybride)
-        comparison_indicators = ["vs", "versus", "compare", "comparaison", "différence", "mieux"]
-        has_comparison = any(indicator in query_lower for indicator in comparison_indicators)
+        comparison_indicators = [
+            "vs",
+            "versus",
+            "compare",
+            "comparaison",
+            "différence",
+            "mieux",
+        ]
+        has_comparison = any(
+            indicator in query_lower for indicator in comparison_indicators
+        )
 
         # Règles de décision
         if metric_score > knowledge_score + 1:
@@ -126,7 +185,7 @@ class PostgreSQLRetriever:
         """Initialise la connexion PostgreSQL"""
         if not ASYNCPG_AVAILABLE:
             raise ImportError("asyncpg requis pour PostgreSQL")
-            
+
         try:
             self.pool = await asyncpg.create_pool(
                 user=self.config["user"],
@@ -143,9 +202,11 @@ class PostgreSQLRetriever:
             logger.error(f"❌ Erreur PostgreSQL Retriever: {e}")
             raise
 
-    async def search_metrics(self, query: str, intent_result=None, top_k: int = 10) -> List[MetricResult]:
+    async def search_metrics(
+        self, query: str, intent_result=None, top_k: int = 10
+    ) -> List[MetricResult]:
         """Recherche de métriques dans PostgreSQL"""
-        
+
         if not self.pool:
             await self.initialize()
 
@@ -161,7 +222,7 @@ class PostgreSQLRetriever:
             for row in rows:
                 result = MetricResult(
                     company=row["company_name"],
-                    breed=row["breed_name"], 
+                    breed=row["breed_name"],
                     strain=row["strain_name"],
                     species=row["species"],
                     metric_name=row["metric_name"],
@@ -183,9 +244,11 @@ class PostgreSQLRetriever:
             logger.error(f"Erreur recherche PostgreSQL: {e}")
             return []
 
-    def _build_sql_query(self, query: str, intent_result=None, top_k: int = 10) -> Tuple[str, List]:
+    def _build_sql_query(
+        self, query: str, intent_result=None, top_k: int = 10
+    ) -> Tuple[str, List]:
         """Construction dynamique de la requête SQL"""
-        
+
         base_query = """
         SELECT 
             c.company_name,
@@ -223,7 +286,9 @@ class PostgreSQLRetriever:
 
             if hasattr(intent_result, "age") and intent_result.age:
                 param_count += 1
-                conditions.append(f"(m.age_min <= ${param_count} AND m.age_max >= ${param_count}) OR (m.age_min IS NULL AND m.age_max IS NULL)")
+                conditions.append(
+                    f"(m.age_min <= ${param_count} AND m.age_max >= ${param_count}) OR (m.age_min IS NULL AND m.age_max IS NULL)"
+                )
                 params.append(intent_result.age)
                 params.append(intent_result.age)
                 param_count += 1
@@ -233,7 +298,9 @@ class PostgreSQLRetriever:
         for word in query_words[:3]:  # Limite à 3 mots
             if len(word) > 3:  # Ignorer mots trop courts
                 param_count += 1
-                conditions.append(f"(LOWER(m.metric_name) ILIKE ${param_count} OR LOWER(m.value_text) ILIKE ${param_count})")
+                conditions.append(
+                    f"(LOWER(m.metric_name) ILIKE ${param_count} OR LOWER(m.value_text) ILIKE ${param_count})"
+                )
                 params.append(f"%{word}%")
                 params.append(f"%{word}%")
                 param_count += 1
@@ -249,7 +316,7 @@ class PostgreSQLRetriever:
 
     def _calculate_relevance_score(self, query: str, row: Dict) -> float:
         """Calcule un score de pertinence pour un résultat"""
-        
+
         score = 0.5  # Score de base
         query_lower = query.lower()
 
@@ -282,18 +349,18 @@ class PostgreSQLSystem:
 
     async def initialize(self):
         """Initialise le système PostgreSQL"""
-        
+
         if not ASYNCPG_AVAILABLE:
             raise ImportError("asyncpg requis pour PostgreSQL")
 
         try:
             # Router de requêtes
             self.query_router = QueryRouter()
-            
+
             # PostgreSQL Retriever
             self.postgres_retriever = PostgreSQLRetriever(POSTGRESQL_CONFIG)
             await self.postgres_retriever.initialize()
-            
+
             logger.info("✅ Système PostgreSQL initialisé")
 
         except Exception as e:
@@ -307,23 +374,27 @@ class PostgreSQLSystem:
 
         return self.query_router.route_query(query, intent_result)
 
-    async def search_metrics(self, query: str, intent_result=None, top_k: int = 10) -> RAGResult:
+    async def search_metrics(
+        self, query: str, intent_result=None, top_k: int = 10
+    ) -> RAGResult:
         """Recherche dans PostgreSQL pour les métriques"""
-        
+
         if not self.postgres_retriever:
             return RAGResult(
                 source=RAGSource.NO_RESULTS,
-                metadata={"error": "PostgreSQL non disponible"}
+                metadata={"error": "PostgreSQL non disponible"},
             )
 
         try:
             # Recherche des métriques
-            metric_results = await self.postgres_retriever.search_metrics(query, intent_result, top_k)
+            metric_results = await self.postgres_retriever.search_metrics(
+                query, intent_result, top_k
+            )
 
             if not metric_results:
                 return RAGResult(
                     source=RAGSource.NO_RESULTS,
-                    metadata={"source_type": "metrics", "data_source": "postgresql"}
+                    metadata={"source_type": "metrics", "data_source": "postgresql"},
                 )
 
             # Conversion en Documents pour compatibilité
@@ -349,7 +420,9 @@ class PostgreSQLSystem:
                 documents.append(doc)
 
             # Calcul confiance globale
-            avg_confidence = sum(m.confidence for m in metric_results) / len(metric_results)
+            avg_confidence = sum(m.confidence for m in metric_results) / len(
+                metric_results
+            )
 
             return RAGResult(
                 documents=documents,
@@ -357,7 +430,7 @@ class PostgreSQLSystem:
                 confidence=avg_confidence,
                 metadata={
                     "source_type": "metrics",
-                    "data_source": "postgresql", 
+                    "data_source": "postgresql",
                     "metric_count": len(metric_results),
                     "avg_confidence": avg_confidence,
                 },
@@ -367,12 +440,12 @@ class PostgreSQLSystem:
             logger.error(f"Erreur recherche métriques PostgreSQL: {e}")
             return RAGResult(
                 source=RAGSource.ERROR,
-                metadata={"error": str(e), "source_type": "metrics"}
+                metadata={"error": str(e), "source_type": "metrics"},
             )
 
     def _format_metric_content(self, metric: MetricResult) -> str:
         """Formate une métrique en contenu texte pour le LLM"""
-        
+
         content_parts = [
             f"**{metric.metric_name}**",
             f"Entreprise: {metric.company}",
