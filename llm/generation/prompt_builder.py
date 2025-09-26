@@ -133,9 +133,7 @@ ANALYSE DES DONNÉES:
             metrics_list = [
                 m.strip() for m in entities["metrics"].split(",") if m.strip()
             ]
-            base_prompt += (
-                f"\n\nMÉTRIQUES À TRAITER: {', '.join(metrics_list)}"
-            )
+            base_prompt += f"\n\nMÉTRIQUES À TRAITER: {', '.join(metrics_list)}"
 
         adaptive_factors = intent_result.vocabulary_coverage.get("adaptive_factors", {})
         if adaptive_factors.get("high_confidence", False):

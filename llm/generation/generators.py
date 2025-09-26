@@ -5,7 +5,6 @@ Version AFFIRMATIVE - Ton expert direct et professionnel
 """
 
 import logging
-import re
 from typing import List, Tuple, Dict
 from dataclasses import dataclass
 from core.data_models import Document
