@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 data_models.py - Classes et structures de données pour RAG Engine
-Version corrigée avec tous les RAGSource nécessaires et architecture modulaire
+VERSION CORRIGÉE COMPLÈTE - Tous les RAGSource nécessaires ajoutés
 """
 
 from typing import Dict, List, Optional, Any
@@ -22,11 +22,14 @@ class RAGSource(Enum):
     # Sources de fallback/filtrage
     FALLBACK_NEEDED = "fallback_needed"
     OOD_FILTERED = "ood_filtered"
+    
+    # CORRECTION CRITIQUE - Sources manquantes qui causaient les erreurs
+    NO_RESULTS = "no_results"
+    NO_DOCUMENTS_FOUND = "no_documents_found"
 
     # Erreurs spécifiques par étape
     EMBEDDING_FAILED = "embedding_failed"
     SEARCH_FAILED = "search_failed"
-    NO_DOCUMENTS_FOUND = "no_documents_found"
     LOW_CONFIDENCE = "low_confidence"
     GENERATION_FAILED = "generation_failed"
 
@@ -37,7 +40,12 @@ class RAGSource(Enum):
     @property
     def is_success(self) -> bool:
         """Indique si la source représente un succès"""
-        return self in {self.RAG_SUCCESS, self.RAG_KNOWLEDGE, self.RAG_VERIFIED}
+        return self in {
+            self.RAG_SUCCESS, 
+            self.RAG_KNOWLEDGE, 
+            self.RAG_VERIFIED,
+            self.RETRIEVAL_SUCCESS
+        }
 
     @property
     def is_error(self) -> bool:
@@ -50,12 +58,22 @@ class RAGSource(Enum):
             self.GENERATION_FAILED,
             self.INTERNAL_ERROR,
             self.ERROR,
+            self.NO_RESULTS,  # Ajouté dans les erreurs
         }
 
     @property
     def is_fallback(self) -> bool:
         """Indique si la source nécessite un fallback"""
         return self in {self.FALLBACK_NEEDED, self.OOD_FILTERED}
+
+    @property
+    def needs_retry(self) -> bool:
+        """Indique si on peut retenter la requête"""
+        return self in {
+            self.EMBEDDING_FAILED,
+            self.SEARCH_FAILED,
+            self.INTERNAL_ERROR,
+        }
 
 
 @dataclass
@@ -65,7 +83,7 @@ class RAGResult:
     source: RAGSource
     answer: Optional[str] = None
     confidence: float = 0.0
-    context_docs: List[Dict] = field(default_factory=list)
+    context_docs: List[Dict] = field(default_factory=list)  # CORRECTION: context_docs pas documents
     processing_time: float = 0.0
     metadata: Dict[str, Any] = field(default_factory=dict)
     verification_status: Optional[Dict] = None
@@ -98,11 +116,17 @@ class RAGResult:
     @property
     def should_retry(self) -> bool:
         """Indique si la requête devrait être retentée"""
-        return self.source in {
-            RAGSource.EMBEDDING_FAILED,
-            RAGSource.SEARCH_FAILED,
-            RAGSource.INTERNAL_ERROR,
-        }
+        return self.source.needs_retry
+
+    @property
+    def documents(self) -> List[Dict]:
+        """Alias pour context_docs pour compatibilité ascendante"""
+        return self.context_docs
+
+    @documents.setter
+    def documents(self, value: List[Dict]):
+        """Setter pour l'alias documents"""
+        self.context_docs = value
 
     def to_dict(self) -> Dict[str, Any]:
         """Convertit le résultat en dictionnaire pour sérialisation"""

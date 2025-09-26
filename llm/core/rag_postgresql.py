@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql.py - Système PostgreSQL pour métriques avicoles
-VERSION AMÉLIORÉE: Normalisation multilingue inspirée du PerfStore + Debug AttributeError
+VERSION CORRIGÉE COMPLÈTE - Résolution de tous les problèmes identifiés
 """
 
 import os
@@ -10,22 +10,23 @@ from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
 from enum import Enum
 
+# Imports conditionnels sécurisés
 try:
     import asyncpg
-
     ASYNCPG_AVAILABLE = True
 except ImportError:
     ASYNCPG_AVAILABLE = False
+    asyncpg = None
 
 from .data_models import RAGResult, RAGSource, Document
 
 logger = logging.getLogger(__name__)
 
-# Configuration PostgreSQL
+# Configuration PostgreSQL avec valeurs par défaut sécurisées
 POSTGRESQL_CONFIG = {
     "user": os.getenv("DB_USER", "doadmin"),
-    "password": os.getenv("DB_PASSWORD"),
-    "host": os.getenv("DB_HOST"),
+    "password": os.getenv("DB_PASSWORD", ""),
+    "host": os.getenv("DB_HOST", "localhost"),
     "port": int(os.getenv("DB_PORT", 25060)),
     "database": os.getenv("DB_NAME", "defaultdb"),
     "ssl": os.getenv("DB_SSL", "require"),
@@ -50,14 +51,28 @@ class MetricResult:
     strain: str
     species: str
     metric_name: str
-    value_numeric: Optional[float]
-    value_text: Optional[str]
-    unit: Optional[str]
-    age_min: Optional[int]
-    age_max: Optional[int]
-    sheet_name: str
-    category: str
+    value_numeric: Optional[float] = None
+    value_text: Optional[str] = None
+    unit: Optional[str] = None
+    age_min: Optional[int] = None
+    age_max: Optional[int] = None
+    sheet_name: str = ""
+    category: str = ""
     confidence: float = 1.0
+
+    def __post_init__(self):
+        """Validation et nettoyage des données"""
+        # Assurer que les champs string ne sont pas None
+        self.company = str(self.company) if self.company is not None else "Unknown"
+        self.breed = str(self.breed) if self.breed is not None else "Unknown"
+        self.strain = str(self.strain) if self.strain is not None else "Unknown"
+        self.species = str(self.species) if self.species is not None else "Unknown"
+        self.metric_name = str(self.metric_name) if self.metric_name is not None else "Unknown"
+        self.sheet_name = str(self.sheet_name) if self.sheet_name is not None else ""
+        self.category = str(self.category) if self.category is not None else ""
+        
+        # Valider la confidence
+        self.confidence = max(0.0, min(1.0, float(self.confidence)))
 
 
 class SQLQueryNormalizer:
@@ -68,121 +83,51 @@ class SQLQueryNormalizer:
 
     CONCEPT_MAPPINGS = {
         "weight": [
-            "poids",
-            "peso",
-            "weight",
-            "body_weight",
-            "live_weight",
-            "body weight",
-            "weight_g",
-            "weight_lb",
-            "masse",
-            "masse corporelle",
-            "poids corporel",
-            "poids vif",
+            "poids", "peso", "weight", "body_weight", "live_weight", "body weight",
+            "weight_g", "weight_lb", "masse", "masse corporelle", "poids corporel",
+            "poids vif", "body_weight_day"
         ],
         "feed": [
-            "alimentation",
-            "alimento",
-            "feed",
-            "nutrition",
-            "consommation",
-            "feed_intake",
-            "feed consumption",
-            "aliment",
-            "nourriture",
-            "ration",
-            "aliment_consommé",
+            "alimentation", "alimento", "feed", "nutrition", "consommation",
+            "feed_intake", "feed consumption", "aliment", "nourriture", "ration",
+            "aliment_consommé", "feed_consumed"
         ],
         "mortality": [
-            "mortalité",
-            "mortalidad",
-            "mortality",
-            "death_rate",
-            "viability",
-            "survie",
-            "taux de mortalité",
-            "mort",
-            "décès",
-            "pertes",
+            "mortalité", "mortalidad", "mortality", "death_rate", "viability",
+            "survie", "taux de mortalité", "mort", "décès", "pertes"
         ],
         "growth": [
-            "croissance",
-            "crecimiento",
-            "growth",
-            "gain",
-            "développement",
-            "daily_gain",
-            "gain quotidien",
-            "croissance pondérale",
+            "croissance", "crecimiento", "growth", "gain", "développement",
+            "daily_gain", "gain quotidien", "croissance pondérale"
         ],
         "production": [
-            "production",
-            "producción",
-            "ponte",
-            "laying",
-            "egg_production",
-            "lay_rate",
-            "taux de ponte",
-            "œufs",
-            "eggs",
-            "rendement",
+            "production", "producción", "ponte", "laying", "egg_production",
+            "lay_rate", "taux de ponte", "œufs", "eggs", "rendement"
         ],
         "fcr": [
-            "icg",
-            "fcr",
-            "feed_conversion",
-            "conversion",
-            "efficacité",
-            "efficiency",
-            "indice de consommation",
-            "conversion alimentaire",
+            "icg", "fcr", "feed_conversion", "conversion", "efficacité",
+            "efficiency", "indice de consommation", "conversion alimentaire"
         ],
         "water": [
-            "eau",
-            "water",
-            "água",
-            "water_consumption",
-            "hydratation",
-            "consommation d'eau",
-            "abreuvement",
+            "eau", "water", "água", "water_consumption", "hydratation",
+            "consommation d'eau", "abreuvement"
         ],
         "temperature": [
-            "température",
-            "temperature",
-            "temp",
-            "chaleur",
-            "froid",
-            "thermique",
-            "climat",
+            "température", "temperature", "temp", "chaleur", "froid",
+            "thermique", "climat"
         ],
         "density": [
-            "densité",
-            "density",
-            "peuplement",
-            "stocking",
-            "occupation",
-            "espace",
-            "space",
+            "densité", "density", "peuplement", "stocking", "occupation",
+            "espace", "space"
         ],
         "age": [
-            "âge",
-            "age",
-            "semaine",
-            "week",
-            "jour",
-            "day",
-            "période",
-            "phase",
-            "stade",
+            "âge", "age", "semaine", "week", "jour", "day", "période",
+            "phase", "stade", "at day"
         ],
     }
 
     def normalize_query_concepts(self, query: str) -> List[str]:
-        """
-        Convertit 'quel poids' en ['weight', 'body_weight', 'live_weight']
-        Inspiré de la méthode _canon_sex du PerfStore
-        """
+        """Convertit 'quel poids' en ['weight', 'body_weight', 'live_weight']"""
         query_lower = query.lower()
         normalized_concepts = []
 
@@ -202,12 +147,9 @@ class SQLQueryNormalizer:
         return unique_concepts
 
     def get_search_terms(self, query: str) -> Tuple[List[str], List[str]]:
-        """
-        Retourne (concepts_normalisés, mots_bruts) pour recherche SQL
-        """
+        """Retourne (concepts_normalisés, mots_bruts) pour recherche SQL"""
         normalized = self.normalize_query_concepts(query)
         raw_words = [word for word in query.lower().split() if len(word) > 3]
-
         return normalized, raw_words
 
 
@@ -217,69 +159,21 @@ class QueryRouter:
     def __init__(self):
         # Mots-clés pour PostgreSQL (métriques/performance)
         self.metric_keywords = {
-            "performance",
-            "metrics",
-            "données",
-            "chiffres",
-            "résultats",
-            "weight",
-            "poids",
-            "egg",
-            "oeuf",
-            "production",
-            "feed",
-            "alimentation",
-            "mortality",
-            "mortalité",
-            "growth",
-            "croissance",
-            "nutrition",
-            "age",
-            "semaine",
-            "week",
-            "day",
-            "jour",
-            "phase",
-            "temperature",
-            "température",
-            "humidity",
-            "humidité",
-            "housing",
-            "logement",
-            "density",
-            "densité",
-            "fcr",
-            "icg",
-            "conversion",
-            "efficacité",
+            "performance", "metrics", "données", "chiffres", "résultats",
+            "weight", "poids", "egg", "oeuf", "production", "feed", "alimentation",
+            "mortality", "mortalité", "growth", "croissance", "nutrition", "age",
+            "semaine", "week", "day", "jour", "phase", "temperature", "température",
+            "humidity", "humidité", "housing", "logement", "density", "densité",
+            "fcr", "icg", "conversion", "efficacité", "ross", "cobb", "hubbard"
         }
 
         # Mots-clés pour Weaviate (connaissances)
         self.knowledge_keywords = {
-            "comment",
-            "pourquoi",
-            "qu'est-ce",
-            "expliquer",
-            "définir",
-            "maladie",
-            "disease",
-            "traitement",
-            "treatment",
-            "symptom",
-            "symptôme",
-            "prévention",
-            "prevention",
-            "biosécurité",
-            "biosecurity",
-            "management",
-            "gestion",
-            "guide",
-            "protocol",
-            "protocole",
-            "conseil",
-            "advice",
-            "recommendation",
-            "recommandation",
+            "comment", "pourquoi", "qu'est-ce", "expliquer", "définir",
+            "maladie", "disease", "traitement", "treatment", "symptom", "symptôme",
+            "prévention", "prevention", "biosécurité", "biosecurity", "management",
+            "gestion", "guide", "protocol", "protocole", "conseil", "advice",
+            "recommendation", "recommandation"
         }
 
     def route_query(self, query: str, intent_result=None) -> QueryType:
@@ -287,12 +181,8 @@ class QueryRouter:
         query_lower = query.lower()
 
         # Compteurs de mots-clés
-        metric_score = sum(
-            1 for keyword in self.metric_keywords if keyword in query_lower
-        )
-        knowledge_score = sum(
-            1 for keyword in self.knowledge_keywords if keyword in query_lower
-        )
+        metric_score = sum(1 for keyword in self.metric_keywords if keyword in query_lower)
+        knowledge_score = sum(1 for keyword in self.knowledge_keywords if keyword in query_lower)
 
         # Analyse des entités si intent_result disponible
         if intent_result:
@@ -302,17 +192,8 @@ class QueryRouter:
                 metric_score += 1
 
         # Détection de comparaisons (souvent hybride)
-        comparison_indicators = [
-            "vs",
-            "versus",
-            "compare",
-            "comparaison",
-            "différence",
-            "mieux",
-        ]
-        has_comparison = any(
-            indicator in query_lower for indicator in comparison_indicators
-        )
+        comparison_indicators = ["vs", "versus", "compare", "comparaison", "différence", "mieux"]
+        has_comparison = any(indicator in query_lower for indicator in comparison_indicators)
 
         # Règles de décision
         if metric_score > knowledge_score + 1:
@@ -331,14 +212,26 @@ class PostgreSQLRetriever:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.pool = None
-        self.query_normalizer = SQLQueryNormalizer()  # NOUVEAU
+        self.query_normalizer = SQLQueryNormalizer()
+        self.is_initialized = False
 
     async def initialize(self):
         """Initialise la connexion PostgreSQL"""
         if not ASYNCPG_AVAILABLE:
+            logger.error("asyncpg non disponible - PostgreSQL désactivé")
             raise ImportError("asyncpg requis pour PostgreSQL")
 
+        if self.is_initialized:
+            return
+
         try:
+            # Vérifier que les variables d'environnement sont définies
+            if not self.config.get("password"):
+                logger.warning("DB_PASSWORD non défini - PostgreSQL peut échouer")
+            
+            if not self.config.get("host"):
+                logger.warning("DB_HOST non défini - PostgreSQL peut échouer")
+
             self.pool = await asyncpg.create_pool(
                 user=self.config["user"],
                 password=self.config["password"],
@@ -348,10 +241,20 @@ class PostgreSQLRetriever:
                 ssl=self.config["ssl"],
                 min_size=2,
                 max_size=10,
+                command_timeout=30
             )
-            logger.info("✅ PostgreSQL Retriever initialisé")
+            
+            # Test de connexion
+            async with self.pool.acquire() as conn:
+                await conn.execute("SELECT 1")
+            
+            self.is_initialized = True
+            logger.info("PostgreSQL Retriever initialisé avec succès")
+            
         except Exception as e:
-            logger.error(f"❌ Erreur PostgreSQL Retriever: {e}")
+            logger.error(f"Erreur initialisation PostgreSQL: {e}")
+            self.pool = None
+            self.is_initialized = False
             raise
 
     async def search_metrics(
@@ -359,8 +262,13 @@ class PostgreSQLRetriever:
     ) -> List[MetricResult]:
         """Recherche de métriques dans PostgreSQL avec normalisation multilingue"""
 
-        if not self.pool:
-            await self.initialize()
+        if not self.is_initialized or not self.pool:
+            logger.warning("PostgreSQL non initialisé - tentative d'initialisation")
+            try:
+                await self.initialize()
+            except Exception as e:
+                logger.error(f"Échec initialisation PostgreSQL: {e}")
+                return []
 
         try:
             # Construction de la requête SQL avec normalisation
@@ -374,40 +282,41 @@ class PostgreSQLRetriever:
             async with self.pool.acquire() as conn:
                 rows = await conn.fetch(sql_query, *params)
 
-            # Conversion en MetricResult
+            # Conversion en MetricResult avec gestion des erreurs
             results = []
-            for row in rows:
-                result = MetricResult(
-                    company=row["company_name"],
-                    breed=row["breed_name"],
-                    strain=row["strain_name"],
-                    species=row["species"],
-                    metric_name=row["metric_name"],
-                    value_numeric=row["value_numeric"],
-                    value_text=row["value_text"],
-                    unit=row["unit"],
-                    age_min=row["age_min"],
-                    age_max=row["age_max"],
-                    sheet_name=row["sheet_name"],
-                    category=row["category_name"],
-                    confidence=self._calculate_relevance_score(query, row),
-                )
-                results.append(result)
+            for i, row in enumerate(rows):
+                try:
+                    result = MetricResult(
+                        company=row.get("company_name", "Unknown"),
+                        breed=row.get("breed_name", "Unknown"),
+                        strain=row.get("strain_name", "Unknown"),
+                        species=row.get("species", "Unknown"),
+                        metric_name=row.get("metric_name", "Unknown"),
+                        value_numeric=row.get("value_numeric"),
+                        value_text=row.get("value_text"),
+                        unit=row.get("unit"),
+                        age_min=row.get("age_min"),
+                        age_max=row.get("age_max"),
+                        sheet_name=row.get("sheet_name", ""),
+                        category=row.get("category_name", ""),
+                        confidence=self._calculate_relevance_score(query, row),
+                    )
+                    results.append(result)
+                except Exception as row_error:
+                    logger.error(f"Erreur conversion ligne {i}: {row_error}")
+                    continue
 
-            logger.info(f"PostgreSQL: {len(results)} métriques trouvées")
+            logger.info(f"PostgreSQL: {len(results)} métriques trouvées sur {len(rows)} lignes")
             return results
 
         except Exception as e:
             logger.error(f"Erreur recherche PostgreSQL: {e}")
-            return []  # Retourne liste vide au lieu de lever exception
+            return []
 
     def _build_sql_query_with_normalization(
         self, query: str, intent_result=None, top_k: int = 10
     ) -> Tuple[str, List]:
-        """
-        Construction dynamique de la requête SQL avec normalisation multilingue
-        VERSION AMÉLIORÉE: Résout le problème "quel poids" → "weight"
-        """
+        """Construction dynamique de la requête SQL avec normalisation multilingue"""
 
         base_query = """
         SELECT 
@@ -437,11 +346,10 @@ class PostgreSQLRetriever:
         conditions = []
         param_count = 0
 
-        # NOUVEAU: Normalisation des concepts
+        # Normalisation des concepts
         normalized_concepts, raw_words = self.query_normalizer.get_search_terms(query)
-
-        logger.debug(f"Concepts normalisés: {normalized_concepts}")
-        logger.debug(f"Mots bruts: {raw_words}")
+        logger.debug(f"Concepts normalisés: {normalized_concepts[:5]}")
+        logger.debug(f"Mots bruts: {raw_words[:3]}")
 
         # Filtres selon intent_result
         if intent_result:
@@ -456,33 +364,27 @@ class PostgreSQLRetriever:
                 conditions.append(
                     f"(m.age_min <= ${param_count} AND m.age_max >= ${param_count_age2}) OR (m.age_min IS NULL AND m.age_max IS NULL)"
                 )
-                params.append(intent_result.age)
-                params.append(intent_result.age)
+                params.extend([intent_result.age, intent_result.age])
                 param_count += 1
 
-        # CORRECTION PRINCIPALE: Recherche avec concepts normalisés
+        # Recherche avec concepts normalisés et mots bruts
         metric_search_conditions = []
 
-        # 1. Recherche sur concepts normalisés (priorité haute)
-        if normalized_concepts:
-            for concept in normalized_concepts[
-                :10
-            ]:  # Limite pour éviter requêtes trop lourdes
-                param_count += 1
-                metric_search_conditions.append(
-                    f"LOWER(m.metric_name) ILIKE ${param_count}"
-                )
-                params.append(f"%{concept}%")
+        # 1. Priorité aux concepts normalisés
+        for concept in normalized_concepts[:8]:  # Limite pour éviter requêtes trop lourdes
+            param_count += 1
+            metric_search_conditions.append(f"LOWER(m.metric_name) ILIKE ${param_count}")
+            params.append(f"%{concept}%")
 
-        # 2. Recherche sur mots bruts (fallback)
-        for word in raw_words[:3]:  # Limite à 3 mots
+        # 2. Fallback sur mots bruts
+        for word in raw_words[:3]:
             param_count += 1
             param_count_word2 = param_count + 1
-            metric_search_conditions.append(
-                f"(LOWER(m.metric_name) ILIKE ${param_count} OR LOWER(m.value_text) ILIKE ${param_count_word2})"
-            )
-            params.append(f"%{word}%")
-            params.append(f"%{word}%")
+            metric_search_conditions.extend([
+                f"LOWER(m.metric_name) ILIKE ${param_count}",
+                f"LOWER(m.value_text) ILIKE ${param_count_word2}"
+            ])
+            params.extend([f"%{word}%", f"%{word}%"])
             param_count += 1
 
         # Ajouter les conditions de recherche métrique
@@ -499,10 +401,7 @@ class PostgreSQLRetriever:
         return base_query, params
 
     def _calculate_relevance_score(self, query: str, row: Dict) -> float:
-        """
-        Calcule un score de pertinence pour un résultat
-        AMÉLIORÉ: Prend en compte la normalisation multilingue
-        """
+        """Calcule un score de pertinence pour un résultat"""
         score = 0.5  # Score de base
         query_lower = query.lower()
 
@@ -510,7 +409,7 @@ class PostgreSQLRetriever:
         normalized_concepts, _ = self.query_normalizer.get_search_terms(query)
 
         # Boost si métrique correspond aux concepts normalisés
-        metric_name_lower = (row["metric_name"] or "").lower()
+        metric_name_lower = (row.get("metric_name") or "").lower()
         for concept in normalized_concepts:
             if concept in metric_name_lower:
                 score += 0.4  # Boost élevé pour correspondance conceptuelle
@@ -521,11 +420,11 @@ class PostgreSQLRetriever:
             score += 0.3
 
         # Boost si valeur numérique disponible
-        if row["value_numeric"] is not None:
+        if row.get("value_numeric") is not None:
             score += 0.1
 
         # Boost si âge spécifique
-        if row["age_min"] is not None and row["age_max"] is not None:
+        if row.get("age_min") is not None and row.get("age_max") is not None:
             score += 0.1
 
         return min(1.0, score)
@@ -533,7 +432,14 @@ class PostgreSQLRetriever:
     async def close(self):
         """Ferme la connexion PostgreSQL"""
         if self.pool:
-            await self.pool.close()
+            try:
+                await self.pool.close()
+                logger.info("Connexion PostgreSQL fermée")
+            except Exception as e:
+                logger.error(f"Erreur fermeture PostgreSQL: {e}")
+            finally:
+                self.pool = None
+                self.is_initialized = False
 
 
 class PostgreSQLSystem:
@@ -542,10 +448,15 @@ class PostgreSQLSystem:
     def __init__(self):
         self.query_router = None
         self.postgres_retriever = None
+        self.is_initialized = False
 
     async def initialize(self):
         """Initialise le système PostgreSQL"""
+        if self.is_initialized:
+            return
+
         if not ASYNCPG_AVAILABLE:
+            logger.error("asyncpg non disponible - PostgreSQL désactivé")
             raise ImportError("asyncpg requis pour PostgreSQL")
 
         try:
@@ -556,12 +467,12 @@ class PostgreSQLSystem:
             self.postgres_retriever = PostgreSQLRetriever(POSTGRESQL_CONFIG)
             await self.postgres_retriever.initialize()
 
-            logger.info(
-                "✅ Système PostgreSQL initialisé avec normalisation multilingue"
-            )
+            self.is_initialized = True
+            logger.info("Système PostgreSQL initialisé avec normalisation multilingue")
 
         except Exception as e:
-            logger.error(f"❌ Erreur initialisation PostgreSQL: {e}")
+            logger.error(f"Erreur initialisation PostgreSQL System: {e}")
+            self.is_initialized = False
             raise
 
     def route_query(self, query: str, intent_result=None) -> QueryType:
@@ -573,9 +484,9 @@ class PostgreSQLSystem:
     async def search_metrics(
         self, query: str, intent_result=None, top_k: int = 10
     ) -> RAGResult:
-        """Recherche dans PostgreSQL pour les métriques avec confidence scoring"""
+        """CORRECTION PRINCIPALE - Recherche avec le bon nom de paramètre"""
 
-        if not self.postgres_retriever:
+        if not self.is_initialized or not self.postgres_retriever:
             return RAGResult(
                 source=RAGSource.NO_RESULTS,
                 metadata={"error": "PostgreSQL non disponible"},
@@ -593,75 +504,39 @@ class PostgreSQLSystem:
                     metadata={"source_type": "metrics", "data_source": "postgresql"},
                 )
 
-            # Conversion en Documents pour compatibilité - AVEC DEBUG DÉTAILLÉ
+            # Conversion en Documents pour compatibilité
             documents = []
-            logger.debug(f"DEBUG: Début conversion de {len(metric_results)} métriques")
+            logger.debug(f"Conversion de {len(metric_results)} métriques en documents")
 
             for i, metric in enumerate(metric_results):
                 try:
-                    logger.debug(f"DEBUG: Traitement métrique {i}: {type(metric)}")
-
-                    # Vérification des attributs requis
-                    if not hasattr(metric, "company"):
-                        logger.error(f"DEBUG: Métrique {i} manque attribut 'company'")
-                        continue
-                    if not hasattr(metric, "metric_name"):
-                        logger.error(
-                            f"DEBUG: Métrique {i} manque attribut 'metric_name'"
-                        )
-                        continue
-
-                    logger.debug(
-                        f"DEBUG: Métrique {i} - company={metric.company}, name={metric.metric_name}"
-                    )
-
-                    # Appel sécurisé de _format_metric_content
-                    try:
-                        doc_content = self._format_metric_content(metric)
-                        logger.debug(f"DEBUG: doc_content créé pour métrique {i}")
-                    except Exception as format_error:
-                        logger.error(
-                            f"DEBUG: Erreur _format_metric_content pour métrique {i}: {format_error}"
-                        )
-                        continue
-
+                    # Formatage sécurisé du contenu
+                    doc_content = self._format_metric_content(metric)
+                    
                     # Création sécurisée du Document
-                    try:
-                        doc = Document(
-                            content=doc_content,
-                            metadata={
-                                "company": str(metric.company),
-                                "breed": str(metric.breed),
-                                "strain": str(metric.strain),
-                                "species": str(metric.species),
-                                "metric_name": str(metric.metric_name),
-                                "category": str(metric.category),
-                                "sheet_name": str(metric.sheet_name),
-                                "source_type": "metrics",
-                                "data_source": "postgresql",
-                                "normalized_search": True,
-                            },
-                            score=float(metric.confidence),
-                        )
-                        logger.debug(f"DEBUG: Document créé pour métrique {i}")
-                        documents.append(doc)
-
-                    except Exception as doc_error:
-                        logger.error(
-                            f"DEBUG: Erreur création Document pour métrique {i}: {doc_error}"
-                        )
-                        continue
-
-                except Exception as metric_error:
-                    logger.error(
-                        f"DEBUG: Erreur globale métrique {i}: {type(metric_error)} - {metric_error}"
+                    doc = Document(
+                        content=doc_content,
+                        metadata={
+                            "company": metric.company,
+                            "breed": metric.breed,
+                            "strain": metric.strain,
+                            "species": metric.species,
+                            "metric_name": metric.metric_name,
+                            "category": metric.category,
+                            "sheet_name": metric.sheet_name,
+                            "source_type": "metrics",
+                            "data_source": "postgresql",
+                            "normalized_search": True,
+                        },
+                        score=metric.confidence,
+                        source_type="metrics",
+                        retrieval_method="postgresql_normalized"
                     )
-                    logger.error(f"DEBUG: Métrique problématique: {metric}")
-                    continue
+                    documents.append(doc)
 
-            logger.debug(
-                f"DEBUG: Fin conversion: {len(documents)} documents créés sur {len(metric_results)} métriques"
-            )
+                except Exception as doc_error:
+                    logger.error(f"Erreur création Document pour métrique {i}: {doc_error}")
+                    continue
 
             if not documents:
                 logger.warning("Aucun document créé à partir des métriques trouvées")
@@ -675,22 +550,19 @@ class PostgreSQLSystem:
                 )
 
             # Calcul confiance globale avec boost pour normalisation
-            avg_confidence = sum(m.confidence for m in metric_results) / len(
-                metric_results
-            )
+            avg_confidence = sum(m.confidence for m in metric_results) / len(metric_results)
 
             # Bonus de confiance si recherche normalisée a trouvé des résultats
-            normalized_concepts, _ = (
-                self.postgres_retriever.query_normalizer.get_search_terms(query)
-            )
+            normalized_concepts, _ = self.postgres_retriever.query_normalizer.get_search_terms(query)
             if normalized_concepts:
                 avg_confidence = min(1.0, avg_confidence + 0.1)
 
             logger.info(f"PostgreSQL SUCCESS: {len(documents)} documents retournés")
 
+            # CORRECTION CRITIQUE - Utiliser context_docs au lieu de documents
             return RAGResult(
                 source=RAGSource.RAG_SUCCESS,
-                context_docs=documents,
+                context_docs=[doc.to_dict() for doc in documents],  # ✅ CORRECT
                 confidence=avg_confidence,
                 metadata={
                     "source_type": "metrics",
@@ -699,19 +571,14 @@ class PostgreSQLSystem:
                     "document_count": len(documents),
                     "avg_confidence": avg_confidence,
                     "multilingual_normalization": True,
-                    "normalized_concepts": normalized_concepts[
-                        :5
-                    ],  # Premiers concepts pour debug
+                    "normalized_concepts": normalized_concepts[:5],
                 },
             )
 
         except Exception as e:
-            logger.error(f"DEBUG: Type d'exception: {type(e)}")
-            logger.error(f"DEBUG: Valeur exception: {e}")
-            logger.error(f"DEBUG: Erreur recherche métriques PostgreSQL: {e}")
+            logger.error(f"Erreur recherche métriques PostgreSQL: {e}")
             import traceback
-
-            logger.error(f"DEBUG: Stack trace: {traceback.format_exc()}")
+            logger.error(f"Stack trace: {traceback.format_exc()}")
             return RAGResult(
                 source=RAGSource.ERROR,
                 metadata={"error": str(e), "source_type": "metrics"},
@@ -743,12 +610,13 @@ class PostgreSQLSystem:
                 if metric.age_min == metric.age_max:
                     content_parts.append(f"Age: {metric.age_min} semaines")
                 else:
-                    content_parts.append(
-                        f"Age: {metric.age_min}-{metric.age_max} semaines"
-                    )
+                    content_parts.append(f"Age: {metric.age_min}-{metric.age_max} semaines")
 
-            content_parts.append(f"Source: {metric.sheet_name}")
+            if metric.sheet_name:
+                content_parts.append(f"Source: {metric.sheet_name}")
+            
             return "\n".join(content_parts)
+            
         except Exception as e:
             logger.error(f"Erreur formatage métrique: {e}")
             return f"Métrique: {getattr(metric, 'metric_name', 'Nom inconnu')}"
@@ -757,11 +625,12 @@ class PostgreSQLSystem:
         """Ferme le système PostgreSQL"""
         if self.postgres_retriever:
             await self.postgres_retriever.close()
+        self.is_initialized = False
 
     def get_normalization_status(self) -> Dict[str, Any]:
         """Retourne le statut du système de normalisation"""
         if not self.postgres_retriever:
-            return {"available": False}
+            return {"available": False, "reason": "retriever_not_initialized"}
 
         return {
             "available": True,
