@@ -453,12 +453,8 @@ class SystemHealthMonitor:
 
         rag_engine = self._critical_services.get("rag_engine_enhanced")
         if rag_engine:
-            # Chercher dans weaviate_core (architecture modulaire)
-            weaviate_core = getattr(rag_engine, "weaviate_core", None)
-            if weaviate_core:
-                weaviate_client = getattr(weaviate_core, "client", None)
-            else:
-                weaviate_client = getattr(rag_engine, "weaviate_client", None)
+            weaviate_client = getattr(rag_engine, "weaviate_client", None)
+
         try:
             connectivity = await asyncio.wait_for(
                 quick_connectivity_check(redis_client, weaviate_client), timeout=10.0
