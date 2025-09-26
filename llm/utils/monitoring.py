@@ -465,7 +465,8 @@ class SystemHealthMonitor:
             if not weaviate_client:
                 weaviate_core = getattr(rag_engine, "weaviate_core", None)
                 if weaviate_core:
-                    weaviate_client = getattr(weaviate_core, "client", None)
+                    # CORRECTION: L'attribut est 'weaviate_client' dans WeaviateCore, pas 'client'
+                    weaviate_client = getattr(weaviate_core, "weaviate_client", None)
                     logger.debug("Client Weaviate trouvé dans weaviate_core")
                 else:
                     logger.debug("weaviate_core non trouvé dans RAG engine")
