@@ -2,6 +2,7 @@
 """
 rag_postgresql.py - Système PostgreSQL pour métriques avicoles
 Extrait du fichier principal pour modularité
+VERSION CORRIGÉE: Fix de la construction des requêtes SQL dynamiques
 """
 
 import os
@@ -214,6 +215,9 @@ class PostgreSQLRetriever:
             # Construction de la requête SQL dynamique
             sql_query, params = self._build_sql_query(query, intent_result, top_k)
 
+            logger.debug(f"SQL Query: {sql_query}")
+            logger.debug(f"Parameters: {params}")
+
             async with self.pool.acquire() as conn:
                 rows = await conn.fetch(sql_query, *params)
 
@@ -242,12 +246,12 @@ class PostgreSQLRetriever:
 
         except Exception as e:
             logger.error(f"Erreur recherche PostgreSQL: {e}")
-            return []
+            raise Exception("NO_RESULTS")
 
     def _build_sql_query(
         self, query: str, intent_result=None, top_k: int = 10
     ) -> Tuple[str, List]:
-        """Construction dynamique de la requête SQL"""
+        """Construction dynamique de la requête SQL - VERSION CORRIGÉE"""
 
         base_query = """
         SELECT 
@@ -286,20 +290,22 @@ class PostgreSQLRetriever:
 
             if hasattr(intent_result, "age") and intent_result.age:
                 param_count += 1
+                param_count_age2 = param_count + 1
                 conditions.append(
-                    f"(m.age_min <= ${param_count} AND m.age_max >= ${param_count}) OR (m.age_min IS NULL AND m.age_max IS NULL)"
+                    f"(m.age_min <= ${param_count} AND m.age_max >= ${param_count_age2}) OR (m.age_min IS NULL AND m.age_max IS NULL)"
                 )
                 params.append(intent_result.age)
                 params.append(intent_result.age)
                 param_count += 1
 
-        # Recherche textuelle sur les métriques
+        # CORRECTION PRINCIPALE: Recherche textuelle sur les métriques
         query_words = query.lower().split()
         for word in query_words[:3]:  # Limite à 3 mots
             if len(word) > 3:  # Ignorer mots trop courts
                 param_count += 1
+                param_count_word2 = param_count + 1
                 conditions.append(
-                    f"(LOWER(m.metric_name) ILIKE ${param_count} OR LOWER(m.value_text) ILIKE ${param_count})"
+                    f"(LOWER(m.metric_name) ILIKE ${param_count} OR LOWER(m.value_text) ILIKE ${param_count_word2})"
                 )
                 params.append(f"%{word}%")
                 params.append(f"%{word}%")
