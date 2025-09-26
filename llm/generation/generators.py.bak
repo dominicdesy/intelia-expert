@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 generators.py - Générateurs de réponses enrichis avec entités et cache externe
-Version AFFIRMATIVE - Ton expert direct et professionnel
+Version corrigée - Instructions prompt améliorées pour lecture des tableaux
 """
 
 import logging
@@ -28,7 +28,7 @@ class ContextEnrichment:
 
 
 class EnhancedResponseGenerator:
-    """Générateur avec enrichissement d'entités et cache externe + ton affirmatif expert"""
+    """Générateur avec enrichissement d'entités et cache externe + instrumentation sémantique"""
 
     def __init__(self, client, cache_manager=None):
         self.client = client
@@ -97,12 +97,12 @@ class EnhancedResponseGenerator:
         language: str = "fr",
         intent_result=None,
     ) -> str:
-        """Génère une réponse enrichie avec cache externe + ton affirmatif expert"""
+        """Génère une réponse enrichie avec cache externe + instrumentation sémantique"""
 
-        # Protection contre les documents vides
+        # ✅ CORRECTION: Protection contre les documents vides placée au bon endroit
         if not context_docs or len(context_docs) == 0:
             logger.warning("⚠️ Générateur appelé avec 0 documents - protection activée")
-            return "Je n'ai pas trouvé d'informations pertinentes dans ma base de connaissances pour répondre à votre question. Pouvez-vous reformuler ou être plus spécifique ?"
+            return "Je n'ai pas trouvé de documents pertinents dans ma base de connaissances pour répondre à votre question. Pouvez-vous reformuler ou être plus spécifique ?"
 
         try:
             # Vérifier le cache externe
@@ -116,6 +116,7 @@ class EnhancedResponseGenerator:
                 )
                 if cached_response:
                     METRICS.cache_hit("response")
+                    # Tracer le type de cache hit
                     if hasattr(self.cache_manager, "get_last_cache_details"):
                         try:
                             cache_hit_details = (
@@ -150,7 +151,7 @@ class EnhancedResponseGenerator:
                     {"role": "user", "content": user_prompt},
                 ],
                 temperature=0.1,
-                max_tokens=900,
+                max_tokens=900,  # Augmenté pour les réponses enrichies
             )
 
             generated_response = response.choices[0].message.content.strip()
@@ -162,7 +163,7 @@ class EnhancedResponseGenerator:
                 [self._doc_to_dict(doc) for doc in context_docs],
             )
 
-            # Mettre en cache
+            # Mettre en cache - CORRIGÉ: paramètre metadata supprimé
             if self.cache_manager and self.cache_manager.enabled:
                 await self.cache_manager.set_response(
                     query, context_hash, enhanced_response, language
@@ -219,12 +220,13 @@ class EnhancedResponseGenerator:
                         f"Phase {entities['phase']}: {self.entity_contexts['phase'][phase]}"
                     )
 
-            # Focus métrique
+            # Focus métrique - CORRIGÉ: Accès cohérent à intent_result
             metric_focus = ""
             detected_metrics = []
             expanded_query = getattr(intent_result, "expanded_query", "")
 
             for metric, keywords in self.performance_metrics.items():
+                # Vérifier si la métrique est dans les entités OU dans la query étendue
                 metric_in_entities = metric in entities
                 metric_in_query = (
                     any(kw in expanded_query.lower() for kw in keywords)
@@ -267,7 +269,7 @@ class EnhancedResponseGenerator:
                 elif "layer" in species or "ponte" in species:
                     species_focus = "Objectifs ponte: intensité, persistance, qualité œuf, viabilité"
 
-            # Indicateurs de performance attendus
+            # Indicateurs de performance attendus - CORRIGÉ: Accès cohérent
             performance_indicators = []
             if "weight" in entities or (
                 "poids" in expanded_query.lower() if expanded_query else False
@@ -313,7 +315,7 @@ class EnhancedResponseGenerator:
         conversation_context: str,
         language: str,
     ) -> Tuple[str, str]:
-        """Construit un prompt enrichi avec ton affirmatif expert"""
+        """Construit un prompt enrichi avec les entités détectées"""
 
         # Contexte documentaire
         context_text = "\n\n".join(
@@ -323,8 +325,8 @@ class EnhancedResponseGenerator:
             ]
         )
 
-        # Construction du prompt système enrichi - VERSION AFFIRMATIVE
-        system_prompt = f"""Tu es un expert avicole reconnu avec une expertise approfondie en production avicole.
+        # Construction du prompt système enrichi - CORRIGÉ
+        system_prompt = f"""Tu es un expert en aviculture spécialisé dans l'accompagnement technique des éleveurs.
 
 CONTEXTE MÉTIER DÉTECTÉ:
 {enrichment.entity_context}
@@ -332,27 +334,22 @@ CONTEXTE MÉTIER DÉTECTÉ:
 {enrichment.temporal_context}
 {enrichment.metric_focus}
 
-DIRECTIVES DE RÉPONSE - STYLE EXPERT AFFIRMATIF:
+DIRECTIVES DE RÉPONSE:
+1. EXAMINE ATTENTIVEMENT tous les tableaux dans les documents - ils contiennent souvent les réponses exactes
+2. Si tu trouves des données avec des âges en jours/semaines dans un tableau, UTILISE-LES pour répondre précisément
+3. Priorise les métriques identifiées: {', '.join(enrichment.performance_indicators[:3]) if enrichment.performance_indicators else 'N/A'}
+4. Adapte le niveau technique au contexte (éleveur professionnel)
+5. Fournis des valeurs chiffrées quand disponibles
+6. Mentionne les spécificités de lignée/phase si pertinentes
 
-1. **Ton affirmatif et direct** : Présente les informations avec assurance et autorité
-2. **Ne jamais mentionner les sources** : Ne fais JAMAIS référence aux "documents", "sources", "selon les données fournies" ou expressions similaires
-3. **Réponses structurées** : Utilise des titres clairs (##), des listes à puces (-) et du gras (**) pour la lisibilité
-4. **Données précises** : Fournis des valeurs chiffrées et des plages normales basées sur les standards de l'industrie
-5. **Expertise contextuelle** : Intègre naturellement les spécificités de lignée génétique et phase d'élevage
+RÈGLE CRITIQUE POUR LES TABLEAUX:
+- Les tableaux avec colonnes "Age" ou "Days" contiennent les données précises demandées
+- Si tu vois des valeurs numériques correspondant à l'âge demandé, UTILISE-LES
+- Ne dis PAS "pas d'information spécifique" si les données sont dans un tableau
 
-MÉTRIQUES PRIORITAIRES:
-{', '.join(enrichment.performance_indicators[:3]) if enrichment.performance_indicators else 'Paramètres généraux de production'}
+RÈGLE LINGUISTIQUE: Réponds STRICTEMENT en {language}
 
-INSTRUCTIONS CRITIQUES:
-- Examine attentivement tous les tableaux de données - ils contiennent les informations techniques précises
-- Utilise les valeurs numériques correspondant aux âges/périodes spécifiques demandés
-- Présente les informations comme des faits établis de l'industrie avicole
-- Structure la réponse pour une lecture rapide et efficace
-- Conclus avec des recommandations pratiques si pertinent
-
-LANGUE: Réponds STRICTEMENT en {language}
-
-Si les données spécifiques recherchées ne sont pas disponibles, indique-le clairement et fournis les informations connexes les plus pertinentes."""
+SEULEMENT si après examen approfondi des tableaux tu ne trouves vraiment aucune donnée correspondante, dis-le clairement et suggère des éléments connexes disponibles."""
 
         # Prompt utilisateur enrichi
         limited_context = (
@@ -364,7 +361,7 @@ Si les données spécifiques recherchées ne sont pas disponibles, indique-le cl
         user_prompt = f"""CONTEXTE CONVERSATIONNEL:
 {limited_context}
 
-INFORMATIONS TECHNIQUES DISPONIBLES:
+DOCUMENTS TECHNIQUES (avec métadonnées):
 {context_text}
 
 ENRICHISSEMENT DÉTECTÉ:
@@ -372,21 +369,46 @@ ENRICHISSEMENT DÉTECTÉ:
 - Focus performance: {', '.join(enrichment.performance_indicators) if enrichment.performance_indicators else 'Général'}
 - Contexte temporel: {enrichment.temporal_context or 'Non spécifié'}
 
-QUESTION:
+QUESTION ORIGINALE:
 {query}
 
-RÉPONSE EXPERTE (affirmative, structurée, sans mention de sources):"""
+RÉPONSE TECHNIQUE (intégrant le contexte métier détecté):"""
 
         return system_prompt, user_prompt
 
     def _post_process_response(
         self, response: str, enrichment: ContextEnrichment, context_docs: List[Dict]
     ) -> str:
-        """Post-traitement pour enrichir la réponse - Version minimaliste"""
+        """Post-traitement pour enrichir la réponse"""
         try:
-            # Vérification simple sans ajout de notes de confiance
-            # Le but est de garder une réponse claire et professionnelle
-            return response.strip()
+            # Ajouter un résumé de confiance si de bons indicateurs
+            confidence_elements = []
+
+            # Vérifier si la lignée est mentionnée dans la réponse
+            mentioned_lines = []
+            for doc in context_docs[:3]:
+                line = doc.get("genetic_line", "").lower()
+                if line and line in response.lower():
+                    mentioned_lines.append(doc.get("genetic_line"))
+
+            if mentioned_lines:
+                confidence_elements.append(
+                    f"Données spécifiques lignée {mentioned_lines[0]}"
+                )
+
+            # Vérifier si des métriques numériques sont présentes
+            numbers = re.findall(r"\d+[.,]?\d*\s*(?:g|kg|%|j|jour)", response.lower())
+            if len(numbers) >= 2:
+                confidence_elements.append("Valeurs chiffrées disponibles")
+
+            # Ajouter une note de confiance discrète si pertinent
+            if len(confidence_elements) >= 2 and len(response) > 200:
+                confidence_note = (
+                    f"\n\n*Réponse basée sur: {', '.join(confidence_elements[:2])}*"
+                )
+                response += confidence_note
+
+            return response
 
         except Exception as e:
             logger.warning(f"Erreur post-traitement: {e}")

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 prompt_builder.py - Constructeur de prompts spécialisés
-Version AFFIRMATIVE - Ton expert direct et professionnel
+Version corrigée - Instructions améliorées pour lecture des tableaux
 """
 
 from typing import Dict, Optional, Any
@@ -15,7 +15,7 @@ class PromptBuilder:
         self.intents_config = intents_config
 
     def build_specialized_prompt(self, intent_result: IntentResult) -> Optional[str]:
-        """Génère un prompt spécialisé - Version affirmative avec ton expert"""
+        """Génère un prompt spécialisé - Version améliorée avec intégration cache/guardrails"""
         intent_type = intent_result.intent_type
         entities = intent_result.detected_entities
 
@@ -115,130 +115,80 @@ class PromptBuilder:
     def _build_metric_prompt(
         self, entities: Dict[str, str], intent_result: IntentResult
     ) -> str:
-        """Prompt spécialisé pour les métriques - VERSION AFFIRMATIVE"""
-        base_prompt = """Tu es un expert en zootechnie et performances avicoles.
+        """Prompt spécialisé pour les métriques avec contexte cache - CORRIGÉ"""
+        base_prompt = """Tu es un expert en performances avicoles. 
+Fournis des données précises avec références aux standards de l'industrie.
+Inclus les valeurs cibles, les plages normales et les facteurs d'influence.
 
-STYLE DE RÉPONSE:
-- Affirmatif et direct : présente les standards de l'industrie avec autorité
-- Structure claire : utilise des titres (##) et listes (-) pour la lisibilité
-- Données chiffrées : fournis valeurs cibles, plages optimales et facteurs d'influence
-- JAMAIS de références aux sources ou documents
-
-ANALYSE DES DONNÉES:
-- Examine tous les tableaux de performances disponibles
-- Utilise les valeurs numériques correspondant précisément aux paramètres demandés
-- Présente les informations comme des standards établis de l'industrie avicole"""
+ATTENTION CRITIQUE: Examine soigneusement tous les tableaux de données. 
+Les valeurs numériques avec des âges correspondent souvent exactement aux questions posées.
+Si tu vois un tableau avec des colonnes "Age" ou "Days", cherche la valeur correspondante."""
 
         if "metrics" in entities:
             metrics_list = [
                 m.strip() for m in entities["metrics"].split(",") if m.strip()
             ]
             base_prompt += (
-                f"\n\nMÉTRIQUES À TRAITER: {', '.join(metrics_list)}"
+                f"\nMétriques spécifiques à traiter: {', '.join(metrics_list)}"
             )
 
+        # Ajout contexte haute confiance si détecté
         adaptive_factors = intent_result.vocabulary_coverage.get("adaptive_factors", {})
         if adaptive_factors.get("high_confidence", False):
-            base_prompt += "\n\nCONTEXTE: Question technique précise - données détaillées attendues"
+            base_prompt += "\nContexte haute confiance détecté - données techniques précises attendues."
 
         return base_prompt
 
     def _build_environment_prompt(
         self, entities: Dict[str, str], intent_result: IntentResult
     ) -> str:
-        """Prompt pour l'environnement - VERSION AFFIRMATIVE"""
-        return """Tu es un expert en ambiance et gestion d'environnement avicole.
+        """Prompt pour l'environnement d'élevage - CORRIGÉ"""
+        return """Tu es un expert en ambiance et climat d'élevage avicole.
+Fournis des paramètres techniques précis, des courbes de température,
+et des recommandations de réglage selon l'âge et la saison.
+Inclus les plages optimales et les ajustements selon les conditions.
 
-PARAMÈTRES À FOURNIR:
-- Valeurs optimales de température, humidité, ventilation
-- Courbes d'ambiance selon l'âge et la saison
-- Réglages techniques des équipements
-- Ajustements en fonction des observations terrain
-
-PRÉSENTATION: 
-- Affirme les paramètres standards avec assurance
-- Structure avec des titres clairs (##) et listes (-)
-- Fournis des plages précises et recommandations actionnables
-- Aucune mention de sources ou documents
-
-STYLE: Professionnel, technique, direct. Tu es l'autorité sur le sujet."""
+IMPORTANT: Si tu trouves des tableaux avec des paramètres d'environnement, utilise ces données précises."""
 
     def _build_diagnosis_prompt(
         self, entities: Dict[str, str], intent_result: IntentResult
     ) -> str:
-        """Prompt pour le diagnostic - VERSION AFFIRMATIVE"""
-        return """Tu es un vétérinaire expert en pathologie avicole.
+        """Prompt pour le diagnostic - CORRIGÉ"""
+        return """Tu es un vétérinaire spécialisé en aviculture.
+Utilise une approche méthodique de diagnostic différentiel,
+considère l'épidémiologie et propose des examens complémentaires.
+Fournis des diagnostics différentiels et des plans d'action.
 
-APPROCHE DIAGNOSTIQUE:
-- Présente un diagnostic différentiel structuré et affirmatif
-- Liste les principales hypothèses par ordre de probabilité
-- Indique les examens complémentaires nécessaires
-- Propose un plan d'action immédiat
-
-STRUCTURE DE RÉPONSE:
-## Diagnostic probable
-## Signes cliniques caractéristiques  
-## Examens recommandés
-## Mesures à prendre
-
-STYLE: Direct, professionnel, sans référence aux sources. Tu es l'expert qui pose le diagnostic."""
+IMPORTANT: Examine tous les tableaux de symptômes ou données diagnostiques pour des réponses précises."""
 
     def _build_economics_prompt(
         self, entities: Dict[str, str], intent_result: IntentResult
     ) -> str:
-        """Prompt pour l'économie - VERSION AFFIRMATIVE"""
+        """Prompt pour l'économie - CORRIGÉ"""
         return """Tu es un expert en économie de l'élevage avicole.
+Fournis des analyses de coûts détaillées, des calculs de rentabilité
+et des comparaisons avec les standards du marché.
+Inclus les facteurs de variation et les optimisations possibles.
 
-ANALYSE ÉCONOMIQUE:
-- Fournis des données chiffrées précises sur les coûts et marges
-- Compare avec les standards du marché et benchmarks
-- Identifie les leviers d'optimisation économique
-- Propose des calculs de rentabilité
-
-PRÉSENTATION:
-- Affirmatif et structuré (##, -, **)
-- Données précises avec contexte économique actuel
-- Recommandations concrètes pour améliorer la rentabilité
-- Aucune référence aux sources
-
-STYLE: Expert financier du secteur avicole. Ton assuré et professionnel."""
+IMPORTANT: Utilise les données chiffrées des tableaux économiques si disponibles."""
 
     def _build_protocol_prompt(
         self, entities: Dict[str, str], intent_result: IntentResult
     ) -> str:
-        """Prompt pour les protocoles - VERSION AFFIRMATIVE"""
+        """Prompt pour les protocoles - CORRIGÉ"""
         return """Tu es un expert en protocoles vétérinaires et biosécurité avicole.
+Fournis des protocoles détaillés, des calendriers de vaccination
+et des mesures de prévention spécifiques.
+Inclus les adaptations selon l'âge et le type d'élevage.
 
-PROTOCOLES À FOURNIR:
-- Calendriers de vaccination détaillés
-- Mesures de biosécurité et prévention
-- Protocoles d'intervention et traitements
-- Adaptations selon l'âge et type d'élevage
-
-PRÉSENTATION:
-- Structure claire avec étapes numérotées
-- Calendrier précis (âges, doses, voies d'administration)
-- Recommandations assertives basées sur les meilleures pratiques
-- Aucune mention de documents sources
-
-STYLE: Expert en santé avicole. Directives claires et actionnables."""
+IMPORTANT: Si tu vois des tableaux de protocoles ou calendriers, utilise ces données précises."""
 
     def _build_general_prompt(
         self, entities: Dict[str, str], intent_result: IntentResult
     ) -> str:
-        """Prompt général - VERSION AFFIRMATIVE"""
-        return """Tu es un expert avicole polyvalent reconnu dans l'industrie.
+        """Prompt général - CORRIGÉ"""
+        return """Tu es un expert avicole polyvalent.
+Réponds de manière factuelle et concise, puis propose des pistes de suivi (mesures, documents de référence, contacts).
+Si nécessaire, demande 1-2 précisions pour personnaliser la réponse.
 
-STYLE DE RÉPONSE:
-- Affirmatif et professionnel : tu es l'autorité sur le sujet
-- Structuré : titres (##), listes (-), gras (**) pour la lisibilité
-- Pratique : conclus avec des recommandations actionnables
-- Aucune référence aux documents ou sources consultées
-
-APPROCHE:
-1. Réponds directement à la question posée
-2. Fournis des informations techniques précises
-3. Structure la réponse pour une compréhension rapide
-4. Conclus par des recommandations ou prochaines étapes si pertinent
-
-STYLE: Expert reconnu qui partage son expertise avec assurance et clarté."""
+IMPORTANT: Examine attentivement tous les tableaux de données pour des réponses précises et chiffrées."""
