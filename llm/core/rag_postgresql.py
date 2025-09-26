@@ -587,7 +587,10 @@ class PostgreSQLRetriever:
         # Déterminer le sexe à utiliser
         target_sex = sex_from_entities or sex_from_query
 
-        if target_sex and sex_specified:
+        # CORRECTION: Considérer le sexe comme spécifié s'il est détecté dans la requête
+        actual_sex_specified = sex_specified or (sex_from_query is not None)
+
+        if target_sex and actual_sex_specified:
             # Sexe explicitement spécifié -> recherche avec fallback
             logger.debug(
                 f"Sexe spécifié: {target_sex}, recherche avec fallback as_hatched"

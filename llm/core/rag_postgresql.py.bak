@@ -1273,28 +1273,26 @@ class PostgreSQLSystem:
         elif metric.age_min:
             age_context = f" au jour {metric.age_min}"
 
-        # Construire la valeur
+        # Construire la valeur avec formatage amélioré
         value_context = ""
         if metric.value_numeric is not None:
-            value_str = f"**{metric.value_numeric}"
+            # Formatage avec 1 décimale maximum
+            if metric.value_numeric == int(metric.value_numeric):
+                value_str = f"{int(metric.value_numeric)}"
+            else:
+                value_str = f"{metric.value_numeric:.1f}"
+
             if metric.unit:
-                value_str += f" {metric.unit}"
-            value_str += "**"
-            value_context = f": {value_str}"
+                # Simplifier les unités courantes
+                unit_display = metric.unit.replace("grams", "g").replace("gram", "g")
+                value_str += f" {unit_display}"
+
+            value_context = f", le poids est de {value_str}"
         elif metric.value_text:
-            value_context = f": {metric.value_text}"
+            value_context = f", la valeur est {metric.value_text}"
 
-        # Assembler la réponse complète
+        # Assembler la réponse complète de manière fluide
         response = f"{sex_context}{age_context}{value_context}."
-
-        # Ajouter contexte de performance si pertinent
-        if metric_type == "weight" and metric.value_numeric:
-            if metric.value_numeric > 3000:
-                response += " Poids de fin d'élevage."
-            elif metric.value_numeric > 1000:
-                response += " Poids intermédiaire de croissance."
-            elif metric.value_numeric < 100:
-                response += " Poids de jeune poussin."
 
         return response
 
