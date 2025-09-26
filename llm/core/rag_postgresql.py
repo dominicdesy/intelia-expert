@@ -1,4 +1,14 @@
-# -*- coding: utf-8 -*-
+def _build_sql_query_with_normalization(
+        self, query: str, intent_result=None, top_k: int = 10
+    ) -> Tuple[str, List]:
+        """Construction dynamique de la requête SQL avec normalisation multilingue"""
+
+        base_query = """
+        SELECT 
+            c.company_name,
+            b.breed_name,
+            s.strain_name,
+            s# -*- coding: utf-8 -*-
 """
 rag_postgresql.py - Système PostgreSQL pour métriques avicoles
 VERSION CORRIGÉE COMPLÈTE - Résolution de tous les problèmes identifiés
@@ -351,6 +361,25 @@ class PostgreSQLRetriever:
         logger.debug(f"Concepts normalisés: {normalized_concepts[:5]}")
         logger.debug(f"Mots bruts: {raw_words[:3]}")
 
+        # NOUVEAU: Extraction intelligente de l'âge de la requête
+        age_extracted = self._extract_age_from_query(query)
+        if age_extracted:
+            logger.debug(f"Âge extrait de la requête: {age_extracted} jours")
+            # Convertir en semaines pour la BD (si les âges sont stockés en semaines)
+            age_weeks = age_extracted / 7.0
+            # Tolérance de ±3 jours (environ 0.4 semaines)
+            age_tolerance = 0.4
+            
+            param_count += 1
+            param_count_age2 = param_count + 1
+            conditions.append(
+                f"((m.age_min <= ${param_count} AND m.age_max >= ${param_count_age2}) OR "
+                f"(ABS(m.age_min - ${param_count}) <= {age_tolerance}) OR "
+                f"(ABS(m.age_max - ${param_count_age2}) <= {age_tolerance}))"
+            )
+            params.extend([age_weeks, age_weeks])
+            param_count += 1
+
         # Filtres selon intent_result
         if intent_result:
             if hasattr(intent_result, "genetic_line") and intent_result.genetic_line:
@@ -358,7 +387,7 @@ class PostgreSQLRetriever:
                 conditions.append(f"LOWER(s.strain_name) ILIKE ${param_count}")
                 params.append(f"%{intent_result.genetic_line.lower()}%")
 
-            if hasattr(intent_result, "age") and intent_result.age:
+            if hasattr(intent_result, "age") and intent_result.age and not age_extracted:
                 param_count += 1
                 param_count_age2 = param_count + 1
                 conditions.append(
@@ -395,10 +424,44 @@ class PostgreSQLRetriever:
         if conditions:
             base_query += " AND " + " AND ".join(conditions)
 
-        # Tri par pertinence et limite
-        base_query += f" ORDER BY m.value_numeric DESC NULLS LAST LIMIT {top_k}"
+        # Tri par pertinence (âge d'abord si spécifié, puis valeur)
+        if age_extracted:
+            base_query += f" ORDER BY ABS(m.age_min - {age_extracted/7.0}), m.value_numeric DESC NULLS LAST"
+        else:
+            base_query += " ORDER BY m.value_numeric DESC NULLS LAST"
+        
+        base_query += f" LIMIT {top_k}"
 
         return base_query, params
+
+    def _extract_age_from_query(self, query: str) -> Optional[int]:
+        """Extrait l'âge en jours de la requête (ex: 'day 11' -> 11)"""
+        import re
+        
+        # Patterns pour détecter l'âge
+        patterns = [
+            r'day\s+(\d+)',  # "day 11"
+            r'jour\s+(\d+)', # "jour 11" 
+            r'j\s*(\d+)',    # "j11" ou "j 11"
+            r'(\d+)\s*day',  # "11 day"
+            r'(\d+)\s*jour', # "11 jour"
+            r'à\s+(\d+)\s+jours?', # "à 11 jours"
+            r'at\s+day\s+(\d+)',   # "at day 11"
+        ]
+        
+        query_lower = query.lower()
+        for pattern in patterns:
+            match = re.search(pattern, query_lower)
+            if match:
+                try:
+                    age = int(match.group(1))
+                    # Validation raisonnable (0-100 jours)
+                    if 0 <= age <= 100:
+                        return age
+                except ValueError:
+                    continue
+        
+        return None
 
     def _calculate_relevance_score(self, query: str, row: Dict) -> float:
         """Calcule un score de pertinence pour un résultat"""
@@ -629,49 +692,115 @@ class PostgreSQLSystem:
     async def _generate_metrics_response(
         self, query: str, documents: List[Document], metric_results: List[MetricResult]
     ) -> str:
-        """Génère une réponse finale basée sur les métriques trouvées"""
+        """Génère une réponse intelligente et contextuelle basée sur les métriques trouvées"""
         try:
-            # Créer un résumé des données trouvées
-            data_summary = []
+            # Extraire l'âge demandé de la requête
+            age_requested = self._extract_age_from_query(query)
             
-            for metric in metric_results[:5]:  # Limiter à 5 résultats les plus pertinents
-                summary = f"- {metric.metric_name}"
-                if metric.value_numeric is not None:
-                    value_str = f"{metric.value_numeric}"
-                    if metric.unit:
-                        value_str += f" {metric.unit}"
-                    summary += f": {value_str}"
-                elif metric.value_text:
-                    summary += f": {metric.value_text}"
-                
-                if metric.age_min is not None and metric.age_max is not None:
-                    if metric.age_min == metric.age_max:
-                        summary += f" (à {metric.age_min} semaines)"
+            # Analyser le type de métrique demandé
+            query_lower = query.lower()
+            metric_type = None
+            if any(word in query_lower for word in ["weight", "poids", "body"]):
+                metric_type = "weight"
+            elif any(word in query_lower for word in ["fcr", "conversion", "efficacité"]):
+                metric_type = "fcr"
+            elif any(word in query_lower for word in ["eau", "water", "drink"]):
+                metric_type = "water"
+            
+            # Trouver la métrique la plus pertinente (âge le plus proche)
+            best_metric = None
+            if age_requested and metric_results:
+                best_metric = min(
+                    metric_results,
+                    key=lambda m: abs((m.age_min or 0) - age_requested) if m.age_min else float('inf')
+                )
+            elif metric_results:
+                best_metric = metric_results[0]  # Premier résultat par défaut
+            
+            if not best_metric:
+                return f"Aucune donnée trouvée pour '{query}'."
+            
+            # Générer une réponse contextuelle et intelligente
+            if metric_type == "weight" and age_requested:
+                # Réponse spécialisée pour le poids
+                if best_metric.value_numeric:
+                    weight_value = best_metric.value_numeric
+                    unit = best_metric.unit or "grammes"
+                    actual_age = best_metric.age_min if best_metric.age_min else "âge non spécifié"
+                    
+                    response = f"Pour la lignée {best_metric.strain} de {best_metric.company}, "
+                    
+                    if age_requested == actual_age:
+                        response += f"le poids corporel au jour {age_requested} est de **{weight_value} {unit}**."
                     else:
-                        summary += f" ({metric.age_min}-{metric.age_max} semaines)"
-                
-                summary += f" - {metric.company} {metric.strain}"
-                data_summary.append(summary)
-
-            # Générer une réponse structurée basée sur la requête
-            if "weight" in query.lower() or "poids" in query.lower():
-                response = f"Voici les données de poids disponibles pour votre requête '{query}':\n\n"
-            elif "fcr" in query.lower() or "conversion" in query.lower():
-                response = f"Voici les données de conversion alimentaire (FCR) pour '{query}':\n\n"
-            else:
-                response = f"Voici les données de performance trouvées pour '{query}':\n\n"
-
-            response += "\n".join(data_summary)
+                        response += f"la donnée la plus proche de votre requête (jour {age_requested}) "
+                        response += f"est le poids au jour {actual_age} : **{weight_value} {unit}**."
+                    
+                    # Ajouter du contexte si possible
+                    if weight_value > 3000:
+                        response += " Il s'agit d'un poids d'adulte en fin d'élevage."
+                    elif weight_value > 1000:
+                        response += " Il s'agit d'un poids de croissance intermédiaire."
+                    elif weight_value < 100:
+                        response += " Il s'agit d'un poids de jeune poussin."
+                    
+                else:
+                    response = f"Les données de poids pour {best_metric.strain} au jour {age_requested} ne contiennent pas de valeur numérique exploitable."
             
-            # Ajouter une note sur la source
-            response += f"\n\nCes données proviennent de {len(metric_results)} métriques trouvées dans la base de données PostgreSQL."
+            elif metric_type == "fcr":
+                # Réponse spécialisée pour FCR
+                if best_metric.value_numeric:
+                    fcr_value = best_metric.value_numeric
+                    response = f"L'indice de conversion alimentaire (FCR) pour {best_metric.strain} "
+                    response += f"est de **{fcr_value}**"
+                    if best_metric.age_min:
+                        response += f" à {best_metric.age_min} jours"
+                    response += "."
+                    
+                    # Contexte sur la performance
+                    if fcr_value < 1.5:
+                        response += " Il s'agit d'une excellente conversion alimentaire."
+                    elif fcr_value < 2.0:
+                        response += " Il s'agit d'une bonne conversion alimentaire."
+                    else:
+                        response += " Cette conversion alimentaire pourrait être améliorée."
+                else:
+                    response = f"Les données FCR pour {best_metric.strain} ne contiennent pas de valeur numérique."
+            
+            else:
+                # Réponse générique mais intelligente
+                if best_metric.value_numeric:
+                    value = best_metric.value_numeric
+                    unit = best_metric.unit or ""
+                    metric_name = best_metric.metric_name.replace("_", " ").title()
+                    
+                    response = f"Selon les données disponibles, {metric_name.lower()} "
+                    response += f"pour {best_metric.strain} de {best_metric.company} "
+                    response += f"est de **{value} {unit}**"
+                    
+                    if age_requested and best_metric.age_min:
+                        if age_requested == best_metric.age_min:
+                            response += f" au jour {age_requested}."
+                        else:
+                            response += f" (donnée du jour {best_metric.age_min}, la plus proche de votre requête du jour {age_requested})."
+                    else:
+                        response += "."
+                else:
+                    response = f"Des données sont disponibles pour {best_metric.metric_name} mais sans valeur numérique précise."
+            
+            # Ajouter info sur les autres résultats si pertinent
+            if len(metric_results) > 1:
+                response += f"\n\n*{len(metric_results)} résultats au total trouvés dans la base de données.*"
             
             return response
 
         except Exception as e:
-            logger.error(f"Erreur génération réponse métriques: {e}")
-            # Fallback simple
-            return f"J'ai trouvé {len(metric_results)} métriques pour votre requête '{query}', mais il y a eu une erreur lors de la génération de la réponse détaillée."
+            logger.error(f"Erreur génération réponse intelligente: {e}")
+            # Fallback très simple
+            if metric_results:
+                best = metric_results[0]
+                return f"Donnée trouvée : {best.metric_name} = {best.value_numeric or best.value_text or 'valeur non disponible'} pour {best.strain}."
+            return f"Erreur lors de la génération de la réponse pour '{query}'."
 
     async def close(self):
         """Ferme le système PostgreSQL"""
