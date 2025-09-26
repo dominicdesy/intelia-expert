@@ -484,7 +484,7 @@ class PostgreSQLSystem:
     async def search_metrics(
         self, query: str, intent_result=None, top_k: int = 10
     ) -> RAGResult:
-        """CORRECTION PRINCIPALE - Recherche avec le bon nom de paramètre"""
+        """CORRECTION PRINCIPALE - Recherche avec génération de réponse complète"""
 
         if not self.is_initialized or not self.postgres_retriever:
             return RAGResult(
@@ -549,6 +549,9 @@ class PostgreSQLSystem:
                     },
                 )
 
+            # NOUVEAU: Génération de la réponse finale avec le LLM
+            answer_text = await self._generate_metrics_response(query, documents, metric_results)
+
             # Calcul confiance globale avec boost pour normalisation
             avg_confidence = sum(m.confidence for m in metric_results) / len(metric_results)
 
@@ -557,11 +560,12 @@ class PostgreSQLSystem:
             if normalized_concepts:
                 avg_confidence = min(1.0, avg_confidence + 0.1)
 
-            logger.info(f"PostgreSQL SUCCESS: {len(documents)} documents retournés")
+            logger.info(f"PostgreSQL SUCCESS: {len(documents)} documents retournés avec réponse générée")
 
-            # CORRECTION CRITIQUE - Utiliser context_docs au lieu de documents
+            # CORRECTION CRITIQUE - Utiliser context_docs au lieu de documents + AJOUTER answer
             return RAGResult(
                 source=RAGSource.RAG_SUCCESS,
+                answer=answer_text,  # ✅ AJOUT CRITIQUE - La réponse générée
                 context_docs=[doc.to_dict() for doc in documents],  # ✅ CORRECT
                 confidence=avg_confidence,
                 metadata={
@@ -572,6 +576,7 @@ class PostgreSQLSystem:
                     "avg_confidence": avg_confidence,
                     "multilingual_normalization": True,
                     "normalized_concepts": normalized_concepts[:5],
+                    "response_generated": True,  # Nouveau flag
                 },
             )
 
@@ -620,6 +625,53 @@ class PostgreSQLSystem:
         except Exception as e:
             logger.error(f"Erreur formatage métrique: {e}")
             return f"Métrique: {getattr(metric, 'metric_name', 'Nom inconnu')}"
+
+    async def _generate_metrics_response(
+        self, query: str, documents: List[Document], metric_results: List[MetricResult]
+    ) -> str:
+        """Génère une réponse finale basée sur les métriques trouvées"""
+        try:
+            # Créer un résumé des données trouvées
+            data_summary = []
+            
+            for metric in metric_results[:5]:  # Limiter à 5 résultats les plus pertinents
+                summary = f"- {metric.metric_name}"
+                if metric.value_numeric is not None:
+                    value_str = f"{metric.value_numeric}"
+                    if metric.unit:
+                        value_str += f" {metric.unit}"
+                    summary += f": {value_str}"
+                elif metric.value_text:
+                    summary += f": {metric.value_text}"
+                
+                if metric.age_min is not None and metric.age_max is not None:
+                    if metric.age_min == metric.age_max:
+                        summary += f" (à {metric.age_min} semaines)"
+                    else:
+                        summary += f" ({metric.age_min}-{metric.age_max} semaines)"
+                
+                summary += f" - {metric.company} {metric.strain}"
+                data_summary.append(summary)
+
+            # Générer une réponse structurée basée sur la requête
+            if "weight" in query.lower() or "poids" in query.lower():
+                response = f"Voici les données de poids disponibles pour votre requête '{query}':\n\n"
+            elif "fcr" in query.lower() or "conversion" in query.lower():
+                response = f"Voici les données de conversion alimentaire (FCR) pour '{query}':\n\n"
+            else:
+                response = f"Voici les données de performance trouvées pour '{query}':\n\n"
+
+            response += "\n".join(data_summary)
+            
+            # Ajouter une note sur la source
+            response += f"\n\nCes données proviennent de {len(metric_results)} métriques trouvées dans la base de données PostgreSQL."
+            
+            return response
+
+        except Exception as e:
+            logger.error(f"Erreur génération réponse métriques: {e}")
+            # Fallback simple
+            return f"J'ai trouvé {len(metric_results)} métriques pour votre requête '{query}', mais il y a eu une erreur lors de la génération de la réponse détaillée."
 
     async def close(self):
         """Ferme le système PostgreSQL"""
