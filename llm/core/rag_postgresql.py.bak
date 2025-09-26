@@ -399,7 +399,7 @@ class PostgreSQLRetriever:
 
         except Exception as e:
             logger.error(f"Erreur recherche PostgreSQL: {e}")
-            return []  # Retourne liste vide au lieu de lever exception
+            raise Exception("NO_RESULTS")
 
     def _build_sql_query_with_normalization(
         self, query: str, intent_result=None, top_k: int = 10
