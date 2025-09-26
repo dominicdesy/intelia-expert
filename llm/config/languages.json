@@ -1,15 +1,27 @@
 {
-  "default": "Intelia Expert is a poultry-focused application. Questions outside this domain cannot be processed.",
-  "de": "Intelia Expert ist eine auf Geflügelhaltung spezialisierte Anwendung. Fragen außerhalb dieses Bereichs können nicht bearbeitet werden.",
-  "en": "Intelia Expert is a poultry-focused application. Questions outside this domain cannot be processed.",
-  "es": "Intelia Expert es una aplicación especializada en avicultura. Las preguntas fuera de este dominio no pueden ser atendidas.",
-  "fr": "Intelia Expert est une application spécialisée en aviculture. Les questions hors de ce domaine ne peuvent pas être traitées.",
-  "hi": "इंटेलिया एक्सपर्ट एक कुक्कुट पालन केंद्रित अनुप्रयोग है। इस क्षेत्र के बाहर के प्रश्नों का उत्तर नहीं दिया जा सकता।",
-  "id": "Intelia Expert adalah aplikasi yang berfokus pada perunggasan. Pertanyaan di luar bidang ini tidak dapat diproses.",
-  "it": "Intelia Expert è un'applicazione specializzata in avicoltura. Le domande fuori da questo ambito non possono essere trattate.",
-  "nl": "Intelia Expert is een applicatie die gespecialiseerd is in pluimvee. Vragen buiten dit domein kunnen niet worden behandeld.",
-  "pl": "Intelia Expert to aplikacja specjalizująca się w drobiarstwie. Pytania spoza tej dziedziny nie mogą być obsługiwane.",
-  "pt": "Intelia Expert é uma aplicação especializada em avicultura. Perguntas fora desse domínio não podem ser tratadas.",
-  "th": "Intelia Expert เป็นแอปพลิเคชันที่เชี่ยวชาญด้านการเลี้ยงสัตว์ปีก คำถามที่อยู่นอกเหนือจากสาขานี้ไม่สามารถดำเนินการได้",
-  "zh": "Intelia Expert 是一个专注于家禽业的应用程序。无法处理该领域之外的问题。"
+  "default": "Intelia Expert is an expert system specialized in poultry production and cannot assist with questions outside this domain. I am here to support you on all aspects of poultry farming. How can I help you with poultry?",
+  
+  "de": "Intelia Expert ist ein Expertensystem, das auf Geflügelproduktion spezialisiert ist und keine Fragen außerhalb dieses Bereichs behandeln kann. Ich bin hier, um Sie bei allen Aspekten der Geflügelhaltung zu unterstützen. Wie kann ich Ihnen in der Geflügelzucht helfen?",
+  
+  "en": "Intelia Expert is an expert system specialized in poultry production and cannot assist with questions outside this domain. I am here to support you on all aspects of poultry farming. How can I help you with poultry?",
+  
+  "es": "Intelia Expert es un sistema experto especializado en producción avícola y no puede atender preguntas fuera de este ámbito. Estoy aquí para acompañarle en todos los aspectos de la cría de aves. ¿Cómo puedo ayudarle en avicultura?",
+  
+  "fr": "Intelia Expert est un système expert spécialisé en production avicole et ne peut traiter les questions hors de ce domaine. Je suis là pour vous accompagner sur tous les aspects de l'élevage de volailles. Comment puis-je vous aider en aviculture ?",
+  
+  "hi": "इंटेलिया एक्सपर्ट कुक्कुट उत्पादन में विशेषज्ञता प्राप्त एक विशेषज्ञ प्रणाली है और इस क्षेत्र के बाहर के प्रश्नों में सहायता नहीं कर सकती। मैं यहां पोल्ट्री फार्मिंग के सभी पहलुओं पर आपका समर्थन करने के लिए हूं। मैं पोल्ट्री में आपकी कैसे मदद कर सकता हूं?",
+  
+  "id": "Intelia Expert adalah sistem pakar yang mengkhususkan diri dalam produksi unggas dan tidak dapat membantu pertanyaan di luar domain ini. Saya di sini untuk mendukung Anda dalam semua aspek peternakan unggas. Bagaimana saya dapat membantu Anda dengan unggas?",
+  
+  "it": "Intelia Expert è un sistema esperto specializzato nella produzione avicola e non può assistere con domande al di fuori di questo ambito. Sono qui per supportarvi su tutti gli aspetti dell'allevamento avicolo. Come posso aiutarvi con l'avicoltura?",
+  
+  "nl": "Intelia Expert is een expertsysteem gespecialiseerd in pluimveeproductie en kan niet helpen met vragen buiten dit domein. Ik ben hier om u te ondersteunen bij alle aspecten van pluimveehouderij. Hoe kan ik u helpen met pluimvee?",
+  
+  "pl": "Intelia Expert to system ekspercki specjalizujący się w produkcji drobiarskiej i nie może pomagać w pytaniach spoza tej dziedziny. jestem tutaj, aby wspierać Cię we wszystkich aspektach hodowli drobiu. Jak mogę Ci pomóc w drobiarstwie?",
+  
+  "pt": "Intelia Expert é um sistema especialista especializado em produção avícola e não pode auxiliar com perguntas fora deste domínio. Estou aqui para apoiá-lo em todos os aspectos da criação de aves. Como posso ajudá-lo com avicultura?",
+  
+  "th": "Intelia Expert เป็นระบบผู้เชี่ยวชาญที่เชี่ยวชาญด้านการผลิตสัตว์ปีกและไม่สามารถช่วยเหลือคำถามที่อยู่นอกขอบเขตนี้ได้ ฉันอยู่ที่นี่เพื่อสนับสนุนคุณในทุกด้านของการเลี้ยงสัตว์ปีก ฉันจะช่วยคุณเกี่ยวกับสัตว์ปีกได้อย่างไร?",
+  
+  "zh": "Intelia Expert 是专门从事家禽生产的专家系统，无法协助处理此领域以外的问题。我在这里为您提供家禽养殖各个方面的支持。我如何帮助您处理家禽问题？"
 }

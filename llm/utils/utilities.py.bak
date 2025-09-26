@@ -589,48 +589,42 @@ def get_universal_translation(
 
 
 def get_out_of_domain_message(language: str = None) -> str:
-    """Message hors domaine traduit selon la langue détectée - LIT DEPUIS languages.json"""
+    """Message hors domaine traduit selon la langue détectée"""
 
     if language is None:
         language = DEFAULT_LANGUAGE
 
-    # Normaliser le code de langue
-    language = normalize_language_code(language)
+    # D'abord essayer le service de traduction
+    translation_service = _get_translation_service()
+    if translation_service:
+        try:
+            # Récupérer depuis le dictionnaire universel
+            result = translation_service.translate_term(
+                "out_of_domain_message", language, domain="system_messages"
+            )
+            if result.confidence >= 0.7:
+                return result.text
+        except Exception as e:
+            logger.debug(f"Erreur service traduction pour message OOD: {e}")
 
-    # CORRECTION: Lire depuis le fichier languages.json
-    try:
-        # Déterminer le chemin du fichier languages.json
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        config_dir = os.path.join(os.path.dirname(current_dir), "config")
-        languages_file = os.path.join(config_dir, "languages.json")
-
-        # Lire le fichier JSON
-        if os.path.exists(languages_file):
-            with open(languages_file, "r", encoding="utf-8") as f:
-                messages = json.load(f)
-
-            # Retourner le message dans la langue demandée
-            if language in messages:
-                return messages[language]
-
-            # Fallback sur 'default' si la langue n'existe pas
-            if "default" in messages:
-                return messages["default"]
-
-        logger.warning(f"Fichier languages.json introuvable: {languages_file}")
-
-    except Exception as e:
-        logger.warning(f"Erreur lecture languages.json: {e}")
-
-    # Fallback ultime si le fichier n'existe pas ou erreur
-    fallback_messages = {
-        "fr": "Intelia Expert est un système expert spécialisé en production avicole et ne peut traiter les questions hors de ce domaine. Je suis là pour vous accompagner sur tous les aspects de l'élevage de volailles. Comment puis-je vous aider en aviculture ?",
-        "en": "Intelia Expert is an expert system specialized in poultry production and cannot assist with questions outside this domain. I am here to support you on all aspects of poultry farming. How can I help you with poultry?",
-        "es": "Intelia Expert es un sistema experto especializado en producción avícola y no puede atender preguntas fuera de este ámbito. Estoy aquí para acompañarle en todos los aspectos de la cría de aves. ¿Cómo puedo ayudarle en avicultura?",
+    # Messages par défaut intégrés (fallback)
+    default_messages = {
+        "fr": "Je me spécialise dans l'aviculture et l'élevage de volailles. Je peux vous aider avec: Performance (FCR, poids, croissance), Nutrition (programmes alimentaires), Environnement (température, ventilation), Santé (prévention, vaccination), et Gestion technique. Posez-moi une question spécifique!",
+        "en": "I specialize in poultry farming and broiler production. I can help with: Performance (FCR, weight, growth), Nutrition (feeding programs), Environment (temperature, ventilation), Health (prevention, vaccination), and Technical management. Ask me a specific question!",
+        "es": "Me especializo en avicultura y producción de pollos. Puedo ayudar con: Rendimiento (FCR, peso, crecimiento), Nutrición (programas de alimentación), Ambiente (temperatura, ventilación), Salud (prevención, vacunación), y Gestión técnica. ¡Hágame una pregunta específica!",
+        "de": "Ich spezialisiere mich auf Geflügelzucht und Hähnchenmast. Ich kann helfen bei: Leistung (FCR, Gewicht, Wachstum), Ernährung (Fütterungsprogramme), Umgebung (Temperatur, Lüftung), Gesundheit (Vorbeugung, Impfung), und Technisches Management. Stellen Sie mir eine spezifische Frage!",
+        "it": "Mi specializzo in avicoltura e produzione di polli. Posso aiutare con: Prestazioni (FCR, peso, crescita), Nutrizione (programmi alimentari), Ambiente (temperatura, ventilazione), Salute (prevenzione, vaccinazione), e Gestione tecnica. Fatemi una domanda specifica!",
+        "pt": "Especializo-me na avicultura e produção de frangos. Posso ajudar com: Desempenho (FCR, peso, crescimento), Nutrição (programas alimentares), Ambiente (temperatura, ventilação), Saúde (prevenção, vacinação), e Gestão técnica. Faça-me uma pergunta específica!",
+        "nl": "Ik specialiseer me in pluimveehouderij en vleeskuikenproductie. Ik kan helpen met: Prestaties (FCR, gewicht, groei), Voeding (voerprogramma's), Omgeving (temperatuur, ventilatie), Gezondheid (preventie, vaccinatie), en Technisch beheer. Stel me een specifieke vraag!",
+        "pl": "Specjalizuję się w hodowli drobiu i produkcji kurczят. Mogę pomóc z: Wydajność (FCR, waga, wzrost), Żywienie (programy żywieniowe), Środowisko (temperatura, wentylacja), Zdrowie (profilaktyka, szczepienia), i Zarządzanie techniczne. Zadaj mi konkretne pytanie!",
+        "hi": "मैं मुर्गीपालन और ब्रॉयलर उत्पादन में विशेषज्ञता रखता हूं। मैं इनमें मदद कर सकता हूं: प्रदर्शन (FCR, वजन, वृद्धि), पोषण (आहार कार्यक्रम), पर्यावरण (तापमान, वेंटिलेशन), स्वास्थ्य (रोकथाम, टीकाकरण), और तकनीकी प्रबंधन। मुझसे कोई विशिष्ट प्रश्न पूछें!",
+        "zh": "我专门从事家禽养殖和肉鸡生产。我可以帮助: 性能 (FCR, 体重, 生长), 营养 (饲养计划), 环境 (温度, 通风), 健康 (预防, 疫苗接种), 和技术管理。请问我一个具体问题！",
+        "th": "ฉันเชี่ยวชาญด้านการเลี้ยงสัตว์ปีกและการผลิตไก่เนื้อ ฉันสามารถช่วยได้ในเรื่อง: ประสิทธิภาพ (FCR, น้ำหนัก, การเจริญเติบโต), โภชนาการ (โปรแกรมการให้อาหาร), สิ่งแวดล้อม (อุณหภูมิ, การระบายอากาศ), สุขภาพ (การป้องกัน, การฉีดวัคซีน), และการจัดการทางเทคนิค กรุณาถามคำถามเฉพาะจง!",
+        "id": "Saya ahli dalam budidaya unggas dan produksi ayam pedaging. Saya dapat membantu dengan: Performa (FCR, berat, pertumbuhan), Nutrisi (program pakan), Lingkungan (suhu, ventilasi), Kesehatan (pencegahan, vaksinasi), dan Manajemen teknis. Ajukan pertanyaan spesifik kepada saya!",
     }
 
-    return fallback_messages.get(
-        language, fallback_messages.get(FALLBACK_LANGUAGE, fallback_messages["en"])
+    return default_messages.get(
+        language, default_messages.get(FALLBACK_LANGUAGE, default_messages["en"])
     )
 
 
