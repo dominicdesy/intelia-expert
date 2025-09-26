@@ -645,6 +645,8 @@ class PostgreSQLSystem:
             )
 
         except Exception as e:
+            logger.error(f"Type d'exception: {type(e)}")
+            logger.error(f"Valeur exception: {e}")
             logger.error(f"Erreur recherche métriques PostgreSQL: {e}")
             return RAGResult(
                 source=RAGSource.ERROR,
