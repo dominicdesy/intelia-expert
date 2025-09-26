@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 imports_and_dependencies.py - Gestion robuste des dépendances avec structure modulaire
-Version CORRIGÉE - Résolution des imports circulaires
+Version CORRIGÉE FINALE - Résolution des imports circulaires + Fix _test_weaviate_v4_safe
 """
 
 import logging
@@ -93,37 +93,84 @@ async def _test_redis_async_safe(redis_client) -> bool:
 
         return False
 
-    except Exception:
+    except Exception as e:
+        logger.debug(f"Test Redis échoué: {e}")
         return False
 
 
 async def _test_weaviate_v4_safe(weaviate_client) -> bool:
-    """Test Weaviate avec support v4 complet"""
+    """Test Weaviate avec support v4 complet - VERSION CORRIGÉE"""
     try:
         if weaviate_client is None:
+            logger.debug("Client Weaviate None")
             return False
+
+        logger.debug(f"Test Weaviate client type: {type(weaviate_client)}")
 
         # v4: présence de .collections
         if hasattr(weaviate_client, "collections"):
-            ready = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: weaviate_client.is_ready()
-            )
-            if not ready:
+            logger.debug("Client Weaviate v4 détecté (has collections)")
+
+            # Test is_ready avec timeout
+            try:
+                ready = await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(
+                        None, lambda: weaviate_client.is_ready()
+                    ),
+                    timeout=5.0,
+                )
+                logger.debug(f"Weaviate is_ready: {ready}")
+
+                if not ready:
+                    logger.debug("Weaviate pas ready")
+                    return False
+            except asyncio.TimeoutError:
+                logger.debug("Timeout sur is_ready")
+                return False
+            except Exception as ready_e:
+                logger.debug(f"Erreur is_ready: {ready_e}")
                 return False
 
-            await asyncio.get_event_loop().run_in_executor(
-                None, lambda: list(weaviate_client.collections.list_all())
-            )
-            return True
+            # Test collections avec timeout
+            try:
+                collections = await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(
+                        None, lambda: list(weaviate_client.collections.list_all())
+                    ),
+                    timeout=5.0,
+                )
+                logger.debug(f"Collections trouvées: {len(collections)}")
+                return True
+
+            except asyncio.TimeoutError:
+                logger.debug("Timeout sur collections.list_all")
+                return False
+            except Exception as coll_e:
+                logger.debug(f"Erreur collections: {coll_e}")
+                return False
 
         # v3 fallback
-        if hasattr(weaviate_client, "schema"):
-            await asyncio.get_event_loop().run_in_executor(
-                None, lambda: weaviate_client.schema.get()
-            )
-            return True
+        elif hasattr(weaviate_client, "schema"):
+            logger.debug("Client Weaviate v3 détecté (has schema)")
+            try:
+                await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(
+                        None, lambda: weaviate_client.schema.get()
+                    ),
+                    timeout=5.0,
+                )
+                logger.debug("Schema v3 accessible")
+                return True
+            except asyncio.TimeoutError:
+                logger.debug("Timeout sur schema.get")
+                return False
+            except Exception as schema_e:
+                logger.debug(f"Erreur schema: {schema_e}")
+                return False
+        else:
+            logger.debug("Client Weaviate sans collections ni schema")
+            return False
 
-        return False
     except Exception as e:
         logger.debug(f"Test Weaviate v4-safe échoué: {e}")
         return False
@@ -480,10 +527,16 @@ def get_full_status_report() -> Dict[str, Any]:
 async def quick_connectivity_check(
     redis_client=None, weaviate_client=None
 ) -> Dict[str, bool]:
-    """Test de connectivité rapide et sécurisé"""
+    """Test de connectivité rapide et sécurisé - VERSION CORRIGÉE"""
+    logger.debug("Début quick_connectivity_check")
+    logger.debug(f"Redis client fourni: {redis_client is not None}")
+    logger.debug(f"Weaviate client fourni: {weaviate_client is not None}")
+
     weav_ok = await _test_weaviate_v4_safe(weaviate_client)
     redis_ok = await _test_redis_async_safe(redis_client)
     openai_ok = OPENAI_AVAILABLE
+
+    logger.debug(f"Résultats: weaviate={weav_ok}, redis={redis_ok}, openai={openai_ok}")
 
     return {"redis": redis_ok, "weaviate": weav_ok, "openai": openai_ok}
 
@@ -565,7 +618,7 @@ def validate_imports_corrections() -> Dict[str, bool]:
             "_test_weaviate_v4_safe": "_test_weaviate_v4_safe" in globals(),
             "UNIDECODE_AVAILABLE": UNIDECODE_AVAILABLE is not None,
         },
-        "version": "circular_import_fixed_v1.0",
+        "version": "connectivity_debug_fixed_v1.1",
     }
 
 
