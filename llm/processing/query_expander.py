@@ -221,9 +221,9 @@ class QueryExpander:
             logger.debug("As-hatched détecté, ajout variantes")
 
         else:
-            # FALLBACK: Aucun sexe détecté -> ajouter as-hatched par défaut
-            expansions.extend(["as-hatched", "mixed", "straight run"])
-            logger.debug("Aucun sexe détecté, fallback as-hatched par défaut")
+            # AMÉLIORATION: Aucun sexe détecté -> expansion neutre
+            expansions.extend(["weight", "performance", "growth"])
+            logger.debug("Aucun sexe détecté, expansion termes génériques")
 
         return expansions[:3]  # Limiter à 3 termes
 
@@ -355,7 +355,7 @@ def get_cache_normalized_expansions(query: str) -> Dict[str, Any]:
     elif any(term in q_low for term in ["as-hatched", "mixed", "mixte"]):
         sex_detected = "as_hatched"
     else:
-        sex_detected = "as_hatched"  # Fallback par défaut
+        sex_detected = None
 
     # Heuristique simple pour extraire (line/metric/age)
     line = None
@@ -374,11 +374,10 @@ def get_cache_normalized_expansions(query: str) -> Dict[str, Any]:
     m = re.search(r"(\d{1,3})\s*(j|jours|jour|d|days?)", q_low)
     age = _normalize_age(m.group(1) + "j") if m else ""
 
-    # NOUVEAU: Inclure sexe dans la clé cache
+    # Inclure sexe seulement s'il est explicitement détecté
+    sex_part = sex_detected if sex_detected else ""
     cache_key = (
-        ":".join(
-            [p for p in [line or "", metric or "", age or "", sex_detected or ""] if p]
-        )
+        ":".join([p for p in [line or "", metric or "", age or "", sex_part] if p])
         or q_low
     )
 

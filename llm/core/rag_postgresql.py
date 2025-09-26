@@ -13,6 +13,7 @@ from enum import Enum
 # Safe conditional imports
 try:
     import asyncpg
+
     ASYNCPG_AVAILABLE = True
 except ImportError:
     ASYNCPG_AVAILABLE = False
@@ -35,6 +36,7 @@ POSTGRESQL_CONFIG = {
 
 class QueryType(Enum):
     """Query types for intelligent routing"""
+
     KNOWLEDGE = "knowledge"  # General knowledge -> Weaviate
     METRICS = "metrics"  # Performance data -> PostgreSQL
     HYBRID = "hybrid"  # Combination of both
@@ -44,6 +46,7 @@ class QueryType(Enum):
 @dataclass
 class MetricResult:
     """Result of a PostgreSQL metrics query"""
+
     company: str
     breed: str
     strain: str
@@ -69,23 +72,31 @@ class MetricResult:
         self.breed = str(self.breed) if self.breed is not None else "Unknown"
         self.strain = str(self.strain) if self.strain is not None else "Unknown"
         self.species = str(self.species) if self.species is not None else "Unknown"
-        self.metric_name = str(self.metric_name) if self.metric_name is not None else "Unknown"
+        self.metric_name = (
+            str(self.metric_name) if self.metric_name is not None else "Unknown"
+        )
         self.sheet_name = str(self.sheet_name) if self.sheet_name is not None else ""
         self.category = str(self.category) if self.category is not None else ""
-        
+
         # NOUVEAU: Normalisation du sexe
         if self.sex:
             self.sex = str(self.sex).lower()
             # Normaliser les variantes vers les valeurs canoniques
-            if self.sex in ['male', 'mâle', 'm', 'masculin']:
-                self.sex = 'male'
-            elif self.sex in ['female', 'femelle', 'f', 'féminin']:
-                self.sex = 'female'
-            elif self.sex in ['mixed', 'mixte', 'as_hatched', 'as-hatched', 'straight_run']:
-                self.sex = 'as_hatched'
+            if self.sex in ["male", "mâle", "m", "masculin"]:
+                self.sex = "male"
+            elif self.sex in ["female", "femelle", "f", "féminin"]:
+                self.sex = "female"
+            elif self.sex in [
+                "mixed",
+                "mixte",
+                "as_hatched",
+                "as-hatched",
+                "straight_run",
+            ]:
+                self.sex = "as_hatched"
             else:
                 # Si pas reconnu, fallback vers as_hatched
-                self.sex = 'as_hatched'
+                self.sex = "as_hatched"
 
         # Validate confidence
         self.confidence = max(0.0, min(1.0, float(self.confidence)))
@@ -100,48 +111,130 @@ class SQLQueryNormalizer:
 
     CONCEPT_MAPPINGS = {
         "weight": [
-            "poids", "peso", "weight", "body_weight", "live_weight", "body weight",
-            "weight_g", "weight_lb", "masse", "masse corporelle", "poids corporel", 
-            "poids vif", "body_weight_day",
+            "poids",
+            "peso",
+            "weight",
+            "body_weight",
+            "live_weight",
+            "body weight",
+            "weight_g",
+            "weight_lb",
+            "masse",
+            "masse corporelle",
+            "poids corporel",
+            "poids vif",
+            "body_weight_day",
         ],
         "feed": [
-            "alimentation", "alimento", "feed", "nutrition", "consommation",
-            "feed_intake", "feed consumption", "aliment", "nourriture", "ration",
-            "aliment_consomme", "feed_consumed",
+            "alimentation",
+            "alimento",
+            "feed",
+            "nutrition",
+            "consommation",
+            "feed_intake",
+            "feed consumption",
+            "aliment",
+            "nourriture",
+            "ration",
+            "aliment_consomme",
+            "feed_consumed",
         ],
         "mortality": [
-            "mortalite", "mortalidad", "mortality", "death_rate", "viability",
-            "survie", "taux de mortalite", "mort", "deces", "pertes",
+            "mortalite",
+            "mortalidad",
+            "mortality",
+            "death_rate",
+            "viability",
+            "survie",
+            "taux de mortalite",
+            "mort",
+            "deces",
+            "pertes",
         ],
         "growth": [
-            "croissance", "crecimiento", "growth", "gain", "developpement",
-            "daily_gain", "gain quotidien", "croissance ponderale",
+            "croissance",
+            "crecimiento",
+            "growth",
+            "gain",
+            "developpement",
+            "daily_gain",
+            "gain quotidien",
+            "croissance ponderale",
         ],
         "production": [
-            "production", "produccion", "ponte", "laying", "egg_production",
-            "lay_rate", "taux de ponte", "oeufs", "eggs", "rendement",
+            "production",
+            "produccion",
+            "ponte",
+            "laying",
+            "egg_production",
+            "lay_rate",
+            "taux de ponte",
+            "oeufs",
+            "eggs",
+            "rendement",
         ],
         "fcr": [
-            "icg", "fcr", "feed_conversion", "conversion", "efficacite", "efficiency",
-            "indice de consommation", "conversion alimentaire",
+            "icg",
+            "fcr",
+            "feed_conversion",
+            "conversion",
+            "efficacite",
+            "efficiency",
+            "indice de consommation",
+            "conversion alimentaire",
         ],
         "water": [
-            "eau", "water", "agua", "water_consumption", "hydratation",
-            "consommation d'eau", "abreuvement",
+            "eau",
+            "water",
+            "agua",
+            "water_consumption",
+            "hydratation",
+            "consommation d'eau",
+            "abreuvement",
         ],
         "temperature": [
-            "temperature", "temp", "chaleur", "froid", "thermique", "climat",
+            "temperature",
+            "temp",
+            "chaleur",
+            "froid",
+            "thermique",
+            "climat",
         ],
         "density": [
-            "densite", "density", "peuplement", "stocking", "occupation", "espace", "space",
+            "densite",
+            "density",
+            "peuplement",
+            "stocking",
+            "occupation",
+            "espace",
+            "space",
         ],
         "age": [
-            "age", "semaine", "week", "jour", "day", "periode", "phase", "stade", "at day",
+            "age",
+            "semaine",
+            "week",
+            "jour",
+            "day",
+            "periode",
+            "phase",
+            "stade",
+            "at day",
         ],
         # NOUVEAU: Concepts liés au sexe
         "sex": [
-            "sexe", "sex", "male", "mâle", "female", "femelle", "mixed", "mixte",
-            "as-hatched", "as_hatched", "straight_run", "both_sexes", "sexes_mélangés",
+            "sexe",
+            "sex",
+            "male",
+            "mâle",
+            "female",
+            "femelle",
+            "mixed",
+            "mixte",
+            "as-hatched",
+            "as_hatched",
+            "straight_run",
+            "both_sexes",
+            "sexes_mélangés",
         ],
     }
 
@@ -177,22 +270,38 @@ class SQLQueryNormalizer:
         Retourne: 'male', 'female', 'as_hatched', ou None
         """
         query_lower = query.lower()
-        
+
         # Patterns pour male
-        male_patterns = ['male', 'mâle', 'mâles', 'masculin', 'coq', 'coqs', 'rooster']
+        male_patterns = ["male", "mâle", "mâles", "masculin", "coq", "coqs", "rooster"]
         if any(pattern in query_lower for pattern in male_patterns):
-            return 'male'
-        
+            return "male"
+
         # Patterns pour female
-        female_patterns = ['female', 'femelle', 'femelles', 'féminin', 'poule', 'poules', 'hen']
+        female_patterns = [
+            "female",
+            "femelle",
+            "femelles",
+            "féminin",
+            "poule",
+            "poules",
+            "hen",
+        ]
         if any(pattern in query_lower for pattern in female_patterns):
-            return 'female'
-        
+            return "female"
+
         # Patterns pour as-hatched/mixed
-        mixed_patterns = ['as-hatched', 'ashatched', 'mixed', 'mixte', 'mélangé', 'non sexé', 'straight run']
+        mixed_patterns = [
+            "as-hatched",
+            "ashatched",
+            "mixed",
+            "mixte",
+            "mélangé",
+            "non sexé",
+            "straight run",
+        ]
         if any(pattern in query_lower for pattern in mixed_patterns):
-            return 'as_hatched'
-        
+            return "as_hatched"
+
         # Si aucun sexe détecté, retourner None (fallback sera appliqué plus tard)
         return None
 
@@ -203,19 +312,70 @@ class QueryRouter:
     def __init__(self):
         # Keywords for PostgreSQL (metrics/performance)
         self.metric_keywords = {
-            "performance", "metrics", "donnees", "chiffres", "resultats", "weight", "poids",
-            "egg", "oeuf", "production", "feed", "alimentation", "mortality", "mortalite",
-            "growth", "croissance", "nutrition", "age", "semaine", "week", "day", "jour",
-            "phase", "temperature", "humidity", "humidite", "housing", "logement", "density",
-            "densite", "fcr", "icg", "conversion", "efficacite", "ross", "cobb", "hubbard",
+            "performance",
+            "metrics",
+            "donnees",
+            "chiffres",
+            "resultats",
+            "weight",
+            "poids",
+            "egg",
+            "oeuf",
+            "production",
+            "feed",
+            "alimentation",
+            "mortality",
+            "mortalite",
+            "growth",
+            "croissance",
+            "nutrition",
+            "age",
+            "semaine",
+            "week",
+            "day",
+            "jour",
+            "phase",
+            "temperature",
+            "humidity",
+            "humidite",
+            "housing",
+            "logement",
+            "density",
+            "densite",
+            "fcr",
+            "icg",
+            "conversion",
+            "efficacite",
+            "ross",
+            "cobb",
+            "hubbard",
         }
 
         # Keywords for Weaviate (knowledge)
         self.knowledge_keywords = {
-            "comment", "pourquoi", "qu'est-ce", "expliquer", "definir", "maladie", "disease",
-            "traitement", "treatment", "symptom", "symptome", "prevention", "biosecurite",
-            "biosecurity", "management", "gestion", "guide", "protocol", "protocole", "conseil",
-            "advice", "recommendation", "recommandation",
+            "comment",
+            "pourquoi",
+            "qu'est-ce",
+            "expliquer",
+            "definir",
+            "maladie",
+            "disease",
+            "traitement",
+            "treatment",
+            "symptom",
+            "symptome",
+            "prevention",
+            "biosecurite",
+            "biosecurity",
+            "management",
+            "gestion",
+            "guide",
+            "protocol",
+            "protocole",
+            "conseil",
+            "advice",
+            "recommendation",
+            "recommandation",
         }
 
     def route_query(self, query: str, intent_result=None) -> QueryType:
@@ -223,8 +383,12 @@ class QueryRouter:
         query_lower = query.lower()
 
         # Keyword counters
-        metric_score = sum(1 for keyword in self.metric_keywords if keyword in query_lower)
-        knowledge_score = sum(1 for keyword in self.knowledge_keywords if keyword in query_lower)
+        metric_score = sum(
+            1 for keyword in self.metric_keywords if keyword in query_lower
+        )
+        knowledge_score = sum(
+            1 for keyword in self.knowledge_keywords if keyword in query_lower
+        )
 
         # Entity analysis if intent_result available
         if intent_result:
@@ -234,8 +398,17 @@ class QueryRouter:
                 metric_score += 1
 
         # Comparison detection (often hybrid)
-        comparison_indicators = ["vs", "versus", "compare", "comparaison", "difference", "mieux"]
-        has_comparison = any(indicator in query_lower for indicator in comparison_indicators)
+        comparison_indicators = [
+            "vs",
+            "versus",
+            "compare",
+            "comparaison",
+            "difference",
+            "mieux",
+        ]
+        has_comparison = any(
+            indicator in query_lower for indicator in comparison_indicators
+        )
 
         # Decision rules
         if metric_score > knowledge_score + 1:
@@ -299,7 +472,9 @@ class PostgreSQLRetriever:
             self.is_initialized = False
             raise
 
-    async def search_metrics(self, query: str, entities: Dict[str, str] = None, top_k: int = 10) -> List[MetricResult]:
+    async def search_metrics(
+        self, query: str, entities: Dict[str, str] = None, top_k: int = 10
+    ) -> List[MetricResult]:
         """
         Search metrics in PostgreSQL with sex/as-hatched logic
         MODIFIÉ: Intègre la logique sexe avec fallback intelligent
@@ -343,24 +518,30 @@ class PostgreSQLRetriever:
                         sex=row.get("sex"),  # NOUVEAU
                         housing_system=row.get("housing_system"),  # NOUVEAU
                         data_type=row.get("data_type"),  # NOUVEAU
-                        confidence=self._calculate_sex_aware_relevance(query, row, entities),
+                        confidence=self._calculate_sex_aware_relevance(
+                            query, row, entities
+                        ),
                     )
                     results.append(result)
                 except Exception as row_error:
                     logger.error(f"Row conversion error {i}: {row_error}")
                     continue
 
-            logger.info(f"PostgreSQL: {len(results)} metrics found from {len(rows)} rows")
+            logger.info(
+                f"PostgreSQL: {len(results)} metrics found from {len(rows)} rows"
+            )
             return results
 
         except Exception as e:
             logger.error(f"PostgreSQL search error: {e}")
             return []
 
-    def _build_sex_aware_sql_query(self, query: str, entities: Dict[str, str] = None, top_k: int = 10) -> Tuple[str, List]:
+    def _build_sex_aware_sql_query(
+        self, query: str, entities: Dict[str, str] = None, top_k: int = 10
+    ) -> Tuple[str, List]:
         """
         NOUVELLE MÉTHODE: Construit une requête SQL intelligente avec logique sexe/as-hatched
-        
+
         Logique:
         1. Si sexe spécifié -> chercher ce sexe en priorité + as_hatched comme fallback
         2. Si aucun sexe spécifié -> prioriser as_hatched + inclure autres sexes
@@ -400,18 +581,20 @@ class PostgreSQLRetriever:
 
         # 1. NOUVELLE LOGIQUE SEXE avec fallback intelligent
         sex_from_query = self.query_normalizer.extract_sex_from_query(query)
-        sex_from_entities = entities.get('sex') if entities else None
-        sex_specified = entities.get('sex_specified') == 'true' if entities else False
-        
+        sex_from_entities = entities.get("sex") if entities else None
+        sex_specified = entities.get("sex_specified") == "true" if entities else False
+
         # Déterminer le sexe à utiliser
         target_sex = sex_from_entities or sex_from_query
-        
+
         if target_sex and sex_specified:
             # Sexe explicitement spécifié -> recherche avec fallback
-            logger.debug(f"Sexe spécifié: {target_sex}, recherche avec fallback as_hatched")
-            
+            logger.debug(
+                f"Sexe spécifié: {target_sex}, recherche avec fallback as_hatched"
+            )
+
             param_count += 1
-            
+
             # CASE pour priorisation: sexe spécifié en premier, as_hatched en fallback
             sex_priority_case = f"""
                 CASE 
@@ -420,18 +603,22 @@ class PostgreSQLRetriever:
                     ELSE 3
                 END
             """
-            
-            conditions.append(f"""
+
+            conditions.append(
+                f"""
                 (LOWER(COALESCE(d.sex, 'as_hatched')) = ${param_count} 
                  OR LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed', 'as-hatched', 'straight_run'))
-            """)
-            
+            """
+            )
+
             params.append(target_sex.lower())
-            
+
         else:
             # Aucun sexe spécifié -> prioriser as_hatched par défaut
-            logger.debug("Aucun sexe spécifié, fallback vers as_hatched avec inclusion autres sexes")
-            
+            logger.debug(
+                "Aucun sexe spécifié, fallback vers as_hatched avec inclusion autres sexes"
+            )
+
             sex_priority_case = """
                 CASE 
                     WHEN LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed', 'as-hatched') THEN 1
@@ -440,7 +627,7 @@ class PostgreSQLRetriever:
                     ELSE 4
                 END
             """
-            
+
             # Pas de condition restrictive sur le sexe -> inclure tous les résultats
             # La priorisation se fera dans l'ORDER BY
 
@@ -455,35 +642,39 @@ class PostgreSQLRetriever:
             logger.debug(f"Age extracted from query: {age_extracted} days")
             # Tolérance de ±3 jours
             age_tolerance = 3
-            
+
             param_count += 1
             param_count_age2 = param_count + 1
             param_count_tolerance = param_count + 2
-            
-            conditions.append(f"""
+
+            conditions.append(
+                f"""
                 ((m.age_min <= ${param_count} AND m.age_max >= ${param_count_age2}) 
                  OR ABS(COALESCE(m.age_min, 0) - ${param_count}) <= ${param_count_tolerance}
                  OR ABS(COALESCE(m.age_max, 0) - ${param_count_age2}) <= ${param_count_tolerance})
-            """)
-            
+            """
+            )
+
             params.extend([age_extracted, age_extracted, age_tolerance])
             param_count += 2
 
         # 4. Filters selon entities (existant)
         if entities:
-            if entities.get('line'):
+            if entities.get("line"):
                 param_count += 1
                 conditions.append(f"LOWER(s.strain_name) ILIKE ${param_count}")
                 params.append(f"%{entities['line'].lower()}%")
 
-            if entities.get('age_days') and not age_extracted:
-                age_days = int(entities['age_days'])
+            if entities.get("age_days") and not age_extracted:
+                age_days = int(entities["age_days"])
                 param_count += 1
                 param_count_age2 = param_count + 1
-                conditions.append(f"""
+                conditions.append(
+                    f"""
                     (m.age_min <= ${param_count} AND m.age_max >= ${param_count_age2}) 
                     OR (m.age_min IS NULL AND m.age_max IS NULL)
-                """)
+                """
+                )
                 params.extend([age_days, age_days])
                 param_count += 1
 
@@ -493,17 +684,21 @@ class PostgreSQLRetriever:
         # Priority aux concepts normalisés
         for concept in normalized_concepts[:8]:
             param_count += 1
-            metric_search_conditions.append(f"LOWER(m.metric_name) ILIKE ${param_count}")
+            metric_search_conditions.append(
+                f"LOWER(m.metric_name) ILIKE ${param_count}"
+            )
             params.append(f"%{concept}%")
 
         # Fallback sur raw words
         for word in raw_words[:3]:
             param_count += 1
             param_count_word2 = param_count + 1
-            metric_search_conditions.extend([
-                f"LOWER(m.metric_name) ILIKE ${param_count}",
-                f"LOWER(m.value_text) ILIKE ${param_count_word2}",
-            ])
+            metric_search_conditions.extend(
+                [
+                    f"LOWER(m.metric_name) ILIKE ${param_count}",
+                    f"LOWER(m.value_text) ILIKE ${param_count_word2}",
+                ]
+            )
             params.extend([f"%{word}%", f"%{word}%"])
             param_count += 1
 
@@ -517,21 +712,20 @@ class PostgreSQLRetriever:
 
         # 6. NOUVELLE LOGIQUE DE TRI avec priorisation sexe
         order_clauses = [sex_priority_case]  # Priorisation par sexe
-        
+
         if age_extracted:
             order_clauses.append(f"ABS(COALESCE(m.age_min, 999) - {age_extracted})")
-        
-        order_clauses.extend([
-            "m.value_numeric DESC NULLS LAST",
-            "m.metric_name"
-        ])
-        
+
+        order_clauses.extend(["m.value_numeric DESC NULLS LAST", "m.metric_name"])
+
         base_query += f" ORDER BY {', '.join(order_clauses)}"
         base_query += f" LIMIT {top_k}"
 
         return base_query, params
 
-    def _calculate_sex_aware_relevance(self, query: str, row: Dict, entities: Dict[str, str] = None) -> float:
+    def _calculate_sex_aware_relevance(
+        self, query: str, row: Dict, entities: Dict[str, str] = None
+    ) -> float:
         """
         NOUVELLE MÉTHODE: Calcule la pertinence en tenant compte du sexe
         """
@@ -539,21 +733,21 @@ class PostgreSQLRetriever:
 
         # Score basé sur la correspondance du sexe
         sex_from_query = self.query_normalizer.extract_sex_from_query(query)
-        sex_from_entities = entities.get('sex') if entities else None
-        sex_specified = entities.get('sex_specified') == 'true' if entities else False
-        
+        sex_from_entities = entities.get("sex") if entities else None
+        sex_specified = entities.get("sex_specified") == "true" if entities else False
+
         target_sex = sex_from_entities or sex_from_query
-        row_sex = (row.get('sex') or 'as_hatched').lower()
-        
+        row_sex = (row.get("sex") or "as_hatched").lower()
+
         if target_sex and sex_specified:
             # Sexe explicitement demandé
             if row_sex == target_sex.lower():
                 score += 0.3  # Correspondance exacte du sexe
-            elif row_sex in ['as_hatched', 'mixed', 'as-hatched']:
+            elif row_sex in ["as_hatched", "mixed", "as-hatched"]:
                 score += 0.1  # Fallback as_hatched acceptable
         else:
             # Aucun sexe spécifié -> prioriser as_hatched
-            if row_sex in ['as_hatched', 'mixed', 'as-hatched']:
+            if row_sex in ["as_hatched", "mixed", "as-hatched"]:
                 score += 0.2  # Priorité as_hatched par défaut
             else:
                 score += 0.05  # Autres sexes moins prioritaires
@@ -561,7 +755,7 @@ class PostgreSQLRetriever:
         # Score existant pour concepts normalisés
         normalized_concepts, _ = self.query_normalizer.get_search_terms(query)
         metric_name_lower = (row.get("metric_name") or "").lower()
-        
+
         for concept in normalized_concepts:
             if concept in metric_name_lower:
                 score += 0.3
@@ -607,7 +801,9 @@ class PostgreSQLRetriever:
                     age = int(match.group(1))
                     # Validation raisonnable (0-150 jours)
                     if 0 <= age <= 150:
-                        logger.debug(f"Age détecté: {age} jours via pattern '{pattern}'")
+                        logger.debug(
+                            f"Age détecté: {age} jours via pattern '{pattern}'"
+                        )
                         return age
                 except ValueError:
                     continue
@@ -626,7 +822,9 @@ class PostgreSQLRetriever:
                 try:
                     age = int(match.group(1))
                     if 0 <= age <= 150:
-                        logger.debug(f"Age implicite détecté: {age} jours via pattern '{pattern}'")
+                        logger.debug(
+                            f"Age implicite détecté: {age} jours via pattern '{pattern}'"
+                        )
                         return age
                 except ValueError:
                     continue
@@ -685,7 +883,9 @@ class PostgreSQLSystem:
             return QueryType.KNOWLEDGE
         return self.query_router.route_query(query, intent_result)
 
-    async def search_metrics(self, query: str, entities: Dict[str, str] = None, top_k: int = 10) -> RAGResult:
+    async def search_metrics(
+        self, query: str, entities: Dict[str, str] = None, top_k: int = 10
+    ) -> RAGResult:
         """
         MAIN METHOD - Search with sex-aware logic and complete response generation
         MODIFIÉ: Intègre la logique sexe/as-hatched
@@ -699,15 +899,17 @@ class PostgreSQLSystem:
 
         try:
             # Search metrics with sex-aware logic
-            metric_results = await self.postgres_retriever.search_metrics(query, entities, top_k)
+            metric_results = await self.postgres_retriever.search_metrics(
+                query, entities, top_k
+            )
 
             if not metric_results:
                 return RAGResult(
                     source=RAGSource.NO_RESULTS,
                     metadata={
-                        "source_type": "metrics", 
+                        "source_type": "metrics",
                         "data_source": "postgresql",
-                        "sex_logic_applied": True
+                        "sex_logic_applied": True,
                     },
                 )
 
@@ -761,19 +963,27 @@ class PostgreSQLSystem:
                 )
 
             # NEW: Sex-aware response generation
-            answer_text = await self._generate_sex_aware_response(query, documents, metric_results, entities)
+            answer_text = await self._generate_sex_aware_response(
+                query, documents, metric_results, entities
+            )
 
             # Calculate global confidence with sex matching bonus
-            avg_confidence = sum(m.confidence for m in metric_results) / len(metric_results)
+            avg_confidence = sum(m.confidence for m in metric_results) / len(
+                metric_results
+            )
 
             # Bonus if sex logic was successfully applied
-            sex_from_entities = entities.get('sex') if entities else None
+            sex_from_entities = entities.get("sex") if entities else None
             if sex_from_entities:
-                matching_sex_results = [m for m in metric_results if m.sex == sex_from_entities]
+                matching_sex_results = [
+                    m for m in metric_results if m.sex == sex_from_entities
+                ]
                 if matching_sex_results:
                     avg_confidence = min(1.0, avg_confidence + 0.1)
 
-            logger.info(f"PostgreSQL SUCCESS: {len(documents)} documents with sex-aware logic")
+            logger.info(
+                f"PostgreSQL SUCCESS: {len(documents)} documents with sex-aware logic"
+            )
 
             return RAGResult(
                 source=RAGSource.RAG_SUCCESS,
@@ -787,8 +997,10 @@ class PostgreSQLSystem:
                     "document_count": len(documents),
                     "avg_confidence": avg_confidence,
                     "sex_logic_applied": True,
-                    "sex_specified": entities.get('sex_specified') == 'true' if entities else False,
-                    "target_sex": entities.get('sex') if entities else 'as_hatched',
+                    "sex_specified": (
+                        entities.get("sex_specified") == "true" if entities else False
+                    ),
+                    "target_sex": entities.get("sex") if entities else "as_hatched",
                     "response_generated": True,
                 },
             )
@@ -796,10 +1008,15 @@ class PostgreSQLSystem:
         except Exception as e:
             logger.error(f"PostgreSQL sex-aware search error: {e}")
             import traceback
+
             logger.error(f"Stack trace: {traceback.format_exc()}")
             return RAGResult(
                 source=RAGSource.ERROR,
-                metadata={"error": str(e), "source_type": "metrics", "sex_logic_applied": True},
+                metadata={
+                    "error": str(e),
+                    "source_type": "metrics",
+                    "sex_logic_applied": True,
+                },
             )
 
     def _format_metric_content_with_sex(self, metric: MetricResult) -> str:
@@ -819,10 +1036,10 @@ class PostgreSQLSystem:
             # NOUVEAU: Ajouter information sexe
             if metric.sex:
                 sex_display = {
-                    'male': 'Male',
-                    'female': 'Female', 
-                    'as_hatched': 'As-hatched (mixed sexes)',
-                    'mixed': 'Mixed sexes',
+                    "male": "Male",
+                    "female": "Female",
+                    "as_hatched": "As-hatched (mixed sexes)",
+                    "mixed": "Mixed sexes",
                 }.get(metric.sex, metric.sex.title())
                 content_parts.append(f"Sex: {sex_display}")
 
@@ -852,7 +1069,11 @@ class PostgreSQLSystem:
             return f"Metric: {getattr(metric, 'metric_name', 'Unknown name')}"
 
     async def _generate_sex_aware_response(
-        self, query: str, documents: List[Document], metric_results: List[MetricResult], entities: Dict[str, str] = None
+        self,
+        query: str,
+        documents: List[Document],
+        metric_results: List[MetricResult],
+        entities: Dict[str, str] = None,
     ) -> str:
         """
         NOUVELLE MÉTHODE: Generate intelligent response with sex/as-hatched context
@@ -860,23 +1081,33 @@ class PostgreSQLSystem:
         try:
             # Extract requested age and sex information
             age_requested = self._extract_age_from_query(query)
-            sex_from_entities = entities.get('sex') if entities else None
-            sex_specified = entities.get('sex_specified') == 'true' if entities else False
-            sex_detection_method = entities.get('sex_detection_method') if entities else 'none'
+            sex_from_entities = entities.get("sex") if entities else None
+            sex_specified = (
+                entities.get("sex_specified") == "true" if entities else False
+            )
+            sex_detection_method = (
+                entities.get("sex_detection_method") if entities else "none"
+            )
 
             # Analyze query for metric type
             query_lower = query.lower()
             metric_type = None
             if any(word in query_lower for word in ["weight", "poids", "body"]):
                 metric_type = "weight"
-            elif any(word in query_lower for word in ["fcr", "conversion", "efficacite"]):
+            elif any(
+                word in query_lower for word in ["fcr", "conversion", "efficacite"]
+            ):
                 metric_type = "fcr"
             elif any(word in query_lower for word in ["gain", "croissance", "growth"]):
                 metric_type = "gain"
 
             # Find best metric with sex-aware selection
             best_metric = self._select_best_metric_with_sex_logic(
-                metric_results, age_requested, metric_type, sex_from_entities, sex_specified
+                metric_results,
+                age_requested,
+                metric_type,
+                sex_from_entities,
+                sex_specified,
             )
 
             if not best_metric:
@@ -884,7 +1115,13 @@ class PostgreSQLSystem:
 
             # Generate context-aware response with sex clarification
             response = self._build_sex_aware_response_text(
-                best_metric, query, age_requested, metric_type, sex_from_entities, sex_specified, sex_detection_method
+                best_metric,
+                query,
+                age_requested,
+                metric_type,
+                sex_from_entities,
+                sex_specified,
+                sex_detection_method,
             )
 
             # Add info about multiple results if relevant
@@ -900,13 +1137,21 @@ class PostgreSQLSystem:
             # Simple fallback
             if metric_results:
                 best = metric_results[0]
-                sex_info = f" for {best.sex}" if best.sex and best.sex != 'as_hatched' else " (as-hatched)"
+                sex_info = (
+                    f" for {best.sex}"
+                    if best.sex and best.sex != "as_hatched"
+                    else " (as-hatched)"
+                )
                 return f"Data found{sex_info}: {best.metric_name} = {best.value_numeric or best.value_text or 'value not available'} for {best.strain}."
             return f"Error generating response for '{query}'."
 
     def _select_best_metric_with_sex_logic(
-        self, metric_results: List[MetricResult], age_requested: Optional[int], 
-        metric_type: Optional[str], target_sex: Optional[str], sex_specified: bool
+        self,
+        metric_results: List[MetricResult],
+        age_requested: Optional[int],
+        metric_type: Optional[str],
+        target_sex: Optional[str],
+        sex_specified: bool,
     ) -> Optional[MetricResult]:
         """
         NOUVELLE MÉTHODE: Sélectionne la meilleure métrique avec logique sexe
@@ -920,40 +1165,60 @@ class PostgreSQLSystem:
             exact_sex_matches = [m for m in metric_results if m.sex == target_sex]
             if exact_sex_matches:
                 candidate_results = exact_sex_matches
-                logger.debug(f"Sexe spécifié trouvé: {len(exact_sex_matches)} résultats pour {target_sex}")
+                logger.debug(
+                    f"Sexe spécifié trouvé: {len(exact_sex_matches)} résultats pour {target_sex}"
+                )
             else:
                 # Fallback vers as_hatched si sexe spécifique non trouvé
-                as_hatched_matches = [m for m in metric_results if m.sex in ['as_hatched', 'mixed']]
+                as_hatched_matches = [
+                    m for m in metric_results if m.sex in ["as_hatched", "mixed"]
+                ]
                 if as_hatched_matches:
                     candidate_results = as_hatched_matches
-                    logger.debug(f"Fallback as_hatched: {len(as_hatched_matches)} résultats")
+                    logger.debug(
+                        f"Fallback as_hatched: {len(as_hatched_matches)} résultats"
+                    )
                 else:
                     candidate_results = metric_results
         else:
             # Aucun sexe spécifié -> prioriser as_hatched
-            as_hatched_first = [m for m in metric_results if m.sex in ['as_hatched', 'mixed']]
-            other_sexes = [m for m in metric_results if m.sex not in ['as_hatched', 'mixed']]
+            as_hatched_first = [
+                m for m in metric_results if m.sex in ["as_hatched", "mixed"]
+            ]
+            other_sexes = [
+                m for m in metric_results if m.sex not in ["as_hatched", "mixed"]
+            ]
             candidate_results = as_hatched_first + other_sexes
-            logger.debug(f"Priorisation as_hatched: {len(as_hatched_first)} as_hatched + {len(other_sexes)} autres")
+            logger.debug(
+                f"Priorisation as_hatched: {len(as_hatched_first)} as_hatched + {len(other_sexes)} autres"
+            )
 
         # 2. Filtrer par âge si spécifié
         if age_requested:
             # Correspondance exacte d'âge
-            exact_age_matches = [m for m in candidate_results if m.age_min == age_requested]
+            exact_age_matches = [
+                m for m in candidate_results if m.age_min == age_requested
+            ]
             if exact_age_matches:
                 candidate_results = exact_age_matches
             else:
                 # Âge le plus proche (tolérance ±3 jours)
                 close_age_matches = [
-                    m for m in candidate_results 
+                    m
+                    for m in candidate_results
                     if m.age_min and abs(m.age_min - age_requested) <= 3
                 ]
                 if close_age_matches:
-                    candidate_results = sorted(close_age_matches, key=lambda m: abs((m.age_min or 0) - age_requested))
+                    candidate_results = sorted(
+                        close_age_matches,
+                        key=lambda m: abs((m.age_min or 0) - age_requested),
+                    )
 
         # 3. Filtrer par type de métrique si détecté
         if metric_type:
-            type_matches = [m for m in candidate_results if metric_type in m.metric_name.lower()]
+            type_matches = [
+                m for m in candidate_results if metric_type in m.metric_name.lower()
+            ]
             if type_matches:
                 candidate_results = type_matches
 
@@ -961,19 +1226,24 @@ class PostgreSQLSystem:
         return candidate_results[0] if candidate_results else metric_results[0]
 
     def _build_sex_aware_response_text(
-        self, metric: MetricResult, query: str, age_requested: Optional[int], 
-        metric_type: Optional[str], target_sex: Optional[str], sex_specified: bool, 
-        sex_detection_method: str
+        self,
+        metric: MetricResult,
+        query: str,
+        age_requested: Optional[int],
+        metric_type: Optional[str],
+        target_sex: Optional[str],
+        sex_specified: bool,
+        sex_detection_method: str,
     ) -> str:
         """
         NOUVELLE MÉTHODE: Construit la réponse avec clarification du sexe
         """
-        
+
         # Construire la partie sexe de la réponse
         sex_context = ""
         if metric.sex:
-            if metric.sex == 'as_hatched' or metric.sex == 'mixed':
-                if sex_specified and target_sex not in ['as_hatched', 'mixed']:
+            if metric.sex == "as_hatched" or metric.sex == "mixed":
+                if sex_specified and target_sex not in ["as_hatched", "mixed"]:
                     # L'utilisateur a demandé un sexe spécifique mais on a trouvé as_hatched
                     sex_context = f"Pour as-hatched (sexes mélangés) {metric.strain}"
                 else:
@@ -981,7 +1251,9 @@ class PostgreSQLSystem:
                     sex_context = f"Pour as-hatched (sexes mélangés) {metric.strain}"
             else:
                 # Sexe spécifique (male/female)
-                sex_display = {'male': 'mâles', 'female': 'femelles'}.get(metric.sex, metric.sex)
+                sex_display = {"male": "mâles", "female": "femelles"}.get(
+                    metric.sex, metric.sex
+                )
                 sex_context = f"Pour {sex_display} {metric.strain}"
         else:
             sex_context = f"Pour {metric.strain}"
@@ -1009,12 +1281,12 @@ class PostgreSQLSystem:
                 value_str = f"{int(metric.value_numeric)}"
             else:
                 value_str = f"{metric.value_numeric:.1f}"
-            
+
             if metric.unit:
                 # Simplifier les unités courantes
                 unit_display = metric.unit.replace("grams", "g").replace("gram", "g")
                 value_str += f" {unit_display}"
-            
+
             value_context = f", le poids est de {value_str}"
         elif metric.value_text:
             value_context = f", la valeur est {metric.value_text}"
@@ -1030,17 +1302,17 @@ class PostgreSQLSystem:
         """
         sex_counts = {}
         for metric in metric_results:
-            sex = metric.sex or 'as_hatched'
+            sex = metric.sex or "as_hatched"
             sex_counts[sex] = sex_counts.get(sex, 0) + 1
 
         if len(sex_counts) <= 1:
             return ""
 
         sex_labels = {
-            'male': 'mâles',
-            'female': 'femelles', 
-            'as_hatched': 'as-hatched',
-            'mixed': 'mixte'
+            "male": "mâles",
+            "female": "femelles",
+            "as_hatched": "as-hatched",
+            "mixed": "mixte",
         }
 
         breakdown_parts = []
@@ -1074,6 +1346,10 @@ class PostgreSQLSystem:
             "sex_aware_search": True,
             "supported_sexes": ["male", "female", "as_hatched", "mixed"],
             "fallback_behavior": "as_hatched",
-            "sex_detection_patterns": len([p for p in ["male", "female", "as_hatched"] if p]),
-            "normalization_concepts": len(self.postgres_retriever.query_normalizer.CONCEPT_MAPPINGS),
+            "sex_detection_patterns": len(
+                [p for p in ["male", "female", "as_hatched"] if p]
+            ),
+            "normalization_concepts": len(
+                self.postgres_retriever.query_normalizer.CONCEPT_MAPPINGS
+            ),
         }
