@@ -9,6 +9,7 @@ CORRECTIONS APPORTÉES:
 3. Initialisation robuste avec gestion d'erreurs
 4. Normalisation multilingue stable
 5. Diagnostics améliorés pour le debugging
+6. Correction des imports PostgreSQL et QueryType
 """
 
 import asyncio
@@ -49,10 +50,11 @@ try:
 except ImportError as e:
     logging.warning(f"Utilities non disponibles: {e}")
     METRICS = None
-    
+
     def detect_language_enhanced(text: str, default: str = "fr") -> str:
         """Fallback function for language detection"""
         return default
+
 
 # Logger défini AVANT utilisation
 logger = logging.getLogger(__name__)
@@ -64,22 +66,25 @@ WEAVIATE_CORE_AVAILABLE = False
 LANGSMITH_INTEGRATION_AVAILABLE = False
 
 PostgreSQLSystem = None
-QueryType = None
 JSONSystem = None
 WeaviateCore = None
 LangSmithIntegration = None
 
 # Import PostgreSQL System
 try:
-    from .rag_postgresql import PostgreSQLSystem, QueryType
+    from .rag_postgresql import PostgreSQLSystem
+
     POSTGRESQL_INTEGRATION_AVAILABLE = True
     logger.info("Système PostgreSQL avec normalisation multilingue importé")
 except ImportError as e:
     logger.warning(f"PostgreSQL non disponible: {e}")
+    PostgreSQLSystem = None
+    POSTGRESQL_INTEGRATION_AVAILABLE = False
 
 # Import JSON System
 try:
     from .rag_json_system import JSONSystem
+
     RAG_JSON_SYSTEM_AVAILABLE = True
     logger.info("Système JSON importé")
 except ImportError as e:
@@ -88,6 +93,7 @@ except ImportError as e:
 # Import Weaviate Core
 try:
     from .rag_weaviate_core import WeaviateCore
+
     WEAVIATE_CORE_AVAILABLE = True
     logger.info("Weaviate Core importé")
 except ImportError as e:
@@ -96,6 +102,7 @@ except ImportError as e:
 # Import LangSmith
 try:
     from .rag_langsmith import LangSmithIntegration
+
     LANGSMITH_INTEGRATION_AVAILABLE = True
     logger.info("LangSmith importé")
 except ImportError as e:
@@ -155,6 +162,7 @@ class InteliaRAGEngine:
             # Essayer avec httpx pour timeout personnalisé
             try:
                 import httpx
+
                 http_client = httpx.AsyncClient(timeout=30.0)
                 return AsyncOpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
             except ImportError:
@@ -190,30 +198,38 @@ class InteliaRAGEngine:
             if WEAVIATE_CORE_AVAILABLE and WeaviateCore:
                 await self._initialize_weaviate_core()
             else:
-                logger.warning("Weaviate Core non disponible - fonctionnalités limitées")
+                logger.warning(
+                    "Weaviate Core non disponible - fonctionnalités limitées"
+                )
 
             # 4. LangSmith (complètement optionnel)
-            if (LANGSMITH_INTEGRATION_AVAILABLE and 
-                LangSmithIntegration and 
-                LANGSMITH_ENABLED):
+            if (
+                LANGSMITH_INTEGRATION_AVAILABLE
+                and LangSmithIntegration
+                and LANGSMITH_ENABLED
+            ):
                 await self._initialize_langsmith()
 
             self.is_initialized = True
-            
+
             # Log du statut final
             active_modules = [
-                name for name, module in [
+                name
+                for name, module in [
                     ("PostgreSQL", self.postgresql_system),
                     ("JSON", self.json_system),
                     ("Weaviate", self.weaviate_core),
-                    ("LangSmith", self.langsmith_integration)
-                ] if module is not None
+                    ("LangSmith", self.langsmith_integration),
+                ]
+                if module is not None
             ]
-            
+
             logger.info(f"RAG Engine initialisé - Modules actifs: {active_modules}")
-            
+
             if self.initialization_errors:
-                logger.warning(f"Erreurs d'initialisation: {self.initialization_errors}")
+                logger.warning(
+                    f"Erreurs d'initialisation: {self.initialization_errors}"
+                )
 
         except Exception as e:
             logger.error(f"Erreur initialisation critique: {e}")
@@ -287,7 +303,7 @@ class InteliaRAGEngine:
 
         start_time = time.time()
         self.optimization_stats["requests_total"] += 1
-        
+
         if METRICS:
             METRICS.inc("requests_total")
 
@@ -295,23 +311,24 @@ class InteliaRAGEngine:
         if not query or not query.strip():
             return RAGResult(
                 source=RAGSource.ERROR,
-                metadata={"error": "Query vide", "processing_time": time.time() - start_time}
+                metadata={
+                    "error": "Query vide",
+                    "processing_time": time.time() - start_time,
+                },
             )
 
         # Fallback si système complètement indisponible
-        if self.degraded_mode and not any([
-            self.postgresql_system, 
-            self.json_system, 
-            self.weaviate_core
-        ]):
+        if self.degraded_mode and not any(
+            [self.postgresql_system, self.json_system, self.weaviate_core]
+        ):
             return RAGResult(
                 source=RAGSource.FALLBACK_NEEDED,
                 answer="Le système RAG n'est pas disponible actuellement.",
                 metadata={
                     "reason": "tous_modules_indisponibles",
                     "processing_time": time.time() - start_time,
-                    "initialization_errors": self.initialization_errors
-                }
+                    "initialization_errors": self.initialization_errors,
+                },
             )
 
         try:
@@ -324,19 +341,33 @@ class InteliaRAGEngine:
             # LangSmith si disponible
             if self.langsmith_integration:
                 try:
-                    return await self.langsmith_integration.generate_response_with_tracing(
-                        query, tenant_id, conversation_context, language,
-                        explain_score, use_json_search, genetic_line_filter,
-                        performance_context, self
+                    return (
+                        await self.langsmith_integration.generate_response_with_tracing(
+                            query,
+                            tenant_id,
+                            conversation_context,
+                            language,
+                            explain_score,
+                            use_json_search,
+                            genetic_line_filter,
+                            performance_context,
+                            self,
+                        )
                     )
                 except Exception as e:
                     logger.warning(f"LangSmith échec, fallback: {e}")
 
             # Traitement core
             return await self._generate_response_core(
-                query, tenant_id, conversation_context, language,
-                explain_score, use_json_search, genetic_line_filter,
-                performance_context, start_time
+                query,
+                tenant_id,
+                conversation_context,
+                language,
+                explain_score,
+                use_json_search,
+                genetic_line_filter,
+                performance_context,
+                start_time,
             )
 
         except Exception as e:
@@ -347,8 +378,8 @@ class InteliaRAGEngine:
                 metadata={
                     "error": str(e),
                     "processing_time": time.time() - start_time,
-                    "query": query[:100] + "..." if len(query) > 100 else query
-                }
+                    "query": query[:100] + "..." if len(query) > 100 else query,
+                },
             )
 
     def _detect_multilingual_query(self, query: str) -> bool:
@@ -394,7 +425,7 @@ class InteliaRAGEngine:
                 try:
                     query_type = self.postgresql_system.route_query(query, None)
 
-                    if query_type and hasattr(query_type, 'value'):
+                    if query_type and hasattr(query_type, "value"):
                         query_type_value = query_type.value
                     else:
                         query_type_value = str(query_type) if query_type else None
@@ -425,14 +456,19 @@ class InteliaRAGEngine:
                         genetic_line=genetic_line_filter,
                         performance_metrics=(
                             performance_context.get("metrics")
-                            if performance_context else None
+                            if performance_context
+                            else None
                         ),
                     )
 
                     if json_results and len(json_results) >= 3:
                         self.optimization_stats["json_searches"] += 1
                         return await self._generate_response_from_json_results(
-                            query, json_results, language, conversation_context, start_time
+                            query,
+                            json_results,
+                            language,
+                            conversation_context,
+                            start_time,
                         )
                 except Exception as e:
                     logger.warning(f"Erreur JSON search: {e}")
@@ -442,7 +478,12 @@ class InteliaRAGEngine:
                 logger.info("Utilisation Weaviate (fallback)")
                 try:
                     return await self._generate_response_core_weaviate_only(
-                        query, None, conversation_context, language, start_time, tenant_id
+                        query,
+                        None,
+                        conversation_context,
+                        language,
+                        start_time,
+                        tenant_id,
                     )
                 except Exception as e:
                     logger.error(f"Erreur Weaviate: {e}")
@@ -454,13 +495,15 @@ class InteliaRAGEngine:
                 metadata={
                     "processing_time": time.time() - start_time,
                     "available_modules": [
-                        name for name, module in [
+                        name
+                        for name, module in [
                             ("postgresql", self.postgresql_system),
                             ("json", self.json_system),
-                            ("weaviate", self.weaviate_core)
-                        ] if module is not None
-                    ]
-                }
+                            ("weaviate", self.weaviate_core),
+                        ]
+                        if module is not None
+                    ],
+                },
             )
 
         except Exception as e:
@@ -485,11 +528,17 @@ class InteliaRAGEngine:
 
                 if normalized_concepts:
                     self.optimization_stats["normalization_hits"] += 1
-                    self.optimization_stats["concept_mappings_used"] += len(normalized_concepts)
-                    logger.debug(f"Concepts normalisés utilisés: {normalized_concepts[:3]}")
+                    self.optimization_stats["concept_mappings_used"] += len(
+                        normalized_concepts
+                    )
+                    logger.debug(
+                        f"Concepts normalisés utilisés: {normalized_concepts[:3]}"
+                    )
 
             # Recherche avec normalisation
-            result = await self.postgresql_system.search_metrics(query, intent_result, top_k)
+            result = await self.postgresql_system.search_metrics(
+                query, intent_result, top_k
+            )
 
             # Enrichir les métadonnées avec info normalisation
             if result and result.metadata and normalized_concepts:
@@ -503,12 +552,15 @@ class InteliaRAGEngine:
             logger.error(f"Erreur PostgreSQL avec normalisation: {e}")
             return RAGResult(
                 source=RAGSource.ERROR,
-                metadata={"error": str(e), "source_type": "postgresql_normalized"}
+                metadata={"error": str(e), "source_type": "postgresql_normalized"},
             )
 
     async def _search_hybrid_sources_with_normalization(
-        self, query: str, conversation_context: List[Dict], 
-        language: str, start_time: float
+        self,
+        query: str,
+        conversation_context: List[Dict],
+        language: str,
+        start_time: float,
     ) -> RAGResult:
         """Recherche hybride avec normalisation intégrée"""
         try:
@@ -522,18 +574,28 @@ class InteliaRAGEngine:
             if self.weaviate_core:
                 tasks.append(
                     self.weaviate_core.generate_response(
-                        query, None, conversation_context, language, start_time, "default"
+                        query,
+                        None,
+                        conversation_context,
+                        language,
+                        start_time,
+                        "default",
                     )
                 )
 
             if not tasks:
                 return RAGResult(
                     source=RAGSource.NO_RESULTS,
-                    metadata={"source_type": "hybrid", "reason": "no_sources_available"}
+                    metadata={
+                        "source_type": "hybrid",
+                        "reason": "no_sources_available",
+                    },
                 )
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
-            return self._merge_hybrid_results_with_normalization(results, query, start_time)
+            return self._merge_hybrid_results_with_normalization(
+                results, query, start_time
+            )
 
         except Exception as e:
             logger.error(f"Erreur recherche hybride: {e}")
@@ -547,7 +609,8 @@ class InteliaRAGEngine:
     ) -> RAGResult:
         """Fusionne les résultats hybrides en priorisant les résultats normalisés"""
         valid_results = [
-            r for r in results 
+            r
+            for r in results
             if isinstance(r, RAGResult) and not isinstance(r, Exception)
         ]
 
@@ -557,12 +620,13 @@ class InteliaRAGEngine:
                 metadata={
                     "source_type": "hybrid_normalized",
                     "processing_time": time.time() - start_time,
-                }
+                },
             )
 
         # Prioriser les résultats avec normalisation appliquée
         normalized_results = [
-            r for r in valid_results
+            r
+            for r in valid_results
             if r.metadata and r.metadata.get("normalization_applied")
         ]
 
@@ -573,18 +637,25 @@ class InteliaRAGEngine:
             best_result = max(valid_results, key=lambda r: r.confidence)
 
         # Enrichir les métadonnées
-        best_result.metadata.update({
-            "source_type": "hybrid_normalized",
-            "results_merged": len(valid_results),
-            "normalized_results_count": len(normalized_results),
-            "processing_time": time.time() - start_time,
-        })
+        best_result.metadata.update(
+            {
+                "source_type": "hybrid_normalized",
+                "results_merged": len(valid_results),
+                "normalized_results_count": len(normalized_results),
+                "processing_time": time.time() - start_time,
+            }
+        )
 
         return best_result
 
     async def _generate_response_core_weaviate_only(
-        self, query: str, intent_result, conversation_context: List[Dict],
-        language: str, start_time: float, tenant_id: str
+        self,
+        query: str,
+        intent_result,
+        conversation_context: List[Dict],
+        language: str,
+        start_time: float,
+        tenant_id: str,
     ) -> RAGResult:
         """Méthode Weaviate avec gestion d'erreurs"""
         if not self.weaviate_core:
@@ -596,18 +667,27 @@ class InteliaRAGEngine:
         try:
             self.optimization_stats["weaviate_searches"] += 1
             return await self.weaviate_core.generate_response(
-                query, intent_result, conversation_context, language, start_time, tenant_id
+                query,
+                intent_result,
+                conversation_context,
+                language,
+                start_time,
+                tenant_id,
             )
         except Exception as e:
             logger.error(f"Erreur Weaviate Core: {e}")
             return RAGResult(
                 source=RAGSource.ERROR,
-                metadata={"error": str(e), "source_type": "weaviate"}
+                metadata={"error": str(e), "source_type": "weaviate"},
             )
 
     async def _generate_response_from_json_results(
-        self, query: str, json_results: List[Dict[str, Any]], 
-        language: str, conversation_context: List[Dict], start_time: float
+        self,
+        query: str,
+        json_results: List[Dict[str, Any]],
+        language: str,
+        conversation_context: List[Dict],
+        start_time: float,
     ) -> RAGResult:
         """Génère réponse depuis résultats JSON"""
         if not self.json_system:
@@ -621,7 +701,7 @@ class InteliaRAGEngine:
             logger.error(f"Erreur génération JSON: {e}")
             return RAGResult(
                 source=RAGSource.ERROR,
-                metadata={"error": str(e), "source_type": "json"}
+                metadata={"error": str(e), "source_type": "json"},
             )
 
     def get_status(self) -> Dict:
@@ -657,13 +737,21 @@ class InteliaRAGEngine:
 
                 # Statistiques d'utilisation
                 base_status["normalization_stats"] = {
-                    "multilingual_queries": self.optimization_stats["multilingual_queries"],
+                    "multilingual_queries": self.optimization_stats[
+                        "multilingual_queries"
+                    ],
                     "normalization_hits": self.optimization_stats["normalization_hits"],
-                    "concept_mappings_used": self.optimization_stats["concept_mappings_used"],
+                    "concept_mappings_used": self.optimization_stats[
+                        "concept_mappings_used"
+                    ],
                     "normalization_hit_rate": (
-                        (self.optimization_stats["normalization_hits"] / 
-                         max(1, self.optimization_stats["multilingual_queries"])) * 100
-                        if self.optimization_stats["multilingual_queries"] > 0 else 0
+                        (
+                            self.optimization_stats["normalization_hits"]
+                            / max(1, self.optimization_stats["multilingual_queries"])
+                        )
+                        * 100
+                        if self.optimization_stats["multilingual_queries"] > 0
+                        else 0
                     ),
                 }
             except Exception as e:
@@ -696,7 +784,11 @@ class InteliaRAGEngine:
             return {
                 "available": True,
                 "original_query": query,
-                "detected_language": detect_language_enhanced(query, default="fr") if detect_language_enhanced else "fr",
+                "detected_language": (
+                    detect_language_enhanced(query, default="fr")
+                    if detect_language_enhanced
+                    else "fr"
+                ),
                 "normalization_applied": len(normalized_concepts) > 0,
                 "normalized_concepts": normalized_concepts,
                 "raw_words": raw_words,
@@ -759,7 +851,7 @@ async def test_multilingual_normalization(
 ) -> Dict[str, Any]:
     """Fonction de test pour la normalisation multilingue"""
     engine = InteliaRAGEngine(openai_client)
-    
+
     try:
         await engine.initialize()
 
@@ -777,19 +869,25 @@ async def test_multilingual_normalization(
             )
             diagnostics["search_test"] = {
                 "success": search_result.source != RAGSource.NO_RESULTS,
-                "results_count": len(search_result.context_docs) if search_result.context_docs else 0,
+                "results_count": (
+                    len(search_result.context_docs) if search_result.context_docs else 0
+                ),
                 "confidence": search_result.confidence,
-                "source": search_result.source.value if hasattr(search_result.source, "value") else str(search_result.source),
+                "source": (
+                    search_result.source.value
+                    if hasattr(search_result.source, "value")
+                    else str(search_result.source)
+                ),
             }
         except Exception as e:
             diagnostics["search_test"] = {"error": str(e)}
 
         return diagnostics
-    
+
     except Exception as e:
         logger.error(f"Erreur test normalisation: {e}")
         return {"error": str(e)}
-    
+
     finally:
         try:
             await engine.close()
@@ -817,7 +915,7 @@ async def diagnose_rag_system() -> Dict[str, Any]:
             "rag_enabled": RAG_ENABLED,
             "langsmith_enabled": LANGSMITH_ENABLED,
             "openai_key_present": bool(OPENAI_API_KEY),
-        }
+        },
     }
 
     # Test d'initialisation rapide
@@ -829,13 +927,15 @@ async def diagnose_rag_system() -> Dict[str, Any]:
             "degraded_mode": engine.degraded_mode,
             "errors": engine.initialization_errors,
             "active_modules": [
-                name for name, module in [
+                name
+                for name, module in [
                     ("postgresql", engine.postgresql_system),
                     ("json", engine.json_system),
                     ("weaviate", engine.weaviate_core),
-                    ("langsmith", engine.langsmith_integration)
-                ] if module is not None
-            ]
+                    ("langsmith", engine.langsmith_integration),
+                ]
+                if module is not None
+            ],
         }
 
         # Status détaillé si possible
@@ -844,7 +944,7 @@ async def diagnose_rag_system() -> Dict[str, Any]:
 
     except Exception as e:
         diagnostics["initialization"] = {"success": False, "error": str(e)}
-    
+
     finally:
         try:
             await engine.close()

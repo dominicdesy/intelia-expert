@@ -22,7 +22,7 @@ class RAGSource(Enum):
     # Sources de fallback/filtrage
     FALLBACK_NEEDED = "fallback_needed"
     OOD_FILTERED = "ood_filtered"
-    
+
     # CORRECTION CRITIQUE - Sources manquantes qui causaient les erreurs
     NO_RESULTS = "no_results"
     NO_DOCUMENTS_FOUND = "no_documents_found"
@@ -41,10 +41,10 @@ class RAGSource(Enum):
     def is_success(self) -> bool:
         """Indique si la source représente un succès"""
         return self in {
-            self.RAG_SUCCESS, 
-            self.RAG_KNOWLEDGE, 
+            self.RAG_SUCCESS,
+            self.RAG_KNOWLEDGE,
             self.RAG_VERIFIED,
-            self.RETRIEVAL_SUCCESS
+            self.RETRIEVAL_SUCCESS,
         }
 
     @property
@@ -83,7 +83,9 @@ class RAGResult:
     source: RAGSource
     answer: Optional[str] = None
     confidence: float = 0.0
-    context_docs: List[Dict] = field(default_factory=list)  # CORRECTION: context_docs pas documents
+    context_docs: List[Dict] = field(
+        default_factory=list
+    )  # CORRECTION: context_docs pas documents
     processing_time: float = 0.0
     metadata: Dict[str, Any] = field(default_factory=dict)
     verification_status: Optional[Dict] = None
