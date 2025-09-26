@@ -2,7 +2,7 @@
 """
 monitoring.py - Module de surveillance et monitoring du système
 SystemHealthMonitor déplacé depuis main.py pour architecture modulaire
-VERSION CORRIGÉE: Gestion robuste du cache et des erreurs OpenAI
+VERSION CORRIGÉE: Gestion robuste du cache et des erreurs de connectivité Weaviate
 """
 
 import time
@@ -175,10 +175,10 @@ class SystemHealthMonitor:
                 validation_report["warnings"].extend(service_errors)
                 logger.warning(f"Certains services en mode dégradé: {service_errors}")
 
-            # 6. Tests de connectivité
+            # 6. Tests de connectivité - VERSION CORRIGÉE
             logger.info("Tests de connectivité...")
 
-            connectivity_status = await self._test_service_connectivity()
+            connectivity_status = await self._test_service_connectivity_corrected()
             validation_report["service_connectivity"] = connectivity_status
 
             # Vérification connectivité critique
@@ -440,29 +440,47 @@ class SystemHealthMonitor:
 
         return errors
 
-    async def _test_service_connectivity(self) -> Dict[str, bool]:
-        """Teste la connectivité aux services externes avec timeout"""
+    async def _test_service_connectivity_corrected(self) -> Dict[str, bool]:
+        """CORRECTION: Teste la connectivité aux services externes avec accès correct au client Weaviate"""
 
         # Récupérer les clients depuis les services initialisés
         redis_client = None
         weaviate_client = None
 
+        # Redis - inchangé
         cache_core = self._critical_services.get("cache_core")
         if cache_core and getattr(cache_core, "initialized", False):
             redis_client = getattr(cache_core, "client", None)
 
+        # CORRECTION WEAVIATE: Accès correct selon l'architecture
         rag_engine = self._critical_services.get("rag_engine_enhanced")
         if rag_engine:
-            # Chercher dans weaviate_core (architecture modulaire)
-            weaviate_core = getattr(rag_engine, "weaviate_core", None)
-            if weaviate_core:
-                weaviate_client = getattr(weaviate_core, "client", None)
+            # OPTION 1: Weaviate directement dans RAG engine
+            weaviate_client = getattr(rag_engine, "weaviate_client", None)
+
+            # OPTION 2: Si pas trouvé, chercher dans weaviate_core
+            if not weaviate_client:
+                weaviate_core = getattr(rag_engine, "weaviate_core", None)
+                if weaviate_core:
+                    weaviate_client = getattr(weaviate_core, "client", None)
+                    logger.debug("Client Weaviate trouvé dans weaviate_core")
+                else:
+                    logger.debug("weaviate_core non trouvé dans RAG engine")
             else:
-                weaviate_client = getattr(rag_engine, "weaviate_client", None)
+                logger.debug("Client Weaviate trouvé directement dans RAG engine")
+
+        # Logging pour debugging
+        logger.debug(f"Redis client: {redis_client is not None}")
+        logger.debug(f"Weaviate client: {weaviate_client is not None}")
+
         try:
             connectivity = await asyncio.wait_for(
                 quick_connectivity_check(redis_client, weaviate_client), timeout=10.0
             )
+
+            # Log détaillé du résultat
+            logger.debug(f"Résultat connectivité: {connectivity}")
+
             return connectivity
 
         except asyncio.TimeoutError:
@@ -649,7 +667,7 @@ class SystemHealthMonitor:
             global_status["environment"] = {
                 "platform": "digital_ocean",
                 "python_version": f"{__import__('sys').version_info.major}.{__import__('sys').version_info.minor}",
-                "monitoring_version": "1.0.2-cache-fixed",
+                "monitoring_version": "1.0.3-connectivity-fixed",
             }
 
             # Déterminer statut global final
