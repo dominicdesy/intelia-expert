@@ -680,7 +680,7 @@ class InteliaRAGEngine:
         query: str,
         intent_result,
         top_k: int = 10,
-        entities: Dict[str, Any] = None,
+        entities: Dict[str, Any] = None,  # Paramètre déjà présent
     ) -> RAGResult:
         """Recherche PostgreSQL avec tracking de normalisation ET entités preprocessées"""
         if not self.postgresql_system:
@@ -702,9 +702,12 @@ class InteliaRAGEngine:
                         f"Concepts normalisés utilisés: {normalized_concepts[:3]}"
                     )
 
-            # Recherche avec normalisation
+            # Recherche avec normalisation ET entités
             result = await self.postgresql_system.search_metrics(
-                query, intent_result, top_k
+                query,
+                intent_result,
+                top_k,
+                entities=entities,  # ✅ AJOUT : passage des entités
             )
 
             # Enrichir les métadonnées avec info normalisation ET entités

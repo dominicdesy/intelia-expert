@@ -481,9 +481,21 @@ class PostgreSQLRetriever:
             raise
 
     async def search_metrics(
-        self, query: str, entities: Dict[str, str] = None, top_k: int = 10
+        self,
+        query: str,
+        entities: Dict[str, Any] = None,  # ✅ Type changé de str à Any
+        top_k: int = 10,
     ) -> List[MetricResult]:
-        """Search metrics in PostgreSQL with sex/as-hatched logic"""
+        """Search metrics in PostgreSQL with sex/as-hatched logic and entity support
+
+        Args:
+            query: User query string
+            entities: Preprocessed entities from intent analysis (can contain objects, not just strings)
+            top_k: Maximum number of results to return
+
+        Returns:
+            List[MetricResult]: List of matching metrics
+        """
 
         if not self.is_initialized or not self.pool:
             logger.warning("PostgreSQL not initialized - attempting initialization")
@@ -494,7 +506,16 @@ class PostgreSQLRetriever:
                 return []
 
         try:
-            sql_query, params = self._build_sex_aware_sql_query(query, entities, top_k)
+            # ✅ NOUVEAU: Normaliser les entités si elles proviennent de l'analyse d'intent
+            normalized_entities = self._normalize_entities(entities)
+
+            # ✅ NOUVEAU: Log des entités reçues pour debug
+            logger.debug(f"Entities received: {entities}")
+            logger.debug(f"Normalized entities: {normalized_entities}")
+
+            sql_query, params = self._build_sex_aware_sql_query(
+                query, normalized_entities, top_k
+            )
 
             logger.debug(f"SQL Query: {sql_query}")
             logger.debug(f"Parameters: {params}")
@@ -522,7 +543,9 @@ class PostgreSQLRetriever:
                         housing_system=row.get("housing_system"),
                         data_type=row.get("data_type"),
                         confidence=self._calculate_sex_aware_relevance(
-                            query, row, entities
+                            query,
+                            row,
+                            normalized_entities,  # ✅ Utilise les entités normalisées
                         ),
                     )
                     results.append(result)
@@ -538,6 +561,44 @@ class PostgreSQLRetriever:
         except Exception as e:
             logger.error(f"PostgreSQL search error: {e}")
             return []
+
+        def _normalize_entities(
+            self, entities: Dict[str, Any] = None
+        ) -> Dict[str, str]:
+            """Normalize entities from intent analysis to simple string dict
+
+            Args:
+                entities: Raw entities dict (may contain objects or complex types)
+
+            Returns:
+                Dict[str, str]: Normalized entities with string values only
+            """
+            if not entities:
+                return {}
+
+            normalized = {}
+
+            for key, value in entities.items():
+                if value is None:
+                    continue
+
+                # Si c'est déjà une string, on la garde
+                if isinstance(value, str):
+                    normalized[key] = value
+                # Si c'est un bool, on le convertit en string
+                elif isinstance(value, bool):
+                    normalized[key] = "true" if value else "false"
+                # Si c'est un nombre, on le convertit en string
+                elif isinstance(value, (int, float)):
+                    normalized[key] = str(value)
+                # Si c'est un objet avec un attribut 'value', on l'extrait
+                elif hasattr(value, "value"):
+                    normalized[key] = str(value.value)
+                # Sinon, on convertit en string
+                else:
+                    normalized[key] = str(value)
+
+            return normalized
 
     def _build_sex_aware_sql_query(
         self, query: str, entities: Dict[str, str] = None, top_k: int = 10
