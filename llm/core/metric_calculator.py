@@ -136,25 +136,43 @@ class MetricCalculator:
         comparison: ComparisonResult,
         metric_name: str = "métrique",
         language: str = "fr",
+        terminology: Dict[str, Any] = None,
     ) -> str:
         """
         Formate le résultat de comparaison en texte naturel
 
         Args:
             comparison: Résultat de comparaison
-            metric_name: Nom de la métrique
+            metric_name: Nom de la métrique (clé technique comme 'feed_conversion_ratio')
             language: Langue ('fr' ou 'en')
+            terminology: Dictionnaire de terminologie chargé depuis les fichiers JSON
 
         Returns:
             Texte formaté
         """
+        # Nettoyer le nom de métrique (enlever "for 17" etc.)
+        if "for" in metric_name:
+            metric_name = metric_name.split("for")[0].strip()
+
+        # Traduire le nom de métrique depuis terminology si disponible
+        if terminology and language in terminology:
+            lang_terms = terminology[language]
+            if "performance_metrics" in lang_terms:
+                perf_metrics = lang_terms["performance_metrics"]
+
+                # Chercher la traduction dans performance_metrics
+                metric_key = metric_name.lower().replace(" ", "_")
+                if metric_key in perf_metrics and isinstance(
+                    perf_metrics[metric_key], list
+                ):
+                    # Prendre le premier terme (généralement le plus formel)
+                    metric_name = perf_metrics[metric_key][0]
+
         if language == "fr":
-            # Déterminer le format d'affichage selon l'unité
             unit_display = f" {comparison.unit}" if comparison.unit else ""
 
-            text = f"### Comparaison de {metric_name}\n\n"
-            text += f"- **{comparison.label1.capitalize()}** : {comparison.value1:.3f}{unit_display}\n"
-            text += f"- **{comparison.label2.capitalize()}** : {comparison.value2:.3f}{unit_display}\n\n"
+            text = f"• **{comparison.label1.capitalize()}** : {comparison.value1:.3f}{unit_display}\n"
+            text += f"• **{comparison.label2.capitalize()}** : {comparison.value2:.3f}{unit_display}\n\n"
             text += f"**Différence** : {abs(comparison.absolute_difference):.3f}{unit_display}"
 
             if comparison.relative_difference_pct is not None:
@@ -162,20 +180,18 @@ class MetricCalculator:
 
             text += "\n\n"
 
-            # Interprétation avec formulation améliorée
             if comparison.absolute_difference > 0:
-                text += f"💡 Le **{comparison.label1}** présente une valeur supérieure de **{abs(comparison.relative_difference_pct):.1f}%** "
+                text += f"Le **{comparison.label1}** présente une valeur supérieure de **{abs(comparison.relative_difference_pct):.1f}%** "
                 text += f"par rapport au **{comparison.label2}**."
             else:
-                text += f"💡 Le **{comparison.label1}** présente une valeur inférieure de **{abs(comparison.relative_difference_pct):.1f}%** "
+                text += f"Le **{comparison.label1}** présente une valeur inférieure de **{abs(comparison.relative_difference_pct):.1f}%** "
                 text += f"par rapport au **{comparison.label2}**."
 
         else:  # English
             unit_display = f" {comparison.unit}" if comparison.unit else ""
 
-            text = f"### {metric_name} Comparison\n\n"
-            text += f"- **{comparison.label1.capitalize()}**: {comparison.value1:.3f}{unit_display}\n"
-            text += f"- **{comparison.label2.capitalize()}**: {comparison.value2:.3f}{unit_display}\n\n"
+            text = f"• **{comparison.label1.capitalize()}**: {comparison.value1:.3f}{unit_display}\n"
+            text += f"• **{comparison.label2.capitalize()}**: {comparison.value2:.3f}{unit_display}\n\n"
             text += f"**Difference**: {abs(comparison.absolute_difference):.3f}{unit_display}"
 
             if comparison.relative_difference_pct is not None:
@@ -184,10 +200,10 @@ class MetricCalculator:
             text += "\n\n"
 
             if comparison.absolute_difference > 0:
-                text += f"💡 **{comparison.label1.capitalize()}** shows a value **{abs(comparison.relative_difference_pct):.1f}% higher** "
+                text += f"**{comparison.label1.capitalize()}** shows a value **{abs(comparison.relative_difference_pct):.1f}% higher** "
                 text += f"than **{comparison.label2}**."
             else:
-                text += f"💡 **{comparison.label1.capitalize()}** shows a value **{abs(comparison.relative_difference_pct):.1f}% lower** "
+                text += f"**{comparison.label1.capitalize()}** shows a value **{abs(comparison.relative_difference_pct):.1f}% lower** "
                 text += f"than **{comparison.label2}**."
 
         return text

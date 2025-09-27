@@ -286,9 +286,16 @@ class ComparisonHandler:
             if "data" in first_result and len(first_result["data"]) > 0:
                 metric_name = first_result["data"][0].get("metric_name", metric_name)
 
-        # Utiliser le formatter du calculator
+        # Récupérer la terminologie depuis postgresql_system
+        terminology = None
+        if hasattr(self.postgresql_system, "postgres_retriever"):
+            retriever = self.postgresql_system.postgres_retriever
+            if hasattr(retriever, "query_normalizer"):
+                terminology = retriever.query_normalizer.terminology
+
+        # Utiliser le formatter du calculator avec terminologie
         formatted_text = self.calculator.format_comparison_text(
-            comparison, metric_name, language
+            comparison, metric_name, language, terminology
         )
 
         return formatted_text
