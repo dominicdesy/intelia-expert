@@ -494,7 +494,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                 try:
                     if hasattr(rag_engine, "generate_response"):
                         try:
-                            # NOUVELLE SIGNATURE avec paramètres JSON
+                            # ✅ MODIFICATION 1: Ajout de enable_preprocessing=True
                             rag_result = await rag_engine.generate_response(
                                 query=message,
                                 tenant_id=tenant_id,
@@ -502,6 +502,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                                 use_json_search=use_json_search,
                                 genetic_line_filter=genetic_line_filter,
                                 performance_context=performance_context,
+                                enable_preprocessing=True,  # ✅ AJOUTÉ
                             )
                             logger.info(
                                 f"RAG generate_response réussi (JSON: {use_json_search})"
@@ -708,6 +709,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
 
             if rag_engine and safe_get_attribute(rag_engine, "is_initialized", False):
                 try:
+                    # ✅ MODIFICATION 2: Ajout de enable_preprocessing=True
                     rag_result = await rag_engine.generate_response(
                         query=request.question,
                         tenant_id=request.user_id or str(uuid.uuid4())[:8],
@@ -715,6 +717,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                         use_json_search=request.use_json_search,
                         genetic_line_filter=request.genetic_line,
                         performance_context=performance_context,
+                        enable_preprocessing=True,  # ✅ AJOUTÉ
                     )
                 except Exception as e:
                     logger.error(f"Erreur expert chat: {e}")
@@ -910,10 +913,12 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
 
             # Test 3: Génération avec JSON
             try:
+                # ✅ MODIFICATION 3: Ajout de enable_preprocessing=True
                 generation_result = await rag_engine.generate_response(
                     query="Quel est le poids cible Ross 308 à 35 jours ?",
                     use_json_search=True,
                     genetic_line_filter="ross308",
+                    enable_preprocessing=True,  # ✅ AJOUTÉ
                 )
 
                 metadata = getattr(generation_result, "metadata", {})
@@ -989,13 +994,14 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                 try:
                     start_time = time.time()
 
-                    # Test avec système JSON activé
+                    # ✅ MODIFICATION 4: Ajout de enable_preprocessing=True
                     result = await rag_engine.generate_response(
                         query=query,
                         tenant_id="test_ross308",
                         language="fr",
                         use_json_search=True,
                         genetic_line_filter="ross308",
+                        enable_preprocessing=True,  # ✅ AJOUTÉ
                     )
 
                     processing_time = time.time() - start_time
