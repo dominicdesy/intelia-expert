@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 metric_calculator.py - Calculs mathématiques sur les métriques avicoles
-Effectue les opérations de comparaison, différence, ratio, etc.
+VERSION CORRIGÉE : Gestion correcte des métriques où "plus bas = meilleur" (FCR, mortalité)
 """
 
 import logging
@@ -23,7 +23,9 @@ class ComparisonResult:
     relative_difference_pct: Optional[float]
     ratio: Optional[float]
     higher_label: str
+    better_label: str  # NOUVEAU: qui a la meilleure valeur (selon le contexte)
     unit: str = ""
+    metric_name: str = ""  # NOUVEAU: pour déterminer si lower is better
 
     def to_dict(self) -> Dict[str, Any]:
         """Convertit en dictionnaire"""
@@ -34,12 +36,54 @@ class ComparisonResult:
             "relative_difference_pct": self.relative_difference_pct,
             "ratio": self.ratio,
             "higher": self.higher_label,
+            "better": self.better_label,
             "unit": self.unit,
+            "metric_name": self.metric_name,
         }
 
 
 class MetricCalculator:
     """Effectue des calculs mathématiques sur les métriques"""
+
+    # Métriques où une valeur PLUS BASSE est meilleure
+    LOWER_IS_BETTER_METRICS = [
+        "fcr",
+        "feed_conversion",
+        "conversion",
+        "indice_conversion",
+        "mortality",
+        "mortalite",
+        "mort",
+        "death",
+        "culling",
+        "cull",
+        "elimination",
+        "cost",
+        "cout",
+        "price",
+        "prix",
+    ]
+
+    @staticmethod
+    def _is_lower_better(metric_name: str) -> bool:
+        """
+        Détermine si pour cette métrique, une valeur plus basse est meilleure
+
+        Args:
+            metric_name: Nom de la métrique (ex: "feed_conversion_ratio")
+
+        Returns:
+            True si lower is better (FCR, mortalité, coûts)
+        """
+        metric_lower = metric_name.lower().replace("_", " ")
+
+        for pattern in MetricCalculator.LOWER_IS_BETTER_METRICS:
+            if pattern in metric_lower:
+                logger.debug(f"Metric '{metric_name}' identified as LOWER IS BETTER")
+                return True
+
+        logger.debug(f"Metric '{metric_name}' identified as HIGHER IS BETTER")
+        return False
 
     @staticmethod
     def calculate_comparison(results: List[Dict[str, Any]]) -> ComparisonResult:
@@ -70,10 +114,12 @@ class MetricCalculator:
         label1 = results[0].get("sex") or results[0].get("label", "Value 1")
         label2 = results[1].get("sex") or results[1].get("label", "Value 2")
 
-        # Extraction de l'unité
+        # Extraction de l'unité et du nom de métrique
         unit = ""
+        metric_name = ""
         if results[0]["data"] and len(results[0]["data"]) > 0:
             unit = results[0]["data"][0].get("unit", "")
+            metric_name = results[0]["data"][0].get("metric_name", "")
 
         # Calculs
         absolute_diff = value1 - value2
@@ -81,9 +127,20 @@ class MetricCalculator:
         ratio = value1 / value2 if value2 != 0 else None
         higher_label = label1 if value1 > value2 else label2
 
+        # NOUVEAU: Déterminer qui est "meilleur" selon le type de métrique
+        is_lower_better = MetricCalculator._is_lower_better(metric_name)
+
+        if is_lower_better:
+            # Pour FCR, mortalité, etc. : le plus BAS est meilleur
+            better_label = label1 if value1 < value2 else label2
+        else:
+            # Pour poids, production, etc. : le plus HAUT est meilleur
+            better_label = label1 if value1 > value2 else label2
+
         logger.info(
             f"Comparison calculated: {label1}={value1} vs {label2}={value2}, "
-            f"diff={absolute_diff:.3f} ({relative_diff_pct:.1f}%)"
+            f"diff={absolute_diff:.3f} ({relative_diff_pct:.1f}%), "
+            f"better={better_label} (lower_is_better={is_lower_better})"
         )
 
         return ComparisonResult(
@@ -95,7 +152,9 @@ class MetricCalculator:
             relative_difference_pct=relative_diff_pct,
             ratio=ratio,
             higher_label=higher_label,
+            better_label=better_label,
             unit=unit,
+            metric_name=metric_name,
         )
 
     @staticmethod
@@ -140,38 +199,44 @@ class MetricCalculator:
     ) -> str:
         """
         Formate le résultat de comparaison en texte naturel
+        VERSION CORRIGÉE : Interprétation correcte selon le type de métrique
 
         Args:
             comparison: Résultat de comparaison
-            metric_name: Nom de la métrique (clé technique comme 'feed_conversion_ratio')
+            metric_name: Nom de la métrique
             language: Langue ('fr' ou 'en')
-            terminology: Dictionnaire de terminologie chargé depuis les fichiers JSON
+            terminology: Dictionnaire de terminologie
 
         Returns:
-            Texte formaté
+            Texte formaté avec interprétation correcte
         """
-        # Nettoyer le nom de métrique (enlever "for 17" etc.)
+        # Nettoyer le nom de métrique
         if "for" in metric_name:
             metric_name = metric_name.split("for")[0].strip()
 
-        # Traduire le nom de métrique depuis terminology si disponible
+        # Traduire le nom de métrique
+        display_metric_name = metric_name
         if terminology and language in terminology:
             lang_terms = terminology[language]
             if "performance_metrics" in lang_terms:
                 perf_metrics = lang_terms["performance_metrics"]
-
-                # Chercher la traduction dans performance_metrics
                 metric_key = metric_name.lower().replace(" ", "_")
                 if metric_key in perf_metrics and isinstance(
                     perf_metrics[metric_key], list
                 ):
-                    # Prendre le premier terme (généralement le plus formel)
-                    metric_name = perf_metrics[metric_key][0]
+                    display_metric_name = perf_metrics[metric_key][0]
+
+        # Déterminer si lower is better
+        is_lower_better = MetricCalculator._is_lower_better(
+            comparison.metric_name or metric_name
+        )
 
         if language == "fr":
             unit_display = f" {comparison.unit}" if comparison.unit else ""
 
-            text = f"• **{comparison.label1.capitalize()}** : {comparison.value1:.3f}{unit_display}\n"
+            # Affichage des valeurs
+            text = f"Pour la **{display_metric_name}** :\n\n"
+            text += f"• **{comparison.label1.capitalize()}** : {comparison.value1:.3f}{unit_display}\n"
             text += f"• **{comparison.label2.capitalize()}** : {comparison.value2:.3f}{unit_display}\n\n"
             text += f"**Différence** : {abs(comparison.absolute_difference):.3f}{unit_display}"
 
@@ -180,17 +245,33 @@ class MetricCalculator:
 
             text += "\n\n"
 
-            if comparison.absolute_difference > 0:
-                text += f"Le **{comparison.label1}** présente une valeur supérieure de **{abs(comparison.relative_difference_pct):.1f}%** "
-                text += f"par rapport au **{comparison.label2}**."
+            # CORRECTION : Interprétation selon le type de métrique
+            if is_lower_better:
+                # Pour FCR, mortalité : plus bas = meilleur
+                if comparison.value1 < comparison.value2:
+                    text += f"Le **{comparison.label1}** présente une **meilleure** performance "
+                    text += f"avec une valeur **{abs(comparison.relative_difference_pct):.1f}% inférieure** "
+                    text += f"au **{comparison.label2}**.\n"
+                    text += "_Une valeur plus basse indique une meilleure efficacité pour cette métrique._"
+                else:
+                    text += f"Le **{comparison.label2}** présente une **meilleure** performance "
+                    text += f"avec une valeur **{abs(comparison.relative_difference_pct):.1f}% inférieure** "
+                    text += f"au **{comparison.label1}**.\n"
+                    text += "_Une valeur plus basse indique une meilleure efficacité pour cette métrique._"
             else:
-                text += f"Le **{comparison.label1}** présente une valeur inférieure de **{abs(comparison.relative_difference_pct):.1f}%** "
-                text += f"par rapport au **{comparison.label2}**."
+                # Pour poids, production : plus haut = meilleur
+                if comparison.absolute_difference > 0:
+                    text += f"Le **{comparison.label1}** présente une valeur **{abs(comparison.relative_difference_pct):.1f}% supérieure** "
+                    text += f"au **{comparison.label2}**."
+                else:
+                    text += f"Le **{comparison.label2}** présente une valeur **{abs(comparison.relative_difference_pct):.1f}% supérieure** "
+                    text += f"au **{comparison.label1}**."
 
         else:  # English
             unit_display = f" {comparison.unit}" if comparison.unit else ""
 
-            text = f"• **{comparison.label1.capitalize()}**: {comparison.value1:.3f}{unit_display}\n"
+            text = f"For **{display_metric_name}**:\n\n"
+            text += f"• **{comparison.label1.capitalize()}**: {comparison.value1:.3f}{unit_display}\n"
             text += f"• **{comparison.label2.capitalize()}**: {comparison.value2:.3f}{unit_display}\n\n"
             text += f"**Difference**: {abs(comparison.absolute_difference):.3f}{unit_display}"
 
@@ -199,33 +280,113 @@ class MetricCalculator:
 
             text += "\n\n"
 
-            if comparison.absolute_difference > 0:
-                text += f"**{comparison.label1.capitalize()}** shows a value **{abs(comparison.relative_difference_pct):.1f}% higher** "
-                text += f"than **{comparison.label2}**."
+            # CORRECTION : Correct interpretation based on metric type
+            if is_lower_better:
+                # For FCR, mortality: lower = better
+                if comparison.value1 < comparison.value2:
+                    text += f"**{comparison.label1.capitalize()}** shows **better** performance "
+                    text += f"with a value **{abs(comparison.relative_difference_pct):.1f}% lower** "
+                    text += f"than **{comparison.label2}**.\n"
+                    text += (
+                        "_A lower value indicates better efficiency for this metric._"
+                    )
+                else:
+                    text += f"**{comparison.label2.capitalize()}** shows **better** performance "
+                    text += f"with a value **{abs(comparison.relative_difference_pct):.1f}% lower** "
+                    text += f"than **{comparison.label1}**.\n"
+                    text += (
+                        "_A lower value indicates better efficiency for this metric._"
+                    )
             else:
-                text += f"**{comparison.label1.capitalize()}** shows a value **{abs(comparison.relative_difference_pct):.1f}% lower** "
-                text += f"than **{comparison.label2}**."
+                # For weight, production: higher = better
+                if comparison.absolute_difference > 0:
+                    text += f"**{comparison.label1.capitalize()}** shows a value **{abs(comparison.relative_difference_pct):.1f}% higher** "
+                    text += f"than **{comparison.label2}**."
+                else:
+                    text += f"**{comparison.label2.capitalize()}** shows a value **{abs(comparison.relative_difference_pct):.1f}% higher** "
+                    text += f"than **{comparison.label1}**."
 
         return text
 
 
 # Tests unitaires
 if __name__ == "__main__":
-    # Test de comparaison
     calculator = MetricCalculator()
 
-    test_results = [
-        {"sex": "male", "data": [{"value_numeric": 1.081, "unit": "ratio"}]},
-        {"sex": "female", "data": [{"value_numeric": 1.045, "unit": "ratio"}]},
+    print("=" * 80)
+    print("TEST 1: FCR Comparison (lower is better)")
+    print("=" * 80)
+
+    fcr_results = [
+        {
+            "sex": "Cobb 500",
+            "data": [
+                {
+                    "value_numeric": 1.081,
+                    "unit": "ratio",
+                    "metric_name": "feed_conversion_ratio for 17",
+                }
+            ],
+        },
+        {
+            "sex": "Ross 308",
+            "data": [
+                {
+                    "value_numeric": 1.065,
+                    "unit": "ratio",
+                    "metric_name": "feed_conversion_ratio for 17",
+                }
+            ],
+        },
     ]
 
-    comparison = calculator.calculate_comparison(test_results)
-    print("Comparison Result:")
-    print(f"  {comparison.label1}: {comparison.value1}")
-    print(f"  {comparison.label2}: {comparison.value2}")
-    print(f"  Difference: {comparison.absolute_difference:.3f}")
-    print(f"  Relative: {comparison.relative_difference_pct:.1f}%")
-    print(f"  Higher: {comparison.higher_label}")
+    comparison = calculator.calculate_comparison(fcr_results)
+    print(f"Value 1 (Cobb 500): {comparison.value1}")
+    print(f"Value 2 (Ross 308): {comparison.value2}")
+    print(f"Higher: {comparison.higher_label}")
+    print(f"Better: {comparison.better_label}")
+    print(f"Difference: {comparison.absolute_difference:.3f}")
+    print(f"Relative: {comparison.relative_difference_pct:.1f}%")
 
-    print("\n" + "=" * 50)
-    print(calculator.format_comparison_text(comparison, "FCR"))
+    print("\n" + "-" * 80)
+    print("FORMATTED TEXT:")
+    print("-" * 80)
+    print(calculator.format_comparison_text(comparison, "feed_conversion_ratio"))
+
+    print("\n" + "=" * 80)
+    print("TEST 2: Body Weight Comparison (higher is better)")
+    print("=" * 80)
+
+    weight_results = [
+        {
+            "sex": "male",
+            "data": [
+                {
+                    "value_numeric": 950.5,
+                    "unit": "g",
+                    "metric_name": "body_weight for 17",
+                }
+            ],
+        },
+        {
+            "sex": "female",
+            "data": [
+                {
+                    "value_numeric": 880.2,
+                    "unit": "g",
+                    "metric_name": "body_weight for 17",
+                }
+            ],
+        },
+    ]
+
+    comparison2 = calculator.calculate_comparison(weight_results)
+    print(f"Value 1 (male): {comparison2.value1}")
+    print(f"Value 2 (female): {comparison2.value2}")
+    print(f"Higher: {comparison2.higher_label}")
+    print(f"Better: {comparison2.better_label}")
+
+    print("\n" + "-" * 80)
+    print("FORMATTED TEXT:")
+    print("-" * 80)
+    print(calculator.format_comparison_text(comparison2, "body_weight"))
