@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 comparison_handler.py - Gestion des requêtes comparatives
-Orchestre les requêtes multiples et calculs pour les comparaisons
+VERSION CORRIGÉE : Passage du contexte (âge, sexe) à format_comparison_text
 """
 
 import logging
@@ -35,10 +35,11 @@ class ComparisonHandler:
 
         Returns:
             {
-                'results': List[Dict],  # Résultats de chaque requête
+                'results': List[Dict],
                 'comparison': ComparisonResult,
                 'success': bool,
-                'error': Optional[str]
+                'error': Optional[str],
+                'context': Dict  # NOUVEAU: contexte pour la génération de réponse
             }
         """
         try:
@@ -76,6 +77,9 @@ class ComparisonHandler:
             # Calculer la comparaison
             comparison = self.calculator.calculate_comparison(results)
 
+            # NOUVEAU: Extraire le contexte commun (âge, sexe, etc.)
+            context = self._extract_common_context(results, comparison_entities)
+
             logger.info(
                 f"Comparison successful: {comparison.label1} vs {comparison.label2}"
             )
@@ -86,6 +90,7 @@ class ComparisonHandler:
                 "comparison": comparison,
                 "operation": comparative_info.get("operation"),
                 "comparison_type": comparative_info.get("type"),
+                "context": context,  # NOUVEAU
             }
 
         except Exception as e:
@@ -96,6 +101,51 @@ class ComparisonHandler:
                 "results": [],
                 "comparison": None,
             }
+
+    def _extract_common_context(
+        self, results: List[Dict], comparison_entities: List[Dict]
+    ) -> Dict[str, Any]:
+        """
+        Extrait le contexte commun aux deux résultats (âge, sexe si comparaison de souches, etc.)
+        
+        Args:
+            results: Résultats des deux requêtes
+            comparison_entities: Entités de comparaison originales
+            
+        Returns:
+            Dict avec age_days, sex, breed, comparison_dimension, etc.
+        """
+        context = {}
+        
+        if not results or len(results) == 0:
+            return context
+        
+        # Extraire depuis les entity_sets
+        if results[0].get("entity_set"):
+            first_entity_set = results[0]["entity_set"]
+            
+            # Âge (commun aux deux)
+            if "age_days" in first_entity_set:
+                context["age_days"] = first_entity_set["age_days"]
+            
+            # Sexe (si comparaison de souches, le sexe est commun)
+            if "sex" in first_entity_set:
+                # Vérifier si c'est la dimension de comparaison
+                comparison_dimension = comparison_entities[0].get("_comparison_dimension") if comparison_entities else None
+                if comparison_dimension != "sex":
+                    # Le sexe est commun (on compare autre chose)
+                    context["sex"] = first_entity_set["sex"]
+        
+        # Extraire depuis les métadonnées des résultats
+        if results[0].get("data") and len(results[0]["data"]) > 0:
+            first_metric = results[0]["data"][0]
+            metadata = first_metric.get("metadata", {})
+            
+            if "age_min" in metadata and "age_days" not in context:
+                context["age_days"] = metadata["age_min"]
+        
+        logger.debug(f"Extracted context: {context}")
+        return context
 
     async def _execute_single_query(
         self, query: str, entities: Dict[str, Any], top_k: int
@@ -112,8 +162,8 @@ class ComparisonHandler:
             {
                 'sex': str,  # ou autre label
                 'label': str,
-                'data': List[Dict],  # Résultats bruts
-                'best_metric': Dict  # Meilleur résultat
+                'data': List[Dict],
+                'entity_set': Dict  # NOUVEAU: pour extraire le contexte
             }
         """
         try:
@@ -135,7 +185,7 @@ class ComparisonHandler:
                 query=query,
                 entities=clean_entities,
                 top_k=top_k,
-                strict_sex_match=True,  # Mode strict pour comparaisons
+                strict_sex_match=True,
             )
 
             # Vérifier si on a des résultats
@@ -161,9 +211,9 @@ class ComparisonHandler:
             return {
                 comparison_dimension: comparison_label,
                 "label": comparison_label,
-                "data": [best_metric],  # Format attendu par calculator
+                "data": [best_metric],
                 "all_metrics": metrics,
-                "entity_set": clean_entities,
+                "entity_set": clean_entities,  # GARDÉ pour extraction de contexte
             }
 
         except Exception as e:
@@ -201,11 +251,7 @@ class ComparisonHandler:
             value_numeric = None
 
             # Parser le content pour extraire value_numeric et unit
-            # Le format attendu est quelque chose comme:
-            # "**metric_name**\nStrain: 500\nSex: male\nValue: 1.081 ratio\nAge: 17 days"
-
             if content:
-                # Chercher pattern "Value: <number> <unit>"
                 import re
 
                 value_match = re.search(r"Value:\s*([0-9.]+)\s*(\w*)", content)
@@ -244,8 +290,7 @@ class ComparisonHandler:
         if not metrics:
             return {}
 
-        # Pour l'instant, prendre la première (déjà triée par pertinence)
-        # TODO: Améliorer la sélection si nécessaire
+        # Prendre la première (déjà triée par pertinence)
         best = metrics[0]
 
         logger.debug(
@@ -260,6 +305,7 @@ class ComparisonHandler:
     ) -> str:
         """
         Génère une réponse naturelle pour une comparaison
+        VERSION CORRIGÉE : Passe le contexte à format_comparison_text
 
         Args:
             query: Requête originale
@@ -267,7 +313,7 @@ class ComparisonHandler:
             language: Langue de la réponse
 
         Returns:
-            Texte de réponse formaté
+            Texte de réponse formaté avec contexte enrichi
         """
         if not comparison_result.get("success"):
             error = comparison_result.get("error", "Unknown error")
@@ -279,25 +325,13 @@ class ComparisonHandler:
         comparison = comparison_result["comparison"]
         results = comparison_result["results"]
 
-        # Déterminer le nom de la métrique et l'âge
+        # Extraire le nom de métrique
         metric_name = "métrique"
-        age_days = None
-        breed = None
-
         if results and len(results) > 0:
             first_result = results[0]
             if "data" in first_result and len(first_result["data"]) > 0:
                 metric_data = first_result["data"][0]
                 metric_name = metric_data.get("metric_name", metric_name)
-
-                # Extraire l'âge depuis les métadonnées
-                metadata = metric_data.get("metadata", {})
-                if "age_min" in metadata:
-                    age_days = metadata.get("age_min")
-
-            # Extraire la souche
-            if "entity_set" in first_result:
-                breed = first_result["entity_set"].get("breed")
 
         # Récupérer la terminologie depuis postgresql_system
         terminology = None
@@ -306,33 +340,19 @@ class ComparisonHandler:
             if hasattr(retriever, "query_normalizer"):
                 terminology = retriever.query_normalizer.terminology
 
-        # Construire le contexte introductif
-        intro = ""
-        if language == "fr":
-            if age_days:
-                intro = f"Au jour de production **{age_days}**"
-                if breed:
-                    intro += f" pour la souche **{breed}**"
-                intro += ", les valeurs sont les suivantes :\n\n"
-            elif breed:
-                intro = (
-                    f"Pour la souche **{breed}**, les valeurs sont les suivantes :\n\n"
-                )
-        else:  # English
-            if age_days:
-                intro = f"At production day **{age_days}**"
-                if breed:
-                    intro += f" for strain **{breed}**"
-                intro += ", the values are as follows:\n\n"
-            elif breed:
-                intro = f"For strain **{breed}**, the values are as follows:\n\n"
+        # NOUVEAU: Récupérer le contexte depuis comparison_result
+        context = comparison_result.get("context", {})
 
-        # Utiliser le formatter du calculator avec terminologie
+        # Utiliser le formatter du calculator avec terminologie ET contexte
         formatted_text = self.calculator.format_comparison_text(
-            comparison, metric_name, language, terminology
+            comparison=comparison,
+            metric_name=metric_name,
+            language=language,
+            terminology=terminology,
+            context=context,  # NOUVEAU: passage du contexte
         )
 
-        return intro + formatted_text
+        return formatted_text
 
 
 # Tests unitaires
@@ -354,12 +374,14 @@ if __name__ == "__main__":
                     def __init__(self, sex_val):
                         self.context_docs = [
                             {
+                                "content": f"Value: {'1.081' if sex_val == 'male' else '1.045'} ratio",
                                 "metadata": {
                                     "value_numeric": (
                                         1.081 if sex_val == "male" else 1.045
                                     ),
                                     "unit": "ratio",
-                                    "metric_name": "feed_conversion_ratio",
+                                    "metric_name": "feed_conversion_ratio for 17",
+                                    "age_min": 17,
                                 }
                             }
                         ]
@@ -379,19 +401,22 @@ if __name__ == "__main__":
             "comparison_entities": [
                 {
                     "sex": "male",
-                    "_comparison_label": "male",
-                    "_comparison_dimension": "sex",
+                    "age_days": 17,
+                    "_comparison_label": "Cobb 500",
+                    "_comparison_dimension": "breed",
                 },
                 {
-                    "sex": "female",
-                    "_comparison_label": "female",
-                    "_comparison_dimension": "sex",
+                    "sex": "male",
+                    "age_days": 17,
+                    "_comparison_label": "Ross 308",
+                    "_comparison_dimension": "breed",
                 },
             ],
         }
 
         result = await handler.handle_comparative_query(
-            "Quelle est la différence entre mâle et femelle ?", preprocessed
+            "Quelle est la différence de FCR entre Cobb 500 et Ross 308 mâle à 17 jours ?",
+            preprocessed,
         )
 
         print("Comparison Result:")
@@ -401,6 +426,7 @@ if __name__ == "__main__":
             print(f"  {comp.label1}: {comp.value1}")
             print(f"  {comp.label2}: {comp.value2}")
             print(f"  Difference: {comp.absolute_difference:.3f}")
+            print(f"  Context: {result.get('context')}")
 
             # Générer la réponse
             response = await handler.generate_comparative_response(
