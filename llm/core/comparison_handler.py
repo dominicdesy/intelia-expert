@@ -279,12 +279,25 @@ class ComparisonHandler:
         comparison = comparison_result["comparison"]
         results = comparison_result["results"]
 
-        # Déterminer le nom de la métrique
+        # Déterminer le nom de la métrique et l'âge
         metric_name = "métrique"
+        age_days = None
+        breed = None
+
         if results and len(results) > 0:
             first_result = results[0]
             if "data" in first_result and len(first_result["data"]) > 0:
-                metric_name = first_result["data"][0].get("metric_name", metric_name)
+                metric_data = first_result["data"][0]
+                metric_name = metric_data.get("metric_name", metric_name)
+
+                # Extraire l'âge depuis les métadonnées
+                metadata = metric_data.get("metadata", {})
+                if "age_min" in metadata:
+                    age_days = metadata.get("age_min")
+
+            # Extraire la souche
+            if "entity_set" in first_result:
+                breed = first_result["entity_set"].get("breed")
 
         # Récupérer la terminologie depuis postgresql_system
         terminology = None
@@ -293,12 +306,33 @@ class ComparisonHandler:
             if hasattr(retriever, "query_normalizer"):
                 terminology = retriever.query_normalizer.terminology
 
+        # Construire le contexte introductif
+        intro = ""
+        if language == "fr":
+            if age_days:
+                intro = f"Au jour de production **{age_days}**"
+                if breed:
+                    intro += f" pour la souche **{breed}**"
+                intro += ", les valeurs sont les suivantes :\n\n"
+            elif breed:
+                intro = (
+                    f"Pour la souche **{breed}**, les valeurs sont les suivantes :\n\n"
+                )
+        else:  # English
+            if age_days:
+                intro = f"At production day **{age_days}**"
+                if breed:
+                    intro += f" for strain **{breed}**"
+                intro += ", the values are as follows:\n\n"
+            elif breed:
+                intro = f"For strain **{breed}**, the values are as follows:\n\n"
+
         # Utiliser le formatter du calculator avec terminologie
         formatted_text = self.calculator.format_comparison_text(
             comparison, metric_name, language, terminology
         )
 
-        return formatted_text
+        return intro + formatted_text
 
 
 # Tests unitaires

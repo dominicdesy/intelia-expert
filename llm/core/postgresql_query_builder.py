@@ -225,11 +225,19 @@ class PostgreSQLQueryBuilder:
     ) -> int:
         """Ajoute les filtres basés sur les entités"""
 
-        # Filtre de ligne génétique
+        # Filtre de souche/race (breed)
+        if entities.get("breed"):
+            param_count += 1
+            conditions.append(f"LOWER(s.strain_name) ILIKE ${param_count}")
+            params.append(f"%{entities['breed'].lower()}%")
+            logger.debug(f"Adding breed filter: {entities['breed']}")
+
+        # Filtre de ligne génétique (legacy support)
         if entities.get("line"):
             param_count += 1
             conditions.append(f"LOWER(s.strain_name) ILIKE ${param_count}")
             params.append(f"%{entities['line'].lower()}%")
+            logger.debug(f"Adding line filter: {entities['line']}")
 
         # Filtre d'âge depuis entities (si pas déjà extrait de la query)
         if entities.get("age_days") and not age_extracted:
