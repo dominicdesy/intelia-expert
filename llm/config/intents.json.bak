@@ -2,9 +2,9 @@
   "version": "1.3",
   "aliases": {
     "line": {
-	  "ross 308": ["ross308","ross-308","r308","ross","ross 308 broiler","ross308 ap","ross 308 ap","308/308 FF","308/308ff","308 ff"],
-	  "ross 708": ["ross708","ross-708","r708"],
-	  "cobb 500": ["cobb500","cobb-500","c500","cobb","cobb 500 broiler","500"],
+      "ross 308": ["ross308","ross-308","r308","ross","ross 308 broiler","ross308 ap","ross 308 ap"],
+      "ross 708": ["ross708","ross-708","r708"],
+      "cobb 500": ["cobb500","cobb-500","c500","cobb","cobb 500 broiler"],
       "cobb 700": ["cobb700","cobb-700","c700"],
       "cobb 400": ["cobb400","cobb-400","c400"],
       "hubbard classic": ["classic","hubbard-classic","hclassic"],

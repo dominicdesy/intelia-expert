@@ -1,25 +1,131 @@
 # -*- coding: utf-8 -*-
 """
 postgresql_query_builder.py - Construction de requêtes SQL pour PostgreSQL
-Version CORRIGÉE avec normalisation robuste des noms de souches
+Version CORRIGÉE utilisant intents.json + mappings réels de la base de données
 """
 
 import logging
 import re
+import json
 from typing import Dict, List, Tuple, Optional, Any
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 
 class PostgreSQLQueryBuilder:
-    """Construit les requêtes SQL pour la recherche de métriques avec normalisation robuste"""
+    """Construit les requêtes SQL en utilisant intents.json et les noms réels de la BD"""
+
+    # Mapping des noms normalisés -> noms RÉELS dans la base de données
+    # À synchroniser avec la structure réelle de votre BD
+    DB_STRAIN_MAPPING = {
+        # Ross
+        "ross308": "308/308 FF",
+        "ross 308": "308/308 FF",
+        "ross-308": "308/308 FF",
+        "r308": "308/308 FF",
+        # Cobb
+        "cobb500": "500",
+        "cobb 500": "500",
+        "cobb-500": "500",
+        "c500": "500",
+    }
 
     def __init__(self, query_normalizer):
         """
         Args:
-            query_normalizer: Instance de SQLQueryNormalizer pour normalisation
+            query_normalizer: Instance de SQLQueryNormalizer
         """
         self.query_normalizer = query_normalizer
+        self.intents_config = self._load_intents_config()
+        self.line_aliases = self._extract_line_aliases()
+
+    def _load_intents_config(self) -> Dict:
+        """Charge intents.json pour récupérer les aliases"""
+        config_paths = [
+            Path(__file__).parent.parent / "config" / "intents.json",
+            Path(__file__).parent / "config" / "intents.json",
+            Path.cwd() / "config" / "intents.json",
+            Path.cwd() / "llm" / "config" / "intents.json",
+        ]
+
+        for path in config_paths:
+            if path.exists():
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        config = json.load(f)
+                        logger.info(f"Intents.json chargé depuis: {path}")
+                        return config
+                except Exception as e:
+                    logger.warning(f"Erreur chargement {path}: {e}")
+
+        logger.warning("intents.json non trouvé - utilisation mappings par défaut")
+        return {}
+
+    def _extract_line_aliases(self) -> Dict[str, List[str]]:
+        """Extrait les aliases de lignées depuis intents.json"""
+        if not self.intents_config:
+            return {}
+
+        aliases = self.intents_config.get("aliases", {}).get("line", {})
+        logger.info(f"Aliases chargés pour {len(aliases)} lignées")
+        return aliases
+
+    def _normalize_breed_for_db(self, breed_input: str) -> Optional[str]:
+        """
+        Convertit l'entrée utilisateur en nom RÉEL de la base de données
+
+        Args:
+            breed_input: Ex: "Cobb 500", "ross 308", "cobb500"
+
+        Returns:
+            Nom réel BD: "500", "308/308 FF", ou None
+        """
+        if not breed_input:
+            return None
+
+        breed_normalized = breed_input.lower().strip()
+        breed_clean = re.sub(r"[\s\-_]+", "", breed_normalized)
+
+        # 1. Vérifier le mapping direct vers la BD
+        if breed_clean in self.DB_STRAIN_MAPPING:
+            result = self.DB_STRAIN_MAPPING[breed_clean]
+            logger.debug(f"Breed DB mapping: '{breed_input}' -> '{result}'")
+            return result
+
+        # 2. Vérifier les variantes avec espaces/tirets
+        for key, value in self.DB_STRAIN_MAPPING.items():
+            if breed_normalized == key:
+                logger.debug(
+                    f"Breed DB mapping (avec espaces): '{breed_input}' -> '{value}'"
+                )
+                return value
+
+        # 3. Fallback: chercher dans les aliases intents.json
+        for canonical_line, aliases in self.line_aliases.items():
+            # Normaliser le canonical_line pour matching
+            canonical_clean = re.sub(r"[\s\-_]+", "", canonical_line.lower())
+
+            if breed_clean == canonical_clean:
+                # On a trouvé dans intents.json, mapper vers la BD
+                if canonical_clean in self.DB_STRAIN_MAPPING:
+                    result = self.DB_STRAIN_MAPPING[canonical_clean]
+                    logger.debug(f"Breed via intents+DB: '{breed_input}' -> '{result}'")
+                    return result
+
+            # Vérifier les aliases
+            for alias in aliases:
+                alias_clean = re.sub(r"[\s\-_]+", "", alias.lower())
+                if breed_clean == alias_clean and alias_clean in self.DB_STRAIN_MAPPING:
+                    result = self.DB_STRAIN_MAPPING[alias_clean]
+                    logger.debug(f"Breed via alias+DB: '{breed_input}' -> '{result}'")
+                    return result
+
+        # 4. Dernier recours: retourner l'input nettoyé
+        logger.warning(
+            f"Aucun mapping trouvé pour '{breed_input}', utilisation directe"
+        )
+        return breed_normalized
 
     def build_sex_aware_sql_query(
         self,
@@ -29,13 +135,13 @@ class PostgreSQLQueryBuilder:
         strict_sex_match: bool = False,
     ) -> Tuple[str, List]:
         """
-        Construit une requête SQL avec logique de sexe adaptative et normalisation robuste
+        Construit une requête SQL adaptée à la structure réelle de la BD
 
         Args:
             query: Requête utilisateur
             entities: Entités extraites (breed, sex, age_days, etc.)
             top_k: Nombre de résultats
-            strict_sex_match: Si True, ne cherche que le sexe exact (pas de fallback as_hatched)
+            strict_sex_match: Si True, ne cherche que le sexe exact
 
         Returns:
             Tuple[str, List]: (requête SQL, paramètres)
@@ -71,7 +177,7 @@ class PostgreSQLQueryBuilder:
         conditions = []
         param_count = 0
 
-        # Extraction du sexe depuis query et entities
+        # Extraction du sexe
         sex_from_query = self.query_normalizer.extract_sex_from_query(query)
         sex_from_entities = entities.get("sex") if entities else None
         sex_specified = entities.get("sex_specified") == "true" if entities else False
@@ -92,11 +198,6 @@ class PostgreSQLQueryBuilder:
         if target_sex and (actual_sex_specified or strict_sex_match):
             param_count += 1
 
-        # Normalisation des concepts
-        normalized_concepts, raw_words = self.query_normalizer.get_search_terms(query)
-        logger.debug(f"Normalized concepts: {normalized_concepts[:5]}")
-        logger.debug(f"Raw words: {raw_words[:3]}")
-
         # Extraction de l'âge
         age_extracted = self._extract_age_from_query(query)
         if age_extracted:
@@ -105,15 +206,15 @@ class PostgreSQLQueryBuilder:
                 age_extracted, param_count, conditions, params
             )
 
-        # Filtres d'entités (CORRIGÉ avec normalisation)
+        # Filtres d'entités avec normalisation BD
         if entities:
             param_count = self._add_entity_filters(
                 entities, age_extracted, param_count, conditions, params
             )
 
-        # Conditions de recherche métrique
+        # Conditions de recherche métrique (feed_conversion_ratio for X)
         param_count = self._add_metric_search_conditions(
-            normalized_concepts, raw_words, param_count, conditions, params
+            query, age_extracted, param_count, conditions, params
         )
 
         # Assemblage final
@@ -131,27 +232,6 @@ class PostgreSQLQueryBuilder:
 
         return base_query, params
 
-    def _normalize_breed_name(self, breed: str) -> str:
-        """
-        Normalise un nom de souche pour la recherche
-        Retire espaces, tirets, underscores et met en minuscules
-
-        Args:
-            breed: Nom de souche à normaliser
-
-        Returns:
-            str: Nom normalisé (ex: "Cobb 500" -> "cobb500")
-        """
-        if not breed:
-            return ""
-
-        normalized = breed.lower()
-        # Retirer tous les séparateurs communs
-        normalized = re.sub(r"[\s\-_\.]+", "", normalized)
-
-        logger.debug(f"Breed normalization: '{breed}' -> '{normalized}'")
-        return normalized
-
     def _build_sex_condition(
         self,
         target_sex: Optional[str],
@@ -161,14 +241,8 @@ class PostgreSQLQueryBuilder:
         conditions: List[str],
         params: List[Any],
     ) -> str:
-        """
-        Construit la condition SQL pour le sexe
-
-        Returns:
-            str: Expression CASE pour le tri par priorité de sexe
-        """
+        """Construit la condition SQL pour le sexe"""
         if not target_sex or target_sex == "as_hatched":
-            # Pas de sexe spécifié -> priorité as_hatched
             logger.debug("No specific sex requested, prioritizing as_hatched")
             return """
                 CASE 
@@ -179,9 +253,7 @@ class PostgreSQLQueryBuilder:
                 END
             """
 
-        # Sexe spécifié
         if strict_sex_match:
-            # Mode strict : SEULEMENT le sexe demandé (pour comparaisons)
             logger.debug(f"Strict sex match: {target_sex} only")
             conditions.append(f"LOWER(d.sex) = ${param_count + 1}")
             params.append(target_sex.lower())
@@ -193,7 +265,6 @@ class PostgreSQLQueryBuilder:
                 END
             """
         else:
-            # Mode normal : sexe spécifié + fallback as_hatched
             logger.debug(f"Sex specified: {target_sex}, with as_hatched fallback")
             conditions.append(
                 f"""
@@ -241,41 +312,34 @@ class PostgreSQLQueryBuilder:
         conditions: List[str],
         params: List[Any],
     ) -> int:
-        """
-        Ajoute les filtres basés sur les entités
-        VERSION CORRIGÉE avec normalisation robuste des noms de souches
-        """
+        """Ajoute les filtres basés sur les entités - VERSION BD RÉELLE"""
 
-        # Filtre de souche/race (breed) - NORMALISATION ROBUSTE
+        # Filtre de souche avec normalisation vers noms BD
         if entities.get("breed"):
-            param_count += 1
+            db_strain_name = self._normalize_breed_for_db(entities["breed"])
 
-            breed_normalized = self._normalize_breed_name(entities["breed"])
-
-            # Chercher en normalisant aussi le champ de la BD
-            # REPLACE(REPLACE(REPLACE(...))) retire espaces, tirets, underscores
-            conditions.append(
-                f"LOWER(REPLACE(REPLACE(REPLACE(s.strain_name, ' ', ''), '-', ''), '_', '')) LIKE ${param_count}"
-            )
-            params.append(f"%{breed_normalized}%")
-            logger.debug(
-                f"Adding breed filter: {entities['breed']} -> normalized: {breed_normalized}"
-            )
+            if db_strain_name:
+                param_count += 1
+                # Recherche EXACTE du nom de la BD (sensible à la casse dans la BD)
+                conditions.append(f"s.strain_name = ${param_count}")
+                params.append(db_strain_name)
+                logger.debug(
+                    f"Adding breed filter: {entities['breed']} -> DB: '{db_strain_name}'"
+                )
 
         # Filtre de ligne génétique (legacy support)
         elif entities.get("line"):
-            param_count += 1
-            line_normalized = self._normalize_breed_name(entities["line"])
+            db_strain_name = self._normalize_breed_for_db(entities["line"])
 
-            conditions.append(
-                f"LOWER(REPLACE(REPLACE(REPLACE(s.strain_name, ' ', ''), '-', ''), '_', '')) LIKE ${param_count}"
-            )
-            params.append(f"%{line_normalized}%")
-            logger.debug(
-                f"Adding line filter: {entities['line']} -> normalized: {line_normalized}"
-            )
+            if db_strain_name:
+                param_count += 1
+                conditions.append(f"s.strain_name = ${param_count}")
+                params.append(db_strain_name)
+                logger.debug(
+                    f"Adding line filter: {entities['line']} -> DB: '{db_strain_name}'"
+                )
 
-        # Filtre d'âge depuis entities (si pas déjà extrait de la query)
+        # Filtre d'âge depuis entities (si pas déjà extrait)
         if entities.get("age_days") and not age_extracted:
             try:
                 age_days = int(entities["age_days"])
@@ -298,37 +362,61 @@ class PostgreSQLQueryBuilder:
 
     def _add_metric_search_conditions(
         self,
-        normalized_concepts: List[str],
-        raw_words: List[str],
+        query: str,
+        age_extracted: Optional[int],
         param_count: int,
         conditions: List[str],
         params: List[Any],
     ) -> int:
-        """Ajoute les conditions de recherche de métriques"""
+        """
+        Ajoute les conditions de recherche de métriques
+        Adapté à la structure réelle: "feed_conversion_ratio for X"
+        """
         metric_search_conditions = []
 
-        # Concepts normalisés (max 8)
-        for concept in normalized_concepts[:8]:
-            param_count += 1
-            metric_search_conditions.append(
-                f"LOWER(m.metric_name) ILIKE ${param_count}"
-            )
-            params.append(f"%{concept}%")
+        # Détection du type de métrique demandé
+        query_lower = query.lower()
 
-        # Mots bruts (max 3)
-        for word in raw_words[:3]:
-            param_count += 1
-            param_word1 = param_count
-            param_word2 = param_count + 1
+        # Pattern pour FCR/conversion
+        if any(term in query_lower for term in ["fcr", "conversion", "indice"]):
+            if age_extracted:
+                # Chercher "feed_conversion_ratio for X"
+                param_count += 1
+                metric_search_conditions.append(
+                    f"LOWER(m.metric_name) LIKE ${param_count}"
+                )
+                params.append(f"%feed_conversion_ratio for {age_extracted}%")
+                logger.debug(
+                    f"Searching for: feed_conversion_ratio for {age_extracted}"
+                )
 
-            metric_search_conditions.extend(
-                [
-                    f"LOWER(m.metric_name) ILIKE ${param_word1}",
-                    f"LOWER(m.value_text) ILIKE ${param_word2}",
-                ]
-            )
-            params.extend([f"%{word}%", f"%{word}%"])
+            # Fallback: chercher toutes les métriques FCR
             param_count += 1
+            metric_search_conditions.append(f"LOWER(m.metric_name) LIKE ${param_count}")
+            params.append("%feed_conversion_ratio%")
+
+        # Pattern pour poids/weight
+        elif any(term in query_lower for term in ["poids", "weight", "body"]):
+            if age_extracted:
+                param_count += 1
+                metric_search_conditions.append(
+                    f"LOWER(m.metric_name) LIKE ${param_count}"
+                )
+                params.append(f"%body_weight for {age_extracted}%")
+
+            param_count += 1
+            metric_search_conditions.append(f"LOWER(m.metric_name) LIKE ${param_count}")
+            params.append("%body_weight%")
+
+        # Pattern générique si rien de spécifique
+        else:
+            # Chercher dans metric_name avec l'âge
+            if age_extracted:
+                param_count += 1
+                metric_search_conditions.append(
+                    f"LOWER(m.metric_name) LIKE ${param_count}"
+                )
+                params.append(f"% for {age_extracted}%")
 
         if metric_search_conditions:
             conditions.append(f"({' OR '.join(metric_search_conditions)})")
@@ -338,17 +426,14 @@ class PostgreSQLQueryBuilder:
     def _extract_age_from_query(self, query: str) -> Optional[int]:
         """Extrait l'âge en jours depuis la requête"""
         patterns = [
-            r"day\s+(\d+)",
+            r"(\d+)\s*jours?",
+            r"(\d+)\s*days?",
             r"jour\s+(\d+)",
-            r"j\s*(\d+)",
-            r"(\d+)\s*day",
-            r"(\d+)\s*jour",
-            r"a\s+(\d+)\s+jours?",
-            r"at\s+day\s+(\d+)",
-            r"age\s+(\d+)",
-            r"(\d+)\s*j\b",
-            r"d(\d+)",
-            r"age_day_(\d+)",
+            r"day\s+(\d+)",
+            r"à\s+(\d+)\s+jours?",
+            r"at\s+(\d+)\s+days?",
+            r"de\s+(\d+)\s+jours?",
+            r"of\s+(\d+)\s+days?",
         ]
 
         query_lower = query.lower()
@@ -365,25 +450,6 @@ class PostgreSQLQueryBuilder:
                 except ValueError:
                     continue
 
-        # Patterns implicites
-        implicit_patterns = [
-            r"à\s+(\d+)\s+jours?",
-            r"at\s+(\d+)\s+days?",
-            r"de\s+(\d+)\s+jours?",
-            r"of\s+(\d+)\s+days?",
-        ]
-
-        for pattern in implicit_patterns:
-            match = re.search(pattern, query_lower)
-            if match:
-                try:
-                    age = int(match.group(1))
-                    if 0 <= age <= 150:
-                        logger.debug(f"Implicit age: {age} days via '{pattern}'")
-                        return age
-                except ValueError:
-                    continue
-
         return None
 
 
@@ -394,54 +460,34 @@ if __name__ == "__main__":
     # Mock normalizer
     mock_normalizer = Mock()
     mock_normalizer.extract_sex_from_query.return_value = "male"
-    mock_normalizer.get_search_terms.return_value = (
-        ["feed conversion", "fcr", "indice consommation"],
-        ["cobb", "conversion"],
-    )
 
     builder = PostgreSQLQueryBuilder(mock_normalizer)
 
     print("=" * 80)
-    print("TEST 1: Mode normal avec Cobb 500")
+    print("TEST 1: Normalisation Cobb 500 -> 500")
     print("=" * 80)
-    sql, params = builder.build_sex_aware_sql_query(
-        "FCR du Cobb 500 mâle à 17 jours",
-        entities={"breed": "Cobb 500", "sex": "male", "age_days": "17"},
-        top_k=10,
-        strict_sex_match=False,
-    )
-    print(f"SQL (extrait): ...{sql[-300:]}")
-    print(f"\nParams: {params}")
+    test_inputs = ["Cobb 500", "cobb 500", "cobb500", "Cobb-500", "c500"]
+    for inp in test_inputs:
+        result = builder._normalize_breed_for_db(inp)
+        print(f"  {inp:20s} -> {result}")
 
     print("\n" + "=" * 80)
-    print("TEST 2: Mode strict avec Ross 308")
+    print("TEST 2: Normalisation Ross 308 -> 308/308 FF")
+    print("=" * 80)
+    test_inputs = ["Ross 308", "ross 308", "ross308", "Ross-308", "r308"]
+    for inp in test_inputs:
+        result = builder._normalize_breed_for_db(inp)
+        print(f"  {inp:20s} -> {result}")
+
+    print("\n" + "=" * 80)
+    print("TEST 3: Construction requête complète")
     print("=" * 80)
     sql, params = builder.build_sex_aware_sql_query(
-        "Conversion du Ross 308 mâle à 21 jours",
-        entities={"breed": "Ross 308", "sex": "male", "age_days": "21"},
+        "Quelle est la conversion alimentaire du Cobb 500 mâle à 17 jours ?",
+        entities={"breed": "Cobb 500", "sex": "male", "age_days": "17"},
         top_k=10,
         strict_sex_match=True,
     )
-    print(f"SQL (extrait): ...{sql[-300:]}")
-    print(f"\nParams: {params}")
-
-    print("\n" + "=" * 80)
-    print("TEST 3: Test de normalisation")
-    print("=" * 80)
-    test_breeds = [
-        "Cobb 500",
-        "Cobb-500",
-        "cobb500",
-        "Ross 308",
-        "Ross-308",
-        "ross308",
-        "Hy-Line Brown",
-        "HyLine Brown",
-    ]
-    for breed in test_breeds:
-        normalized = builder._normalize_breed_name(breed)
-        print(f"  {breed:20s} -> {normalized}")
-
-    print("\n" + "=" * 80)
-    print("TESTS TERMINÉS")
-    print("=" * 80)
+    print(f"Params extraits: {params[:6]}")
+    print(f"SQL contient 'strain_name = $': {('strain_name = $' in sql)}")
+    print(f"SQL contient 'feed_conversion_ratio': {('feed_conversion_ratio' in sql)}")
