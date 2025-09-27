@@ -46,7 +46,6 @@ ComparisonHandler = None
 
 try:
     from .rag_postgresql import PostgreSQLSystem
-
     POSTGRESQL_INTEGRATION_AVAILABLE = True
     logger.info("PostgreSQL System importé")
 except ImportError as e:
@@ -54,7 +53,6 @@ except ImportError as e:
 
 try:
     from .query_preprocessor import QueryPreprocessor
-
     QUERY_PREPROCESSOR_AVAILABLE = True
     logger.info("Query Preprocessor importé")
 except ImportError as e:
@@ -62,7 +60,6 @@ except ImportError as e:
 
 try:
     from .comparison_handler import ComparisonHandler
-
     COMPARISON_HANDLER_AVAILABLE = True
     logger.info("Comparison Handler importé")
 except ImportError as e:
@@ -113,7 +110,6 @@ class InteliaRAGEngine:
         try:
             try:
                 import httpx
-
                 http_client = httpx.AsyncClient(timeout=30.0)
                 return AsyncOpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
             except ImportError:
@@ -132,11 +128,7 @@ class InteliaRAGEngine:
 
         try:
             # 1. Query Preprocessor
-            if (
-                QUERY_PREPROCESSOR_AVAILABLE
-                and QueryPreprocessor
-                and self.openai_client
-            ):
+            if QUERY_PREPROCESSOR_AVAILABLE and QueryPreprocessor and self.openai_client:
                 await self._initialize_query_preprocessor()
 
             # 2. PostgreSQL System
@@ -144,18 +136,14 @@ class InteliaRAGEngine:
                 await self._initialize_postgresql_system()
 
             # 3. Comparison Handler (dépend de PostgreSQL)
-            if (
-                COMPARISON_HANDLER_AVAILABLE
-                and ComparisonHandler
-                and self.postgresql_system
-            ):
+            if (COMPARISON_HANDLER_AVAILABLE and ComparisonHandler 
+                and self.postgresql_system):
                 await self._initialize_comparison_handler()
 
             self.is_initialized = True
 
             active_modules = [
-                name
-                for name, module in [
+                name for name, module in [
                     ("Preprocessor", self.query_preprocessor),
                     ("PostgreSQL", self.postgresql_system),
                     ("ComparisonHandler", self.comparison_handler),
@@ -213,11 +201,11 @@ class InteliaRAGEngine:
         conversation_context: List[Dict] = None,
         language: Optional[str] = None,
         enable_preprocessing: bool = True,
-        **kwargs,
+        **kwargs
     ) -> RAGResult:
         """
         Point d'entrée principal avec support comparatif
-
+        
         NOUVEAU: Détecte et traite les requêtes comparatives
         """
 
@@ -272,7 +260,7 @@ class InteliaRAGEngine:
     ) -> RAGResult:
         """
         Pipeline avec support comparatif
-
+        
         NOUVEAU: Branche vers comparison_handler si requête comparative
         """
 
@@ -310,6 +298,12 @@ class InteliaRAGEngine:
 
                     logger.info(f"Preprocessing: '{query}' -> '{normalized_query}'")
                     logger.debug(f"Comparative: {is_comparative}")
+                    
+                    # Debug: vérifier si comparison_handler est disponible
+                    if is_comparative:
+                        logger.debug(f"ComparisonHandler available: {self.comparison_handler is not None}")
+                        if preprocessed.get("comparison_entities"):
+                            logger.debug(f"Comparison entities: {len(preprocessed['comparison_entities'])} sets")
 
                 except Exception as e:
                     logger.warning(f"Preprocessing failed: {e}")
@@ -318,23 +312,30 @@ class InteliaRAGEngine:
             # ============================================
             # BRANCHEMENT COMPARATIF
             # ============================================
-            if is_comparative and self.comparison_handler:
-                logger.info(
-                    "Requête COMPARATIVE détectée - routage vers ComparisonHandler"
-                )
-                self.optimization_stats["comparative_queries"] += 1
-
-                result = await self._handle_comparative_query(
-                    query, normalized_query, preprocessed, language, start_time
-                )
-
-                result.metadata.update(preprocessed_metadata)
-                return result
+            if is_comparative:
+                if self.comparison_handler:
+                    logger.info("Requête COMPARATIVE détectée - routage vers ComparisonHandler")
+                    self.optimization_stats["comparative_queries"] += 1
+                    
+                    result = await self._handle_comparative_query(
+                        query,
+                        normalized_query,
+                        preprocessed,
+                        language,
+                        start_time
+                    )
+                    
+                    result.metadata.update(preprocessed_metadata)
+                    return result
+                else:
+                    logger.warning("Requête comparative détectée mais ComparisonHandler non disponible")
+                    # Fallback vers traitement standard
+                    is_comparative = False
 
             # ============================================
             # ROUTAGE STANDARD (non-comparatif)
             # ============================================
-
+            
             # PostgreSQL si suggéré
             if routing_hint == "postgresql" and self.postgresql_system:
                 logger.info("Routage PostgreSQL (preprocessing)")
@@ -342,9 +343,9 @@ class InteliaRAGEngine:
                     query=normalized_query,
                     entities=entities,
                     top_k=RAG_SIMILARITY_TOP_K,
-                    strict_sex_match=False,  # Mode normal
+                    strict_sex_match=False  # Mode normal
                 )
-
+                
                 if result and result.source != RAGSource.NO_RESULTS:
                     result.metadata.update(preprocessed_metadata)
                     return result
@@ -357,7 +358,7 @@ class InteliaRAGEngine:
                     entities=entities,
                     top_k=RAG_SIMILARITY_TOP_K,
                 )
-
+                
                 if result and result.source != RAGSource.NO_RESULTS:
                     result.metadata.update(preprocessed_metadata)
                     return result
@@ -386,44 +387,48 @@ class InteliaRAGEngine:
         normalized_query: str,
         preprocessed: Dict[str, Any],
         language: str,
-        start_time: float,
+        start_time: float
     ) -> RAGResult:
         """
         NOUVEAU: Gère les requêtes comparatives via ComparisonHandler
-
+        
         Returns:
             RAGResult avec calculs de comparaison
         """
         try:
             # Utiliser le ComparisonHandler
             comparison_result = await self.comparison_handler.handle_comparative_query(
-                normalized_query, preprocessed, top_k=RAG_SIMILARITY_TOP_K
+                normalized_query,
+                preprocessed,
+                top_k=RAG_SIMILARITY_TOP_K
             )
 
-            if not comparison_result["success"]:
+            if not comparison_result['success']:
                 logger.warning(f"Comparison failed: {comparison_result.get('error')}")
                 self.optimization_stats["comparative_failures"] += 1
-
+                
                 return RAGResult(
                     source=RAGSource.NO_RESULTS,
                     answer=f"Impossible de comparer: {comparison_result.get('error')}",
                     metadata={
                         "source_type": "comparative",
-                        "error": comparison_result.get("error"),
+                        "error": comparison_result.get('error'),
                         "processing_time": time.time() - start_time,
-                    },
+                    }
                 )
 
             # Générer la réponse naturelle
             answer_text = await self.comparison_handler.generate_comparative_response(
-                original_query, comparison_result, language
+                original_query,
+                comparison_result,
+                language
             )
 
             self.optimization_stats["comparative_success"] += 1
 
             # Construire le résultat
-            comparison = comparison_result["comparison"]
-
+            comparison = comparison_result['comparison']
+            
             logger.info(
                 f"Comparison SUCCESS: {comparison.label1}={comparison.value1} vs "
                 f"{comparison.label2}={comparison.value2}"
@@ -436,27 +441,27 @@ class InteliaRAGEngine:
                 confidence=0.95,  # Haute confiance pour comparaisons réussies
                 metadata={
                     "source_type": "comparative",
-                    "comparison_type": comparison_result.get("comparison_type"),
-                    "operation": comparison_result.get("operation"),
+                    "comparison_type": comparison_result.get('comparison_type'),
+                    "operation": comparison_result.get('operation'),
                     "value1": comparison.value1,
                     "value2": comparison.value2,
                     "difference": comparison.absolute_difference,
                     "difference_pct": comparison.relative_difference_pct,
                     "processing_time": time.time() - start_time,
-                    "result_count": len(comparison_result["results"]),
-                },
+                    "result_count": len(comparison_result['results'])
+                }
             )
 
         except Exception as e:
             logger.error(f"Erreur traitement comparatif: {e}")
             self.optimization_stats["comparative_failures"] += 1
-
+            
             return RAGResult(
                 source=RAGSource.ERROR,
                 metadata={
                     "error": str(e),
                     "source_type": "comparative",
-                },
+                }
             )
 
     def get_status(self) -> Dict:
@@ -511,23 +516,23 @@ def create_rag_engine(openai_client=None) -> InteliaRAGEngine:
 async def test_comparative_query():
     """Test d'une requête comparative"""
     engine = InteliaRAGEngine()
-
+    
     try:
         await engine.initialize()
-
+        
         test_query = "Quelle est la différence de FCR entre un Cobb 500 mâle et femelle de 17 jours ?"
-
+        
         logger.info(f"Testing: {test_query}")
         result = await engine.generate_response(test_query)
-
-        print("\n" + "=" * 60)
+        
+        print("\n" + "="*60)
         print("TEST RÉSULTAT")
-        print("=" * 60)
+        print("="*60)
         print(f"Source: {result.source}")
         print(f"Answer: {result.answer}")
         print(f"\nMetadata: {result.metadata}")
-        print("=" * 60)
-
+        print("="*60)
+        
     except Exception as e:
         logger.error(f"Test error: {e}")
     finally:
