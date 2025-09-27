@@ -3,6 +3,7 @@
 rag_postgresql.py - PostgreSQL System for RAG
 VERSION WITH OPENAI GPT-4O-MINI - Natural response generation
 Complete rewrite with JSON-based terminology loading
+Version corrigée avec gestion correcte des entités et du sexe as_hatched
 """
 
 import os
@@ -137,7 +138,6 @@ class SQLQueryNormalizer:
         """
         config_dir = os.path.join(os.path.dirname(__file__), "..", "config")
         terms = {}
-
         supported_languages = ["en", "fr", "es"]
 
         for lang in supported_languages:
@@ -480,17 +480,53 @@ class PostgreSQLRetriever:
             self.is_initialized = False
             raise
 
+    def _normalize_entities(self, entities: Dict[str, Any] = None) -> Dict[str, str]:
+        """Normalize entities from preprocessing to simple string dict
+
+        Args:
+            entities: Raw entities dict (may contain objects or complex types)
+
+        Returns:
+            Dict[str, str]: Normalized entities with string values only
+        """
+        if not entities:
+            return {}
+
+        normalized = {}
+
+        for key, value in entities.items():
+            if value is None:
+                continue
+
+            # Si c'est déjà une string, on la garde
+            if isinstance(value, str):
+                normalized[key] = value
+            # Si c'est un bool, on le convertit en string
+            elif isinstance(value, bool):
+                normalized[key] = "true" if value else "false"
+            # Si c'est un nombre, on le convertit en string
+            elif isinstance(value, (int, float)):
+                normalized[key] = str(value)
+            # Si c'est un objet avec un attribut 'value', on l'extrait
+            elif hasattr(value, "value"):
+                normalized[key] = str(value.value)
+            # Sinon, on convertit en string
+            else:
+                normalized[key] = str(value)
+
+        return normalized
+
     async def search_metrics(
         self,
         query: str,
-        entities: Dict[str, Any] = None,  # ✅ Type changé de str à Any
+        entities: Dict[str, Any] = None,
         top_k: int = 10,
     ) -> List[MetricResult]:
         """Search metrics in PostgreSQL with sex/as-hatched logic and entity support
 
         Args:
             query: User query string
-            entities: Preprocessed entities from intent analysis (can contain objects, not just strings)
+            entities: Preprocessed entities from intent analysis
             top_k: Maximum number of results to return
 
         Returns:
@@ -506,10 +542,10 @@ class PostgreSQLRetriever:
                 return []
 
         try:
-            # ✅ NOUVEAU: Normaliser les entités si elles proviennent de l'analyse d'intent
+            # Normaliser les entités
             normalized_entities = self._normalize_entities(entities)
 
-            # ✅ NOUVEAU: Log des entités reçues pour debug
+            # Log des entités pour debug
             logger.debug(f"Entities received: {entities}")
             logger.debug(f"Normalized entities: {normalized_entities}")
 
@@ -543,9 +579,7 @@ class PostgreSQLRetriever:
                         housing_system=row.get("housing_system"),
                         data_type=row.get("data_type"),
                         confidence=self._calculate_sex_aware_relevance(
-                            query,
-                            row,
-                            normalized_entities,  # ✅ Utilise les entités normalisées
+                            query, row, normalized_entities
                         ),
                     )
                     results.append(result)
@@ -561,44 +595,6 @@ class PostgreSQLRetriever:
         except Exception as e:
             logger.error(f"PostgreSQL search error: {e}")
             return []
-
-        def _normalize_entities(
-            self, entities: Dict[str, Any] = None
-        ) -> Dict[str, str]:
-            """Normalize entities from intent analysis to simple string dict
-
-            Args:
-                entities: Raw entities dict (may contain objects or complex types)
-
-            Returns:
-                Dict[str, str]: Normalized entities with string values only
-            """
-            if not entities:
-                return {}
-
-            normalized = {}
-
-            for key, value in entities.items():
-                if value is None:
-                    continue
-
-                # Si c'est déjà une string, on la garde
-                if isinstance(value, str):
-                    normalized[key] = value
-                # Si c'est un bool, on le convertit en string
-                elif isinstance(value, bool):
-                    normalized[key] = "true" if value else "false"
-                # Si c'est un nombre, on le convertit en string
-                elif isinstance(value, (int, float)):
-                    normalized[key] = str(value)
-                # Si c'est un objet avec un attribut 'value', on l'extrait
-                elif hasattr(value, "value"):
-                    normalized[key] = str(value.value)
-                # Sinon, on convertit en string
-                else:
-                    normalized[key] = str(value)
-
-            return normalized
 
     def _build_sex_aware_sql_query(
         self, query: str, entities: Dict[str, str] = None, top_k: int = 10
@@ -644,7 +640,7 @@ class PostgreSQLRetriever:
         target_sex = sex_from_entities or sex_from_query
         actual_sex_specified = sex_specified or (sex_from_query is not None)
 
-        if target_sex and actual_sex_specified:
+        if target_sex and target_sex != "as_hatched" and actual_sex_specified:
             logger.debug(
                 f"Sex specified: {target_sex}, searching with as_hatched fallback"
             )
@@ -669,7 +665,7 @@ class PostgreSQLRetriever:
 
         else:
             logger.debug(
-                "No sex specified, defaulting to as_hatched with other sexes included"
+                "No sex specified or as_hatched requested, defaulting to as_hatched priority"
             )
 
             sex_priority_case = """
@@ -781,7 +777,7 @@ class PostgreSQLRetriever:
         target_sex = sex_from_entities or sex_from_query
         row_sex = (row.get("sex") or "as_hatched").lower()
 
-        if target_sex and sex_specified:
+        if target_sex and target_sex != "as_hatched" and sex_specified:
             if row_sex == target_sex.lower():
                 score += 0.3
             elif row_sex in ["as_hatched", "mixed", "as-hatched"]:
@@ -993,9 +989,23 @@ Génère une réponse naturelle en français qui reprend la question et donne l'
             return f"Le poids d'un {context['strain']} {sex_display} de {context['age']} jours est de {context['value']} {context['unit']}."
 
     async def search_metrics(
-        self, query: str, entities: Dict[str, str] = None, top_k: int = 10
+        self,
+        query: str,
+        intent_result=None,
+        top_k: int = 10,
+        entities: Dict[str, Any] = None,
     ) -> RAGResult:
-        """Main search method with OpenAI-powered response generation"""
+        """Main search method with OpenAI-powered response generation
+
+        Args:
+            query: User query string
+            intent_result: Optional intent analysis result (for backward compatibility)
+            top_k: Maximum number of results to return
+            entities: Preprocessed entities from query preprocessor
+
+        Returns:
+            RAGResult: Search result with metrics and generated response
+        """
 
         if not self.is_initialized or not self.postgres_retriever:
             return RAGResult(
@@ -1004,9 +1014,9 @@ Génère une réponse naturelle en français qui reprend la question et donne l'
             )
 
         try:
-            # Search metrics
+            # Search metrics with entities
             metric_results = await self.postgres_retriever.search_metrics(
-                query, entities, top_k
+                query=query, entities=entities, top_k=top_k
             )
 
             if not metric_results:
@@ -1246,7 +1256,7 @@ Génère une réponse naturelle en français qui reprend la question et donne l'
             return None
 
         # Filter by sex if specified
-        if target_sex and sex_specified:
+        if target_sex and target_sex != "as_hatched" and sex_specified:
             exact_sex_matches = [m for m in metric_results if m.sex == target_sex]
             if exact_sex_matches:
                 candidate_results = exact_sex_matches
@@ -1341,8 +1351,8 @@ Génère une réponse naturelle en français qui reprend la question et donne l'
             await self.postgres_retriever.close()
         self.is_initialized = False
 
-    def get_sex_logic_status(self) -> Dict[str, Any]:
-        """Return sex/as-hatched logic system status"""
+    def get_normalization_status(self) -> Dict[str, Any]:
+        """Return normalization system status for compatibility"""
         if not self.postgres_retriever:
             return {"available": False, "reason": "retriever_not_initialized"}
 

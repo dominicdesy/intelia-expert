@@ -1,31 +1,34 @@
 # -*- coding: utf-8 -*-
 """
 query_preprocessor.py - Préprocesseur de requêtes avec OpenAI
-Version améliorée avec gestion correcte du sexe (as_hatched par défaut)
+Version modulaire utilisant ComparativeQueryDetector
 """
 
 import logging
 from openai import AsyncOpenAI
 import json
-from typing import Dict, Any
-import re
+from typing import Dict, Any, List
+
+# Import du détecteur comparatif
+from .comparative_detector import ComparativeQueryDetector
 
 logger = logging.getLogger(__name__)
 
 
 class QueryPreprocessor:
     """
-    Préprocesse les requêtes utilisateur avec OpenAI pour :
-    - Corriger les fautes de frappe
-    - Normaliser la terminologie
-    - Extraire les métadonnées structurées
-    - Déterminer le type de requête
-    - Gérer correctement le sexe (as_hatched par défaut si non spécifié)
+    Préprocesse les requêtes utilisateur avec :
+    - Correction des fautes de frappe
+    - Normalisation de la terminologie
+    - Extraction des métadonnées structurées
+    - Détection des requêtes comparatives (via ComparativeQueryDetector)
+    - Gestion correcte du sexe (as_hatched par défaut si non spécifié)
     """
 
     def __init__(self, openai_client: AsyncOpenAI):
         self.client = openai_client
         self._is_initialized = False
+        self.comparative_detector = ComparativeQueryDetector()
 
     async def initialize(self):
         """Initialisation et validation du preprocessor"""
@@ -33,7 +36,9 @@ class QueryPreprocessor:
             raise ValueError("OpenAI client is required for QueryPreprocessor")
 
         try:
-            logger.info("Initialisation du Query Preprocessor...")
+            logger.info(
+                "Initialisation du Query Preprocessor avec support comparatif..."
+            )
             self._is_initialized = True
             logger.info("Query Preprocessor initialisé avec succès")
             return self
@@ -50,24 +55,30 @@ class QueryPreprocessor:
         self, query: str, language: str = "fr"
     ) -> Dict[str, Any]:
         """
-        Analyse et normalise une requête utilisateur
+        Analyse et normalise une requête utilisateur avec détection comparative
 
         Returns:
             {
-                "normalized_query": str,  # Requête corrigée
-                "query_type": str,        # "metric" | "document" | "general"
-                "entities": {
-                    "breed": str,         # Ex: "Cobb 500"
-                    "sex": str,           # "male" | "female" | "as_hatched"
-                    "age_days": int,      # Ex: 17
-                    "metric_type": str    # Ex: "feed_conversion", "body_weight"
-                },
-                "routing": str,           # "postgresql" | "weaviate"
-                "confidence": float       # 0-1
+                "normalized_query": str,
+                "query_type": str,
+                "entities": Dict,
+                "routing": str,
+                "confidence": float,
+                "is_comparative": bool,
+                "comparative_info": Dict,
+                "requires_calculation": bool,
+                "comparison_entities": List[Dict]  # Si comparatif
             }
         """
 
-        system_prompt = self._get_system_prompt(language)
+        # 1. Détection comparative AVANT OpenAI (économie de tokens)
+        comparative_info = self.comparative_detector.detect(query)
+        logger.debug(f"Détection comparative: {comparative_info}")
+
+        # 2. Appel OpenAI pour normalisation et extraction d'entités
+        system_prompt = self._get_system_prompt(
+            language, comparative_info["is_comparative"]
+        )
 
         try:
             response = await self.client.chat.completions.create(
@@ -83,170 +94,220 @@ class QueryPreprocessor:
 
             result = json.loads(response.choices[0].message.content)
 
-            # Validation et nettoyage du format de réponse
+            # Validation
             if "normalized_query" not in result:
                 logger.warning("Preprocessing incomplet, utilisation query originale")
                 result["normalized_query"] = query
 
-            # CRITIQUE: Assurer que 'sex' est toujours présent dans entities
             if "entities" not in result:
                 result["entities"] = {}
 
-            if "sex" not in result["entities"]:
-                logger.debug(
-                    "Aucun sexe détecté par OpenAI, utilisation as_hatched par défaut"
-                )
+            # Garantir as_hatched par défaut si sexe non spécifié
+            if "sex" not in result["entities"] or not result["entities"]["sex"]:
                 result["entities"]["sex"] = "as_hatched"
+                logger.debug("Sexe non spécifié → as_hatched par défaut")
 
-            # Validation que le sexe est valide
-            valid_sexes = ["male", "female", "as_hatched"]
-            if result["entities"]["sex"] not in valid_sexes:
-                logger.warning(
-                    f"Sexe invalide '{result['entities']['sex']}', correction vers as_hatched"
+            # 3. Enrichir avec les informations comparatives
+            result["is_comparative"] = comparative_info["is_comparative"]
+            result["comparative_info"] = comparative_info
+            result["requires_calculation"] = comparative_info["is_comparative"]
+
+            # 4. Si comparaison détectée, créer les entités multiples
+            if comparative_info["is_comparative"]:
+                result["comparison_entities"] = self._build_comparison_entities(
+                    result["entities"], comparative_info["entities"]
                 )
-                result["entities"]["sex"] = "as_hatched"
+                logger.info(
+                    f"Requête comparative détectée: {comparative_info['type']}, "
+                    f"{len(result['comparison_entities'])} jeux d'entités à rechercher"
+                )
 
-            logger.debug(
-                f"Preprocessing terminé - Sex: {result['entities'].get('sex', 'as_hatched')}"
+            logger.info(
+                f"Query preprocessed: '{query}' -> '{result['normalized_query']}'"
             )
+            logger.debug(f"Routing suggestion: {result.get('routing')}")
+            logger.debug(f"Entities detected: {result['entities']}")
 
             return result
 
+        except json.JSONDecodeError as e:
+            logger.error(f"Erreur parsing JSON OpenAI: {e}")
+            return self._fallback_preprocessing(query, comparative_info)
+
         except Exception as e:
-            logger.error(f"Erreur preprocessing query: {e}")
-            # Fallback : retourner la query originale avec as_hatched par défaut
-            return {
-                "normalized_query": query,
-                "query_type": "general",
-                "entities": {"sex": "as_hatched"},  # Valeur par défaut explicite
-                "routing": "weaviate",
-                "confidence": 0.5,
-                "error": str(e),
-            }
+            logger.error(f"Erreur preprocessing OpenAI: {e}")
+            return self._fallback_preprocessing(query, comparative_info)
 
-    def _get_system_prompt(self, language: str) -> str:
-        return f"""Tu es un expert en analyse de requêtes avicoles. Ton rôle est de :
+    def _build_comparison_entities(
+        self, base_entities: Dict[str, Any], comparative_entities: List[Dict]
+    ) -> List[Dict[str, Any]]:
+        """
+        Construit les différents jeux d'entités pour chaque comparaison
 
-1. **Corriger les fautes** : "conversation alimentaire" → "conversion alimentaire"
-   Autres exemples courants :
-   - "poid" → "poids"
-   - "mortaliter" → "mortalité"
-   - "consomation" → "consommation"
-   - "Ros 308" → "Ross 308"
+        Exemple:
+        Si base_entities = {'breed': 'Cobb 500', 'age_days': 17}
+        Et comparative_entities = [{'dimension': 'sex', 'values': ['male', 'female']}]
 
-2. **Normaliser la terminologie** : 
-   - Poids corporel = body_weight = live_weight = peso corporal
-   - Conversion alimentaire = feed_conversion = FCR = cum feed conversion = indice de consommation = IC
-   - Mortalité = mortality = mortalidad
-   - Consommation alimentaire = feed intake = feed consumption = consommation d'aliment
+        Returns:
+        [
+            {'breed': 'Cobb 500', 'sex': 'male', 'age_days': 17, '_comparison_label': 'male'},
+            {'breed': 'Cobb 500', 'sex': 'female', 'age_days': 17, '_comparison_label': 'female'}
+        ]
+        """
+        if not comparative_entities:
+            return [base_entities]
 
-3. **Extraire les entités** :
-   - Race : Cobb 500, Ross 308, Ross 708, Hubbard, ISA Brown, Lohmann, etc.
-   - Sexe : RÈGLES CRITIQUES
-     * Si la requête mentionne explicitement : "mâle", "male", "masculin", "coq" → "male"
-     * Si la requête mentionne explicitement : "femelle", "female", "féminin", "poule" → "female"
-     * Si AUCUNE mention explicite du sexe → "as_hatched" (VALEUR PAR DÉFAUT - le cas le plus fréquent)
-     * Le champ "sex" est OBLIGATOIRE dans toutes les réponses
-   - Âge : en jours (convertir semaines en jours si nécessaire : 1 semaine = 7 jours)
-   - Type de métrique : body_weight, feed_conversion, mortality, feed_intake, fcr, etc.
+        entity_sets = []
 
-4. **Déterminer le routage** :
-   - **postgresql** : Requêtes sur des métriques chiffrées à un âge précis
-     Exemples : "poids à 17 jours", "FCR semaine 3", "mortalité jour 10", "conversion alimentaire jour 27"
-   
-   - **weaviate** : Requêtes sur des concepts, recommandations, explications
-     Exemples : "comment améliorer la conversion", "recommandations nutritionnelles", "gestion de la température"
+        # Pour l'instant, on gère une seule dimension de comparaison
+        # TODO: Support multi-dimensionnel (ex: mâle vs femelle ET 17j vs 21j)
+        comparison_dimension = comparative_entities[0]
+        dimension_name = comparison_dimension["dimension"]
 
-5. **Répondre en JSON** avec cette structure exacte :
+        for value in comparison_dimension["values"]:
+            entity_set = base_entities.copy()
+            entity_set[dimension_name] = value
+            entity_set["_comparison_label"] = str(value)
+            entity_set["_comparison_dimension"] = dimension_name
+            entity_sets.append(entity_set)
+
+        logger.debug(f"Construit {len(entity_sets)} jeux d'entités pour comparaison")
+        return entity_sets
+
+    def _get_system_prompt(self, language: str, is_comparative: bool) -> str:
+        """Génère le prompt système avec support comparatif"""
+
+        comparative_instructions = ""
+        if is_comparative:
+            comparative_instructions = """
+ATTENTION: Cette requête demande une COMPARAISON ou un CALCUL.
+- Extrais TOUTES les valeurs à comparer (ex: mâle ET femelle)
+- Identifie les dimensions de comparaison (sexe, âge, souche)
+- Ne privilégie pas une valeur par rapport à l'autre
+"""
+
+        if language == "fr":
+            return f"""Tu es un assistant expert en aviculture qui normalise les requêtes utilisateur.
+
+{comparative_instructions}
+
+Tâches:
+1. Corriger les fautes de frappe et orthographe
+2. Normaliser la terminologie avicole (ex: "conversion aliment" → "conversion alimentaire")
+3. Extraire les entités structurées:
+   - breed: race/souche (ex: "Cobb 500", "Ross 308")
+   - sex: sexe ("male", "female", ou "as_hatched" si non spécifié)
+   - age_days: âge en jours (nombre entier)
+   - metric_type: type de métrique (ex: "feed_conversion", "body_weight", "mortality")
+4. Suggérer le routage optimal:
+   - "postgresql" pour métriques chiffrées
+   - "weaviate" pour documents/guides
+5. Déterminer le type de requête:
+   - "metric" pour données chiffrées
+   - "document" pour guides/docs
+   - "general" pour questions générales
+
+IMPORTANT: 
+- Si le sexe n'est PAS explicitement mentionné, utiliser "as_hatched"
+- Pour les comparaisons, extraire TOUTES les entités mentionnées
+
+Réponds en JSON:
 {{
-    "normalized_query": "requête corrigée et normalisée",
+    "normalized_query": "requête corrigée",
     "query_type": "metric|document|general",
     "entities": {{
-        "breed": "nom de la race si détecté (optionnel)",
-        "sex": "male|female|as_hatched",  // OBLIGATOIRE - toujours inclure
-        "age_days": nombre de jours (optionnel),
-        "metric_type": "body_weight|feed_conversion|mortality|etc (optionnel)"
+        "breed": "...",
+        "sex": "male|female|as_hatched",
+        "age_days": 17,
+        "metric_type": "..."
     }},
     "routing": "postgresql|weaviate",
-    "confidence": 0.0 à 1.0
-}}
+    "confidence": 0.95
+}}"""
 
-RÈGLES CRITIQUES :
-- Le champ "sex" dans entities est OBLIGATOIRE dans chaque réponse
-- Par défaut, si aucun sexe n'est mentionné explicitement → "as_hatched"
-- Ne devine JAMAIS le sexe s'il n'est pas explicitement mentionné
-- Exemples où le sexe N'est PAS mentionné :
-  * "Quelle est la conversion d'un poulet Cobb 500 ?" → sex: "as_hatched"
-  * "Poids Ross 308 à 17 jours" → sex: "as_hatched"
-  * "FCR du broiler au jour 27" → sex: "as_hatched"
-- Exemples où le sexe EST mentionné :
-  * "Quelle est la conversion d'un poulet mâle Cobb 500 ?" → sex: "male"
-  * "Poids femelle Ross 308 à 17 jours" → sex: "female"
+        else:  # English
+            return f"""You are a poultry expert assistant that normalizes user queries.
 
-IMPORTANT : 
-- Si tu détectes une faute de frappe évidente, corrige-la dans normalized_query
-- Si l'âge est en semaines, convertis en jours (1 semaine = 7 jours)
-- Si aucune race n'est mentionnée, n'ajoute pas le champ breed aux entities
-- La confidence doit refléter ta certitude dans l'analyse (0.0 à 1.0)
-- Sois conservateur sur le sexe : en cas de doute, utilise "as_hatched"
+{comparative_instructions}
 
-Langue de sortie pour normalized_query : {language}"""
+Tasks:
+1. Fix typos and spelling errors
+2. Normalize poultry terminology
+3. Extract structured entities:
+   - breed: breed/strain name
+   - sex: "male", "female", or "as_hatched" if not specified
+   - age_days: age in days (integer)
+   - metric_type: metric type
+4. Suggest optimal routing:
+   - "postgresql" for numeric metrics
+   - "weaviate" for documents/guides
+5. Determine query type
 
-    def _extract_age_from_query(self, query: str) -> int:
-        """Fallback : extraction d'âge par regex si OpenAI échoue"""
-        patterns = [
-            (r"(\d+)\s*jour", 1),  # "27 jours" ou "jour 27"
-            (r"jour\s*(\d+)", 1),
-            (r"(\d+)\s*day", 1),  # "27 days" ou "day 27"
-            (r"day\s*(\d+)", 1),
-            (r"semaine\s*(\d+)", 7),  # "semaine 4" → 28 jours
-            (r"(\d+)\s*semaine", 7),
-            (r"week\s*(\d+)", 7),  # "week 4" → 28 jours
-            (r"(\d+)\s*week", 7),
-        ]
+IMPORTANT:
+- If sex is NOT explicitly mentioned, use "as_hatched"
+- For comparisons, extract ALL mentioned entities
 
-        for pattern, multiplier in patterns:
-            match = re.search(pattern, query.lower())
-            if match:
-                age = int(match.group(1)) * multiplier
-                logger.debug(f"Âge extrait par regex: {age} jours (pattern: {pattern})")
-                return age
+Respond in JSON:
+{{
+    "normalized_query": "corrected query",
+    "query_type": "metric|document|general",
+    "entities": {{...}},
+    "routing": "postgresql|weaviate",
+    "confidence": 0.95
+}}"""
 
-        return None
+    def _fallback_preprocessing(
+        self, query: str, comparative_info: Dict
+    ) -> Dict[str, Any]:
+        """Preprocessing de secours en cas d'erreur OpenAI"""
+        logger.warning("Utilisation du preprocessing de secours")
 
-    def _extract_sex_fallback(self, query: str) -> str:
-        """
-        Fallback : extraction du sexe par regex si OpenAI échoue
-        Retourne toujours "as_hatched" sauf si mention explicite
-        """
-        query_lower = query.lower()
+        return {
+            "normalized_query": query,
+            "query_type": "general",
+            "entities": {"sex": "as_hatched"},
+            "routing": "weaviate",
+            "confidence": 0.3,
+            "is_comparative": comparative_info["is_comparative"],
+            "comparative_info": comparative_info,
+            "requires_calculation": comparative_info["is_comparative"],
+            "comparison_entities": [],
+            "preprocessing_fallback": True,
+        }
 
-        # Patterns explicites pour male
-        male_patterns = [
-            r"\bmâle\b",
-            r"\bmale\b",
-            r"\bmasculin\b",
-            r"\bcoq\b",
-            r"\bmâles\b",
-            r"\bmales\b",
-        ]
-        if any(re.search(pattern, query_lower) for pattern in male_patterns):
-            logger.debug("Sexe détecté par regex fallback: male")
-            return "male"
+    def get_status(self) -> Dict[str, Any]:
+        """Status du preprocessor"""
+        return {
+            "initialized": self._is_initialized,
+            "comparative_detection": True,
+            "supported_comparisons": list(
+                self.comparative_detector.COMPARATIVE_PATTERNS.keys()
+            ),
+            "client_available": self.client is not None,
+        }
 
-        # Patterns explicites pour female
-        female_patterns = [
-            r"\bfemelle\b",
-            r"\bfemale\b",
-            r"\bféminin\b",
-            r"\bpoule\b",
-            r"\bfemelles\b",
-            r"\bfemales\b",
-        ]
-        if any(re.search(pattern, query_lower) for pattern in female_patterns):
-            logger.debug("Sexe détecté par regex fallback: female")
-            return "female"
 
-        # Aucun sexe explicite détecté
-        logger.debug("Aucun sexe explicite détecté par regex, retour as_hatched")
-        return "as_hatched"
+# Fonction utilitaire pour tests
+async def test_comparative_detection():
+    """Test de la détection comparative sans OpenAI"""
+    detector = ComparativeQueryDetector()
+
+    test_queries = [
+        "Quelle est la différence de FCR entre un Cobb 500 mâle et femelle de 17 jours ?",
+        "Compare le poids vif mâle vs femelle à 21 jours",
+        "FCR du Cobb 500 mâle à 17 jours",  # Non comparatif
+    ]
+
+    for query in test_queries:
+        result = detector.detect(query)
+        print(f"\nQuery: {query}")
+        print(f"Comparative: {result['is_comparative']}")
+        if result["is_comparative"]:
+            print(f"Type: {result['type']}")
+            print(f"Entities: {result['entities']}")
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    asyncio.run(test_comparative_detection())

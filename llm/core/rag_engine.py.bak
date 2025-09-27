@@ -702,22 +702,23 @@ class InteliaRAGEngine:
                         f"Concepts normalisés utilisés: {normalized_concepts[:3]}"
                     )
 
-            # Recherche avec normalisation ET entités
+            # Recherche avec normalisation ET entités (arguments nommés pour éviter conflits)
             result = await self.postgresql_system.search_metrics(
-                query,
-                intent_result,
-                top_k,
-                entities=entities,  # ✅ AJOUT : passage des entités
+                query=query,
+                intent_result=intent_result,
+                top_k=top_k,
+                entities=entities,
             )
 
-            # Enrichir les métadonnées avec info normalisation ET entités
+            # Enrichir les métadonnées (entités déjà propagées dans search_metrics)
             if result and result.metadata:
                 if normalized_concepts:
                     result.metadata["normalization_applied"] = True
                     result.metadata["original_query"] = query
                     result.metadata["concept_count"] = len(normalized_concepts)
 
-                if entities:
+                # Ajouter entities uniquement si pas déjà présentes
+                if entities and "entities_used" not in result.metadata:
                     result.metadata["entities_used"] = entities
                     result.metadata["entity_count"] = len(entities)
 
