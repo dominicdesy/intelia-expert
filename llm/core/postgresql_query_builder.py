@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 postgresql_query_builder.py - Construction de requêtes SQL pour PostgreSQL
-Gère la logique de construction SQL avec support du mode strict pour comparaisons
+Version CORRIGÉE avec normalisation robuste des noms de souches
 """
 
 import logging
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class PostgreSQLQueryBuilder:
-    """Construit les requêtes SQL pour la recherche de métriques"""
+    """Construit les requêtes SQL pour la recherche de métriques avec normalisation robuste"""
 
     def __init__(self, query_normalizer):
         """
@@ -29,7 +29,7 @@ class PostgreSQLQueryBuilder:
         strict_sex_match: bool = False,
     ) -> Tuple[str, List]:
         """
-        Construit une requête SQL avec logique de sexe adaptative
+        Construit une requête SQL avec logique de sexe adaptative et normalisation robuste
 
         Args:
             query: Requête utilisateur
@@ -105,7 +105,7 @@ class PostgreSQLQueryBuilder:
                 age_extracted, param_count, conditions, params
             )
 
-        # Filtres d'entités
+        # Filtres d'entités (CORRIGÉ avec normalisation)
         if entities:
             param_count = self._add_entity_filters(
                 entities, age_extracted, param_count, conditions, params
@@ -131,6 +131,27 @@ class PostgreSQLQueryBuilder:
 
         return base_query, params
 
+    def _normalize_breed_name(self, breed: str) -> str:
+        """
+        Normalise un nom de souche pour la recherche
+        Retire espaces, tirets, underscores et met en minuscules
+
+        Args:
+            breed: Nom de souche à normaliser
+
+        Returns:
+            str: Nom normalisé (ex: "Cobb 500" -> "cobb500")
+        """
+        if not breed:
+            return ""
+
+        normalized = breed.lower()
+        # Retirer tous les séparateurs communs
+        normalized = re.sub(r"[\s\-_\.]+", "", normalized)
+
+        logger.debug(f"Breed normalization: '{breed}' -> '{normalized}'")
+        return normalized
+
     def _build_sex_condition(
         self,
         target_sex: Optional[str],
@@ -148,7 +169,7 @@ class PostgreSQLQueryBuilder:
         """
         if not target_sex or target_sex == "as_hatched":
             # Pas de sexe spécifié -> priorité as_hatched
-            logger.debug("No sex specified, defaulting to as_hatched priority")
+            logger.debug("No specific sex requested, prioritizing as_hatched")
             return """
                 CASE 
                     WHEN LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed', 'as-hatched') THEN 1
@@ -158,28 +179,25 @@ class PostgreSQLQueryBuilder:
                 END
             """
 
+        # Sexe spécifié
         if strict_sex_match:
-            # Mode strict: SEULEMENT le sexe exact
+            # Mode strict : SEULEMENT le sexe demandé (pour comparaisons)
             logger.debug(f"Strict sex match: {target_sex} only")
-            param_num = param_count + 1
-            conditions.append(f"LOWER(d.sex) = ${param_num}")
+            conditions.append(f"LOWER(d.sex) = ${param_count + 1}")
             params.append(target_sex.lower())
 
             return f"""
                 CASE 
-                    WHEN LOWER(d.sex) = ${param_num} THEN 1
+                    WHEN LOWER(d.sex) = ${param_count + 1} THEN 1
                     ELSE 2
                 END
             """
-
         else:
-            # Mode normal: sexe exact + fallback as_hatched
-            logger.debug(f"Sex with fallback: {target_sex} + as_hatched")
-            param_num = param_count + 1
-
+            # Mode normal : sexe spécifié + fallback as_hatched
+            logger.debug(f"Sex specified: {target_sex}, with as_hatched fallback")
             conditions.append(
                 f"""
-                (LOWER(COALESCE(d.sex, 'as_hatched')) = ${param_num} 
+                (LOWER(COALESCE(d.sex, 'as_hatched')) = ${param_count + 1} 
                  OR LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed', 'as-hatched', 'straight_run'))
             """
             )
@@ -187,7 +205,7 @@ class PostgreSQLQueryBuilder:
 
             return f"""
                 CASE 
-                    WHEN LOWER(COALESCE(d.sex, 'as_hatched')) = ${param_num} THEN 1
+                    WHEN LOWER(COALESCE(d.sex, 'as_hatched')) = ${param_count + 1} THEN 1
                     WHEN LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed', 'as-hatched') THEN 2
                     ELSE 3
                 END
@@ -223,21 +241,39 @@ class PostgreSQLQueryBuilder:
         conditions: List[str],
         params: List[Any],
     ) -> int:
-        """Ajoute les filtres basés sur les entités"""
+        """
+        Ajoute les filtres basés sur les entités
+        VERSION CORRIGÉE avec normalisation robuste des noms de souches
+        """
 
-        # Filtre de souche/race (breed)
+        # Filtre de souche/race (breed) - NORMALISATION ROBUSTE
         if entities.get("breed"):
             param_count += 1
-            conditions.append(f"LOWER(s.strain_name) ILIKE ${param_count}")
-            params.append(f"%{entities['breed'].lower()}%")
-            logger.debug(f"Adding breed filter: {entities['breed']}")
+
+            breed_normalized = self._normalize_breed_name(entities["breed"])
+
+            # Chercher en normalisant aussi le champ de la BD
+            # REPLACE(REPLACE(REPLACE(...))) retire espaces, tirets, underscores
+            conditions.append(
+                f"LOWER(REPLACE(REPLACE(REPLACE(s.strain_name, ' ', ''), '-', ''), '_', '')) LIKE ${param_count}"
+            )
+            params.append(f"%{breed_normalized}%")
+            logger.debug(
+                f"Adding breed filter: {entities['breed']} -> normalized: {breed_normalized}"
+            )
 
         # Filtre de ligne génétique (legacy support)
-        if entities.get("line"):
+        elif entities.get("line"):
             param_count += 1
-            conditions.append(f"LOWER(s.strain_name) ILIKE ${param_count}")
-            params.append(f"%{entities['line'].lower()}%")
-            logger.debug(f"Adding line filter: {entities['line']}")
+            line_normalized = self._normalize_breed_name(entities["line"])
+
+            conditions.append(
+                f"LOWER(REPLACE(REPLACE(REPLACE(s.strain_name, ' ', ''), '-', ''), '_', '')) LIKE ${param_count}"
+            )
+            params.append(f"%{line_normalized}%")
+            logger.debug(
+                f"Adding line filter: {entities['line']} -> normalized: {line_normalized}"
+            )
 
         # Filtre d'âge depuis entities (si pas déjà extrait de la query)
         if entities.get("age_days") and not age_extracted:
@@ -333,8 +369,8 @@ class PostgreSQLQueryBuilder:
         implicit_patterns = [
             r"à\s+(\d+)\s+jours?",
             r"at\s+(\d+)\s+days?",
-            r"(\d+)\s+jours?\s+de",
-            r"(\d+)\s+days?\s+of",
+            r"de\s+(\d+)\s+jours?",
+            r"of\s+(\d+)\s+days?",
         ]
 
         for pattern in implicit_patterns:
@@ -359,29 +395,53 @@ if __name__ == "__main__":
     mock_normalizer = Mock()
     mock_normalizer.extract_sex_from_query.return_value = "male"
     mock_normalizer.get_search_terms.return_value = (
-        ["feed_conversion", "fcr"],
+        ["feed conversion", "fcr", "indice consommation"],
         ["cobb", "conversion"],
     )
 
     builder = PostgreSQLQueryBuilder(mock_normalizer)
 
-    # Test mode normal
-    print("=== TEST MODE NORMAL ===")
+    print("=" * 80)
+    print("TEST 1: Mode normal avec Cobb 500")
+    print("=" * 80)
     sql, params = builder.build_sex_aware_sql_query(
         "FCR du Cobb 500 mâle à 17 jours",
-        entities={"sex": "male", "age_days": "17"},
+        entities={"breed": "Cobb 500", "sex": "male", "age_days": "17"},
         top_k=10,
         strict_sex_match=False,
     )
-    print(f"SQL: {sql[:200]}...")
-    print(f"Params: {params}")
+    print(f"SQL (extrait): ...{sql[-300:]}")
+    print(f"\nParams: {params}")
 
-    print("\n=== TEST MODE STRICT ===")
+    print("\n" + "=" * 80)
+    print("TEST 2: Mode strict avec Ross 308")
+    print("=" * 80)
     sql, params = builder.build_sex_aware_sql_query(
-        "FCR du Cobb 500 mâle à 17 jours",
-        entities={"sex": "male", "age_days": "17"},
+        "Conversion du Ross 308 mâle à 21 jours",
+        entities={"breed": "Ross 308", "sex": "male", "age_days": "21"},
         top_k=10,
         strict_sex_match=True,
     )
-    print(f"SQL: {sql[:200]}...")
-    print(f"Params: {params}")
+    print(f"SQL (extrait): ...{sql[-300:]}")
+    print(f"\nParams: {params}")
+
+    print("\n" + "=" * 80)
+    print("TEST 3: Test de normalisation")
+    print("=" * 80)
+    test_breeds = [
+        "Cobb 500",
+        "Cobb-500",
+        "cobb500",
+        "Ross 308",
+        "Ross-308",
+        "ross308",
+        "Hy-Line Brown",
+        "HyLine Brown",
+    ]
+    for breed in test_breeds:
+        normalized = builder._normalize_breed_name(breed)
+        print(f"  {breed:20s} -> {normalized}")
+
+    print("\n" + "=" * 80)
+    print("TESTS TERMINÉS")
+    print("=" * 80)
