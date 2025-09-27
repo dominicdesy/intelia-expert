@@ -176,36 +176,66 @@ class ComparisonHandler:
         """Extrait les métriques des documents de contexte"""
         metrics = []
 
+        # Debug: inspecter le premier document pour comprendre la structure
+        if context_docs and len(context_docs) > 0:
+            first_doc = context_docs[0]
+            logger.debug(f"First doc type: {type(first_doc)}")
+            if isinstance(first_doc, dict):
+                logger.debug(f"First doc keys: {list(first_doc.keys())}")
+                if "metadata" in first_doc:
+                    logger.debug(f"Metadata keys: {list(first_doc['metadata'].keys())}")
+
         for doc in context_docs:
-            # Les docs peuvent être des dicts ou des objets
+            # Les docs sont des dicts avec structure {content: str, metadata: dict, ...}
             if isinstance(doc, dict):
                 metadata = doc.get("metadata", {})
-            else:
-                metadata = getattr(doc, "metadata", {})
 
-            # Chercher value_numeric dans metadata ou au niveau racine
-            value_numeric = None
-            unit = ""
-            metric_name = ""
-
-            if isinstance(doc, dict):
+                # Essayer d'extraire value_numeric de plusieurs endroits possibles
                 value_numeric = metadata.get("value_numeric")
-                unit = metadata.get("unit", "")
-                metric_name = metadata.get("metric_name", "")
 
-                # Fallback si pas dans metadata
+                # Si pas dans metadata, chercher au niveau racine
                 if value_numeric is None:
                     value_numeric = doc.get("value_numeric")
 
-            if value_numeric is not None:
-                metrics.append(
-                    {
-                        "value_numeric": value_numeric,
-                        "unit": unit,
-                        "metric_name": metric_name,
-                        "metadata": metadata,
-                    }
+                # Essayer aussi dans le contenu parsé si c'est un Document object
+                if value_numeric is None and hasattr(doc, "metadata"):
+                    value_numeric = doc.metadata.get("value_numeric")
+
+                unit = metadata.get("unit", "") or doc.get("unit", "")
+                metric_name = metadata.get("metric_name", "") or doc.get(
+                    "metric_name", ""
                 )
+
+            elif hasattr(doc, "metadata"):
+                # C'est un objet Document
+                metadata = doc.metadata
+                value_numeric = metadata.get("value_numeric")
+                unit = metadata.get("unit", "")
+                metric_name = metadata.get("metric_name", "")
+            else:
+                logger.warning(f"Unknown doc format: {type(doc)}")
+                continue
+
+            # Ne garder que les docs avec value_numeric valide
+            if value_numeric is not None:
+                try:
+                    value_numeric = float(value_numeric)
+                    metrics.append(
+                        {
+                            "value_numeric": value_numeric,
+                            "unit": unit,
+                            "metric_name": metric_name,
+                            "metadata": metadata if isinstance(metadata, dict) else {},
+                        }
+                    )
+                    logger.debug(
+                        f"Extracted metric: {metric_name} = {value_numeric} {unit}"
+                    )
+                except (ValueError, TypeError) as e:
+                    logger.warning(
+                        f"Invalid value_numeric: {value_numeric}, error: {e}"
+                    )
+                    continue
 
         logger.debug(f"Extracted {len(metrics)} metrics from {len(context_docs)} docs")
         return metrics
