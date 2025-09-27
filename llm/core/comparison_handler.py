@@ -309,7 +309,7 @@ class ComparisonHandler:
     ) -> str:
         """
         Génère une réponse naturelle pour une comparaison
-        VERSION CORRIGÉE : Passe le contexte à format_comparison_text
+        VERSION AMÉLIORÉE : Utilise OpenAI pour une réponse professionnelle
 
         Args:
             query: Requête originale
@@ -317,7 +317,7 @@ class ComparisonHandler:
             language: Langue de la réponse
 
         Returns:
-            Texte de réponse formaté avec contexte enrichi
+            Texte de réponse formaté et enrichi par OpenAI
         """
         if not comparison_result.get("success"):
             error = comparison_result.get("error", "Unknown error")
@@ -328,6 +328,7 @@ class ComparisonHandler:
 
         comparison = comparison_result["comparison"]
         results = comparison_result["results"]
+        context = comparison_result.get("context", {})
 
         # Extraire le nom de métrique
         metric_name = "métrique"
@@ -337,23 +338,132 @@ class ComparisonHandler:
                 metric_data = first_result["data"][0]
                 metric_name = metric_data.get("metric_name", metric_name)
 
-        # Récupérer la terminologie depuis postgresql_system
+        # Construire les données structurées pour OpenAI
+        comparison_data = {
+            "metric_name": metric_name,
+            "label1": comparison.label1,
+            "value1": comparison.value1,
+            "label2": comparison.label2,
+            "value2": comparison.value2,
+            "difference_absolute": comparison.absolute_difference,
+            "difference_percent": comparison.relative_difference_pct,
+            "better": comparison.better_label,
+            "unit": comparison.unit,
+            "age_days": context.get("age_days"),
+            "sex": context.get("sex"),
+            "is_lower_better": self.calculator._is_lower_better(
+                comparison.metric_name or metric_name
+            ),
+        }
+
+        # Prompt système pour OpenAI
+        if language == "fr":
+            system_prompt = """Tu es un expert en aviculture qui rédige des réponses professionnelles et claires pour comparer des performances entre souches.
+
+Règles importantes :
+1. Utilise les noms corrects : "Cobb 500", "Ross 308" (avec majuscules)
+2. Traduis les métriques techniques en français : "feed_conversion_ratio" → "conversion alimentaire (FCR)"
+3. Pour le FCR et la mortalité : une valeur PLUS BASSE est MEILLEURE
+4. Pour le poids et la production : une valeur PLUS HAUTE est MEILLEURE
+5. Fournis un contexte métier pour interpréter l'écart
+6. Sois concis mais informatif
+
+Format attendu :
+- Titre avec contexte (âge, sexe si pertinent)
+- Valeurs comparées avec unités
+- Différence avec pourcentage
+- Interprétation : qui est meilleur et pourquoi
+- Note explicative courte sur l'impact pratique"""
+
+            user_prompt = f"""Génère une réponse professionnelle pour cette comparaison :
+
+Données :
+- Métrique : {comparison_data['metric_name']}
+- {comparison_data['label1']} : {comparison_data['value1']:.3f} {comparison_data['unit']}
+- {comparison_data['label2']} : {comparison_data['value2']:.3f} {comparison_data['unit']}
+- Différence : {abs(comparison_data['difference_absolute']):.3f} ({abs(comparison_data['difference_percent']):.1f}%)
+- Meilleur : {comparison_data['better']}
+- Contexte : {'mâles' if comparison_data['sex'] == 'male' else 'femelles' if comparison_data['sex'] == 'female' else 'sexes mélangés'} à {comparison_data['age_days']} jours
+- Type métrique : {"plus bas = meilleur" if comparison_data['is_lower_better'] else "plus haut = meilleur"}
+
+Requête originale : {query}"""
+
+        else:  # English
+            system_prompt = """You are a poultry expert writing professional and clear responses comparing strain performances.
+
+Important rules:
+1. Use proper names: "Cobb 500", "Ross 308" (capitalized)
+2. Translate technical metrics: "feed_conversion_ratio" → "feed conversion ratio (FCR)"
+3. For FCR and mortality: LOWER value is BETTER
+4. For weight and production: HIGHER value is BETTER
+5. Provide business context to interpret the difference
+6. Be concise but informative
+
+Expected format:
+- Title with context (age, sex if relevant)
+- Compared values with units
+- Difference with percentage
+- Interpretation: who is better and why
+- Brief note on practical impact"""
+
+            user_prompt = f"""Generate a professional response for this comparison:
+
+Data:
+- Metric: {comparison_data['metric_name']}
+- {comparison_data['label1']}: {comparison_data['value1']:.3f} {comparison_data['unit']}
+- {comparison_data['label2']}: {comparison_data['value2']:.3f} {comparison_data['unit']}
+- Difference: {abs(comparison_data['difference_absolute']):.3f} ({abs(comparison_data['difference_percent']):.1f}%)
+- Better: {comparison_data['better']}
+- Context: {'males' if comparison_data['sex'] == 'male' else 'females' if comparison_data['sex'] == 'female' else 'mixed'} at {comparison_data['age_days']} days
+- Metric type: {"lower is better" if comparison_data['is_lower_better'] else "higher is better"}
+
+Original query: {query}"""
+
+        try:
+            # Appel OpenAI pour génération de réponse de qualité
+            if hasattr(self.postgresql_system, "postgres_retriever"):
+                retriever = self.postgresql_system.postgres_retriever
+                if hasattr(retriever, "query_normalizer"):
+                    # Utiliser le client OpenAI déjà existant
+                    from openai import AsyncOpenAI
+                    import os
+
+                    client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+                    response = await client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        temperature=0.3,  # Un peu de créativité mais pas trop
+                        max_tokens=500,
+                    )
+
+                    enhanced_response = response.choices[0].message.content.strip()
+                    logger.info("Réponse comparative enrichie par OpenAI")
+                    return enhanced_response
+
+        except Exception as e:
+            logger.warning(
+                f"Erreur enrichissement OpenAI: {e}, utilisation template de base"
+            )
+            # Fallback sur le template basique
+            pass
+
+        # Fallback : utiliser le formatter basique si OpenAI échoue
         terminology = None
         if hasattr(self.postgresql_system, "postgres_retriever"):
             retriever = self.postgresql_system.postgres_retriever
             if hasattr(retriever, "query_normalizer"):
                 terminology = retriever.query_normalizer.terminology
 
-        # NOUVEAU: Récupérer le contexte depuis comparison_result
-        context = comparison_result.get("context", {})
-
-        # Utiliser le formatter du calculator avec terminologie ET contexte
         formatted_text = self.calculator.format_comparison_text(
             comparison=comparison,
             metric_name=metric_name,
             language=language,
             terminology=terminology,
-            context=context,  # NOUVEAU: passage du contexte
+            context=context,
         )
 
         return formatted_text
