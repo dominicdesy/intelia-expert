@@ -365,17 +365,18 @@ Règles importantes :
 2. Traduis les métriques techniques en français : "feed_conversion_ratio" → "conversion alimentaire (FCR)"
 3. Pour le FCR et la mortalité : une valeur PLUS BASSE est MEILLEURE
 4. Pour le poids et la production : une valeur PLUS HAUTE est MEILLEURE
-5. Fournis un contexte métier pour interpréter l'écart
-6. Sois concis mais informatif
+5. Fournis une interprétation concise de l'écart
+6. NE commence PAS par un titre comme "Comparaison de..." - va directement aux données
+7. NE termine PAS avec une section "Impact pratique" ou "Recommandations"
 
 Format attendu :
-- Titre avec contexte (âge, sexe si pertinent)
-- Valeurs comparées avec unités
+- Contexte en une ligne (âge, sexe)
+- Valeurs comparées avec unités (format liste à puces)
 - Différence avec pourcentage
-- Interprétation : qui est meilleur et pourquoi
-- Note explicative courte sur l'impact pratique"""
+- Interprétation : qui est meilleur et pourquoi en 1-2 phrases maximum
+- Pas de conclusion ou d'impact pratique"""
 
-            user_prompt = f"""Génère une réponse professionnelle pour cette comparaison :
+            user_prompt = f"""Génère une réponse concise pour cette comparaison :
 
 Données :
 - Métrique : {comparison_data['metric_name']}
@@ -384,9 +385,7 @@ Données :
 - Différence : {abs(comparison_data['difference_absolute']):.3f} ({abs(comparison_data['difference_percent']):.1f}%)
 - Meilleur : {comparison_data['better']}
 - Contexte : {'mâles' if comparison_data['sex'] == 'male' else 'femelles' if comparison_data['sex'] == 'female' else 'sexes mélangés'} à {comparison_data['age_days']} jours
-- Type métrique : {"plus bas = meilleur" if comparison_data['is_lower_better'] else "plus haut = meilleur"}
-
-Requête originale : {query}"""
+- Type métrique : {"plus bas = meilleur" if comparison_data['is_lower_better'] else "plus haut = meilleur"}"""
 
         else:  # English
             system_prompt = """You are a poultry expert writing professional and clear responses comparing strain performances.
@@ -396,17 +395,18 @@ Important rules:
 2. Translate technical metrics: "feed_conversion_ratio" → "feed conversion ratio (FCR)"
 3. For FCR and mortality: LOWER value is BETTER
 4. For weight and production: HIGHER value is BETTER
-5. Provide business context to interpret the difference
-6. Be concise but informative
+5. Provide concise interpretation of the difference
+6. DO NOT start with a title like "Comparison of..." - go directly to data
+7. DO NOT end with "Practical impact" or "Recommendations" section
 
 Expected format:
-- Title with context (age, sex if relevant)
-- Compared values with units
+- Context in one line (age, sex)
+- Compared values with units (bullet list)
 - Difference with percentage
-- Interpretation: who is better and why
-- Brief note on practical impact"""
+- Interpretation: who is better and why in 1-2 sentences max
+- No conclusion or practical impact"""
 
-            user_prompt = f"""Generate a professional response for this comparison:
+            user_prompt = f"""Generate a concise response for this comparison:
 
 Data:
 - Metric: {comparison_data['metric_name']}
@@ -415,9 +415,7 @@ Data:
 - Difference: {abs(comparison_data['difference_absolute']):.3f} ({abs(comparison_data['difference_percent']):.1f}%)
 - Better: {comparison_data['better']}
 - Context: {'males' if comparison_data['sex'] == 'male' else 'females' if comparison_data['sex'] == 'female' else 'mixed'} at {comparison_data['age_days']} days
-- Metric type: {"lower is better" if comparison_data['is_lower_better'] else "higher is better"}
-
-Original query: {query}"""
+- Metric type: {"lower is better" if comparison_data['is_lower_better'] else "higher is better"}"""
 
         try:
             # Appel OpenAI pour génération de réponse de qualité
