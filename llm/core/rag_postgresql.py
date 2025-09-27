@@ -2,9 +2,11 @@
 """
 rag_postgresql.py - PostgreSQL System for RAG
 VERSION WITH OPENAI GPT-4O-MINI - Natural response generation
+Complete rewrite with JSON-based terminology loading
 """
 
 import os
+import json
 import logging
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
@@ -110,144 +112,141 @@ class MetricResult:
 
 
 class SQLQueryNormalizer:
-    """Multilingual normalizer for converting user concepts to searchable database terms"""
+    """Multilingual normalizer for converting user concepts to searchable database terms
 
-    CONCEPT_MAPPINGS = {
-        "weight": [
-            "poids",
-            "peso",
-            "weight",
-            "body_weight",
-            "live_weight",
-            "body weight",
-            "weight_g",
-            "weight_lb",
-            "masse",
-            "masse corporelle",
-            "poids corporel",
-            "poids vif",
-            "body_weight_day",
-        ],
-        "feed": [
-            "alimentation",
-            "alimento",
-            "feed",
-            "nutrition",
-            "consommation",
-            "feed_intake",
-            "feed consumption",
-            "aliment",
-            "nourriture",
-            "ration",
-            "aliment_consomme",
-            "feed_consumed",
-        ],
-        "mortality": [
-            "mortalite",
-            "mortalidad",
-            "mortality",
-            "death_rate",
-            "viability",
-            "survie",
-            "taux de mortalite",
-            "mort",
-            "deces",
-            "pertes",
-        ],
-        "growth": [
-            "croissance",
-            "crecimiento",
-            "growth",
-            "gain",
-            "developpement",
-            "daily_gain",
-            "gain quotidien",
-            "croissance ponderale",
-        ],
-        "production": [
-            "production",
-            "produccion",
-            "ponte",
-            "laying",
-            "egg_production",
-            "lay_rate",
-            "taux de ponte",
-            "oeufs",
-            "eggs",
-            "rendement",
-        ],
-        "fcr": [
-            "icg",
-            "fcr",
-            "feed_conversion",
-            "conversion",
-            "efficacite",
-            "efficiency",
-            "indice de consommation",
-            "conversion alimentaire",
-        ],
-        "water": [
-            "eau",
-            "water",
-            "agua",
-            "water_consumption",
-            "hydratation",
-            "consommation d'eau",
-            "abreuvement",
-        ],
-        "temperature": [
-            "temperature",
-            "temp",
-            "chaleur",
-            "froid",
-            "thermique",
-            "climat",
-        ],
-        "density": [
-            "densite",
-            "density",
-            "peuplement",
-            "stocking",
-            "occupation",
-            "espace",
-            "space",
-        ],
-        "age": [
-            "age",
-            "semaine",
-            "week",
-            "jour",
-            "day",
-            "periode",
-            "phase",
-            "stade",
-            "at day",
-        ],
-        "sex": [
-            "sexe",
-            "sex",
-            "male",
-            "mâle",
-            "female",
-            "femelle",
-            "mixed",
-            "mixte",
-            "as-hatched",
-            "as_hatched",
-            "straight_run",
-            "both_sexes",
-            "sexes_mélangés",
-        ],
-    }
+    This class loads terminology from JSON configuration files and provides methods
+    to normalize queries, extract search terms, and detect sex information.
+    """
+
+    def __init__(self):
+        """Initialize normalizer with terminology from JSON files"""
+        self.terminology = self._load_terminology()
+        self.CONCEPT_MAPPINGS = self._build_concept_mappings()
+        logger.info(
+            f"SQLQueryNormalizer initialized with {len(self.CONCEPT_MAPPINGS)} concept mappings"
+        )
+
+    def _load_terminology(self) -> Dict[str, Any]:
+        """Load terminology from JSON configuration files
+
+        Loads terminology files for supported languages (en, fr, es) from the config directory.
+        If a file is not found or cannot be loaded, logs a warning and continues with empty dict.
+
+        Returns:
+            Dict[str, Any]: Dictionary with language codes as keys and terminology as values
+        """
+        config_dir = os.path.join(os.path.dirname(__file__), "..", "config")
+        terms = {}
+
+        supported_languages = ["en", "fr", "es"]
+
+        for lang in supported_languages:
+            file_path = os.path.join(config_dir, f"universal_terms_{lang}.json")
+            try:
+                if os.path.exists(file_path):
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        terms[lang] = json.load(f)
+                        logger.info(
+                            f"Terminology loaded successfully for language: {lang}"
+                        )
+                else:
+                    logger.warning(f"Terminology file not found: {file_path}")
+                    terms[lang] = {}
+            except Exception as e:
+                logger.error(f"Error loading terminology for {lang}: {e}")
+                terms[lang] = {}
+
+        return terms
+
+    def _build_concept_mappings(self) -> Dict[str, List[str]]:
+        """Build concept mappings from loaded terminology
+
+        Aggregates terms from all loaded language files into a unified mapping
+        where each concept key maps to all its possible terms across languages.
+
+        Returns:
+            Dict[str, List[str]]: Mapping of concept keys to lists of searchable terms
+        """
+        mappings = {}
+
+        # Aggregate terms from all languages
+        for lang, lang_terms in self.terminology.items():
+            if "performance_metrics" not in lang_terms:
+                continue
+
+            perf_metrics = lang_terms["performance_metrics"]
+
+            for metric_key, metric_terms in perf_metrics.items():
+                # Normalize metric key (e.g., "body_weight" -> "weight")
+                base_key = metric_key.split("_")[0] if "_" in metric_key else metric_key
+
+                if base_key not in mappings:
+                    mappings[base_key] = []
+
+                # Add all terms for this metric
+                if isinstance(metric_terms, list):
+                    mappings[base_key].extend(metric_terms)
+
+                # Also map the full metric key
+                if metric_key not in mappings:
+                    mappings[metric_key] = []
+                if isinstance(metric_terms, list):
+                    mappings[metric_key].extend(metric_terms)
+
+        # Remove duplicates
+        for key in mappings:
+            mappings[key] = list(set(mappings[key]))
+
+        logger.info(f"Built concept mappings for {len(mappings)} concepts")
+        return mappings
+
+    def get_metric_patterns(self, query: str, language: str = "fr") -> List[str]:
+        """Get search patterns based on configured terms
+
+        Args:
+            query: User query string
+            language: Target language code (default: 'fr')
+
+        Returns:
+            List[str]: List of matching search patterns for the query
+        """
+        query_lower = query.lower()
+        patterns = []
+
+        if language not in self.terminology:
+            logger.warning(f"Language {language} not found in terminology")
+            return patterns
+
+        lang_terms = self.terminology[language]
+
+        if "performance_metrics" not in lang_terms:
+            return patterns
+
+        perf_metrics = lang_terms["performance_metrics"]
+
+        # Check each metric type
+        for metric_key, metric_terms in perf_metrics.items():
+            if isinstance(metric_terms, list):
+                if any(term.lower() in query_lower for term in metric_terms):
+                    patterns.extend(metric_terms)
+
+        return list(set(patterns))  # Remove duplicates
 
     def normalize_query_concepts(self, query: str) -> List[str]:
-        """Converts user query to normalized concept terms"""
+        """Converts user query to normalized concept terms
+
+        Args:
+            query: User query string
+
+        Returns:
+            List[str]: List of unique normalized concept terms found in query
+        """
         query_lower = query.lower()
         normalized_concepts = []
 
         for concept, terms in self.CONCEPT_MAPPINGS.items():
-            if any(term in query_lower for term in terms):
-                normalized_concepts.extend(self.CONCEPT_MAPPINGS[concept])
+            if any(term.lower() in query_lower for term in terms):
+                normalized_concepts.extend(terms)
 
         seen = set()
         unique_concepts = []
@@ -259,13 +258,29 @@ class SQLQueryNormalizer:
         return unique_concepts
 
     def get_search_terms(self, query: str) -> Tuple[List[str], List[str]]:
-        """Returns (normalized_concepts, raw_words) for SQL search"""
+        """Returns (normalized_concepts, raw_words) for SQL search
+
+        Args:
+            query: User query string
+
+        Returns:
+            Tuple containing:
+                - List of normalized concept terms
+                - List of raw words from query (length > 3)
+        """
         normalized = self.normalize_query_concepts(query)
         raw_words = [word for word in query.lower().split() if len(word) > 3]
         return normalized, raw_words
 
     def extract_sex_from_query(self, query: str) -> Optional[str]:
-        """Extract sex from query - returns 'male', 'female', 'as_hatched', or None"""
+        """Extract sex from query - returns 'male', 'female', 'as_hatched', or None
+
+        Args:
+            query: User query string
+
+        Returns:
+            Optional[str]: Detected sex ('male', 'female', 'as_hatched') or None
+        """
         query_lower = query.lower()
 
         male_patterns = ["male", "mâle", "mâles", "masculin", "coq", "coqs", "rooster"]
@@ -370,7 +385,15 @@ class QueryRouter:
         }
 
     def route_query(self, query: str, intent_result=None) -> QueryType:
-        """Determines query type and appropriate source"""
+        """Determines query type and appropriate source
+
+        Args:
+            query: User query string
+            intent_result: Optional intent analysis result
+
+        Returns:
+            QueryType: Determined query type (METRICS, KNOWLEDGE, HYBRID, or UNKNOWN)
+        """
         query_lower = query.lower()
 
         metric_score = sum(
@@ -597,7 +620,7 @@ class PostgreSQLRetriever:
                 END
             """
 
-        # Concept normalization
+        # Concept normalization using JSON-based terminology
         normalized_concepts, raw_words = self.query_normalizer.get_search_terms(query)
         logger.debug(f"Normalized concepts: {normalized_concepts[:5]}")
         logger.debug(f"Raw words: {raw_words[:3]}")
@@ -1273,4 +1296,8 @@ Génère une réponse naturelle en français qui reprend la question et donne l'
             "normalization_concepts": len(
                 self.postgres_retriever.query_normalizer.CONCEPT_MAPPINGS
             ),
+            "terminology_loaded": len(
+                self.postgres_retriever.query_normalizer.terminology
+            )
+            > 0,
         }

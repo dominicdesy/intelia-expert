@@ -208,7 +208,7 @@
 		  "facteur d'efficacité européen",
 		  "indice productivité"
 		]
-	  },  
+	  }  
 	  
   "nutrition_detailed": {
     "crude_protein": ["protéines brutes", "pb", "protéines", "crude protein", "cp"],

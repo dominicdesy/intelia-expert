@@ -85,122 +85,19 @@
     "hatchery": ["incubatório", "chocadeira", "nascedouro"],
     "feed_mill": ["fábrica ração", "moinho", "planta ração"]
   },
-
-	"performance_metrics": {
-		"feed_conversion_ratio": [
-		  "ca",
-		  "fcr",
-		  "conversão alimentar",
-		  "conversação alimentar",
-		  "índice conversão",
-		  "eficiência alimentar",
-		  "taxa conversão",
-		  "conversão alimentar acumulada",
-		  "conversão acumulada",
-		  "eficiência conversão",
-		  "índice de conversão alimentar"
-		],
-		"average_daily_gain": [
-		  "gpd",
-		  "gdp",
-		  "ganho médio diário",
-		  "ganho diário",
-		  "g/dia",
-		  "ganho peso diário",
-		  "crescimento diário",
-		  "incremento diário",
-		  "taxa crescimento",
-		  "ganho por dia"
-		],
-		"feed_intake": [
-		  "consumo ração",
-		  "ingestão",
-		  "consumo alimento",
-		  "g/ave/dia",
-		  "consumo de ração",
-		  "ingestão diária",
-		  "ração consumida",
-		  "consumo diário",
-		  "ingestão alimentar",
-		  "consumo acumulado",
-		  "consumo total",
-		  "quantidade ração"
-		],
-		"water_intake": [
-		  "consumo água",
-		  "ingestão água",
-		  "l/1000/dia",
-		  "ml/ave/dia",
-		  "consumo de água",
-		  "água consumida",
-		  "ingestão hídrica",
-		  "água por ave",
-		  "consumo hídrico diário"
-		],
-		"body_weight": [
-		  "peso",
-		  "peso corporal",
-		  "peso vivo",
-		  "peso médio",
-		  "peso objetivo",
-		  "pv",
-		  "peso da ave",
-		  "peso individual",
-		  "peso padrão",
-		  "peso alvo"
-		],
-		"mortality": [
-		  "mortalidade",
-		  "taxa mortalidade",
-		  "morte",
-		  "taxa de morte",
-		  "perda",
-		  "taxa de mortalidade",
-		  "mortalidade acumulada",
-		  "mortalidade diária",
-		  "aves mortas",
-		  "perdas",
-		  "taxa sobrevivência",
-		  "percentual mortalidade"
-		],
-		"egg_production": [
-		  "produção ovos",
-		  "postura",
-		  "taxa postura",
-		  "produção ovo",
-		  "oviposição",
-		  "ovos por galinha",
-		  "produção diária",
-		  "taxa de postura",
-		  "rendimento ovos",
-		  "percentual postura",
-		  "produção galinha-dia"
-		],
-		"uniformity": [
-		  "uniformidade",
-		  "homogeneidade",
-		  "coeficiente variação",
-		  "cv",
-		  "regularidade",
-		  "uniformidade do lote",
-		  "uniformidade de peso",
-		  "uniformidade de tamanho",
-		  "consistência",
-		  "coeficiente de variação"
-		],
-		"epef": [
-		  "epef",
-		  "fator eficiência produção",
-		  "índice eficiência",
-		  "fator de eficiência",
-		  "índice rendimento",
-		  "fator eficiência europeu",
-		  "índice produtividade"
-		]
-	  },  
-
-
-
+  
+  "performance_metrics": {
+    "feed_conversion_ratio": ["conversão alimentar", "fcr", "índice conversão"],
+    "average_daily_gain": ["ganho diário médio", "adg", "g/dia"],
+    "feed_intake": ["consumo ração", "ingestão", "g/ave/dia"],
+    "water_intake": ["consumo água", "ingestão água", "l/1000/dia"],
+    "body_weight": ["peso", "peso corporal", "peso vivo", "peso médio", "peso alvo"],
+    "mortality": ["mortalidade", "taxa mortalidade", "morte", "perdas", "óbitos"],
+    "egg_production": ["produção ovos", "postura", "taxa postura", "produção ovo", "oviposição"],
+    "uniformity": ["uniformidade", "homogeneidade", "coeficiente variação"],
+    "epef": ["epef", "fator eficiência produção", "índice eficiência"]
+  },
+  
   "nutrition_detailed": {
     "crude_protein": ["proteína bruta", "pb", "proteína", "proteínas"],
     "metabolizable_energy": ["energia metabolizável", "em", "kcal/kg", "densidade energética"],

@@ -194,7 +194,7 @@
 		  "production index",
 		  "performance factor"
 		]
-	  },
+	  }
  
   "nutrition_detailed": {
     "crude_protein": ["crude protein", "cp", "protein", "proteins", "raw protein"],
