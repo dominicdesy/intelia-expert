@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-rag_engine.py - RAG Engine Principal - Version Corrigée Complète
-Version 5.3 - Résolution de tous les problèmes identifiés
+rag_engine.py - RAG Engine Principal avec Preprocessing Intelligent
+Version 6.0 - Ajout du preprocessing OpenAI pour normalisation avancée
 
-CORRECTIONS APPORTÉES:
-1. Gestion sécurisée des imports avec fallbacks appropriés
-2. Correction des erreurs RAGResult et RAGSource
-3. Initialisation robuste avec gestion d'erreurs
-4. Normalisation multilingue stable
-5. Diagnostics améliorés pour le debugging
-6. Correction des imports PostgreSQL et QueryType
+NOUVELLES FONCTIONNALITÉS:
+1. Preprocessing intelligent des requêtes avec OpenAI
+2. Détection d'entités et normalisation contextuelle
+3. Routage intelligent basé sur l'analyse sémantique
+4. Conservation totale de la compatibilité avec v5.3
+5. Métriques étendues pour le preprocessing
 """
 
 import asyncio
@@ -64,11 +63,13 @@ POSTGRESQL_INTEGRATION_AVAILABLE = False
 RAG_JSON_SYSTEM_AVAILABLE = False
 WEAVIATE_CORE_AVAILABLE = False
 LANGSMITH_INTEGRATION_AVAILABLE = False
+QUERY_PREPROCESSOR_AVAILABLE = False
 
 PostgreSQLSystem = None
 JSONSystem = None
 WeaviateCore = None
 LangSmithIntegration = None
+QueryPreprocessor = None
 
 # Import PostgreSQL System
 try:
@@ -108,9 +109,18 @@ try:
 except ImportError as e:
     logger.warning(f"LangSmith non disponible: {e}")
 
+# NOUVEAU: Import Query Preprocessor
+try:
+    from .query_preprocessor import QueryPreprocessor
+
+    QUERY_PREPROCESSOR_AVAILABLE = True
+    logger.info("Query Preprocessor importé")
+except ImportError as e:
+    logger.warning(f"Query Preprocessor non disponible: {e}")
+
 
 class InteliaRAGEngine:
-    """RAG Engine principal - Architecture modulaire avec normalisation multilingue"""
+    """RAG Engine principal - Architecture modulaire avec preprocessing intelligent"""
 
     def __init__(self, openai_client: AsyncOpenAI = None):
         """Initialisation avec gestion d'erreurs robuste"""
@@ -125,13 +135,14 @@ class InteliaRAGEngine:
         self.json_system = None
         self.weaviate_core = None
         self.langsmith_integration = None
+        self.query_preprocessor = None  # NOUVEAU
 
         # État
         self.is_initialized = False
         self.degraded_mode = False
         self.initialization_errors = []
 
-        # Stats consolidées avec normalisation
+        # Stats consolidées avec normalisation ET preprocessing
         self.optimization_stats = {
             "requests_total": 0,
             "cache_hits": 0,
@@ -145,6 +156,13 @@ class InteliaRAGEngine:
             "multilingual_queries": 0,
             "normalization_hits": 0,
             "concept_mappings_used": 0,
+            # NOUVELLES: Stats preprocessing
+            "preprocessing_enabled": 0,
+            "preprocessing_success": 0,
+            "preprocessing_failures": 0,
+            "entities_detected": 0,
+            "queries_normalized": 0,
+            "routing_suggestions_used": 0,
             "errors_count": 0,
         }
 
@@ -177,7 +195,7 @@ class InteliaRAGEngine:
         if self.is_initialized:
             return
 
-        logger.info("Initialisation RAG Engine v5.3 - Version corrigée complète")
+        logger.info("Initialisation RAG Engine v6.0 - Avec Preprocessing Intelligent")
         self.initialization_errors = []
 
         # Vérifications préliminaires
@@ -186,6 +204,14 @@ class InteliaRAGEngine:
             logger.warning("Mode dégradé activé - dépendances manquantes")
 
         try:
+            # 0. NOUVEAU: Query Preprocessor (optionnel mais recommandé)
+            if (
+                QUERY_PREPROCESSOR_AVAILABLE
+                and QueryPreprocessor
+                and self.openai_client
+            ):
+                await self._initialize_query_preprocessor()
+
             # 1. Système PostgreSQL avec normalisation (optionnel)
             if POSTGRESQL_INTEGRATION_AVAILABLE and PostgreSQLSystem:
                 await self._initialize_postgresql_system()
@@ -216,6 +242,7 @@ class InteliaRAGEngine:
             active_modules = [
                 name
                 for name, module in [
+                    ("Preprocessor", self.query_preprocessor),
                     ("PostgreSQL", self.postgresql_system),
                     ("JSON", self.json_system),
                     ("Weaviate", self.weaviate_core),
@@ -236,6 +263,18 @@ class InteliaRAGEngine:
             self.degraded_mode = True
             self.is_initialized = True
             self.initialization_errors.append(str(e))
+
+    async def _initialize_query_preprocessor(self):
+        """NOUVEAU: Initialise le preprocessor de requêtes"""
+        try:
+            self.query_preprocessor = QueryPreprocessor(self.openai_client)
+            await self.query_preprocessor.initialize()
+            logger.info("Query Preprocessor initialisé avec succès")
+            self.optimization_stats["preprocessing_enabled"] = 1
+        except Exception as e:
+            logger.warning(f"Query Preprocessor échoué: {e}")
+            self.query_preprocessor = None
+            self.initialization_errors.append(f"Preprocessor: {e}")
 
     async def _initialize_postgresql_system(self):
         """Initialise le système PostgreSQL avec gestion d'erreurs"""
@@ -291,8 +330,9 @@ class InteliaRAGEngine:
         use_json_search: bool = True,
         genetic_line_filter: Optional[str] = None,
         performance_context: Optional[Dict[str, Any]] = None,
+        enable_preprocessing: bool = True,  # NOUVEAU paramètre
     ) -> RAGResult:
-        """Point d'entrée principal avec gestion d'erreurs robuste"""
+        """Point d'entrée principal avec preprocessing intelligent"""
 
         if not self.is_initialized:
             logger.warning("RAG Engine non initialisé - tentative d'initialisation")
@@ -332,7 +372,7 @@ class InteliaRAGEngine:
             )
 
         try:
-            # Détection de normalisation nécessaire
+            # Détection de normalisation nécessaire (ancien système)
             needs_normalization = self._detect_multilingual_query(query)
             if needs_normalization:
                 self.optimization_stats["multilingual_queries"] += 1
@@ -357,7 +397,7 @@ class InteliaRAGEngine:
                 except Exception as e:
                     logger.warning(f"LangSmith échec, fallback: {e}")
 
-            # Traitement core
+            # Traitement core avec preprocessing
             return await self._generate_response_core(
                 query,
                 tenant_id,
@@ -368,6 +408,7 @@ class InteliaRAGEngine:
                 genetic_line_filter,
                 performance_context,
                 start_time,
+                enable_preprocessing,  # NOUVEAU
             )
 
         except Exception as e:
@@ -406,8 +447,13 @@ class InteliaRAGEngine:
         genetic_line_filter: Optional[str],
         performance_context: Optional[Dict[str, Any]],
         start_time: float,
+        enable_preprocessing: bool = True,
     ) -> RAGResult:
-        """Méthode core avec routage intelligent et normalisation multilingue"""
+        """
+        Pipeline de génération avec preprocessing intelligent
+
+        NOUVEAU: Intègre le preprocessing OpenAI avant le routage
+        """
 
         try:
             # Détection langue
@@ -420,10 +466,110 @@ class InteliaRAGEngine:
                 else:
                     language = "fr"
 
-            # Routage intelligent PostgreSQL
+            # ============================================
+            # NOUVEAU: PREPROCESSING INTELLIGENT
+            # ============================================
+            normalized_query = query
+            routing_hint = None
+            entities = {}
+            preprocessed_metadata = {}
+
+            if enable_preprocessing and self.query_preprocessor:
+                try:
+                    logger.debug("Application du preprocessing OpenAI")
+                    preprocessed = await self.query_preprocessor.preprocess_query(
+                        query=query, language=language
+                    )
+
+                    normalized_query = preprocessed["normalized_query"]
+                    routing_hint = preprocessed["routing"]
+                    entities = preprocessed["entities"]
+
+                    # Mise à jour des stats
+                    self.optimization_stats["preprocessing_success"] += 1
+                    self.optimization_stats["queries_normalized"] += 1
+                    if entities:
+                        self.optimization_stats["entities_detected"] += len(entities)
+                    if routing_hint:
+                        self.optimization_stats["routing_suggestions_used"] += 1
+
+                    # Métadonnées pour traçabilité
+                    preprocessed_metadata = {
+                        "original_query": query,
+                        "normalized_query": normalized_query,
+                        "routing_hint": routing_hint,
+                        "entities_count": len(entities),
+                        "preprocessing_applied": True,
+                    }
+
+                    logger.info(
+                        f"Query preprocessed: '{query}' -> '{normalized_query}'"
+                    )
+                    logger.debug(f"Routing suggestion: {routing_hint}")
+                    logger.debug(f"Entities detected: {entities}")
+
+                except Exception as e:
+                    logger.warning(f"Preprocessing failed, using original query: {e}")
+                    self.optimization_stats["preprocessing_failures"] += 1
+                    normalized_query = query
+                    routing_hint = None
+                    entities = {}
+                    preprocessed_metadata = {"preprocessing_error": str(e)}
+
+            # ============================================
+            # ROUTAGE INTELLIGENT BASÉ SUR PREPROCESSING
+            # ============================================
+
+            # 1. PostgreSQL si suggéré par preprocessing
+            if routing_hint == "postgresql" and self.postgresql_system:
+                logger.info("Requête routée vers PostgreSQL (suggestion preprocessing)")
+                result = await self._search_postgresql_with_normalization(
+                    normalized_query,
+                    None,
+                    top_k=RAG_SIMILARITY_TOP_K,
+                    entities=entities,
+                )
+                if result and result.source != RAGSource.NO_RESULTS:
+                    result.metadata.update(preprocessed_metadata)
+                    return result
+                logger.warning("PostgreSQL sans résultats, fallback")
+
+            # 2. JSON si suggéré par preprocessing
+            elif routing_hint == "json" and self.json_system:
+                logger.info("Requête routée vers JSON (suggestion preprocessing)")
+                result = await self._search_json_with_preprocessing(
+                    normalized_query,
+                    genetic_line_filter,
+                    performance_context,
+                    entities,
+                    language,
+                    conversation_context,
+                    start_time,
+                )
+                if result:
+                    result.metadata.update(preprocessed_metadata)
+                    return result
+
+            # 3. Hybrid si suggéré
+            elif routing_hint == "hybrid":
+                logger.info("Requête routée vers recherche hybride (preprocessing)")
+                self.optimization_stats["hybrid_queries"] += 1
+                result = await self._search_hybrid_sources_with_normalization(
+                    normalized_query, conversation_context, language, start_time
+                )
+                result.metadata.update(preprocessed_metadata)
+                return result
+
+            # ============================================
+            # ROUTAGE LEGACY (si pas de preprocessing ou pas de suggestion)
+            # ============================================
+
+            # Routage PostgreSQL classique
             if self.postgresql_system and self.postgresql_system.query_router:
                 try:
-                    query_type = self.postgresql_system.route_query(query, None)
+                    query_type = self.postgresql_system.route_query(
+                        normalized_query, None
+                    )
 
                     if query_type and hasattr(query_type, "value"):
                         query_type_value = query_type.value
@@ -433,18 +579,27 @@ class InteliaRAGEngine:
                     if query_type_value == "metrics":
                         logger.info("Requête routée vers PostgreSQL (métriques)")
                         result = await self._search_postgresql_with_normalization(
-                            query, None, top_k=RAG_SIMILARITY_TOP_K
+                            normalized_query,
+                            None,
+                            top_k=RAG_SIMILARITY_TOP_K,
+                            entities=entities,
                         )
                         if result and result.source != RAGSource.NO_RESULTS:
+                            result.metadata.update(preprocessed_metadata)
                             return result
                         logger.warning("PostgreSQL sans résultats, fallback")
 
                     elif query_type_value == "hybrid":
                         logger.info("Requête routée vers recherche hybride")
                         self.optimization_stats["hybrid_queries"] += 1
-                        return await self._search_hybrid_sources_with_normalization(
-                            query, conversation_context, language, start_time
+                        result = await self._search_hybrid_sources_with_normalization(
+                            normalized_query,
+                            conversation_context,
+                            language,
+                            start_time,
                         )
+                        result.metadata.update(preprocessed_metadata)
+                        return result
                 except Exception as e:
                     logger.warning(f"Erreur routage PostgreSQL: {e}")
 
@@ -452,7 +607,7 @@ class InteliaRAGEngine:
             if use_json_search and self.json_system:
                 try:
                     json_results = await self.json_system.search_enhanced(
-                        query=query,
+                        query=normalized_query,
                         genetic_line=genetic_line_filter,
                         performance_metrics=(
                             performance_context.get("metrics")
@@ -463,13 +618,15 @@ class InteliaRAGEngine:
 
                     if json_results and len(json_results) >= 3:
                         self.optimization_stats["json_searches"] += 1
-                        return await self._generate_response_from_json_results(
-                            query,
+                        result = await self._generate_response_from_json_results(
+                            normalized_query,
                             json_results,
                             language,
                             conversation_context,
                             start_time,
                         )
+                        result.metadata.update(preprocessed_metadata)
+                        return result
                 except Exception as e:
                     logger.warning(f"Erreur JSON search: {e}")
 
@@ -477,19 +634,21 @@ class InteliaRAGEngine:
             if self.weaviate_core:
                 logger.info("Utilisation Weaviate (fallback)")
                 try:
-                    return await self._generate_response_core_weaviate_only(
-                        query,
+                    result = await self._generate_response_core_weaviate_only(
+                        normalized_query,
                         None,
                         conversation_context,
                         language,
                         start_time,
                         tenant_id,
                     )
+                    result.metadata.update(preprocessed_metadata)
+                    return result
                 except Exception as e:
                     logger.error(f"Erreur Weaviate: {e}")
 
             # Fallback ultime
-            return RAGResult(
+            final_result = RAGResult(
                 source=RAGSource.NO_RESULTS,
                 answer="Aucun résultat trouvé dans les sources disponibles.",
                 metadata={
@@ -497,6 +656,7 @@ class InteliaRAGEngine:
                     "available_modules": [
                         name
                         for name, module in [
+                            ("preprocessor", self.query_preprocessor),
                             ("postgresql", self.postgresql_system),
                             ("json", self.json_system),
                             ("weaviate", self.weaviate_core),
@@ -505,6 +665,8 @@ class InteliaRAGEngine:
                     ],
                 },
             )
+            final_result.metadata.update(preprocessed_metadata)
+            return final_result
 
         except Exception as e:
             logger.error(f"Erreur génération réponse core: {e}")
@@ -514,14 +676,19 @@ class InteliaRAGEngine:
             )
 
     async def _search_postgresql_with_normalization(
-        self, query: str, intent_result, top_k: int = 10
+        self,
+        query: str,
+        intent_result,
+        top_k: int = 10,
+        entities: Dict[str, Any] = None,
     ) -> RAGResult:
-        """Recherche PostgreSQL avec tracking de normalisation"""
+        """Recherche PostgreSQL avec tracking de normalisation ET entités preprocessées"""
         if not self.postgresql_system:
             return RAGResult(source=RAGSource.NO_RESULTS)
 
         try:
             # Capturer les concepts avant recherche
+            normalized_concepts = []
             if self.postgresql_system.postgres_retriever:
                 normalizer = self.postgresql_system.postgres_retriever.query_normalizer
                 normalized_concepts, _ = normalizer.get_search_terms(query)
@@ -540,11 +707,16 @@ class InteliaRAGEngine:
                 query, intent_result, top_k
             )
 
-            # Enrichir les métadonnées avec info normalisation
-            if result and result.metadata and normalized_concepts:
-                result.metadata["normalization_applied"] = True
-                result.metadata["original_query"] = query
-                result.metadata["concept_count"] = len(normalized_concepts)
+            # Enrichir les métadonnées avec info normalisation ET entités
+            if result and result.metadata:
+                if normalized_concepts:
+                    result.metadata["normalization_applied"] = True
+                    result.metadata["original_query"] = query
+                    result.metadata["concept_count"] = len(normalized_concepts)
+
+                if entities:
+                    result.metadata["entities_used"] = entities
+                    result.metadata["entity_count"] = len(entities)
 
             return result
 
@@ -554,6 +726,46 @@ class InteliaRAGEngine:
                 source=RAGSource.ERROR,
                 metadata={"error": str(e), "source_type": "postgresql_normalized"},
             )
+
+    async def _search_json_with_preprocessing(
+        self,
+        query: str,
+        genetic_line_filter: Optional[str],
+        performance_context: Optional[Dict[str, Any]],
+        entities: Dict[str, Any],
+        language: str,
+        conversation_context: List[Dict],
+        start_time: float,
+    ) -> Optional[RAGResult]:
+        """NOUVEAU: Recherche JSON enrichie avec entités preprocessées"""
+        if not self.json_system:
+            return None
+
+        try:
+            # Extraction des filtres depuis les entités
+            if entities:
+                if "genetic_line" in entities and not genetic_line_filter:
+                    genetic_line_filter = entities["genetic_line"]
+
+            json_results = await self.json_system.search_enhanced(
+                query=query,
+                genetic_line=genetic_line_filter,
+                performance_metrics=(
+                    performance_context.get("metrics") if performance_context else None
+                ),
+            )
+
+            if json_results and len(json_results) >= 3:
+                self.optimization_stats["json_searches"] += 1
+                return await self._generate_response_from_json_results(
+                    query, json_results, language, conversation_context, start_time
+                )
+
+            return None
+
+        except Exception as e:
+            logger.warning(f"Erreur JSON search avec preprocessing: {e}")
+            return None
 
     async def _search_hybrid_sources_with_normalization(
         self,
@@ -705,13 +917,14 @@ class InteliaRAGEngine:
             )
 
     def get_status(self) -> Dict:
-        """Status système complet avec informations de normalisation"""
+        """Status système complet avec informations de normalisation ET preprocessing"""
         base_status = {
             "rag_enabled": RAG_ENABLED,
             "initialized": self.is_initialized,
             "degraded_mode": self.degraded_mode,
-            "approach": "enhanced_rag_v5.3_corrected",
+            "approach": "enhanced_rag_v6.0_with_preprocessing",
             "modules": {
+                "query_preprocessor": bool(self.query_preprocessor),  # NOUVEAU
                 "postgresql_system": bool(self.postgresql_system),
                 "json_system": bool(self.json_system),
                 "weaviate_core": bool(self.weaviate_core),
@@ -719,6 +932,7 @@ class InteliaRAGEngine:
             },
             "optimization_stats": self.optimization_stats.copy(),
             "processing_capabilities": {
+                "intelligent_preprocessing": bool(self.query_preprocessor),  # NOUVEAU
                 "metrics_queries": bool(self.postgresql_system),
                 "json_search": bool(self.json_system),
                 "knowledge_base": bool(self.weaviate_core),
@@ -729,13 +943,12 @@ class InteliaRAGEngine:
             "initialization_errors": self.initialization_errors,
         }
 
-        # Ajouter les statistiques de normalisation
+        # Statistiques de normalisation
         if self.postgresql_system:
             try:
                 norm_status = self.postgresql_system.get_normalization_status()
                 base_status["multilingual_normalization"] = norm_status
 
-                # Statistiques d'utilisation
                 base_status["normalization_stats"] = {
                     "multilingual_queries": self.optimization_stats[
                         "multilingual_queries"
@@ -756,6 +969,39 @@ class InteliaRAGEngine:
                 }
             except Exception as e:
                 logger.warning(f"Erreur récupération stats normalisation: {e}")
+
+        # NOUVEAU: Statistiques preprocessing
+        if self.query_preprocessor:
+            try:
+                base_status["preprocessing_stats"] = {
+                    "total_requests": self.optimization_stats["requests_total"],
+                    "preprocessing_success": self.optimization_stats[
+                        "preprocessing_success"
+                    ],
+                    "preprocessing_failures": self.optimization_stats[
+                        "preprocessing_failures"
+                    ],
+                    "queries_normalized": self.optimization_stats["queries_normalized"],
+                    "entities_detected": self.optimization_stats["entities_detected"],
+                    "routing_suggestions_used": self.optimization_stats[
+                        "routing_suggestions_used"
+                    ],
+                    "success_rate": (
+                        (
+                            self.optimization_stats["preprocessing_success"]
+                            / max(
+                                1,
+                                self.optimization_stats["preprocessing_success"]
+                                + self.optimization_stats["preprocessing_failures"],
+                            )
+                        )
+                        * 100
+                        if self.optimization_stats["preprocessing_success"] > 0
+                        else 0
+                    ),
+                }
+            except Exception as e:
+                logger.warning(f"Erreur récupération stats preprocessing: {e}")
 
         return base_status
 
@@ -808,9 +1054,99 @@ class InteliaRAGEngine:
             logger.error(f"Erreur diagnostics multilingues: {e}")
             return {"available": False, "error": str(e)}
 
+    async def get_preprocessing_diagnostics(
+        self, query: str, language: str = "fr"
+    ) -> Dict[str, Any]:
+        """NOUVEAU: Diagnostics pour le preprocessing intelligent"""
+        if not self.query_preprocessor:
+            return {
+                "available": False,
+                "reason": "Query Preprocessor not initialized",
+            }
+
+        try:
+            # Appliquer le preprocessing
+            preprocessed = await self.query_preprocessor.preprocess_query(
+                query=query, language=language
+            )
+
+            return {
+                "available": True,
+                "original_query": query,
+                "normalized_query": preprocessed["normalized_query"],
+                "language": language,
+                "routing_suggestion": preprocessed["routing"],
+                "entities": preprocessed["entities"],
+                "analysis": {
+                    "query_changed": query != preprocessed["normalized_query"],
+                    "entities_detected": len(preprocessed["entities"]) > 0,
+                    "routing_provided": preprocessed["routing"] is not None,
+                    "normalization_improvements": self._compare_queries(
+                        query, preprocessed["normalized_query"]
+                    ),
+                },
+                "recommendations": self._get_preprocessing_recommendations(
+                    preprocessed
+                ),
+            }
+        except Exception as e:
+            logger.error(f"Erreur diagnostics preprocessing: {e}")
+            return {"available": False, "error": str(e)}
+
+    def _compare_queries(self, original: str, normalized: str) -> Dict[str, Any]:
+        """Compare deux requêtes pour identifier les améliorations"""
+        return {
+            "length_change": len(normalized) - len(original),
+            "word_count_change": len(normalized.split()) - len(original.split()),
+            "similarity": (
+                1.0
+                if original.lower() == normalized.lower()
+                else len(
+                    set(original.lower().split()) & set(normalized.lower().split())
+                )
+                / max(len(original.split()), len(normalized.split()))
+            ),
+        }
+
+    def _get_preprocessing_recommendations(
+        self, preprocessed: Dict[str, Any]
+    ) -> List[str]:
+        """Génère des recommandations basées sur le preprocessing"""
+        recommendations = []
+
+        if preprocessed["routing"] == "postgresql":
+            recommendations.append(
+                "Use PostgreSQL for structured metrics/performance queries"
+            )
+        elif preprocessed["routing"] == "json":
+            recommendations.append("Use JSON system for genetic line specific queries")
+        elif preprocessed["routing"] == "hybrid":
+            recommendations.append("Use hybrid search for complex multi-source queries")
+
+        if preprocessed["entities"]:
+            recommendations.append(
+                f"Apply filters based on {len(preprocessed['entities'])} detected entities"
+            )
+
+        if (
+            preprocessed["normalized_query"]
+            != preprocessed.get("original_query", "")[:100]
+        ):
+            recommendations.append(
+                "Query normalization applied - improved search accuracy expected"
+            )
+
+        return recommendations
+
     async def close(self):
         """Fermeture propre de tous les modules"""
         logger.info("Fermeture RAG Engine...")
+
+        try:
+            if self.query_preprocessor:
+                await self.query_preprocessor.close()
+        except Exception as e:
+            logger.error(f"Erreur fermeture Preprocessor: {e}")
 
         try:
             if self.postgresql_system:
@@ -843,6 +1179,33 @@ class InteliaRAGEngine:
 def create_rag_engine(openai_client=None) -> InteliaRAGEngine:
     """Factory pour créer une instance RAG Engine"""
     return InteliaRAGEngine(openai_client)
+
+
+# NOUVEAU: Fonction utilitaire pour tester le preprocessing
+async def test_query_preprocessing(
+    query: str, language: str = "fr", openai_client=None
+) -> Dict[str, Any]:
+    """Fonction de test pour le preprocessing intelligent"""
+    engine = InteliaRAGEngine(openai_client)
+
+    try:
+        await engine.initialize()
+
+        if not engine.query_preprocessor:
+            return {"error": "Query Preprocessor not available for testing"}
+
+        # Diagnostics preprocessing
+        return await engine.get_preprocessing_diagnostics(query, language)
+
+    except Exception as e:
+        logger.error(f"Erreur test preprocessing: {e}")
+        return {"error": str(e)}
+
+    finally:
+        try:
+            await engine.close()
+        except Exception as e:
+            logger.error(f"Erreur fermeture engine de test: {e}")
 
 
 # Fonction utilitaire pour tester la normalisation
@@ -897,10 +1260,11 @@ async def test_multilingual_normalization(
 
 # Fonction utilitaire pour diagnostics système
 async def diagnose_rag_system() -> Dict[str, Any]:
-    """Diagnostique complet du système RAG"""
+    """Diagnostique complet du système RAG avec preprocessing"""
     diagnostics = {
         "timestamp": time.time(),
         "modules_availability": {
+            "query_preprocessor": QUERY_PREPROCESSOR_AVAILABLE,  # NOUVEAU
             "postgresql": POSTGRESQL_INTEGRATION_AVAILABLE,
             "json_system": RAG_JSON_SYSTEM_AVAILABLE,
             "weaviate_core": WEAVIATE_CORE_AVAILABLE,
@@ -929,6 +1293,7 @@ async def diagnose_rag_system() -> Dict[str, Any]:
             "active_modules": [
                 name
                 for name, module in [
+                    ("preprocessor", engine.query_preprocessor),
                     ("postgresql", engine.postgresql_system),
                     ("json", engine.json_system),
                     ("weaviate", engine.weaviate_core),
