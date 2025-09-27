@@ -2,6 +2,7 @@
 """
 metric_calculator.py - Calculs mathématiques sur les métriques avicoles
 VERSION CORRIGÉE : Gestion correcte des métriques où "plus bas = meilleur" (FCR, mortalité)
++ Contexte enrichi (âge, sexe) dans la réponse
 """
 
 import logging
@@ -196,23 +197,38 @@ class MetricCalculator:
         metric_name: str = "métrique",
         language: str = "fr",
         terminology: Dict[str, Any] = None,
+        context: Dict[str, Any] = None,
     ) -> str:
         """
         Formate le résultat de comparaison en texte naturel
-        VERSION CORRIGÉE : Interprétation correcte selon le type de métrique
+        VERSION CORRIGÉE : Interprétation correcte + contexte enrichi
 
         Args:
             comparison: Résultat de comparaison
             metric_name: Nom de la métrique
             language: Langue ('fr' ou 'en')
             terminology: Dictionnaire de terminologie
+            context: Contexte supplémentaire (age_days, sex, etc.)
 
         Returns:
-            Texte formaté avec interprétation correcte
+            Texte formaté avec interprétation correcte et contexte
         """
-        # Nettoyer le nom de métrique
+        # Extraire le contexte
+        age_days = None
+        sex = None
+        if context:
+            age_days = context.get("age_days")
+            sex = context.get("sex")
+
+        # Nettoyer le nom de métrique et extraire l'âge si présent
         if "for" in metric_name:
-            metric_name = metric_name.split("for")[0].strip()
+            parts = metric_name.split("for")
+            metric_name = parts[0].strip()
+            if len(parts) > 1 and not age_days:
+                try:
+                    age_days = int(parts[1].strip())
+                except (ValueError, IndexError):
+                    pass
 
         # Traduire le nom de métrique
         display_metric_name = metric_name
@@ -234,8 +250,28 @@ class MetricCalculator:
         if language == "fr":
             unit_display = f" {comparison.unit}" if comparison.unit else ""
 
+            # Construction de l'en-tête avec contexte
+            header = f"Pour la **{display_metric_name}**"
+
+            # Ajouter le contexte s'il est disponible
+            context_parts = []
+            if sex and sex != "as_hatched":
+                sex_display = {"male": "mâles", "female": "femelles"}.get(sex, sex)
+                context_parts.append(f"des {sex_display}")
+            elif sex == "as_hatched":
+                context_parts.append("(sexes mélangés)")
+
+            if age_days:
+                context_parts.append(f"à {age_days} jours")
+
+            if context_parts:
+                header += f" {' '.join(context_parts)}"
+
+            header += " :\n\n"
+
+            text = header
+
             # Affichage des valeurs
-            text = f"Pour la **{display_metric_name}** :\n\n"
             text += f"• **{comparison.label1.capitalize()}** : {comparison.value1:.3f}{unit_display}\n"
             text += f"• **{comparison.label2.capitalize()}** : {comparison.value2:.3f}{unit_display}\n\n"
             text += f"**Différence** : {abs(comparison.absolute_difference):.3f}{unit_display}"
@@ -251,13 +287,34 @@ class MetricCalculator:
                 if comparison.value1 < comparison.value2:
                     text += f"Le **{comparison.label1}** présente une **meilleure** performance "
                     text += f"avec une valeur **{abs(comparison.relative_difference_pct):.1f}% inférieure** "
-                    text += f"au **{comparison.label2}**.\n"
-                    text += "_Une valeur plus basse indique une meilleure efficacité pour cette métrique._"
+                    text += f"au **{comparison.label2}**.\n\n"
+
+                    # Explication contextuelle selon la métrique
+                    if (
+                        "fcr" in metric_name.lower()
+                        or "conversion" in metric_name.lower()
+                    ):
+                        text += f"_Le {comparison.label1} nécessite moins d'aliment pour produire 1 kg de poids vif, "
+                        text += (
+                            "ce qui représente une meilleure efficacité alimentaire._"
+                        )
+                    else:
+                        text += "_Une valeur plus basse indique une meilleure performance pour cette métrique._"
                 else:
                     text += f"Le **{comparison.label2}** présente une **meilleure** performance "
                     text += f"avec une valeur **{abs(comparison.relative_difference_pct):.1f}% inférieure** "
-                    text += f"au **{comparison.label1}**.\n"
-                    text += "_Une valeur plus basse indique une meilleure efficacité pour cette métrique._"
+                    text += f"au **{comparison.label1}**.\n\n"
+
+                    if (
+                        "fcr" in metric_name.lower()
+                        or "conversion" in metric_name.lower()
+                    ):
+                        text += f"_Le {comparison.label2} nécessite moins d'aliment pour produire 1 kg de poids vif, "
+                        text += (
+                            "ce qui représente une meilleure efficacité alimentaire._"
+                        )
+                    else:
+                        text += "_Une valeur plus basse indique une meilleure performance pour cette métrique._"
             else:
                 # Pour poids, production : plus haut = meilleur
                 if comparison.absolute_difference > 0:
@@ -270,7 +327,27 @@ class MetricCalculator:
         else:  # English
             unit_display = f" {comparison.unit}" if comparison.unit else ""
 
-            text = f"For **{display_metric_name}**:\n\n"
+            # Construction de l'en-tête avec contexte
+            header = f"For **{display_metric_name}**"
+
+            # Ajouter le contexte
+            context_parts = []
+            if sex and sex != "as_hatched":
+                sex_display = {"male": "males", "female": "females"}.get(sex, sex)
+                context_parts.append(sex_display)
+            elif sex == "as_hatched":
+                context_parts.append("(mixed sexes)")
+
+            if age_days:
+                context_parts.append(f"at {age_days} days")
+
+            if context_parts:
+                header += f" ({', '.join(context_parts)})"
+
+            header += ":\n\n"
+
+            text = header
+
             text += f"• **{comparison.label1.capitalize()}**: {comparison.value1:.3f}{unit_display}\n"
             text += f"• **{comparison.label2.capitalize()}**: {comparison.value2:.3f}{unit_display}\n\n"
             text += f"**Difference**: {abs(comparison.absolute_difference):.3f}{unit_display}"
@@ -286,17 +363,29 @@ class MetricCalculator:
                 if comparison.value1 < comparison.value2:
                     text += f"**{comparison.label1.capitalize()}** shows **better** performance "
                     text += f"with a value **{abs(comparison.relative_difference_pct):.1f}% lower** "
-                    text += f"than **{comparison.label2}**.\n"
-                    text += (
-                        "_A lower value indicates better efficiency for this metric._"
-                    )
+                    text += f"than **{comparison.label2}**.\n\n"
+
+                    if (
+                        "fcr" in metric_name.lower()
+                        or "conversion" in metric_name.lower()
+                    ):
+                        text += f"_{comparison.label1.capitalize()} requires less feed to produce 1 kg of live weight, "
+                        text += "indicating better feed efficiency._"
+                    else:
+                        text += "_A lower value indicates better performance for this metric._"
                 else:
                     text += f"**{comparison.label2.capitalize()}** shows **better** performance "
                     text += f"with a value **{abs(comparison.relative_difference_pct):.1f}% lower** "
-                    text += f"than **{comparison.label1}**.\n"
-                    text += (
-                        "_A lower value indicates better efficiency for this metric._"
-                    )
+                    text += f"than **{comparison.label1}**.\n\n"
+
+                    if (
+                        "fcr" in metric_name.lower()
+                        or "conversion" in metric_name.lower()
+                    ):
+                        text += f"_{comparison.label2.capitalize()} requires less feed to produce 1 kg of live weight, "
+                        text += "indicating better feed efficiency._"
+                    else:
+                        text += "_A lower value indicates better performance for this metric._"
             else:
                 # For weight, production: higher = better
                 if comparison.absolute_difference > 0:
@@ -351,7 +440,12 @@ if __name__ == "__main__":
     print("\n" + "-" * 80)
     print("FORMATTED TEXT:")
     print("-" * 80)
-    print(calculator.format_comparison_text(comparison, "feed_conversion_ratio"))
+    context = {"age_days": 17, "sex": "male"}
+    print(
+        calculator.format_comparison_text(
+            comparison, "feed_conversion_ratio", context=context
+        )
+    )
 
     print("\n" + "=" * 80)
     print("TEST 2: Body Weight Comparison (higher is better)")
@@ -389,4 +483,6 @@ if __name__ == "__main__":
     print("\n" + "-" * 80)
     print("FORMATTED TEXT:")
     print("-" * 80)
-    print(calculator.format_comparison_text(comparison2, "body_weight"))
+    print(
+        calculator.format_comparison_text(comparison2, "body_weight", context=context)
+    )

@@ -107,43 +107,47 @@ class ComparisonHandler:
     ) -> Dict[str, Any]:
         """
         Extrait le contexte commun aux deux résultats (âge, sexe si comparaison de souches, etc.)
-        
+
         Args:
             results: Résultats des deux requêtes
             comparison_entities: Entités de comparaison originales
-            
+
         Returns:
             Dict avec age_days, sex, breed, comparison_dimension, etc.
         """
         context = {}
-        
+
         if not results or len(results) == 0:
             return context
-        
+
         # Extraire depuis les entity_sets
         if results[0].get("entity_set"):
             first_entity_set = results[0]["entity_set"]
-            
+
             # Âge (commun aux deux)
             if "age_days" in first_entity_set:
                 context["age_days"] = first_entity_set["age_days"]
-            
+
             # Sexe (si comparaison de souches, le sexe est commun)
             if "sex" in first_entity_set:
                 # Vérifier si c'est la dimension de comparaison
-                comparison_dimension = comparison_entities[0].get("_comparison_dimension") if comparison_entities else None
+                comparison_dimension = (
+                    comparison_entities[0].get("_comparison_dimension")
+                    if comparison_entities
+                    else None
+                )
                 if comparison_dimension != "sex":
                     # Le sexe est commun (on compare autre chose)
                     context["sex"] = first_entity_set["sex"]
-        
+
         # Extraire depuis les métadonnées des résultats
         if results[0].get("data") and len(results[0]["data"]) > 0:
             first_metric = results[0]["data"][0]
             metadata = first_metric.get("metadata", {})
-            
+
             if "age_min" in metadata and "age_days" not in context:
                 context["age_days"] = metadata["age_min"]
-        
+
         logger.debug(f"Extracted context: {context}")
         return context
 
@@ -382,7 +386,7 @@ if __name__ == "__main__":
                                     "unit": "ratio",
                                     "metric_name": "feed_conversion_ratio for 17",
                                     "age_min": 17,
-                                }
+                                },
                             }
                         ]
 
