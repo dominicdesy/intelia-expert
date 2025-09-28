@@ -12,6 +12,10 @@ from .utilities import (
     create_intent_processor,
     process_query_with_intents,
     validate_intents_config,
+    # CORRECTION: Ajouter les flags FastText manquants
+    FASTTEXT_AVAILABLE,
+    FAST_LANGDETECT_AVAILABLE,
+    UNIDECODE_AVAILABLE,
 )
 
 # ÉTAPE 2: Importer imports_and_dependencies après utilities
@@ -27,7 +31,6 @@ try:
         OPENAI_AVAILABLE,
         WEAVIATE_AVAILABLE,
         REDIS_AVAILABLE,
-        UNIDECODE_AVAILABLE,  # AJOUT CRITIQUE
         VOYAGEAI_AVAILABLE,
         SENTENCE_TRANSFORMERS_AVAILABLE,
         TRANSFORMERS_AVAILABLE,
@@ -49,7 +52,6 @@ except ImportError as e:
     OPENAI_AVAILABLE = False
     WEAVIATE_AVAILABLE = False
     REDIS_AVAILABLE = False
-    UNIDECODE_AVAILABLE = False
     VOYAGEAI_AVAILABLE = False
     SENTENCE_TRANSFORMERS_AVAILABLE = False
     TRANSFORMERS_AVAILABLE = False
@@ -64,6 +66,10 @@ __all__ = [
     "create_intent_processor",
     "process_query_with_intents",
     "validate_intents_config",
+    # CORRECTION: Flags FastText depuis utilities
+    "FASTTEXT_AVAILABLE",
+    "FAST_LANGDETECT_AVAILABLE",
+    "UNIDECODE_AVAILABLE",
     # Dependencies manager - peut être None
     "dependency_manager",
     "get_openai_sync",
@@ -76,7 +82,6 @@ __all__ = [
     "OPENAI_AVAILABLE",
     "WEAVIATE_AVAILABLE",
     "REDIS_AVAILABLE",
-    "UNIDECODE_AVAILABLE",  # AJOUT CRITIQUE
     "VOYAGEAI_AVAILABLE",
     "SENTENCE_TRANSFORMERS_AVAILABLE",
     "TRANSFORMERS_AVAILABLE",

@@ -15,14 +15,14 @@ from utils.data_classes import (
     safe_serialize_for_json,
 )
 
-# Détection de langue
+# Détection de langue - CORRIGÉ
 from utils.language_detection import (
     LanguageDetectionResult,
     detect_language_enhanced,
     is_supported_language,
     normalize_language_code,
-    FASTTEXT_AVAILABLE,
-    FAST_LANGDETECT_AVAILABLE,
+    FASTTEXT_LANGDETECT_AVAILABLE,
+    LANGDETECT_AVAILABLE,
     UNIDECODE_AVAILABLE,
 )
 
@@ -64,6 +64,14 @@ from utils.test_data import (
     COMPREHENSIVE_TEST_QUERIES,
     setup_logging,
 )
+
+# ============================================================================
+# ALIAS POUR COMPATIBILITÉ APRÈS TOUS LES IMPORTS
+# ============================================================================
+
+# CORRECTION: Alias pour compatibilité avec le code existant
+FASTTEXT_AVAILABLE = FASTTEXT_LANGDETECT_AVAILABLE
+FAST_LANGDETECT_AVAILABLE = LANGDETECT_AVAILABLE
 
 # ============================================================================
 # EXPORTS - MAINTIEN DE LA COMPATIBILITÉ
