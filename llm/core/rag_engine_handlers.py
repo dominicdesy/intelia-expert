@@ -350,12 +350,16 @@ class StandardQueryHandler(BaseQueryHandler):
         if self.weaviate_core:
             try:
                 logger.info("Tentative Weaviate")
+
+                # CORRECTION: Respecter la vraie signature de WeaviateCore.generate_response()
                 result = await self.weaviate_core.generate_response(
-                    query=original_query,
-                    tenant_id=tenant_id,
-                    conversation_context=conversation_context,
-                    language=language,
-                    **kwargs,
+                    query=original_query,  # Position 1
+                    intent_result=None,  # Position 2 (requis)
+                    conversation_context=conversation_context
+                    or [],  # Position 3 (requis)
+                    language=language or "fr",  # Position 4 (requis)
+                    start_time=time.time(),  # Position 5 (requis)
+                    tenant_id=tenant_id or "default",  # Position 6 (requis)
                 )
 
                 if result and result.source != RAGSource.INTERNAL_ERROR:
@@ -364,11 +368,9 @@ class StandardQueryHandler(BaseQueryHandler):
                 else:
                     logger.warning("Weaviate fallback échoué")
 
-            except AttributeError as e:
-                logger.warning(f"Erreur Weaviate: {e}")
-                # Fallback gracieux
             except Exception as e:
                 logger.error(f"Erreur inattendue Weaviate: {e}")
+                # Continuer avec le fallback final
 
         # Aucun résultat trouvé
         return RAGResult(

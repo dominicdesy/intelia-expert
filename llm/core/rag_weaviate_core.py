@@ -425,27 +425,13 @@ class WeaviateCore:
         logger.debug(f"WeaviateCore.search appelé avec query: {query}")
 
         try:
-            # Préparation des paramètres pour generate_response
-            start_time = time.time()
-
-            # Récupération des paramètres optionnels
-            intent_result = kwargs.get("intent_result", None)
-
-            # Langue par défaut si non spécifiée
-            if language is None:
-                language = kwargs.get("language", "fr")
-
-            # Contexte de conversation par défaut
-            if conversation_context is None:
-                conversation_context = []
-
-            # Déléguer vers la méthode generate_response existante
+            # CORRECTION: Respecter la vraie signature de generate_response
             result = await self.generate_response(
                 query=query,
-                intent_result=intent_result,
-                conversation_context=conversation_context,
-                language=language,
-                start_time=start_time,
+                intent_result=None,
+                conversation_context=conversation_context or [],
+                language=language or "fr",
+                start_time=time.time(),
                 tenant_id=tenant_id,
             )
 
