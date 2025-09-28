@@ -302,13 +302,24 @@ class StandardQueryHandler(BaseQueryHandler):
     """Handler pour les requêtes standard"""
 
     async def handle(
-        self, preprocessed_data: Dict[str, Any], start_time: float
+        self,
+        preprocessed_data: Dict[str, Any],
+        start_time: float,
+        original_query: str = None,
+        tenant_id: str = None,
+        conversation_context: list = None,
+        language: str = "fr",
+        **kwargs,
     ) -> RAGResult:
         """Traite les requêtes standard avec fallback intelligent"""
 
         query = preprocessed_data["normalized_query"]
         entities = preprocessed_data["entities"]
         routing_hint = preprocessed_data.get("routing_hint")
+
+        # Utiliser original_query si fourni, sinon fallback sur normalized_query
+        if original_query is None:
+            original_query = preprocessed_data.get("original_query", query)
 
         # PostgreSQL avec hint prioritaire
         if routing_hint == "postgresql" and self.postgresql_system:
@@ -337,17 +348,27 @@ class StandardQueryHandler(BaseQueryHandler):
 
         # Weaviate si disponible
         if self.weaviate_core:
-            logger.info("Tentative Weaviate")
             try:
-                result = await self.weaviate_core.search(
-                    query=query,
-                    top_k=RAG_SIMILARITY_TOP_K,
+                logger.info("Tentative Weaviate")
+                result = await self.weaviate_core.generate_response(
+                    query=original_query,
+                    tenant_id=tenant_id,
+                    conversation_context=conversation_context,
+                    language=language,
+                    **kwargs,
                 )
 
-                if result and result.source != RAGSource.NO_RESULTS:
+                if result and result.source != RAGSource.INTERNAL_ERROR:
+                    logger.info("Weaviate fallback réussi")
                     return result
-            except Exception as e:
+                else:
+                    logger.warning("Weaviate fallback échoué")
+
+            except AttributeError as e:
                 logger.warning(f"Erreur Weaviate: {e}")
+                # Fallback gracieux
+            except Exception as e:
+                logger.error(f"Erreur inattendue Weaviate: {e}")
 
         # Aucun résultat trouvé
         return RAGResult(

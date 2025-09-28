@@ -346,7 +346,7 @@ class WeaviateCore:
             raise
 
     async def _initialize_generator(self):
-        """Initialise le générateur de réponses"""
+        """Initialise le gÃ©nÃ©rateur de rÃ©ponses"""
 
         try:
             self.generator = EnhancedResponseGenerator(
@@ -407,6 +407,57 @@ class WeaviateCore:
             logger.info("✅ Guardrails initialisés")
         except Exception as e:
             logger.warning(f"Guardrails échoué: {e}")
+
+    async def search(
+        self,
+        query: str,
+        tenant_id: str = "default",
+        conversation_context: List[Dict] = None,
+        language: Optional[str] = None,
+        **kwargs,
+    ) -> RAGResult:
+        """
+        Méthode search manquante pour compatibilité avec rag_engine_handlers
+
+        CORRECTION: Cette méthode était appelée mais n'existait pas
+        Délègue vers generate_response qui contient la logique principale
+        """
+        logger.debug(f"WeaviateCore.search appelé avec query: {query}")
+
+        try:
+            # Préparation des paramètres pour generate_response
+            start_time = time.time()
+
+            # Récupération des paramètres optionnels
+            intent_result = kwargs.get("intent_result", None)
+
+            # Langue par défaut si non spécifiée
+            if language is None:
+                language = kwargs.get("language", "fr")
+
+            # Contexte de conversation par défaut
+            if conversation_context is None:
+                conversation_context = []
+
+            # Déléguer vers la méthode generate_response existante
+            result = await self.generate_response(
+                query=query,
+                intent_result=intent_result,
+                conversation_context=conversation_context,
+                language=language,
+                start_time=start_time,
+                tenant_id=tenant_id,
+            )
+
+            logger.debug(f"WeaviateCore.search résultat: {result.source}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Erreur WeaviateCore.search: {e}")
+            return RAGResult(
+                source=RAGSource.INTERNAL_ERROR,
+                metadata={"error": f"WeaviateCore search failed: {e}"},
+            )
 
     async def generate_response(
         self,
@@ -878,7 +929,7 @@ class WeaviateCore:
         language: str,
         conversation_context: List[Dict],
     ):
-        """Met en cache une réponse"""
+        """Met en cache une rÃ©ponse"""
 
         try:
             if hasattr(self.cache_manager, "semantic_cache"):

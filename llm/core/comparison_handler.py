@@ -22,11 +22,54 @@ class ComparisonHandler:
         self.postgresql_system = postgresql_system
         self.calculator = MetricCalculator()
 
+    def _parse_multiple_entities_from_preprocessing(
+        self, preprocessed: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """
+        CORRECTION: Parse les entités multiples depuis le preprocessing
+
+        Problème détecté: Le preprocessing extrait "Ross 308, Cobb 500" mais
+        le ComparisonHandler ne le parse pas correctement
+        """
+        entities_list = []
+
+        # Récupérer les entités de base du preprocessing
+        base_entities = preprocessed.get("entities", {})
+        logger.debug(f"Base entities from preprocessing: {base_entities}")
+
+        # Vérifier chaque champ pour des valeurs multiples séparées par des virgules
+        comparison_found = False
+
+        for field, value in base_entities.items():
+            if isinstance(value, str) and "," in value:
+                # Parser les valeurs multiples
+                values = [v.strip() for v in value.split(",")]
+                logger.debug(f"Field {field} has multiple values: {values}")
+
+                if len(values) > 1:
+                    comparison_found = True
+                    # Créer une entité pour chaque valeur
+                    for val in values:
+                        entity_set = base_entities.copy()
+                        entity_set[field] = val
+                        entity_set["_comparison_label"] = val
+                        entity_set["_comparison_dimension"] = field
+                        entities_list.append(entity_set)
+                    break  # Une seule dimension de comparaison à la fois
+
+        # Si aucune comparaison détectée, utiliser les entités de base
+        if not comparison_found:
+            entities_list = [base_entities]
+            logger.debug("No multiple entities found, using base entities")
+
+        logger.info(f"Parsed {len(entities_list)} entity sets for comparison")
+        return entities_list
+
     async def handle_comparative_query(
         self, query: str, preprocessed: Dict[str, Any], top_k: int = 12
     ) -> Dict[str, Any]:
         """
-        Traite une requête comparative avec validation renforcée et distinction temporelle
+        CORRECTION: Version corrigée qui parse correctement les entités multiples
 
         Args:
             query: Requête utilisateur originale
@@ -43,9 +86,7 @@ class ComparisonHandler:
                 'metadata': Dict  # NOUVEAU: métadonnées enrichies
             }
         """
-        logger.info(
-            f"Handling comparative query with {len(preprocessed.get('comparison_entities', []))} entity sets"
-        )
+        logger.info("Handling comparative query with preprocessed data")
 
         # NOUVEAU: Vérifier si c'est vraiment comparatif ou temporel
         if self._is_temporal_range_query(query):
@@ -59,18 +100,10 @@ class ComparisonHandler:
                 "comparison": None,
             }
 
-        # VALIDATION RENFORCÉE
-        comparison_entities = preprocessed.get("comparison_entities", [])
-
-        if not comparison_entities:
-            logger.warning("Aucune entité de comparaison trouvée")
-            return {
-                "success": False,
-                "error": "Aucune entité de comparaison détectée",
-                "suggestion": "Précisez ce que vous souhaitez comparer (ex: mâle vs femelle, Ross vs Cobb)",
-                "results": [],
-                "comparison": None,
-            }
+        # CORRECTION: Parser les entités depuis le preprocessing
+        comparison_entities = self._parse_multiple_entities_from_preprocessing(
+            preprocessed
+        )
 
         if len(comparison_entities) < 2:
             logger.warning(
@@ -80,10 +113,15 @@ class ComparisonHandler:
                 "success": False,
                 "error": "Comparaison impossible avec une seule entité",
                 "entities_found": comparison_entities,
-                "suggestion": "Ajoutez une seconde entité à comparer",
+                "suggestion": "Vérifiez que votre requête contient bien 2 éléments à comparer",
                 "results": [],
                 "comparison": None,
             }
+
+        # Continuer avec le reste de la logique existante...
+        logger.info(
+            f"Proceeding with comparison of {len(comparison_entities)} entities"
+        )
 
         # VALIDATION DE COHÉRENCE
         validation_result = self._validate_comparison_entities(comparison_entities)
@@ -579,7 +617,7 @@ class ComparisonHandler:
             language: Langue de la réponse
 
         Returns:
-            Texte de réponse formaté et enrichi par OpenAI
+            Texte de réponse formatté et enrichi par OpenAI
         """
         if not comparison_result.get("success"):
             error = comparison_result.get("error", "Unknown error")
