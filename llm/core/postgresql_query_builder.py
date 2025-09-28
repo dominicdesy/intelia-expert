@@ -283,6 +283,111 @@ class PostgreSQLQueryBuilder:
 
         return normalized
 
+    def build_range_query(
+        self, entities: Dict[str, str], age_min: int, age_max: int, limit: int = 12
+    ) -> Tuple[str, List]:
+        """Construction SQL optimisée pour plages temporelles"""
+
+        logger.debug(f"Building range query: age {age_min}-{age_max} days")
+        normalized_entities = self._normalize_entities(entities or {})
+
+        conditions = ["1=1"]
+        params = []
+        param_count = 0
+
+        # Condition d'âge optimisée avec BETWEEN
+        param_count += 6
+        conditions.append(
+            f"""((m.age_min BETWEEN ${param_count-5} AND ${param_count-4}) OR 
+            (m.age_max BETWEEN ${param_count-3} AND ${param_count-2}) OR 
+            (m.age_min <= ${param_count-1} AND m.age_max >= ${param_count}))"""
+        )
+        params.extend([age_min, age_max, age_min, age_max, age_min, age_max])
+
+        # Breed condition
+        breed_db = normalized_entities.get("breed")
+        if breed_db:
+            breed_condition, breed_params = self._handle_multiple_breeds(breed_db)
+            if breed_condition and breed_params:
+                # Ajuster les placeholders
+                adjusted_condition = breed_condition
+                for i, param in enumerate(breed_params):
+                    placeholder_template = "${}"
+                    placeholder_new = f"${param_count + i + 1}"
+                    adjusted_condition = adjusted_condition.replace(
+                        placeholder_template, placeholder_new, 1
+                    )
+
+                conditions.append(adjusted_condition)
+                params.extend(breed_params)
+                param_count += len(breed_params)
+
+                logger.debug(f"Adding breed filter for range query: {breed_params}")
+
+        # Métrique condition (simplifié pour plages)
+        param_count = self._add_metric_search_conditions_simple(
+            conditions, params, param_count
+        )
+
+        # ORDER BY optimisé pour plages temporelles
+        order_clause = """
+        ORDER BY 
+            m.age_min ASC,
+            CASE WHEN LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed') THEN 1 ELSE 2 END,
+            m.value_numeric DESC NULLS LAST
+        """
+
+        sql = f"""
+        SELECT DISTINCT ON (m.age_min, m.metric_name)
+            c.company_name, b.breed_name, s.strain_name, s.species,
+            m.metric_name, m.value_numeric, m.value_text, m.unit,
+            m.age_min, m.age_max, m.sheet_name, dc.category_name,
+            d.sex, d.housing_system, d.data_type, m.metadata
+        FROM companies c
+        JOIN breeds b ON c.id = b.company_id
+        JOIN strains s ON b.id = s.breed_id  
+        JOIN documents d ON s.id = d.strain_id
+        JOIN metrics m ON d.id = m.document_id
+        JOIN data_categories dc ON m.category_id = dc.id
+        WHERE {' AND '.join(conditions)}
+        {order_clause}
+        LIMIT {limit}
+        """
+
+        # Validation des paramètres
+        placeholders = re.findall(r"\$(\d+)", sql)
+        max_placeholder = max([int(p) for p in placeholders]) if placeholders else 0
+
+        if len(params) < max_placeholder:
+            logger.error(
+                f"RANGE QUERY MISMATCH: {len(params)} params pour {max_placeholder} placeholders"
+            )
+            while len(params) < max_placeholder:
+                params.append("")
+
+        logger.debug(f"Range query SQL: {sql}")
+        logger.debug(f"Range query params: {params}")
+
+        return sql, params
+
+    def _add_metric_search_conditions_simple(
+        self, conditions: List[str], params: List[Any], param_count: int
+    ) -> int:
+        """Version simplifiée pour requêtes de plage - sans query parsing"""
+
+        # Ajouter condition générique pour métriques communes
+        param_count += 2
+        conditions.append(
+            f"""(LOWER(m.metric_name) LIKE ${param_count-1} 
+            OR LOWER(m.metric_name) LIKE ${param_count})"""
+        )
+        params.extend(["%body_weight%", "%feed_conversion_ratio%"])
+
+        logger.debug(
+            f"Added simple metric conditions (params ${param_count-1}, ${param_count})"
+        )
+        return param_count
+
     def build_sex_aware_sql_query(
         self,
         query: str,
@@ -819,6 +924,24 @@ if __name__ == "__main__":
         out_of_range = builder._handle_out_of_range_age(age, "Cobb 500")
         status = "HORS PLAGE" if out_of_range else "OK"
         print(f"  {age:3d} jours -> {status}")
+
+    print("\n" + "=" * 80)
+    print("TEST 8: Requête de plage temporelle optimisée")
+    print("=" * 80)
+    sql_range, params_range = builder.build_range_query(
+        entities={"breed": "Cobb 500"}, age_min=21, age_max=42, limit=8
+    )
+
+    placeholders_range = re.findall(r"\$\d+", sql_range)
+    unique_placeholders_range = set(placeholders_range)
+
+    print(f"Paramètres fournis (range): {len(params_range)}")
+    print(f"Placeholders uniques (range): {len(unique_placeholders_range)}")
+    print(
+        f"Correspondance range: {'✓' if len(params_range) >= len(unique_placeholders_range) else '✗'}"
+    )
+    print(f"SQL contient BETWEEN: {'BETWEEN' in sql_range}")
+    print(f"SQL contient DISTINCT ON: {'DISTINCT ON' in sql_range}")
 
     if len(params) >= len(unique_placeholders):
         print("\n🎉 CORRECTION RÉUSSIE: Nombre de paramètres >= placeholders")

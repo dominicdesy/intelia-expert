@@ -122,7 +122,7 @@ class QueryPreprocessor:
         self, query: str, language: str = "fr"
     ) -> Dict[str, Any]:
         """
-        AMÉLIORÉ: Preprocessing avec cache et extraction locale optimisée
+        AMÉLIORÉ: Preprocessing avec cache, extraction locale et classification améliorée
 
         Returns:
             {
@@ -132,6 +132,7 @@ class QueryPreprocessor:
                 "routing": str,
                 "confidence": float,
                 "is_comparative": bool,
+                "is_temporal_range": bool,
                 "comparative_info": Dict,
                 "requires_calculation": bool,
                 "comparison_entities": List[Dict],
@@ -148,32 +149,45 @@ class QueryPreprocessor:
         self._current_query = query
 
         try:
-            # 1. Essayer extraction locale d'abord (rapide)
+            # 1. Classification détaillée du type de requête (priorité haute)
+            detailed_query_type = self._classify_detailed_query_type(query)
+            logger.debug(f"Type de requête classifié: {detailed_query_type}")
+
+            # 2. Essayer extraction locale d'abord (rapide)
             local_entities = self.local_extractor.extract_entities(query)
             logger.debug(f"Entités locales extraites: {local_entities}")
 
-            # 2. Détection comparative
+            # 3. Détection comparative (basée sur la classification)
             comparative_info = self.comparative_detector.detect(query)
+            # Override si classification détecte comparaison
+            if detailed_query_type == "comparative":
+                comparative_info["is_comparative"] = True
+                comparative_info["type"] = "comparative_detected"
             logger.debug(f"Détection comparative: {comparative_info}")
 
-            # 3. Détection des patterns spéciaux
+            # 4. Détection des patterns spéciaux
             query_patterns = self._detect_query_patterns(query)
             logger.debug(f"Patterns détectés: {query_patterns}")
 
-            # 4. Si extraction locale suffisante ET non comparative, utiliser directement
+            # 5. Si extraction locale suffisante ET requête simple, utiliser directement
             if (
                 self.local_extractor.is_extraction_sufficient(local_entities)
+                and detailed_query_type in ["standard", "metric"]
                 and not comparative_info["is_comparative"]
             ):
 
                 logger.info(f"Utilisation extraction locale pour: {query}")
                 result = self._build_local_result(
-                    query, local_entities, query_patterns, comparative_info
+                    query,
+                    local_entities,
+                    query_patterns,
+                    comparative_info,
+                    detailed_query_type,
                 )
                 self._cache[query] = result
                 return result
 
-            # 5. Sinon, utiliser OpenAI pour cas complexes
+            # 6. Sinon, utiliser OpenAI pour cas complexes
             system_prompt = self._get_system_prompt(
                 language, comparative_info["is_comparative"]
             )
@@ -213,21 +227,31 @@ class QueryPreprocessor:
                     query, comparative_info, query_patterns
                 )
 
-            # 6. Validation et correction des entités
+            # 7. Validation et correction des entités
             enhanced_result["entities"] = self._validate_and_fix_entities(
                 enhanced_result["entities"]
             )
             logger.debug(f"Entités après validation: {enhanced_result['entities']}")
 
-            # 7. Enrichir avec les informations comparatives
+            # 8. Enrichir avec les informations de classification
+            enhanced_result["query_type"] = detailed_query_type
+            enhanced_result["routing"] = self._determine_routing(
+                detailed_query_type, enhanced_result.get("routing")
+            )
             enhanced_result["is_comparative"] = comparative_info["is_comparative"]
+            enhanced_result["is_temporal_range"] = (
+                detailed_query_type == "temporal_range"
+            )
             enhanced_result["comparative_info"] = comparative_info
-            enhanced_result["requires_calculation"] = comparative_info["is_comparative"]
+            enhanced_result["requires_calculation"] = (
+                comparative_info["is_comparative"]
+                or detailed_query_type == "temporal_range"
+            )
 
-            # 8. Ajouter les patterns détectés
+            # 9. Ajouter les patterns détectés
             enhanced_result["query_patterns"] = query_patterns
 
-            # 9. Si comparaison détectée, créer les entités multiples
+            # 10. Si comparaison détectée, créer les entités multiples
             if comparative_info["is_comparative"]:
                 enhanced_result["comparison_entities"] = (
                     self._build_comparison_entities(
@@ -239,11 +263,11 @@ class QueryPreprocessor:
                     f"{len(enhanced_result['comparison_entities'])} jeux d'entités à rechercher"
                 )
 
-            # 10. Cache du résultat
+            # 11. Cache du résultat
             self._cache[query] = enhanced_result
 
             logger.info(
-                f"Query preprocessed: '{query}' -> '{enhanced_result['normalized_query']}'"
+                f"Query preprocessed: '{query}' -> '{enhanced_result['normalized_query']}' (type: {detailed_query_type})"
             )
             logger.debug(f"Routing suggestion: {enhanced_result.get('routing')}")
             logger.debug(f"Entities detected: {enhanced_result['entities']}")
@@ -263,7 +287,142 @@ class QueryPreprocessor:
             self._current_query = ""
 
     # ========================================================================
-    # NOUVELLE MÉTHODE: Construction de résultat local
+    # NOUVELLE MÉTHODE: Classification détaillée des requêtes
+    # ========================================================================
+
+    def _classify_detailed_query_type(self, query: str) -> str:
+        """
+        Classification détaillée des types de requêtes avec priorité hiérarchique
+
+        Returns:
+            - "temporal_range": requêtes d'évolution temporelle (entre X et Y jours)
+            - "comparative": requêtes de comparaison (vs, différence, meilleur)
+            - "recommendation": requêtes de conseil/recommandation
+            - "calculation": requêtes de calcul/projection
+            - "optimization": requêtes d'optimisation
+            - "standard": requêtes métriques simples
+            - "document": requêtes documentaires/explicatives
+            - "general": requêtes générales
+        """
+        query_lower = query.lower()
+
+        # 1. PRIORITÉ HAUTE: Requêtes temporelles (évolution dans le temps)
+        temporal_patterns = [
+            r"évolu\w*",  # évolution, évolue
+            r"entre\s+\d+\s+et\s+\d+",  # "entre 21 et 42 jours"
+            r"de\s+\d+\s+à\s+\d+",  # "de 21 à 42 jours"
+            r"from\s+\d+\s+to\s+\d+",  # "from 21 to 42 days"
+            r"progression",  # progression
+            r"courbe",  # courbe de croissance
+            r"suivi",  # suivi dans le temps
+        ]
+        if any(re.search(pattern, query_lower) for pattern in temporal_patterns):
+            return "temporal_range"
+
+        # 2. PRIORITÉ HAUTE: Requêtes comparatives (mots-clés spécifiques)
+        comparative_patterns = [
+            r"\bdifférence\b",  # différence
+            r"\bcompare\w*\b",  # compare, comparaison
+            r"\bversus\b|\bvs\b",  # versus, vs
+            r"\bmeilleur\w*\b",  # meilleur, meilleure
+            r"\bentre\s+\w+\s+et\s+\w+",  # "entre Cobb et Ross"
+            r"\bmieux\b",  # mieux
+            r"\bplus\s+\w+\s+que\b",  # "plus lourd que"
+            r"\bmoins\s+\w+\s+que\b",  # "moins que"
+        ]
+        if any(re.search(pattern, query_lower) for pattern in comparative_patterns):
+            return "comparative"
+
+        # 3. Requêtes de recommandation/conseil
+        recommendation_patterns = [
+            r"\brecommande\w*\b",  # recommande, recommandation
+            r"\bconseil\w*\b",  # conseil, conseille
+            r"\bsuggère\w*\b",  # suggère, suggestion
+            r"\bchoisir\b",  # choisir
+            r"\bquel\w*\s+\w+\s+choisir\b",  # "quelle souche choisir"
+            r"\bque\s+me\s+\w+\b",  # "que me conseillez"
+        ]
+        if any(re.search(pattern, query_lower) for pattern in recommendation_patterns):
+            return "recommendation"
+
+        # 4. Requêtes de calcul/projection
+        calculation_patterns = [
+            r"\bcalcul\w*\b",  # calcul, calculer
+            r"\bprojection\b",  # projection
+            r"\bprojette\w*\b",  # projette
+            r"\bestim\w*\b",  # estime, estimation
+            r"\btotal\w*\b",  # total, totaux
+            r"\bsomme\b",  # somme
+            r"\bcombien\b",  # combien
+        ]
+        if any(re.search(pattern, query_lower) for pattern in calculation_patterns):
+            return "calculation"
+
+        # 5. Requêtes d'optimisation
+        optimization_patterns = [
+            r"\boptimal\w*\b",  # optimal, optimiser
+            r"\bidéal\w*\b",  # idéal, idéale
+            r"\bperfect\w*\b",  # perfect, perfection
+            r"\bmaximis\w*\b",  # maximiser
+            r"\bminimis\w*\b",  # minimiser
+            r"\baméliorer\b",  # améliorer
+        ]
+        if any(re.search(pattern, query_lower) for pattern in optimization_patterns):
+            return "optimization"
+
+        # 6. Requêtes documentaires/explicatives
+        document_patterns = [
+            r"\bcomment\b",  # comment
+            r"\bpourquoi\b",  # pourquoi
+            r"\bexplique\w*\b",  # explique, explication
+            r"\bqu\'?est-ce\s+que\b",  # qu'est-ce que
+            r"\bmaladie\w*\b",  # maladie, maladies
+            r"\bsymptôme\w*\b",  # symptôme, symptômes
+            r"\btraitement\w*\b",  # traitement
+            r"\bguide\b",  # guide
+            r"\bprocédure\w*\b",  # procédure
+        ]
+        if any(re.search(pattern, query_lower) for pattern in document_patterns):
+            return "document"
+
+        # 7. Requêtes métriques standard (avec entités spécifiques)
+        metric_patterns = [
+            r"\b(?:poids|weight|fcr|conversion|mortalité|mortality)\b",
+            r"\b(?:cobb|ross|hubbard)\b",  # Breeds mentionnées
+            r"\b\d+\s*(?:jours?|days?|j)\b",  # Âges mentionnés
+        ]
+        if any(re.search(pattern, query_lower) for pattern in metric_patterns):
+            return "standard"
+
+        # 8. Par défaut: requête générale
+        return "general"
+
+    def _determine_routing(
+        self, query_type: str, existing_routing: Optional[str] = None
+    ) -> str:
+        """
+        Détermine le routage optimal basé sur le type de requête classifié
+        """
+        # Si un routage existe déjà et semble approprié, le conserver
+        if existing_routing in ["postgresql", "weaviate"]:
+            return existing_routing
+
+        # Routage basé sur la classification
+        routing_map = {
+            "temporal_range": "postgresql",  # Données temporelles → DB
+            "comparative": "postgresql",  # Comparaisons → DB
+            "recommendation": "postgresql",  # Recommandations basées sur données
+            "calculation": "postgresql",  # Calculs → DB
+            "optimization": "postgresql",  # Optimisation → DB
+            "standard": "postgresql",  # Métriques → DB
+            "document": "weaviate",  # Documents → Vector DB
+            "general": "weaviate",  # Général → Vector DB
+        }
+
+        return routing_map.get(query_type, "postgresql")  # PostgreSQL par défaut
+
+    # ========================================================================
+    # MÉTHODE MISE À JOUR: Construction de résultat local
     # ========================================================================
 
     def _build_local_result(
@@ -272,18 +431,16 @@ class QueryPreprocessor:
         local_entities: Dict,
         query_patterns: Dict,
         comparative_info: Dict,
+        query_type: str,
     ) -> Dict[str, Any]:
         """
-        Construit un résultat complet à partir de l'extraction locale
+        Construit un résultat complet à partir de l'extraction locale avec classification
         """
         # Validation et enrichissement des entités locales
         validated_entities = self._validate_and_fix_entities(local_entities)
 
-        # Déterminer le type de requête
-        query_type = "metric" if validated_entities.get("metric_type") else "general"
-
-        # Routage intelligent
-        routing = "postgresql" if validated_entities.get("breed") else "weaviate"
+        # Routage intelligent basé sur le type de requête
+        routing = self._determine_routing(query_type)
 
         return {
             "normalized_query": query,  # Pas de normalisation complexe en local
@@ -291,9 +448,14 @@ class QueryPreprocessor:
             "entities": validated_entities,
             "routing": routing,
             "confidence": 0.8,  # Confiance élevée pour extraction locale réussie
-            "is_comparative": comparative_info["is_comparative"],
+            "is_comparative": comparative_info["is_comparative"]
+            or query_type == "comparative",
+            "is_temporal_range": query_type == "temporal_range",
             "comparative_info": comparative_info,
-            "requires_calculation": comparative_info["is_comparative"],
+            "requires_calculation": (
+                comparative_info["is_comparative"]
+                or query_type in ["temporal_range", "calculation", "comparative"]
+            ),
             "comparison_entities": (
                 [validated_entities] if not comparative_info["is_comparative"] else []
             ),

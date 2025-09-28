@@ -26,7 +26,7 @@ class ComparisonHandler:
         self, query: str, preprocessed: Dict[str, Any], top_k: int = 12
     ) -> Dict[str, Any]:
         """
-        Traite une requête comparative avec validation renforcée et fallback
+        Traite une requête comparative avec validation renforcée et distinction temporelle
 
         Args:
             query: Requête utilisateur originale
@@ -46,6 +46,18 @@ class ComparisonHandler:
         logger.info(
             f"Handling comparative query with {len(preprocessed.get('comparison_entities', []))} entity sets"
         )
+
+        # NOUVEAU: Vérifier si c'est vraiment comparatif ou temporel
+        if self._is_temporal_range_query(query):
+            logger.info("Query detected as temporal range, not comparative")
+            return {
+                "success": False,
+                "error": "Query is temporal, not comparative",
+                "suggestion": "Use temporal handler instead",
+                "query_type": "temporal",
+                "results": [],
+                "comparison": None,
+            }
 
         # VALIDATION RENFORCÉE
         comparison_entities = preprocessed.get("comparison_entities", [])
@@ -929,6 +941,75 @@ Data:
         except Exception as e:
             logger.warning(f"Error extracting unit: {e}")
             return ""
+
+    def _is_temporal_range_query(self, query: str) -> bool:
+        """
+        Détecte si la requête concerne une plage temporelle plutôt qu'une comparaison
+
+        Args:
+            query: Requête utilisateur
+
+        Returns:
+            True si la requête est temporelle, False si comparative
+        """
+        import re
+
+        query_lower = query.lower()
+
+        # Patterns spécifiques aux requêtes temporelles
+        temporal_patterns = [
+            r"entre\s+\d+\s+et\s+\d+\s+jours?",
+            r"de\s+\d+\s+à\s+\d+\s+jours?",
+            r"du\s+jour\s+\d+\s+au\s+jour\s+\d+",
+            r"évolu(e|tion).*entre\s+\d+",
+            r"gain.*entre\s+\d+",
+            r"croissance.*entre\s+\d+",
+            r"progression.*entre\s+\d+",
+            r"variation.*entre\s+\d+",
+            r"changement.*entre\s+\d+",
+            r"développement.*entre\s+\d+",
+            r"courbe.*entre\s+\d+",
+            r"tendance.*entre\s+\d+",
+            # Patterns anglais
+            r"between\s+\d+\s+and\s+\d+\s+days?",
+            r"from\s+\d+\s+to\s+\d+\s+days?",
+            r"evolution.*between\s+\d+",
+            r"growth.*between\s+\d+",
+        ]
+
+        # Vérifier chaque pattern
+        for pattern in temporal_patterns:
+            if re.search(pattern, query_lower):
+                logger.debug(f"Temporal pattern detected: {pattern}")
+                return True
+
+        # Patterns additionnels pour évolution temporelle
+        evolution_keywords = [
+            "évolution",
+            "evolution",
+            "gain",
+            "croissance",
+            "growth",
+            "progression",
+            "développement",
+            "development",
+            "courbe",
+            "curve",
+        ]
+        age_ranges = re.findall(r"\d+.*\d+.*jours?|\d+.*\d+.*days?", query_lower)
+
+        if any(keyword in query_lower for keyword in evolution_keywords) and age_ranges:
+            logger.debug("Evolution keywords + age ranges detected")
+            return True
+
+        # Si on trouve "entre X et Y" avec des nombres, probablement temporel
+        between_pattern = r"entre\s+\d+.*\d+"
+        if re.search(between_pattern, query_lower):
+            logger.debug("Generic 'entre X et Y' pattern detected")
+            return True
+
+        logger.debug("No temporal patterns detected, treating as comparative")
+        return False
 
 
 # Tests unitaires
