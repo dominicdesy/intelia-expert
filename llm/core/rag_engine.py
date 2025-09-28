@@ -69,6 +69,18 @@ try:
 except ImportError as e:
     logger.warning(f"Comparison Handler non disponible: {e}")
 
+# NOUVEAU: Import Weaviate Core
+WEAVIATE_CORE_AVAILABLE = False
+WeaviateCore = None
+
+try:
+    from .rag_weaviate_core import WeaviateCore
+
+    WEAVIATE_CORE_AVAILABLE = True
+    logger.info("Weaviate Core importé")
+except ImportError as e:
+    logger.warning(f"Weaviate Core non disponible: {e}")
+
 
 class InteliaRAGEngine:
     """RAG Engine avec support des requêtes comparatives"""
@@ -85,6 +97,9 @@ class InteliaRAGEngine:
         self.postgresql_system = None
         self.query_preprocessor = None
         self.comparison_handler = None  # NOUVEAU
+
+        # NOUVEAU: Module Weaviate
+        self.weaviate_core = None
 
         # État
         self.is_initialized = False
@@ -145,7 +160,11 @@ class InteliaRAGEngine:
             if POSTGRESQL_INTEGRATION_AVAILABLE and PostgreSQLSystem:
                 await self._initialize_postgresql_system()
 
-            # 3. Comparison Handler (dépend de PostgreSQL)
+            # 3. NOUVEAU: Weaviate Core
+            if WEAVIATE_CORE_AVAILABLE and WeaviateCore and self.openai_client:
+                await self._initialize_weaviate_core()
+
+            # 4. Comparison Handler (dépend de PostgreSQL)
             if (
                 COMPARISON_HANDLER_AVAILABLE
                 and ComparisonHandler
@@ -160,6 +179,7 @@ class InteliaRAGEngine:
                 for name, module in [
                     ("Preprocessor", self.query_preprocessor),
                     ("PostgreSQL", self.postgresql_system),
+                    ("WeaviateCore", self.weaviate_core),  # NOUVEAU
                     ("ComparisonHandler", self.comparison_handler),
                 ]
                 if module is not None
@@ -207,6 +227,23 @@ class InteliaRAGEngine:
             logger.warning(f"Comparison Handler échoué: {e}")
             self.comparison_handler = None
             self.initialization_errors.append(f"ComparisonHandler: {e}")
+
+    async def _initialize_weaviate_core(self):
+        """Initialise Weaviate Core"""
+        try:
+            self.weaviate_core = WeaviateCore(self.openai_client)
+            await self.weaviate_core.initialize()
+
+            # Connecter le cache si disponible
+            cache_core = getattr(self, "cache_manager", None)
+            if cache_core:
+                self.weaviate_core.set_cache_manager(cache_core)
+
+            logger.info("Weaviate Core initialisé")
+        except Exception as e:
+            logger.warning(f"Weaviate Core échoué: {e}")
+            self.weaviate_core = None
+            self.initialization_errors.append(f"WeaviateCore: {e}")
 
     async def generate_response(
         self,
@@ -575,10 +612,11 @@ Exemple de formulation : "Compare le poids du Cobb 500 et du Ross 308 à 42 jour
             "rag_enabled": RAG_ENABLED,
             "initialized": self.is_initialized,
             "degraded_mode": self.degraded_mode,
-            "version": "v7.1_with_robust_comparative_support",
+            "version": "v7.2_with_weaviate_integration",
             "modules": {
                 "query_preprocessor": bool(self.query_preprocessor),
                 "postgresql_system": bool(self.postgresql_system),
+                "weaviate_core": bool(self.weaviate_core),  # NOUVEAU
                 "comparison_handler": bool(self.comparison_handler),
             },
             "optimization_stats": self.optimization_stats.copy(),
@@ -587,6 +625,7 @@ Exemple de formulation : "Compare le poids du Cobb 500 et du Ross 308 à 42 jour
                 "comparative_fallback": True,  # NOUVEAU
                 "intelligent_preprocessing": bool(self.query_preprocessor),
                 "metrics_queries": bool(self.postgresql_system),
+                "weaviate_search": bool(self.weaviate_core),  # NOUVEAU
             },
             "initialization_errors": self.initialization_errors,
         }
@@ -606,6 +645,13 @@ Exemple de formulation : "Compare le poids du Cobb 500 et du Ross 308 à 42 jour
                 await self.postgresql_system.close()
         except Exception as e:
             logger.error(f"Erreur fermeture PostgreSQL: {e}")
+
+        # NOUVEAU: Fermeture Weaviate Core
+        try:
+            if self.weaviate_core:
+                await self.weaviate_core.close()
+        except Exception as e:
+            logger.error(f"Erreur fermeture Weaviate Core: {e}")
 
         # comparison_handler n'a pas de close()
 

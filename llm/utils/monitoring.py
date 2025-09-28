@@ -455,17 +455,16 @@ class SystemHealthMonitor:
         if cache_core and getattr(cache_core, "initialized", False):
             redis_client = getattr(cache_core, "client", None)
 
-        # CORRECTION WEAVIATE: Accès correct selon l'architecture avec debug avancé
+        # CORRECTION WEAVIATE: Accès correct selon la nouvelle architecture
         rag_engine = self._critical_services.get("rag_engine_enhanced")
         if rag_engine:
-            # OPTION 1: Weaviate directement dans RAG engine
+            # OPTION 1: Weaviate directement dans RAG engine (si ajouté)
             weaviate_client = getattr(rag_engine, "weaviate_client", None)
 
-            # OPTION 2: Si pas trouvé, chercher dans weaviate_core
+            # OPTION 2: Si pas trouvé, chercher dans weaviate_core (NOUVEAU)
             if not weaviate_client:
                 weaviate_core = getattr(rag_engine, "weaviate_core", None)
                 if weaviate_core:
-                    # CORRECTION: L'attribut est 'weaviate_client' dans WeaviateCore, pas 'client'
                     weaviate_client = getattr(weaviate_core, "weaviate_client", None)
                     logger.debug("Client Weaviate trouvé dans weaviate_core")
                 else:
@@ -602,7 +601,48 @@ class SystemHealthMonitor:
                         "metrics": safe_dict_get(
                             safe_rag_status, "optimization_stats", {}
                         ),
+                        "modules": safe_dict_get(
+                            safe_rag_status, "modules", {}
+                        ),  # NOUVEAU
+                        "capabilities": safe_dict_get(
+                            safe_rag_status, "capabilities", {}
+                        ),  # NOUVEAU
                     }
+
+                    # NOUVEAU: Statut spécifique Weaviate
+                    weaviate_core = getattr(rag_engine, "weaviate_core", None)
+                    if weaviate_core:
+                        weaviate_initialized = getattr(
+                            weaviate_core, "is_initialized", False
+                        )
+                        weaviate_client = getattr(
+                            weaviate_core, "weaviate_client", None
+                        )
+
+                        global_status["services"]["weaviate"] = {
+                            "status": "healthy" if weaviate_initialized else "degraded",
+                            "core_initialized": weaviate_initialized,
+                            "client_connected": bool(weaviate_client),
+                            "available": True,
+                        }
+
+                        # Obtenir les stats Weaviate si disponibles
+                        if hasattr(weaviate_core, "get_stats"):
+                            try:
+                                weaviate_stats = weaviate_core.get_stats()
+                                global_status["services"]["weaviate"]["stats"] = (
+                                    safe_serialize_for_json(weaviate_stats)
+                                )
+                            except Exception as stats_e:
+                                global_status["services"]["weaviate"]["stats_error"] = (
+                                    str(stats_e)
+                                )
+                    else:
+                        global_status["services"]["weaviate"] = {
+                            "status": "missing",
+                            "available": False,
+                            "reason": "weaviate_core_not_initialized_in_rag_engine",
+                        }
 
                     # Intégrations spécialisées avec validation
 
