@@ -6,7 +6,7 @@ Extrait du query_preprocessor.py pour modularité
 
 import logging
 import re
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +40,12 @@ class ComparativeQueryDetector:
         "average": [
             r"moyenne\s+(?:de|entre)",
             r"en\s+moyenne",
+        ],
+        "temporal": [
+            r"entre\s+(\d+)\s+et\s+(\d+)\s+jours?",
+            r"différence.*(\d+).*(\d+)\s+jours?",
+            r"évolution.*(\d+).*(\d+)",
+            r"de\s+(\d+)\s+à\s+(\d+)\s+jours?",
         ],
     }
 
@@ -149,6 +155,20 @@ class ComparativeQueryDetector:
 
         return entities
 
+    def _extract_age_range(self, query: str) -> Optional[Tuple[int, int]]:
+        """Extrait une plage d'âges"""
+        patterns = [
+            r"entre\s+(\d+)\s+et\s+(\d+)\s+jours?",
+            r"de\s+(\d+)\s+à\s+(\d+)\s+jours?",
+            r"(\d+).*(\d+)\s+jours?",
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, query.lower())
+            if match:
+                return (int(match.group(1)), int(match.group(2)))
+        return None
+
     def _determine_operation(self, comparison_type: str) -> str:
         """Détermine l'opération mathématique à effectuer"""
         operation_map = {
@@ -157,6 +177,7 @@ class ComparativeQueryDetector:
             "ratio": "divide",
             "evolution": "subtract",
             "average": "average",
+            "temporal": "subtract",
         }
         return operation_map.get(comparison_type, "subtract")
 

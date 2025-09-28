@@ -8,8 +8,9 @@ Version corrigée avec gestion d'erreur comparative robuste
 
 import asyncio
 import logging
+import re
 import time
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 
 from config.config import (
     RAG_ENABLED,
@@ -466,6 +467,21 @@ class InteliaRAGEngine:
                 # NOUVEAU: Fallback intelligent vers requête standard
                 logger.info("Attempting fallback to standard query processing")
 
+                # Vérifier si c'est une comparaison temporelle (plage d'âges)
+                if (
+                    comparison_result.get("error")
+                    == "Comparaison impossible avec une seule entité"
+                ):
+                    age_range = self._extract_age_range_from_query(original_query)
+                    if age_range:
+                        logger.info(f"Requête temporelle détectée: {age_range}")
+                        return await self._handle_temporal_query(
+                            original_query,
+                            preprocessed.get("entities", {}),
+                            age_range,
+                            start_time,
+                        )
+
                 # Extraire la première entité pour requête standard
                 entities = preprocessed.get("entities", {})
                 if entities:
@@ -605,6 +621,157 @@ Exemple de formulation : "Compare le poids du Cobb 500 et du Ross 308 à 42 jour
         except Exception as e:
             logger.warning(f"Erreur extraction documents comparatifs: {e}")
             return []
+
+    def _extract_age_range_from_query(self, query: str) -> Optional[Tuple[int, int]]:
+        """Extrait plage d'âges de la requête"""
+        patterns = [
+            r"entre\s+(\d+)\s+et\s+(\d+)\s+jours?",
+            r"de\s+(\d+)\s+à\s+(\d+)\s+jours?",
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, query.lower())
+            if match:
+                return (int(match.group(1)), int(match.group(2)))
+        return None
+
+    async def _handle_temporal_query(
+        self, query: str, entities: Dict, age_range: Tuple[int, int], start_time: float
+    ) -> RAGResult:
+        """Gère les requêtes temporelles (comparaison sur plage d'âges)"""
+
+        try:
+            logger.info(
+                f"Traitement requête temporelle: âges {age_range[0]}-{age_range[1]} jours"
+            )
+
+            results = []
+            successful_ages = []
+
+            # Rechercher pour chaque âge dans la plage
+            for age in range(age_range[0], age_range[1] + 1):
+                entities_age = entities.copy()
+                entities_age["age_days"] = age
+
+                result = await self.postgresql_system.search_metrics(
+                    query=query,
+                    entities=entities_age,
+                    top_k=3,  # Moins de résultats par âge
+                )
+
+                if result and result.source != RAGSource.NO_RESULTS:
+                    results.append(
+                        {
+                            "age": age,
+                            "result": result,
+                            "metrics": result.metadata.get("metrics", []),
+                        }
+                    )
+                    successful_ages.append(age)
+
+            if not results:
+                return RAGResult(
+                    source=RAGSource.NO_RESULTS,
+                    answer=f"Aucune donnée trouvée pour la plage d'âges {age_range[0]}-{age_range[1]} jours.",
+                    metadata={
+                        "source_type": "temporal",
+                        "age_range": age_range,
+                        "processing_time": time.time() - start_time,
+                    },
+                )
+
+            # Générer réponse temporelle
+            answer = await self._generate_temporal_response(query, results, age_range)
+
+            return RAGResult(
+                source=RAGSource.RAG_SUCCESS,
+                answer=answer,
+                context_docs=[],
+                confidence=0.85,
+                metadata={
+                    "source_type": "temporal",
+                    "age_range": age_range,
+                    "successful_ages": successful_ages,
+                    "data_points": len(results),
+                    "processing_time": time.time() - start_time,
+                },
+            )
+
+        except Exception as e:
+            logger.error(f"Erreur requête temporelle: {e}")
+            return RAGResult(
+                source=RAGSource.ERROR,
+                answer="Erreur lors du traitement de la requête temporelle.",
+                metadata={
+                    "error": str(e),
+                    "source_type": "temporal_error",
+                    "processing_time": time.time() - start_time,
+                },
+            )
+
+    async def _generate_temporal_response(
+        self, query: str, results: List[Dict], age_range: Tuple[int, int]
+    ) -> str:
+        """Génère une réponse pour les requêtes temporelles"""
+
+        if len(results) == 1:
+            age = results[0]["age"]
+            return f"Pour {age} jours : {results[0]['result'].answer}"
+
+        # Multi-âges : créer un résumé
+        response_parts = [
+            f"Évolution sur la période {age_range[0]}-{age_range[1]} jours :"
+        ]
+
+        for result_data in results:
+            age = result_data["age"]
+            metrics = result_data.get("metrics", [])
+
+            if metrics:
+                # Extraire les valeurs principales
+                main_values = []
+                for metric in metrics[:2]:  # Maximum 2 métriques principales
+                    if "value" in metric:
+                        main_values.append(
+                            f"{metric.get('name', 'Métrique')}: {metric['value']}"
+                        )
+
+                if main_values:
+                    response_parts.append(f"- {age} jours : {', '.join(main_values)}")
+
+        return "\n".join(response_parts)
+
+    async def _handle_out_of_range_age(
+        self, query: str, age: int, entities: Dict, start_time: float
+    ) -> RAGResult:
+        """Gère les âges hors plage"""
+
+        # Chercher l'âge le plus proche disponible
+        closest_age = min(56, age)  # Max observé = 56 jours
+
+        entities_fallback = entities.copy()
+        entities_fallback["age_days"] = closest_age
+
+        result = await self.postgresql_system.search_metrics(
+            query=query, entities=entities_fallback, top_k=12
+        )
+
+        if result and result.source != RAGSource.NO_RESULTS:
+            # Ajouter note d'extrapolation
+            result.answer = (
+                f"Données disponibles jusqu'à {closest_age} jours pour cette race. "
+                + result.answer
+            )
+            result.metadata.update(
+                {
+                    "extrapolated": True,
+                    "requested_age": age,
+                    "provided_age": closest_age,
+                    "processing_time": time.time() - start_time,
+                }
+            )
+
+        return result
 
     def get_status(self) -> Dict:
         """Status système avec stats comparatives"""

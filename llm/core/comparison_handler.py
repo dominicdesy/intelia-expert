@@ -742,6 +742,194 @@ Data:
 
         return formatted_text
 
+    async def handle_temporal_comparison(
+        self, query: str, age_start: int, age_end: int, entities: Dict
+    ) -> Dict:
+        """
+        Gère les comparaisons temporelles entre deux âges
+
+        Args:
+            query: Requête utilisateur originale
+            age_start: Âge de début en jours
+            age_end: Âge de fin en jours
+            entities: Entités communes (breed, sex, etc.)
+
+        Returns:
+            Dict avec les résultats de comparaison temporelle
+        """
+        try:
+            logger.info(f"Handling temporal comparison: {age_start} -> {age_end} days")
+
+            # Requête pour âge de début
+            entities_start = entities.copy()
+            entities_start["age_days"] = age_start
+            result_start = await self.postgresql_system.search_metrics(
+                query=f"Métrique à {age_start} jours",
+                entities=entities_start,
+                top_k=12,
+                strict_sex_match=True,
+            )
+
+            # Requête pour âge de fin
+            entities_end = entities.copy()
+            entities_end["age_days"] = age_end
+            result_end = await self.postgresql_system.search_metrics(
+                query=f"Métrique à {age_end} jours",
+                entities=entities_end,
+                top_k=12,
+                strict_sex_match=True,
+            )
+
+            # Vérification des résultats
+            if not (
+                result_start
+                and hasattr(result_start, "context_docs")
+                and result_start.context_docs
+            ):
+                logger.warning(f"No results for age {age_start} days")
+                return {
+                    "success": False,
+                    "error": f"Aucun résultat trouvé pour {age_start} jours",
+                    "comparison_type": "temporal",
+                }
+
+            if not (
+                result_end
+                and hasattr(result_end, "context_docs")
+                and result_end.context_docs
+            ):
+                logger.warning(f"No results for age {age_end} days")
+                return {
+                    "success": False,
+                    "error": f"Aucun résultat trouvé pour {age_end} jours",
+                    "comparison_type": "temporal",
+                }
+
+            # Extraction des métriques
+            metric_start = self._extract_metric_value(result_start.context_docs[0])
+            metric_end = self._extract_metric_value(result_end.context_docs[0])
+
+            if metric_start is None or metric_end is None:
+                return {
+                    "success": False,
+                    "error": "Impossible d'extraire les valeurs numériques",
+                    "comparison_type": "temporal",
+                }
+
+            # Calcul différence et évolution
+            difference = metric_end - metric_start
+            percent_change = (
+                (difference / metric_start * 100) if metric_start != 0 else 0
+            )
+
+            # Déterminer le type d'évolution
+            evolution = "stable"
+            if (
+                abs(percent_change) > 1
+            ):  # Seuil de 1% pour considérer un changement significatif
+                evolution = "croissance" if difference > 0 else "diminution"
+
+            # Extraire les métadonnées pour contexte
+            start_doc = result_start.context_docs[0]
+            start_metadata = start_doc.get("metadata", {})
+            metric_name = start_metadata.get("metric_name", "métrique")
+            unit = self._extract_unit_from_doc(start_doc)
+
+            logger.info(
+                f"Temporal comparison successful: {metric_start} -> {metric_end} ({percent_change:.1f}%)"
+            )
+
+            return {
+                "success": True,
+                "comparison_type": "temporal",
+                "start_age": age_start,
+                "end_age": age_end,
+                "start_value": metric_start,
+                "end_value": metric_end,
+                "difference": difference,
+                "percent_change": percent_change,
+                "evolution": evolution,
+                "metric_name": metric_name,
+                "unit": unit,
+                "entities": entities,
+                "metadata": {
+                    "age_range": f"{age_start}-{age_end} jours",
+                    "evolution_type": evolution,
+                    "significant_change": abs(percent_change) > 1,
+                },
+            }
+
+        except Exception as e:
+            logger.error(f"Error in temporal comparison: {e}")
+            return {
+                "success": False,
+                "error": f"Erreur dans la comparaison temporelle: {str(e)}",
+                "comparison_type": "temporal",
+            }
+
+    def _extract_metric_value(self, document: Dict) -> Optional[float]:
+        """
+        Extrait la valeur numérique d'un document
+
+        Args:
+            document: Document de contexte
+
+        Returns:
+            Valeur numérique ou None si extraction échoue
+        """
+        try:
+            # Essayer d'abord via metadata
+            metadata = document.get("metadata", {})
+            if "value_numeric" in metadata:
+                return float(metadata["value_numeric"])
+
+            # Sinon parser le content
+            content = document.get("content", "")
+            if content:
+                import re
+
+                value_match = re.search(r"Value:\s*([0-9.]+)", content)
+                if value_match:
+                    return float(value_match.group(1))
+
+            logger.warning("Could not extract numeric value from document")
+            return None
+
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Error extracting metric value: {e}")
+            return None
+
+    def _extract_unit_from_doc(self, document: Dict) -> str:
+        """
+        Extrait l'unité d'un document
+
+        Args:
+            document: Document de contexte
+
+        Returns:
+            Unité ou chaîne vide
+        """
+        try:
+            # Essayer metadata
+            metadata = document.get("metadata", {})
+            if "unit" in metadata:
+                return metadata["unit"]
+
+            # Parser le content pour l'unité
+            content = document.get("content", "")
+            if content:
+                import re
+
+                unit_match = re.search(r"Value:\s*[0-9.]+\s*(\w+)", content)
+                if unit_match:
+                    return unit_match.group(1)
+
+            return ""
+
+        except Exception as e:
+            logger.warning(f"Error extracting unit: {e}")
+            return ""
+
 
 # Tests unitaires
 if __name__ == "__main__":

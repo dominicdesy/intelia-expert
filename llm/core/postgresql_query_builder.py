@@ -16,6 +16,15 @@ logger = logging.getLogger(__name__)
 class PostgreSQLQueryBuilder:
     """Construit les requêtes SQL en utilisant intents.json et les noms réels de la BD"""
 
+    # Mapping étendu des breeds vers noms BD
+    BREED_EXTENDED_MAPPING = {
+        "Hubbard JA87": "JA87",
+        "Arbor Acres": "AA+",
+        "Cobb-Vantress": "500",
+        "Ross 708": "708",
+        "Hubbard": "JA87",
+    }
+
     def __init__(self, query_normalizer):
         """
         Args:
@@ -96,6 +105,12 @@ class PostgreSQLQueryBuilder:
         if breed_lower in direct_mapping:
             result = direct_mapping[breed_lower]
             logger.debug(f"Breed exact match: '{breed_input}' -> '{result}'")
+            return result
+
+        # NOUVEAU: Vérifier mapping étendu
+        if breed_input in self.BREED_EXTENDED_MAPPING:
+            result = self.BREED_EXTENDED_MAPPING[breed_input]
+            logger.debug(f"Breed extended match: '{breed_input}' -> '{result}'")
             return result
 
         # NOUVEAU: Détecter si c'est une liste séparée par virgules
@@ -241,6 +256,13 @@ class PostgreSQLQueryBuilder:
             placeholders = ", ".join("${}" for _ in range(len(valid_breeds)))
             return f"s.strain_name IN ({placeholders})", valid_breeds
 
+    def _handle_out_of_range_age(self, age: int, breed: str) -> str:
+        """Gère les âges hors plage de données"""
+        if age > 56:  # Limite observée dans les logs
+            logger.warning(f"Age {age} jours hors plage pour {breed} (max: 56j)")
+            return f"WHERE 1=0 -- Age {age} jours hors plage pour {breed} (max: 56j)"
+        return ""  # Pas de condition spéciale
+
     def _normalize_entities(self, entities: Dict[str, str]) -> Dict[str, str]:
         """Normalise les entités pour la BD"""
         if not entities:
@@ -284,6 +306,41 @@ class PostgreSQLQueryBuilder:
         # 1. Age (toujours en premier si présent)
         age_extracted = self._extract_age_from_query(query)
         if age_extracted:
+            # NOUVEAU: Vérifier si l'âge est dans la plage valide
+            breed_for_check = (
+                normalized_entities.get("breed", "").split(",")[0]
+                if normalized_entities.get("breed")
+                else "unknown"
+            )
+            out_of_range_condition = self._handle_out_of_range_age(
+                age_extracted, breed_for_check
+            )
+
+            if out_of_range_condition:
+                # Âge hors plage - retourner requête vide
+                logger.warning(f"Age {age_extracted} hors plage - requête vide")
+                empty_query = """
+                    SELECT 
+                        NULL as company_name,
+                        NULL as breed_name,
+                        NULL as strain_name,
+                        NULL as species,
+                        NULL as metric_name,
+                        NULL as value_numeric,
+                        NULL as value_text,
+                        NULL as unit,
+                        NULL as age_min,
+                        NULL as age_max,
+                        NULL as sheet_name,
+                        NULL as category_name,
+                        NULL as sex,
+                        NULL as housing_system,
+                        NULL as data_type,
+                        NULL as metadata
+                    WHERE 1=0
+                    LIMIT 0"""
+                return empty_query, []
+
             param_count += 4  # Réserver 4 paramètres pour l'âge
             age_condition = f"""
             ((m.age_min <= ${param_count-3} AND m.age_max >= ${param_count-2}) 
@@ -650,7 +707,7 @@ if __name__ == "__main__":
     builder = PostgreSQLQueryBuilder(mock_normalizer)
 
     print("\n" + "=" * 80)
-    print("TEST 1: Normalisation breeds simples et multiples")
+    print("TEST 1: Normalisation breeds simples, multiples et étendus")
     print("=" * 80)
     test_inputs = [
         "Cobb 500",
@@ -661,6 +718,10 @@ if __name__ == "__main__":
         "Cobb 500, Ross 308",
         "ross 308, cobb 500",
         "cobb vs ross",
+        "Hubbard JA87",
+        "Arbor Acres",
+        "Ross 708",
+        "Hubbard",
     ]
     for inp in test_inputs:
         result = builder._normalize_breed_for_db(inp)
@@ -749,6 +810,15 @@ if __name__ == "__main__":
         f"Correspondance multi-breeds: {'✓' if len(params_multi) >= len(unique_placeholders_multi) else '✗'}"
     )
     print(f"SQL contient IN clause: {'IN (' in sql_multi}")
+
+    print("\n" + "=" * 80)
+    print("TEST 7: Gestion âges hors plage")
+    print("=" * 80)
+    test_ages = [42, 56, 60, 70, 100]
+    for age in test_ages:
+        out_of_range = builder._handle_out_of_range_age(age, "Cobb 500")
+        status = "HORS PLAGE" if out_of_range else "OK"
+        print(f"  {age:3d} jours -> {status}")
 
     if len(params) >= len(unique_placeholders):
         print("\n🎉 CORRECTION RÉUSSIE: Nombre de paramètres >= placeholders")

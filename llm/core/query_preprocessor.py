@@ -15,6 +15,70 @@ from .comparative_detector import ComparativeQueryDetector
 logger = logging.getLogger(__name__)
 
 
+class LocalEntityExtractor:
+    """Extraction locale sans LLM pour requêtes simples"""
+
+    BREED_PATTERNS = {
+        r"(?:cobb|500)": "Cobb 500",
+        r"(?:ross|308)": "Ross 308",
+        r"(?:hubbard|ja87)": "Hubbard JA87",
+    }
+
+    METRIC_PATTERNS = {
+        r"(?:poids|weight|masse)": "weight",
+        r"(?:fcr|conversion|indice)": "fcr",
+        r"(?:mortalité|mortality)": "mortality",
+        r"(?:production|ponte)": "production",
+    }
+
+    def extract_entities(self, query: str) -> Dict[str, Any]:
+        """Extraction rapide des entités communes"""
+        entities = {"sex": "as_hatched"}
+        query_lower = query.lower()
+
+        # Breed detection
+        for pattern, breed in self.BREED_PATTERNS.items():
+            if re.search(pattern, query_lower):
+                entities["breed"] = breed
+                break
+
+        # Age detection - patterns multiples
+        age_patterns = [
+            r"(\d+)\s*jours?",
+            r"(\d+)\s*j\b",
+            r"à\s+(\d+)\s*jours?",
+            r"de\s+(\d+)\s*jours?",
+        ]
+        for pattern in age_patterns:
+            age_match = re.search(pattern, query_lower)
+            if age_match:
+                entities["age_days"] = int(age_match.group(1))
+                break
+
+        # Metric detection
+        for pattern, metric in self.METRIC_PATTERNS.items():
+            if re.search(pattern, query_lower):
+                entities["metric_type"] = metric
+                break
+
+        # Sex detection
+        if re.search(r"\b(?:male|mâle|m)\b", query_lower):
+            entities["sex"] = "male"
+        elif re.search(r"\b(?:female|femelle|f)\b", query_lower):
+            entities["sex"] = "female"
+
+        return entities
+
+    def is_extraction_sufficient(self, entities: Dict) -> bool:
+        """Vérifie si l'extraction locale est suffisante"""
+        # Considérer suffisant si on a breed + (age ou metric)
+        has_breed = entities.get("breed") is not None
+        has_age = entities.get("age_days") is not None
+        has_metric = entities.get("metric_type") is not None
+
+        return has_breed and (has_age or has_metric)
+
+
 class QueryPreprocessor:
     """
     Préprocesse les requêtes utilisateur avec :
@@ -29,6 +93,8 @@ class QueryPreprocessor:
         self.client = openai_client
         self._is_initialized = False
         self.comparative_detector = ComparativeQueryDetector()
+        self.local_extractor = LocalEntityExtractor()
+        self._cache = {}  # Cache pour éviter reprocessing
 
     async def initialize(self):
         """Initialisation et validation du preprocessor"""
@@ -49,13 +115,14 @@ class QueryPreprocessor:
     async def close(self):
         """Fermeture propre du preprocessor"""
         self._is_initialized = False
+        self._cache.clear()  # Nettoyer le cache
         logger.debug("Query Preprocessor fermé")
 
     async def preprocess_query(
         self, query: str, language: str = "fr"
     ) -> Dict[str, Any]:
         """
-        AMÉLIORÉ: Preprocessing avec contextualisation intelligente
+        AMÉLIORÉ: Preprocessing avec cache et extraction locale optimisée
 
         Returns:
             {
@@ -68,23 +135,45 @@ class QueryPreprocessor:
                 "comparative_info": Dict,
                 "requires_calculation": bool,
                 "comparison_entities": List[Dict],
-                "query_patterns": Dict  # NOUVEAU
+                "query_patterns": Dict
             }
         """
+
+        # Cache check
+        if query in self._cache:
+            logger.debug(f"Cache hit pour: {query}")
+            return self._cache[query]
 
         # Stocker la requête pour utilisation dans les corrections
         self._current_query = query
 
         try:
-            # 1. Détection comparative AVANT OpenAI
+            # 1. Essayer extraction locale d'abord (rapide)
+            local_entities = self.local_extractor.extract_entities(query)
+            logger.debug(f"Entités locales extraites: {local_entities}")
+
+            # 2. Détection comparative
             comparative_info = self.comparative_detector.detect(query)
             logger.debug(f"Détection comparative: {comparative_info}")
 
-            # 2. NOUVEAU: Détection des patterns spéciaux
+            # 3. Détection des patterns spéciaux
             query_patterns = self._detect_query_patterns(query)
             logger.debug(f"Patterns détectés: {query_patterns}")
 
-            # 3. Appel OpenAI pour normalisation et extraction d'entités
+            # 4. Si extraction locale suffisante ET non comparative, utiliser directement
+            if (
+                self.local_extractor.is_extraction_sufficient(local_entities)
+                and not comparative_info["is_comparative"]
+            ):
+
+                logger.info(f"Utilisation extraction locale pour: {query}")
+                result = self._build_local_result(
+                    query, local_entities, query_patterns, comparative_info
+                )
+                self._cache[query] = result
+                return result
+
+            # 5. Sinon, utiliser OpenAI pour cas complexes
             system_prompt = self._get_system_prompt(
                 language, comparative_info["is_comparative"]
             )
@@ -113,7 +202,7 @@ class QueryPreprocessor:
                 if "entities" not in result:
                     result["entities"] = {}
 
-                # NOUVEAU: Post-traitement intelligent
+                # Post-traitement intelligent
                 enhanced_result = self._enhance_openai_result(
                     result, query, comparative_info
                 )
@@ -124,21 +213,21 @@ class QueryPreprocessor:
                     query, comparative_info, query_patterns
                 )
 
-            # NOUVEAU: Validation et correction des entités OpenAI défaillantes
+            # 6. Validation et correction des entités
             enhanced_result["entities"] = self._validate_and_fix_entities(
                 enhanced_result["entities"]
             )
             logger.debug(f"Entités après validation: {enhanced_result['entities']}")
 
-            # 4. Enrichir avec les informations comparatives
+            # 7. Enrichir avec les informations comparatives
             enhanced_result["is_comparative"] = comparative_info["is_comparative"]
             enhanced_result["comparative_info"] = comparative_info
             enhanced_result["requires_calculation"] = comparative_info["is_comparative"]
 
-            # 5. NOUVEAU: Ajouter les patterns détectés
+            # 8. Ajouter les patterns détectés
             enhanced_result["query_patterns"] = query_patterns
 
-            # 6. Si comparaison détectée, créer les entités multiples
+            # 9. Si comparaison détectée, créer les entités multiples
             if comparative_info["is_comparative"]:
                 enhanced_result["comparison_entities"] = (
                     self._build_comparison_entities(
@@ -149,6 +238,9 @@ class QueryPreprocessor:
                     f"Requête comparative détectée: {comparative_info['type']}, "
                     f"{len(enhanced_result['comparison_entities'])} jeux d'entités à rechercher"
                 )
+
+            # 10. Cache du résultat
+            self._cache[query] = enhanced_result
 
             logger.info(
                 f"Query preprocessed: '{query}' -> '{enhanced_result['normalized_query']}'"
@@ -169,6 +261,46 @@ class QueryPreprocessor:
         finally:
             # Nettoyer la variable temporaire
             self._current_query = ""
+
+    # ========================================================================
+    # NOUVELLE MÉTHODE: Construction de résultat local
+    # ========================================================================
+
+    def _build_local_result(
+        self,
+        query: str,
+        local_entities: Dict,
+        query_patterns: Dict,
+        comparative_info: Dict,
+    ) -> Dict[str, Any]:
+        """
+        Construit un résultat complet à partir de l'extraction locale
+        """
+        # Validation et enrichissement des entités locales
+        validated_entities = self._validate_and_fix_entities(local_entities)
+
+        # Déterminer le type de requête
+        query_type = "metric" if validated_entities.get("metric_type") else "general"
+
+        # Routage intelligent
+        routing = "postgresql" if validated_entities.get("breed") else "weaviate"
+
+        return {
+            "normalized_query": query,  # Pas de normalisation complexe en local
+            "query_type": query_type,
+            "entities": validated_entities,
+            "routing": routing,
+            "confidence": 0.8,  # Confiance élevée pour extraction locale réussie
+            "is_comparative": comparative_info["is_comparative"],
+            "comparative_info": comparative_info,
+            "requires_calculation": comparative_info["is_comparative"],
+            "comparison_entities": (
+                [validated_entities] if not comparative_info["is_comparative"] else []
+            ),
+            "query_patterns": query_patterns,
+            "preprocessing_method": "local_extraction",
+            "processing_time_saved": True,
+        }
 
     # ========================================================================
     # NOUVELLES MÉTHODES: Post-traitement et enrichissement
@@ -769,6 +901,9 @@ Respond in JSON:
             "initialized": self._is_initialized,
             "comparative_detection": True,
             "pattern_detection": True,
+            "local_extraction": True,
+            "cache_enabled": True,
+            "cache_size": len(self._cache),
             "supported_comparisons": list(
                 self.comparative_detector.COMPARATIVE_PATTERNS.keys()
             ),
