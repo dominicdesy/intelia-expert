@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
+
 """
+
 rag_postgresql.py - PostgreSQL System for RAG
 Version modulaire avec intégration QueryValidator et DataAvailabilityChecker
-Phase 1 du plan d'implémentation LLM
+
 """
 
 import os
