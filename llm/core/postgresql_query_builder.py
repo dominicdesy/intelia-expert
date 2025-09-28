@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 postgresql_query_builder.py - Construction de requêtes SQL pour PostgreSQL
-Version ENRICHIE avec support recherches inversées
+Version CORRIGÉE - Alignement des paramètres et placeholders SQL
 """
 
 import logging
@@ -171,7 +171,7 @@ class PostgreSQLQueryBuilder:
 
         params = []
         conditions = []
-        param_count = 0
+        param_index = 0  # FIXE: Compteur séquentiel pour les placeholders
 
         # Extraction du sexe
         sex_from_query = self.query_normalizer.extract_sex_from_query(query)
@@ -182,35 +182,32 @@ class PostgreSQLQueryBuilder:
         actual_sex_specified = sex_specified or (sex_from_query is not None)
 
         # Construction de la condition de sexe
-        sex_priority_case = self._build_sex_condition(
+        sex_priority_case, param_index = self._build_sex_condition(
             target_sex,
             actual_sex_specified,
             strict_sex_match,
-            param_count,
+            param_index,
             conditions,
             params,
         )
-
-        if target_sex and (actual_sex_specified or strict_sex_match):
-            param_count += 1
 
         # Extraction de l'âge
         age_extracted = self._extract_age_from_query(query)
         if age_extracted:
             logger.debug(f"Age extracted from query: {age_extracted} days")
-            param_count = self._add_age_condition(
-                age_extracted, param_count, conditions, params
+            param_index = self._add_age_condition(
+                age_extracted, param_index, conditions, params
             )
 
         # Filtres d'entités avec normalisation BD
         if entities:
-            param_count = self._add_entity_filters(
-                entities, age_extracted, param_count, conditions, params
+            param_index = self._add_entity_filters(
+                entities, age_extracted, param_index, conditions, params
             )
 
         # Conditions de recherche métrique (feed_conversion_ratio for X)
-        param_count = self._add_metric_search_conditions(
-            query, age_extracted, param_count, conditions, params
+        param_index = self._add_metric_search_conditions(
+            query, age_extracted, param_index, conditions, params
         )
 
         # Assemblage final
@@ -225,6 +222,10 @@ class PostgreSQLQueryBuilder:
 
         base_query += f" ORDER BY {', '.join(order_clauses)}"
         base_query += f" LIMIT {top_k}"
+
+        logger.debug(f"Final SQL: {base_query}")
+        logger.debug(f"Final params count: {len(params)}")
+        logger.debug(f"Final params: {params}")
 
         return base_query, params
 
@@ -282,61 +283,77 @@ class PostgreSQLQueryBuilder:
         target_sex: Optional[str],
         sex_specified: bool,
         strict_sex_match: bool,
-        param_count: int,
+        param_index: int,
         conditions: List[str],
         params: List[Any],
-    ) -> str:
-        """Construit la condition SQL pour le sexe"""
+    ) -> Tuple[str, int]:
+        """
+        FIXE: Construit la condition SQL pour le sexe avec comptage correct
+
+        Returns:
+            Tuple[str, int]: (ORDER BY clause, nouveau param_index)
+        """
         if not target_sex or target_sex == "as_hatched":
             logger.debug("No specific sex requested, prioritizing as_hatched")
-            return """
+            return (
+                """
                 CASE 
                     WHEN LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed', 'as-hatched') THEN 1
                     WHEN LOWER(COALESCE(d.sex, 'as_hatched')) = 'male' THEN 2
                     WHEN LOWER(COALESCE(d.sex, 'as_hatched')) = 'female' THEN 3
                     ELSE 4
                 END
-            """
+            """,
+                param_index,
+            )
 
         if strict_sex_match:
             logger.debug(f"Strict sex match: {target_sex} only")
-            conditions.append(f"LOWER(d.sex) = ${param_count + 1}")
+            param_index += 1
+            conditions.append(f"LOWER(d.sex) = ${param_index}")
             params.append(target_sex.lower())
 
-            return f"""
+            return (
+                f"""
                 CASE 
-                    WHEN LOWER(d.sex) = ${param_count + 1} THEN 1
+                    WHEN LOWER(d.sex) = ${param_index} THEN 1
                     ELSE 2
                 END
-            """
+            """,
+                param_index,
+            )
         else:
             logger.debug(f"Sex specified: {target_sex}, with as_hatched fallback")
+            param_index += 1
             conditions.append(
                 f"""
-                (LOWER(COALESCE(d.sex, 'as_hatched')) = ${param_count + 1} 
+                (LOWER(COALESCE(d.sex, 'as_hatched')) = ${param_index} 
                  OR LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed', 'as-hatched', 'straight_run'))
             """
             )
             params.append(target_sex.lower())
 
-            return f"""
+            return (
+                f"""
                 CASE 
-                    WHEN LOWER(COALESCE(d.sex, 'as_hatched')) = ${param_count + 1} THEN 1
+                    WHEN LOWER(COALESCE(d.sex, 'as_hatched')) = ${param_index} THEN 1
                     WHEN LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed', 'as-hatched') THEN 2
                     ELSE 3
                 END
-            """
+            """,
+                param_index,
+            )
 
     def _add_age_condition(
-        self, age: int, param_count: int, conditions: List[str], params: List[Any]
+        self, age: int, param_index: int, conditions: List[str], params: List[Any]
     ) -> int:
-        """Ajoute la condition d'âge avec tolérance"""
+        """FIXE: Ajoute la condition d'âge avec tolérance"""
         age_tolerance = 3
 
-        param_count += 1
-        param_age1 = param_count
-        param_age2 = param_count + 1
-        param_tolerance = param_count + 2
+        # Trois paramètres: age, age, tolerance
+        param_age1 = param_index + 1
+        param_age2 = param_index + 2
+        param_tolerance = param_index + 3
 
         conditions.append(
             f"""
@@ -347,25 +364,25 @@ class PostgreSQLQueryBuilder:
         )
 
         params.extend([age, age, age_tolerance])
-        return param_count + 2
+        return param_index + 3
 
     def _add_entity_filters(
         self,
         entities: Dict[str, str],
         age_extracted: Optional[int],
-        param_count: int,
+        param_index: int,
         conditions: List[str],
         params: List[Any],
     ) -> int:
-        """Ajoute les filtres basés sur les entités - VERSION BD RÉELLE"""
+        """FIXE: Ajoute les filtres basés sur les entités - VERSION BD RÉELLE"""
 
         # Filtre de souche avec normalisation vers noms BD
         if entities.get("breed"):
             db_strain_name = self._normalize_breed_for_db(entities["breed"])
 
             if db_strain_name:
-                param_count += 1
-                conditions.append(f"s.strain_name = ${param_count}")
+                param_index += 1
+                conditions.append(f"s.strain_name = ${param_index}")
                 params.append(db_strain_name)
                 logger.debug(
                     f"Adding breed filter: {entities['breed']} -> DB: '{db_strain_name}'"
@@ -375,8 +392,8 @@ class PostgreSQLQueryBuilder:
             db_strain_name = self._normalize_breed_for_db(entities["line"])
 
             if db_strain_name:
-                param_count += 1
-                conditions.append(f"s.strain_name = ${param_count}")
+                param_index += 1
+                conditions.append(f"s.strain_name = ${param_index}")
                 params.append(db_strain_name)
                 logger.debug(
                     f"Adding line filter: {entities['line']} -> DB: '{db_strain_name}'"
@@ -386,9 +403,8 @@ class PostgreSQLQueryBuilder:
         if entities.get("age_days") and not age_extracted:
             try:
                 age_days = int(entities["age_days"])
-                param_count += 1
-                param_age1 = param_count
-                param_age2 = param_count + 1
+                param_age1 = param_index + 1
+                param_age2 = param_index + 2
 
                 conditions.append(
                     f"""
@@ -397,22 +413,22 @@ class PostgreSQLQueryBuilder:
                 """
                 )
                 params.extend([age_days, age_days])
-                param_count += 1
+                param_index += 2
             except ValueError:
                 logger.warning(f"Invalid age_days value: {entities.get('age_days')}")
 
-        return param_count
+        return param_index
 
     def _add_metric_search_conditions(
         self,
         query: str,
         age_extracted: Optional[int],
-        param_count: int,
+        param_index: int,
         conditions: List[str],
         params: List[Any],
     ) -> int:
         """
-        Ajoute les conditions de recherche de métriques
+        FIXE: Ajoute les conditions de recherche de métriques
         Adapté à la structure réelle: "feed_conversion_ratio for X"
         """
         metric_search_conditions = []
@@ -422,45 +438,45 @@ class PostgreSQLQueryBuilder:
         # Pattern pour FCR/conversion
         if any(term in query_lower for term in ["fcr", "conversion", "indice"]):
             if age_extracted:
-                param_count += 1
+                param_index += 1
                 metric_search_conditions.append(
-                    f"LOWER(m.metric_name) LIKE ${param_count}"
+                    f"LOWER(m.metric_name) LIKE ${param_index}"
                 )
                 params.append(f"%feed_conversion_ratio for {age_extracted}%")
                 logger.debug(
                     f"Searching for: feed_conversion_ratio for {age_extracted}"
                 )
 
-            param_count += 1
-            metric_search_conditions.append(f"LOWER(m.metric_name) LIKE ${param_count}")
+            param_index += 1
+            metric_search_conditions.append(f"LOWER(m.metric_name) LIKE ${param_index}")
             params.append("%feed_conversion_ratio%")
 
         # Pattern pour poids/weight
         elif any(term in query_lower for term in ["poids", "weight", "body"]):
             if age_extracted:
-                param_count += 1
+                param_index += 1
                 metric_search_conditions.append(
-                    f"LOWER(m.metric_name) LIKE ${param_count}"
+                    f"LOWER(m.metric_name) LIKE ${param_index}"
                 )
                 params.append(f"%body_weight for {age_extracted}%")
 
-            param_count += 1
-            metric_search_conditions.append(f"LOWER(m.metric_name) LIKE ${param_count}")
+            param_index += 1
+            metric_search_conditions.append(f"LOWER(m.metric_name) LIKE ${param_index}")
             params.append("%body_weight%")
 
         # Pattern générique si rien de spécifique
         else:
             if age_extracted:
-                param_count += 1
+                param_index += 1
                 metric_search_conditions.append(
-                    f"LOWER(m.metric_name) LIKE ${param_count}"
+                    f"LOWER(m.metric_name) LIKE ${param_index}"
                 )
                 params.append(f"% for {age_extracted}%")
 
         if metric_search_conditions:
             conditions.append(f"({' OR '.join(metric_search_conditions)})")
 
-        return param_count
+        return param_index
 
     def _extract_age_from_query(self, query: str) -> Optional[int]:
         """Extrait l'âge en jours depuis la requête"""
@@ -490,3 +506,42 @@ class PostgreSQLQueryBuilder:
                     continue
 
         return None
+
+
+# Tests unitaires
+if __name__ == "__main__":
+    from unittest.mock import Mock
+
+    # Mock normalizer
+    mock_normalizer = Mock()
+    mock_normalizer.extract_sex_from_query.return_value = "male"
+
+    builder = PostgreSQLQueryBuilder(mock_normalizer)
+
+    print("=" * 80)
+    print("TEST: Construction requête complète avec paramètres alignés")
+    print("=" * 80)
+    sql, params = builder.build_sex_aware_sql_query(
+        "Quelle est la conversion alimentaire du Cobb 500 mâle à 17 jours ?",
+        entities={"breed": "Cobb 500", "sex": "male", "age_days": "17"},
+        top_k=10,
+        strict_sex_match=True,
+    )
+
+    # Compter les placeholders dans la requête
+    import re
+
+    placeholders = re.findall(r"\$\d+", sql)
+    unique_placeholders = set(placeholders)
+
+    print(f"Paramètres fournis: {len(params)}")
+    print(f"Placeholders uniques trouvés: {len(unique_placeholders)}")
+    print(f"Placeholders: {sorted(unique_placeholders)}")
+    print(f"Correspondance: {'✓' if len(params) >= len(unique_placeholders) else '✗'}")
+
+    if len(params) >= len(unique_placeholders):
+        print("\n🎉 CORRECTION RÉUSSIE: Nombre de paramètres >= placeholders")
+    else:
+        print(
+            f"\n❌ PROBLÈME RESTANT: {len(unique_placeholders) - len(params)} paramètres manquants"
+        )

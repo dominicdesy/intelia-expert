@@ -58,6 +58,11 @@ class DataAvailabilityChecker:
         Returns:
             Dict avec clés: data_available, reason, data_type
         """
+        # CORRECTION: Normaliser les entités age_days → age
+        normalized_entities = entities.copy()
+        if "age_days" in entities and "age" not in entities:
+            normalized_entities["age"] = entities["age_days"]
+
         # Vérifications par priorité
 
         # 1. Données économiques
@@ -69,18 +74,20 @@ class DataAvailabilityChecker:
             }
 
         # 2. Nutrition Ross 308
-        if self._is_nutrition_ross_query(query, entities):
+        if self._is_nutrition_ross_query(query, normalized_entities):
             return {
                 "data_available": False,
                 "reason": "Les tables nutritionnelles Ross 308 ne sont pas disponibles",
                 "data_type": "nutrition",
             }
 
-        # 3. Plage d'âge
-        if "age_days" in entities:
+        # 3. Plage d'âge - utiliser entités normalisées
+        if "age_days" in entities or "age" in normalized_entities:
             try:
-                age = int(entities["age_days"])
-                age_check = self.check_age_range(entities.get("breed", ""), age)
+                age = int(entities.get("age_days") or normalized_entities.get("age"))
+                age_check = self.check_age_range(
+                    normalized_entities.get("breed", ""), age
+                )
                 if not age_check.available:
                     return {
                         "data_available": False,
@@ -90,13 +97,13 @@ class DataAvailabilityChecker:
             except (ValueError, TypeError):
                 return {
                     "data_available": False,
-                    "reason": f"Âge invalide: {entities['age_days']}",
+                    "reason": f"Âge invalide: {entities.get('age_days', 'unknown')}",
                     "data_type": "metrics",
                 }
 
         # 4. Souche existe
-        if "breed" in entities:
-            breed_check = self.check_breed_exists(entities["breed"])
+        if "breed" in normalized_entities:
+            breed_check = self.check_breed_exists(normalized_entities["breed"])
             if not breed_check.available:
                 return {
                     "data_available": False,

@@ -69,10 +69,15 @@ class QueryValidator:
         Returns:
             Dict avec clés: is_complete, missing_entities, confidence, clarification_message
         """
+        # CORRECTION: Normaliser les entités age_days → age
+        normalized_entities = entities.copy()
+        if "age_days" in entities and "age" not in entities:
+            normalized_entities["age"] = entities["age_days"]
+
         # Détecter le type de requête
         query_type = self._detect_query_type(query)
 
-        missing = self.identify_missing_entities(entities, query_type, query)
+        missing = self.identify_missing_entities(normalized_entities, query_type, query)
 
         if not missing:
             return {
@@ -117,7 +122,7 @@ class QueryValidator:
         Identifie les entités manquantes pour une requête
 
         Args:
-            entities: Entités extraites
+            entities: Entités extraites (déjà normalisées)
             query_type: Type de requête
             query: Requête originale
 
@@ -127,7 +132,7 @@ class QueryValidator:
         missing = []
         required = self.REQUIRED_ENTITIES.get(query_type, ["breed"])
 
-        # Vérifier entités de base
+        # Vérifier entités de base (entities déjà normalisées dans validate_query_completeness)
         for entity in required:
             if entity not in entities or not entities[entity]:
                 missing.append(entity)
