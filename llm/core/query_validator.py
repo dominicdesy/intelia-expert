@@ -130,6 +130,12 @@ class QueryValidator:
             Liste d'entités manquantes
         """
         missing = []
+
+        # CORRECTION: Vérifier si la question nécessite vraiment breed+age
+        if not self._should_require_breed_and_age(query):
+            # Questions générales : pas besoin de breed/age spécifiques
+            return missing
+
         required = self.REQUIRED_ENTITIES.get(query_type, ["breed"])
 
         # Vérifier entités de base (entities déjà normalisées dans validate_query_completeness)
@@ -148,6 +154,57 @@ class QueryValidator:
                 missing.append("comparison_dimension")
 
         return missing
+
+    def _should_require_breed_and_age(self, query: str) -> bool:
+        """Détermine si la question nécessite vraiment breed+age spécifiques"""
+        query_lower = query.lower()
+
+        # Patterns pour questions générales qui ne nécessitent pas breed/age
+        general_question_patterns = [
+            "comment calculer",
+            "qu'est-ce que",
+            "symptômes",
+            "température optimale",
+            "température idéale",
+            "définition",
+            "expliquer",
+            "pourquoi",
+            "comment faire",
+            "que signifie",
+            "principe",
+            "méthode",
+            "technique",
+            "procédure",
+            "facteurs",
+            "causes",
+            "prévention",
+            "traitement",
+        ]
+
+        # Si c'est une question générale, pas besoin de breed/age
+        if any(pattern in query_lower for pattern in general_question_patterns):
+            return False
+
+        # Si la question mentionne explicitement une souche ou un âge, alors les exiger
+        specific_patterns = [
+            "ross",
+            "cobb",
+            "hubbard",  # souches
+            "jour",
+            "jours",
+            "semaine",
+            "semaines",  # âges
+            "mâle",
+            "femelle",
+            "male",
+            "female",  # sexes
+        ]
+
+        if any(pattern in query_lower for pattern in specific_patterns):
+            return True
+
+        # Par défaut, pour les questions ambiguës, ne pas exiger breed/age
+        return False
 
     def _query_needs_age(self, query: str) -> bool:
         """Vérifie si la requête nécessite un âge"""
