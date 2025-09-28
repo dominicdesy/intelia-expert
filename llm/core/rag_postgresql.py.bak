@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql.py - PostgreSQL System for RAG
-Version modulaire avec intégration QueryValidator et DataAvailabilityChecker
-Phase 1 du plan d'implémentation LLM
+Version modulaire utilisant PostgreSQLQueryBuilder et ComparisonHandler
 """
 
 import os
@@ -31,25 +30,6 @@ except ImportError:
 
 from .data_models import RAGResult, RAGSource, Document
 from .postgresql_query_builder import PostgreSQLQueryBuilder
-
-# ✅ PHASE 1: Import des nouveaux modules
-try:
-    from .query_validator import QueryValidator
-
-    QUERY_VALIDATOR_AVAILABLE = True
-except ImportError:
-    QUERY_VALIDATOR_AVAILABLE = False
-    QueryValidator = None
-    logging.warning("QueryValidator non disponible")
-
-try:
-    from .data_availability_checker import DataAvailabilityChecker
-
-    DATA_CHECKER_AVAILABLE = True
-except ImportError:
-    DATA_CHECKER_AVAILABLE = False
-    DataAvailabilityChecker = None
-    logging.warning("DataAvailabilityChecker non disponible")
 
 logger = logging.getLogger(__name__)
 
@@ -388,7 +368,7 @@ class PostgreSQLRetriever:
         query: str,
         entities: Dict[str, Any] = None,
         top_k: int = 10,
-        strict_sex_match: bool = False,
+        strict_sex_match: bool = False,  # NOUVEAU paramètre
     ) -> List[MetricResult]:
         """
         Search metrics with optional strict sex matching
@@ -410,6 +390,7 @@ class PostgreSQLRetriever:
             logger.debug(f"Entities: {entities}")
             logger.debug(f"Normalized: {normalized_entities}")
 
+            # Utilisation du QueryBuilder avec strict_sex_match
             sql_query, params = self.query_builder.build_sex_aware_sql_query(
                 query, normalized_entities, top_k, strict_sex_match
             )
@@ -463,6 +444,7 @@ class PostgreSQLRetriever:
         """Calculate relevance score"""
         score = 0.5
 
+        # Sex matching bonus
         sex_from_entities = entities.get("sex") if entities else None
         row_sex = (row.get("sex") or "as_hatched").lower()
 
@@ -475,6 +457,7 @@ class PostgreSQLRetriever:
             if row_sex in ["as_hatched", "mixed"]:
                 score += 0.2
 
+        # Concept matching
         normalized_concepts, _ = self.query_normalizer.get_search_terms(query)
         metric_name_lower = (row.get("metric_name") or "").lower()
 
@@ -502,7 +485,7 @@ class PostgreSQLRetriever:
 
 
 class PostgreSQLSystem:
-    """Main PostgreSQL system - Interface simplifiée + Phase 1 modules"""
+    """Main PostgreSQL system - Interface simplifiée"""
 
     def __init__(self):
         self.query_router = None
@@ -510,12 +493,8 @@ class PostgreSQLSystem:
         self.is_initialized = False
         self.openai_client = None
 
-        # ✅ PHASE 1: Initialisation des nouveaux modules
-        self.query_validator = None
-        self.data_availability_checker = None
-
     async def initialize(self):
-        """Initialize PostgreSQL system + Phase 1 modules"""
+        """Initialize PostgreSQL system"""
         if self.is_initialized:
             return
 
@@ -534,26 +513,8 @@ class PostgreSQLSystem:
             else:
                 logger.warning("OpenAI not available")
 
-            # ✅ PHASE 1: Initialisation QueryValidator
-            if QUERY_VALIDATOR_AVAILABLE and QueryValidator:
-                try:
-                    self.query_validator = QueryValidator()
-                    logger.info("✅ QueryValidator initialisé (Phase 1)")
-                except Exception as e:
-                    logger.warning(f"QueryValidator init failed: {e}")
-                    self.query_validator = None
-
-            # ✅ PHASE 1: Initialisation DataAvailabilityChecker
-            if DATA_CHECKER_AVAILABLE and DataAvailabilityChecker:
-                try:
-                    self.data_availability_checker = DataAvailabilityChecker()
-                    logger.info("✅ DataAvailabilityChecker initialisé (Phase 1)")
-                except Exception as e:
-                    logger.warning(f"DataAvailabilityChecker init failed: {e}")
-                    self.data_availability_checker = None
-
             self.is_initialized = True
-            logger.info("PostgreSQL System initialized with Phase 1 modules")
+            logger.info("PostgreSQL System initialized")
 
         except Exception as e:
             logger.error(f"PostgreSQL System initialization error: {e}")
@@ -572,10 +533,10 @@ class PostgreSQLSystem:
         intent_result=None,
         top_k: int = 10,
         entities: Dict[str, Any] = None,
-        strict_sex_match: bool = False,
+        strict_sex_match: bool = False,  # NOUVEAU
     ) -> RAGResult:
         """
-        Main search method with Phase 1 validation
+        Main search method
 
         Args:
             strict_sex_match: Mode strict pour comparaisons (pas de fallback as_hatched)
@@ -587,77 +548,12 @@ class PostgreSQLSystem:
                 metadata={"error": "PostgreSQL not available"},
             )
 
-        # ✅ PHASE 1: Validation de la complétude de la requête
-        if self.query_validator:
-            try:
-                validation_result = self.query_validator.validate_query_completeness(
-                    query, entities or {}
-                )
-
-                if not validation_result.get("is_complete", True):
-                    missing_entities = validation_result.get("missing_entities", [])
-                    clarification_prompt = (
-                        self.query_validator.generate_clarification_prompt(
-                            missing_entities, query
-                        )
-                    )
-
-                    logger.info(
-                        f"Query validation: incomplete - missing {missing_entities}"
-                    )
-
-                    return RAGResult(
-                        source=RAGSource.NO_RESULTS,
-                        answer=clarification_prompt,
-                        metadata={
-                            "validation_status": "incomplete",
-                            "missing_entities": missing_entities,
-                            "requires_clarification": True,
-                            "phase": "1_validation",
-                        },
-                    )
-            except Exception as e:
-                logger.warning(f"Query validation failed: {e}")
-
-        # ✅ PHASE 1: Vérification de la disponibilité des données
-        if self.data_availability_checker:
-            try:
-                availability_check = (
-                    self.data_availability_checker.check_data_availability(
-                        query, entities or {}
-                    )
-                )
-
-                if not availability_check.get("data_available", True):
-                    unavailable_reason = availability_check.get("reason", "unknown")
-                    unavailable_message = (
-                        self.data_availability_checker.generate_unavailable_message(
-                            unavailable_reason, query
-                        )
-                    )
-
-                    logger.info(f"Data availability check: {unavailable_reason}")
-
-                    return RAGResult(
-                        source=RAGSource.NO_RESULTS,
-                        answer=unavailable_message,
-                        metadata={
-                            "availability_status": "unavailable",
-                            "reason": unavailable_reason,
-                            "data_type_requested": availability_check.get("data_type"),
-                            "phase": "1_availability",
-                        },
-                    )
-            except Exception as e:
-                logger.warning(f"Data availability check failed: {e}")
-
-        # Recherche normale si validations OK
         try:
             metric_results = await self.postgres_retriever.search_metrics(
                 query=query,
                 entities=entities,
                 top_k=top_k,
-                strict_sex_match=strict_sex_match,
+                strict_sex_match=strict_sex_match,  # Propagation du paramètre
             )
 
             if not metric_results:
@@ -667,11 +563,10 @@ class PostgreSQLSystem:
                         "source_type": "metrics",
                         "data_source": "postgresql",
                         "strict_sex_match": strict_sex_match,
-                        "validation_passed": True,
-                        "availability_passed": True,
                     },
                 )
 
+            # Convert to Documents
             documents = self._convert_metrics_to_documents(metric_results)
 
             if not documents:
@@ -681,6 +576,7 @@ class PostgreSQLSystem:
                     metadata={"error": "No valid documents"},
                 )
 
+            # Generate response
             answer_text = await self._generate_response(
                 query, documents, metric_results, entities
             )
@@ -702,9 +598,6 @@ class PostgreSQLSystem:
                     "metric_count": len(metric_results),
                     "strict_sex_match": strict_sex_match,
                     "openai_model": OPENAI_MODEL,
-                    "validation_passed": True,
-                    "availability_passed": True,
-                    "phase": "1_complete",
                 },
             )
 
@@ -778,6 +671,7 @@ class PostgreSQLSystem:
 
         best_metric = metric_results[0]
 
+        # Simple structured response
         sex_info = (
             f" pour {best_metric.sex}"
             if best_metric.sex and best_metric.sex != "as_hatched"
@@ -792,7 +686,7 @@ class PostgreSQLSystem:
         self.is_initialized = False
 
     def get_normalization_status(self) -> Dict[str, Any]:
-        """Return normalization status + Phase 1 modules"""
+        """Return normalization status"""
         if not self.postgres_retriever:
             return {"available": False}
 
@@ -800,21 +694,5 @@ class PostgreSQLSystem:
             "available": True,
             "sex_aware_search": True,
             "openai_enabled": self.openai_client is not None,
-            "strict_sex_match_supported": True,
-            # ✅ PHASE 1: Status des nouveaux modules
-            "phase_1_modules": {
-                "query_validator": {
-                    "available": self.query_validator is not None,
-                    "status": "initialized" if self.query_validator else "unavailable",
-                },
-                "data_availability_checker": {
-                    "available": self.data_availability_checker is not None,
-                    "status": (
-                        "initialized"
-                        if self.data_availability_checker
-                        else "unavailable"
-                    ),
-                },
-            },
-            "implementation_phase": "1_validation_availability",
+            "strict_sex_match_supported": True,  # NOUVEAU
         }

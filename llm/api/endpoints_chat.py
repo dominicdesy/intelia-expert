@@ -2,7 +2,7 @@
 """
 api/endpoints_chat.py - Endpoints de chat et streaming avec Système RAG JSON
 Gestion des conversations, streaming SSE, validation JSON, ingestion avicole
-Version 4.0 - Intégration complète du pipeline JSON
+Version 4.1 - Intégration preprocessing activé
 """
 
 import time
@@ -181,7 +181,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                 **result,
                 "processing_time": time.time() - start_time,
                 "timestamp": time.time(),
-                "version": "4.0_json_integrated",
+                "version": "4.1_preprocessed",
             }
 
             return JSONResponse(content=safe_serialize_for_json(response))
@@ -505,7 +505,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                                 enable_preprocessing=True,  # ✅ AJOUTÉ
                             )
                             logger.info(
-                                f"RAG generate_response réussi (JSON: {use_json_search})"
+                                f"RAG generate_response réussi (JSON: {use_json_search}, preprocessing: enabled)"
                             )
 
                         except Exception as generate_error:
@@ -549,6 +549,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                             "source_type": "integrated_knowledge",
                             "json_system_attempted": use_json_search,
                             "genetic_line_filter": genetic_line_filter,
+                            "preprocessing_enabled": True,
                         }
                         self.context_docs = []
 
@@ -587,6 +588,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                         ),
                         "architecture": "modular-endpoints-json",
                         "serialization_version": "optimized_cached",
+                        "preprocessing_enabled": True,
                         # NOUVELLES MÉTADONNÉES JSON
                         "json_system_used": metadata.get("json_system", {}).get(
                             "used", False
@@ -651,6 +653,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                         "documents_used": documents_used,
                         "source": source,
                         "architecture": "modular-endpoints-json",
+                        "preprocessing_enabled": True,
                         # NOUVELLES MÉTADONNÉES FINALES
                         "json_system_used": metadata.get("json_system", {}).get(
                             "used", False
@@ -741,6 +744,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                         "age_range": request.age_range,
                         "response_format": request.response_format,
                         "json_search_used": request.use_json_search,
+                        "preprocessing_enabled": True,
                         "confidence": float(
                             safe_get_attribute(rag_result, "confidence", 0.5)
                         ),
@@ -791,6 +795,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                             safe_get_attribute(rag_result, "confidence", 0.5)
                         ),
                         "response_format_applied": request.response_format,
+                        "preprocessing_enabled": True,
                     }
 
                     yield sse_event(safe_serialize_for_json(end_metadata))
@@ -930,6 +935,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     "json_results_count": json_system_info.get("results_count", 0),
                     "confidence": getattr(generation_result, "confidence", 0),
                     "has_answer": bool(getattr(generation_result, "answer", "")),
+                    "preprocessing_enabled": True,
                 }
             except Exception as e:
                 test_results["json_generation"] = {"success": False, "error": str(e)}
@@ -965,6 +971,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     if successful_tests == total_tests
                     else "DEGRADED" if successful_tests > 0 else "FAILED"
                 ),
+                "version": "4.1_preprocessed",
             }
 
             return safe_serialize_for_json(analysis)
@@ -1050,6 +1057,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                         ),
                         "has_specific_data": has_specific_data,
                         "has_generic_response": has_generic_response,
+                        "preprocessing_enabled": True,
                         "response_preview": (
                             response_text[:200] + "..."
                             if len(response_text) > 200
@@ -1096,6 +1104,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     "json_system_effectiveness": queries_with_json / len(test_queries),
                 },
                 "recommendations": [],
+                "version": "4.1_preprocessed",
             }
 
             # Recommandations basées sur les résultats

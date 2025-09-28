@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 postgresql_query_builder.py - Construction de requêtes SQL pour PostgreSQL
-Version ENRICHIE avec support recherches inversées
+Version CORRIGÉE utilisant intents.json + mappings réels de la base de données
 """
 
 import logging
@@ -17,6 +17,7 @@ class PostgreSQLQueryBuilder:
     """Construit les requêtes SQL en utilisant intents.json et les noms réels de la BD"""
 
     # Mapping des noms normalisés -> noms RÉELS dans la base de données
+    # À synchroniser avec la structure réelle de votre BD
     DB_STRAIN_MAPPING = {
         # Ross
         "ross308": "308/308 FF",
@@ -102,14 +103,17 @@ class PostgreSQLQueryBuilder:
 
         # 3. Fallback: chercher dans les aliases intents.json
         for canonical_line, aliases in self.line_aliases.items():
+            # Normaliser le canonical_line pour matching
             canonical_clean = re.sub(r"[\s\-_]+", "", canonical_line.lower())
 
             if breed_clean == canonical_clean:
+                # On a trouvé dans intents.json, mapper vers la BD
                 if canonical_clean in self.DB_STRAIN_MAPPING:
                     result = self.DB_STRAIN_MAPPING[canonical_clean]
                     logger.debug(f"Breed via intents+DB: '{breed_input}' -> '{result}'")
                     return result
 
+            # Vérifier les aliases
             for alias in aliases:
                 alias_clean = re.sub(r"[\s\-_]+", "", alias.lower())
                 if breed_clean == alias_clean and alias_clean in self.DB_STRAIN_MAPPING:
@@ -228,55 +232,6 @@ class PostgreSQLQueryBuilder:
 
         return base_query, params
 
-    # ========================================================================
-    # NOUVELLE MÉTHODE: Recherche inversée (valeur → âge)
-    # ========================================================================
-
-    def build_reverse_lookup_query(
-        self, breed: str, sex: str, metric_type: str, target_value: float
-    ) -> Tuple[str, List]:
-        """
-        Construit une requête pour trouver l'âge correspondant à une valeur cible
-
-        Args:
-            breed: Nom de la souche (normalisé)
-            sex: Sexe
-            metric_type: Type de métrique ("body_weight", "feed_conversion_ratio", etc.)
-            target_value: Valeur cible à trouver
-
-        Returns:
-            Tuple[str, List]: (requête SQL, paramètres)
-        """
-        # Normaliser breed pour DB
-        db_strain_name = self._normalize_breed_for_db(breed)
-
-        query = """
-        SELECT 
-            m.age_min,
-            m.value_numeric as value,
-            m.unit,
-            ABS(m.value_numeric - $1) as difference,
-            s.strain_name,
-            d.sex
-        FROM metrics m
-        JOIN documents d ON m.document_id = d.id
-        JOIN strains s ON d.strain_id = s.id
-        WHERE s.strain_name = $2
-          AND d.sex = $3
-          AND m.metric_name LIKE $4
-          AND m.value_numeric IS NOT NULL
-        ORDER BY difference ASC
-        LIMIT 1
-        """
-
-        params = [target_value, db_strain_name, sex, f"%{metric_type}%"]
-
-        logger.debug(
-            f"Reverse lookup: {metric_type}={target_value} for {db_strain_name} {sex}"
-        )
-
-        return query, params
-
     def _build_sex_condition(
         self,
         target_sex: Optional[str],
@@ -365,12 +320,14 @@ class PostgreSQLQueryBuilder:
 
             if db_strain_name:
                 param_count += 1
+                # Recherche EXACTE du nom de la BD (sensible à la casse dans la BD)
                 conditions.append(f"s.strain_name = ${param_count}")
                 params.append(db_strain_name)
                 logger.debug(
                     f"Adding breed filter: {entities['breed']} -> DB: '{db_strain_name}'"
                 )
 
+        # Filtre de ligne génétique (legacy support)
         elif entities.get("line"):
             db_strain_name = self._normalize_breed_for_db(entities["line"])
 
@@ -417,11 +374,13 @@ class PostgreSQLQueryBuilder:
         """
         metric_search_conditions = []
 
+        # Détection du type de métrique demandé
         query_lower = query.lower()
 
         # Pattern pour FCR/conversion
         if any(term in query_lower for term in ["fcr", "conversion", "indice"]):
             if age_extracted:
+                # Chercher "feed_conversion_ratio for X"
                 param_count += 1
                 metric_search_conditions.append(
                     f"LOWER(m.metric_name) LIKE ${param_count}"
@@ -431,6 +390,7 @@ class PostgreSQLQueryBuilder:
                     f"Searching for: feed_conversion_ratio for {age_extracted}"
                 )
 
+            # Fallback: chercher toutes les métriques FCR
             param_count += 1
             metric_search_conditions.append(f"LOWER(m.metric_name) LIKE ${param_count}")
             params.append("%feed_conversion_ratio%")
@@ -450,6 +410,7 @@ class PostgreSQLQueryBuilder:
 
         # Pattern générique si rien de spécifique
         else:
+            # Chercher dans metric_name avec l'âge
             if age_extracted:
                 param_count += 1
                 metric_search_conditions.append(
@@ -490,3 +451,43 @@ class PostgreSQLQueryBuilder:
                     continue
 
         return None
+
+
+# Tests unitaires
+if __name__ == "__main__":
+    from unittest.mock import Mock
+
+    # Mock normalizer
+    mock_normalizer = Mock()
+    mock_normalizer.extract_sex_from_query.return_value = "male"
+
+    builder = PostgreSQLQueryBuilder(mock_normalizer)
+
+    print("=" * 80)
+    print("TEST 1: Normalisation Cobb 500 -> 500")
+    print("=" * 80)
+    test_inputs = ["Cobb 500", "cobb 500", "cobb500", "Cobb-500", "c500"]
+    for inp in test_inputs:
+        result = builder._normalize_breed_for_db(inp)
+        print(f"  {inp:20s} -> {result}")
+
+    print("\n" + "=" * 80)
+    print("TEST 2: Normalisation Ross 308 -> 308/308 FF")
+    print("=" * 80)
+    test_inputs = ["Ross 308", "ross 308", "ross308", "Ross-308", "r308"]
+    for inp in test_inputs:
+        result = builder._normalize_breed_for_db(inp)
+        print(f"  {inp:20s} -> {result}")
+
+    print("\n" + "=" * 80)
+    print("TEST 3: Construction requête complète")
+    print("=" * 80)
+    sql, params = builder.build_sex_aware_sql_query(
+        "Quelle est la conversion alimentaire du Cobb 500 mâle à 17 jours ?",
+        entities={"breed": "Cobb 500", "sex": "male", "age_days": "17"},
+        top_k=10,
+        strict_sex_match=True,
+    )
+    print(f"Params extraits: {params[:6]}")
+    print(f"SQL contient 'strain_name = $': {('strain_name = $' in sql)}")
+    print(f"SQL contient 'feed_conversion_ratio': {('feed_conversion_ratio' in sql)}")
