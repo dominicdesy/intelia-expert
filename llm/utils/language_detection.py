@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 utils/language_detection.py - Module de détection de langue multilingue
-Extrait de utilities.py pour modularisation
+Version corrigée avec FastText proper et téléchargement automatique pour Digital Ocean
 """
 
 import os
@@ -14,19 +14,28 @@ from dataclasses import dataclass
 # Imports conditionnels pour détection de langue
 try:
     import fasttext
+
+    FASTTEXT_AVAILABLE = True
 except ImportError:
     fasttext = None
+    FASTTEXT_AVAILABLE = False
 
 try:
     from fastlangdetect import detect, LangDetectException
+
+    FAST_LANGDETECT_AVAILABLE = True
 except ImportError:
     detect = None
     LangDetectException = Exception
+    FAST_LANGDETECT_AVAILABLE = False
 
 try:
     from unidecode import unidecode
+
+    UNIDECODE_AVAILABLE = True
 except ImportError:
     unidecode = None
+    UNIDECODE_AVAILABLE = False
 
 # Imports configuration
 from config.config import (
@@ -40,11 +49,6 @@ from config.config import (
 
 logger = logging.getLogger(__name__)
 
-# FLAGS de disponibilité des modules (définis après imports)
-FASTTEXT_AVAILABLE = fasttext is not None
-FAST_LANGDETECT_AVAILABLE = detect is not None
-UNIDECODE_AVAILABLE = unidecode is not None
-
 # Log des disponibilités
 if FASTTEXT_AVAILABLE:
     logger.info("FastText disponible pour détection multilingue")
@@ -55,6 +59,7 @@ if not FASTTEXT_AVAILABLE and not FAST_LANGDETECT_AVAILABLE:
 
 # Variables globales
 _fasttext_model = None
+_model_download_attempted = False
 
 # ============================================================================
 # CLASSES DE DONNÉES
@@ -98,44 +103,159 @@ class LanguageDetectionResult:
 
 
 # ============================================================================
-# FONCTIONS DE DÉTECTION DE LANGUE
+# FONCTIONS DE TÉLÉCHARGEMENT ET CHARGEMENT FASTTEXT
 # ============================================================================
 
 
+def _download_fasttext_model():
+    """
+    Télécharge automatiquement le modèle FastText sur Digital Ocean
+    """
+    global _model_download_attempted
+
+    if _model_download_attempted:
+        return None
+
+    _model_download_attempted = True
+
+    try:
+        import requests
+    except ImportError:
+        logger.error("Module requests non disponible pour téléchargement FastText")
+        return None
+
+    model_url = "https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.ftz"
+
+    # Essayer différents répertoires de destination sur Digital Ocean
+    target_dirs = [
+        "/tmp",  # Digital Ocean App Platform tmp
+        "./models",
+        ".",
+        "/app/models",  # DO App Platform app directory
+        os.path.join(os.path.dirname(__file__), "..", "models"),
+    ]
+
+    for target_dir in target_dirs:
+        try:
+            if not os.path.exists(target_dir):
+                os.makedirs(target_dir, exist_ok=True)
+
+            model_path = os.path.join(target_dir, "lid.176.ftz")
+
+            # Skip si déjà présent
+            if os.path.exists(model_path) and os.path.getsize(model_path) > 100000:
+                logger.info(f"Modèle FastText déjà présent: {model_path}")
+                return model_path
+
+            logger.info(f"Téléchargement du modèle FastText vers {model_path}...")
+
+            response = requests.get(model_url, stream=True, timeout=120)
+            response.raise_for_status()
+
+            total_size = int(response.headers.get("content-length", 0))
+            downloaded = 0
+
+            with open(model_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+
+                        # Log progress pour gros fichiers
+                        if total_size > 0 and downloaded % (total_size // 10) == 0:
+                            progress = (downloaded / total_size) * 100
+                            logger.info(f"Téléchargement: {progress:.1f}%")
+
+            # Vérifier que le fichier est valide
+            if os.path.getsize(model_path) > 100000:  # > 100KB
+                logger.info(
+                    f"✅ Modèle FastText téléchargé: {model_path} ({os.path.getsize(model_path)} bytes)"
+                )
+                return model_path
+            else:
+                logger.warning(f"Fichier téléchargé trop petit: {model_path}")
+                os.remove(model_path)
+
+        except Exception as e:
+            logger.warning(f"Échec téléchargement vers {target_dir}: {e}")
+            continue
+
+    logger.error("❌ Impossible de télécharger le modèle FastText")
+    return None
+
+
 def _load_fasttext_model():
-    """Charge le modèle FastText avec lazy loading"""
+    """
+    Charge le modèle FastText avec téléchargement automatique sur Digital Ocean
+    """
     global _fasttext_model
 
     if not FASTTEXT_AVAILABLE:
+        logger.warning(
+            "FastText non disponible - installer avec: pip install fasttext==0.9.2"
+        )
         return None
 
     if _fasttext_model is None:
         try:
-            model_path = FASTTEXT_MODEL_PATH
-            if not os.path.exists(model_path):
-                logger.warning(f"Modèle FastText non trouvé: {model_path}")
+            # Chemins possibles sur Digital Ocean App Platform
+            possible_paths = [
+                FASTTEXT_MODEL_PATH,  # Chemin configuré
+                "/app/models/lid.176.ftz",
+                "/tmp/lid.176.ftz",  # Tmp sur Digital Ocean
+                "./models/lid.176.ftz",
+                "./lid.176.ftz",
+                os.path.join(os.path.dirname(__file__), "..", "models", "lid.176.ftz"),
+            ]
+
+            model_path = None
+            for path in possible_paths:
+                if path and os.path.exists(path):
+                    file_size = os.path.getsize(path)
+                    if file_size > 100000:  # > 100KB
+                        model_path = path
+                        logger.debug(
+                            f"Modèle FastText trouvé: {path} ({file_size} bytes)"
+                        )
+                        break
+
+            # Si modèle non trouvé, télécharger automatiquement
+            if not model_path:
                 logger.info(
-                    "Le modèle devrait être pré-chargé au démarrage de l'application"
+                    "Modèle FastText non trouvé - téléchargement automatique..."
                 )
+                model_path = _download_fasttext_model()
+
+            if model_path and os.path.exists(model_path):
+                logger.info(f"Chargement du modèle FastText: {model_path}")
+                _fasttext_model = fasttext.load_model(model_path)
+                logger.info("✅ Modèle FastText chargé avec succès")
+            else:
+                logger.error("❌ Impossible de charger le modèle FastText")
                 return None
 
-            _fasttext_model = fasttext.load_model(model_path)
-            logger.info(f"Modèle FastText chargé: {model_path}")
-
         except Exception as e:
-            logger.warning(f"Erreur chargement FastText: {e}")
+            logger.error(f"❌ Erreur chargement FastText: {e}")
             _fasttext_model = None
 
     return _fasttext_model
 
 
+# ============================================================================
+# FONCTIONS DE DÉTECTION DE LANGUE
+# ============================================================================
+
+
 def _detect_with_universal_patterns(text: str) -> Optional[str]:
     """Détection de langue via patterns universels du dictionnaire"""
     # Import local pour éviter la circularité
-    from utils.translation_utils import get_translation_service
+    try:
+        from utils.translation_utils import get_translation_service
 
-    translation_service = get_translation_service()
-    if not translation_service:
+        translation_service = get_translation_service()
+        if not translation_service:
+            return None
+    except ImportError:
         return None
 
     text_lower = text.lower()
@@ -161,22 +281,26 @@ def _detect_with_universal_patterns(text: str) -> Optional[str]:
 
     # Si contient des termes techniques, probable contexte avicole
     if any(pattern in text_lower for pattern in technical_patterns):
-
         # Vérification patterns par langue via service traduction
         for lang in SUPPORTED_LANGUAGES:
             # Récupérer termes questions dans cette langue
-            question_terms = translation_service.get_domain_terms(
-                "question_words", lang
-            )
-            if any(term in text_lower for term in question_terms[:5]):  # Top 5 termes
-                return lang
+            try:
+                question_terms = translation_service.get_domain_terms(
+                    "question_words", lang
+                )
+                if any(
+                    term in text_lower for term in question_terms[:5]
+                ):  # Top 5 termes
+                    return lang
+            except Exception:
+                continue
 
     return None
 
 
 def detect_language_enhanced(text: str, default: str = None) -> LanguageDetectionResult:
     """
-    Détection de langue multilingue avec FastText
+    Détection de langue multilingue avec FastText - VERSION CORRIGÉE
     Remplace l'ancienne version langdetect avec support 13 langues
     """
     start_time = time.time()
@@ -250,8 +374,11 @@ def detect_language_enhanced(text: str, default: str = None) -> LanguageDetectio
         model = _load_fasttext_model()
         if model:
             try:
-                predictions = model.predict(text_clean.replace("\n", " "), k=1)
-                if predictions and len(predictions) >= 2:
+                # Nettoyer le texte pour FastText
+                text_for_fasttext = text_clean.replace("\n", " ").replace("\r", " ")
+                predictions = model.predict(text_for_fasttext, k=1)
+
+                if predictions and len(predictions) >= 2 and len(predictions[0]) > 0:
                     lang_label = predictions[0][0].replace("__label__", "")
                     confidence = float(predictions[1][0])
 

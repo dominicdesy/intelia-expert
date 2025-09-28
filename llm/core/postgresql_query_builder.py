@@ -58,47 +58,62 @@ class PostgreSQLQueryBuilder:
 
     def _normalize_breed_for_db(self, breed_input: str) -> Optional[str]:
         """
-        Normalisation robuste des noms de souches - VERSION CORRIGÉE
+        AMÉLIORÉ: Normalise breed name pour correspondre aux noms en BD
+        Gère maintenant les breeds multiples séparés par virgules
 
         Args:
-            breed_input: Ex: "Cobb 500", "ross 308", "cobb500"
+            breed_input: Ex: "Cobb 500", "ross 308", "cobb500", "Cobb 500, Ross 308"
 
         Returns:
-            Nom réel BD: "500", "308/308 FF", ou None
+            Nom réel BD: "500", "308/308 FF", "500,308/308 FF", ou None
         """
         if not breed_input:
             return None
 
-        breed_lower = breed_input.lower().strip()
+        breed_input = str(breed_input).strip()
+        breed_lower = breed_input.lower()
 
-        # Mappings complets avec toutes les variantes
-        breed_mappings = {
-            # Cobb 500 variants
+        # Mapping direct exact (priorité haute)
+        direct_mapping = {
             "cobb 500": "500",
             "cobb500": "500",
             "cobb-500": "500",
             "c500": "500",
             "500": "500",
-            # Ross 308 variants
             "ross 308": "308/308 FF",
             "ross308": "308/308 FF",
             "ross-308": "308/308 FF",
             "r308": "308/308 FF",
             "308": "308/308 FF",
-            # Gestion des comparaisons multiples
-            "cobb 500, ross 308": ["500", "308/308 FF"],
-            "ross 308, cobb 500": ["308/308 FF", "500"],
-            "cobb vs ross": ["500", "308/308 FF"],
-            "ross vs cobb": ["308/308 FF", "500"],
+            # NOUVEAU: Gérer les cas avec virgules (multi-breeds)
+            "cobb 500, ross 308": "500,308/308 FF",
+            "ross 308, cobb 500": "308/308 FF,500",
+            "cobb vs ross": "500,308/308 FF",
+            "ross vs cobb": "308/308 FF,500",
         }
 
-        # Chercher correspondance exacte
-        if breed_lower in breed_mappings:
-            result = breed_mappings[breed_lower]
-            logger.debug(f"Breed DB mapping: '{breed_input}' -> '{result}'")
+        # Vérification exacte d'abord
+        if breed_lower in direct_mapping:
+            result = direct_mapping[breed_lower]
+            logger.debug(f"Breed exact match: '{breed_input}' -> '{result}'")
             return result
 
-        # Recherche par mots-clés si pas de correspondance exacte
+        # NOUVEAU: Détecter si c'est une liste séparée par virgules
+        if "," in breed_input:
+            breeds = [b.strip() for b in breed_input.split(",")]
+            normalized_breeds = []
+            for breed in breeds:
+                norm = self._normalize_breed_for_db(breed)  # Récursion
+                if norm and "," not in norm:  # Éviter récursion infinie
+                    normalized_breeds.append(norm)
+            result = ",".join(normalized_breeds) if normalized_breeds else None
+            if result:
+                logger.debug(
+                    f"Multiple breeds normalized: '{breed_input}' -> '{result}'"
+                )
+            return result
+
+        # Recherche par mots-clés (code existant...)
         if "cobb" in breed_lower and "500" in breed_lower:
             logger.debug(f"Breed keyword match: '{breed_input}' -> '500'")
             return "500"
@@ -192,6 +207,40 @@ class PostgreSQLQueryBuilder:
         logger.debug("Aucun âge ou phase détecté dans la requête")
         return None
 
+    def _handle_multiple_breeds(self, breeds_input: str) -> Tuple[str, List[str]]:
+        """
+        NOUVEAU: Gère les requêtes avec multiples breeds (Cobb 500, Ross 308)
+
+        Args:
+            breeds_input: String normalisé contenant un ou plusieurs breeds
+                         Ex: "500", "308/308 FF", "500,308/308 FF"
+
+        Returns:
+            Tuple[str, List[str]]: (condition_sql, list_params)
+        """
+        if not breeds_input:
+            return "", []
+
+        # Séparer les breeds multiples si séparés par virgule
+        if "," in breeds_input:
+            breed_names = [b.strip() for b in breeds_input.split(",")]
+        else:
+            breed_names = [breeds_input.strip()]
+
+        # Filtrer les breeds valides
+        valid_breeds = [breed for breed in breed_names if breed]
+
+        if not valid_breeds:
+            return "", []
+
+        if len(valid_breeds) == 1:
+            # Un seul breed - utiliser égalité simple
+            return "s.strain_name = ${}", valid_breeds
+        else:
+            # Multiples breeds - utiliser IN
+            placeholders = ", ".join("${}" for _ in range(len(valid_breeds)))
+            return f"s.strain_name IN ({placeholders})", valid_breeds
+
     def _normalize_entities(self, entities: Dict[str, str]) -> Dict[str, str]:
         """Normalise les entités pour la BD"""
         if not entities:
@@ -251,15 +300,27 @@ class PostgreSQLQueryBuilder:
             logger.debug("Aucun âge spécifié - recherche tous âges")
             # Pas de condition d'âge = recherche plus large
 
-        # 2. Breed (toujours après age)
+        # 2. Breed (toujours après age) - VERSION CORRIGÉE POUR MULTIPLES BREEDS
         breed_db = normalized_entities.get("breed")
         if breed_db:
-            param_count += 1
-            conditions.append(f"s.strain_name = ${param_count}")
-            params.append(breed_db)
-            logger.debug(
-                f"Adding breed filter: {entities.get('breed') if entities else 'N/A'} -> DB: '{breed_db}' (param ${param_count})"
-            )
+            breed_condition, breed_params = self._handle_multiple_breeds(breed_db)
+            if breed_condition and breed_params:
+                # Ajuster les placeholders selon le nombre de paramètres existants
+                adjusted_condition = breed_condition
+                for i, param in enumerate(breed_params):
+                    placeholder_template = "${}"
+                    placeholder_new = f"${param_count + i + 1}"
+                    adjusted_condition = adjusted_condition.replace(
+                        placeholder_template, placeholder_new, 1
+                    )
+
+                conditions.append(adjusted_condition)
+                params.extend(breed_params)
+                param_count += len(breed_params)
+
+                logger.debug(
+                    f"Adding breed filter: {entities.get('breed') if entities else 'N/A'} -> DB: '{breed_params}' (params ${param_count - len(breed_params) + 1} to ${param_count})"
+                )
 
         # 3. Métrique (toujours après breed)
         param_count = self._add_metric_search_conditions(
@@ -588,21 +649,31 @@ if __name__ == "__main__":
 
     builder = PostgreSQLQueryBuilder(mock_normalizer)
 
+    print("\n" + "=" * 80)
+    print("TEST 1: Normalisation breeds simples et multiples")
     print("=" * 80)
-    print("TEST 1: Normalisation Cobb 500 -> 500")
-    print("=" * 80)
-    test_inputs = ["Cobb 500", "cobb 500", "cobb500", "Cobb-500", "c500"]
+    test_inputs = [
+        "Cobb 500",
+        "ross 308",
+        "cobb500",
+        "Cobb-500",
+        "c500",
+        "Cobb 500, Ross 308",
+        "ross 308, cobb 500",
+        "cobb vs ross",
+    ]
     for inp in test_inputs:
         result = builder._normalize_breed_for_db(inp)
-        print(f"  {inp:20s} -> {result}")
+        print(f"  {inp:25s} -> {result}")
 
     print("\n" + "=" * 80)
-    print("TEST 2: Normalisation Ross 308 -> 308/308 FF")
+    print("TEST 2: Gestion breeds multiples SQL")
     print("=" * 80)
-    test_inputs = ["Ross 308", "ross 308", "ross308", "Ross-308", "r308"]
-    for inp in test_inputs:
-        result = builder._normalize_breed_for_db(inp)
-        print(f"  {inp:20s} -> {result}")
+    test_breeds = ["500", "308/308 FF", "500,308/308 FF"]
+    for breed in test_breeds:
+        condition, params = builder._handle_multiple_breeds(breed)
+        print(f"  {breed:15s} -> Condition: {condition}")
+        print(f"  {' ':15s}    Params: {params}")
 
     print("\n" + "=" * 80)
     print("TEST 3: Extraction d'âge améliorée avec phases alimentaires")
@@ -659,6 +730,25 @@ if __name__ == "__main__":
         f"Correspondance sans âge: {'✓' if len(params_no_age) >= len(unique_placeholders_no_age) else '✗'}"
     )
     print(f"ORDER BY adapté: {'age_min ASC' in sql_no_age}")
+
+    print("\n" + "=" * 80)
+    print("TEST 6: Requête avec breeds multiples")
+    print("=" * 80)
+    sql_multi, params_multi = builder.build_sex_aware_sql_query(
+        "comparer conversion Cobb 500 vs Ross 308 à 42 jours",
+        entities={"breed": "Cobb 500, Ross 308", "age_days": "42"},
+        top_k=10,
+    )
+
+    placeholders_multi = re.findall(r"\$\d+", sql_multi)
+    unique_placeholders_multi = set(placeholders_multi)
+
+    print(f"Paramètres fournis (multi-breeds): {len(params_multi)}")
+    print(f"Placeholders uniques (multi-breeds): {len(unique_placeholders_multi)}")
+    print(
+        f"Correspondance multi-breeds: {'✓' if len(params_multi) >= len(unique_placeholders_multi) else '✗'}"
+    )
+    print(f"SQL contient IN clause: {'IN (' in sql_multi}")
 
     if len(params) >= len(unique_placeholders):
         print("\n🎉 CORRECTION RÉUSSIE: Nombre de paramètres >= placeholders")

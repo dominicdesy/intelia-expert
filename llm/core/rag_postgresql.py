@@ -572,88 +572,72 @@ class PostgreSQLSystem:
         self,
         query: str,
         intent_result=None,
-        top_k: int = 10,
+        top_k: int = 12,
         entities: Dict[str, Any] = None,
         strict_sex_match: bool = False,
     ) -> RAGResult:
         """
-        Main search method with Phase 1 validation
-
-        Args:
-            strict_sex_match: Mode strict pour comparaisons (pas de fallback as_hatched)
+        AMÉLIORÉ: Recherche de métriques avec validation flexible
         """
 
         if not self.is_initialized or not self.postgres_retriever:
+            logger.warning("PostgreSQL retriever non initialisé")
             return RAGResult(
-                source=RAGSource.NO_RESULTS,
-                metadata={"error": "PostgreSQL not available"},
+                source=RAGSource.ERROR, answer="Système de métriques non disponible."
             )
 
-        # ✅ PHASE 1: Validation de la complétude de la requête
-        if self.query_validator:
-            try:
-                validation_result = self.query_validator.validate_query_completeness(
-                    query, entities or {}
-                )
+        import time
 
-                if not validation_result.get("is_complete", True):
-                    missing_entities = validation_result.get("missing_entities", [])
-                    clarification_prompt = (
-                        self.query_validator.generate_clarification_prompt(
-                            missing_entities, query
-                        )
-                    )
+        start_time = time.time()
 
-                    logger.info(
-                        f"Query validation: incomplete - missing {missing_entities}"
-                    )
-
-                    return RAGResult(
-                        source=RAGSource.NO_RESULTS,
-                        answer=clarification_prompt,
-                        metadata={
-                            "validation_status": "incomplete",
-                            "missing_entities": missing_entities,
-                            "requires_clarification": True,
-                            "phase": "1_validation",
-                        },
-                    )
-            except Exception as e:
-                logger.warning(f"Query validation failed: {e}")
-
-        # ✅ PHASE 1: Vérification de la disponibilité des données avec CORRECTION as_hatched
-        if self.data_availability_checker:
-            try:
-                # 🔧 CORRECTION CRITIQUE: Traiter as_hatched correctement
-                availability_check = self._check_data_availability_with_as_hatched_fix(
-                    query, entities or {}
-                )
-
-                if not availability_check.get("data_available", True):
-                    unavailable_reason = availability_check.get("reason", "unknown")
-                    unavailable_message = (
-                        self.data_availability_checker.generate_unavailable_message(
-                            unavailable_reason, query
-                        )
-                    )
-
-                    logger.info(f"Data availability check: {unavailable_reason}")
-
-                    return RAGResult(
-                        source=RAGSource.NO_RESULTS,
-                        answer=unavailable_message,
-                        metadata={
-                            "availability_status": "unavailable",
-                            "reason": unavailable_reason,
-                            "data_type_requested": availability_check.get("data_type"),
-                            "phase": "1_availability",
-                        },
-                    )
-            except Exception as e:
-                logger.warning(f"Data availability check failed: {e}")
-
-        # Recherche normale si validations OK
         try:
+            # NOUVEAU: Validation flexible avec suggestions
+            validation_result = self._flexible_query_validation(query, entities)
+
+            if validation_result["status"] == "complete":
+                # Requête complète - traitement normal
+                logger.info("Query validation: complete")
+
+            elif validation_result["status"] == "incomplete_but_processable":
+                # Requête incomplète mais traitable
+                logger.info(f"🔧 Correction: {validation_result['message']}")
+                entities = validation_result["enhanced_entities"]
+
+            elif validation_result["status"] == "needs_fallback":
+                # Rediriger vers réponse d'aide
+                logger.info("Query validation: redirecting to helpful response")
+                return RAGResult(
+                    source=RAGSource.NO_RESULTS,
+                    answer=validation_result["helpful_message"],
+                    metadata={
+                        "processing_time": time.time() - start_time,
+                        "validation_status": "incomplete",
+                        "missing_entities": validation_result["missing"],
+                        "suggestions": validation_result["suggestions"],
+                    },
+                )
+
+            # NOUVEAU: Vérification disponibilité des données plus flexible
+            if entities and entities.get("breed") and entities.get("age_days"):
+                availability_check = self._check_data_availability_flexible(entities)
+                if not availability_check["available"]:
+                    logger.info(
+                        f"Data availability check: {availability_check['message']}"
+                    )
+
+                    # Proposer alternatives au lieu de rejeter
+                    if availability_check.get("alternatives"):
+                        return RAGResult(
+                            source=RAGSource.NO_RESULTS,
+                            answer=availability_check["helpful_response"],
+                            metadata={
+                                "processing_time": time.time() - start_time,
+                                "availability_status": "out_of_range",
+                                "alternatives": availability_check["alternatives"],
+                            },
+                        )
+
+            # Exécution normale de la requête
             metric_results = await self.postgres_retriever.search_metrics(
                 query=query,
                 entities=entities,
@@ -664,13 +648,8 @@ class PostgreSQLSystem:
             if not metric_results:
                 return RAGResult(
                     source=RAGSource.NO_RESULTS,
-                    metadata={
-                        "source_type": "metrics",
-                        "data_source": "postgresql",
-                        "strict_sex_match": strict_sex_match,
-                        "validation_passed": True,
-                        "availability_passed": True,
-                    },
+                    answer="Aucune métrique trouvée pour cette requête.",
+                    metadata={"processing_time": time.time() - start_time},
                 )
 
             documents = self._convert_metrics_to_documents(metric_results)
@@ -705,7 +684,7 @@ class PostgreSQLSystem:
                     "openai_model": OPENAI_MODEL,
                     "validation_passed": True,
                     "availability_passed": True,
-                    "phase": "1_complete",
+                    "processing_time": time.time() - start_time,
                 },
             )
 
@@ -713,8 +692,227 @@ class PostgreSQLSystem:
             logger.error(f"PostgreSQL search error: {e}")
             return RAGResult(
                 source=RAGSource.ERROR,
-                metadata={"error": str(e)},
+                answer="Erreur lors de la recherche de métriques.",
+                metadata={"error": str(e), "processing_time": time.time() - start_time},
             )
+
+    def _flexible_query_validation(
+        self, query: str, entities: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        NOUVEAU: Validation flexible qui essaie de compléter les requêtes incomplètes
+        """
+
+        entities = entities or {}
+        missing = []
+        suggestions = []
+        enhanced_entities = entities.copy()
+
+        # Vérifier breed
+        if not entities.get("breed"):
+            # Essayer d'extraire breed du texte de la requête
+            detected_breed = self._detect_breed_from_query(query)
+            if detected_breed:
+                enhanced_entities["breed"] = detected_breed
+                logger.debug(f"Auto-detected breed: {detected_breed}")
+            else:
+                missing.append("breed")
+                suggestions.append("Spécifiez une race (Cobb 500, Ross 308, etc.)")
+
+        # Vérifier âge
+        if not entities.get("age_days"):
+            # Essayer d'extraire âge du texte
+            detected_age = self._detect_age_from_query(query)
+            if detected_age:
+                enhanced_entities["age_days"] = detected_age
+                logger.debug(f"Auto-detected age: {detected_age} days")
+            else:
+                # Pour certaines requêtes, l'âge n'est pas critique
+                if any(
+                    word in query.lower()
+                    for word in ["recommande", "meilleur", "compare", "général"]
+                ):
+                    # Requête générale - pas besoin d'âge spécifique
+                    pass
+                else:
+                    missing.append("age")
+                    suggestions.append("Précisez un âge (21 jours, 42 jours, etc.)")
+
+        # Vérifier métrique
+        if not entities.get("metric_type"):
+            detected_metric = self._detect_metric_from_query(query)
+            if detected_metric:
+                enhanced_entities["metric_type"] = detected_metric
+                logger.debug(f"Auto-detected metric: {detected_metric}")
+
+        # Déterminer le statut
+        if not missing:
+            return {"status": "complete", "enhanced_entities": enhanced_entities}
+
+        elif len(missing) <= 1 and ("breed" not in missing):
+            # Si juste l'âge ou métrique manque, on peut souvent traiter
+            return {
+                "status": "incomplete_but_processable",
+                "message": f"Autoriser la requête sans {', '.join(missing)} spécifique",
+                "enhanced_entities": enhanced_entities,
+                "missing": missing,
+            }
+
+        else:
+            # Trop d'informations manquantes
+            helpful_message = self._generate_validation_help_message(
+                query, missing, suggestions
+            )
+            return {
+                "status": "needs_fallback",
+                "missing": missing,
+                "suggestions": suggestions,
+                "helpful_message": helpful_message,
+            }
+
+    def _detect_breed_from_query(self, query: str) -> Optional[str]:
+        """Détecte la race dans le texte de la requête"""
+        query_lower = query.lower()
+
+        # Patterns de détection
+        breed_patterns = {
+            "cobb 500": ["cobb 500", "cobb500", "c500"],
+            "ross 308": ["ross 308", "ross308", "r308"],
+            "hubbard ja87": ["hubbard", "ja87", "j87"],
+        }
+
+        for canonical_breed, patterns in breed_patterns.items():
+            for pattern in patterns:
+                if pattern in query_lower:
+                    return canonical_breed
+
+        return None
+
+    def _detect_age_from_query(self, query: str) -> Optional[int]:
+        """Détecte l'âge dans le texte de la requête"""
+        import re
+
+        age_patterns = [
+            r"à\s+(\d+)\s+jours?",
+            r"(\d+)\s+jours?",
+            r"(\d+)\s*j\b",
+            r"(\d+)\s+semaines?",  # Sera multiplié par 7
+        ]
+
+        query_lower = query.lower()
+
+        for pattern in age_patterns:
+            match = re.search(pattern, query_lower)
+            if match:
+                age = int(match.group(1))
+                # Convertir semaines en jours
+                if "semaine" in pattern:
+                    age *= 7
+                if 0 <= age <= 150:  # Validation range
+                    return age
+
+        return None
+
+    def _detect_metric_from_query(self, query: str) -> Optional[str]:
+        """Détecte le type de métrique dans la requête"""
+        query_lower = query.lower()
+
+        metric_keywords = {
+            "weight": ["poids", "weight", "masse"],
+            "fcr": ["fcr", "conversion", "indice", "ic"],
+            "mortality": ["mortalité", "mortality", "mort"],
+            "production": ["production", "ponte", "œuf", "egg"],
+            "feed": ["alimentation", "feed", "aliment"],
+        }
+
+        for metric_type, keywords in metric_keywords.items():
+            if any(keyword in query_lower for keyword in keywords):
+                return metric_type
+
+        return None
+
+    def _generate_validation_help_message(
+        self, query: str, missing: List[str], suggestions: List[str]
+    ) -> str:
+        """Génère un message d'aide pour requêtes incomplètes"""
+
+        if "recommande" in query.lower() or "meilleur" in query.lower():
+            return """Pour une recommandation personnalisée, précisez :
+
+**Races disponibles :**
+• Cobb 500 - Croissance rapide, bon FCR
+• Ross 308 - Excellent rendement, robustesse  
+• Hubbard JA87 - Adaptabilité, rusticité
+
+**Contexte nécessaire :**
+• Type de production (chair, ponte)
+• Objectifs (croissance, conversion, mortalité)
+• Conditions d'élevage
+
+**Exemple :** "Recommande une race pour production intensive de chair"."""
+
+        else:
+            return f"""Informations manquantes : {', '.join(missing)}
+
+**Suggestions :**
+{chr(10).join(f'• {s}' for s in suggestions)}
+
+**Exemple de requête complète :**
+"Quel est le poids du Cobb 500 à 42 jours ?"
+
+Reformulez avec plus de détails pour des données précises."""
+
+    def _check_data_availability_flexible(
+        self, entities: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Vérification flexible de disponibilité avec alternatives
+        """
+
+        breed = entities.get("breed", "").lower()
+        age_days = entities.get("age_days")
+
+        if not age_days or not breed:
+            return {"available": True}  # Skip si données incomplètes
+
+        # Ranges de données connus
+        data_ranges = {
+            "cobb 500": {"min": 0, "max": 56},
+            "ross 308": {"min": 0, "max": 56},
+            "hubbard ja87": {"min": 0, "max": 49},
+        }
+
+        range_info = data_ranges.get(breed)
+        if not range_info:
+            return {"available": True}  # Breed inconnu - laisser passer
+
+        if range_info["min"] <= age_days <= range_info["max"]:
+            return {"available": True}
+
+        # Hors plage - proposer alternatives
+        alternatives = []
+        if age_days > range_info["max"]:
+            alternatives.append(
+                f"Données disponibles jusqu'à {range_info['max']} jours"
+            )
+            alternatives.append(f"Essayez: poids à {range_info['max']} jours")
+
+        helpful_response = f"""L'âge demandé ({age_days} jours) est hors de la plage de données disponibles pour {breed.title()} ({range_info['min']}-{range_info['max']} jours).
+
+**Alternatives disponibles :**
+{chr(10).join(f'• {alt}' for alt in alternatives)}
+
+**Données disponibles pour {breed.title()} :**
+• Poids corporel (0-{range_info['max']} jours)
+• FCR et conversion alimentaire  
+• Mortalité et performance"""
+
+        return {
+            "available": False,
+            "message": f"L'âge demandé ({age_days} jours) est hors de la plage de données disponibles pour {breed} ({range_info['min']}-{range_info['max']} jours).",
+            "alternatives": alternatives,
+            "helpful_response": helpful_response,
+        }
 
     def _check_data_availability_with_as_hatched_fix(
         self, query: str, entities: Dict[str, Any]
@@ -869,6 +1067,18 @@ class PostgreSQLSystem:
             "as_hatched_fix": {
                 "applied": True,
                 "description": "Correction pour traiter as_hatched comme âge non spécifié",
+                "status": "active",
+            },
+            # 🔧 NOUVELLE INFO: Statut de la validation flexible
+            "flexible_validation": {
+                "applied": True,
+                "description": "Validation flexible avec auto-détection et alternatives",
+                "features": [
+                    "Auto-détection breed/age/metric",
+                    "Requêtes partiellement spécifiées",
+                    "Messages d'aide intelligents",
+                    "Alternatives pour données hors plage",
+                ],
                 "status": "active",
             },
         }

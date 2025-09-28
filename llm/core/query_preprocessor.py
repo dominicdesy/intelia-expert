@@ -55,7 +55,7 @@ class QueryPreprocessor:
         self, query: str, language: str = "fr"
     ) -> Dict[str, Any]:
         """
-        Analyse et normalise une requête utilisateur avec détections enrichies
+        AMÉLIORÉ: Preprocessing avec contextualisation intelligente
 
         Returns:
             {
@@ -72,71 +72,92 @@ class QueryPreprocessor:
             }
         """
 
-        # 1. Détection comparative AVANT OpenAI
-        comparative_info = self.comparative_detector.detect(query)
-        logger.debug(f"Détection comparative: {comparative_info}")
-
-        # 2. NOUVEAU: Détection des patterns spéciaux
-        query_patterns = self._detect_query_patterns(query)
-        logger.debug(f"Patterns détectés: {query_patterns}")
-
-        # 3. Appel OpenAI pour normalisation et extraction d'entités
-        system_prompt = self._get_system_prompt(
-            language, comparative_info["is_comparative"]
-        )
+        # Stocker la requête pour utilisation dans les corrections
+        self._current_query = query
 
         try:
-            response = await self.client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": query},
-                ],
-                temperature=0.1,
-                max_tokens=300,
-                response_format={"type": "json_object"},
+            # 1. Détection comparative AVANT OpenAI
+            comparative_info = self.comparative_detector.detect(query)
+            logger.debug(f"Détection comparative: {comparative_info}")
+
+            # 2. NOUVEAU: Détection des patterns spéciaux
+            query_patterns = self._detect_query_patterns(query)
+            logger.debug(f"Patterns détectés: {query_patterns}")
+
+            # 3. Appel OpenAI pour normalisation et extraction d'entités
+            system_prompt = self._get_system_prompt(
+                language, comparative_info["is_comparative"]
             )
 
-            result = json.loads(response.choices[0].message.content)
+            try:
+                response = await self.client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": query},
+                    ],
+                    temperature=0.1,
+                    max_tokens=300,
+                    response_format={"type": "json_object"},
+                )
 
-            # Validation
-            if "normalized_query" not in result:
-                logger.warning("Preprocessing incomplet, utilisation query originale")
-                result["normalized_query"] = query
+                result = json.loads(response.choices[0].message.content)
 
-            if "entities" not in result:
-                result["entities"] = {}
+                # Validation
+                if "normalized_query" not in result:
+                    logger.warning(
+                        "Preprocessing incomplet, utilisation query originale"
+                    )
+                    result["normalized_query"] = query
+
+                if "entities" not in result:
+                    result["entities"] = {}
+
+                # NOUVEAU: Post-traitement intelligent
+                enhanced_result = self._enhance_openai_result(
+                    result, query, comparative_info
+                )
+
+            except Exception as e:
+                logger.warning(f"OpenAI normalization failed: {e}")
+                enhanced_result = self._fallback_preprocessing(
+                    query, comparative_info, query_patterns
+                )
 
             # NOUVEAU: Validation et correction des entités OpenAI défaillantes
-            result["entities"] = self._validate_and_fix_entities(result["entities"])
-            logger.debug(f"Entités après validation: {result['entities']}")
+            enhanced_result["entities"] = self._validate_and_fix_entities(
+                enhanced_result["entities"]
+            )
+            logger.debug(f"Entités après validation: {enhanced_result['entities']}")
 
             # 4. Enrichir avec les informations comparatives
-            result["is_comparative"] = comparative_info["is_comparative"]
-            result["comparative_info"] = comparative_info
-            result["requires_calculation"] = comparative_info["is_comparative"]
+            enhanced_result["is_comparative"] = comparative_info["is_comparative"]
+            enhanced_result["comparative_info"] = comparative_info
+            enhanced_result["requires_calculation"] = comparative_info["is_comparative"]
 
             # 5. NOUVEAU: Ajouter les patterns détectés
-            result["query_patterns"] = query_patterns
+            enhanced_result["query_patterns"] = query_patterns
 
             # 6. Si comparaison détectée, créer les entités multiples
             if comparative_info["is_comparative"]:
-                result["comparison_entities"] = self._build_comparison_entities(
-                    result["entities"], comparative_info["entities"]
+                enhanced_result["comparison_entities"] = (
+                    self._build_comparison_entities(
+                        enhanced_result["entities"], comparative_info["entities"]
+                    )
                 )
                 logger.info(
                     f"Requête comparative détectée: {comparative_info['type']}, "
-                    f"{len(result['comparison_entities'])} jeux d'entités à rechercher"
+                    f"{len(enhanced_result['comparison_entities'])} jeux d'entités à rechercher"
                 )
 
             logger.info(
-                f"Query preprocessed: '{query}' -> '{result['normalized_query']}'"
+                f"Query preprocessed: '{query}' -> '{enhanced_result['normalized_query']}'"
             )
-            logger.debug(f"Routing suggestion: {result.get('routing')}")
-            logger.debug(f"Entities detected: {result['entities']}")
+            logger.debug(f"Routing suggestion: {enhanced_result.get('routing')}")
+            logger.debug(f"Entities detected: {enhanced_result['entities']}")
             logger.debug(f"Patterns: {query_patterns}")
 
-            return result
+            return enhanced_result
 
         except json.JSONDecodeError as e:
             logger.error(f"Erreur parsing JSON OpenAI: {e}")
@@ -145,85 +166,179 @@ class QueryPreprocessor:
         except Exception as e:
             logger.error(f"Erreur preprocessing OpenAI: {e}")
             return self._fallback_preprocessing(query, comparative_info, query_patterns)
+        finally:
+            # Nettoyer la variable temporaire
+            self._current_query = ""
+
+    # ========================================================================
+    # NOUVELLES MÉTHODES: Post-traitement et enrichissement
+    # ========================================================================
+
+    def _enhance_openai_result(
+        self, openai_result: Dict, original_query: str, comparative_info: Dict
+    ) -> Dict:
+        """
+        NOUVEAU: Post-traitement pour enrichir le résultat OpenAI
+        """
+        enhanced = openai_result.copy()
+
+        # Enrichir pour requêtes de recommandation
+        if any(
+            word in original_query.lower()
+            for word in ["meilleur", "recommande", "conseil"]
+        ):
+            if not enhanced.get("entities", {}).get("breed"):
+                # Suggérer breeds populaires pour recommandations
+                enhanced.setdefault("entities", {})[
+                    "breed"
+                ] = "Cobb 500, Ross 308, Hubbard JA87"
+                enhanced["query_type"] = "recommendation"
+
+        # Enrichir pour requêtes de comparaison
+        if comparative_info["is_comparative"] and not enhanced.get("entities", {}).get(
+            "breed"
+        ):
+            # Pour les comparaisons sans breed spécifique
+            enhanced.setdefault("entities", {})["breed"] = "Cobb 500, Ross 308"
+            enhanced["routing"] = "postgresql"  # Forcer PostgreSQL pour comparaisons
+
+        # Enrichir le routage
+        if not enhanced.get("routing"):
+            # Routage intelligent basé sur le contenu
+            if any(
+                word in original_query.lower()
+                for word in ["poids", "fcr", "conversion", "mortalité", "production"]
+            ):
+                enhanced["routing"] = "postgresql"
+            elif any(
+                word in original_query.lower()
+                for word in ["comment", "pourquoi", "explique", "maladie"]
+            ):
+                enhanced["routing"] = "weaviate"
+            else:
+                # Défaut: PostgreSQL pour données numériques
+                enhanced["routing"] = "postgresql"
+
+        return enhanced
 
     # ========================================================================
     # NOUVELLE MÉTHODE: Validation des entités OpenAI
     # ========================================================================
 
-    def _validate_and_fix_entities(self, entities: Dict) -> Dict:
+    def _validate_and_fix_entities(self, entities: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Nettoie les entités OpenAI défaillantes
-
-        OpenAI peut générer des incohérences comme :
-        - age_days: "as_hatched" (devrait être un nombre ou None)
-        - breed: "as_hatched" (devrait être une souche ou None)
-        - sex manquant ou invalide
-
-        Args:
-            entities: Dictionnaire d'entités brutes d'OpenAI
-
-        Returns:
-            Dictionnaire d'entités nettoyées et validées
+        AMÉLIORÉ: Validation et correction avec suggestions intelligentes
         """
-        cleaned_entities = entities.copy()
+        if not entities:
+            entities = {}
 
-        # Correction age_days
-        if cleaned_entities.get("age_days") == "as_hatched":
-            cleaned_entities["age_days"] = None  # Plus clair que "as_hatched"
-            logger.debug("Correction: age_days 'as_hatched' → None")
+        corrected = {}
+        corrections_applied = []
 
-        # Validation age_days est un nombre valide
-        if "age_days" in cleaned_entities and cleaned_entities["age_days"] is not None:
-            try:
-                age = cleaned_entities["age_days"]
-                if isinstance(age, str):
-                    # Tenter conversion string → int
-                    if age.isdigit():
-                        cleaned_entities["age_days"] = int(age)
-                    else:
-                        cleaned_entities["age_days"] = None
-                        logger.warning(f"age_days invalide '{age}' → None")
-                elif isinstance(age, (int, float)):
-                    # Validation range
-                    if not (0 <= age <= 150):
-                        cleaned_entities["age_days"] = None
-                        logger.warning(f"age_days hors range {age} → None")
-                    else:
-                        cleaned_entities["age_days"] = int(age)
-            except (ValueError, TypeError):
-                cleaned_entities["age_days"] = None
-                logger.warning("age_days non convertible → None")
+        # Correction sexe
+        if entities.get("sex") is None or entities.get("sex") == "None":
+            corrected["sex"] = "as_hatched"
+            corrections_applied.append("sex 'None' → 'as_hatched'")
+        else:
+            # Normaliser les valeurs de sexe
+            sex_value = str(entities["sex"]).lower()
+            if sex_value in ["m", "male", "mâle", "males"]:
+                corrected["sex"] = "male"
+            elif sex_value in ["f", "female", "femelle", "females"]:
+                corrected["sex"] = "female"
+            elif sex_value in ["as_hatched", "as-hatched", "mixed", "mixte"]:
+                corrected["sex"] = "as_hatched"
+            else:
+                corrected["sex"] = "as_hatched"
+                corrections_applied.append(f"sex '{sex_value}' → 'as_hatched'")
 
-        # Correction breed
-        if cleaned_entities.get("breed") == "as_hatched":
-            cleaned_entities["breed"] = None
-            logger.debug("Correction: breed 'as_hatched' → None")
+        # Correction breed - NOUVEAU: Suggestions pour requêtes générales
+        if entities.get("breed"):
+            corrected["breed"] = entities["breed"]
+        else:
+            # NOUVEAU: Pour requêtes générales, suggérer breeds populaires
+            query_context = getattr(self, "_current_query", "").lower()
+            if any(
+                word in query_context
+                for word in ["meilleur", "recommande", "compare", "différence"]
+            ):
+                # Pour requêtes comparatives/recommandations, suggérer plusieurs races
+                corrected["breed"] = "Cobb 500, Ross 308"  # Breeds les plus populaires
+                corrections_applied.append("breed suggéré pour requête générale")
+            # Sinon, laisser vide pour validation flexible
 
-        # Validation breed
-        if "breed" in cleaned_entities and cleaned_entities["breed"]:
-            breed = str(cleaned_entities["breed"]).strip()
-            if not breed or breed.lower() in ["none", "null", ""]:
-                cleaned_entities["breed"] = None
+        # Correction âge
+        if entities.get("age_days"):
+            age_val = entities["age_days"]
+            if isinstance(age_val, str) and age_val.lower() in ["as_hatched", "none"]:
+                corrected["age_days"] = None
+                corrections_applied.append(f"age_days '{age_val}' → None")
+            else:
+                try:
+                    corrected["age_days"] = int(age_val)
+                except (ValueError, TypeError):
+                    corrected["age_days"] = None
+                    corrections_applied.append(f"age_days '{age_val}' → None (invalid)")
+        else:
+            # NOUVEAU: Suggestion d'âge pour certains contextes
+            query_context = getattr(self, "_current_query", "").lower()
+            if any(word in query_context for word in ["abattage", "finition", "final"]):
+                corrected["age_days"] = 42  # Âge d'abattage standard
+                corrections_applied.append("age_days suggéré (42j pour finition)")
+            elif any(
+                word in query_context for word in ["démarrage", "starter", "début"]
+            ):
+                corrected["age_days"] = 21  # Phase démarrage
+                corrections_applied.append("age_days suggéré (21j pour démarrage)")
 
-        # Assurer que sex a une valeur valide
-        valid_sexes = ["male", "female", "as_hatched"]
-        current_sex = cleaned_entities.get("sex")
+        # Correction metric_type - NOUVEAU: Détection améliorée
+        if entities.get("metric_type"):
+            # Normaliser les types de métriques
+            metric = str(entities["metric_type"]).lower()
+            metric_mapping = {
+                "poids": "weight",
+                "weight": "weight",
+                "masse": "weight",
+                "fcr": "fcr",
+                "conversion": "fcr",
+                "ic": "fcr",
+                "indice": "fcr",
+                "mortalité": "mortality",
+                "mortality": "mortality",
+                "production": "production",
+                "ponte": "production",
+                "œuf": "production",
+                "alimentation": "feed",
+                "feed": "feed",
+            }
+            corrected["metric_type"] = metric_mapping.get(metric, metric)
+        else:
+            # NOUVEAU: Détecter métrique depuis le contexte de la requête
+            query_context = getattr(self, "_current_query", "").lower()
+            if any(word in query_context for word in ["poids", "weight", "masse"]):
+                corrected["metric_type"] = "weight"
+                corrections_applied.append("metric_type détecté: weight")
+            elif any(word in query_context for word in ["fcr", "conversion", "indice"]):
+                corrected["metric_type"] = "fcr"
+                corrections_applied.append("metric_type détecté: fcr")
+            elif any(word in query_context for word in ["mortalité", "mortality"]):
+                corrected["metric_type"] = "mortality"
+                corrections_applied.append("metric_type détecté: mortality")
 
-        if not current_sex or current_sex not in valid_sexes:
-            cleaned_entities["sex"] = "as_hatched"
-            logger.debug(f"Correction: sex '{current_sex}' → 'as_hatched'")
+        # Copier autres entités non modifiées
+        for key, value in entities.items():
+            if key not in corrected:
+                corrected[key] = value
 
-        # Validation metric_type
-        if "metric_type" in cleaned_entities and cleaned_entities["metric_type"]:
-            metric = str(cleaned_entities["metric_type"]).strip()
-            if not metric or metric.lower() in ["none", "null", ""]:
-                cleaned_entities["metric_type"] = None
+        # Log des corrections
+        if corrections_applied:
+            original_keys = list(entities.keys()) if entities else []
+            corrected_keys = list(corrected.keys())
+            logger.info(f"Entités corrigées: {original_keys} → {corrected_keys}")
+            for correction in corrections_applied:
+                logger.debug(f"Correction: {correction}")
 
-        # Log des corrections effectuées
-        if cleaned_entities != entities:
-            logger.info(f"Entités corrigées: {entities} → {cleaned_entities}")
-
-        return cleaned_entities
+        return corrected
 
     # ========================================================================
     # MÉTHODES CORRIGÉES: Détection de patterns spéciaux
@@ -600,15 +715,46 @@ Respond in JSON:
     def _fallback_preprocessing(
         self, query: str, comparative_info: Dict, query_patterns: Dict
     ) -> Dict[str, Any]:
-        """Preprocessing de secours en cas d'erreur OpenAI"""
+        """
+        AMÉLIORÉ: Preprocessing de secours avec détection locale
+        """
         logger.warning("Utilisation du preprocessing de secours")
+
+        # Détection locale de base
+        detected_entities = {"sex": "as_hatched"}
+
+        query_lower = query.lower()
+
+        # Détection breed locale
+        if any(word in query_lower for word in ["cobb", "500"]):
+            detected_entities["breed"] = "Cobb 500"
+        elif any(word in query_lower for word in ["ross", "308"]):
+            detected_entities["breed"] = "Ross 308"
+        elif any(word in query_lower for word in ["hubbard", "ja87"]):
+            detected_entities["breed"] = "Hubbard JA87"
+
+        # Détection âge locale
+        import re
+
+        age_match = re.search(r"(\d+)\s*(?:jours?|days?|j)", query_lower)
+        if age_match:
+            detected_entities["age_days"] = int(age_match.group(1))
+
+        # Détection métrique locale
+        if any(word in query_lower for word in ["poids", "weight"]):
+            detected_entities["metric_type"] = "weight"
+        elif any(word in query_lower for word in ["fcr", "conversion"]):
+            detected_entities["metric_type"] = "fcr"
+
+        # Routage local
+        routing = "postgresql" if detected_entities.get("breed") else "weaviate"
 
         return {
             "normalized_query": query,
             "query_type": "general",
-            "entities": self._validate_and_fix_entities({"sex": "as_hatched"}),
-            "routing": "weaviate",
-            "confidence": 0.3,
+            "entities": self._validate_and_fix_entities(detected_entities),
+            "routing": routing,
+            "confidence": 0.5,  # Confidence réduite pour fallback
             "is_comparative": comparative_info["is_comparative"],
             "comparative_info": comparative_info,
             "requires_calculation": comparative_info["is_comparative"],
