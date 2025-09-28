@@ -107,10 +107,9 @@ class QueryPreprocessor:
             if "entities" not in result:
                 result["entities"] = {}
 
-            # Garantir as_hatched par défaut si sexe non spécifié
-            if "sex" not in result["entities"] or not result["entities"]["sex"]:
-                result["entities"]["sex"] = "as_hatched"
-                logger.debug("Sexe non spécifié → as_hatched par défaut")
+            # NOUVEAU: Validation et correction des entités OpenAI défaillantes
+            result["entities"] = self._validate_and_fix_entities(result["entities"])
+            logger.debug(f"Entités après validation: {result['entities']}")
 
             # 4. Enrichir avec les informations comparatives
             result["is_comparative"] = comparative_info["is_comparative"]
@@ -148,13 +147,92 @@ class QueryPreprocessor:
             return self._fallback_preprocessing(query, comparative_info, query_patterns)
 
     # ========================================================================
+    # NOUVELLE MÉTHODE: Validation des entités OpenAI
+    # ========================================================================
+
+    def _validate_and_fix_entities(self, entities: Dict) -> Dict:
+        """
+        Nettoie les entités OpenAI défaillantes
+        
+        OpenAI peut générer des incohérences comme :
+        - age_days: "as_hatched" (devrait être un nombre ou None)
+        - breed: "as_hatched" (devrait être une souche ou None)
+        - sex manquant ou invalide
+        
+        Args:
+            entities: Dictionnaire d'entités brutes d'OpenAI
+            
+        Returns:
+            Dictionnaire d'entités nettoyées et validées
+        """
+        cleaned_entities = entities.copy()
+        
+        # Correction age_days
+        if cleaned_entities.get("age_days") == "as_hatched":
+            cleaned_entities["age_days"] = None  # Plus clair que "as_hatched"
+            logger.debug("Correction: age_days 'as_hatched' → None")
+        
+        # Validation age_days est un nombre valide
+        if "age_days" in cleaned_entities and cleaned_entities["age_days"] is not None:
+            try:
+                age = cleaned_entities["age_days"]
+                if isinstance(age, str):
+                    # Tenter conversion string → int
+                    if age.isdigit():
+                        cleaned_entities["age_days"] = int(age)
+                    else:
+                        cleaned_entities["age_days"] = None
+                        logger.warning(f"age_days invalide '{age}' → None")
+                elif isinstance(age, (int, float)):
+                    # Validation range
+                    if not (0 <= age <= 150):
+                        cleaned_entities["age_days"] = None
+                        logger.warning(f"age_days hors range {age} → None")
+                    else:
+                        cleaned_entities["age_days"] = int(age)
+            except (ValueError, TypeError):
+                cleaned_entities["age_days"] = None
+                logger.warning("age_days non convertible → None")
+        
+        # Correction breed
+        if cleaned_entities.get("breed") == "as_hatched":
+            cleaned_entities["breed"] = None
+            logger.debug("Correction: breed 'as_hatched' → None")
+            
+        # Validation breed
+        if "breed" in cleaned_entities and cleaned_entities["breed"]:
+            breed = str(cleaned_entities["breed"]).strip()
+            if not breed or breed.lower() in ["none", "null", ""]:
+                cleaned_entities["breed"] = None
+        
+        # Assurer que sex a une valeur valide
+        valid_sexes = ["male", "female", "as_hatched"]
+        current_sex = cleaned_entities.get("sex")
+        
+        if not current_sex or current_sex not in valid_sexes:
+            cleaned_entities["sex"] = "as_hatched"
+            logger.debug(f"Correction: sex '{current_sex}' → 'as_hatched'")
+        
+        # Validation metric_type
+        if "metric_type" in cleaned_entities and cleaned_entities["metric_type"]:
+            metric = str(cleaned_entities["metric_type"]).strip()
+            if not metric or metric.lower() in ["none", "null", ""]:
+                cleaned_entities["metric_type"] = None
+        
+        # Log des corrections effectuées
+        if cleaned_entities != entities:
+            logger.info(f"Entités corrigées: {entities} → {cleaned_entities}")
+        
+        return cleaned_entities
+
+    # ========================================================================
     # MÉTHODES CORRIGÉES: Détection de patterns spéciaux
     # ========================================================================
 
     def _detect_query_patterns(self, query: str) -> Dict[str, Any]:
         """
         Version corrigée avec patterns d'âge robustes
-
+        
         Détecte les patterns spéciaux dans la requête
 
         Returns:
@@ -170,22 +248,22 @@ class QueryPreprocessor:
                 "target_value": float
             }
         """
-
+        
         # NOUVEAUX patterns d'âge plus robustes
         age_patterns = [
-            r"à\s+(\d+)\s+jours?",  # "à 42 jours"
-            r"(\d+)\s+jours?",  # "42 jours"
-            r"de\s+(\d+)\s+jours?",  # "de 42 jours"
-            r"(\d+)\s*j\b",  # "42j"
-            r"day\s+(\d+)",  # "day 42"
-            r"(\d+)\s+days?",  # "42 days"
-            r"(\d+)-?jours?",  # "42-jours"
-            r"(\d+)\s+semaines?",  # "6 semaines" → *7
+            r"à\s+(\d+)\s+jours?",           # "à 42 jours" 
+            r"(\d+)\s+jours?",               # "42 jours"
+            r"de\s+(\d+)\s+jours?",          # "de 42 jours"
+            r"(\d+)\s*j\b",                  # "42j"
+            r"day\s+(\d+)",                  # "day 42"
+            r"(\d+)\s+days?",                # "42 days"
+            r"(\d+)-?jours?",                # "42-jours"
+            r"(\d+)\s+semaines?",            # "6 semaines" → *7
         ]
-
+        
         query_lower = query.lower()
         extracted_age = None
-
+        
         for pattern in age_patterns:
             match = re.search(pattern, query_lower)
             if match:
@@ -196,9 +274,7 @@ class QueryPreprocessor:
                         age = age * 7
                     if 0 <= age <= 150:  # Validation range
                         extracted_age = age
-                        logger.debug(
-                            f"Age détecté: {age} jours via pattern '{pattern}'"
-                        )
+                        logger.debug(f"Age détecté: {age} jours via pattern '{pattern}'")
                         break
                 except ValueError:
                     continue
@@ -352,7 +428,7 @@ class QueryPreprocessor:
     ) -> List[Dict[str, Any]]:
         """
         Construire des entités multiples pour comparaisons
-
+        
         Construit les différents jeux d'entités pour chaque comparaison
 
         Exemple:
@@ -365,12 +441,12 @@ class QueryPreprocessor:
             {'breed': 'Cobb 500', 'sex': 'female', 'age_days': 17, '_comparison_label': 'female'}
         ]
         """
-
+        
         if not comparative_entities:
             return [base_entities]
 
         comparison_sets = []
-
+        
         # Cas 1: Comparaison de sexes (mâle vs femelle)
         if any(entity.get("dimension") == "sex" for entity in comparative_entities):
             for sex in ["male", "female"]:
@@ -379,35 +455,35 @@ class QueryPreprocessor:
                 entity_set["_comparison_label"] = sex
                 entity_set["_comparison_dimension"] = "sex"
                 comparison_sets.append(entity_set)
-
+        
         # Cas 2: Comparaison de souches (Ross vs Cobb)
         elif any(entity.get("dimension") == "breed" for entity in comparative_entities):
             breeds = []
             for entity in comparative_entities:
                 if entity.get("dimension") == "breed":
                     breeds.extend(entity.get("values", []))
-
+            
             for breed in breeds:
                 entity_set = base_entities.copy()
                 entity_set["breed"] = breed
                 entity_set["_comparison_label"] = breed
                 entity_set["_comparison_dimension"] = "breed"
                 comparison_sets.append(entity_set)
-
+        
         # Cas 3: Comparaison d'âges
         elif any(entity.get("dimension") == "age" for entity in comparative_entities):
             ages = []
             for entity in comparative_entities:
                 if entity.get("dimension") == "age":
                     ages.extend(entity.get("values", []))
-
+            
             for age in ages:
                 entity_set = base_entities.copy()
                 entity_set["age_days"] = age
                 entity_set["_comparison_label"] = str(age)
                 entity_set["_comparison_dimension"] = "age"
                 comparison_sets.append(entity_set)
-
+        
         # Cas 4: Gestion des entités dans base_entities (format "value1, value2")
         else:
             # Vérifier si les entités de base contiennent des comparaisons
@@ -422,7 +498,7 @@ class QueryPreprocessor:
                             entity_set["_comparison_dimension"] = key
                             comparison_sets.append(entity_set)
                         break
-
+        
         logger.debug(f"Entités de comparaison construites: {len(comparison_sets)} sets")
         return comparison_sets if comparison_sets else [base_entities]
 
@@ -528,7 +604,7 @@ Respond in JSON:
         return {
             "normalized_query": query,
             "query_type": "general",
-            "entities": {"sex": "as_hatched"},
+            "entities": self._validate_and_fix_entities({"sex": "as_hatched"}),
             "routing": "weaviate",
             "confidence": 0.3,
             "is_comparative": comparative_info["is_comparative"],

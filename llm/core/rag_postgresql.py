@@ -621,13 +621,12 @@ class PostgreSQLSystem:
             except Exception as e:
                 logger.warning(f"Query validation failed: {e}")
 
-        # ✅ PHASE 1: Vérification de la disponibilité des données
+        # ✅ PHASE 1: Vérification de la disponibilité des données avec CORRECTION as_hatched
         if self.data_availability_checker:
             try:
-                availability_check = (
-                    self.data_availability_checker.check_data_availability(
-                        query, entities or {}
-                    )
+                # 🔧 CORRECTION CRITIQUE: Traiter as_hatched correctement
+                availability_check = self._check_data_availability_with_as_hatched_fix(
+                    query, entities or {}
                 )
 
                 if not availability_check.get("data_available", True):
@@ -716,6 +715,47 @@ class PostgreSQLSystem:
                 source=RAGSource.ERROR,
                 metadata={"error": str(e)},
             )
+
+    def _check_data_availability_with_as_hatched_fix(
+        self, query: str, entities: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        🔧 CORRECTION CRITIQUE: Gestion correcte de as_hatched dans la validation des âges
+        
+        Cette méthode corrige le problème où 'as_hatched' était traité comme un âge invalide
+        """
+        # Obtenir la validation originale
+        original_check = self.data_availability_checker.check_data_availability(
+            query, entities
+        )
+        
+        # Si la validation a échoué à cause d'un "âge invalide"
+        if not original_check.get("data_available", True):
+            reason = original_check.get("reason", "")
+            
+            # 🔧 CORRECTION: Vérifier si l'erreur concerne "as_hatched"
+            if "invalide" in reason.lower() and "as_hatched" in str(entities.get("age_days", "")):
+                logger.info("🔧 Correction as_hatched: Autoriser la requête sans âge spécifique")
+                return {
+                    "data_available": True,
+                    "reason": "Age non spécifié (as_hatched) - recherche générale autorisée",
+                    "data_type": "metrics",
+                    "corrected_as_hatched": True
+                }
+            
+            # 🔧 CORRECTION: Aussi pour les valeurs None ou "None"
+            age_days = entities.get("age_days")
+            if "invalide" in reason.lower() and (age_days is None or str(age_days).lower() in ["none", "null"]):
+                logger.info("🔧 Correction: Autoriser la requête sans âge spécifique")
+                return {
+                    "data_available": True,
+                    "reason": "Age non spécifié - recherche générale autorisée",
+                    "data_type": "metrics",
+                    "corrected_none_age": True
+                }
+        
+        # Retourner la validation originale si pas de problème as_hatched
+        return original_check
 
     def _convert_metrics_to_documents(
         self, metric_results: List[MetricResult]
@@ -819,4 +859,10 @@ class PostgreSQLSystem:
                 },
             },
             "implementation_phase": "1_validation_availability",
+            # 🔧 NOUVELLE INFO: Statut de la correction as_hatched
+            "as_hatched_fix": {
+                "applied": True,
+                "description": "Correction pour traiter as_hatched comme âge non spécifié",
+                "status": "active"
+            }
         }
