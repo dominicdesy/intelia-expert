@@ -4,30 +4,28 @@ utils/language_detection.py - Module de détection de langue multilingue
 Version corrigée avec FastText proper et téléchargement automatique pour Digital Ocean
 """
 
-import os
 import re
 import time
 import logging
-from typing import Optional
 from dataclasses import dataclass
 
 # Imports conditionnels pour détection de langue
 try:
-    import fasttext
+    from fasttext_langdetect import detect_language as fasttext_detect
 
-    FASTTEXT_AVAILABLE = True
+    FASTTEXT_LANGDETECT_AVAILABLE = True
 except ImportError:
-    fasttext = None
-    FASTTEXT_AVAILABLE = False
+    fasttext_detect = None
+    FASTTEXT_LANGDETECT_AVAILABLE = False
 
 try:
-    from fastlangdetect import detect, LangDetectException
+    from langdetect import detect as langdetect_detect, LangDetectException
 
-    FAST_LANGDETECT_AVAILABLE = True
+    LANGDETECT_AVAILABLE = True
 except ImportError:
-    detect = None
+    langdetect_detect = None
     LangDetectException = Exception
-    FAST_LANGDETECT_AVAILABLE = False
+    LANGDETECT_AVAILABLE = False
 
 try:
     from unidecode import unidecode
@@ -44,21 +42,19 @@ from config.config import (
     FALLBACK_LANGUAGE,
     LANG_DETECTION_MIN_LENGTH,
     LANG_DETECTION_CONFIDENCE_THRESHOLD,
-    FASTTEXT_MODEL_PATH,
 )
 
 logger = logging.getLogger(__name__)
 
 # Log des disponibilités
-if FASTTEXT_AVAILABLE:
-    logger.info("FastText disponible pour détection multilingue")
-if FAST_LANGDETECT_AVAILABLE:
-    logger.info("fast-langdetect disponible comme fallback")
-if not FASTTEXT_AVAILABLE and not FAST_LANGDETECT_AVAILABLE:
+if FASTTEXT_LANGDETECT_AVAILABLE:
+    logger.info("fasttext-langdetect disponible pour détection multilingue")
+if LANGDETECT_AVAILABLE:
+    logger.info("langdetect disponible comme fallback")
+if not FASTTEXT_LANGDETECT_AVAILABLE and not LANGDETECT_AVAILABLE:
     logger.warning("Aucun module de détection de langue disponible")
 
-# Variables globales
-_fasttext_model = None
+# Variables globales - Plus besoin de _fasttext_model
 _model_download_attempted = False
 
 # ============================================================================
@@ -103,150 +99,11 @@ class LanguageDetectionResult:
 
 
 # ============================================================================
-# FONCTIONS DE TÉLÉCHARGEMENT ET CHARGEMENT FASTTEXT
+# FONCTIONS DE DÉTECTION DE LANGUE - VERSION SIMPLIFIÉE
 # ============================================================================
 
 
-def _download_fasttext_model():
-    """
-    Télécharge automatiquement le modèle FastText sur Digital Ocean
-    """
-    global _model_download_attempted
-
-    if _model_download_attempted:
-        return None
-
-    _model_download_attempted = True
-
-    try:
-        import requests
-    except ImportError:
-        logger.error("Module requests non disponible pour téléchargement FastText")
-        return None
-
-    model_url = "https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.ftz"
-
-    # Essayer différents répertoires de destination sur Digital Ocean
-    target_dirs = [
-        "/tmp",  # Digital Ocean App Platform tmp
-        "./models",
-        ".",
-        "/app/models",  # DO App Platform app directory
-        os.path.join(os.path.dirname(__file__), "..", "models"),
-    ]
-
-    for target_dir in target_dirs:
-        try:
-            if not os.path.exists(target_dir):
-                os.makedirs(target_dir, exist_ok=True)
-
-            model_path = os.path.join(target_dir, "lid.176.ftz")
-
-            # Skip si déjà présent
-            if os.path.exists(model_path) and os.path.getsize(model_path) > 100000:
-                logger.info(f"Modèle FastText déjà présent: {model_path}")
-                return model_path
-
-            logger.info(f"Téléchargement du modèle FastText vers {model_path}...")
-
-            response = requests.get(model_url, stream=True, timeout=120)
-            response.raise_for_status()
-
-            total_size = int(response.headers.get("content-length", 0))
-            downloaded = 0
-
-            with open(model_path, "wb") as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-                        downloaded += len(chunk)
-
-                        # Log progress pour gros fichiers
-                        if total_size > 0 and downloaded % (total_size // 10) == 0:
-                            progress = (downloaded / total_size) * 100
-                            logger.info(f"Téléchargement: {progress:.1f}%")
-
-            # Vérifier que le fichier est valide
-            if os.path.getsize(model_path) > 100000:  # > 100KB
-                logger.info(
-                    f"✅ Modèle FastText téléchargé: {model_path} ({os.path.getsize(model_path)} bytes)"
-                )
-                return model_path
-            else:
-                logger.warning(f"Fichier téléchargé trop petit: {model_path}")
-                os.remove(model_path)
-
-        except Exception as e:
-            logger.warning(f"Échec téléchargement vers {target_dir}: {e}")
-            continue
-
-    logger.error("❌ Impossible de télécharger le modèle FastText")
-    return None
-
-
-def _load_fasttext_model():
-    """
-    Charge le modèle FastText avec téléchargement automatique sur Digital Ocean
-    """
-    global _fasttext_model
-
-    if not FASTTEXT_AVAILABLE:
-        logger.warning(
-            "FastText non disponible - installer avec: pip install fasttext==0.9.2"
-        )
-        return None
-
-    if _fasttext_model is None:
-        try:
-            # Chemins possibles sur Digital Ocean App Platform
-            possible_paths = [
-                FASTTEXT_MODEL_PATH,  # Chemin configuré
-                "/app/models/lid.176.ftz",
-                "/tmp/lid.176.ftz",  # Tmp sur Digital Ocean
-                "./models/lid.176.ftz",
-                "./lid.176.ftz",
-                os.path.join(os.path.dirname(__file__), "..", "models", "lid.176.ftz"),
-            ]
-
-            model_path = None
-            for path in possible_paths:
-                if path and os.path.exists(path):
-                    file_size = os.path.getsize(path)
-                    if file_size > 100000:  # > 100KB
-                        model_path = path
-                        logger.debug(
-                            f"Modèle FastText trouvé: {path} ({file_size} bytes)"
-                        )
-                        break
-
-            # Si modèle non trouvé, télécharger automatiquement
-            if not model_path:
-                logger.info(
-                    "Modèle FastText non trouvé - téléchargement automatique..."
-                )
-                model_path = _download_fasttext_model()
-
-            if model_path and os.path.exists(model_path):
-                logger.info(f"Chargement du modèle FastText: {model_path}")
-                _fasttext_model = fasttext.load_model(model_path)
-                logger.info("✅ Modèle FastText chargé avec succès")
-            else:
-                logger.error("❌ Impossible de charger le modèle FastText")
-                return None
-
-        except Exception as e:
-            logger.error(f"❌ Erreur chargement FastText: {e}")
-            _fasttext_model = None
-
-    return _fasttext_model
-
-
-# ============================================================================
-# FONCTIONS DE DÉTECTION DE LANGUE
-# ============================================================================
-
-
-def _detect_with_universal_patterns(text: str) -> Optional[str]:
+def _detect_with_universal_patterns(text: str) -> str:
     """Détection de langue via patterns universels du dictionnaire"""
     # Import local pour éviter la circularité
     try:
@@ -300,8 +157,8 @@ def _detect_with_universal_patterns(text: str) -> Optional[str]:
 
 def detect_language_enhanced(text: str, default: str = None) -> LanguageDetectionResult:
     """
-    Détection de langue multilingue avec FastText - VERSION CORRIGÉE
-    Remplace l'ancienne version langdetect avec support 13 langues
+    Détection de langue multilingue sans compilation FastText
+    Version optimisée pour Digital Ocean App Platform
     """
     start_time = time.time()
 
@@ -367,51 +224,20 @@ def detect_language_enhanced(text: str, default: str = None) -> LanguageDetectio
             processing_time_ms=int((time.time() - start_time) * 1000),
         )
 
-    # === LOGIQUE LONGUE: FastText ou fast-langdetect ===
+    # === LOGIQUE LONGUE: fasttext-langdetect puis langdetect ===
 
-    # 1. Essayer FastText en priorité
-    if FASTTEXT_AVAILABLE:
-        model = _load_fasttext_model()
-        if model:
-            try:
-                # Nettoyer le texte pour FastText
-                text_for_fasttext = text_clean.replace("\n", " ").replace("\r", " ")
-                predictions = model.predict(text_for_fasttext, k=1)
-
-                if predictions and len(predictions) >= 2 and len(predictions[0]) > 0:
-                    lang_label = predictions[0][0].replace("__label__", "")
-                    confidence = float(predictions[1][0])
-
-                    # Normalisation code langue
-                    if lang_label == "zh-cn":
-                        lang_label = "zh"
-
-                    # Vérification langue supportée
-                    if (
-                        lang_label in SUPPORTED_LANGUAGES
-                        and confidence >= LANG_DETECTION_CONFIDENCE_THRESHOLD
-                    ):
-                        return LanguageDetectionResult(
-                            language=lang_label,
-                            confidence=confidence,
-                            source="fasttext",
-                            processing_time_ms=int((time.time() - start_time) * 1000),
-                        )
-
-            except Exception as e:
-                logger.debug(f"Erreur FastText pour '{text_clean[:50]}...': {e}")
-
-    # 2. Fallback vers fast-langdetect
-    if FAST_LANGDETECT_AVAILABLE:
+    # 1. Essayer fasttext-langdetect en priorité (sans compilation)
+    if FASTTEXT_LANGDETECT_AVAILABLE:
         try:
-            result = detect(text_clean, low_memory=True)
+            result = fasttext_detect(text_clean)
             detected_lang = result["lang"]
             confidence = result["score"]
 
-            # Normalisation et validation
+            # Normalisation code langue
             if detected_lang == "zh-cn":
                 detected_lang = "zh"
 
+            # Vérification langue supportée
             if (
                 detected_lang in SUPPORTED_LANGUAGES
                 and confidence >= LANG_DETECTION_CONFIDENCE_THRESHOLD
@@ -419,12 +245,33 @@ def detect_language_enhanced(text: str, default: str = None) -> LanguageDetectio
                 return LanguageDetectionResult(
                     language=detected_lang,
                     confidence=confidence,
-                    source="fast-langdetect",
+                    source="fasttext_langdetect",
                     processing_time_ms=int((time.time() - start_time) * 1000),
                 )
 
         except Exception as e:
-            logger.debug(f"Erreur fast-langdetect pour '{text_clean[:50]}...': {e}")
+            logger.debug(f"Erreur fasttext-langdetect pour '{text_clean[:50]}...': {e}")
+
+    # 2. Fallback vers langdetect standard
+    if LANGDETECT_AVAILABLE:
+        try:
+            detected_lang = langdetect_detect(text_clean)
+            confidence = 0.8  # langdetect ne fournit pas de score
+
+            # Normalisation et validation
+            if detected_lang == "zh-cn":
+                detected_lang = "zh"
+
+            if detected_lang in SUPPORTED_LANGUAGES:
+                return LanguageDetectionResult(
+                    language=detected_lang,
+                    confidence=confidence,
+                    source="langdetect",
+                    processing_time_ms=int((time.time() - start_time) * 1000),
+                )
+
+        except Exception as e:
+            logger.debug(f"Erreur langdetect pour '{text_clean[:50]}...': {e}")
 
     # 3. Dernier recours: patterns universels même pour texte long
     universal_lang = _detect_with_universal_patterns(text_clean)
