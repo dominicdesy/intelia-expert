@@ -4,6 +4,9 @@ utilities.py - Point d'entrée principal des utilitaires - VERSION MODULAIRE
 Refactorisé pour éviter un seul gros fichier tout en conservant la compatibilité
 """
 
+import os
+import logging
+
 # ============================================================================
 # IMPORTS DES MODULES REFACTORISÉS
 # ============================================================================
@@ -66,6 +69,56 @@ from utils.test_data import (
 )
 
 # ============================================================================
+# VARIABLES GLOBALES POUR FASTTEXT
+# ============================================================================
+
+logger = logging.getLogger(__name__)
+_fasttext_model = None
+
+# ============================================================================
+# FONCTION FASTTEXT MANQUANTE - CORRECTION CRITIQUE
+# ============================================================================
+
+
+def _load_fasttext_model():
+    """
+    Charge le modèle FastText avec lazy loading
+    Fonction requise par main.py pour le pré-chargement au démarrage
+    """
+    global _fasttext_model
+
+    # Vérifier si FastText est disponible
+    try:
+        import fasttext
+    except ImportError:
+        logger.warning("FastText non disponible - module non installé")
+        return None
+
+    if _fasttext_model is None:
+        try:
+            from config.config import FASTTEXT_MODEL_PATH
+
+            if not os.path.exists(FASTTEXT_MODEL_PATH):
+                logger.warning(f"Modèle FastText non trouvé: {FASTTEXT_MODEL_PATH}")
+                logger.info(
+                    "Le modèle devrait être téléchargé automatiquement au démarrage"
+                )
+                return None
+
+            _fasttext_model = fasttext.load_model(FASTTEXT_MODEL_PATH)
+            logger.info(f"Modèle FastText chargé avec succès: {FASTTEXT_MODEL_PATH}")
+
+        except Exception as e:
+            logger.warning(f"Erreur lors du chargement FastText: {e}")
+            import traceback
+
+            logger.debug(f"Traceback FastText: {traceback.format_exc()}")
+            _fasttext_model = None
+
+    return _fasttext_model
+
+
+# ============================================================================
 # ALIAS POUR COMPATIBILITÉ APRÈS TOUS LES IMPORTS
 # ============================================================================
 
@@ -82,6 +135,8 @@ __all__ = [
     "FASTTEXT_AVAILABLE",
     "FAST_LANGDETECT_AVAILABLE",
     "UNIDECODE_AVAILABLE",
+    # FONCTION FASTTEXT MANQUANTE - AJOUT CRITIQUE
+    "_load_fasttext_model",
     # Classes de données multilingues
     "LanguageDetectionResult",
     "ValidationReport",
