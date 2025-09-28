@@ -5,7 +5,7 @@ Vérifie si une requête contient toutes les entités nécessaires
 """
 
 import logging
-from typing import Dict, List
+from typing import Dict, List, Any
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -24,13 +24,18 @@ class ValidationResult:
 class QueryValidator:
     """Validateur de complétude des requêtes utilisateur"""
 
-    # Entités requises par type de requête
+    # Entités requises par type de requête (ASSOUPLIES)
     REQUIRED_ENTITIES = {
-        "performance_query": ["breed", "age"],  # sex optionnel (défaut: as_hatched)
-        "comparison_query": ["breed", "age"],  # Deux valeurs pour la dimension comparée
-        "calculation_query": ["breed", "age"],
+        "comparative": ["breed"],  # Assouplir: age non obligatoire
+        "metric": ["breed"],  # Assouplir: age non obligatoire
+        "temporal_reverse": ["breed", "metric_type"],  # Pas d'âge requis
+        "document": [],  # Très permissif
+        "general": [],  # Très permissif
+        "performance_query": ["breed"],  # Ancien système maintenu pour compatibilité
+        "comparison_query": ["breed"],  # Ancien système maintenu pour compatibilité
+        "calculation_query": ["breed"],  # Ancien système maintenu pour compatibilité
         "nutrition_query": ["breed"],  # Age optionnel pour nutrition
-        "carcass_query": ["breed", "weight"],  # Poids vif pour rendement
+        "carcass_query": ["breed"],  # Assouplir: weight non obligatoire
     }
 
     # Métriques nécessitant un âge
@@ -55,47 +60,112 @@ class QueryValidator:
         pass
 
     def validate_query_completeness(
-        self, query: str, entities: Dict[str, str]
-    ) -> Dict[str, any]:
+        self, query: str, entities: Dict[str, str], query_type: str = "metric"
+    ) -> Dict[str, Any]:
         """
-        Vérifie si une requête contient toutes les entités nécessaires
-
-        INTERFACE CORRIGÉE: Retourne un dict au lieu d'un objet ValidationResult
+        Validation assouplie pour les requêtes
 
         Args:
             query: Requête originale de l'utilisateur
             entities: Entités extraites par EntityExtractor
+            query_type: Type de requête détecté
 
         Returns:
-            Dict avec clés: is_complete, missing_entities, confidence, clarification_message
+            Dict avec clés: valid, complete, missing_entities, warnings, suggestion
         """
         # CORRECTION: Normaliser les entités age_days → age
         normalized_entities = entities.copy()
         if "age_days" in entities and "age" not in entities:
             normalized_entities["age"] = entities["age_days"]
 
-        # Détecter le type de requête
-        query_type = self._detect_query_type(query)
+        # Si query_type n'est pas fourni, le détecter
+        if query_type == "metric":
+            query_type = self._detect_query_type(query)
 
-        missing = self.identify_missing_entities(normalized_entities, query_type, query)
+        # Entités essentielles pour différents types de requêtes
+        requirements = self.REQUIRED_ENTITIES.get(query_type, ["breed"])
 
+        missing = []
+        for req in requirements:
+            if not normalized_entities.get(req):
+                missing.append(req)
+
+        # NOUVEAU: Validation contextuelle intelligente
+        warnings = []
         if not missing:
-            return {
-                "is_complete": True,
-                "missing_entities": [],
-                "confidence": 1.0,
-                "clarification_message": "",
-            }
+            # Vérification de cohérence plutôt que de complétude
+            coherence_issues = self._check_entity_coherence(normalized_entities)
+            if coherence_issues:
+                warnings = coherence_issues
 
-        # Générer message de clarification
-        clarification = self.generate_clarification_prompt(missing, query)
-
-        return {
-            "is_complete": False,
+        result = {
+            "valid": len(missing) == 0,
+            "complete": len(missing) == 0,
             "missing_entities": missing,
-            "confidence": 0.8,
-            "clarification_message": clarification,
+            "warnings": warnings,
+            "is_complete": len(missing) == 0,  # Pour compatibilité avec ancien système
+            "confidence": 0.8 if missing else 1.0,
+            "clarification_message": (
+                self.generate_clarification_prompt(missing, query) if missing else ""
+            ),
         }
+
+        if missing:
+            result["suggestion"] = self._generate_completion_suggestion(missing)
+
+        return result
+
+    def _check_entity_coherence(self, entities: Dict[str, str]) -> List[str]:
+        """Vérifications de cohérence plutôt que de complétude"""
+        warnings = []
+
+        # Vérifier les âges aberrants
+        if entities.get("age_days"):
+            try:
+                age = int(entities["age_days"])
+                if age > 100:
+                    warnings.append(f"Âge élevé détecté: {age} jours")
+                elif age < 0:
+                    warnings.append(f"Âge négatif: {age} jours")
+            except ValueError:
+                warnings.append(f"Âge invalide: {entities['age_days']}")
+
+        # Vérifier les souches connues
+        if entities.get("breed"):
+            known_breeds = ["cobb 500", "ross 308", "500", "308", "cobb", "ross"]
+            breed_lower = entities["breed"].lower()
+            if not any(kb in breed_lower for kb in known_breeds):
+                warnings.append(f"Souche non reconnue: {entities['breed']}")
+
+        # Vérifier cohérence poids/âge pour carcasse
+        if (
+            entities.get("weight")
+            and not entities.get("age_days")
+            and not entities.get("age")
+        ):
+            warnings.append(
+                "Poids spécifié sans âge - calculs de rendement peuvent être imprécis"
+            )
+
+        return warnings
+
+    def _generate_completion_suggestion(self, missing_entities: List[str]) -> str:
+        """Génère une suggestion pour compléter les entités manquantes"""
+        suggestions = {
+            "breed": "Spécifiez une souche (ex: Cobb 500, Ross 308)",
+            "age": "Indiquez l'âge en jours",
+            "metric_type": "Précisez la métrique recherchée",
+            "weight": "Indiquez le poids vif",
+            "sex": "Spécifiez le sexe (mâle/femelle/mixte)",
+        }
+
+        if len(missing_entities) == 1:
+            entity = missing_entities[0]
+            return suggestions.get(entity, f"Spécifiez {entity}")
+        else:
+            return "Spécifiez: " + ", ".join(
+                [suggestions.get(e, e) for e in missing_entities]
+            )
 
     def _detect_query_type(self, query: str) -> str:
         """Détecte le type de requête basé sur le contenu"""
@@ -105,15 +175,17 @@ class QueryValidator:
             word in query_lower
             for word in ["compare", "comparaison", "vs", "versus", "différence"]
         ):
-            return "comparison_query"
+            return "comparative"
         elif any(word in query_lower for word in ["nutrition", "aliment", "régime"]):
             return "nutrition_query"
         elif any(word in query_lower for word in ["rendement", "carcasse", "abattage"]):
             return "carcass_query"
         elif any(word in query_lower for word in ["calcul", "calculer"]):
             return "calculation_query"
+        elif any(word in query_lower for word in ["document", "rapport", "fichier"]):
+            return "document"
         else:
-            return "performance_query"
+            return "metric"
 
     def identify_missing_entities(
         self, entities: Dict[str, str], query_type: str, query: str
@@ -143,15 +215,17 @@ class QueryValidator:
             if entity not in entities or not entities[entity]:
                 missing.append(entity)
 
-        # Vérifier si métrique nécessite un âge
+        # Vérifier si métrique nécessite un âge (plus souple maintenant)
         if self._query_needs_age(query) and "age" not in entities:
-            if "age" not in missing:
-                missing.append("age")
+            # Ne plus ajouter age comme manquant automatiquement
+            # Juste un warning si nécessaire
+            pass
 
         # Cas spécial: comparaison nécessite deux valeurs
         if "comparison" in query_type.lower() or self._is_comparative(query):
             if not self._has_comparison_dimension(entities):
-                missing.append("comparison_dimension")
+                # Ne plus bloquer, juste suggérer
+                pass
 
         return missing
 
@@ -288,6 +362,7 @@ class QueryValidator:
             "age": "À quel âge (en jours)?",
             "sex": "Quel sexe? (mâle, femelle, ou mixte)",
             "weight": "Quel poids vif?",
+            "metric_type": "Quelle métrique vous intéresse?",
             "comparison_dimension": "Que souhaitez-vous comparer exactement?",
         }
 
@@ -373,8 +448,10 @@ class QueryValidator:
                 if len(entities) < 2:
                     return True
 
-        # Si aucune entité principale
+        # Si aucune entité principale (plus souple maintenant)
         if "breed" not in entities and "strain" not in entities:
-            return True
+            # Ne plus considérer comme ambigu automatiquement
+            # Peut être une question générale valide
+            return False
 
         return False

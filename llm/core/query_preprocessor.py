@@ -148,11 +148,13 @@ class QueryPreprocessor:
             return self._fallback_preprocessing(query, comparative_info, query_patterns)
 
     # ========================================================================
-    # NOUVELLES MÉTHODES: Détection de patterns spéciaux
+    # MÉTHODES CORRIGÉES: Détection de patterns spéciaux
     # ========================================================================
 
     def _detect_query_patterns(self, query: str) -> Dict[str, Any]:
         """
+        Version corrigée avec patterns d'âge robustes
+
         Détecte les patterns spéciaux dans la requête
 
         Returns:
@@ -162,12 +164,44 @@ class QueryPreprocessor:
                 "is_optimization": bool,
                 "is_economic": bool,
                 "is_planning": bool,
+                "extracted_age": int,
                 "calculation_type": str,
                 "flock_size": int,
                 "target_value": float
             }
         """
+
+        # NOUVEAUX patterns d'âge plus robustes
+        age_patterns = [
+            r"à\s+(\d+)\s+jours?",  # "à 42 jours"
+            r"(\d+)\s+jours?",  # "42 jours"
+            r"de\s+(\d+)\s+jours?",  # "de 42 jours"
+            r"(\d+)\s*j\b",  # "42j"
+            r"day\s+(\d+)",  # "day 42"
+            r"(\d+)\s+days?",  # "42 days"
+            r"(\d+)-?jours?",  # "42-jours"
+            r"(\d+)\s+semaines?",  # "6 semaines" → *7
+        ]
+
         query_lower = query.lower()
+        extracted_age = None
+
+        for pattern in age_patterns:
+            match = re.search(pattern, query_lower)
+            if match:
+                try:
+                    age = int(match.group(1))
+                    # Conversion semaines → jours si nécessaire
+                    if "semaine" in pattern:
+                        age = age * 7
+                    if 0 <= age <= 150:  # Validation range
+                        extracted_age = age
+                        logger.debug(
+                            f"Age détecté: {age} jours via pattern '{pattern}'"
+                        )
+                        break
+                except ValueError:
+                    continue
 
         patterns = {
             "is_calculation": self._is_calculation_query(query_lower),
@@ -175,6 +209,7 @@ class QueryPreprocessor:
             "is_optimization": self._is_optimization_query(query_lower),
             "is_economic": self._is_economic_query(query_lower),
             "is_planning": self._is_planning_query(query_lower),
+            "extracted_age": extracted_age,
         }
 
         # Extraire informations additionnelles
@@ -308,10 +343,16 @@ class QueryPreprocessor:
                     continue
         return None
 
+    # ========================================================================
+    # MÉTHODE CORRIGÉE: Construction des entités de comparaison
+    # ========================================================================
+
     def _build_comparison_entities(
         self, base_entities: Dict[str, Any], comparative_entities: List[Dict]
     ) -> List[Dict[str, Any]]:
         """
+        Construire des entités multiples pour comparaisons
+
         Construit les différents jeux d'entités pour chaque comparaison
 
         Exemple:
@@ -324,34 +365,83 @@ class QueryPreprocessor:
             {'breed': 'Cobb 500', 'sex': 'female', 'age_days': 17, '_comparison_label': 'female'}
         ]
         """
+
         if not comparative_entities:
             return [base_entities]
 
-        entity_sets = []
+        comparison_sets = []
 
-        # Pour l'instant, on gère une seule dimension de comparaison
-        comparison_dimension = comparative_entities[0]
-        dimension_name = comparison_dimension["dimension"]
+        # Cas 1: Comparaison de sexes (mâle vs femelle)
+        if any(entity.get("dimension") == "sex" for entity in comparative_entities):
+            for sex in ["male", "female"]:
+                entity_set = base_entities.copy()
+                entity_set["sex"] = sex
+                entity_set["_comparison_label"] = sex
+                entity_set["_comparison_dimension"] = "sex"
+                comparison_sets.append(entity_set)
 
-        for value in comparison_dimension["values"]:
-            entity_set = base_entities.copy()
-            entity_set[dimension_name] = value
-            entity_set["_comparison_label"] = str(value)
-            entity_set["_comparison_dimension"] = dimension_name
-            entity_sets.append(entity_set)
+        # Cas 2: Comparaison de souches (Ross vs Cobb)
+        elif any(entity.get("dimension") == "breed" for entity in comparative_entities):
+            breeds = []
+            for entity in comparative_entities:
+                if entity.get("dimension") == "breed":
+                    breeds.extend(entity.get("values", []))
 
-        logger.debug(f"Construit {len(entity_sets)} jeux d'entités pour comparaison")
-        return entity_sets
+            for breed in breeds:
+                entity_set = base_entities.copy()
+                entity_set["breed"] = breed
+                entity_set["_comparison_label"] = breed
+                entity_set["_comparison_dimension"] = "breed"
+                comparison_sets.append(entity_set)
+
+        # Cas 3: Comparaison d'âges
+        elif any(entity.get("dimension") == "age" for entity in comparative_entities):
+            ages = []
+            for entity in comparative_entities:
+                if entity.get("dimension") == "age":
+                    ages.extend(entity.get("values", []))
+
+            for age in ages:
+                entity_set = base_entities.copy()
+                entity_set["age_days"] = age
+                entity_set["_comparison_label"] = str(age)
+                entity_set["_comparison_dimension"] = "age"
+                comparison_sets.append(entity_set)
+
+        # Cas 4: Gestion des entités dans base_entities (format "value1, value2")
+        else:
+            # Vérifier si les entités de base contiennent des comparaisons
+            for key, value in base_entities.items():
+                if isinstance(value, str) and "," in value:
+                    values = [v.strip() for v in value.split(",")]
+                    if len(values) > 1:
+                        for val in values:
+                            entity_set = base_entities.copy()
+                            entity_set[key] = val
+                            entity_set["_comparison_label"] = val
+                            entity_set["_comparison_dimension"] = key
+                            comparison_sets.append(entity_set)
+                        break
+
+        logger.debug(f"Entités de comparaison construites: {len(comparison_sets)} sets")
+        return comparison_sets if comparison_sets else [base_entities]
+
+    # ========================================================================
+    # MÉTHODE CORRIGÉE: Prompts système améliorés
+    # ========================================================================
 
     def _get_system_prompt(self, language: str, is_comparative: bool) -> str:
-        """Génère le prompt système avec support comparatif"""
+        """Prompts spécialisés selon le type de requête"""
 
         comparative_instructions = ""
         if is_comparative:
             comparative_instructions = """
 ATTENTION: Cette requête demande une COMPARAISON ou un CALCUL.
-- Extrais TOUTES les valeurs à comparer (ex: mâle ET femelle)
+- Extrais TOUTES les valeurs à comparer (ex: mâle ET femelle, Ross ET Cobb)
 - Identifie les dimensions de comparaison (sexe, âge, souche)
+- Pour "Ross 308 vs Cobb 500" → breed: "Ross 308, Cobb 500"
+- Pour "mâle vs femelle" → sex: "male, female"  
+- Pour "21 jours vs 42 jours" → age_days: "21, 42"
 - Ne privilégie pas une valeur par rapport à l'autre
 """
 
@@ -364,9 +454,9 @@ Tâches:
 1. Corriger les fautes de frappe et orthographe
 2. Normaliser la terminologie avicole (ex: "conversion aliment" → "conversion alimentaire")
 3. Extraire les entités structurées:
-   - breed: race/souche (ex: "Cobb 500", "Ross 308")
-   - sex: sexe ("male", "female", ou "as_hatched" si non spécifié)
-   - age_days: âge en jours (nombre entier)
+   - breed: race/souche (ex: "Cobb 500", "Ross 308", "Cobb 500, Ross 308" pour comparaisons)
+   - sex: sexe ("male", "female", "male, female" pour comparaisons, ou "as_hatched" si non spécifié)
+   - age_days: âge en jours (nombre entier ou "21, 42" pour comparaisons)
    - metric_type: type de métrique (ex: "feed_conversion", "body_weight", "mortality")
 4. Suggérer le routage optimal:
    - "postgresql" pour métriques chiffrées
@@ -379,6 +469,8 @@ Tâches:
 IMPORTANT: 
 - Si le sexe n'est PAS explicitement mentionné, utiliser "as_hatched"
 - Pour les comparaisons, extraire TOUTES les entités mentionnées
+- Pour "à 42 jours", extraire age_days: 42
+- Pour "Ross vs Cobb", extraire breed: "Ross 308, Cobb 500"
 
 Réponds en JSON:
 {{
@@ -386,7 +478,7 @@ Réponds en JSON:
     "query_type": "metric|document|general",
     "entities": {{
         "breed": "...",
-        "sex": "male|female|as_hatched",
+        "sex": "male|female|as_hatched|male, female",
         "age_days": 17,
         "metric_type": "..."
     }},
@@ -403,9 +495,9 @@ Tasks:
 1. Fix typos and spelling errors
 2. Normalize poultry terminology
 3. Extract structured entities:
-   - breed: breed/strain name
-   - sex: "male", "female", or "as_hatched" if not specified
-   - age_days: age in days (integer)
+   - breed: breed/strain name (ex: "Cobb 500, Ross 308" for comparisons)
+   - sex: "male", "female", "male, female" for comparisons, or "as_hatched" if not specified
+   - age_days: age in days (integer or "21, 42" for comparisons)
    - metric_type: metric type
 4. Suggest optimal routing:
    - "postgresql" for numeric metrics
@@ -415,6 +507,8 @@ Tasks:
 IMPORTANT:
 - If sex is NOT explicitly mentioned, use "as_hatched"
 - For comparisons, extract ALL mentioned entities
+- For "at 42 days", extract age_days: 42
+- For "Ross vs Cobb", extract breed: "Ross 308, Cobb 500"
 
 Respond in JSON:
 {{

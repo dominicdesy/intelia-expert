@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 comparison_handler.py - Gestion des requêtes comparatives
-VERSION CORRIGÉE : Passage du contexte (âge, sexe) à format_comparison_text
+VERSION CORRIGÉE : Validation renforcée, gestion d'erreur améliorée, fallback intelligent
 """
 
 import logging
@@ -23,62 +23,148 @@ class ComparisonHandler:
         self.calculator = MetricCalculator()
 
     async def handle_comparative_query(
-        self, query: str, preprocessed: Dict[str, Any], top_k: int = 10
+        self, query: str, preprocessed: Dict[str, Any], top_k: int = 12
     ) -> Dict[str, Any]:
         """
-        Traite une requête comparative
+        Traite une requête comparative avec validation renforcée et fallback
 
         Args:
             query: Requête utilisateur originale
             preprocessed: Résultat du preprocessing avec comparative_info
-            top_k: Nombre de résultats par requête
+            top_k: Nombre de résultats par requête (augmenté à 12)
 
         Returns:
             {
-                'results': List[Dict],
+                'results': List[Dict] | Dict[str, Any],  # Nouveau format ou ancien
                 'comparison': ComparisonResult,
                 'success': bool,
                 'error': Optional[str],
-                'context': Dict  # NOUVEAU: contexte pour la génération de réponse
+                'context': Dict,
+                'metadata': Dict  # NOUVEAU: métadonnées enrichies
             }
         """
+        logger.info(
+            f"Handling comparative query with {len(preprocessed.get('comparison_entities', []))} entity sets"
+        )
+
+        # VALIDATION RENFORCÉE
+        comparison_entities = preprocessed.get("comparison_entities", [])
+
+        if not comparison_entities:
+            logger.warning("Aucune entité de comparaison trouvée")
+            return {
+                "success": False,
+                "error": "Aucune entité de comparaison détectée",
+                "suggestion": "Précisez ce que vous souhaitez comparer (ex: mâle vs femelle, Ross vs Cobb)",
+                "results": [],
+                "comparison": None,
+            }
+
+        if len(comparison_entities) < 2:
+            logger.warning(
+                f"Comparaison nécessite au moins 2 entités, trouvé: {len(comparison_entities)}"
+            )
+            return {
+                "success": False,
+                "error": "Comparaison impossible avec une seule entité",
+                "entities_found": comparison_entities,
+                "suggestion": "Ajoutez une seconde entité à comparer",
+                "results": [],
+                "comparison": None,
+            }
+
+        # VALIDATION DE COHÉRENCE
+        validation_result = self._validate_comparison_entities(comparison_entities)
+        if not validation_result["valid"]:
+            return {
+                "success": False,
+                "error": f"Entités de comparaison invalides: {validation_result['reason']}",
+                "entities": comparison_entities,
+                "results": [],
+                "comparison": None,
+            }
+
+        # EXÉCUTION DES REQUÊTES AVEC GESTION D'ERREUR
+        results = {}
+        successful_queries = 0
+
+        for i, entity_set in enumerate(comparison_entities):
+            entity_key = self._generate_entity_key(entity_set)
+            logger.debug(f"Executing query for {entity_key}")
+
+            try:
+                result = await self.postgresql_system.search_metrics(
+                    query=query,
+                    entities={
+                        k: v for k, v in entity_set.items() if not k.startswith("_")
+                    },
+                    top_k=top_k,
+                    strict_sex_match=True,  # Mode strict pour comparaisons
+                )
+
+                if result and hasattr(result, "context_docs") and result.context_docs:
+                    results[entity_key] = result
+                    successful_queries += 1
+                    logger.debug(
+                        f"Found {len(result.context_docs)} results for {entity_key}"
+                    )
+                else:
+                    logger.warning(f"Empty context_docs for {entity_key}")
+                    results[entity_key] = None
+
+            except Exception as e:
+                logger.error(f"Error querying {entity_key}: {e}")
+                results[entity_key] = None
+
+        # VÉRIFICATION DES RÉSULTATS
+        if successful_queries < 2:
+            logger.warning(f"Insufficient results: found {successful_queries}, need 2")
+
+            # FALLBACK: Essayer avec strict_sex_match=False
+            if successful_queries == 0:
+                logger.info("Trying fallback with relaxed sex matching...")
+                return await self._fallback_relaxed_search(
+                    query, comparison_entities, top_k
+                )
+
+            return {
+                "success": False,
+                "error": f"Insufficient results: found {successful_queries}, need 2",
+                "details": {
+                    "successful_entities": [
+                        k for k, v in results.items() if v is not None
+                    ],
+                    "failed_entities": [k for k, v in results.items() if v is None],
+                    "suggestion": "Vérifiez que les données existent pour les entités demandées",
+                },
+                "results": [],
+                "comparison": None,
+            }
+
+        # ANALYSE ET COMPARAISON
         try:
-            comparative_info = preprocessed.get("comparative_info", {})
-            comparison_entities = preprocessed.get("comparison_entities", [])
-
-            if not comparison_entities:
-                logger.warning("No comparison entities found")
-                return {
-                    "success": False,
-                    "error": "No entities to compare",
-                    "results": [],
-                    "comparison": None,
-                }
-
-            logger.info(
-                f"Handling comparative query with {len(comparison_entities)} entity sets"
+            # Convertir vers l'ancien format pour compatibilité avec le reste du code
+            old_format_results = self._convert_to_old_format(
+                results, comparison_entities
             )
 
-            # Exécuter une requête pour chaque jeu d'entités
-            results = []
-            for entity_set in comparison_entities:
-                result = await self._execute_single_query(query, entity_set, top_k)
-                if result:
-                    results.append(result)
-
-            if len(results) < 2:
+            if len(old_format_results) < 2:
                 return {
                     "success": False,
-                    "error": f"Insufficient results: found {len(results)}, need 2",
-                    "results": results,
+                    "error": f"Insufficient results after conversion: found {len(old_format_results)}, need 2",
+                    "results": old_format_results,
                     "comparison": None,
                 }
 
-            # Calculer la comparaison
-            comparison = self.calculator.calculate_comparison(results)
+            # Calculer la comparaison avec l'ancien format
+            comparison = self.calculator.calculate_comparison(old_format_results)
 
-            # NOUVEAU: Extraire le contexte commun (âge, sexe, etc.)
-            context = self._extract_common_context(results, comparison_entities)
+            # Extraire le contexte commun (âge, sexe, etc.)
+            context = self._extract_common_context(
+                old_format_results, comparison_entities
+            )
+
+            comparative_info = preprocessed.get("comparative_info", {})
 
             logger.info(
                 f"Comparison successful: {comparison.label1} vs {comparison.label2}"
@@ -86,21 +172,185 @@ class ComparisonHandler:
 
             return {
                 "success": True,
-                "results": results,
+                "results": old_format_results,
                 "comparison": comparison,
                 "operation": comparative_info.get("operation"),
                 "comparison_type": comparative_info.get("type"),
-                "context": context,  # NOUVEAU
+                "context": context,
+                "metadata": {
+                    "entities_compared": len(comparison_entities),
+                    "successful_queries": successful_queries,
+                    "query_type": "comparative",
+                    "fallback_used": False,
+                },
             }
 
         except Exception as e:
-            logger.error(f"Error handling comparative query: {e}")
+            logger.error(f"Error in comparison analysis: {e}")
             return {
                 "success": False,
-                "error": str(e),
+                "error": f"Erreur dans l'analyse comparative: {str(e)}",
+                "raw_results": {
+                    k: len(v.context_docs) if v else 0 for k, v in results.items()
+                },
                 "results": [],
                 "comparison": None,
             }
+
+    def _validate_comparison_entities(self, entities: List[Dict]) -> Dict[str, Any]:
+        """Validation des entités de comparaison"""
+
+        if not entities or len(entities) < 2:
+            return {"valid": False, "reason": "Au moins 2 entités requises"}
+
+        # Vérifier que toutes les entités ont les champs requis de base
+        for i, entity in enumerate(entities):
+            # Nettoyer les métadonnées internes
+            clean_entity = {k: v for k, v in entity.items() if not k.startswith("_")}
+
+            # Au minimum, nous devons avoir quelque chose à comparer
+            if not clean_entity:
+                return {
+                    "valid": False,
+                    "reason": f"Entité {i+1} est vide après nettoyage",
+                }
+
+        return {"valid": True, "reason": "Entités valides"}
+
+    def _generate_entity_key(self, entity_set: Dict[str, Any]) -> str:
+        """Génère une clé unique pour identifier un jeu d'entités"""
+
+        # Utiliser le label de comparaison si disponible
+        if "_comparison_label" in entity_set:
+            return entity_set["_comparison_label"]
+
+        # Sinon, construire une clé à partir des attributs principaux
+        key_parts = []
+
+        for field in ["breed", "sex", "age_days", "line", "species"]:
+            if field in entity_set and entity_set[field]:
+                key_parts.append(f"{field}:{entity_set[field]}")
+
+        return "_".join(key_parts) if key_parts else f"entity_{hash(str(entity_set))}"
+
+    async def _fallback_relaxed_search(
+        self, query: str, comparison_entities: List[Dict], top_k: int
+    ) -> Dict[str, Any]:
+        """Recherche de secours avec critères assouplis"""
+
+        logger.info("Executing fallback search with relaxed criteria")
+
+        results = {}
+        successful_queries = 0
+
+        for entity_set in comparison_entities:
+            # Copier et assouplir les critères
+            relaxed_entity = {
+                k: v for k, v in entity_set.items() if not k.startswith("_")
+            }
+
+            # Assouplir le critère de sexe si présent
+            if "sex" in relaxed_entity:
+                relaxed_entity["sex"] = "as_hatched"  # Mode permissif
+
+            entity_key = self._generate_entity_key(
+                entity_set
+            )  # Garder la clé originale
+
+            try:
+                result = await self.postgresql_system.search_metrics(
+                    query=query,
+                    entities=relaxed_entity,
+                    top_k=top_k,
+                    strict_sex_match=False,
+                )
+
+                if result and hasattr(result, "context_docs") and result.context_docs:
+                    results[entity_key] = result
+                    successful_queries += 1
+
+            except Exception as e:
+                logger.error(f"Fallback search failed for {entity_key}: {e}")
+
+        if successful_queries >= 2:
+            # Convertir et analyser comme dans la méthode principale
+            old_format_results = self._convert_to_old_format(
+                results, comparison_entities
+            )
+
+            if len(old_format_results) >= 2:
+                try:
+                    comparison = self.calculator.calculate_comparison(
+                        old_format_results
+                    )
+                    context = self._extract_common_context(
+                        old_format_results, comparison_entities
+                    )
+
+                    return {
+                        "success": True,
+                        "results": old_format_results,
+                        "comparison": comparison,
+                        "context": context,
+                        "metadata": {
+                            "entities_compared": len(comparison_entities),
+                            "successful_queries": successful_queries,
+                            "query_type": "comparative",
+                            "fallback_used": True,
+                        },
+                        "fallback_used": True,
+                        "note": "Résultats avec critères assouplis",
+                    }
+                except Exception as e:
+                    logger.error(f"Error in fallback comparison: {e}")
+
+        return {
+            "success": False,
+            "error": "Aucun résultat même avec critères assouplis",
+            "suggestion": "Vérifiez l'existence des données pour ces souches/âges",
+            "results": [],
+            "comparison": None,
+        }
+
+    def _convert_to_old_format(
+        self, results: Dict[str, Any], comparison_entities: List[Dict]
+    ) -> List[Dict[str, Any]]:
+        """Convertit le nouveau format de résultats vers l'ancien format pour compatibilité"""
+
+        old_format_results = []
+
+        for i, entity_set in enumerate(comparison_entities):
+            entity_key = self._generate_entity_key(entity_set)
+            result = results.get(entity_key)
+
+            if result and hasattr(result, "context_docs"):
+                # Extraire le label de comparaison
+                comparison_label = entity_set.get("_comparison_label", entity_key)
+                comparison_dimension = entity_set.get(
+                    "_comparison_dimension", "unknown"
+                )
+
+                # Convertir les documents en format exploitable
+                metrics = self._extract_metrics_from_docs(result.context_docs)
+
+                if metrics:
+                    # Sélectionner le meilleur résultat
+                    clean_entities = {
+                        k: v for k, v in entity_set.items() if not k.startswith("_")
+                    }
+                    best_metric = self._select_best_metric(metrics, clean_entities)
+
+                    old_format_result = {
+                        comparison_dimension: comparison_label,
+                        "label": comparison_label,
+                        "data": [best_metric],
+                        "all_metrics": metrics,
+                        "entity_set": clean_entities,
+                    }
+
+                    old_format_results.append(old_format_result)
+
+        return old_format_results
 
     def _extract_common_context(
         self, results: List[Dict], comparison_entities: List[Dict]

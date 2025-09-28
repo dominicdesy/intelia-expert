@@ -3,6 +3,7 @@
 rag_engine.py - RAG Engine Principal avec Support Comparatif
 Version modulaire utilisant ComparisonHandler pour requêtes comparatives
 Simplifié - garde seulement l'essentiel du code original
+Version corrigée avec gestion d'erreur comparative robuste
 """
 
 import asyncio
@@ -98,6 +99,7 @@ class InteliaRAGEngine:
             "comparative_queries": 0,  # NOUVEAU
             "comparative_success": 0,  # NOUVEAU
             "comparative_failures": 0,  # NOUVEAU
+            "comparative_fallbacks": 0,  # NOUVEAU
             "postgresql_queries": 0,
             "errors_count": 0,
         }
@@ -406,75 +408,166 @@ class InteliaRAGEngine:
         start_time: float,
     ) -> RAGResult:
         """
-        NOUVEAU: Gère les requêtes comparatives via ComparisonHandler
-
-        Returns:
-            RAGResult avec calculs de comparaison
+        NOUVEAU: Gestion robuste des requêtes comparatives avec fallback intelligent
         """
+
         try:
+            logger.info("Executing comparative query via ComparisonHandler")
+
             # Utiliser le ComparisonHandler
             comparison_result = await self.comparison_handler.handle_comparative_query(
                 normalized_query, preprocessed, top_k=RAG_SIMILARITY_TOP_K
             )
 
             if not comparison_result["success"]:
-                logger.warning(f"Comparison failed: {comparison_result.get('error')}")
+                error_msg = comparison_result.get(
+                    "error", "Erreur comparative inconnue"
+                )
+                logger.warning(f"Comparison failed: {error_msg}")
                 self.optimization_stats["comparative_failures"] += 1
+
+                # NOUVEAU: Fallback intelligent vers requête standard
+                logger.info("Attempting fallback to standard query processing")
+
+                # Extraire la première entité pour requête standard
+                entities = preprocessed.get("entities", {})
+                if entities:
+                    fallback_result = await self._execute_standard_query(
+                        normalized_query, entities, start_time
+                    )
+
+                    # Enrichir avec info sur l'échec comparatif
+                    fallback_result.metadata.update(
+                        {
+                            "source_type": "comparative_fallback",
+                            "comparative_error": error_msg,
+                            "suggestion": comparison_result.get("suggestion"),
+                            "fallback_applied": True,
+                        }
+                    )
+
+                    self.optimization_stats["comparative_fallbacks"] += 1
+                    return fallback_result
 
                 return RAGResult(
                     source=RAGSource.NO_RESULTS,
-                    answer=f"Impossible de comparer: {comparison_result.get('error')}",
+                    answer=self._generate_helpful_error_message(comparison_result),
                     metadata={
                         "source_type": "comparative",
-                        "error": comparison_result.get("error"),
+                        "error": error_msg,
                         "processing_time": time.time() - start_time,
                     },
                 )
 
-            # Générer la réponse naturelle
-            answer_text = await self.comparison_handler.generate_comparative_response(
-                original_query, comparison_result, language
-            )
-
+            # Succès: générer la réponse comparative
             self.optimization_stats["comparative_success"] += 1
 
-            # Construire le résultat
-            comparison = comparison_result["comparison"]
-
-            logger.info(
-                f"Comparison SUCCESS: {comparison.label1}={comparison.value1} vs "
-                f"{comparison.label2}={comparison.value2}"
+            answer_text = await self.comparison_handler.generate_comparative_response(
+                original_query, comparison_result, language
             )
 
             return RAGResult(
                 source=RAGSource.RAG_SUCCESS,
                 answer=answer_text,
-                context_docs=[],  # Les docs sont dans comparison_result si besoin
+                context_docs=self._extract_comparison_documents(comparison_result),
                 confidence=0.95,  # Haute confiance pour comparaisons réussies
                 metadata={
                     "source_type": "comparative",
                     "comparison_type": comparison_result.get("comparison_type"),
                     "operation": comparison_result.get("operation"),
-                    "value1": comparison.value1,
-                    "value2": comparison.value2,
-                    "difference": comparison.absolute_difference,
-                    "difference_pct": comparison.relative_difference_pct,
+                    "entities_compared": comparison_result["metadata"][
+                        "entities_compared"
+                    ],
+                    "successful_queries": comparison_result["metadata"][
+                        "successful_queries"
+                    ],
                     "processing_time": time.time() - start_time,
                     "result_count": len(comparison_result["results"]),
                 },
             )
 
         except Exception as e:
-            logger.error(f"Erreur traitement comparatif: {e}")
+            logger.error(f"Critical error in comparative handling: {e}")
             self.optimization_stats["comparative_failures"] += 1
 
+            # Fallback d'urgence
             return RAGResult(
-                source=RAGSource.ERROR,
+                source=RAGSource.INTERNAL_ERROR,
+                answer="Une erreur s'est produite lors de la comparaison. Veuillez reformuler votre question.",
                 metadata={
                     "error": str(e),
-                    "source_type": "comparative",
+                    "source_type": "comparative_error",
+                    "processing_time": time.time() - start_time,
                 },
             )
+
+    def _generate_helpful_error_message(self, comparison_result: Dict) -> str:
+        """Générer des messages d'erreur utiles"""
+
+        error = comparison_result.get("error", "")
+        suggestion = comparison_result.get("suggestion", "")
+
+        if "Insufficient results" in error:
+            return f"""Je n'ai pas pu trouver suffisamment de données pour effectuer cette comparaison. 
+
+{suggestion}
+
+Vous pouvez essayer de :
+- Vérifier les noms des souches (Cobb 500, Ross 308)
+- Préciser l'âge en jours
+- Reformuler votre question de manière plus simple"""
+
+        elif "entités de comparaison" in error:
+            return f"""Il me faut au moins deux éléments à comparer pour répondre à votre question.
+
+{suggestion}
+
+Exemple de formulation : "Compare le poids du Cobb 500 et du Ross 308 à 42 jours" """
+
+        else:
+            return f"""Je n'ai pas pu traiter cette demande de comparaison.
+
+{suggestion if suggestion else "Veuillez reformuler votre question plus clairement."}"""
+
+    async def _execute_standard_query(
+        self, query: str, entities: Dict, start_time: float
+    ) -> RAGResult:
+        """Exécution d'une requête standard en fallback"""
+
+        if self.postgresql_system:
+            result = await self.postgresql_system.search_metrics(
+                query=query,
+                entities=entities,
+                top_k=RAG_SIMILARITY_TOP_K,
+            )
+
+            if result and result.source != RAGSource.NO_RESULTS:
+                return result
+
+        return RAGResult(
+            source=RAGSource.NO_RESULTS,
+            answer="Aucun résultat trouvé même en mode standard.",
+            metadata={
+                "processing_time": time.time() - start_time,
+                "fallback_type": "standard_query",
+            },
+        )
+
+    def _extract_comparison_documents(self, comparison_result: Dict) -> List:
+        """Extrait les documents des résultats de comparaison"""
+        try:
+            documents = []
+
+            # Extraire les documents des résultats si disponibles
+            if "results" in comparison_result:
+                for result_set in comparison_result["results"]:
+                    if isinstance(result_set, dict) and "context_docs" in result_set:
+                        documents.extend(result_set["context_docs"])
+
+            return documents
+        except Exception as e:
+            logger.warning(f"Erreur extraction documents comparatifs: {e}")
+            return []
 
     def get_status(self) -> Dict:
         """Status système avec stats comparatives"""
@@ -482,7 +575,7 @@ class InteliaRAGEngine:
             "rag_enabled": RAG_ENABLED,
             "initialized": self.is_initialized,
             "degraded_mode": self.degraded_mode,
-            "version": "v7.0_with_comparative_support",
+            "version": "v7.1_with_robust_comparative_support",
             "modules": {
                 "query_preprocessor": bool(self.query_preprocessor),
                 "postgresql_system": bool(self.postgresql_system),
@@ -491,6 +584,7 @@ class InteliaRAGEngine:
             "optimization_stats": self.optimization_stats.copy(),
             "capabilities": {
                 "comparative_queries": bool(self.comparison_handler),
+                "comparative_fallback": True,  # NOUVEAU
                 "intelligent_preprocessing": bool(self.query_preprocessor),
                 "metrics_queries": bool(self.postgresql_system),
             },

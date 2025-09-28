@@ -16,20 +16,6 @@ logger = logging.getLogger(__name__)
 class PostgreSQLQueryBuilder:
     """Construit les requêtes SQL en utilisant intents.json et les noms réels de la BD"""
 
-    # Mapping des noms normalisés -> noms RÉELS dans la base de données
-    DB_STRAIN_MAPPING = {
-        # Ross
-        "ross308": "308/308 FF",
-        "ross 308": "308/308 FF",
-        "ross-308": "308/308 FF",
-        "r308": "308/308 FF",
-        # Cobb
-        "cobb500": "500",
-        "cobb 500": "500",
-        "cobb-500": "500",
-        "c500": "500",
-    }
-
     def __init__(self, query_normalizer):
         """
         Args:
@@ -72,7 +58,7 @@ class PostgreSQLQueryBuilder:
 
     def _normalize_breed_for_db(self, breed_input: str) -> Optional[str]:
         """
-        Convertit l'entrée utilisateur en nom RÉEL de la base de données
+        Normalisation robuste des noms de souches - VERSION CORRIGÉE
 
         Args:
             breed_input: Ex: "Cobb 500", "ross 308", "cobb500"
@@ -83,151 +69,296 @@ class PostgreSQLQueryBuilder:
         if not breed_input:
             return None
 
-        breed_normalized = breed_input.lower().strip()
-        breed_clean = re.sub(r"[\s\-_]+", "", breed_normalized)
+        breed_lower = breed_input.lower().strip()
 
-        # 1. Vérifier le mapping direct vers la BD
-        if breed_clean in self.DB_STRAIN_MAPPING:
-            result = self.DB_STRAIN_MAPPING[breed_clean]
+        # Mappings complets avec toutes les variantes
+        breed_mappings = {
+            # Cobb 500 variants
+            "cobb 500": "500",
+            "cobb500": "500",
+            "cobb-500": "500",
+            "c500": "500",
+            "500": "500",
+            # Ross 308 variants
+            "ross 308": "308/308 FF",
+            "ross308": "308/308 FF",
+            "ross-308": "308/308 FF",
+            "r308": "308/308 FF",
+            "308": "308/308 FF",
+            # Gestion des comparaisons multiples
+            "cobb 500, ross 308": ["500", "308/308 FF"],
+            "ross 308, cobb 500": ["308/308 FF", "500"],
+            "cobb vs ross": ["500", "308/308 FF"],
+            "ross vs cobb": ["308/308 FF", "500"],
+        }
+
+        # Chercher correspondance exacte
+        if breed_lower in breed_mappings:
+            result = breed_mappings[breed_lower]
             logger.debug(f"Breed DB mapping: '{breed_input}' -> '{result}'")
             return result
 
-        # 2. Vérifier les variantes avec espaces/tirets
-        for key, value in self.DB_STRAIN_MAPPING.items():
-            if breed_normalized == key:
-                logger.debug(
-                    f"Breed DB mapping (avec espaces): '{breed_input}' -> '{value}'"
-                )
-                return value
+        # Recherche par mots-clés si pas de correspondance exacte
+        if "cobb" in breed_lower and "500" in breed_lower:
+            logger.debug(f"Breed keyword match: '{breed_input}' -> '500'")
+            return "500"
+        elif "ross" in breed_lower and "308" in breed_lower:
+            logger.debug(f"Breed keyword match: '{breed_input}' -> '308/308 FF'")
+            return "308/308 FF"
 
-        # 3. Fallback: chercher dans les aliases intents.json
+        # Fallback: chercher dans les aliases intents.json
         for canonical_line, aliases in self.line_aliases.items():
             canonical_clean = re.sub(r"[\s\-_]+", "", canonical_line.lower())
+            breed_clean = re.sub(r"[\s\-_]+", "", breed_lower)
 
             if breed_clean == canonical_clean:
-                if canonical_clean in self.DB_STRAIN_MAPPING:
-                    result = self.DB_STRAIN_MAPPING[canonical_clean]
-                    logger.debug(f"Breed via intents+DB: '{breed_input}' -> '{result}'")
-                    return result
+                # Mapper vers les noms de BD si possible
+                if "cobb" in canonical_line.lower():
+                    return "500"
+                elif "ross" in canonical_line.lower():
+                    return "308/308 FF"
 
             for alias in aliases:
                 alias_clean = re.sub(r"[\s\-_]+", "", alias.lower())
-                if breed_clean == alias_clean and alias_clean in self.DB_STRAIN_MAPPING:
-                    result = self.DB_STRAIN_MAPPING[alias_clean]
-                    logger.debug(f"Breed via alias+DB: '{breed_input}' -> '{result}'")
-                    return result
+                if breed_clean == alias_clean:
+                    if "cobb" in alias.lower():
+                        return "500"
+                    elif "ross" in alias.lower():
+                        return "308/308 FF"
 
-        # 4. Dernier recours: retourner l'input nettoyé
-        logger.warning(
-            f"Aucun mapping trouvé pour '{breed_input}', utilisation directe"
-        )
-        return breed_normalized
+        logger.warning(f"Souche non reconnue: '{breed_input}'")
+        return None
+
+    def _extract_age_from_query(self, query: str) -> Optional[int]:
+        """Extraction d'âge robuste avec patterns étendus - VERSION CORRIGÉE"""
+
+        patterns = [
+            r"à\s+(\d+)\s+jours?",  # "à 42 jours" - PRIORITÉ 1
+            r"(\d+)\s+jours?",  # "42 jours"
+            r"de\s+(\d+)\s+jours?",  # "de 42 jours"
+            r"(\d+)\s*j\b",  # "42j"
+            r"(\d+)-?jours?",  # "42-jours"
+            r"day\s+(\d+)",  # "day 42"
+            r"(\d+)\s+days?",  # "42 days"
+            r"at\s+(\d+)\s+days?",  # "at 42 days"
+            r"of\s+(\d+)\s+days?",  # "of 42 days"
+            r"(\d+)\s+semaines?",  # "6 semaines"
+        ]
+
+        query_lower = query.lower()
+
+        for i, pattern in enumerate(patterns):
+            match = re.search(pattern, query_lower)
+            if match:
+                try:
+                    age = int(match.group(1))
+
+                    # Conversion semaines → jours
+                    if "semaine" in pattern:
+                        age = age * 7
+
+                    # Validation range
+                    if 0 <= age <= 150:
+                        logger.debug(
+                            f"Age detected: {age} days via pattern '{pattern}' (priority {i+1})"
+                        )
+                        return age
+
+                except ValueError:
+                    continue
+
+        logger.debug("Aucun âge détecté dans la requête")
+        return None
+
+    def _normalize_entities(self, entities: Dict[str, str]) -> Dict[str, str]:
+        """Normalise les entités pour la BD"""
+        if not entities:
+            return {}
+
+        normalized = {}
+
+        # Normaliser breed/line
+        if entities.get("breed"):
+            normalized["breed"] = self._normalize_breed_for_db(entities["breed"])
+        elif entities.get("line"):
+            normalized["breed"] = self._normalize_breed_for_db(entities["line"])
+
+        # Copier les autres entités
+        for key, value in entities.items():
+            if key not in ["breed", "line"]:
+                normalized[key] = value
+
+        return normalized
 
     def build_sex_aware_sql_query(
         self,
         query: str,
         entities: Dict[str, str] = None,
-        top_k: int = 10,
+        top_k: int = 12,
         strict_sex_match: bool = False,
     ) -> Tuple[str, List]:
-        """
-        Construit une requête SQL adaptée à la structure réelle de la BD
+        """Construction SQL avec paramètres alignés - VERSION CORRIGÉE"""
 
-        Args:
-            query: Requête utilisateur
-            entities: Entités extraites (breed, sex, age_days, etc.)
-            top_k: Nombre de résultats
-            strict_sex_match: Si True, ne cherche que le sexe exact
+        logger.debug(f"Entities: {entities}")
+        normalized_entities = self._normalize_entities(entities or {})
+        logger.debug(f"Normalized: {normalized_entities}")
 
-        Returns:
-            Tuple[str, List]: (requête SQL, paramètres)
-        """
-        base_query = """
-        SELECT 
-            c.company_name,
-            b.breed_name,
-            s.strain_name,
-            s.species,
-            m.metric_name,
-            m.value_numeric,
-            m.value_text,
-            m.unit,
-            m.age_min,
-            m.age_max,
-            m.sheet_name,
-            dc.category_name,
-            d.sex,
-            d.housing_system,
-            d.data_type,
-            m.metadata
-        FROM companies c
-        JOIN breeds b ON c.id = b.company_id
-        JOIN strains s ON b.id = s.breed_id  
-        JOIN documents d ON s.id = d.strain_id
-        JOIN metrics m ON d.id = m.document_id
-        JOIN data_categories dc ON m.category_id = dc.id
-        WHERE 1=1
-        """
-
+        # Initialisation
+        conditions = ["1=1"]
         params = []
-        conditions = []
-        param_index = 0  # FIXE: Compteur séquentiel pour les placeholders
+        param_count = 0
 
-        # Extraction du sexe
-        sex_from_query = self.query_normalizer.extract_sex_from_query(query)
-        sex_from_entities = entities.get("sex") if entities else None
-        sex_specified = entities.get("sex_specified") == "true" if entities else False
+        # ORDRE FIXE pour éviter les décalages
 
-        target_sex = sex_from_entities or sex_from_query
-        actual_sex_specified = sex_specified or (sex_from_query is not None)
-
-        # Construction de la condition de sexe
-        sex_priority_case, param_index = self._build_sex_condition(
-            target_sex,
-            actual_sex_specified,
-            strict_sex_match,
-            param_index,
-            conditions,
-            params,
-        )
-
-        # Extraction de l'âge
+        # 1. Age (toujours en premier si présent)
         age_extracted = self._extract_age_from_query(query)
         if age_extracted:
-            logger.debug(f"Age extracted from query: {age_extracted} days")
-            param_index = self._add_age_condition(
-                age_extracted, param_index, conditions, params
+            param_count += 4  # Réserver 4 paramètres pour l'âge
+            age_condition = f"""
+            ((m.age_min <= ${param_count-3} AND m.age_max >= ${param_count-2}) 
+             OR ABS(COALESCE(m.age_min, 0) - ${param_count-3}) <= ${param_count-1}
+             OR ABS(COALESCE(m.age_max, 0) - ${param_count-2}) <= ${param_count})"""
+            conditions.append(age_condition)
+            params.extend([age_extracted, age_extracted, 3, 3])  # 4 paramètres total
+
+            logger.debug(
+                f"Age condition added: {age_extracted} days (params {param_count-3} to {param_count})"
             )
 
-        # Filtres d'entités avec normalisation BD
-        if entities:
-            param_index = self._add_entity_filters(
-                entities, age_extracted, param_index, conditions, params
+        # 2. Breed (toujours après age)
+        breed_db = normalized_entities.get("breed")
+        if breed_db:
+            param_count += 1
+            conditions.append(f"s.strain_name = ${param_count}")
+            params.append(breed_db)
+            logger.debug(
+                f"Adding breed filter: {entities.get('breed') if entities else 'N/A'} -> DB: '{breed_db}' (param ${param_count})"
             )
 
-        # Conditions de recherche métrique (feed_conversion_ratio for X)
-        param_index = self._add_metric_search_conditions(
-            query, age_extracted, param_index, conditions, params
+        # 3. Métrique (toujours après breed)
+        param_count = self._add_metric_search_conditions(
+            query, conditions, params, param_count, age_extracted
         )
 
-        # Assemblage final
-        if conditions:
-            base_query += " AND " + " AND ".join(conditions)
+        # Construction finale
+        sql_conditions = " AND ".join(conditions)
+        sql_query = f"""
+            SELECT 
+                c.company_name,
+                b.breed_name,
+                s.strain_name,
+                s.species,
+                m.metric_name,
+                m.value_numeric,
+                m.value_text,
+                m.unit,
+                m.age_min,
+                m.age_max,
+                m.sheet_name,
+                dc.category_name,
+                d.sex,
+                d.housing_system,
+                d.data_type,
+                m.metadata
+            FROM companies c
+            JOIN breeds b ON c.id = b.company_id
+            JOIN strains s ON b.id = s.breed_id  
+            JOIN documents d ON s.id = d.strain_id
+            JOIN metrics m ON d.id = m.document_id
+            JOIN data_categories dc ON m.category_id = dc.id
+            WHERE {sql_conditions}
+            ORDER BY 
+                CASE 
+                    WHEN LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed', 'as-hatched') THEN 1
+                    WHEN LOWER(COALESCE(d.sex, 'as_hatched')) = 'male' THEN 2
+                    WHEN LOWER(COALESCE(d.sex, 'as_hatched')) = 'female' THEN 3
+                    ELSE 4
+                END
+            , ABS(COALESCE(m.age_min, 999) - {age_extracted or 42}), m.value_numeric DESC NULLS LAST, m.metric_name 
+            LIMIT {top_k}"""
 
-        # Ordre de tri
-        order_clauses = [sex_priority_case]
-        if age_extracted:
-            order_clauses.append(f"ABS(COALESCE(m.age_min, 999) - {age_extracted})")
-        order_clauses.extend(["m.value_numeric DESC NULLS LAST", "m.metric_name"])
+        # VALIDATION CRITIQUE des paramètres
+        placeholders = re.findall(r"\$(\d+)", sql_query)
+        max_placeholder = max([int(p) for p in placeholders]) if placeholders else 0
 
-        base_query += f" ORDER BY {', '.join(order_clauses)}"
-        base_query += f" LIMIT {top_k}"
+        if len(params) < max_placeholder:
+            logger.error(
+                f"MISMATCH: {len(params)} params pour {max_placeholder} placeholders"
+            )
+            # Combler avec des valeurs par défaut
+            while len(params) < max_placeholder:
+                params.append("")
+                logger.warning(f"Adding empty param to reach {max_placeholder}")
 
-        logger.debug(f"Final SQL: {base_query}")
+        logger.debug(f"Final SQL: {sql_query}")
         logger.debug(f"Final params count: {len(params)}")
         logger.debug(f"Final params: {params}")
 
-        return base_query, params
+        return sql_query, params
+
+    def _add_metric_search_conditions(
+        self,
+        query: str,
+        conditions: List[str],
+        params: List[Any],
+        param_count: int,
+        age_extracted: Optional[int],
+    ) -> int:
+        """Ajoute les conditions de recherche de métriques - VERSION CORRIGÉE"""
+
+        metric_search_conditions = []
+        query_lower = query.lower()
+
+        # Pattern pour FCR/conversion
+        if any(term in query_lower for term in ["fcr", "conversion", "indice"]):
+            if age_extracted:
+                param_count += 1
+                metric_search_conditions.append(
+                    f"LOWER(m.metric_name) LIKE ${param_count}"
+                )
+                params.append(f"%feed_conversion_ratio for {age_extracted}%")
+                logger.debug(
+                    f"Searching for: feed_conversion_ratio for {age_extracted} (param ${param_count})"
+                )
+
+            param_count += 1
+            metric_search_conditions.append(f"LOWER(m.metric_name) LIKE ${param_count}")
+            params.append("%feed_conversion_ratio%")
+            logger.debug(f"Searching for: feed_conversion_ratio (param ${param_count})")
+
+        # Pattern pour poids/weight
+        elif any(term in query_lower for term in ["poids", "weight", "body"]):
+            if age_extracted:
+                param_count += 1
+                metric_search_conditions.append(
+                    f"LOWER(m.metric_name) LIKE ${param_count}"
+                )
+                params.append(f"%body_weight for {age_extracted}%")
+                logger.debug(
+                    f"Searching for: body_weight for {age_extracted} (param ${param_count})"
+                )
+
+            param_count += 1
+            metric_search_conditions.append(f"LOWER(m.metric_name) LIKE ${param_count}")
+            params.append("%body_weight%")
+            logger.debug(f"Searching for: body_weight (param ${param_count})")
+
+        # Pattern générique si rien de spécifique
+        else:
+            if age_extracted:
+                param_count += 1
+                metric_search_conditions.append(
+                    f"LOWER(m.metric_name) LIKE ${param_count}"
+                )
+                params.append(f"% for {age_extracted}%")
+                logger.debug(
+                    f"Searching for: generic metric for {age_extracted} (param ${param_count})"
+                )
+
+        if metric_search_conditions:
+            conditions.append(f"({' OR '.join(metric_search_conditions)})")
+
+        return param_count
 
     # ========================================================================
     # NOUVELLE MÉTHODE: Recherche inversée (valeur → âge)
@@ -278,6 +409,10 @@ class PostgreSQLQueryBuilder:
 
         return query, params
 
+    # ========================================================================
+    # MÉTHODES HÉRITÉES CONSERVÉES (pour compatibilité)
+    # ========================================================================
+
     def _build_sex_condition(
         self,
         target_sex: Optional[str],
@@ -288,10 +423,7 @@ class PostgreSQLQueryBuilder:
         params: List[Any],
     ) -> Tuple[str, int]:
         """
-        FIXE: Construit la condition SQL pour le sexe avec comptage correct
-
-        Returns:
-            Tuple[str, int]: (ORDER BY clause, nouveau param_index)
+        CONSERVÉ: Construit la condition SQL pour le sexe (version héritée)
         """
         if not target_sex or target_sex == "as_hatched":
             logger.debug("No specific sex requested, prioritizing as_hatched")
@@ -347,7 +479,7 @@ class PostgreSQLQueryBuilder:
     def _add_age_condition(
         self, age: int, param_index: int, conditions: List[str], params: List[Any]
     ) -> int:
-        """FIXE: Ajoute la condition d'âge avec tolérance"""
+        """CONSERVÉ: Ajoute la condition d'âge avec tolérance (version héritée)"""
         age_tolerance = 3
 
         # Trois paramètres: age, age, tolerance
@@ -374,7 +506,7 @@ class PostgreSQLQueryBuilder:
         conditions: List[str],
         params: List[Any],
     ) -> int:
-        """FIXE: Ajoute les filtres basés sur les entités - VERSION BD RÉELLE"""
+        """CONSERVÉ: Ajoute les filtres basés sur les entités (version héritée)"""
 
         # Filtre de souche avec normalisation vers noms BD
         if entities.get("breed"):
@@ -419,94 +551,6 @@ class PostgreSQLQueryBuilder:
 
         return param_index
 
-    def _add_metric_search_conditions(
-        self,
-        query: str,
-        age_extracted: Optional[int],
-        param_index: int,
-        conditions: List[str],
-        params: List[Any],
-    ) -> int:
-        """
-        FIXE: Ajoute les conditions de recherche de métriques
-        Adapté à la structure réelle: "feed_conversion_ratio for X"
-        """
-        metric_search_conditions = []
-
-        query_lower = query.lower()
-
-        # Pattern pour FCR/conversion
-        if any(term in query_lower for term in ["fcr", "conversion", "indice"]):
-            if age_extracted:
-                param_index += 1
-                metric_search_conditions.append(
-                    f"LOWER(m.metric_name) LIKE ${param_index}"
-                )
-                params.append(f"%feed_conversion_ratio for {age_extracted}%")
-                logger.debug(
-                    f"Searching for: feed_conversion_ratio for {age_extracted}"
-                )
-
-            param_index += 1
-            metric_search_conditions.append(f"LOWER(m.metric_name) LIKE ${param_index}")
-            params.append("%feed_conversion_ratio%")
-
-        # Pattern pour poids/weight
-        elif any(term in query_lower for term in ["poids", "weight", "body"]):
-            if age_extracted:
-                param_index += 1
-                metric_search_conditions.append(
-                    f"LOWER(m.metric_name) LIKE ${param_index}"
-                )
-                params.append(f"%body_weight for {age_extracted}%")
-
-            param_index += 1
-            metric_search_conditions.append(f"LOWER(m.metric_name) LIKE ${param_index}")
-            params.append("%body_weight%")
-
-        # Pattern générique si rien de spécifique
-        else:
-            if age_extracted:
-                param_index += 1
-                metric_search_conditions.append(
-                    f"LOWER(m.metric_name) LIKE ${param_index}"
-                )
-                params.append(f"% for {age_extracted}%")
-
-        if metric_search_conditions:
-            conditions.append(f"({' OR '.join(metric_search_conditions)})")
-
-        return param_index
-
-    def _extract_age_from_query(self, query: str) -> Optional[int]:
-        """Extrait l'âge en jours depuis la requête"""
-        patterns = [
-            r"(\d+)\s*jours?",
-            r"(\d+)\s*days?",
-            r"jour\s+(\d+)",
-            r"day\s+(\d+)",
-            r"à\s+(\d+)\s+jours?",
-            r"at\s+(\d+)\s+days?",
-            r"de\s+(\d+)\s+jours?",
-            r"of\s+(\d+)\s+days?",
-        ]
-
-        query_lower = query.lower()
-        for pattern in patterns:
-            match = re.search(pattern, query_lower)
-            if match:
-                try:
-                    age = int(match.group(1))
-                    if 0 <= age <= 150:
-                        logger.debug(
-                            f"Age detected: {age} days via pattern '{pattern}'"
-                        )
-                        return age
-                except ValueError:
-                    continue
-
-        return None
-
 
 # Tests unitaires
 if __name__ == "__main__":
@@ -519,7 +563,37 @@ if __name__ == "__main__":
     builder = PostgreSQLQueryBuilder(mock_normalizer)
 
     print("=" * 80)
-    print("TEST: Construction requête complète avec paramètres alignés")
+    print("TEST 1: Normalisation Cobb 500 -> 500")
+    print("=" * 80)
+    test_inputs = ["Cobb 500", "cobb 500", "cobb500", "Cobb-500", "c500"]
+    for inp in test_inputs:
+        result = builder._normalize_breed_for_db(inp)
+        print(f"  {inp:20s} -> {result}")
+
+    print("\n" + "=" * 80)
+    print("TEST 2: Normalisation Ross 308 -> 308/308 FF")
+    print("=" * 80)
+    test_inputs = ["Ross 308", "ross 308", "ross308", "Ross-308", "r308"]
+    for inp in test_inputs:
+        result = builder._normalize_breed_for_db(inp)
+        print(f"  {inp:20s} -> {result}")
+
+    print("\n" + "=" * 80)
+    print("TEST 3: Extraction d'âge améliorée")
+    print("=" * 80)
+    test_queries = [
+        "poids à 42 jours",
+        "conversion de 35 jours",
+        "42j",
+        "6 semaines",
+        "at 21 days",
+    ]
+    for query in test_queries:
+        age = builder._extract_age_from_query(query)
+        print(f"  {query:25s} -> {age} jours")
+
+    print("\n" + "=" * 80)
+    print("TEST 4: Construction requête complète avec paramètres alignés")
     print("=" * 80)
     sql, params = builder.build_sex_aware_sql_query(
         "Quelle est la conversion alimentaire du Cobb 500 mâle à 17 jours ?",
@@ -529,8 +603,6 @@ if __name__ == "__main__":
     )
 
     # Compter les placeholders dans la requête
-    import re
-
     placeholders = re.findall(r"\$\d+", sql)
     unique_placeholders = set(placeholders)
 
