@@ -43,6 +43,70 @@ class DataAvailabilityChecker:
         """
         self.db_pool = db_pool
 
+    def check_data_availability(
+        self, query: str, entities: Dict[str, str]
+    ) -> Dict[str, any]:
+        """
+        Vérifie la disponibilité des données pour une requête
+
+        MÉTHODE AJOUTÉE: Interface synchrone requise par le système principal
+
+        Args:
+            query: Requête utilisateur
+            entities: Entités extraites
+
+        Returns:
+            Dict avec clés: data_available, reason, data_type
+        """
+        # Vérifications par priorité
+
+        # 1. Données économiques
+        if self._is_economic_query(query):
+            return {
+                "data_available": False,
+                "reason": "Les données économiques ne sont pas disponibles dans notre système",
+                "data_type": "metrics",
+            }
+
+        # 2. Nutrition Ross 308
+        if self._is_nutrition_ross_query(query, entities):
+            return {
+                "data_available": False,
+                "reason": "Les tables nutritionnelles Ross 308 ne sont pas disponibles",
+                "data_type": "nutrition",
+            }
+
+        # 3. Plage d'âge
+        if "age_days" in entities:
+            try:
+                age = int(entities["age_days"])
+                age_check = self.check_age_range(entities.get("breed", ""), age)
+                if not age_check.available:
+                    return {
+                        "data_available": False,
+                        "reason": age_check.message,
+                        "data_type": "metrics",
+                    }
+            except (ValueError, TypeError):
+                return {
+                    "data_available": False,
+                    "reason": f"Âge invalide: {entities['age_days']}",
+                    "data_type": "metrics",
+                }
+
+        # 4. Souche existe
+        if "breed" in entities:
+            breed_check = self.check_breed_exists(entities["breed"])
+            if not breed_check.available:
+                return {
+                    "data_available": False,
+                    "reason": breed_check.message,
+                    "data_type": "metrics",
+                }
+
+        # Tout est disponible
+        return {"data_available": True, "reason": None, "data_type": "metrics"}
+
     async def check_availability(
         self, query: str, entities: Dict[str, str]
     ) -> AvailabilityResult:

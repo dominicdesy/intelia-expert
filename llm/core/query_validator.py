@@ -55,41 +55,60 @@ class QueryValidator:
         pass
 
     def validate_query_completeness(
-        self,
-        query: str,
-        entities: Dict[str, str],
-        query_type: str = "performance_query",
-    ) -> ValidationResult:
+        self, query: str, entities: Dict[str, str]
+    ) -> Dict[str, any]:
         """
         Vérifie si une requête contient toutes les entités nécessaires
+
+        INTERFACE CORRIGÉE: Retourne un dict au lieu d'un objet ValidationResult
 
         Args:
             query: Requête originale de l'utilisateur
             entities: Entités extraites par EntityExtractor
-            query_type: Type de requête détecté
 
         Returns:
-            ValidationResult avec status et message de clarification
+            Dict avec clés: is_complete, missing_entities, confidence, clarification_message
         """
+        # Détecter le type de requête
+        query_type = self._detect_query_type(query)
+
         missing = self.identify_missing_entities(entities, query_type, query)
 
         if not missing:
-            return ValidationResult(
-                is_complete=True,
-                missing_entities=[],
-                clarification_message="",
-                confidence=1.0,
-            )
+            return {
+                "is_complete": True,
+                "missing_entities": [],
+                "confidence": 1.0,
+                "clarification_message": "",
+            }
 
         # Générer message de clarification
         clarification = self.generate_clarification_prompt(missing, query)
 
-        return ValidationResult(
-            is_complete=False,
-            missing_entities=missing,
-            clarification_message=clarification,
-            confidence=0.8,
-        )
+        return {
+            "is_complete": False,
+            "missing_entities": missing,
+            "confidence": 0.8,
+            "clarification_message": clarification,
+        }
+
+    def _detect_query_type(self, query: str) -> str:
+        """Détecte le type de requête basé sur le contenu"""
+        query_lower = query.lower()
+
+        if any(
+            word in query_lower
+            for word in ["compare", "comparaison", "vs", "versus", "différence"]
+        ):
+            return "comparison_query"
+        elif any(word in query_lower for word in ["nutrition", "aliment", "régime"]):
+            return "nutrition_query"
+        elif any(word in query_lower for word in ["rendement", "carcasse", "abattage"]):
+            return "carcass_query"
+        elif any(word in query_lower for word in ["calcul", "calculer"]):
+            return "calculation_query"
+        else:
+            return "performance_query"
 
     def identify_missing_entities(
         self, entities: Dict[str, str], query_type: str, query: str
