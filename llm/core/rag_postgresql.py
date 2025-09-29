@@ -2,7 +2,7 @@
 """
 rag_postgresql.py - PostgreSQL System Principal Refactorisé
 Point d'entrée principal avec délégation vers modules spécialisés
-VERSION CORRIGÉE: Merge intelligent des entités pour préserver 'sex'
+VERSION CORRIGÉE: Merge intelligent + Logs diagnostiques complets
 """
 
 import logging
@@ -135,7 +135,7 @@ class PostgreSQLSystem:
     ) -> RAGResult:
         """
         Recherche de métriques avec validation et optimisations
-        VERSION CORRIGÉE: Gestion robuste des validations avec merge intelligent
+        VERSION CORRIGÉE: Gestion robuste + Logs diagnostiques complets
         """
 
         if not self.is_initialized or not self.postgres_retriever:
@@ -147,6 +147,15 @@ class PostgreSQLSystem:
         start_time = time.time()
 
         try:
+            # 🔥 LOG CRITIQUE #1 : Ce qui ARRIVE à search_metrics
+            logger.debug(f"🔍 search_metrics INPUT entities: {entities}")
+            logger.debug(
+                f"🔍 INPUT - 'sex' present: {'sex' in (entities or {})}, value: {(entities or {}).get('sex')}"
+            )
+            logger.debug(
+                f"🔍 INPUT - 'explicit_sex_request' present: {'explicit_sex_request' in (entities or {})}, value: {(entities or {}).get('explicit_sex_request')}"
+            )
+
             # 🔧 CORRECTION: Vérification de sécurité pour validator
             if not self.validator:
                 logger.warning(
@@ -158,8 +167,22 @@ class PostgreSQLSystem:
                 }
             else:
                 try:
+                    # 🔥 LOG CRITIQUE #2 : Avant appel validator
+                    logger.debug(f"🔍 BEFORE validator call - entities: {entities}")
+
                     validation_result = self.validator.flexible_query_validation(
                         query, entities
+                    )
+
+                    # 🔥 LOG CRITIQUE #3 : Après appel validator
+                    logger.debug(
+                        f"🔍 AFTER validator call - validation_result: {validation_result}"
+                    )
+                    logger.debug(
+                        f"🔍 AFTER validator - enhanced_entities: {validation_result.get('enhanced_entities')}"
+                    )
+                    logger.debug(
+                        f"🔍 AFTER validator - 'sex' in enhanced: {'sex' in (validation_result.get('enhanced_entities', {}))}"
                     )
 
                     # Vérification supplémentaire de sécurité
@@ -194,26 +217,75 @@ class PostgreSQLSystem:
             original_entities = entities or {}
             enhanced = validation_result.get("enhanced_entities", {})
 
+            # 🔥 LOG CRITIQUE #4 : Avant merge
+            logger.debug(f"🔍 BEFORE merge - original_entities: {original_entities}")
+            logger.debug(f"🔍 BEFORE merge - enhanced: {enhanced}")
+            logger.debug(
+                f"🔍 BEFORE merge - 'sex' in original: {'sex' in original_entities}, value: {original_entities.get('sex')}"
+            )
+            logger.debug(
+                f"🔍 BEFORE merge - 'sex' in enhanced: {'sex' in enhanced}, value: {enhanced.get('sex')}"
+            )
+
             # 🟢 CORRECTION: Priorité aux originaux pour préserver 'sex'
             if enhanced:
                 # Commencer avec les originaux, enrichir avec enhanced
                 entities = {**original_entities, **enhanced}
 
+                logger.debug(f"🔍 AFTER first merge: {entities}")
+                logger.debug(
+                    f"🔍 AFTER first merge - 'sex' present: {'sex' in entities}, value: {entities.get('sex')}"
+                )
+
                 # Si un champ existe dans les deux, garder l'original pour 'sex', 'explicit_sex_request', etc.
                 # mais utiliser enhanced pour 'breed' normalisé
-                for key in [
+                critical_keys_to_preserve = [
                     "sex",
                     "explicit_sex_request",
                     "_comparison_label",
                     "_comparison_dimension",
-                ]:
-                    if key in original_entities and original_entities[key] is not None:
-                        entities[key] = original_entities[key]
+                ]
 
-                logger.debug(f"Merged entities (originals preserved): {entities}")
+                for key in critical_keys_to_preserve:
+                    if key in original_entities and original_entities[key] is not None:
+                        old_value = entities.get(key)
+                        entities[key] = original_entities[key]
+                        if old_value != original_entities[key]:
+                            logger.debug(
+                                f"🔍 RESTORED '{key}': {old_value} → {original_entities[key]}"
+                            )
+                        else:
+                            logger.debug(
+                                f"🔍 PRESERVED '{key}': {original_entities[key]}"
+                            )
+
+                # 🔥 LOG CRITIQUE #5 : Après merge final
+                logger.debug(f"🔍 AFTER final merge - entities: {entities}")
+                logger.debug(
+                    f"🔍 FINAL - 'sex' present: {'sex' in entities}, value: {entities.get('sex')}"
+                )
+                logger.debug(
+                    f"🔍 FINAL - 'explicit_sex_request' present: {'explicit_sex_request' in entities}, value: {entities.get('explicit_sex_request')}"
+                )
+
+                # Vérification finale
+                for key in critical_keys_to_preserve:
+                    if key in original_entities:
+                        if key not in entities:
+                            logger.error(
+                                f"❌❌❌ CRITICAL KEY LOST AFTER MERGE: '{key}'"
+                            )
+                        elif entities[key] != original_entities[key]:
+                            logger.error(
+                                f"❌❌❌ CRITICAL KEY CHANGED: '{key}' {original_entities[key]} → {entities[key]}"
+                            )
+                        else:
+                            logger.debug(
+                                f"✅ Critical key preserved: '{key}' = {entities[key]}"
+                            )
             else:
                 entities = original_entities
-                logger.debug(f"Using original entities: {entities}")
+                logger.debug(f"🔍 No enhanced entities, using original: {entities}")
 
             # 🔧 CORRECTION: Vérification de sécurité pour check_data_availability_flexible
             if self.validator:
@@ -267,6 +339,15 @@ class PostgreSQLSystem:
                 except Exception as temporal_error:
                     logger.warning(f"Erreur détection temporelle: {temporal_error}")
                     # Continuer avec recherche normale
+
+            # 🔥 LOG CRITIQUE #6 : Juste avant l'appel à postgres_retriever
+            logger.debug(
+                f"🔍 CALLING postgres_retriever.search_metrics with entities: {entities}"
+            )
+            logger.debug(f"🔍 Entities 'sex': {entities.get('sex')}")
+            logger.debug(
+                f"🔍 Entities 'explicit_sex_request': {entities.get('explicit_sex_request')}"
+            )
 
             # Exécution normale de la requête
             metric_results = await self.postgres_retriever.search_metrics(
@@ -477,6 +558,17 @@ class PostgreSQLSystem:
                 ],
                 "status": "active",
             },
-            "implementation_phase": "modular_architecture_with_intelligent_merge",
-            "version": "v8.2_entity_merge_fixed",
+            "diagnostic_logging": {
+                "applied": True,
+                "description": "Logs diagnostiques complets pour tracer le flux des entités",
+                "features": [
+                    "Traçage INPUT/OUTPUT de chaque module",
+                    "Vérification des champs critiques à chaque étape",
+                    "Détection automatique des champs perdus",
+                    "Restauration automatique si perte détectée",
+                ],
+                "status": "active",
+            },
+            "implementation_phase": "modular_architecture_with_diagnostic_logging",
+            "version": "v8.3_diagnostic_logs_added",
         }

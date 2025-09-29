@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
-VERSION FINALE CORRIGÉE: Préserve tous les champs originaux en priorité
+VERSION FINALE CORRIGÉE: Préserve tous les champs originaux + Logs diagnostiques
 """
 
 import re
@@ -32,56 +32,130 @@ class PostgreSQLValidator:
         missing = []
         suggestions = []
 
+        # 🔥 LOG CRITIQUE #1 : Ce qui ARRIVE au validator
+        logger.debug(f"🔍 VALIDATOR INPUT entities: {entities}")
+        logger.debug(
+            f"🔍 VALIDATOR INPUT - 'sex' present: {'sex' in entities}, value: {entities.get('sex')}"
+        )
+        logger.debug(
+            f"🔍 VALIDATOR INPUT - 'breed' present: {'breed' in entities}, value: {entities.get('breed')}"
+        )
+        logger.debug(
+            f"🔍 VALIDATOR INPUT - 'age_days' present: {'age_days' in entities}, value: {entities.get('age_days')}"
+        )
+        logger.debug(
+            f"🔍 VALIDATOR INPUT - 'explicit_sex_request' present: {'explicit_sex_request' in entities}, value: {entities.get('explicit_sex_request')}"
+        )
+
         # 🟢 CORRECTION CRITIQUE: Copier TOUTES les entités originales en priorité
         # Cela préserve automatiquement 'sex', 'explicit_sex_request', etc.
         enhanced_entities = dict(entities) if entities else {}
 
+        # 🔥 LOG CRITIQUE #2 : Juste après dict(entities)
+        logger.debug(f"🔍 enhanced_entities AFTER dict(entities): {enhanced_entities}")
+        logger.debug(
+            f"🔍 AFTER COPY - 'sex' present: {'sex' in enhanced_entities}, value: {enhanced_entities.get('sex')}"
+        )
+        logger.debug(
+            f"🔍 AFTER COPY - 'explicit_sex_request' present: {'explicit_sex_request' in enhanced_entities}"
+        )
+
         # 🟢 Auto-détection breed SEULEMENT si absent dans les entités originales
         if not enhanced_entities.get("breed"):
+            logger.debug("🔍 Breed ABSENT, auto-detecting from query...")
             detected_breed = self._detect_breed_from_query(query)
             if detected_breed:
                 enhanced_entities["breed"] = detected_breed
-                logger.debug(f"Auto-detected breed: {detected_breed}")
+                logger.debug(f"✅ Auto-detected breed: {detected_breed}")
             else:
+                logger.debug("❌ No breed detected in query")
                 missing.append("breed")
                 suggestions.append("Spécifiez une race (Cobb 500, Ross 308, etc.)")
+        else:
+            logger.debug(
+                f"🔍 Breed PRESENT: '{enhanced_entities.get('breed')}', skipping auto-detection"
+            )
 
         # 🟢 Auto-détection age SEULEMENT si absent dans les entités originales
         if not enhanced_entities.get("age_days"):
+            logger.debug("🔍 Age ABSENT, auto-detecting from query...")
             detected_age = self._detect_age_from_query(query)
             if detected_age:
                 enhanced_entities["age_days"] = detected_age
-                logger.debug(f"Auto-detected age: {detected_age} days")
+                logger.debug(f"✅ Auto-detected age: {detected_age} days")
             else:
+                logger.debug("❌ No age detected in query")
                 # Pour certaines requêtes, l'âge n'est pas critique
                 if any(
                     word in query.lower()
                     for word in ["recommande", "meilleur", "compare", "général"]
                 ):
+                    logger.debug("🔍 General query, age not critical")
                     pass  # Requête générale - pas besoin d'âge spécifique
                 else:
                     missing.append("age")
                     suggestions.append("Précisez un âge (21 jours, 42 jours, etc.)")
+        else:
+            logger.debug(
+                f"🔍 Age PRESENT: '{enhanced_entities.get('age_days')}', skipping auto-detection"
+            )
 
         # 🟢 Auto-détection metric SEULEMENT si absent dans les entités originales
         if not enhanced_entities.get("metric_type"):
+            logger.debug("🔍 Metric ABSENT, auto-detecting from query...")
             detected_metric = self._detect_metric_from_query(query)
             if detected_metric:
                 enhanced_entities["metric_type"] = detected_metric
-                logger.debug(f"Auto-detected metric: {detected_metric}")
+                logger.debug(f"✅ Auto-detected metric: {detected_metric}")
+            else:
+                logger.debug("❌ No metric detected in query")
+        else:
+            logger.debug(
+                f"🔍 Metric PRESENT: '{enhanced_entities.get('metric_type')}', skipping auto-detection"
+            )
+
+        # 🔥 LOG CRITIQUE #3 : Avant de retourner
+        logger.debug(f"🔍 enhanced_entities FINAL before return: {enhanced_entities}")
+        logger.debug(
+            f"🔍 FINAL - 'sex' present: {'sex' in enhanced_entities}, value: {enhanced_entities.get('sex')}"
+        )
+        logger.debug(
+            f"🔍 FINAL - 'explicit_sex_request' present: {'explicit_sex_request' in enhanced_entities}, value: {enhanced_entities.get('explicit_sex_request')}"
+        )
+
+        # 🔥 VÉRIFICATION CRITIQUE : Comparaison INPUT vs OUTPUT
+        input_keys = set(entities.keys())
+        output_keys = set(enhanced_entities.keys())
+        lost_keys = input_keys - output_keys
+
+        if lost_keys:
+            logger.error(f"❌❌❌ VALIDATOR LOST KEYS: {lost_keys}")
+            logger.error(f"❌ INPUT had: {input_keys}")
+            logger.error(f"❌ OUTPUT has: {output_keys}")
+
+            # 🟢 CORRECTION : RESTAURER les champs perdus
+            for key in lost_keys:
+                enhanced_entities[key] = entities[key]
+                logger.warning(f"⚠️ RESTORED lost key '{key}': {entities[key]}")
+
+            logger.debug(f"🔍 enhanced_entities AFTER restoration: {enhanced_entities}")
+        else:
+            logger.debug("✅ No keys lost, all fields preserved")
 
         # 🟢 Log de debug pour vérifier que tous les champs sont préservés
         if entities:
             preserved_fields = [k for k in entities.keys() if k in enhanced_entities]
             if preserved_fields:
-                logger.debug(f"Preserved original fields: {preserved_fields}")
+                logger.debug(f"✅ Preserved original fields: {preserved_fields}")
 
         # Déterminer le statut
         if not missing:
+            logger.debug("✅ Validation complete, returning enhanced_entities")
             return {"status": "complete", "enhanced_entities": enhanced_entities}
 
         elif len(missing) <= 1 and ("breed" not in missing):
             # Si juste l'âge ou métrique manque, on peut souvent traiter
+            logger.debug(f"⚠️ Validation incomplete but processable, missing: {missing}")
             return {
                 "status": "incomplete_but_processable",
                 "message": f"Autoriser la requête sans {', '.join(missing)} spécifique",
@@ -91,6 +165,7 @@ class PostgreSQLValidator:
 
         else:
             # Trop d'informations manquantes
+            logger.debug(f"❌ Validation needs fallback, missing: {missing}")
             helpful_message = self._generate_validation_help_message(
                 query, missing, suggestions
             )
