@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 rag_engine_handlers.py - Handlers spécialisés pour différents types de requêtes
-VERSION CORRIGÉE : Gestion d'erreur complète pour diagnostiquer les problèmes de comparaison
+VERSION CORRIGÉE : Compatible avec la structure harmonisée du comparison_handler
 """
 
 import re
@@ -72,6 +72,7 @@ class ComparativeQueryHandler(BaseQueryHandler):
                 "fr",
             )
 
+            # 🔧 CORRECTION: Accès sécurisé aux métadonnées
             return RAGResult(
                 source=RAGSource.RAG_SUCCESS,
                 answer=answer_text,
@@ -81,20 +82,19 @@ class ComparativeQueryHandler(BaseQueryHandler):
                     "source_type": "comparative",
                     "comparison_type": comparison_result.get("comparison_type"),
                     "operation": comparison_result.get("operation"),
-                    "entities_compared": comparison_result["metadata"][
-                        "entities_compared"
-                    ],
-                    "successful_queries": comparison_result["metadata"][
-                        "successful_queries"
-                    ],
+                    "entities_compared": comparison_result.get("metadata", {}).get(
+                        "entities_compared", 2
+                    ),
                     "processing_time": time.time() - start_time,
-                    "result_count": len(comparison_result["results"]),
+                    "result_count": len(comparison_result.get("results", [])),
+                    "preprocessing_applied": comparison_result.get("metadata", {}).get(
+                        "preprocessing_applied", False
+                    ),
                 },
             )
 
         except ValueError as ve:
-            # ✅ CORRECTION CRITIQUE : Capturer ValueError spécifiquement
-            logger.error(f"❌ ValueError in comparative handling: {ve}")
+            logger.error(f"ValueError in comparative handling: {ve}")
             logger.error(f"Full traceback:\n{traceback.format_exc()}")
 
             return RAGResult(
@@ -109,8 +109,7 @@ class ComparativeQueryHandler(BaseQueryHandler):
             )
 
         except ZeroDivisionError as zde:
-            # ✅ CORRECTION CRITIQUE : Capturer ZeroDivisionError spécifiquement
-            logger.error(f"❌ ZeroDivisionError in comparative handling: {zde}")
+            logger.error(f"ZeroDivisionError in comparative handling: {zde}")
             logger.error(f"Full traceback:\n{traceback.format_exc()}")
 
             return RAGResult(
@@ -125,8 +124,7 @@ class ComparativeQueryHandler(BaseQueryHandler):
             )
 
         except Exception as e:
-            # ✅ AMÉLIORATION : Log complet avec traceback
-            logger.error("❌ Critical error in comparative handling")
+            logger.error("Critical error in comparative handling")
             logger.error(f"Error type: {type(e).__name__}")
             logger.error(f"Error message: {str(e)}")
             logger.error(f"Error args: {e.args}")
@@ -139,7 +137,6 @@ class ComparativeQueryHandler(BaseQueryHandler):
     ) -> RAGResult:
         """Fallback vers traitement standard"""
 
-        # Extraire la première entité pour requête standard
         entities = preprocessed_data.get("entities", {})
         query = preprocessed_data["normalized_query"]
 
@@ -170,14 +167,27 @@ class ComparativeQueryHandler(BaseQueryHandler):
         )
 
     def _extract_comparison_documents(self, comparison_result: Dict) -> list:
-        """Extrait les documents des résultats de comparaison"""
+        """
+        Extrait les documents des résultats de comparaison
+        Compatible avec la nouvelle structure harmonisée
+        """
         try:
             documents = []
-            if "results" in comparison_result:
-                for result_set in comparison_result["results"]:
-                    if isinstance(result_set, dict) and "context_docs" in result_set:
-                        documents.extend(result_set["context_docs"])
+            results = comparison_result.get("results", [])
+
+            # Nouvelle structure: Liste de dicts avec "all_docs"
+            for result_item in results:
+                if isinstance(result_item, dict):
+                    # Format harmonisé avec all_docs
+                    if "all_docs" in result_item:
+                        documents.extend(result_item["all_docs"])
+                    # Ancien format avec context_docs
+                    elif "context_docs" in result_item:
+                        documents.extend(result_item["context_docs"])
+
+            logger.debug(f"Extracted {len(documents)} comparison documents")
             return documents
+
         except Exception as e:
             logger.warning(f"Erreur extraction documents comparatifs: {e}")
             return []
@@ -194,7 +204,6 @@ class TemporalQueryHandler(BaseQueryHandler):
         query = preprocessed_data["normalized_query"]
         entities = preprocessed_data["entities"]
 
-        # Extraire la plage d'âges
         age_range = self._extract_age_range_from_query(query)
         if not age_range:
             return RAGResult(
@@ -208,7 +217,6 @@ class TemporalQueryHandler(BaseQueryHandler):
                 f"Traitement plage temporelle: {age_range[0]}-{age_range[1]} jours"
             )
 
-            # Utiliser la méthode optimisée si disponible
             if hasattr(self.postgresql_system, "search_metrics_range"):
                 result = await self.postgresql_system.search_metrics_range(
                     query=query,
@@ -229,7 +237,6 @@ class TemporalQueryHandler(BaseQueryHandler):
                     )
                     return result
 
-            # Fallback vers méthode multiple
             return await self._handle_temporal_fallback(
                 query, entities, age_range, start_time
             )
@@ -324,7 +331,6 @@ class StandardQueryHandler(BaseQueryHandler):
         entities = preprocessed_data["entities"]
         routing_hint = preprocessed_data.get("routing_hint")
 
-        # Utiliser original_query si fourni, sinon fallback sur normalized_query
         if original_query is None:
             original_query = preprocessed_data.get("original_query", query)
 
