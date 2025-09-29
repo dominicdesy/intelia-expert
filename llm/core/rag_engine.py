@@ -313,6 +313,7 @@ class InteliaRAGEngine:
                 "entities": {},
                 "routing_hint": None,
                 "is_comparative": False,
+                "comparison_entities": [],  # ← Ajouté
                 "metadata": {"preprocessing_applied": False},
             }
 
@@ -329,6 +330,9 @@ class InteliaRAGEngine:
                 "entities": preprocessed["entities"],
                 "routing_hint": preprocessed["routing"],
                 "is_comparative": preprocessed.get("is_comparative", False),
+                "comparison_entities": preprocessed.get(
+                    "comparison_entities", []
+                ),  # ← Ajouté
                 "metadata": {
                     "original_query": query,
                     "normalized_query": preprocessed["normalized_query"],
@@ -347,6 +351,7 @@ class InteliaRAGEngine:
                 "entities": {},
                 "routing_hint": None,
                 "is_comparative": False,
+                "comparison_entities": [],  # ← Ajouté
                 "metadata": {
                     "preprocessing_applied": False,
                     "preprocessing_error": str(e),
