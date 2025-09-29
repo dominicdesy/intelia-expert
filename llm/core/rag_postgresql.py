@@ -190,9 +190,10 @@ class PostgreSQLSystem:
                     },
                 )
 
-            # Utiliser les entités enrichies si disponibles
-            if validation_result.get("status") == "incomplete_but_processable":
-                entities = validation_result.get("enhanced_entities", entities)
+            # 🔧 CORRECTION CRITIQUE: TOUJOURS utiliser les enhanced_entities
+            # Le validateur enrichit les entités (auto-détection breed/age/metric)
+            # Il faut les utiliser quel que soit le statut de validation
+            entities = validation_result.get("enhanced_entities", entities or {})
 
             # 🔧 CORRECTION: Vérification de sécurité pour check_data_availability_flexible
             if self.validator:
