@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 metric_calculator.py - Calculs mathématiques sur les métriques avicoles
-VERSION CORRIGÉE : Gestion correcte des métriques où "plus bas = meilleur" (FCR, mortalité)
-+ Contexte enrichi (âge, sexe) dans la réponse
+VERSION CORRIGÉE :
+- Gestion correcte des métriques où "plus bas = meilleur" (FCR, mortalité)
+- Validation stricte contre division par zéro
+- Contexte enrichi (âge, sexe) dans la réponse
 """
 
 import logging
@@ -24,9 +26,9 @@ class ComparisonResult:
     relative_difference_pct: Optional[float]
     ratio: Optional[float]
     higher_label: str
-    better_label: str  # NOUVEAU: qui a la meilleure valeur (selon le contexte)
+    better_label: str
     unit: str = ""
-    metric_name: str = ""  # NOUVEAU: pour déterminer si lower is better
+    metric_name: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         """Convertit en dictionnaire"""
@@ -90,6 +92,7 @@ class MetricCalculator:
     def calculate_comparison(results: List[Dict[str, Any]]) -> ComparisonResult:
         """
         Calcule les différences entre deux résultats
+        VERSION CORRIGÉE : Validation stricte contre valeurs nulles/zéro
 
         Args:
             results: Liste de 2 dictionnaires contenant:
@@ -98,6 +101,9 @@ class MetricCalculator:
 
         Returns:
             ComparisonResult avec tous les calculs
+
+        Raises:
+            ValueError: Si valeurs manquantes, nulles ou égales à zéro
         """
         if len(results) != 2:
             raise ValueError(
@@ -108,8 +114,32 @@ class MetricCalculator:
         value1 = MetricCalculator._extract_primary_value(results[0]["data"])
         value2 = MetricCalculator._extract_primary_value(results[1]["data"])
 
+        # ✅ VALIDATION NIVEAU 1 : Valeurs manquantes
         if value1 is None or value2 is None:
-            raise ValueError("Missing values for comparison")
+            error_msg = (
+                f"Missing values for comparison: "
+                f"value1={'None' if value1 is None else value1}, "
+                f"value2={'None' if value2 is None else value2}"
+            )
+            logger.error(f"❌ {error_msg}")
+            raise ValueError(error_msg)
+
+        # ✅ VALIDATION NIVEAU 2 : Valeurs nulles ou zéro
+        if value1 == 0 or value2 == 0:
+            error_msg = (
+                f"Cannot compare with zero values: "
+                f"value1={value1}, value2={value2}. "
+                f"This would cause division by zero in percentage calculations."
+            )
+            logger.error(f"❌ {error_msg}")
+            raise ValueError(error_msg)
+
+        # ✅ VALIDATION NIVEAU 3 : Valeurs négatives (optionnel selon contexte)
+        if value1 < 0 or value2 < 0:
+            logger.warning(
+                f"⚠️ Negative values detected: value1={value1}, value2={value2}. "
+                f"Proceeding but this may indicate data issues."
+            )
 
         # Extraction des labels
         label1 = results[0].get("sex") or results[0].get("label", "Value 1")
@@ -122,13 +152,13 @@ class MetricCalculator:
             unit = results[0]["data"][0].get("unit", "")
             metric_name = results[0]["data"][0].get("metric_name", "")
 
-        # Calculs
+        # Calculs (maintenant sûrs car valeurs validées)
         absolute_diff = value1 - value2
-        relative_diff_pct = ((value1 - value2) / value2) * 100 if value2 != 0 else None
-        ratio = value1 / value2 if value2 != 0 else None
+        relative_diff_pct = ((value1 - value2) / value2) * 100  # Safe: value2 != 0
+        ratio = value1 / value2  # Safe: value2 != 0
         higher_label = label1 if value1 > value2 else label2
 
-        # NOUVEAU: Déterminer qui est "meilleur" selon le type de métrique
+        # Déterminer qui est "meilleur" selon le type de métrique
         is_lower_better = MetricCalculator._is_lower_better(metric_name)
 
         if is_lower_better:
@@ -139,9 +169,11 @@ class MetricCalculator:
             better_label = label1 if value1 > value2 else label2
 
         logger.info(
-            f"Comparison calculated: {label1}={value1} vs {label2}={value2}, "
+            f"✅ Comparison calculated successfully: "
+            f"{label1}={value1:.3f} vs {label2}={value2:.3f}, "
             f"diff={absolute_diff:.3f} ({relative_diff_pct:.1f}%), "
-            f"better={better_label} (lower_is_better={is_lower_better})"
+            f"ratio={ratio:.3f}, better={better_label} "
+            f"(lower_is_better={is_lower_better})"
         )
 
         return ComparisonResult(
@@ -160,8 +192,12 @@ class MetricCalculator:
 
     @staticmethod
     def _extract_primary_value(data: List[Dict]) -> Optional[float]:
-        """Extrait la valeur principale des résultats"""
+        """
+        Extrait la valeur principale des résultats
+        VERSION CORRIGÉE : Validation et logs améliorés
+        """
         if not data or len(data) == 0:
+            logger.warning("No data provided to _extract_primary_value")
             return None
 
         # Prendre le premier résultat et extraire value_numeric
@@ -169,12 +205,22 @@ class MetricCalculator:
 
         # Si c'est un dict
         if isinstance(first_result, dict):
-            return first_result.get("value_numeric")
+            value = first_result.get("value_numeric")
+            if value is not None:
+                logger.debug(f"Extracted value_numeric: {value}")
+            else:
+                logger.warning(
+                    f"value_numeric is None in first result: {first_result.keys()}"
+                )
+            return value
 
         # Si c'est un objet avec attribut
         if hasattr(first_result, "value_numeric"):
-            return first_result.value_numeric
+            value = first_result.value_numeric
+            logger.debug(f"Extracted value_numeric from object: {value}")
+            return value
 
+        logger.error(f"Cannot extract value_numeric from: {type(first_result)}")
         return None
 
     @staticmethod
@@ -186,9 +232,20 @@ class MetricCalculator:
 
     @staticmethod
     def calculate_percentage_change(old_value: float, new_value: float) -> float:
-        """Calcule le pourcentage de changement"""
+        """
+        Calcule le pourcentage de changement
+        VERSION CORRIGÉE : Gestion explicite du cas zéro
+        """
         if old_value == 0:
-            return float("inf") if new_value != 0 else 0.0
+            if new_value == 0:
+                return 0.0
+            else:
+                logger.warning(
+                    f"Cannot calculate percentage change from zero: "
+                    f"old={old_value}, new={new_value}"
+                )
+                return float("inf") if new_value > 0 else float("-inf")
+
         return ((new_value - old_value) / old_value) * 100
 
     @staticmethod
@@ -281,7 +338,7 @@ class MetricCalculator:
 
             text += "\n\n"
 
-            # CORRECTION : Interprétation selon le type de métrique
+            # Interprétation selon le type de métrique
             if is_lower_better:
                 # Pour FCR, mortalité : plus bas = meilleur
                 if comparison.value1 < comparison.value2:
@@ -289,7 +346,6 @@ class MetricCalculator:
                     text += f"avec une valeur **{abs(comparison.relative_difference_pct):.1f}% inférieure** "
                     text += f"au **{comparison.label2}**.\n\n"
 
-                    # Explication contextuelle selon la métrique
                     if (
                         "fcr" in metric_name.lower()
                         or "conversion" in metric_name.lower()
@@ -357,7 +413,7 @@ class MetricCalculator:
 
             text += "\n\n"
 
-            # CORRECTION : Correct interpretation based on metric type
+            # Correct interpretation based on metric type
             if is_lower_better:
                 # For FCR, mortality: lower = better
                 if comparison.value1 < comparison.value2:
@@ -486,3 +542,24 @@ if __name__ == "__main__":
     print(
         calculator.format_comparison_text(comparison2, "body_weight", context=context)
     )
+
+    print("\n" + "=" * 80)
+    print("TEST 3: Zero Value Detection")
+    print("=" * 80)
+
+    zero_results = [
+        {
+            "sex": "Test 1",
+            "data": [{"value_numeric": 0, "unit": "g", "metric_name": "test"}],
+        },
+        {
+            "sex": "Test 2",
+            "data": [{"value_numeric": 100, "unit": "g", "metric_name": "test"}],
+        },
+    ]
+
+    try:
+        comparison3 = calculator.calculate_comparison(zero_results)
+        print("ERROR: Should have raised ValueError!")
+    except ValueError as e:
+        print(f"✅ Successfully caught zero value: {e}")

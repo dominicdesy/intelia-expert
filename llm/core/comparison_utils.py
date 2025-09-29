@@ -2,6 +2,7 @@
 """
 comparison_utils.py - Utilitaires pour le ComparisonHandler
 Extraction, parsing, validation et sélection de métriques
+VERSION CORRIGÉE : Validation stricte des valeurs nulles/zéro
 """
 
 import logging
@@ -235,32 +236,78 @@ class ComparisonUtils:
     def select_best_metric(
         metrics: List[Dict], entities: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Sélectionne la meilleure métrique selon les critères"""
+        """
+        Sélectionne la meilleure métrique selon les critères
+        VERSION CORRIGÉE : Filtre les valeurs nulles/zéro
+        """
         if not metrics:
+            logger.warning("No metrics provided to select_best_metric")
             return {}
+
+        # ✅ FILTRAGE CRITIQUE : Exclure les métriques avec valeurs nulles ou zéro
+        valid_metrics = [
+            m
+            for m in metrics
+            if m.get("value_numeric") is not None
+            and m.get("value_numeric") != 0
+            and not (
+                isinstance(m.get("value_numeric"), float)
+                and m.get("value_numeric") == 0.0
+            )
+        ]
+
+        if not valid_metrics:
+            logger.error(
+                f"❌ No valid metrics found after filtering (all {len(metrics)} "
+                f"metrics have null or zero values)"
+            )
+            # Log les valeurs pour debug
+            for i, m in enumerate(metrics[:3]):  # Log premiers 3 pour debug
+                logger.debug(
+                    f"  Metric {i}: value_numeric={m.get('value_numeric')}, "
+                    f"metric_name={m.get('metric_name')}"
+                )
+            return {}
+
+        logger.debug(
+            f"✅ Filtered metrics: {len(metrics)} -> {len(valid_metrics)} valid metrics"
+        )
 
         target_age = entities.get("age_days")
 
         if target_age:
-            best_metric = ComparisonUtils.select_best_metric_by_age(metrics, target_age)
+            best_metric = ComparisonUtils.select_best_metric_by_age(
+                valid_metrics, target_age
+            )
             if best_metric:
-                return {
-                    "value_numeric": best_metric.get(
-                        "value_numeric", best_metric.get("value", 0)
-                    ),
+                result = {
+                    "value_numeric": best_metric.get("value_numeric"),
                     "unit": best_metric.get("unit", ""),
                     "metric_name": best_metric.get("metric_name", ""),
                     "metadata": best_metric.get("metadata", {}),
                     "unit_system": best_metric.get("unit_system", "metric"),
                     "age": best_metric.get("age", 0),
                 }
+                logger.debug(
+                    f"Selected metric by age: {result['metric_name']} = "
+                    f"{result['value_numeric']} {result['unit']}"
+                )
+                return result
 
-        best = metrics[0]
+        best = valid_metrics[0]
+        result = {
+            "value_numeric": best.get("value_numeric"),
+            "unit": best.get("unit", ""),
+            "metric_name": best.get("metric_name", ""),
+            "metadata": best.get("metadata", {}),
+            "unit_system": best.get("unit_system", "metric"),
+            "age": best.get("age", 0),
+        }
         logger.debug(
-            f"Selected best metric: {best.get('metric_name')} = "
-            f"{best.get('value_numeric')} {best.get('unit')}"
+            f"Selected best metric: {result['metric_name']} = "
+            f"{result['value_numeric']} {result['unit']}"
         )
-        return best
+        return result
 
     @staticmethod
     def extract_common_context(
@@ -301,7 +348,10 @@ class ComparisonUtils:
     def convert_to_old_format(
         results: Dict[str, Any], comparison_entities: List[Dict]
     ) -> List[Dict[str, Any]]:
-        """Convertit le nouveau format de résultats vers l'ancien format"""
+        """
+        Convertit le nouveau format de résultats vers l'ancien format
+        VERSION CORRIGÉE : Validation stricte des métriques avant ajout
+        """
         old_format_results = []
 
         for entity_set in comparison_entities:
@@ -324,6 +374,23 @@ class ComparisonUtils:
                         metrics, clean_entities
                     )
 
+                    # ✅ VALIDATION CRITIQUE : Vérifier que la métrique est exploitable
+                    if not best_metric:
+                        logger.error(
+                            f"❌ No valid metric selected for entity {comparison_label}"
+                        )
+                        continue
+
+                    metric_value = best_metric.get("value_numeric")
+
+                    if metric_value is None or metric_value == 0:
+                        logger.error(
+                            f"❌ Skipping entity {comparison_label}: "
+                            f"invalid metric value ({metric_value})"
+                        )
+                        continue
+
+                    # ✅ Métrique valide, on peut l'ajouter
                     old_format_result = {
                         comparison_dimension: comparison_label,
                         "label": comparison_label,
@@ -332,8 +399,20 @@ class ComparisonUtils:
                         "entity_set": clean_entities,
                     }
 
+                    logger.debug(
+                        f"✅ Added valid result for {comparison_label}: "
+                        f"value={metric_value}"
+                    )
                     old_format_results.append(old_format_result)
+                else:
+                    logger.warning(
+                        f"No metrics extracted for entity {comparison_label}"
+                    )
 
+        logger.info(
+            f"Conversion complete: {len(old_format_results)} valid entities "
+            f"out of {len(comparison_entities)}"
+        )
         return old_format_results
 
     @staticmethod
