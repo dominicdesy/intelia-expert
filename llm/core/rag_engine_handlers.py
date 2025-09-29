@@ -2,6 +2,7 @@
 """
 rag_engine_handlers.py - Handlers spécialisés pour différents types de requêtes
 VERSION CORRIGÉE : Compatible avec la structure harmonisée du comparison_handler
++ MODE OPTIMISATION pour tri par pertinence
 """
 
 import re
@@ -313,7 +314,7 @@ class TemporalQueryHandler(BaseQueryHandler):
 
 
 class StandardQueryHandler(BaseQueryHandler):
-    """Handler pour les requêtes standard"""
+    """Handler pour les requêtes standard avec mode optimisation"""
 
     async def handle(
         self,
@@ -325,14 +326,30 @@ class StandardQueryHandler(BaseQueryHandler):
         language: str = "fr",
         **kwargs,
     ) -> RAGResult:
-        """Traite les requêtes standard avec fallback intelligent"""
+        """Traite les requêtes standard avec fallback intelligent et mode optimisation"""
 
         query = preprocessed_data["normalized_query"]
         entities = preprocessed_data["entities"]
         routing_hint = preprocessed_data.get("routing_hint")
+        is_optimization = preprocessed_data.get("is_optimization", False)  # ← NOUVEAU
 
         if original_query is None:
             original_query = preprocessed_data.get("original_query", query)
+
+        # 🎯 Configuration des paramètres selon le mode
+        if is_optimization:
+            logger.info("🔍 Mode optimisation activé - priorité au tri par pertinence")
+            search_params = {
+                "top_k": 3,  # Limiter aux meilleurs résultats
+                "min_confidence": 0.75,  # Seuil plus élevé
+                "sort_by": "relevance_desc",  # Tri par pertinence
+            }
+        else:
+            search_params = {
+                "top_k": RAG_SIMILARITY_TOP_K,
+                "min_confidence": 0.5,
+                "sort_by": None,
+            }
 
         # PostgreSQL avec hint prioritaire
         if routing_hint == "postgresql" and self.postgresql_system:
@@ -340,38 +357,58 @@ class StandardQueryHandler(BaseQueryHandler):
             result = await self.postgresql_system.search_metrics(
                 query=query,
                 entities=entities,
-                top_k=RAG_SIMILARITY_TOP_K,
                 strict_sex_match=False,
+                **search_params,  # ← Utiliser les paramètres adaptés
             )
 
             if result and result.source != RAGSource.NO_RESULTS:
+                if is_optimization:
+                    result.metadata["query_mode"] = "optimization"
+                    result.metadata["ranking_applied"] = True
                 return result
 
-        # PostgreSQL standard
+        # PostgreSQL standard avec paramètres ajustés
         if self.postgresql_system:
             logger.info("Recherche PostgreSQL standard")
             result = await self.postgresql_system.search_metrics(
                 query=query,
                 entities=entities,
-                top_k=RAG_SIMILARITY_TOP_K,
+                **search_params,  # ← Utiliser les paramètres adaptés
             )
 
             if result and result.source != RAGSource.NO_RESULTS:
+                # 📊 Ajouter metadata spécifique au mode optimisation
+                if is_optimization:
+                    result.metadata["query_mode"] = "optimization"
+                    result.metadata["ranking_applied"] = True
+                    result.metadata["optimization_params"] = {
+                        "top_k": search_params["top_k"],
+                        "min_confidence": search_params["min_confidence"],
+                        "sort_by": search_params["sort_by"],
+                    }
                 return result
 
-        # Weaviate si disponible
+        # Weaviate si disponible (avec paramètres adaptés)
         if self.weaviate_core:
             logger.info("Recherche Weaviate fallback")
+            weaviate_top_k = 3 if is_optimization else RAG_SIMILARITY_TOP_K
+
             result = await self.weaviate_core.search(
                 query=query,
-                top_k=RAG_SIMILARITY_TOP_K,
+                top_k=weaviate_top_k,
             )
 
             if result and result.source != RAGSource.NO_RESULTS:
+                if is_optimization:
+                    result.metadata["query_mode"] = "optimization"
+                    result.metadata["source"] = "weaviate_optimized"
                 return result
 
         return RAGResult(
             source=RAGSource.NO_RESULTS,
             answer="Aucune information trouvée pour cette requête.",
-            metadata={"query_type": "standard"},
+            metadata={
+                "query_type": "standard",
+                "optimization_mode": is_optimization,
+            },
         )
