@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
+
 """
 comparison_handler.py - Gestion des requêtes comparatives
-VERSION CORRIGÉE : Bug du champ 'sex' résolu avec préservation garantie
+
 """
 
 import logging
@@ -31,21 +32,21 @@ class ComparisonHandler:
     ) -> Dict[str, Any]:
         """
         Préserve les champs critiques (sex, age_days, breed) après nettoyage
-
+        
         Args:
             entity_set: Dictionnaire original avec tous les champs
             cleaned: Dictionnaire nettoyé (sans underscores)
-
+            
         Returns:
             Dictionnaire avec champs critiques garantis
         """
         critical_fields = ["sex", "age_days", "breed", "line"]
-
+        
         for field in critical_fields:
             if field not in cleaned and field in entity_set:
                 cleaned[field] = entity_set[field]
                 logger.debug(f"✅ Champ critique '{field}' restauré: {cleaned[field]}")
-
+        
         return cleaned
 
     async def handle_comparison_query(
@@ -328,8 +329,10 @@ class ComparisonHandler:
             relaxed_entity = {
                 k: v for k, v in entity_set.items() if not k.startswith("_")
             }
-
-            relaxed_entity = self._preserve_critical_fields(entity_set, relaxed_entity)
+            
+            relaxed_entity = self._preserve_critical_fields(
+                entity_set, relaxed_entity
+            )
 
             # Override sex pour recherche plus large
             if "sex" in relaxed_entity:
