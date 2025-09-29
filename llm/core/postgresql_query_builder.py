@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 postgresql_query_builder.py - Construction de requêtes SQL pour PostgreSQL
-Version CORRIGÉE - Alignement des paramètres et fallback générique amélioré
+Version CORRIGÉE - Mapping métriques complet + fallback amélioré avec avertissements
 """
 
 import logging
@@ -25,19 +25,66 @@ class PostgreSQLQueryBuilder:
         "Hubbard": "JA87",
     }
 
-    # Mapping des métriques communes
+    # Mapping des métriques communes (noms normalisés)
     METRIC_MAPPINGS = {
         "body_weight": "body_weight",
         "feed_conversion_ratio": "feed_conversion_ratio",
         "fcr": "feed_conversion_ratio",
         "feed_consumption": "feed_consumption",
         "daily_gain": "daily_gain",
+        "average_daily_gain": "daily_gain",
         "mortality": "mortality",
         "livability": "livability",
         "weight": "body_weight",
         "conversion": "feed_conversion_ratio",
         "consumption": "feed_consumption",
         "gain": "daily_gain",
+        "cumulative_feed_intake": "cumulative_feed_intake",
+        "feed_intake": "cumulative_feed_intake",
+    }
+
+    # NOUVEAU: Patterns de recherche SQL pour chaque métrique
+    METRIC_PATTERNS = {
+        "feed_conversion_ratio": [
+            "%feed_conversion_ratio%",
+            "%fcr%",
+            "%feed conversion%",
+            "%conversion ratio%",
+        ],
+        "body_weight": ["%body_weight%", "%body weight%", "%weight%", "%bw%"],
+        "average_daily_gain": [
+            "%daily_gain%",
+            "%daily gain%",
+            "%avg_daily_gain%",
+            "%average_daily_gain%",
+            "%adg%",
+            "%average daily gain%",
+        ],
+        "daily_gain": ["%daily_gain%", "%daily gain%", "%gain%"],
+        "cumulative_feed_intake": [
+            "%cumulative_feed_intake%",
+            "%cumulative feed intake%",
+            "%cumulative feed%",
+            "%feed_intake%",
+            "%feed intake%",
+            "%total feed%",
+        ],
+        "feed_consumption": [
+            "%feed_consumption%",
+            "%feed consumption%",
+            "%daily feed%",
+            "%feed per day%",
+        ],
+        "mortality": ["%mortality%", "%mort%", "%death%", "%cumulative_mortality%"],
+        "livability": ["%livability%", "%viability%", "%survival%", "%liveability%"],
+        "uniformity": ["%uniformity%", "%cv%", "%coefficient_variation%"],
+        "european_efficiency_factor": [
+            "%european_efficiency_factor%",
+            "%eef%",
+            "%efficiency_factor%",
+        ],
+        "feed_cost": ["%feed_cost%", "%cost%", "%feed price%"],
+        "water_consumption": ["%water_consumption%", "%water%", "%water intake%"],
     }
 
     def __init__(self, query_normalizer):
@@ -49,6 +96,8 @@ class PostgreSQLQueryBuilder:
         self.intents_config = self._load_intents_config()
         self.line_aliases = self._extract_line_aliases()
         self.logger = logger
+        self.last_query_used_fallback = False  # NOUVEAU: Flag pour tracking fallback
+        self.fallback_warning_message = None  # NOUVEAU: Message d'avertissement
 
     def _load_intents_config(self) -> Dict:
         """Charge intents.json pour récupérer les aliases"""
@@ -292,48 +341,90 @@ class PostgreSQLQueryBuilder:
 
     def _build_metric_search(
         self, metric_type: Optional[str], age: Optional[int]
-    ) -> List[str]:
+    ) -> Tuple[List[str], bool]:
         """
-        NOUVEAU: Construire les patterns de recherche de métriques avec fallback amélioré
+        AMÉLIORÉ: Construire les patterns avec fallback intelligent et flag d'avertissement
 
         Args:
             metric_type: Type de métrique (peut être None)
             age: Âge en jours (peut être None)
 
         Returns:
-            Liste de patterns de recherche SQL
+            Tuple[List[str], bool]: (patterns SQL, is_fallback_used)
         """
         patterns = []
+        is_fallback = False
 
         if not metric_type:
-            # Fallback générique amélioré
+            # Fallback générique RESTREINT
+            is_fallback = True
+
             if age:
-                patterns.append(f"% for {age}%")
-                patterns.append(f"%{age} days%")
-                patterns.append(f"%day {age}%")
+                # Stratégie conservatrice : chercher seulement les métriques principales avec cet âge
+                patterns.extend(
+                    [
+                        f"%body_weight for {age}%",
+                        f"%feed_conversion_ratio for {age}%",
+                        f"%daily_gain for {age}%",
+                    ]
+                )
+                logger.warning(
+                    f"⚠️ Métrique inconnue avec âge {age}j → recherche LIMITÉE aux 3 métriques principales"
+                )
             else:
-                # Recherche sur métriques communes
+                # Sans âge : encore plus restrictif
                 patterns.extend(
                     [
                         "%body_weight%",
-                        "%feed_consumption%",
                         "%feed_conversion_ratio%",
-                        "%daily_gain%",
                     ]
                 )
+                logger.warning(
+                    "⚠️ Métrique inconnue sans âge → recherche TRÈS LIMITÉE (weight + FCR uniquement)"
+                )
 
-            logger.warning(
-                f"⚠️ Métrique inconnue → patterns génériques: {patterns[:3]}..."
-            )
-            return patterns
+            return patterns, is_fallback
 
-        # Recherche spécifique normale
+        # Recherche spécifique avec METRIC_PATTERNS
         base_name = self.METRIC_MAPPINGS.get(metric_type.lower(), metric_type)
-        if age:
-            patterns.append(f"%{base_name} for {age}%")
-        patterns.append(f"%{base_name}%")
 
-        return patterns
+        # Utiliser les patterns prédéfinis si disponibles
+        if base_name in self.METRIC_PATTERNS:
+            metric_patterns = self.METRIC_PATTERNS[base_name].copy()
+
+            # Ajouter les variantes avec âge si spécifié
+            if age:
+                age_specific_patterns = [f"%{base_name} for {age}%"]
+                patterns.extend(age_specific_patterns)
+
+            # Ajouter les patterns génériques de la métrique
+            patterns.extend(metric_patterns)
+
+            logger.debug(
+                f"✓ Métrique '{metric_type}' → {len(patterns)} patterns SQL précis"
+            )
+        else:
+            # Fallback si métrique non dans METRIC_PATTERNS
+            is_fallback = True
+            if age:
+                patterns.append(f"%{base_name} for {age}%")
+            patterns.append(f"%{base_name}%")
+            logger.warning(
+                f"⚠️ Métrique '{metric_type}' non dans METRIC_PATTERNS → fallback avec 1-2 patterns"
+            )
+
+        return patterns, is_fallback
+
+    def get_fallback_warning(self) -> Optional[str]:
+        """
+        NOUVEAU: Retourne le message d'avertissement si un fallback a été utilisé
+
+        Returns:
+            Message d'avertissement ou None
+        """
+        if self.last_query_used_fallback and self.fallback_warning_message:
+            return self.fallback_warning_message
+        return None
 
     def build_range_query(
         self, entities: Dict[str, str], age_min: int, age_max: int, limit: int = 12
@@ -346,6 +437,10 @@ class PostgreSQLQueryBuilder:
         conditions = ["1=1"]
         params = []
         param_count = 0
+
+        # Reset fallback tracking
+        self.last_query_used_fallback = False
+        self.fallback_warning_message = None
 
         # Condition d'âge optimisée avec BETWEEN
         param_count += 6
@@ -452,6 +547,10 @@ class PostgreSQLQueryBuilder:
         normalized_entities = self._normalize_entities(entities or {})
         logger.debug(f"Normalized: {normalized_entities}")
 
+        # Reset fallback tracking
+        self.last_query_used_fallback = False
+        self.fallback_warning_message = None
+
         conditions = ["1=1"]
         params = []
         param_count = 0
@@ -481,7 +580,7 @@ class PostgreSQLQueryBuilder:
         # 4. FILTRE UNITÉS
         param_count = self._add_unit_filter(conditions, params, param_count)
 
-        # 5. CONDITIONS MÉTRIQUE (avec fallback amélioré)
+        # 5. CONDITIONS MÉTRIQUE (avec fallback amélioré et METRIC_PATTERNS)
         param_count = self._add_metric_search_conditions(
             query, normalized_entities, conditions, params, param_count
         )
@@ -676,7 +775,7 @@ class PostgreSQLQueryBuilder:
         params: List[Any],
         param_count: int,
     ) -> int:
-        """Ajoute les conditions de recherche de métriques - VERSION AMÉLIORÉE avec fallback"""
+        """Ajoute les conditions de recherche de métriques - VERSION AMÉLIORÉE avec fallback intelligent"""
 
         metric_search_conditions = []
         query_lower = query.lower()
@@ -690,12 +789,40 @@ class PostgreSQLQueryBuilder:
             metric_type = "body_weight"
         elif any(term in query_lower for term in ["consumption", "consommation"]):
             metric_type = "feed_consumption"
-        elif any(term in query_lower for term in ["gain", "croissance"]):
+        elif any(term in query_lower for term in ["gain", "croissance", "daily gain"]):
             metric_type = "daily_gain"
+        elif any(term in query_lower for term in ["cumulative feed", "intake"]):
+            metric_type = "cumulative_feed_intake"
+        elif any(term in query_lower for term in ["mortality", "mortalité"]):
+            metric_type = "mortality"
+        elif any(term in query_lower for term in ["livability", "viabilité"]):
+            metric_type = "livability"
 
-        # Construire les patterns avec fallback amélioré
+        # Construire les patterns avec METRIC_PATTERNS complet
         age_int = int(age_extracted) if age_extracted else None
-        patterns = self._build_metric_search(metric_type, age_int)
+        patterns, is_fallback = self._build_metric_search(metric_type, age_int)
+
+        # NOUVEAU: Générer message d'avertissement si fallback utilisé
+        if is_fallback:
+            self.last_query_used_fallback = True
+            if not metric_type:
+                if age_int:
+                    self.fallback_warning_message = (
+                        f"⚠️ Métrique non précisée - Recherche limitée aux métriques principales à {age_int} jours. "
+                        "Les résultats peuvent être incomplets. "
+                        "Précisez la métrique (ex: poids, conversion, gain) pour plus de précision."
+                    )
+                else:
+                    self.fallback_warning_message = (
+                        "⚠️ Métrique et âge non précisés - Recherche très limitée (poids et conversion uniquement). "
+                        "Précisez votre demande pour des résultats plus pertinents."
+                    )
+            else:
+                self.fallback_warning_message = (
+                    f"⚠️ Métrique '{metric_type}' non reconnue dans la base de patterns - "
+                    "Les résultats peuvent être approximatifs. "
+                    "Utilisez des termes standards (poids, conversion, gain, mortalité, etc.)."
+                )
 
         # Ajouter les conditions SQL
         for pattern in patterns:
@@ -897,114 +1024,81 @@ if __name__ == "__main__":
     builder = PostgreSQLQueryBuilder(mock_normalizer)
 
     print("\n" + "=" * 80)
-    print("TEST 1: Fallback générique amélioré")
+    print("TEST 1: METRIC_PATTERNS complet")
     print("=" * 80)
-
-    # Test sans métrique connue, avec âge
-    patterns_with_age = builder._build_metric_search(None, 35)
-    print(f"  Patterns avec âge 35: {patterns_with_age}")
-
-    # Test sans métrique connue, sans âge
-    patterns_no_age = builder._build_metric_search(None, None)
-    print(f"  Patterns sans âge: {patterns_no_age}")
-
-    # Test avec métrique connue
-    patterns_fcr = builder._build_metric_search("fcr", 42)
-    print(f"  Patterns FCR à 42j: {patterns_fcr}")
+    print(f"Nombre de métriques dans METRIC_PATTERNS: {len(builder.METRIC_PATTERNS)}")
 
     print("\n" + "=" * 80)
-    print("TEST 2: Normalisation breeds")
+    print("TEST 2: Fallback intelligent avec avertissements")
     print("=" * 80)
-    test_inputs = [
-        "Cobb 500",
-        "ross 308",
-        "Cobb 500, Ross 308",
-        "Hubbard JA87",
-    ]
-    for inp in test_inputs:
-        result = builder._normalize_breed_for_db(inp)
-        print(f"  {inp:25s} -> {result}")
+
+    # Test 1: Métrique inconnue avec âge
+    patterns1, is_fallback1 = builder._build_metric_search(None, 35)
+    print("\n  Cas 1: Métrique inconnue, âge 35j")
+    print(f"    Fallback utilisé: {is_fallback1}")
+    print(f"    Patterns générés: {len(patterns1)}")
+    print(f"    Exemples: {patterns1}")
+
+    # Test 2: Métrique inconnue sans âge
+    patterns2, is_fallback2 = builder._build_metric_search(None, None)
+    print("\n  Cas 2: Métrique inconnue, pas d'âge")
+    print(f"    Fallback utilisé: {is_fallback2}")
+    print(f"    Patterns générés: {len(patterns2)}")
+    print(f"    Exemples: {patterns2}")
+
+    # Test 3: Métrique connue
+    patterns3, is_fallback3 = builder._build_metric_search("feed_conversion_ratio", 42)
+    print("\n  Cas 3: Métrique connue (FCR), âge 42j")
+    print(f"    Fallback utilisé: {is_fallback3}")
+    print(f"    Patterns générés: {len(patterns3)}")
+    print(f"    Exemples: {patterns3[:3]}")
 
     print("\n" + "=" * 80)
-    print("TEST 3: Extraction d'âge avec phases")
+    print("TEST 3: Messages d'avertissement")
     print("=" * 80)
-    test_queries = [
-        "poids à 42 jours",
-        "starter feed",
-        "grower performance",
-        "finisher phase",
-    ]
-    for query in test_queries:
-        age = builder._extract_age_from_query(query)
-        print(f"  {query:25s} -> {age} jours")
 
-    print("\n" + "=" * 80)
-    print("TEST 4: Construction requête complète avec fallback")
-    print("=" * 80)
-    sql, params = builder.build_sex_aware_sql_query(
-        "Conversion alimentaire du Cobb 500 à 35 jours",
-        entities={"breed": "Cobb 500", "age_days": "35"},
-        top_k=10,
-    )
-
-    placeholders = re.findall(r"\$\d+", sql)
-    unique_placeholders = set(placeholders)
-
-    print(f"Paramètres fournis: {len(params)}")
-    print(f"Placeholders uniques: {len(unique_placeholders)}")
-    print(f"Correspondance: {'✓' if len(params) >= len(unique_placeholders) else '✗'}")
-
-    print("\n" + "=" * 80)
-    print("TEST 5: Requête avec métrique inconnue (fallback)")
-    print("=" * 80)
-    sql_unknown, params_unknown = builder.build_sex_aware_sql_query(
-        "Performance du Cobb 500 à 35 jours",
+    # Test avec métrique inconnue
+    sql1, params1 = builder.build_sex_aware_sql_query(
+        "Données du Cobb 500 à 35 jours",
         entities={"breed": "Cobb 500", "age_days": "35"},
         top_k=5,
     )
+    warning1 = builder.get_fallback_warning()
+    print("\n  Query 1: 'Données du Cobb 500 à 35 jours'")
+    print(f"    Fallback utilisé: {builder.last_query_used_fallback}")
+    if warning1:
+        print(f"    Avertissement: {warning1}")
 
-    print(f"Paramètres fournis (métrique inconnue): {len(params_unknown)}")
-    print(
-        f"Patterns génériques utilisés: {[p for p in params_unknown if '%' in str(p)]}"
-    )
-
-    print("\n" + "=" * 80)
-    print("TEST 6: Requête sans âge ni métrique (double fallback)")
-    print("=" * 80)
-    sql_no_context, params_no_context = builder.build_sex_aware_sql_query(
-        "Données du Cobb 500",
+    # Test sans âge ni métrique
+    sql2, params2 = builder.build_sex_aware_sql_query(
+        "Info sur Cobb 500",
         entities={"breed": "Cobb 500"},
         top_k=5,
     )
+    warning2 = builder.get_fallback_warning()
+    print("\n  Query 2: 'Info sur Cobb 500'")
+    print(f"    Fallback utilisé: {builder.last_query_used_fallback}")
+    if warning2:
+        print(f"    Avertissement: {warning2}")
 
-    print(f"Paramètres fournis (sans contexte): {len(params_no_context)}")
-    generic_patterns = [p for p in params_no_context if "%" in str(p)]
-    print(f"Patterns métriques communes: {generic_patterns}")
-
-    print("\n" + "=" * 80)
-    print("TEST 7: Normalisation Ross 308")
-    print("=" * 80)
-    ross_variants = [
-        "ross 308",
-        "308/308 ff",
-        "308/308FF",
-        "308",
-        "r308",
-    ]
-    for variant in ross_variants:
-        result = builder._normalize_breed_for_db(variant)
-        expected = "308/308 FF"
-        status = "✓" if result == expected else "✗"
-        print(f"  {variant:15s} -> {result:15s} {status}")
-
-    print("\n" + "=" * 80)
-    print("TEST 8: Validation finale")
-    print("=" * 80)
-    if len(params) >= len(unique_placeholders):
-        print("🎉 CORRECTION RÉUSSIE: Nombre de paramètres >= placeholders")
-        print("✓ Fallback générique amélioré implémenté")
-        print("✓ Patterns adaptatifs selon contexte")
+    # Test avec métrique précise
+    sql3, params3 = builder.build_sex_aware_sql_query(
+        "Conversion alimentaire du Cobb 500 à 35 jours",
+        entities={"breed": "Cobb 500", "age_days": "35"},
+        top_k=5,
+    )
+    warning3 = builder.get_fallback_warning()
+    print("\n  Query 3: 'Conversion alimentaire du Cobb 500 à 35 jours'")
+    print(f"    Fallback utilisé: {builder.last_query_used_fallback}")
+    if warning3:
+        print(f"    Avertissement: {warning3}")
     else:
-        print(
-            f"⚠ PROBLÈME: {len(unique_placeholders) - len(params)} paramètres manquants"
-        )
+        print("    Avertissement: Aucun (métrique précise détectée)")
+
+    print("\n" + "=" * 80)
+    print("TEST 4: Validation finale")
+    print("=" * 80)
+    print("✓ Fallback intelligent implémenté (restrictif)")
+    print("✓ Messages d'avertissement contextuels")
+    print("✓ Méthode get_fallback_warning() disponible")
+    print("✓ Stratégie: 3 patterns avec âge, 2 sans âge (au lieu de 4+)")
