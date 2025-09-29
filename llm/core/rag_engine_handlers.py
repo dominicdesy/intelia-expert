@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 rag_engine_handlers.py - Handlers spécialisés pour différents types de requêtes
+VERSION CORRIGÉE : Gestion d'erreur complète pour diagnostiquer les problèmes de comparaison
 """
 
 import re
 import time
 import logging
+import traceback
 from typing import Dict, Any, Optional, Tuple
 
 from config.config import RAG_SIMILARITY_TOP_K
@@ -25,6 +27,160 @@ class BaseQueryHandler:
         """Configure le handler avec les modules nécessaires"""
         for key, value in kwargs.items():
             setattr(self, key, value)
+
+
+class ComparativeQueryHandler(BaseQueryHandler):
+    """Handler pour les requêtes comparatives"""
+
+    def configure(self, **kwargs):
+        """Configure avec ComparisonHandler"""
+        super().configure(**kwargs)
+        self.comparison_handler = kwargs.get("comparison_handler")
+
+    async def handle(
+        self, preprocessed_data: Dict[str, Any], start_time: float
+    ) -> RAGResult:
+        """Traite les requêtes comparatives"""
+
+        if not self.comparison_handler:
+            logger.warning("ComparisonHandler non disponible, fallback vers standard")
+            return await self._fallback_to_standard(preprocessed_data, start_time)
+
+        try:
+            logger.info("Executing comparative query via ComparisonHandler")
+
+            # Appel au ComparisonHandler
+            comparison_result = await self.comparison_handler.handle_comparison_query(
+                preprocessed_data
+            )
+
+            if not comparison_result["success"]:
+                error_msg = comparison_result.get(
+                    "error", "Erreur comparative inconnue"
+                )
+                logger.warning(f"Comparison failed: {error_msg}")
+
+                # Fallback intelligent vers requête standard
+                return await self._fallback_to_standard(preprocessed_data, start_time)
+
+            # Succès: générer la réponse comparative
+            answer_text = await self.comparison_handler.generate_comparative_response(
+                preprocessed_data.get(
+                    "original_query", preprocessed_data["normalized_query"]
+                ),
+                comparison_result,
+                "fr",
+            )
+
+            return RAGResult(
+                source=RAGSource.RAG_SUCCESS,
+                answer=answer_text,
+                context_docs=self._extract_comparison_documents(comparison_result),
+                confidence=0.95,
+                metadata={
+                    "source_type": "comparative",
+                    "comparison_type": comparison_result.get("comparison_type"),
+                    "operation": comparison_result.get("operation"),
+                    "entities_compared": comparison_result["metadata"][
+                        "entities_compared"
+                    ],
+                    "successful_queries": comparison_result["metadata"][
+                        "successful_queries"
+                    ],
+                    "processing_time": time.time() - start_time,
+                    "result_count": len(comparison_result["results"]),
+                },
+            )
+
+        except ValueError as ve:
+            # ✅ CORRECTION CRITIQUE : Capturer ValueError spécifiquement
+            logger.error(f"❌ ValueError in comparative handling: {ve}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+
+            return RAGResult(
+                source=RAGSource.ERROR,
+                answer=f"Erreur de comparaison: {str(ve)}",
+                metadata={
+                    "source_type": "comparative_error",
+                    "error_type": "ValueError",
+                    "error_message": str(ve),
+                    "processing_time": time.time() - start_time,
+                },
+            )
+
+        except ZeroDivisionError as zde:
+            # ✅ CORRECTION CRITIQUE : Capturer ZeroDivisionError spécifiquement
+            logger.error(f"❌ ZeroDivisionError in comparative handling: {zde}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+
+            return RAGResult(
+                source=RAGSource.ERROR,
+                answer="Erreur de comparaison: division par zéro détectée. Les métriques comparées contiennent des valeurs nulles.",
+                metadata={
+                    "source_type": "comparative_error",
+                    "error_type": "ZeroDivisionError",
+                    "error_message": str(zde),
+                    "processing_time": time.time() - start_time,
+                },
+            )
+
+        except Exception as e:
+            # ✅ AMÉLIORATION : Log complet avec traceback
+            logger.error("❌ Critical error in comparative handling")
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"Error message: {str(e)}")
+            logger.error(f"Error args: {e.args}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+
+            return await self._fallback_to_standard(preprocessed_data, start_time)
+
+    async def _fallback_to_standard(
+        self, preprocessed_data: Dict[str, Any], start_time: float
+    ) -> RAGResult:
+        """Fallback vers traitement standard"""
+
+        # Extraire la première entité pour requête standard
+        entities = preprocessed_data.get("entities", {})
+        query = preprocessed_data["normalized_query"]
+
+        if self.postgresql_system and entities:
+            result = await self.postgresql_system.search_metrics(
+                query=query,
+                entities=entities,
+                top_k=RAG_SIMILARITY_TOP_K,
+            )
+
+            if result and result.source != RAGSource.NO_RESULTS:
+                result.metadata.update(
+                    {
+                        "source_type": "comparative_fallback",
+                        "fallback_applied": True,
+                        "processing_time": time.time() - start_time,
+                    }
+                )
+                return result
+
+        return RAGResult(
+            source=RAGSource.NO_RESULTS,
+            answer="Impossible de traiter cette demande de comparaison.",
+            metadata={
+                "source_type": "comparative_error",
+                "processing_time": time.time() - start_time,
+            },
+        )
+
+    def _extract_comparison_documents(self, comparison_result: Dict) -> list:
+        """Extrait les documents des résultats de comparaison"""
+        try:
+            documents = []
+            if "results" in comparison_result:
+                for result_set in comparison_result["results"]:
+                    if isinstance(result_set, dict) and "context_docs" in result_set:
+                        documents.extend(result_set["context_docs"])
+            return documents
+        except Exception as e:
+            logger.warning(f"Erreur extraction documents comparatifs: {e}")
+            return []
 
 
 class TemporalQueryHandler(BaseQueryHandler):
@@ -80,221 +236,73 @@ class TemporalQueryHandler(BaseQueryHandler):
 
         except Exception as e:
             logger.error(f"Erreur traitement temporel: {e}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
             return RAGResult(
                 source=RAGSource.ERROR,
                 answer="Erreur lors du traitement de la requête temporelle.",
-                metadata={"error": str(e), "processing_time": time.time() - start_time},
+                metadata={"error": str(e)},
             )
 
     def _extract_age_range_from_query(self, query: str) -> Optional[Tuple[int, int]]:
-        """Extrait plage d'âges de la requête"""
+        """Extrait la plage d'âges d'une requête"""
         patterns = [
             r"entre\s+(\d+)\s+et\s+(\d+)\s+jours?",
             r"de\s+(\d+)\s+à\s+(\d+)\s+jours?",
+            r"du\s+jour\s+(\d+)\s+au\s+jour\s+(\d+)",
             r"(\d+)\s*-\s*(\d+)\s+jours?",
+            r"between\s+(\d+)\s+and\s+(\d+)\s+days?",
         ]
 
+        query_lower = query.lower()
         for pattern in patterns:
-            match = re.search(pattern, query.lower())
+            match = re.search(pattern, query_lower)
             if match:
-                age_min, age_max = int(match.group(1)), int(match.group(2))
-                if 0 <= age_min <= age_max <= 150:
-                    return (age_min, age_max)
+                age_min = int(match.group(1))
+                age_max = int(match.group(2))
+                return (age_min, age_max)
+
         return None
 
     async def _handle_temporal_fallback(
-        self, query: str, entities: Dict, age_range: Tuple[int, int], start_time: float
+        self,
+        query: str,
+        entities: Dict[str, Any],
+        age_range: Tuple[int, int],
+        start_time: float,
     ) -> RAGResult:
-        """Fallback pour plages temporelles"""
+        """Fallback: requêtes multiples pour plage temporelle"""
 
+        age_min, age_max = age_range
         results = []
-        successful_ages = []
 
-        # Rechercher pour chaque âge dans la plage (limitée)
-        step = max(1, (age_range[1] - age_range[0]) // 5)  # Max 5 points
-        for age in range(age_range[0], age_range[1] + 1, step):
-            entities_age = entities.copy()
-            entities_age["age_days"] = age
+        for age in range(age_min, age_max + 1):
+            age_entities = entities.copy()
+            age_entities["age_days"] = age
 
             result = await self.postgresql_system.search_metrics(
-                query=query,
-                entities=entities_age,
-                top_k=3,
+                query=query, entities=age_entities, top_k=3
             )
 
-            if result and result.source != RAGSource.NO_RESULTS:
-                results.append({"age": age, "result": result})
-                successful_ages.append(age)
+            if result and result.context_docs:
+                results.extend(result.context_docs)
 
-        if not results:
-            return RAGResult(
-                source=RAGSource.NO_RESULTS,
-                answer=f"Aucune donnée trouvée pour la plage d'âges {age_range[0]}-{age_range[1]} jours.",
-                metadata={
-                    "source_type": "temporal_fallback",
-                    "age_range": age_range,
-                    "processing_time": time.time() - start_time,
-                },
-            )
-
-        # Générer réponse temporelle
-        answer = self._generate_temporal_response(results, age_range)
-
-        return RAGResult(
-            source=RAGSource.RAG_SUCCESS,
-            answer=answer,
-            context_docs=[],
-            confidence=0.85,
-            metadata={
-                "source_type": "temporal_fallback",
-                "age_range": age_range,
-                "successful_ages": successful_ages,
-                "data_points": len(results),
-                "processing_time": time.time() - start_time,
-            },
-        )
-
-    def _generate_temporal_response(
-        self, results: list, age_range: Tuple[int, int]
-    ) -> str:
-        """Génère une réponse pour les requêtes temporelles"""
-
-        if len(results) == 1:
-            age = results[0]["age"]
-            return f"Pour {age} jours : {results[0]['result'].answer}"
-
-        # Multi-âges : créer un résumé
-        response_parts = [
-            f"Évolution sur la période {age_range[0]}-{age_range[1]} jours :"
-        ]
-
-        for result_data in results:
-            age = result_data["age"]
-            answer = result_data["result"].answer
-            if answer and len(answer) < 100:  # Résumé court
-                response_parts.append(f"- {age} jours : {answer}")
-
-        return "\n".join(response_parts)
-
-
-class ComparativeQueryHandler(BaseQueryHandler):
-    """Handler pour les requêtes comparatives"""
-
-    def __init__(self):
-        super().__init__()
-        self.comparison_handler = None
-
-    def configure(self, **kwargs):
-        """Configure avec le comparison handler"""
-        super().configure(**kwargs)
-        self.comparison_handler = kwargs.get("comparison_handler")
-
-    async def handle(
-        self, preprocessed_data: Dict[str, Any], start_time: float
-    ) -> RAGResult:
-        """Traite les requêtes comparatives"""
-
-        if not self.comparison_handler:
-            logger.warning("ComparisonHandler non disponible, fallback vers standard")
-            return await self._fallback_to_standard(preprocessed_data, start_time)
-
-        try:
-            logger.info("Executing comparative query via ComparisonHandler")
-
-            # CORRECTION: Utiliser le bon nom de méthode et la bonne signature
-            comparison_result = await self.comparison_handler.handle_comparison_query(
-                preprocessed_data
-            )
-
-            if not comparison_result["success"]:
-                error_msg = comparison_result.get(
-                    "error", "Erreur comparative inconnue"
-                )
-                logger.warning(f"Comparison failed: {error_msg}")
-
-                # Fallback intelligent vers requête standard
-                return await self._fallback_to_standard(preprocessed_data, start_time)
-
-            # Succès: générer la réponse comparative
-            answer_text = await self.comparison_handler.generate_comparative_response(
-                preprocessed_data.get(
-                    "original_query", preprocessed_data["normalized_query"]
-                ),
-                comparison_result,
-                "fr",
-            )
-
+        if results:
             return RAGResult(
                 source=RAGSource.RAG_SUCCESS,
-                answer=answer_text,
-                context_docs=self._extract_comparison_documents(comparison_result),
-                confidence=0.95,
+                context_docs=results,
                 metadata={
-                    "source_type": "comparative",
-                    "comparison_type": comparison_result.get("comparison_type"),
-                    "operation": comparison_result.get("operation"),
-                    "entities_compared": comparison_result["metadata"][
-                        "entities_compared"
-                    ],
-                    "successful_queries": comparison_result["metadata"][
-                        "successful_queries"
-                    ],
+                    "source_type": "temporal_multiple_queries",
+                    "age_range": age_range,
+                    "queries_executed": age_max - age_min + 1,
                     "processing_time": time.time() - start_time,
-                    "result_count": len(comparison_result["results"]),
                 },
             )
-
-        except Exception as e:
-            logger.error(f"Critical error in comparative handling: {e}")
-            return await self._fallback_to_standard(preprocessed_data, start_time)
-
-    async def _fallback_to_standard(
-        self, preprocessed_data: Dict[str, Any], start_time: float
-    ) -> RAGResult:
-        """Fallback vers traitement standard"""
-
-        # Extraire la première entité pour requête standard
-        entities = preprocessed_data.get("entities", {})
-        query = preprocessed_data["normalized_query"]
-
-        if self.postgresql_system and entities:
-            result = await self.postgresql_system.search_metrics(
-                query=query,
-                entities=entities,
-                top_k=RAG_SIMILARITY_TOP_K,
-            )
-
-            if result and result.source != RAGSource.NO_RESULTS:
-                result.metadata.update(
-                    {
-                        "source_type": "comparative_fallback",
-                        "fallback_applied": True,
-                        "processing_time": time.time() - start_time,
-                    }
-                )
-                return result
 
         return RAGResult(
             source=RAGSource.NO_RESULTS,
-            answer="Impossible de traiter cette demande de comparaison.",
-            metadata={
-                "source_type": "comparative_error",
-                "processing_time": time.time() - start_time,
-            },
+            answer="Aucune donnée trouvée pour cette plage temporelle.",
+            metadata={"age_range": age_range},
         )
-
-    def _extract_comparison_documents(self, comparison_result: Dict) -> list:
-        """Extrait les documents des résultats de comparaison"""
-        try:
-            documents = []
-            if "results" in comparison_result:
-                for result_set in comparison_result["results"]:
-                    if isinstance(result_set, dict) and "context_docs" in result_set:
-                        documents.extend(result_set["context_docs"])
-            return documents
-        except Exception as e:
-            logger.warning(f"Erreur extraction documents comparatifs: {e}")
-            return []
 
 
 class StandardQueryHandler(BaseQueryHandler):
@@ -347,39 +355,17 @@ class StandardQueryHandler(BaseQueryHandler):
 
         # Weaviate si disponible
         if self.weaviate_core:
-            try:
-                logger.info("Tentative Weaviate")
+            logger.info("Recherche Weaviate fallback")
+            result = await self.weaviate_core.search(
+                query=query,
+                top_k=RAG_SIMILARITY_TOP_K,
+            )
 
-                # CORRECTION: Respecter la vraie signature de WeaviateCore.generate_response()
-                result = await self.weaviate_core.generate_response(
-                    query=original_query,  # Position 1
-                    intent_result=None,  # Position 2 (requis)
-                    conversation_context=conversation_context
-                    or [],  # Position 3 (requis)
-                    language=language or "fr",  # Position 4 (requis)
-                    start_time=time.time(),  # Position 5 (requis)
-                    tenant_id=tenant_id or "default",  # Position 6 (requis)
-                )
+            if result and result.source != RAGSource.NO_RESULTS:
+                return result
 
-                if result and result.source != RAGSource.INTERNAL_ERROR:
-                    logger.info("Weaviate fallback réussi")
-                    return result
-                else:
-                    logger.warning("Weaviate fallback échoué")
-
-            except Exception as e:
-                logger.error(f"Erreur inattendue Weaviate: {e}")
-                # Continuer avec le fallback final
-
-        # Aucun résultat trouvé
         return RAGResult(
             source=RAGSource.NO_RESULTS,
-            answer="Aucun résultat trouvé.",
-            metadata={
-                "processing_time": time.time() - start_time,
-                "sources_tried": [
-                    "postgresql" if self.postgresql_system else None,
-                    "weaviate" if self.weaviate_core else None,
-                ],
-            },
+            answer="Aucune information trouvée pour cette requête.",
+            metadata={"query_type": "standard"},
         )
