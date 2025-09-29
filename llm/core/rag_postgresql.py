@@ -190,15 +190,21 @@ class PostgreSQLSystem:
                     },
                 )
 
-            # 🔧 CORRECTION CRITIQUE: MERGER les enhanced_entities avec les originales
+            # 🔧 CORRECTION CRITIQUE: MERGER les enhanced_entities INTELLIGEMMENT
             # Le validateur enrichit les entités (auto-détection breed/age/metric)
             # MAIS il faut préserver les entités originales (comme 'sex' du comparison_handler)
+            # car le validator ne détecte PAS toujours tous les champs
+
+            original_entities = entities or {}
             enhanced = validation_result.get("enhanced_entities", {})
+
+            # Merger intelligent: enhanced d'abord, puis overwrite avec originales pour préserver sex
             if enhanced:
-                # Merger: garder les originales + ajouter/surcharger avec enhanced
-                entities = {**(entities or {}), **enhanced}
+                entities = {**enhanced, **original_entities}
             else:
-                entities = entities or {}
+                entities = original_entities
+
+            logger.debug(f"Merged entities: {entities}")
 
             # 🔧 CORRECTION: Vérification de sécurité pour check_data_availability_flexible
             if self.validator:
