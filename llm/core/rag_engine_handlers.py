@@ -201,10 +201,9 @@ class ComparativeQueryHandler(BaseQueryHandler):
         try:
             logger.info("Executing comparative query via ComparisonHandler")
 
-            comparison_result = await self.comparison_handler.handle_comparative_query(
-                preprocessed_data["normalized_query"],
-                preprocessed_data,
-                top_k=RAG_SIMILARITY_TOP_K,
+            # CORRECTION: Utiliser le bon nom de méthode et la bonne signature
+            comparison_result = await self.comparison_handler.handle_comparison_query(
+                preprocessed_data
             )
 
             if not comparison_result["success"]:
