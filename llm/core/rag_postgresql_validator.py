@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
+VERSION CORRIGÉE: Préserve tous les champs originaux non détectés
 """
 
 import re
@@ -19,6 +20,8 @@ class PostgreSQLValidator:
         """
         Validation flexible qui essaie de compléter les requêtes incomplètes
 
+        CORRECTION CRITIQUE: Préserve TOUS les champs originaux qui ne sont pas auto-détectés
+
         Returns:
             Dict avec status: "complete" | "incomplete_but_processable" | "needs_fallback"
         """
@@ -26,7 +29,9 @@ class PostgreSQLValidator:
         entities = entities or {}
         missing = []
         suggestions = []
-        enhanced_entities = dict(entities) if entities else {}  # Créer une vraie copie
+
+        # 🔧 CORRECTION: Créer une vraie copie des entités originales
+        enhanced_entities = dict(entities) if entities else {}
 
         # Vérifier breed
         if not entities.get("breed"):
@@ -62,7 +67,8 @@ class PostgreSQLValidator:
                 enhanced_entities["metric_type"] = detected_metric
                 logger.debug(f"Auto-detected metric: {detected_metric}")
 
-        # PRÉSERVER les champs originaux non détectés (comme 'sex' du comparison_handler)
+        # 🔧 CORRECTION CRITIQUE: Préserver TOUS les champs originaux non détectés
+        # Ceci est essentiel pour les comparaisons où 'sex' vient du comparison_handler
         for key, value in (entities or {}).items():
             if key not in enhanced_entities and value is not None:
                 enhanced_entities[key] = value
@@ -113,23 +119,20 @@ class PostgreSQLValidator:
     def _detect_age_from_query(self, query: str) -> Optional[int]:
         """Détecte l'âge dans le texte de la requête"""
         age_patterns = [
-            r"à \s+(\d+)\s+jours?",
+            r"à\s+(\d+)\s+jours?",
             r"(\d+)\s+jours?",
             r"(\d+)\s*j\b",
-            r"(\d+)\s+semaines?",  # Sera multiplié par 7
+            r"(\d+)\s+semaines?",
+            r"at\s+(\d+)\s+days?",
         ]
 
-        query_lower = query.lower()
-
         for pattern in age_patterns:
-            match = re.search(pattern, query_lower)
+            match = re.search(pattern, query, re.IGNORECASE)
             if match:
                 age = int(match.group(1))
-                # Convertir semaines en jours
-                if "semaine" in pattern:
-                    age *= 7
-                if 0 <= age <= 150:  # Validation range
-                    return age
+                if "semaine" in pattern.lower() or "week" in pattern.lower():
+                    age = age * 7
+                return age
 
         return None
 
@@ -138,11 +141,15 @@ class PostgreSQLValidator:
         query_lower = query.lower()
 
         metric_keywords = {
-            "weight": ["poids", "weight", "masse"],
-            "fcr": ["fcr", "conversion", "indice", "ic"],
-            "mortality": ["mortalité", "mortality", "mort"],
-            "production": ["production", "ponte", "œuf", "egg"],
-            "feed": ["alimentation", "feed", "aliment"],
+            "weight": ["poids", "weight", "body weight"],
+            "feed_conversion": [
+                "conversion",
+                "fcr",
+                "ic",
+                "feed conversion",
+                "conversion alimentaire",
+            ],
+            "mortality": ["mortalité", "mortality", "viabilité", "viability"],
         }
 
         for metric_type, keywords in metric_keywords.items():
@@ -154,82 +161,54 @@ class PostgreSQLValidator:
     def _generate_validation_help_message(
         self, query: str, missing: List[str], suggestions: List[str]
     ) -> str:
-        """Génère un message d'aide pour requêtes incomplètes"""
-
-        if "recommande" in query.lower() or "meilleur" in query.lower():
-            return """Pour une recommandation personnalisée, précisez :
-
-**Races disponibles :**
-• Cobb 500 - Croissance rapide, bon FCR
-• Ross 308 - Excellent rendement, robustesse  
-• Hubbard JA87 - Adaptabilité, rusticité
-
-**Contexte nécessaire :**
-• Type de production (chair, ponte)
-• Objectifs (croissance, conversion, mortalité)
-• Conditions d'élevage
-
-**Exemple :** "Recommande une race pour production intensive de chair"."""
-
-        else:
-            return f"""Informations manquantes : {', '.join(missing)}
-
-**Suggestions :**
-{chr(10).join(f'• {s}' for s in suggestions)}
-
-**Exemple de requête complète :**
-"Quel est le poids du Cobb 500 à 42 jours ?"
-
-Reformulez avec plus de détails pour des données précises."""
+        """Génère un message d'aide pour validation"""
+        return (
+            f"Informations manquantes pour traiter votre requête : {', '.join(missing)}. "
+            f"Suggestions : {' '.join(suggestions)}"
+        )
 
     def check_data_availability_flexible(
         self, entities: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Vérification flexible de disponibilité avec alternatives
+        Vérifie si les données demandées sont disponibles
+        Version flexible avec alternatives
         """
 
-        breed = entities.get("breed", "").lower()
+        # Plages d'âges disponibles par race (approximatif)
+        age_ranges = {
+            "cobb 500": (0, 56),
+            "ross 308": (0, 56),
+            "hubbard ja87": (0, 56),
+        }
+
+        breed = entities.get("breed", "").lower() if entities.get("breed") else None
         age_days = entities.get("age_days")
 
-        if not age_days or not breed:
-            return {"available": True}  # Skip si données incomplètes
-
-        # Ranges de données connus
-        data_ranges = {
-            "cobb 500": {"min": 0, "max": 56},
-            "ross 308": {"min": 0, "max": 56},
-            "hubbard ja87": {"min": 0, "max": 49},
-        }
-
-        range_info = data_ranges.get(breed)
-        if not range_info:
-            return {"available": True}  # Breed inconnu - laisser passer
-
-        if range_info["min"] <= age_days <= range_info["max"]:
+        if not breed or not age_days:
             return {"available": True}
 
-        # Hors plage - proposer alternatives
-        alternatives = []
-        if age_days > range_info["max"]:
-            alternatives.append(
-                f"Données disponibles jusqu'à {range_info['max']} jours"
-            )
-            alternatives.append(f"Essayez: poids à {range_info['max']} jours")
+        age = int(age_days) if isinstance(age_days, (int, str)) else None
+        if not age:
+            return {"available": True}
 
-        helpful_response = f"""L'âge demandé ({age_days} jours) est hors de la plage de données disponibles pour {breed.title()} ({range_info['min']}-{range_info['max']} jours).
+        # Vérifier la plage d'âge
+        for breed_key, (min_age, max_age) in age_ranges.items():
+            if breed_key in breed:
+                if min_age <= age <= max_age:
+                    return {"available": True}
+                else:
+                    # Proposer des alternatives
+                    alternatives = []
+                    if age < min_age:
+                        alternatives.append(f"{min_age} jours (âge minimum)")
+                    if age > max_age:
+                        alternatives.append(f"{max_age} jours (âge maximum)")
 
-**Alternatives disponibles :**
-{chr(10).join(f'• {alt}' for alt in alternatives)}
+                    return {
+                        "available": False,
+                        "alternatives": alternatives,
+                        "helpful_response": f"Données non disponibles pour {breed} à {age} jours. Alternatives : {', '.join(alternatives)}",
+                    }
 
-**Données disponibles pour {breed.title()} :**
-• Poids corporel (0-{range_info['max']} jours)
-• FCR et conversion alimentaire  
-• Mortalité et performance"""
-
-        return {
-            "available": False,
-            "message": f"L'âge demandé ({age_days} jours) est hors de la plage de données disponibles pour {breed} ({range_info['min']}-{range_info['max']} jours).",
-            "alternatives": alternatives,
-            "helpful_response": helpful_response,
-        }
+        return {"available": True}
