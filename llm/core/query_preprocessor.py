@@ -122,74 +122,79 @@ class QueryPreprocessor:
 
     def extract_local_entities(self, query: str) -> Dict[str, Any]:
         """Extraction d'entités avec détection de sexe explicite améliorée"""
-        
+
         entities = {}
-        
+
         # Extraction du sexe avec détection explicite
         sex_info = self._extract_sex_with_explicit_detection(query)
         entities.update(sex_info)
-        
+
         # Extraction de la race
         breed = self._extract_breed(query)
         if breed:
-            entities['breed'] = breed
-        
+            entities["breed"] = breed
+
         # Extraction de l'âge
         age = self._extract_age_days(query)
         if age:
-            entities['age_days'] = age
-        
+            entities["age_days"] = age
+
         # Extraction du type de métrique
         metric_type = self._extract_metric_type(query)
         if metric_type:
-            entities['metric_type'] = metric_type
-        
+            entities["metric_type"] = metric_type
+
         return entities
 
     def _extract_sex_with_explicit_detection(self, query: str) -> Dict[str, Any]:
         """Extraction du sexe avec détection des demandes explicites"""
-        
+
         result = {}
         query_lower = query.lower()
-        
+
         # Patterns pour détection explicite
         explicit_female_patterns = [
-            r'\bfemelle\b', r'\bfemale\b', r'\bpoule\b', r'\bpoulette\b'
+            r"\bfemelle\b",
+            r"\bfemale\b",
+            r"\bpoule\b",
+            r"\bpoulette\b",
         ]
-        explicit_male_patterns = [
-            r'\bmâle\b', r'\bmale\b', r'\bcoq\b', r'\bcockerel\b'
-        ]
-        
+        explicit_male_patterns = [r"\bmâle\b", r"\bmale\b", r"\bcoq\b", r"\bcockerel\b"]
+
         # Vérification des patterns explicites
-        is_explicit_female = any(re.search(pattern, query_lower) for pattern in explicit_female_patterns)
-        is_explicit_male = any(re.search(pattern, query_lower) for pattern in explicit_male_patterns)
-        
+        is_explicit_female = any(
+            re.search(pattern, query_lower) for pattern in explicit_female_patterns
+        )
+        is_explicit_male = any(
+            re.search(pattern, query_lower) for pattern in explicit_male_patterns
+        )
+
         if is_explicit_female:
-            result['sex'] = 'female'
-            result['explicit_sex_request'] = True
+            result["sex"] = "female"
+            result["explicit_sex_request"] = True
             logger.debug(f"Sexe femelle détecté explicitement dans: {query}")
         elif is_explicit_male:
-            result['sex'] = 'male'
-            result['explicit_sex_request'] = True
+            result["sex"] = "male"
+            result["explicit_sex_request"] = True
             logger.debug(f"Sexe mâle détecté explicitement dans: {query}")
         else:
             # Patterns implicites plus faibles
-            if re.search(r'\bof?\s+female\b|\bfemelle?\b', query_lower):
-                result['sex'] = 'female'
-                result['explicit_sex_request'] = False
-            elif re.search(r'\bof?\s+male\b|\bmâle?\b', query_lower):
-                result['sex'] = 'male'
-                result['explicit_sex_request'] = False
+            if re.search(r"\bof?\s+female\b|\bfemelle?\b", query_lower):
+                result["sex"] = "female"
+                result["explicit_sex_request"] = False
+            elif re.search(r"\bof?\s+male\b|\bmâle?\b", query_lower):
+                result["sex"] = "male"
+                result["explicit_sex_request"] = False
             else:
-                result['sex'] = 'as_hatched'
-                result['explicit_sex_request'] = False
-        
+                result["sex"] = "as_hatched"
+                result["explicit_sex_request"] = False
+
         return result
 
     def _extract_breed(self, query: str) -> Optional[str]:
         """Extraction de la race/souche"""
         query_lower = query.lower()
-        
+
         for pattern, breed in self.local_extractor.BREED_PATTERNS.items():
             if re.search(pattern, query_lower):
                 return breed
@@ -198,7 +203,7 @@ class QueryPreprocessor:
     def _extract_age_days(self, query: str) -> Optional[int]:
         """Extraction de l'âge en jours"""
         query_lower = query.lower()
-        
+
         age_patterns = [
             r"(\d+)\s*jours?",
             r"(\d+)\s*j\b",
@@ -207,7 +212,7 @@ class QueryPreprocessor:
             r"day\s+(\d+)",
             r"(\d+)\s+days?",
         ]
-        
+
         for pattern in age_patterns:
             age_match = re.search(pattern, query_lower)
             if age_match:
@@ -222,7 +227,7 @@ class QueryPreprocessor:
     def _extract_metric_type(self, query: str) -> Optional[str]:
         """Extraction du type de métrique"""
         query_lower = query.lower()
-        
+
         for pattern, metric in self.local_extractor.METRIC_PATTERNS.items():
             if re.search(pattern, query_lower):
                 return metric
@@ -282,7 +287,9 @@ class QueryPreprocessor:
             logger.debug(f"Patterns détectés: {query_patterns}")
 
             # 5. NOUVEAU: Analyser les demandes strictes
-            strict_requirements = self._analyze_strict_requirements(query, local_entities)
+            strict_requirements = self._analyze_strict_requirements(
+                query, local_entities
+            )
             logger.debug(f"Exigences strictes: {strict_requirements}")
 
             # 6. Si extraction locale suffisante ET requête simple, utiliser directement
@@ -373,7 +380,7 @@ class QueryPreprocessor:
             if comparative_info["is_comparative"]:
                 enhanced_result["comparison_entities"] = (
                     self._build_comparison_entities(
-                        enhanced_result["entities"], comparative_info["entities"]
+                        comparative_info, enhanced_result["entities"]
                     )
                 )
                 logger.info(
@@ -395,95 +402,116 @@ class QueryPreprocessor:
 
         except json.JSONDecodeError as e:
             logger.error(f"Erreur parsing JSON OpenAI: {e}")
-            return self._fallback_preprocessing(query, comparative_info, query_patterns, strict_requirements)
+            return self._fallback_preprocessing(
+                query, comparative_info, query_patterns, strict_requirements
+            )
 
         except Exception as e:
             logger.error(f"Erreur preprocessing OpenAI: {e}")
-            return self._fallback_preprocessing(query, comparative_info, query_patterns, strict_requirements)
+            return self._fallback_preprocessing(
+                query, comparative_info, query_patterns, strict_requirements
+            )
         finally:
             # Nettoyer la variable temporaire
             self._current_query = ""
 
-    def _analyze_strict_requirements(self, query: str, entities: Dict[str, Any]) -> Dict[str, bool]:
+    def _analyze_strict_requirements(
+        self, query: str, entities: Dict[str, Any]
+    ) -> Dict[str, bool]:
         """Analyse si la requête nécessite des correspondances strictes"""
-        
+
         strict_requirements = {
-            'strict_sex_match': False,
-            'strict_age_match': False,
-            'strict_breed_match': False,
-            'exclude_imperial_units': True  # Par défaut, exclure les unités impériales
+            "strict_sex_match": False,
+            "strict_age_match": False,
+            "strict_breed_match": False,
+            "exclude_imperial_units": True,  # Par défaut, exclure les unités impériales
         }
-        
+
         # Détection de demande de sexe stricte
-        if entities.get('explicit_sex_request', False):
-            strict_requirements['strict_sex_match'] = True
+        if entities.get("explicit_sex_request", False):
+            strict_requirements["strict_sex_match"] = True
             logger.debug("Demande de correspondance sexe stricte détectée")
-        
+
         # Mots-clés indiquant une demande précise
         precision_keywords = [
-            'exactement', 'précisément', 'spécifiquement', 'uniquement',
-            'seulement', 'exactly', 'specifically', 'only', 'precisely'
+            "exactement",
+            "précisément",
+            "spécifiquement",
+            "uniquement",
+            "seulement",
+            "exactly",
+            "specifically",
+            "only",
+            "precisely",
         ]
-        
+
         query_lower = query.lower()
         if any(keyword in query_lower for keyword in precision_keywords):
-            strict_requirements.update({
-                'strict_sex_match': True,
-                'strict_age_match': True,
-                'strict_breed_match': True
-            })
+            strict_requirements.update(
+                {
+                    "strict_sex_match": True,
+                    "strict_age_match": True,
+                    "strict_breed_match": True,
+                }
+            )
             logger.debug("Demande de correspondance stricte détectée via mots-clés")
-        
+
         # Détection d'âge précis (ex: "à 28 jours" vs "vers 28 jours")
         precise_age_patterns = [
-            r'à\s+(\d+)\s+jours?',
-            r'at\s+(\d+)\s+days?',
-            r'day\s+(\d+)',
-            r'jour\s+(\d+)'
+            r"à\s+(\d+)\s+jours?",
+            r"at\s+(\d+)\s+days?",
+            r"day\s+(\d+)",
+            r"jour\s+(\d+)",
         ]
-        
+
         if any(re.search(pattern, query_lower) for pattern in precise_age_patterns):
-            strict_requirements['strict_age_match'] = True
+            strict_requirements["strict_age_match"] = True
             logger.debug("Demande d'âge précis détectée")
-        
+
         return strict_requirements
 
     def _normalize_query_text(self, query: str) -> str:
         """Normalise le texte de la requête"""
-        
+
         # Corrections orthographiques communes
         corrections = {
-            'IC': 'conversion alimentaire',
-            'FCR': 'conversion alimentaire',
-            'poid': 'poids',
-            'convertion': 'conversion',
-            'aliment': 'alimentaire'
+            "IC": "conversion alimentaire",
+            "FCR": "conversion alimentaire",
+            "poid": "poids",
+            "convertion": "conversion",
+            "aliment": "alimentaire",
         }
-        
+
         normalized = query
         for wrong, correct in corrections.items():
-            normalized = re.sub(rf'\b{re.escape(wrong)}\b', correct, normalized, flags=re.IGNORECASE)
-        
+            normalized = re.sub(
+                rf"\b{re.escape(wrong)}\b", correct, normalized, flags=re.IGNORECASE
+            )
+
         # Nettoyage basique
-        normalized = re.sub(r'\s+', ' ', normalized).strip()
-        
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+
         return normalized
 
     def should_use_strict_matching(self, preprocessing_result: Dict[str, Any]) -> bool:
         """Détermine si les requêtes doivent utiliser la correspondance stricte"""
-        
-        strict_reqs = preprocessing_result.get('strict_requirements', {})
-        
+
+        strict_reqs = preprocessing_result.get("strict_requirements", {})
+
         # Si une demande stricte est détectée
         if any(strict_reqs.values()):
             return True
-        
+
         # Si c'est une requête comparative, moins strict par défaut
-        if preprocessing_result.get('comparative_info', {}).get('is_comparative', False):
+        if preprocessing_result.get("comparative_info", {}).get(
+            "is_comparative", False
+        ):
             return False
-        
+
         # Par défaut, modérément strict
-        return preprocessing_result.get('entities', {}).get('explicit_sex_request', False)
+        return preprocessing_result.get("entities", {}).get(
+            "explicit_sex_request", False
+        )
 
     # ========================================================================
     # NOUVELLE MÉTHODE: Classification détaillée des requêtes
@@ -722,6 +750,47 @@ class QueryPreprocessor:
     # ========================================================================
     # NOUVELLE MÉTHODE: Validation des entités OpenAI
     # ========================================================================
+
+    def _validate_entities_for_openai(self, entities: Dict[str, Any]) -> Dict[str, Any]:
+        """Valide les entités SANS corriger les comparaisons de sexe"""
+
+        validated = entities.copy()
+
+        # CORRECTION: Ne pas modifier le sexe si c'est une comparaison explicite
+        if entities.get("explicit_sex_request", False):
+            # Garder le sexe tel quel pour les comparaisons explicites
+            logger.debug(
+                f"Comparaison de sexe explicite détectée, conservation: {entities.get('sex')}"
+            )
+            return validated
+
+        # Validation normale pour les autres cas
+        sex = entities.get("sex", "as_hatched")
+
+        # Correction seulement si ce n'est PAS une comparaison
+        if "," in str(sex) and not entities.get("explicit_sex_request", False):
+            logger.debug(f"Correction: sex '{sex}' → 'as_hatched' (non-comparaison)")
+            validated["sex"] = "as_hatched"
+
+        # Validation des autres champs
+        age = entities.get("age_days")
+        if age and isinstance(age, str) and "," in age:
+            try:
+                # Pour les comparaisons d'âge, prendre le premier
+                validated["age_days"] = int(age.split(",")[0].strip())
+                logger.debug(
+                    f"Âge multiple détecté, utilisation: {validated['age_days']}"
+                )
+            except (ValueError, TypeError):
+                pass
+
+        # Validation race
+        breed = entities.get("breed", "")
+        if breed and isinstance(breed, str) and "," in breed:
+            # Pour les comparaisons de race, garder tel quel pour traitement ultérieur
+            logger.debug(f"Race multiple détectée: {breed}")
+
+        return validated
 
     def _validate_and_fix_entities(self, entities: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -1043,83 +1112,62 @@ class QueryPreprocessor:
     # ========================================================================
 
     def _build_comparison_entities(
-        self, base_entities: Dict[str, Any], comparative_entities: List[Dict]
+        self, comparative_info: Dict[str, Any], base_entities: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """
-        Construire des entités multiples pour comparaisons
+        """Construit les jeux d'entités pour comparaisons"""
 
-        Construit les différents jeux d'entités pour chaque comparaison
+        entity_sets = []
 
-        Exemple:
-        Si base_entities = {'breed': 'Cobb 500', 'age_days': 17}
-        Et comparative_entities = [{'dimension': 'sex', 'values': ['male', 'female']}]
-
-        Returns:
-        [
-            {'breed': 'Cobb 500', 'sex': 'male', 'age_days': 17, '_comparison_label': 'male'},
-            {'breed': 'Cobb 500', 'sex': 'female', 'age_days': 17, '_comparison_label': 'female'}
-        ]
-        """
-
-        if not comparative_entities:
+        if not comparative_info.get("entities"):
+            logger.debug(
+                "Aucune entité comparative détectée, utilisation entités de base"
+            )
             return [base_entities]
 
-        comparison_sets = []
+        # Traiter chaque dimension de comparaison
+        for comp_entity in comparative_info["entities"]:
+            dimension = comp_entity.get("dimension")
+            values = comp_entity.get("values", [])
 
-        # Cas 1: Comparaison de sexes (mâle vs femelle)
-        if any(entity.get("dimension") == "sex" for entity in comparative_entities):
-            for sex in ["male", "female"]:
-                entity_set = base_entities.copy()
-                entity_set["sex"] = sex
-                entity_set["_comparison_label"] = sex
-                entity_set["_comparison_dimension"] = "sex"
-                comparison_sets.append(entity_set)
+            logger.debug(f"Traitement dimension {dimension} avec valeurs: {values}")
 
-        # Cas 2: Comparaison de souches (Ross vs Cobb)
-        elif any(entity.get("dimension") == "breed" for entity in comparative_entities):
-            breeds = []
-            for entity in comparative_entities:
-                if entity.get("dimension") == "breed":
-                    breeds.extend(entity.get("values", []))
+            # CORRECTION: Pour les comparaisons de sexe, créer des entités séparées
+            if dimension == "sex" and len(values) >= 2:
+                for sex_value in values:
+                    entity_set = base_entities.copy()
+                    entity_set["sex"] = sex_value
+                    # IMPORTANT: Marquer comme demande explicite de sexe
+                    entity_set["explicit_sex_request"] = True
+                    entity_sets.append(entity_set)
+                    logger.debug(f"Entité créée pour sexe: {sex_value}")
 
-            for breed in breeds:
-                entity_set = base_entities.copy()
-                entity_set["breed"] = breed
-                entity_set["_comparison_label"] = breed
-                entity_set["_comparison_dimension"] = "breed"
-                comparison_sets.append(entity_set)
+            # Pour les autres dimensions (breed, age, etc.)
+            elif dimension == "breed" and len(values) >= 2:
+                for breed_value in values:
+                    entity_set = base_entities.copy()
+                    entity_set["breed"] = breed_value.strip()
+                    entity_sets.append(entity_set)
+                    logger.debug(f"Entité créée pour race: {breed_value}")
 
-        # Cas 3: Comparaison d'âges
-        elif any(entity.get("dimension") == "age" for entity in comparative_entities):
-            ages = []
-            for entity in comparative_entities:
-                if entity.get("dimension") == "age":
-                    ages.extend(entity.get("values", []))
+            elif dimension == "age_days" and len(values) >= 2:
+                for age_value in values:
+                    entity_set = base_entities.copy()
+                    try:
+                        entity_set["age_days"] = int(age_value)
+                        entity_sets.append(entity_set)
+                        logger.debug(f"Entité créée pour âge: {age_value}")
+                    except (ValueError, TypeError):
+                        logger.warning(f"Âge invalide ignoré: {age_value}")
 
-            for age in ages:
-                entity_set = base_entities.copy()
-                entity_set["age_days"] = age
-                entity_set["_comparison_label"] = str(age)
-                entity_set["_comparison_dimension"] = "age"
-                comparison_sets.append(entity_set)
+        # Si aucune entité de comparaison n'a été créée, retourner les entités de base
+        if not entity_sets:
+            logger.warning(
+                "Aucune entité de comparaison valide, utilisation entités de base"
+            )
+            entity_sets = [base_entities]
 
-        # Cas 4: Gestion des entités dans base_entities (format "value1, value2")
-        else:
-            # Vérifier si les entités de base contiennent des comparaisons
-            for key, value in base_entities.items():
-                if isinstance(value, str) and "," in value:
-                    values = [v.strip() for v in value.split(",")]
-                    if len(values) > 1:
-                        for val in values:
-                            entity_set = base_entities.copy()
-                            entity_set[key] = val
-                            entity_set["_comparison_label"] = val
-                            entity_set["_comparison_dimension"] = key
-                            comparison_sets.append(entity_set)
-                        break
-
-        logger.debug(f"Entités de comparaison construites: {len(comparison_sets)} sets")
-        return comparison_sets if comparison_sets else [base_entities]
+        logger.info(f"Jeux d'entités construits: {len(entity_sets)}")
+        return entity_sets
 
     # ========================================================================
     # MÉTHODE CORRIGÉE: Prompts système améliorés
@@ -1215,7 +1263,11 @@ Respond in JSON:
 }}"""
 
     def _fallback_preprocessing(
-        self, query: str, comparative_info: Dict, query_patterns: Dict, strict_requirements: Dict
+        self,
+        query: str,
+        comparative_info: Dict,
+        query_patterns: Dict,
+        strict_requirements: Dict,
     ) -> Dict[str, Any]:
         """
         AMÉLIORÉ: Preprocessing de secours avec détection locale
@@ -1251,16 +1303,23 @@ Respond in JSON:
         # Routage local
         routing = "postgresql" if detected_entities.get("breed") else "weaviate"
 
+        # CORRECTION: Construction des entités de comparaison dans le fallback
+        comparison_entities = []
+        if comparative_info.get("is_comparative", False):
+            comparison_entities = self._build_comparison_entities(
+                comparative_info, detected_entities
+            )
+
         return {
             "normalized_query": self._normalize_query_text(query),
             "query_type": "general",
-            "entities": self._validate_and_fix_entities(detected_entities),
+            "entities": self._validate_entities_for_openai(detected_entities),
             "routing": routing,
             "confidence": 0.5,  # Confidence réduite pour fallback
             "is_comparative": comparative_info["is_comparative"],
             "comparative_info": comparative_info,
             "requires_calculation": comparative_info["is_comparative"],
-            "comparison_entities": [],
+            "comparison_entities": comparison_entities,
             "query_patterns": query_patterns,
             "strict_requirements": strict_requirements,
             "preprocessing_fallback": True,

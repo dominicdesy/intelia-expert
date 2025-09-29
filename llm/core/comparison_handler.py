@@ -22,28 +22,30 @@ class ComparisonHandler:
         self.postgresql_system = postgresql_system
         self.calculator = MetricCalculator()
 
-    def _parse_multiple_entities_from_preprocessing(self, preprocessed: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _parse_multiple_entities_from_preprocessing(
+        self, preprocessed: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """
         CORRECTION: Parse les entités multiples depuis le preprocessing
-        
-        Problème détecté: Le preprocessing extrait "Ross 308, Cobb 500" mais 
+
+        Problème détecté: Le preprocessing extrait "Ross 308, Cobb 500" mais
         le ComparisonHandler ne le parse pas correctement
         """
         entities_list = []
-        
+
         # Récupérer les entités de base du preprocessing
         base_entities = preprocessed.get("entities", {})
         logger.debug(f"Base entities from preprocessing: {base_entities}")
-        
+
         # Vérifier chaque champ pour des valeurs multiples séparées par des virgules
         comparison_found = False
-        
+
         for field, value in base_entities.items():
             if isinstance(value, str) and "," in value:
                 # Parser les valeurs multiples
                 values = [v.strip() for v in value.split(",")]
                 logger.debug(f"Field {field} has multiple values: {values}")
-                
+
                 if len(values) > 1:
                     comparison_found = True
                     # Créer une entité pour chaque valeur
@@ -54,21 +56,105 @@ class ComparisonHandler:
                         entity_set["_comparison_dimension"] = field
                         entities_list.append(entity_set)
                     break  # Une seule dimension de comparaison à la fois
-        
+
         # Si aucune comparaison détectée, utiliser les entités de base
         if not comparison_found:
             entities_list = [base_entities]
             logger.debug("No multiple entities found, using base entities")
-        
+
         logger.info(f"Parsed {len(entities_list)} entity sets for comparison")
         return entities_list
+
+    def handle_comparison_query(
+        self, preprocessed_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Gère les requêtes comparatives avec support des entités séparées"""
+
+        # Récupérer les entités de comparaison du preprocessing
+        comparison_entities = preprocessed_data.get("comparison_entities", [])
+        base_entities = preprocessed_data.get("entities", {})
+
+        logger.debug(f"Entités de comparaison reçues: {len(comparison_entities)}")
+
+        # NOUVEAU: Utiliser les entités séparées du preprocessing si disponibles
+        if comparison_entities and len(comparison_entities) >= 2:
+            entity_sets = comparison_entities
+            logger.info(
+                f"Utilisation des entités de comparaison du preprocessing: {len(entity_sets)} sets"
+            )
+        else:
+            # Fallback: analyse traditionnelle des entités de base
+            entity_sets = self._parse_comparison_entities(base_entities)
+            logger.info(f"Analyse traditionnelle: {len(entity_sets)} sets")
+
+        # Validation minimum pour comparaison
+        if len(entity_sets) < 2:
+            logger.warning(
+                f"Comparaison nécessite au moins 2 entités, trouvé: {len(entity_sets)}"
+            )
+            return self._create_error_response(
+                "Comparaison impossible avec une seule entité"
+            )
+
+        logger.info(f"Proceeding with comparison of {len(entity_sets)} entities")
+
+        # Exécuter les requêtes pour chaque entité
+        results = []
+        for i, entity_set in enumerate(entity_sets):
+            entity_name = self._generate_entity_name(entity_set, i)
+            logger.debug(f"Executing query for {entity_name}")
+
+            # CORRECTION: Assurer que strict_sex_match est activé pour comparaisons de sexe
+            strict_sex_match = entity_set.get("explicit_sex_request", False)
+
+            try:
+                docs = await self.postgresql_system.search_metrics(
+                    preprocessed_data.get("normalized_query", ""),
+                    entity_set,
+                    top_k=12,
+                    strict_sex_match=strict_sex_match,  # IMPORTANT: Utiliser le flag
+                )
+
+                if docs and hasattr(docs, "context_docs") and docs.context_docs:
+                    logger.debug(
+                        f"Found {len(docs.context_docs)} results for {entity_name}"
+                    )
+                    results.append(
+                        {
+                            "entity_name": entity_name,
+                            "entity_set": entity_set,
+                            "docs": docs.context_docs,
+                        }
+                    )
+                else:
+                    logger.warning(f"No results found for {entity_name}")
+
+            except Exception as e:
+                logger.error(f"Query failed for {entity_name}: {e}")
+                continue
+
+        if len(results) < 2:
+            return self._create_error_response(
+                f"Données insuffisantes: {len(results)} entité(s) trouvée(s)"
+            )
+
+        # Comparaison des résultats
+        try:
+            comparison_result = self._compare_entities(results, preprocessed_data)
+            return self._format_comparison_response(
+                comparison_result, preprocessed_data
+            )
+
+        except Exception as e:
+            logger.error(f"Comparison failed: {e}")
+            return self._create_error_response(f"Erreur de comparaison: {str(e)}")
 
     async def handle_comparative_query(
         self, query: str, preprocessed: Dict[str, Any], top_k: int = 12
     ) -> Dict[str, Any]:
         """
         CORRECTION: Version corrigée qui parse correctement les entités multiples
-        
+
         Args:
             query: Requête utilisateur originale
             preprocessed: Résultat du preprocessing avec comparative_info
@@ -99,10 +185,14 @@ class ComparisonHandler:
             }
 
         # CORRECTION: Parser les entités depuis le preprocessing
-        comparison_entities = self._parse_multiple_entities_from_preprocessing(preprocessed)
+        comparison_entities = self._parse_multiple_entities_from_preprocessing(
+            preprocessed
+        )
 
         if len(comparison_entities) < 2:
-            logger.warning(f"Comparaison nécessite au moins 2 entités, trouvé: {len(comparison_entities)}")
+            logger.warning(
+                f"Comparaison nécessite au moins 2 entités, trouvé: {len(comparison_entities)}"
+            )
             return {
                 "success": False,
                 "error": "Comparaison impossible avec une seule entité",
@@ -113,7 +203,9 @@ class ComparisonHandler:
             }
 
         # Continuer avec le reste de la logique existante...
-        logger.info(f"Proceeding with comparison of {len(comparison_entities)} entities")
+        logger.info(
+            f"Proceeding with comparison of {len(comparison_entities)} entities"
+        )
 
         # VALIDATION DE COHÉRENCE
         validation_result = self._validate_comparison_entities(comparison_entities)
@@ -543,26 +635,28 @@ class ComparisonHandler:
             if parsed_metric:
                 # Enrichir avec les métadonnées du document
                 metadata = doc.get("metadata", {})
-                sheet_name = metadata.get('sheet_name', '').lower()
-                
+                sheet_name = metadata.get("sheet_name", "").lower()
+
                 # Détecter le système d'unité basé sur le nom de la feuille
-                if 'imperial' in sheet_name:
-                    parsed_metric['unit_system'] = 'imperial'
+                if "imperial" in sheet_name:
+                    parsed_metric["unit_system"] = "imperial"
                 else:
-                    parsed_metric['unit_system'] = 'metric'
-                
+                    parsed_metric["unit_system"] = "metric"
+
                 # Maintenir la compatibilité avec l'ancien format
                 metric_dict = {
-                    "value_numeric": parsed_metric.get('value', 0),
-                    "unit": parsed_metric.get('unit', ''),
-                    "metric_name": parsed_metric.get('metric_name', metadata.get("metric_name", "")),
+                    "value_numeric": parsed_metric.get("value", 0),
+                    "unit": parsed_metric.get("unit", ""),
+                    "metric_name": parsed_metric.get(
+                        "metric_name", metadata.get("metric_name", "")
+                    ),
                     "metadata": metadata,
-                    "age": parsed_metric.get('age', 0),
-                    "unit_system": parsed_metric.get('unit_system', 'metric'),
-                    "likely_unit_error": parsed_metric.get('likely_unit_error', False),
-                    "probable_unit": parsed_metric.get('probable_unit', '')
+                    "age": parsed_metric.get("age", 0),
+                    "unit_system": parsed_metric.get("unit_system", "metric"),
+                    "likely_unit_error": parsed_metric.get("likely_unit_error", False),
+                    "probable_unit": parsed_metric.get("probable_unit", ""),
                 }
-                
+
                 metrics.append(metric_dict)
                 logger.debug(
                     f"Extracted: {metric_dict['metric_name']} = {metric_dict['value_numeric']} {metric_dict['unit']} (system: {metric_dict['unit_system']})"
@@ -573,75 +667,83 @@ class ComparisonHandler:
         )
         return metrics
 
-    def _extract_best_metric(self, docs: List[Dict], target_age: int = None) -> Optional[Dict]:
+    def _extract_best_metric(
+        self, docs: List[Dict], target_age: int = None
+    ) -> Optional[Dict]:
         """Extrait la meilleure métrique en gérant les unités conflictuelles"""
-        
+
         if not docs:
             return None
-        
+
         # NOUVEAU: Séparer les données par type d'unité
         metric_data = []
         imperial_data = []
-        
+
         for doc in docs:
-            content = doc.get('content', '')
-            sheet_name = doc.get('metadata', {}).get('sheet_name', '').lower()
-            
+            content = doc.get("content", "")
+            sheet_name = doc.get("metadata", {}).get("sheet_name", "").lower()
+
             # Parser la métrique
             parsed_metric = self._parse_metric_from_content(content)
             if not parsed_metric:
                 continue
-            
+
             # Classer par type d'unité
-            if 'imperial' in sheet_name:
+            if "imperial" in sheet_name:
                 imperial_data.append(parsed_metric)
             else:
                 metric_data.append(parsed_metric)
-        
-        logger.debug(f"Données trouvées - Métriques: {len(metric_data)}, Impériales: {len(imperial_data)}")
-        
+
+        logger.debug(
+            f"Données trouvées - Métriques: {len(metric_data)}, Impériales: {len(imperial_data)}"
+        )
+
         # PRIORITÉ: Utiliser les données métriques d'abord
         if metric_data:
             best_metric = self._select_best_metric_by_age(metric_data, target_age)
             logger.debug(f"Sélection métrique (système métrique): {best_metric}")
             return best_metric
-        
+
         # FALLBACK: Utiliser les données impériales si pas de métriques
         elif imperial_data:
             best_metric = self._select_best_metric_by_age(imperial_data, target_age)
             logger.warning(f"Utilisation données impériales en fallback: {best_metric}")
             # NOUVEAU: Marquer comme impérial pour traitement spécial
             if best_metric:
-                best_metric['unit_system'] = 'imperial'
+                best_metric["unit_system"] = "imperial"
             return best_metric
-        
+
         # Aucune donnée valide trouvée
         logger.warning("Aucune métrique valide trouvée")
         return None
 
-    def _select_best_metric_by_age(self, metrics: List[Dict], target_age: int = None) -> Optional[Dict]:
+    def _select_best_metric_by_age(
+        self, metrics: List[Dict], target_age: int = None
+    ) -> Optional[Dict]:
         """Sélectionne la meilleure métrique selon la proximité d'âge"""
-        
+
         if not metrics:
             return None
-        
+
         if not target_age:
             # Si pas d'âge cible, prendre la première métrique valide
             return metrics[0]
-        
+
         # Trier par proximité d'âge
         def age_distance(metric):
-            metric_age = metric.get('age', 0)
+            metric_age = metric.get("age", 0)
             if metric_age == 0:
-                return float('inf')  # Penaliser les âges manquants
+                return float("inf")  # Penaliser les âges manquants
             return abs(metric_age - target_age)
-        
+
         sorted_metrics = sorted(metrics, key=age_distance)
         best_metric = sorted_metrics[0]
-        
+
         # Validation de la proximité (tolérance max 3 jours)
         if age_distance(best_metric) <= 3:
-            logger.debug(f"Métrique sélectionnée: âge {best_metric.get('age')} (cible: {target_age})")
+            logger.debug(
+                f"Métrique sélectionnée: âge {best_metric.get('age')} (cible: {target_age})"
+            )
             return best_metric
         else:
             logger.warning(f"Aucune métrique proche trouvée pour âge {target_age}")
@@ -649,58 +751,62 @@ class ComparisonHandler:
 
     def _parse_metric_from_content(self, content: str) -> Optional[Dict]:
         """Parse le contenu pour extraire les informations de métrique"""
-        
+
         if not content:
             return None
-        
+
         try:
             import re
-            
+
             # Pattern amélioré pour extraire les informations
             patterns = {
-                'metric_name': r'\*\*(.*?)\*\*',
-                'strain': r'Strain:\s*(.+)',
-                'sex': r'Sex:\s*(.+)',
-                'value': r'Value:\s*([\d.]+)',
-                'unit': r'Value:.*?(grams?|kg|pounds?|lbs?)',
-                'age': r'Age:\s*(\d+)\s*days?'
+                "metric_name": r"\*\*(.*?)\*\*",
+                "strain": r"Strain:\s*(.+)",
+                "sex": r"Sex:\s*(.+)",
+                "value": r"Value:\s*([\d.]+)",
+                "unit": r"Value:.*?(grams?|kg|pounds?|lbs?)",
+                "age": r"Age:\s*(\d+)\s*days?",
             }
-            
+
             extracted = {}
             for key, pattern in patterns.items():
                 match = re.search(pattern, content, re.IGNORECASE)
                 if match:
                     extracted[key] = match.group(1).strip()
-            
+
             # Validation et conversion
-            if 'value' in extracted:
+            if "value" in extracted:
                 try:
-                    extracted['value'] = float(extracted['value'])
+                    extracted["value"] = float(extracted["value"])
                 except (ValueError, TypeError):
                     logger.warning(f"Valeur non numérique: {extracted.get('value')}")
                     return None
-            
-            if 'age' in extracted:
+
+            if "age" in extracted:
                 try:
-                    extracted['age'] = int(extracted['age'])
+                    extracted["age"] = int(extracted["age"])
                 except (ValueError, TypeError):
-                    extracted['age'] = 0
-            
+                    extracted["age"] = 0
+
             # NOUVEAU: Détection automatique du système d'unité basé sur la valeur
-            if extracted.get('value') and extracted.get('unit'):
-                value = extracted['value']
-                unit = extracted['unit'].lower()
-                
+            if extracted.get("value") and extracted.get("unit"):
+                value = extracted["value"]
+                unit = extracted["unit"].lower()
+
                 # Heuristique pour détecter les unités incohérentes
-                if 'gram' in unit and value < 10:  # Probablement des livres mal étiquetées
-                    extracted['likely_unit_error'] = True
-                    extracted['probable_unit'] = 'pounds'
-                elif 'pound' in unit and value > 100:  # Probablement des grammes mal étiquetés
-                    extracted['likely_unit_error'] = True
-                    extracted['probable_unit'] = 'grams'
-            
+                if (
+                    "gram" in unit and value < 10
+                ):  # Probablement des livres mal étiquetées
+                    extracted["likely_unit_error"] = True
+                    extracted["probable_unit"] = "pounds"
+                elif (
+                    "pound" in unit and value > 100
+                ):  # Probablement des grammes mal étiquetés
+                    extracted["likely_unit_error"] = True
+                    extracted["probable_unit"] = "grams"
+
             return extracted
-            
+
         except Exception as e:
             logger.error(f"Erreur parsing métrique: {e}")
             return None
@@ -714,21 +820,23 @@ class ComparisonHandler:
 
         # Extraire l'âge cible si disponible
         target_age = entities.get("age_days")
-        
+
         # Utiliser la nouvelle méthode de sélection par âge
         if target_age:
             best_metric = self._select_best_metric_by_age(metrics, target_age)
             if best_metric:
                 # Convertir vers le format attendu
                 return {
-                    "value_numeric": best_metric.get("value_numeric", best_metric.get("value", 0)),
+                    "value_numeric": best_metric.get(
+                        "value_numeric", best_metric.get("value", 0)
+                    ),
                     "unit": best_metric.get("unit", ""),
                     "metric_name": best_metric.get("metric_name", ""),
                     "metadata": best_metric.get("metadata", {}),
                     "unit_system": best_metric.get("unit_system", "metric"),
-                    "age": best_metric.get("age", 0)
+                    "age": best_metric.get("age", 0),
                 }
-        
+
         # Prendre la première (déjà triée par pertinence) comme fallback
         best = metrics[0]
 
@@ -739,68 +847,96 @@ class ComparisonHandler:
 
         return best
 
-    def _compare_metrics_with_unit_handling(self, metric1: Dict, metric2: Dict, entities: Dict) -> Dict:
+    def _compare_metrics_with_unit_handling(
+        self, metric1: Dict, metric2: Dict, entities: Dict
+    ) -> Dict:
         """Compare deux métriques en gérant les différences d'unités"""
-        
+
         # Vérifier les systèmes d'unités
-        unit_system1 = metric1.get('unit_system', 'metric')
-        unit_system2 = metric2.get('unit_system', 'metric')
-        
-        value1 = metric1.get('value_numeric', metric1.get('value', 0))
-        value2 = metric2.get('value_numeric', metric2.get('value', 0))
-        
+        unit_system1 = metric1.get("unit_system", "metric")
+        unit_system2 = metric2.get("unit_system", "metric")
+
+        value1 = metric1.get("value_numeric", metric1.get("value", 0))
+        value2 = metric2.get("value_numeric", metric2.get("value", 0))
+
         # NOUVEAU: Conversion automatique si systèmes différents
         if unit_system1 != unit_system2:
-            logger.warning("Systèmes d'unités différents détectés, tentative de conversion")
-            
+            logger.warning(
+                "Systèmes d'unités différents détectés, tentative de conversion"
+            )
+
             # Convertir les livres en grammes si nécessaire
-            if unit_system1 == 'imperial' and value1 < 20:  # Probablement en livres
+            if unit_system1 == "imperial" and value1 < 20:  # Probablement en livres
                 value1 = value1 * 453.6  # Conversion livres -> grammes
-                logger.debug(f"Conversion impérial->métrique: {metric1.get('value_numeric', metric1.get('value'))} lbs -> {value1} g")
-            
-            if unit_system2 == 'imperial' and value2 < 20:  # Probablement en livres
+                logger.debug(
+                    f"Conversion impérial->métrique: {metric1.get('value_numeric', metric1.get('value'))} lbs -> {value1} g"
+                )
+
+            if unit_system2 == "imperial" and value2 < 20:  # Probablement en livres
                 value2 = value2 * 453.6  # Conversion livres -> grammes
-                logger.debug(f"Conversion impérial->métrique: {metric2.get('value_numeric', metric2.get('value'))} lbs -> {value2} g")
-        
+                logger.debug(
+                    f"Conversion impérial->métrique: {metric2.get('value_numeric', metric2.get('value'))} lbs -> {value2} g"
+                )
+
         # Calcul de la différence
         difference = abs(value2 - value1)
         percentage = (difference / value1 * 100) if value1 > 0 else 0
-        
+
         # Déterminer le meilleur selon le type de métrique
-        metric_name = metric1.get('metric_name', '').lower()
+        metric_name = metric1.get("metric_name", "").lower()
         higher_is_better = self._is_higher_better_metric(metric_name)
-        
+
         if higher_is_better:
-            better_entity = entities.get('entity2_name') if value2 > value1 else entities.get('entity1_name')
+            better_entity = (
+                entities.get("entity2_name")
+                if value2 > value1
+                else entities.get("entity1_name")
+            )
         else:
-            better_entity = entities.get('entity1_name') if value1 < value2 else entities.get('entity2_name')
-        
+            better_entity = (
+                entities.get("entity1_name")
+                if value1 < value2
+                else entities.get("entity2_name")
+            )
+
         return {
-            'metric_name': metric1.get('metric_name'),
-            'value1': value1,
-            'value2': value2,
-            'difference': difference,
-            'percentage_diff': percentage,
-            'better_entity': better_entity,
-            'unit_conversion_applied': unit_system1 != unit_system2,
-            'confidence': 'high' if unit_system1 == unit_system2 else 'medium'
+            "metric_name": metric1.get("metric_name"),
+            "value1": value1,
+            "value2": value2,
+            "difference": difference,
+            "percentage_diff": percentage,
+            "better_entity": better_entity,
+            "unit_conversion_applied": unit_system1 != unit_system2,
+            "confidence": "high" if unit_system1 == unit_system2 else "medium",
         }
 
     def _is_higher_better_metric(self, metric_name: str) -> bool:
         """Détermine si une valeur plus élevée est meilleure pour cette métrique"""
         metric_name_lower = metric_name.lower()
-        
+
         # Métriques où plus élevé = meilleur
         higher_better_keywords = [
-            'weight', 'poids', 'production', 'yield', 'rendement',
-            'growth', 'croissance', 'gain', 'efficiency'
+            "weight",
+            "poids",
+            "production",
+            "yield",
+            "rendement",
+            "growth",
+            "croissance",
+            "gain",
+            "efficiency",
         ]
-        
+
         # Métriques où plus bas = meilleur
         lower_better_keywords = [
-            'conversion', 'fcr', 'mortality', 'mortalité', 'cost', 'coût'
+            "conversion",
+            "fcr",
+            "mortality",
+            "mortalité",
+            "cost",
+            "coût",
         ]
-        
+
         if any(keyword in metric_name_lower for keyword in higher_better_keywords):
             return True
         elif any(keyword in metric_name_lower for keyword in lower_better_keywords):
@@ -811,29 +947,29 @@ class ComparisonHandler:
 
     def _validate_comparison_consistency(self, comparison_result: Dict) -> Dict:
         """Valide la cohérence du résultat de comparaison"""
-        
+
         # Vérifications de cohérence
         warnings = []
-        
+
         # Vérifier les valeurs aberrantes
-        value1 = comparison_result.get('value1', 0)
-        value2 = comparison_result.get('value2', 0)
-        
+        value1 = comparison_result.get("value1", 0)
+        value2 = comparison_result.get("value2", 0)
+
         if value1 <= 0 or value2 <= 0:
             warnings.append("Valeurs nulles ou négatives détectées")
-        
+
         # Vérifier les différences extrêmes
-        percentage_diff = comparison_result.get('percentage_diff', 0)
+        percentage_diff = comparison_result.get("percentage_diff", 0)
         if percentage_diff > 50:
             warnings.append(f"Différence très importante: {percentage_diff:.1f}%")
-        
+
         # Vérifier la cohérence des unités
-        if comparison_result.get('unit_conversion_applied', False):
+        if comparison_result.get("unit_conversion_applied", False):
             warnings.append("Conversion d'unités appliquée, vérifier la cohérence")
-        
-        comparison_result['validation_warnings'] = warnings
-        comparison_result['is_reliable'] = len(warnings) == 0
-        
+
+        comparison_result["validation_warnings"] = warnings
+        comparison_result["is_reliable"] = len(warnings) == 0
+
         return comparison_result
 
     async def generate_comparative_response(
@@ -1022,7 +1158,173 @@ Data:
             context=context,
         )
 
-        return formatted_text
+    def _generate_entity_name(self, entity_set: Dict[str, Any], index: int) -> str:
+        """Génère un nom descriptif pour l'entité"""
+
+        parts = []
+
+        # Ajouter la race si présente
+        if entity_set.get("breed"):
+            parts.append(entity_set["breed"])
+
+        # Ajouter le sexe de manière explicite
+        sex = entity_set.get("sex", "as_hatched")
+        if sex == "male":
+            parts.append("mâle")
+        elif sex == "female":
+            parts.append("femelle")
+        elif sex != "as_hatched":
+            parts.append(sex)
+
+        # Ajouter l'âge si présent
+        if entity_set.get("age_days"):
+            parts.append(f"{entity_set['age_days']} jours")
+
+        # Si aucune partie spécifique, utiliser un nom générique
+        if not parts:
+            return f"Entité {index + 1}"
+
+        return " ".join(parts)
+
+    def _compare_entities(
+        self, results: List[Dict], preprocessed_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Compare les entités avec gestion améliorée des systèmes d'unités"""
+
+        if len(results) < 2:
+            raise ValueError(f"Impossible de comparer {len(results)} entité(s)")
+
+        entity1 = results[0]
+        entity2 = results[1]
+
+        # Extraire les métriques avec gestion des unités
+        metric1 = self._extract_best_metric_with_units(
+            entity1["docs"], preprocessed_data
+        )
+        metric2 = self._extract_best_metric_with_units(
+            entity2["docs"], preprocessed_data
+        )
+
+        if not metric1 or not metric2:
+            raise ValueError("Impossible d'extraire les métriques pour comparaison")
+
+        # Comparaison avec gestion des unités
+        comparison = self._compare_metrics_with_unit_handling(
+            metric1,
+            metric2,
+            {
+                "entity1_name": entity1["entity_name"],
+                "entity2_name": entity2["entity_name"],
+            },
+        )
+
+        # Ajouter contexte
+        comparison["entity1"] = entity1["entity_name"]
+        comparison["entity2"] = entity2["entity_name"]
+        comparison["context"] = self._extract_context_from_entities(results)
+
+        return comparison
+
+    def _extract_best_metric_with_units(
+        self, docs: List[Dict], preprocessed_data: Dict[str, Any]
+    ) -> Optional[Dict]:
+        """Extrait la meilleure métrique en gérant les unités et priorités"""
+
+        target_age = preprocessed_data.get("entities", {}).get("age_days")
+
+        # Séparer par système d'unité
+        metric_docs = []
+        imperial_docs = []
+
+        for doc in docs:
+            sheet_name = doc.get("metadata", {}).get("sheet_name", "").lower()
+            if "imperial" in sheet_name:
+                imperial_docs.append(doc)
+            else:
+                metric_docs.append(doc)
+
+        # Priorité aux données métriques
+        primary_docs = metric_docs if metric_docs else imperial_docs
+
+        if not primary_docs:
+            return None
+
+        # Extraire et sélectionner la meilleure métrique
+        metrics = []
+        for doc in primary_docs:
+            parsed = self._parse_metric_from_content(doc.get("content", ""))
+            if parsed:
+                # Marquer le système d'unité
+                parsed["unit_system"] = (
+                    "imperial"
+                    if "imperial"
+                    in doc.get("metadata", {}).get("sheet_name", "").lower()
+                    else "metric"
+                )
+                metrics.append(parsed)
+
+        if not metrics:
+            return None
+
+        # Sélectionner par proximité d'âge si spécifié
+        if target_age:
+            best_metric = self._select_best_metric_by_age(metrics, int(target_age))
+        else:
+            best_metric = metrics[0]  # Premier résultat
+
+        return best_metric
+
+    def _create_error_response(self, error_message: str) -> Dict[str, Any]:
+        """Crée une réponse d'erreur standardisée"""
+        return {
+            "success": False,
+            "error": error_message,
+            "results": [],
+            "comparison": None,
+        }
+
+    def _format_comparison_response(
+        self, comparison_result: Dict[str, Any], preprocessed_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Formate la réponse de comparaison"""
+        return {
+            "success": True,
+            "comparison": comparison_result,
+            "results": comparison_result,
+            "metadata": {
+                "query_type": "comparative",
+                "entities_compared": 2,
+                "preprocessing_applied": True,
+            },
+        }
+
+    def _extract_context_from_entities(self, results: List[Dict]) -> Dict[str, Any]:
+        """Extrait le contexte commun des entités comparées"""
+        context = {}
+
+        if results and len(results) > 0:
+            first_entity = results[0].get("entity_set", {})
+
+            # Extraire les informations communes
+            if "age_days" in first_entity:
+                context["age_days"] = first_entity["age_days"]
+
+            if "sex" in first_entity:
+                context["sex"] = first_entity["sex"]
+
+            if "breed" in first_entity:
+                context["breed"] = first_entity["breed"]
+
+        return context
+
+    def _parse_comparison_entities(
+        self, base_entities: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Parse les entités de base pour détecter les comparaisons (fallback)"""
+        # Utiliser la méthode existante _parse_multiple_entities_from_preprocessing
+        # avec un format compatible
+        preprocessed_format = {"entities": base_entities}
+        return self._parse_multiple_entities_from_preprocessing(preprocessed_format)
 
     async def handle_temporal_comparison(
         self, query: str, age_start: int, age_end: int, entities: Dict

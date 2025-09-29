@@ -96,7 +96,7 @@ class PostgreSQLRetriever:
     ) -> List[MetricResult]:
         """
         Recherche de métriques avec gestion des unités et correspondance de sexe stricte
-        
+
         Args:
             strict_sex_match: Si True, correspondance exacte du sexe uniquement
         """
@@ -116,7 +116,9 @@ class PostgreSQLRetriever:
 
             # NOUVEAU: Détecter si c'est une demande de sexe explicite
             if not strict_sex_match:
-                strict_sex_match = self._detect_explicit_sex_request(query, normalized_entities)
+                strict_sex_match = self._detect_explicit_sex_request(
+                    query, normalized_entities
+                )
 
             # Utiliser PostgreSQLQueryBuilder pour construction SQL
             sql_query, params = self.query_builder.build_sex_aware_sql_query(
@@ -132,21 +134,25 @@ class PostgreSQLRetriever:
             async with self.pool.acquire() as conn:
                 try:
                     rows = await conn.fetch(sql_query, *params)
-                    logger.info(f"PostgreSQL: {len(rows)} metrics found from {len(rows)} rows")
-                    
+                    logger.info(
+                        f"PostgreSQL: {len(rows)} metrics found from {len(rows)} rows"
+                    )
+
                     # NOUVEAU: Traitement des résultats avec filtrage unités
                     metrics = []
                     for row in rows:
                         metric = self._row_to_metric_result(dict(row))
                         if metric:
                             metrics.append(metric)
-                    
+
                     # NOUVEAU: Filtrer les conflits d'unités
                     filtered_metrics = self._filter_unit_conflicts(metrics)
-                    
+
                     # NOUVEAU: Validation des résultats
-                    validated_metrics = self._validate_metric_results(filtered_metrics, normalized_entities)
-                    
+                    validated_metrics = self._validate_metric_results(
+                        filtered_metrics, normalized_entities
+                    )
+
                     return validated_metrics
 
                 except Exception as query_error:
@@ -159,109 +165,121 @@ class PostgreSQLRetriever:
             logger.error(f"Search metrics error: {e}")
             return []
 
-    def _detect_explicit_sex_request(self, query: str, entities: Dict[str, str]) -> bool:
+    def _detect_explicit_sex_request(
+        self, query: str, entities: Dict[str, str]
+    ) -> bool:
         """Détecte si l'utilisateur demande explicitement un sexe"""
         # Si sexe spécifié dans entités et pas 'as_hatched'
-        if entities.get('sex') and entities['sex'] != 'as_hatched':
+        if entities.get("sex") and entities["sex"] != "as_hatched":
             return True
-        
+
         # Recherche dans le texte de la requête
         query_lower = query.lower()
-        explicit_markers = ['femelle', 'female', 'mâle', 'male', 'poule', 'coq']
+        explicit_markers = ["femelle", "female", "mâle", "male", "poule", "coq"]
         return any(marker in query_lower for marker in explicit_markers)
 
     def _filter_unit_conflicts(self, metrics: List[MetricResult]) -> List[MetricResult]:
         """Supprime les doublons métrique/impérial, préfère les données métriques"""
         seen_metrics = {}
         filtered = []
-        
+
         # Premier passage : garder seulement les données métriques
         for metric in metrics:
             key = f"{metric.metric_name}_{metric.age_min}_{metric.sex}"
-            sheet_name = getattr(metric, 'sheet_name', '').lower()
-            
-            if 'imperial' not in sheet_name:
+            sheet_name = getattr(metric, "sheet_name", "").lower()
+
+            if "imperial" not in sheet_name:
                 if key not in seen_metrics:
                     seen_metrics[key] = metric
                     filtered.append(metric)
-        
+
         # Si pas de données métriques trouvées, garder les impériales
         if not filtered:
-            logger.warning("Aucune donnée métrique trouvée, utilisation des données impériales")
+            logger.warning(
+                "Aucune donnée métrique trouvée, utilisation des données impériales"
+            )
             for metric in metrics:
                 key = f"{metric.metric_name}_{metric.age_min}_{metric.sex}"
                 if key not in seen_metrics:
                     seen_metrics[key] = metric
                     filtered.append(metric)
-        
+
         logger.debug(f"Filtrage unités: {len(metrics)} -> {len(filtered)} métriques")
         return filtered
 
-    def _validate_metric_results(self, metrics: List[MetricResult], entities: Dict[str, str]) -> List[MetricResult]:
+    def _validate_metric_results(
+        self, metrics: List[MetricResult], entities: Dict[str, str]
+    ) -> List[MetricResult]:
         """Valide les résultats par rapport aux entités demandées"""
         if not metrics:
             return metrics
-        
+
         validated = []
-        target_sex = entities.get('sex', 'as_hatched')
-        target_age = entities.get('age_days')
-        
+        target_sex = entities.get("sex", "as_hatched")
+        target_age = entities.get("age_days")
+
         for metric in metrics:
             # Validation du sexe si spécifié
-            if target_sex != 'as_hatched':
+            if target_sex != "as_hatched":
                 if metric.sex.lower() != target_sex.lower():
                     logger.debug(f"Métrique exclue: sexe {metric.sex} != {target_sex}")
                     continue
-            
+
             # Validation de l'âge si spécifié (tolérance ±3 jours)
             if target_age:
                 age_target = int(target_age)
                 age_metric = metric.age_min or metric.age_max or 0
                 if abs(age_metric - age_target) > 3:
-                    logger.debug(f"Métrique exclue: âge {age_metric} trop éloigné de {age_target}")
+                    logger.debug(
+                        f"Métrique exclue: âge {age_metric} trop éloigné de {age_target}"
+                    )
                     continue
-            
+
             # Validation des valeurs aberrantes
             if metric.value_numeric is not None:
-                if metric.value_numeric <= 0 or metric.value_numeric > 10000:  # Seuils raisonnables
+                if (
+                    metric.value_numeric <= 0 or metric.value_numeric > 10000
+                ):  # Seuils raisonnables
                     logger.warning(f"Valeur aberrante détectée: {metric.value_numeric}")
                     # Ne pas exclure mais logger
-            
+
             validated.append(metric)
-        
-        logger.debug(f"Validation: {len(metrics)} -> {len(validated)} métriques validées")
+
+        logger.debug(
+            f"Validation: {len(metrics)} -> {len(validated)} métriques validées"
+        )
         return validated
 
     def _row_to_metric_result(self, row: dict) -> Optional[MetricResult]:
         """Convertit une ligne de résultat en MetricResult avec validation"""
         try:
             # Extraire les valeurs avec gestion des erreurs
-            value_numeric = row.get('value_numeric')
+            value_numeric = row.get("value_numeric")
             if isinstance(value_numeric, str):
                 try:
                     value_numeric = float(value_numeric)
                 except (ValueError, TypeError):
                     value_numeric = None
-            
+
             return MetricResult(
-                company=row.get('company_name', ''),
-                breed=row.get('breed_name', ''),
-                strain=row.get('strain_name', ''),
-                species=row.get('species', ''),
-                metric_name=row.get('metric_name', ''),
+                company=row.get("company_name", ""),
+                breed=row.get("breed_name", ""),
+                strain=row.get("strain_name", ""),
+                species=row.get("species", ""),
+                metric_name=row.get("metric_name", ""),
                 value_numeric=value_numeric,
-                value_text=row.get('value_text'),
-                unit=row.get('unit', ''),
-                age_min=row.get('age_min'),
-                age_max=row.get('age_max'),
-                sheet_name=row.get('sheet_name', ''),
-                category=row.get('category_name', ''),
-                sex=row.get('sex', 'as_hatched'),
-                housing_system=row.get('housing_system', ''),
-                data_type=row.get('data_type', ''),
+                value_text=row.get("value_text"),
+                unit=row.get("unit", ""),
+                age_min=row.get("age_min"),
+                age_max=row.get("age_max"),
+                sheet_name=row.get("sheet_name", ""),
+                category=row.get("category_name", ""),
+                sex=row.get("sex", "as_hatched"),
+                housing_system=row.get("housing_system", ""),
+                data_type=row.get("data_type", ""),
                 confidence=self._calculate_relevance(
                     query="", dict_row=row, entities={}
-                )
+                ),
             )
         except Exception as e:
             logger.error(f"Erreur conversion MetricResult: {e}")

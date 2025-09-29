@@ -86,20 +86,18 @@ class PostgreSQLQueryBuilder:
         direct_mapping = {
             # Mapping Ross 308 vers 308/308 FF
             "ross 308": "308/308 FF",
-            "ross308": "308/308 FF", 
+            "ross308": "308/308 FF",
             "ross-308": "308/308 FF",
             "r308": "308/308 FF",
             "308": "308/308 FF",
             "308/308 ff": "308/308 FF",  # Normalisation casse
             "308/308ff": "308/308 FF",
-            
             # Mapping Cobb 500 vers 500
             "cobb 500": "500",
             "cobb500": "500",
-            "cobb-500": "500", 
+            "cobb-500": "500",
             "c500": "500",
             "500": "500",
-            
             # NOUVEAU: Mapping pour comparaisons multiples
             "cobb 500, ross 308": "500,308/308 FF",
             "ross 308, cobb 500": "308/308 FF,500",
@@ -429,7 +427,9 @@ class PostgreSQLQueryBuilder:
             )
 
         # 3. NOUVEAU: FILTRE SEXE STRICT (si demandé explicitement)
-        if strict_sex_match or self._is_explicit_sex_request(query, normalized_entities):
+        if strict_sex_match or self._is_explicit_sex_request(
+            query, normalized_entities
+        ):
             param_count = self._add_strict_sex_filter(
                 normalized_entities, conditions, params, param_count
             )
@@ -446,7 +446,7 @@ class PostgreSQLQueryBuilder:
         base_sql = self._get_base_sql()
         where_clause = " AND ".join(conditions)
         order_clause = self._build_order_clause(normalized_entities, strict_sex_match)
-        
+
         final_sql = f"{base_sql} WHERE {where_clause} {order_clause} LIMIT {top_k}"
 
         # Validation finale paramètres vs placeholders
@@ -454,7 +454,9 @@ class PostgreSQLQueryBuilder:
         max_placeholder = max([int(p) for p in placeholders]) if placeholders else 0
 
         if len(params) < max_placeholder:
-            logger.error(f"MISMATCH: {len(params)} params pour {max_placeholder} placeholders")
+            logger.error(
+                f"MISMATCH: {len(params)} params pour {max_placeholder} placeholders"
+            )
             while len(params) < max_placeholder:
                 params.append("")
 
@@ -464,30 +466,38 @@ class PostgreSQLQueryBuilder:
 
     def _is_explicit_sex_request(self, query: str, entities: Dict[str, str]) -> bool:
         """Détecte si l'utilisateur demande explicitement un sexe"""
-        if entities.get('sex') and entities['sex'] != 'as_hatched':
+        if entities.get("sex") and entities["sex"] != "as_hatched":
             return True
-        
+
         query_lower = query.lower()
-        explicit_markers = ['femelle', 'female', 'mâle', 'male', 'poule', 'coq']
+        explicit_markers = ["femelle", "female", "mâle", "male", "poule", "coq"]
         return any(marker in query_lower for marker in explicit_markers)
 
     def _add_age_conditions(
-        self, entities: Dict[str, str], conditions: List[str], params: List[Any], param_count: int
+        self,
+        entities: Dict[str, str],
+        conditions: List[str],
+        params: List[Any],
+        param_count: int,
     ) -> int:
         """Ajoute les conditions d'âge basées sur les entités normalisées"""
         try:
             age = int(entities["age_days"])
-            
+
             # Vérifier si l'âge est dans la plage valide
-            breed_for_check = entities.get("breed", "").split(",")[0] if entities.get("breed") else "unknown"
+            breed_for_check = (
+                entities.get("breed", "").split(",")[0]
+                if entities.get("breed")
+                else "unknown"
+            )
             out_of_range_condition = self._handle_out_of_range_age(age, breed_for_check)
-            
+
             if out_of_range_condition:
                 logger.warning(f"Age {age} hors plage pour {breed_for_check}")
                 # Ajouter condition qui ne retourne rien
                 conditions.append("1=0")
                 return param_count
-            
+
             # Condition d'âge normale avec tolérance
             param_count += 4
             age_condition = f"""
@@ -496,15 +506,21 @@ class PostgreSQLQueryBuilder:
              OR ABS(COALESCE(m.age_max, 0) - ${param_count-2}) <= ${param_count})"""
             conditions.append(age_condition)
             params.extend([age, age, 3, 3])
-            
-            logger.debug(f"Age condition added: {age} days (params {param_count-3} to {param_count})")
+
+            logger.debug(
+                f"Age condition added: {age} days (params {param_count-3} to {param_count})"
+            )
         except (ValueError, KeyError):
             logger.warning(f"Invalid age_days value: {entities.get('age_days')}")
-        
+
         return param_count
 
     def _add_breed_filter(
-        self, entities: Dict[str, str], conditions: List[str], params: List[Any], param_count: int
+        self,
+        entities: Dict[str, str],
+        conditions: List[str],
+        params: List[Any],
+        param_count: int,
     ) -> int:
         """Ajoute le filtre breed avec gestion des breeds multiples"""
         breed_db = entities.get("breed")
@@ -524,29 +540,37 @@ class PostgreSQLQueryBuilder:
                 params.extend(breed_params)
                 param_count += len(breed_params)
 
-                logger.debug(f"Adding breed filter: {breed_params} (params ${param_count - len(breed_params) + 1} to ${param_count})")
-        
+                logger.debug(
+                    f"Adding breed filter: {breed_params} (params ${param_count - len(breed_params) + 1} to ${param_count})"
+                )
+
         return param_count
 
     def _add_strict_sex_filter(
-        self, entities: Dict[str, str], conditions: List[str], params: List[Any], param_count: int
+        self,
+        entities: Dict[str, str],
+        conditions: List[str],
+        params: List[Any],
+        param_count: int,
     ) -> int:
         """Ajoute un filtre sexe strict quand demandé explicitement"""
-        sex = entities.get('sex', 'as_hatched')
-        
-        if sex != 'as_hatched':
+        sex = entities.get("sex", "as_hatched")
+
+        if sex != "as_hatched":
             param_count += 1
             conditions.append(f"d.sex = ${param_count}")
             params.append(sex)
             logger.debug(f"Added strict sex filter: {sex} (param ${param_count})")
-        
+
         return param_count
 
-    def _add_unit_filter(self, conditions: List[str], params: List[Any], param_count: int) -> int:
+    def _add_unit_filter(
+        self, conditions: List[str], params: List[Any], param_count: int
+    ) -> int:
         """Filtre les données impériales pour éviter confusion"""
         param_count += 1
         conditions.append(f"m.sheet_name NOT LIKE ${param_count}")
-        params.append('%imperial%')
+        params.append("%imperial%")
         logger.debug(f"Added unit filter: exclude imperial (param ${param_count})")
         return param_count
 
@@ -577,33 +601,34 @@ class PostgreSQLQueryBuilder:
             JOIN metrics m ON d.id = m.document_id
             JOIN data_categories dc ON m.category_id = dc.id"""
 
-    def _build_order_clause(self, entities: Dict[str, str], strict_sex_match: bool) -> str:
+    def _build_order_clause(
+        self, entities: Dict[str, str], strict_sex_match: bool
+    ) -> str:
         """Construit la clause ORDER BY adaptée"""
-        
+
         order_parts = []
-        
+
         # Si pas de filtre sexe strict, garder le tri par sexe
         if not strict_sex_match:
-            order_parts.append("""
+            order_parts.append(
+                """
                 CASE 
                     WHEN LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed', 'as-hatched') THEN 1
                     WHEN LOWER(COALESCE(d.sex, 'as_hatched')) = 'male' THEN 2
                     WHEN LOWER(COALESCE(d.sex, 'as_hatched')) = 'female' THEN 3
                     ELSE 4
                 END
-            """)
-        
+            """
+            )
+
         # Tri par proximité d'âge si âge spécifié
         if entities.get("age_days"):
             age = int(entities["age_days"])
             order_parts.append(f"ABS(COALESCE(m.age_min, 999) - {age})")
-        
+
         # Tri par valeur et nom métrique
-        order_parts.extend([
-            "m.value_numeric DESC NULLS LAST",
-            "m.metric_name"
-        ])
-        
+        order_parts.extend(["m.value_numeric DESC NULLS LAST", "m.metric_name"])
+
         return "ORDER BY " + ", ".join(order_parts)
 
     def _add_metric_search_conditions(
@@ -890,7 +915,7 @@ if __name__ == "__main__":
         "Ross 708",
         "Hubbard",
         "308/308 ff",  # Test normalisation casse
-        "308/308FF",   # Test sans espace
+        "308/308FF",  # Test sans espace
     ]
     for inp in test_inputs:
         result = builder._normalize_breed_for_db(inp)
@@ -1012,11 +1037,11 @@ if __name__ == "__main__":
     print("=" * 80)
     ross_variants = [
         "ross 308",
-        "308/308 ff",   # Test normalisation casse  
-        "308/308FF",    # Test sans espace
+        "308/308 ff",  # Test normalisation casse
+        "308/308FF",  # Test sans espace
         "308",
         "r308",
-        "ross-308"
+        "ross-308",
     ]
     for variant in ross_variants:
         result = builder._normalize_breed_for_db(variant)
