@@ -2,6 +2,7 @@
 """
 rag_postgresql.py - PostgreSQL System Principal Refactorisé
 Point d'entrée principal avec délégation vers modules spécialisés
+VERSION CORRIGÉE: Gestion robuste des validations avec fallbacks
 """
 
 import logging
@@ -134,6 +135,7 @@ class PostgreSQLSystem:
     ) -> RAGResult:
         """
         Recherche de métriques avec validation et optimisations
+        VERSION CORRIGÉE: Gestion robuste des validations
         """
 
         if not self.is_initialized or not self.postgres_retriever:
@@ -145,60 +147,105 @@ class PostgreSQLSystem:
         start_time = time.time()
 
         try:
-            # Validation flexible avec le nouveau module
-            validation_result = self.validator.flexible_query_validation(
-                query, entities
-            )
+            # 🔧 CORRECTION: Vérification de sécurité pour validator
+            if not self.validator:
+                logger.warning(
+                    "Validator non initialisé, utilisation des entités brutes"
+                )
+                validation_result = {
+                    "status": "complete",
+                    "enhanced_entities": entities or {},
+                }
+            else:
+                try:
+                    validation_result = self.validator.flexible_query_validation(
+                        query, entities
+                    )
 
-            if validation_result["status"] == "needs_fallback":
+                    # Vérification supplémentaire de sécurité
+                    if not validation_result or not isinstance(validation_result, dict):
+                        logger.error(f"validation_result invalide: {validation_result}")
+                        validation_result = {
+                            "status": "complete",
+                            "enhanced_entities": entities or {},
+                        }
+                except Exception as validation_error:
+                    logger.error(f"Erreur lors de la validation: {validation_error}")
+                    validation_result = {
+                        "status": "complete",
+                        "enhanced_entities": entities or {},
+                    }
+
+            if validation_result.get("status") == "needs_fallback":
                 return RAGResult(
                     source=RAGSource.NO_RESULTS,
-                    answer=validation_result["helpful_message"],
+                    answer=validation_result.get(
+                        "helpful_message", "Informations insuffisantes"
+                    ),
                     metadata={
                         "processing_time": time.time() - start_time,
                         "validation_status": "incomplete",
-                        "missing_entities": validation_result["missing"],
-                        "suggestions": validation_result["suggestions"],
+                        "missing_entities": validation_result.get("missing", []),
+                        "suggestions": validation_result.get("suggestions", []),
                     },
                 )
 
             # Utiliser les entités enrichies si disponibles
-            if validation_result["status"] == "incomplete_but_processable":
-                entities = validation_result["enhanced_entities"]
+            if validation_result.get("status") == "incomplete_but_processable":
+                entities = validation_result.get("enhanced_entities", entities)
 
-            # Vérification disponibilité des données
-            availability_check = self.validator.check_data_availability_flexible(
-                entities
-            )
-            if not availability_check["available"] and availability_check.get(
-                "alternatives"
-            ):
-                return RAGResult(
-                    source=RAGSource.NO_RESULTS,
-                    answer=availability_check["helpful_response"],
-                    metadata={
-                        "processing_time": time.time() - start_time,
-                        "availability_status": "out_of_range",
-                        "alternatives": availability_check["alternatives"],
-                    },
-                )
+            # 🔧 CORRECTION: Vérification de sécurité pour check_data_availability_flexible
+            if self.validator:
+                try:
+                    availability_check = (
+                        self.validator.check_data_availability_flexible(entities)
+                    )
+
+                    # Vérification que availability_check est valide
+                    if availability_check and isinstance(availability_check, dict):
+                        if not availability_check.get(
+                            "available", True
+                        ) and availability_check.get("alternatives"):
+                            return RAGResult(
+                                source=RAGSource.NO_RESULTS,
+                                answer=availability_check.get(
+                                    "helpful_response", "Données non disponibles"
+                                ),
+                                metadata={
+                                    "processing_time": time.time() - start_time,
+                                    "availability_status": "out_of_range",
+                                    "alternatives": availability_check.get(
+                                        "alternatives", []
+                                    ),
+                                },
+                            )
+                except Exception as availability_error:
+                    logger.warning(
+                        f"Erreur vérification disponibilité: {availability_error}"
+                    )
+                    # Continuer sans vérification de disponibilité
 
             # Détection de requête temporelle
-            temporal_range = self.temporal_processor.detect_temporal_range(
-                query, entities
-            )
-            if temporal_range:
-                logger.info(
-                    f"Temporal range query detected: {temporal_range['age_min']}-{temporal_range['age_max']} days"
-                )
-                return await self.search_metrics_range(
-                    query=query,
-                    entities=entities,
-                    age_min=temporal_range["age_min"],
-                    age_max=temporal_range["age_max"],
-                    top_k=top_k,
-                    strict_sex_match=strict_sex_match,
-                )
+            if self.temporal_processor:
+                try:
+                    temporal_range = self.temporal_processor.detect_temporal_range(
+                        query, entities
+                    )
+                    if temporal_range:
+                        logger.info(
+                            f"Temporal range query detected: {temporal_range['age_min']}-{temporal_range['age_max']} days"
+                        )
+                        return await self.search_metrics_range(
+                            query=query,
+                            entities=entities,
+                            age_min=temporal_range["age_min"],
+                            age_max=temporal_range["age_max"],
+                            top_k=top_k,
+                            strict_sex_match=strict_sex_match,
+                        )
+                except Exception as temporal_error:
+                    logger.warning(f"Erreur détection temporelle: {temporal_error}")
+                    # Continuer avec recherche normale
 
             # Exécution normale de la requête
             metric_results = await self.postgres_retriever.search_metrics(
@@ -244,7 +291,7 @@ class PostgreSQLSystem:
             )
 
         except Exception as e:
-            logger.error(f"PostgreSQL search error: {e}")
+            logger.error(f"PostgreSQL search error: {e}", exc_info=True)
             return RAGResult(
                 source=RAGSource.ERROR,
                 answer="Erreur lors de la recherche de métriques.",
@@ -387,6 +434,17 @@ class PostgreSQLSystem:
                 ],
                 "status": "active",
             },
-            "implementation_phase": "modular_architecture",
-            "version": "v8.0_refactored",
+            "error_handling": {
+                "applied": True,
+                "description": "Gestion robuste des erreurs avec fallbacks",
+                "features": [
+                    "Vérification validator avant utilisation",
+                    "Fallback sur entités brutes si validation échoue",
+                    "Protection contre NoneType errors",
+                    "Logging détaillé des erreurs",
+                ],
+                "status": "active",
+            },
+            "implementation_phase": "modular_architecture_with_safety",
+            "version": "v8.1_error_handling_fixed",
         }
