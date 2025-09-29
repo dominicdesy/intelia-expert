@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_retriever.py - Récupérateur de données PostgreSQL
+VERSION CORRIGÉE - Utilise PostgreSQLQueryBuilder pour le mapping des souches
 """
 
 import logging
@@ -9,6 +10,7 @@ from typing import Dict, List, Any, Tuple
 from .rag_postgresql_config import ASYNCPG_AVAILABLE
 from .rag_postgresql_models import MetricResult
 from .rag_postgresql_normalizer import SQLQueryNormalizer
+from .postgresql_query_builder import PostgreSQLQueryBuilder
 
 if ASYNCPG_AVAILABLE:
     import asyncpg
@@ -17,12 +19,14 @@ logger = logging.getLogger(__name__)
 
 
 class PostgreSQLRetriever:
-    """Récupérateur de données PostgreSQL avec normalisation"""
+    """Récupérateur de données PostgreSQL avec normalisation et mapping des souches"""
 
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.pool = None
         self.query_normalizer = SQLQueryNormalizer()
+        # NOUVEAU: Utiliser PostgreSQLQueryBuilder pour le mapping correct
+        self.query_builder = PostgreSQLQueryBuilder(self.query_normalizer)
         self.is_initialized = False
 
     async def initialize(self):
@@ -109,8 +113,12 @@ class PostgreSQLRetriever:
             logger.debug(f"Entities: {entities}")
             logger.debug(f"Normalized: {normalized_entities}")
 
-            sql_query, params = self._build_query(
-                query, normalized_entities, top_k, strict_sex_match
+            # CORRECTION: Utiliser PostgreSQLQueryBuilder au lieu de _build_query
+            sql_query, params = self.query_builder.build_sex_aware_sql_query(
+                query=query,
+                entities=normalized_entities,
+                top_k=top_k,
+                strict_sex_match=strict_sex_match,
             )
 
             logger.debug(f"SQL Query: {sql_query}")
@@ -159,70 +167,20 @@ class PostgreSQLRetriever:
     def _build_query(
         self, query: str, entities: Dict[str, str], top_k: int, strict_sex_match: bool
     ) -> Tuple[str, List]:
-        """Construit une requête SQL avec filtres"""
-        conditions = []
-        params = []
-        param_count = 0
-
-        # Filtres de base
-        if entities.get("breed"):
-            param_count += 1
-            conditions.append(f"LOWER(s.strain_name) LIKE LOWER(${param_count})")
-            params.append(f"%{entities['breed']}%")
-
-        # Filtre d'âge
-        if entities.get("age_days"):
-            try:
-                age = int(entities["age_days"])
-                param_count += 1
-                conditions.append(
-                    f"m.age_min <= ${param_count} AND m.age_max >= ${param_count}"
-                )
-                params.append(age)
-            except (ValueError, TypeError):
-                logger.warning(f"Invalid age_days: {entities.get('age_days')}")
-
-        # Filtres pour sexe
-        if entities.get("sex") and entities["sex"] != "as_hatched":
-            if strict_sex_match:
-                param_count += 1
-                conditions.append(f"LOWER(d.sex) = ${param_count}")
-                params.append(entities["sex"].lower())
-            else:
-                param_count += 1
-                conditions.append(
-                    f"""
-                    (LOWER(COALESCE(d.sex, 'as_hatched')) = ${param_count} 
-                     OR LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed'))
-                """
-                )
-                params.append(entities["sex"].lower())
-
-        where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
-
-        sql_query = f"""
-            SELECT 
-                c.company_name, b.breed_name, s.strain_name, s.species,
-                m.metric_name, m.value_numeric, m.value_text, m.unit,
-                m.age_min, m.age_max, m.sheet_name,
-                dc.category_name, d.sex, d.housing_system, d.data_type
-            FROM companies c
-            JOIN breeds b ON c.id = b.company_id
-            JOIN strains s ON b.id = s.breed_id  
-            JOIN documents d ON s.id = d.strain_id
-            JOIN metrics m ON d.id = m.document_id
-            JOIN data_categories dc ON m.category_id = dc.id
-            {where_clause}
-            ORDER BY 
-                CASE 
-                    WHEN LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed') THEN 1
-                    ELSE 2
-                END,
-                m.value_numeric DESC NULLS LAST
-            LIMIT {top_k}
         """
+        DEPRECATED: Cette méthode est remplacée par PostgreSQLQueryBuilder
+        Conservée pour compatibilité mais redirige vers le builder
+        """
+        logger.warning(
+            "_build_query is deprecated, using PostgreSQLQueryBuilder instead"
+        )
 
-        return sql_query, params
+        return self.query_builder.build_sex_aware_sql_query(
+            query=query,
+            entities=entities,
+            top_k=top_k,
+            strict_sex_match=strict_sex_match,
+        )
 
     def _calculate_relevance(
         self, query: str, row: Dict, entities: Dict[str, str] = None
@@ -269,3 +227,55 @@ class PostgreSQLRetriever:
             finally:
                 self.pool = None
                 self.is_initialized = False
+
+
+# Tests unitaires pour vérifier la correction
+if __name__ == "__main__":
+    import asyncio
+
+    async def test_mapping_correction():
+        """Test pour vérifier que le mapping fonctionne"""
+
+        # Mock config
+        mock_config = {
+            "user": "test",
+            "password": "test",
+            "host": "localhost",
+            "port": 5432,
+            "database": "test",
+            "ssl": False,
+        }
+
+        # Créer retriever
+        retriever = PostgreSQLRetriever(mock_config)
+
+        # Vérifier que query_builder est initialisé
+        assert hasattr(
+            retriever, "query_builder"
+        ), "PostgreSQLQueryBuilder non initialisé"
+
+        # Test du mapping via query_builder
+        test_breeds = ["Ross 308", "Cobb 500", "ross 308", "cobb 500"]
+
+        print("Test du mapping des souches:")
+        for breed in test_breeds:
+            mapped = retriever.query_builder._normalize_breed_for_db(breed)
+            print(f"  {breed:15s} -> {mapped}")
+
+        # Vérifier mappings corrects
+        assert (
+            retriever.query_builder._normalize_breed_for_db("Ross 308") == "308/308 FF"
+        )
+        assert retriever.query_builder._normalize_breed_for_db("Cobb 500") == "500"
+        assert (
+            retriever.query_builder._normalize_breed_for_db("ross 308") == "308/308 FF"
+        )
+        assert retriever.query_builder._normalize_breed_for_db("cobb 500") == "500"
+
+        print("\n✅ CORRECTION VALIDÉE: Le mapping fonctionne correctement!")
+        print(
+            "Les requêtes utiliseront maintenant '308/308 FF' et '500' au lieu de 'Ross 308' et 'Cobb 500'"
+        )
+
+    # Exécuter le test
+    asyncio.run(test_mapping_correction())
