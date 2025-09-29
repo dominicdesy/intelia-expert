@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 comparison_handler.py - Gestion des requêtes comparatives
-VERSION CORRIGÉE : Bug du champ 'sex' manquant résolu
+VERSION CORRIGÉE : Bug du champ 'sex' manquant résolu + Appel search_metrics corrigé
 """
 
 import logging
@@ -96,9 +96,10 @@ class ComparisonHandler:
                 # 🟢 LOG FINAL AVANT L'APPEL
                 logger.debug(f"🎯 Entities envoyées à search_metrics: {clean_entities}")
 
+                # 🔥 CORRECTION CRITIQUE: Utiliser des arguments nommés
                 docs = await self.postgresql_system.search_metrics(
-                    preprocessed_data.get("normalized_query", ""),
-                    clean_entities,
+                    query=preprocessed_data.get("normalized_query", ""),
+                    entities=clean_entities,
                     top_k=12,
                     strict_sex_match=strict_sex_match,
                 )
