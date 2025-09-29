@@ -18,7 +18,7 @@ class QueryClassifier:
         Classification précise du type de requête pour un routage optimal
 
         Returns:
-            "temporal_range" | "comparative" | "standard"
+            "temporal_range" | "comparative" | "optimization" | "standard"
         """
 
         # 1. Détection prioritaire des plages temporelles (entre X et Y jours)
@@ -26,12 +26,17 @@ class QueryClassifier:
             logger.debug("Plage temporelle détectée")
             return "temporal_range"
 
-        # 2. Détection des vraies comparaisons (X vs Y, différence entre X et Y)
+        # 2. NOUVEAU: Détection optimisation (avant comparative!)
+        if self._is_optimization_query(query, entities):
+            logger.debug("Requête d'optimisation détectée")
+            return "optimization"
+
+        # 3. Détection des vraies comparaisons (X vs Y, différence entre X et Y)
         if self._is_comparative_query(query, entities, is_comparative):
             logger.debug("Requête comparative confirmée")
             return "comparative"
 
-        # 3. Par défaut : requête standard
+        # 4. Par défaut : requête standard
         return "standard"
 
     def _is_temporal_range_query(self, query: str) -> bool:
@@ -45,6 +50,20 @@ class QueryClassifier:
 
         query_lower = query.lower()
         return any(re.search(pattern, query_lower) for pattern in temporal_patterns)
+
+    def _is_optimization_query(self, query: str, entities: Dict) -> bool:
+        """Détecte les requêtes d'optimisation"""
+        optimization_keywords = [
+            r"\bmeilleur\w*\b",
+            r"\boptimal\w*\b",
+            r"\bidéal\w*\b",
+            r"\bchoisir\b",
+            r"\brecommande\w*\b",
+            r"\bconseill\w*\b",
+        ]
+
+        query_lower = query.lower()
+        return any(re.search(kw, query_lower) for kw in optimization_keywords)
 
     def _is_comparative_query(
         self, query: str, entities: Dict, is_comparative: bool

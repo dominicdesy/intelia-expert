@@ -115,6 +115,7 @@ class InteliaRAGEngine:
             "comparative_failures": 0,
             "comparative_fallbacks": 0,
             "temporal_queries": 0,
+            "optimization_queries": 0,  # ← AJOUTÉ
             "postgresql_queries": 0,
             "errors_count": 0,
         }
@@ -313,7 +314,7 @@ class InteliaRAGEngine:
                 "entities": {},
                 "routing_hint": None,
                 "is_comparative": False,
-                "comparison_entities": [],  # ← Ajouté
+                "comparison_entities": [],
                 "metadata": {"preprocessing_applied": False},
             }
 
@@ -330,9 +331,7 @@ class InteliaRAGEngine:
                 "entities": preprocessed["entities"],
                 "routing_hint": preprocessed["routing"],
                 "is_comparative": preprocessed.get("is_comparative", False),
-                "comparison_entities": preprocessed.get(
-                    "comparison_entities", []
-                ),  # ← Ajouté
+                "comparison_entities": preprocessed.get("comparison_entities", []),
                 "metadata": {
                     "original_query": query,
                     "normalized_query": preprocessed["normalized_query"],
@@ -351,7 +350,7 @@ class InteliaRAGEngine:
                 "entities": {},
                 "routing_hint": None,
                 "is_comparative": False,
-                "comparison_entities": [],  # ← Ajouté
+                "comparison_entities": [],
                 "metadata": {
                     "preprocessing_applied": False,
                     "preprocessing_error": str(e),
@@ -370,6 +369,12 @@ class InteliaRAGEngine:
         elif query_type == "comparative":
             self.optimization_stats["comparative_queries"] += 1
             return await self.comparative_handler.handle(preprocessed_data, start_time)
+
+        elif query_type == "optimization":
+            # Pour l'instant, router vers standard avec flag optimization
+            self.optimization_stats["optimization_queries"] += 1
+            preprocessed_data["is_optimization"] = True
+            return await self.standard_handler.handle(preprocessed_data, start_time)
 
         else:  # standard
             return await self.standard_handler.handle(preprocessed_data, start_time)
@@ -396,6 +401,7 @@ class InteliaRAGEngine:
             "capabilities": {
                 "temporal_range_queries": True,
                 "comparative_queries": bool(self.comparison_handler),
+                "optimization_queries": True,  # ← AJOUTÉ
                 "comparative_fallback": True,
                 "intelligent_preprocessing": bool(self.query_preprocessor),
                 "metrics_queries": bool(self.postgresql_system),

@@ -458,7 +458,7 @@ class QueryPreprocessor:
 
         # Détection d'âge précis (ex: "à 28 jours" vs "vers 28 jours")
         precise_age_patterns = [
-            r"à\s+(\d+)\s+jours?",
+            r"à \s+(\d+)\s+jours?",
             r"at\s+(\d+)\s+days?",
             r"day\s+(\d+)",
             r"jour\s+(\d+)",
@@ -514,19 +514,20 @@ class QueryPreprocessor:
         )
 
     # ========================================================================
-    # NOUVELLE MÉTHODE: Classification détaillée des requêtes
+    # MÉTHODE MODIFIÉE: Classification détaillée des requêtes
     # ========================================================================
 
     def _classify_detailed_query_type(self, query: str) -> str:
         """
         Classification détaillée des types de requêtes avec priorité hiérarchique
+        MODIFICATION: "meilleur" déplacé vers optimization au lieu de comparative
 
         Returns:
             - "temporal_range": requêtes d'évolution temporelle (entre X et Y jours)
-            - "comparative": requêtes de comparaison (vs, différence, meilleur)
+            - "comparative": requêtes de comparaison (vs, différence explicite)
             - "recommendation": requêtes de conseil/recommandation
             - "calculation": requêtes de calcul/projection
-            - "optimization": requêtes d'optimisation
+            - "optimization": requêtes d'optimisation (inclut "meilleur")
             - "standard": requêtes métriques simples
             - "document": requêtes documentaires/explicatives
             - "general": requêtes générales
@@ -546,13 +547,13 @@ class QueryPreprocessor:
         if any(re.search(pattern, query_lower) for pattern in temporal_patterns):
             return "temporal_range"
 
-        # 2. PRIORITÉ HAUTE: Requêtes comparatives (mots-clés spécifiques)
+        # 2. PRIORITÉ HAUTE: Requêtes comparatives (mots-clés EXPLICITES uniquement)
+        # MODIFICATION: Retrait de "meilleur" qui est une requête d'optimization
         comparative_patterns = [
             r"\bdifférence\b",  # différence
             r"\bcompare\w*\b",  # compare, comparaison
             r"\bversus\b|\bvs\b",  # versus, vs
-            r"\bmeilleur\w*\b",  # meilleur, meilleure
-            r"\bentre\s+\w+\s+et\s+\w+",  # "entre Cobb et Ross"
+            r"\bentre\s+\w+\s+et\s+\w+\b",  # "entre Cobb et Ross"
             r"\bmieux\b",  # mieux
             r"\bplus\s+\w+\s+que\b",  # "plus lourd que"
             r"\bmoins\s+\w+\s+que\b",  # "moins que"
@@ -586,9 +587,13 @@ class QueryPreprocessor:
             return "calculation"
 
         # 5. Requêtes d'optimisation
+        # MODIFICATION: Ajout de "meilleur", "choisir", "recommande"
         optimization_patterns = [
             r"\boptimal\w*\b",  # optimal, optimiser
             r"\bidéal\w*\b",  # idéal, idéale
+            r"\bmeilleur\w*\b",  # meilleur, meilleure (DÉPLACÉ ICI)
+            r"\bchoisir\b",  # choisir (AJOUTÉ)
+            r"\brecommande\w*\b",  # recommande (AJOUTÉ pour renforcer)
             r"\bperfect\w*\b",  # perfect, perfection
             r"\bmaximis\w*\b",  # maximiser
             r"\bminimis\w*\b",  # minimiser
@@ -602,7 +607,7 @@ class QueryPreprocessor:
             r"\bcomment\b",  # comment
             r"\bpourquoi\b",  # pourquoi
             r"\bexplique\w*\b",  # explique, explication
-            r"\bqu\'?est-ce\s+que\b",  # qu'est-ce que
+            r"\bqu'?est-ce\s+que\b",  # qu'est-ce que
             r"\bmaladie\w*\b",  # maladie, maladies
             r"\bsymptôme\w*\b",  # symptôme, symptômes
             r"\btraitement\w*\b",  # traitement
