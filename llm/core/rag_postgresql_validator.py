@@ -26,7 +26,7 @@ class PostgreSQLValidator:
         entities = entities or {}
         missing = []
         suggestions = []
-        enhanced_entities = entities.copy()
+        enhanced_entities = dict(entities) if entities else {}  # Créer une vraie copie
 
         # Vérifier breed
         if not entities.get("breed"):
@@ -61,6 +61,12 @@ class PostgreSQLValidator:
             if detected_metric:
                 enhanced_entities["metric_type"] = detected_metric
                 logger.debug(f"Auto-detected metric: {detected_metric}")
+
+        # PRÉSERVER les champs originaux non détectés (comme 'sex' du comparison_handler)
+        for key, value in (entities or {}).items():
+            if key not in enhanced_entities and value is not None:
+                enhanced_entities[key] = value
+                logger.debug(f"Preserved original field: {key} = {value}")
 
         # Déterminer le statut
         if not missing:
@@ -107,7 +113,7 @@ class PostgreSQLValidator:
     def _detect_age_from_query(self, query: str) -> Optional[int]:
         """Détecte l'âge dans le texte de la requête"""
         age_patterns = [
-            r"à\s+(\d+)\s+jours?",
+            r"à \s+(\d+)\s+jours?",
             r"(\d+)\s+jours?",
             r"(\d+)\s*j\b",
             r"(\d+)\s+semaines?",  # Sera multiplié par 7
