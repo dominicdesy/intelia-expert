@@ -464,7 +464,7 @@ class StandardQueryHandler(BaseQueryHandler):
 
                 result.metadata["search_attempt"] = "postgresql_single"
                 logger.info(
-                    f"✅ PostgreSQL: {len(result.context_docs)} documents trouvés"
+                    f"✅ PostgreSQL: {result.metadata.get('documents_used', 0)} documents trouvés"
                 )
                 return result
             else:
