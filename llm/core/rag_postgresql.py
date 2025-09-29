@@ -2,7 +2,7 @@
 """
 rag_postgresql.py - PostgreSQL System Principal Refactorisé
 Point d'entrée principal avec délégation vers modules spécialisés
-VERSION CORRIGÉE: Gestion robuste des validations avec fallbacks
+VERSION CORRIGÉE: Merge intelligent des entités pour préserver 'sex'
 """
 
 import logging
@@ -135,7 +135,7 @@ class PostgreSQLSystem:
     ) -> RAGResult:
         """
         Recherche de métriques avec validation et optimisations
-        VERSION CORRIGÉE: Gestion robuste des validations
+        VERSION CORRIGÉE: Gestion robuste des validations avec merge intelligent
         """
 
         if not self.is_initialized or not self.postgres_retriever:
@@ -191,20 +191,29 @@ class PostgreSQLSystem:
                 )
 
             # 🔧 CORRECTION CRITIQUE: MERGER les enhanced_entities INTELLIGEMMENT
-            # Le validateur enrichit les entités (auto-détection breed/age/metric)
-            # MAIS il faut préserver les entités originales (comme 'sex' du comparison_handler)
-            # car le validator ne détecte PAS toujours tous les champs
-
             original_entities = entities or {}
             enhanced = validation_result.get("enhanced_entities", {})
 
-            # Merger intelligent: enhanced d'abord, puis overwrite avec originales pour préserver sex
+            # 🟢 CORRECTION: Priorité aux originaux pour préserver 'sex'
             if enhanced:
-                entities = {**enhanced, **original_entities}
+                # Commencer avec les originaux, enrichir avec enhanced
+                entities = {**original_entities, **enhanced}
+
+                # Si un champ existe dans les deux, garder l'original pour 'sex', 'explicit_sex_request', etc.
+                # mais utiliser enhanced pour 'breed' normalisé
+                for key in [
+                    "sex",
+                    "explicit_sex_request",
+                    "_comparison_label",
+                    "_comparison_dimension",
+                ]:
+                    if key in original_entities and original_entities[key] is not None:
+                        entities[key] = original_entities[key]
+
+                logger.debug(f"Merged entities (originals preserved): {entities}")
             else:
                 entities = original_entities
-
-            logger.debug(f"Merged entities: {entities}")
+                logger.debug(f"Using original entities: {entities}")
 
             # 🔧 CORRECTION: Vérification de sécurité pour check_data_availability_flexible
             if self.validator:
@@ -457,6 +466,17 @@ class PostgreSQLSystem:
                 ],
                 "status": "active",
             },
-            "implementation_phase": "modular_architecture_with_safety",
-            "version": "v8.1_error_handling_fixed",
+            "entity_merge_strategy": {
+                "applied": True,
+                "description": "Merge intelligent préservant les champs critiques",
+                "features": [
+                    "Priorité aux entités originales pour 'sex'",
+                    "Préservation de 'explicit_sex_request'",
+                    "Enrichissement avec auto-détection pour 'breed'",
+                    "Protection des metadata de comparaison",
+                ],
+                "status": "active",
+            },
+            "implementation_phase": "modular_architecture_with_intelligent_merge",
+            "version": "v8.2_entity_merge_fixed",
         }
