@@ -82,23 +82,29 @@ class PostgreSQLQueryBuilder:
         breed_input = str(breed_input).strip()
         breed_lower = breed_input.lower()
 
-        # Mapping direct exact (priorité haute)
+        # CORRECTION FINALE: Mapping direct exact (priorité haute)
         direct_mapping = {
-            "cobb 500": "500",
-            "cobb500": "500",
-            "cobb-500": "500",
-            "c500": "500",
-            "500": "500",
+            # Mapping Ross 308 vers 308/308 FF
             "ross 308": "308/308 FF",
             "ross308": "308/308 FF",
             "ross-308": "308/308 FF",
             "r308": "308/308 FF",
             "308": "308/308 FF",
-            # NOUVEAU: Gérer les cas avec virgules (multi-breeds)
+            "308/308 ff": "308/308 FF",  # Normalisation casse
+            "308/308ff": "308/308 FF",
+            # Mapping Cobb 500 vers 500
+            "cobb 500": "500",
+            "cobb500": "500",
+            "cobb-500": "500",
+            "c500": "500",
+            "500": "500",
+            # NOUVEAU: Mapping pour comparaisons multiples
             "cobb 500, ross 308": "500,308/308 FF",
             "ross 308, cobb 500": "308/308 FF,500",
             "cobb vs ross": "500,308/308 FF",
             "ross vs cobb": "308/308 FF,500",
+            "500, 308/308 ff": "500,308/308 FF",
+            "308/308 ff, 500": "308/308 FF,500",
         }
 
         # Vérification exacte d'abord
@@ -164,7 +170,7 @@ class PostgreSQLQueryBuilder:
 
         # Patterns d'âge existants (qui marchent bien)
         age_patterns = [
-            r"à\s+(\d+)\s+jours?",  # "à 42 jours" - PRIORITÉ 1
+            r"à \s+(\d+)\s+jours?",  # "à 42 jours" - PRIORITÉ 1
             r"(\d+)\s+jours?",  # "42 jours"
             r"de\s+(\d+)\s+jours?",  # "de 42 jours"
             r"(\d+)\s*j\b",  # "42j"
@@ -827,6 +833,8 @@ if __name__ == "__main__":
         "Arbor Acres",
         "Ross 708",
         "Hubbard",
+        "308/308 ff",  # Test normalisation casse
+        "308/308FF",  # Test sans espace
     ]
     for inp in test_inputs:
         result = builder._normalize_breed_for_db(inp)
@@ -943,9 +951,26 @@ if __name__ == "__main__":
     print(f"SQL contient BETWEEN: {'BETWEEN' in sql_range}")
     print(f"SQL contient DISTINCT ON: {'DISTINCT ON' in sql_range}")
 
+    print("\n" + "=" * 80)
+    print("TEST 9: CORRECTION FINALE - Mappings Ross 308")
+    print("=" * 80)
+    ross_variants = [
+        "ross 308",
+        "308/308 ff",  # Test normalisation casse
+        "308/308FF",  # Test sans espace
+        "308",
+        "r308",
+        "ross-308",
+    ]
+    for variant in ross_variants:
+        result = builder._normalize_breed_for_db(variant)
+        expected = "308/308 FF"
+        status = "✓" if result == expected else "✗"
+        print(f"  {variant:15s} -> {result:15s} {status}")
+
     if len(params) >= len(unique_placeholders):
         print("\n🎉 CORRECTION RÉUSSIE: Nombre de paramètres >= placeholders")
     else:
         print(
-            f"\n❌ PROBLÈME RESTANT: {len(unique_placeholders) - len(params)} paramètres manquants"
+            f"\n⚠ PROBLÈME RESTANT: {len(unique_placeholders) - len(params)} paramètres manquants"
         )
