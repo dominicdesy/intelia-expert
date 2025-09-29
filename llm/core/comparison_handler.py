@@ -65,7 +65,7 @@ class ComparisonHandler:
         logger.info(f"Parsed {len(entities_list)} entity sets for comparison")
         return entities_list
 
-    def handle_comparison_query(
+    async def handle_comparison_query(
         self, preprocessed_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Gère les requêtes comparatives avec support des entités séparées"""
@@ -1150,7 +1150,7 @@ Data:
             if hasattr(retriever, "query_normalizer"):
                 terminology = retriever.query_normalizer.terminology
 
-        formatted_text = self.calculator.format_comparison_text(
+        return self.calculator.format_comparison_text(
             comparison=comparison,
             metric_name=metric_name,
             language=language,
