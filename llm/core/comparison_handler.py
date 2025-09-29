@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 comparison_handler.py - Gestion des requêtes comparatives
-VERSION CORRIGÉE : Bug du champ 'sex' manquant résolu + Appel search_metrics corrigé
+VERSION CORRIGÉE : Bug du champ 'sex' résolu avec préservation garantie
 """
 
 import logging
@@ -25,6 +25,28 @@ class ComparisonHandler:
         self.calculator = MetricCalculator()
         self.utils = ComparisonUtils()
         self.response_generator = ComparisonResponseGenerator(postgresql_system)
+
+    def _preserve_critical_fields(
+        self, entity_set: Dict[str, Any], cleaned: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Préserve les champs critiques (sex, age_days, breed) après nettoyage
+
+        Args:
+            entity_set: Dictionnaire original avec tous les champs
+            cleaned: Dictionnaire nettoyé (sans underscores)
+
+        Returns:
+            Dictionnaire avec champs critiques garantis
+        """
+        critical_fields = ["sex", "age_days", "breed", "line"]
+
+        for field in critical_fields:
+            if field not in cleaned and field in entity_set:
+                cleaned[field] = entity_set[field]
+                logger.debug(f"✅ Champ critique '{field}' restauré: {cleaned[field]}")
+
+        return cleaned
 
     async def handle_comparison_query(
         self, preprocessed_data: Dict[str, Any]
@@ -72,31 +94,24 @@ class ComparisonHandler:
             strict_sex_match = entity_set.get("explicit_sex_request", False)
 
             try:
-                # 🔧 CORRECTION CRITIQUE - Préserver le champ 'sex'
+                # 🔧 CORRECTION: Nettoyage avec préservation des champs critiques
                 clean_entities = {
                     k: v for k, v in entity_set.items() if not k.startswith("_")
                 }
 
-                # 🟢 LOGS DE DEBUG CRITIQUES
                 logger.debug(f"🔍 entity_set BEFORE cleaning: {entity_set}")
                 logger.debug(f"🔍 clean_entities AFTER cleaning: {clean_entities}")
 
-                # 🟢 VÉRIFICATION ET PRÉSERVATION EXPLICITE DE 'sex'
-                if "sex" not in clean_entities:
-                    if "sex" in entity_set:
-                        clean_entities["sex"] = entity_set["sex"]
-                        logger.warning(
-                            f"⚠️ 'sex' était manquant après nettoyage, restauré: {clean_entities['sex']}"
-                        )
-                    else:
-                        logger.error(
-                            f"❌ 'sex' absent de entity_set original: {entity_set}"
-                        )
+                # 🟢 GARANTIR la présence des champs critiques
+                clean_entities = self._preserve_critical_fields(
+                    entity_set, clean_entities
+                )
 
-                # 🟢 LOG FINAL AVANT L'APPEL
-                logger.debug(f"🎯 Entities envoyées à search_metrics: {clean_entities}")
+                logger.debug(
+                    f"🎯 Final entities envoyées à search_metrics: {clean_entities}"
+                )
 
-                # 🔥 CORRECTION CRITIQUE: Utiliser des arguments nommés
+                # 🔥 Appel avec arguments nommés explicites
                 docs = await self.postgresql_system.search_metrics(
                     query=preprocessed_data.get("normalized_query", ""),
                     entities=clean_entities,
@@ -119,7 +134,7 @@ class ComparisonHandler:
                     logger.warning(f"No results found for {entity_name}")
 
             except Exception as e:
-                logger.error(f"Query failed for {entity_name}: {e}")
+                logger.error(f"Query failed for {entity_name}: {e}", exc_info=True)
                 continue
 
         if len(results) < 2:
@@ -134,7 +149,7 @@ class ComparisonHandler:
             )
 
         except Exception as e:
-            logger.error(f"Comparison failed: {e}")
+            logger.error(f"Comparison failed: {e}", exc_info=True)
             return self._create_error_response(f"Erreur de comparaison: {str(e)}")
 
     async def handle_comparative_query(
@@ -193,20 +208,20 @@ class ComparisonHandler:
             logger.debug(f"Executing query for {entity_key}")
 
             try:
-                # 🔧 CORRECTION CRITIQUE ICI AUSSI
+                # 🔧 CORRECTION: Même logique de préservation
                 clean_entities = {
                     k: v for k, v in entity_set.items() if not k.startswith("_")
                 }
 
-                # 🟢 LOGS ET PRÉSERVATION
                 logger.debug(f"🔍 entity_set original: {entity_set}")
-                logger.debug(f"🔍 clean_entities: {clean_entities}")
+                logger.debug(f"🔍 clean_entities avant restauration: {clean_entities}")
 
-                if "sex" not in clean_entities and "sex" in entity_set:
-                    clean_entities["sex"] = entity_set["sex"]
-                    logger.warning(f"⚠️ 'sex' restauré: {clean_entities['sex']}")
+                # 🟢 Préserver les champs critiques
+                clean_entities = self._preserve_critical_fields(
+                    entity_set, clean_entities
+                )
 
-                logger.debug(f"🎯 Final entities: {clean_entities}")
+                logger.debug(f"🎯 Final entities pour {entity_key}: {clean_entities}")
 
                 result = await self.postgresql_system.search_metrics(
                     query=query,
@@ -226,7 +241,7 @@ class ComparisonHandler:
                     results[entity_key] = None
 
             except Exception as e:
-                logger.error(f"Error querying {entity_key}: {e}")
+                logger.error(f"Error querying {entity_key}: {e}", exc_info=True)
                 results[entity_key] = None
 
         if successful_queries < 2:
@@ -291,7 +306,7 @@ class ComparisonHandler:
             }
 
         except Exception as e:
-            logger.error(f"Error in comparison analysis: {e}")
+            logger.error(f"Error in comparison analysis: {e}", exc_info=True)
             return {
                 "success": False,
                 "error": f"Erreur dans l'analyse comparative: {str(e)}",
@@ -309,12 +324,17 @@ class ComparisonHandler:
         successful_queries = 0
 
         for entity_set in comparison_entities:
+            # 🔧 Nettoyage avec préservation
             relaxed_entity = {
                 k: v for k, v in entity_set.items() if not k.startswith("_")
             }
 
+            relaxed_entity = self._preserve_critical_fields(entity_set, relaxed_entity)
+
+            # Override sex pour recherche plus large
             if "sex" in relaxed_entity:
                 relaxed_entity["sex"] = "as_hatched"
+                logger.debug("Fallback: sex set to 'as_hatched' for broader search")
 
             entity_key = self.utils.generate_entity_key(entity_set)
 
@@ -329,6 +349,7 @@ class ComparisonHandler:
                 if result and hasattr(result, "context_docs") and result.context_docs:
                     results[entity_key] = result
                     successful_queries += 1
+                    logger.debug(f"Fallback successful for {entity_key}")
 
             except Exception as e:
                 logger.error(f"Fallback search failed for {entity_key}: {e}")
@@ -509,14 +530,9 @@ class ComparisonHandler:
         if results and len(results) > 0:
             first_entity = results[0].get("entity_set", {})
 
-            if "age_days" in first_entity:
-                context["age_days"] = first_entity["age_days"]
-
-            if "sex" in first_entity:
-                context["sex"] = first_entity["sex"]
-
-            if "breed" in first_entity:
-                context["breed"] = first_entity["breed"]
+            for field in ["age_days", "sex", "breed", "line"]:
+                if field in first_entity:
+                    context[field] = first_entity[field]
 
         return context
 
@@ -559,8 +575,11 @@ class ComparisonHandler:
         try:
             logger.info(f"Handling temporal comparison: {age_start} -> {age_end} days")
 
+            # 🔧 Préservation pour l'âge de départ
             entities_start = entities.copy()
             entities_start["age_days"] = age_start
+            entities_start = self._preserve_critical_fields(entities, entities_start)
+
             result_start = await self.postgresql_system.search_metrics(
                 query=f"Métrique à {age_start} jours",
                 entities=entities_start,
@@ -568,8 +587,11 @@ class ComparisonHandler:
                 strict_sex_match=True,
             )
 
+            # 🔧 Préservation pour l'âge de fin
             entities_end = entities.copy()
             entities_end["age_days"] = age_end
+            entities_end = self._preserve_critical_fields(entities, entities_end)
+
             result_end = await self.postgresql_system.search_metrics(
                 query=f"Métrique à {age_end} jours",
                 entities=entities_end,
@@ -650,7 +672,7 @@ class ComparisonHandler:
             }
 
         except Exception as e:
-            logger.error(f"Error in temporal comparison: {e}")
+            logger.error(f"Error in temporal comparison: {e}", exc_info=True)
             return {
                 "success": False,
                 "error": f"Erreur dans la comparaison temporelle: {str(e)}",
