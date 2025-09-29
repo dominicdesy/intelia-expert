@@ -70,30 +70,38 @@ class ComparisonHandler:
     ) -> Dict[str, Any]:
         """Gère les requêtes comparatives avec support des entités séparées"""
 
-        # Récupérer les entités de comparaison du preprocessing
+        # ===== CORRECTION CRITIQUE =====
+        # Lire comparison_entities au lieu de parsing manuel
         comparison_entities = preprocessed_data.get("comparison_entities", [])
         base_entities = preprocessed_data.get("entities", {})
 
-        logger.debug(f"Entités de comparaison reçues: {len(comparison_entities)}")
+        logger.debug(
+            f"DEBUG: preprocessed_data keys = {list(preprocessed_data.keys())}"
+        )
+        logger.debug(
+            f"DEBUG: comparison_entities from preprocessing = {comparison_entities}"
+        )
+        logger.debug(f"DEBUG: comparison_entities length = {len(comparison_entities)}")
 
-        # NOUVEAU: Utiliser les entités séparées du preprocessing si disponibles
+        # UTILISER les entités du preprocessing si disponibles
         if comparison_entities and len(comparison_entities) >= 2:
             entity_sets = comparison_entities
             logger.info(
-                f"Utilisation des entités de comparaison du preprocessing: {len(entity_sets)} sets"
+                f"✓ Utilisation des {len(entity_sets)} entités du preprocessing"
             )
         else:
-            # Fallback: analyse traditionnelle des entités de base
+            # Fallback vers parsing traditionnel
+            logger.warning("Entités de comparaison non disponibles, tentative parsing")
             entity_sets = self._parse_comparison_entities(base_entities)
-            logger.info(f"Analyse traditionnelle: {len(entity_sets)} sets")
+            logger.info(f"Parsing traditionnel: {len(entity_sets)} entités")
 
-        # Validation minimum pour comparaison
+        # Validation
         if len(entity_sets) < 2:
-            logger.warning(
-                f"Comparaison nécessite au moins 2 entités, trouvé: {len(entity_sets)}"
+            logger.error(
+                f"Comparaison impossible: seulement {len(entity_sets)} entité(s)"
             )
             return self._create_error_response(
-                "Comparaison impossible avec une seule entité"
+                "Comparaison nécessite au moins 2 entités"
             )
 
         logger.info(f"Proceeding with comparison of {len(entity_sets)} entities")
