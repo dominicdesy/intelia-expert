@@ -44,7 +44,7 @@ from .validation_core import (
 # Module 4: Moteur de comparaison unifié
 from .comparison_engine import (
     ComparisonEngine,
-    ComparisonResult,
+    ComparisonResult as ComparisonEngineResult,
     ComparisonStatus,
     ComparisonDimension,
 )
@@ -52,7 +52,7 @@ from .comparison_engine import (
 # Module 5: Calculateur de métriques (conservé)
 from .metric_calculator import (
     MetricCalculator,
-    ComparisonCalculation,
+    ComparisonResult as MetricComparisonResult,
 )
 
 # ============================================================================
@@ -91,12 +91,12 @@ __all__ = [
     "ValidationIssue",
     # Module 4: Comparison Engine
     "ComparisonEngine",
-    "ComparisonResult",
+    "ComparisonEngineResult",
     "ComparisonStatus",
     "ComparisonDimension",
     # Module 5: Metric Calculator
     "MetricCalculator",
-    "ComparisonCalculation",
+    "MetricComparisonResult",
     # Wrappers de compatibilité
     "ComparisonHandler",
     "QueryPreprocessor",
@@ -151,7 +151,7 @@ __all__.extend(
 # INFORMATIONS DE VERSION ET ARCHITECTURE
 # ============================================================================
 
-__version__ = "2.0.0-refactored"
+__version__ = "2.0.1-fixed"
 __architecture__ = "modular_centralized"
 
 
@@ -278,6 +278,13 @@ __all__.extend(
 
 """
 ARCHITECTURE REFACTORISÉE - GUIDE DE MIGRATION
+
+CORRECTIF v2.0.1:
+=================
+- ✅ Correction import: ComparisonCalculation n'existe pas dans metric_calculator.py
+- ✅ La classe correcte est ComparisonResult (dans metric_calculator.py)
+- ✅ Conflit de nom résolu: ComparisonResult existe dans comparison_engine.py ET metric_calculator.py
+- ✅ Solution: Aliases utilisés (ComparisonEngineResult et MetricComparisonResult)
 
 1. NOUVEAUX MODULES CENTRALISÉS (4 modules)
    ==========================================
