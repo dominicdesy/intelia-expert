@@ -1,0 +1,770 @@
+# -*- coding: utf-8 -*-
+"""
+comparison_engine.py - Moteur de comparaison unifié
+Fusionne: comparison_handler + comparison_utils + comparison_response_generator
+Utilise: metric_calculator (conservé pour calculs purs)
+Version 1.0 - Moteur complet pour toutes les comparaisons avicoles
+"""
+
+import logging
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass, field
+from enum import Enum
+
+logger = logging.getLogger(__name__)
+
+
+class ComparisonStatus(Enum):
+    """Statuts de comparaison"""
+
+    SUCCESS = "success"
+    INSUFFICIENT_DATA = "insufficient_data"
+    INCOMPATIBLE_METRICS = "incompatible_metrics"
+    ERROR = "error"
+
+
+class ComparisonDimension(Enum):
+    """Dimensions de comparaison"""
+
+    SEX = "sex"
+    BREED = "breed"
+    AGE = "age"
+    PHASE = "phase"
+
+
+@dataclass
+class ComparisonResult:
+    """Résultat structuré d'une comparaison"""
+
+    success: bool
+    status: ComparisonStatus
+
+    # Données de comparaison
+    comparison_data: Optional[Dict[str, Any]] = None
+    entities_compared: List[str] = field(default_factory=list)
+    dimension: Optional[ComparisonDimension] = None
+
+    # Métadonnées
+    metric_name: Optional[str] = None
+    unit: Optional[str] = None
+    better_entity: Optional[str] = None
+
+    # Erreurs
+    error: Optional[str] = None
+    warnings: List[str] = field(default_factory=list)
+
+    # Contexte
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    fallback_used: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convertit en dictionnaire"""
+        return {
+            "success": self.success,
+            "status": self.status.value,
+            "comparison": self.comparison_data,
+            "entities_compared": self.entities_compared,
+            "dimension": self.dimension.value if self.dimension else None,
+            "metric_name": self.metric_name,
+            "unit": self.unit,
+            "better_entity": self.better_entity,
+            "error": self.error,
+            "warnings": self.warnings,
+            "metadata": self.metadata,
+            "fallback_used": self.fallback_used,
+        }
+
+
+class ComparisonEngine:
+    """
+    Moteur unifié pour toutes les comparaisons avicoles
+
+    Remplace:
+    - comparison_handler.py (orchestration)
+    - comparison_utils.py (extraction et parsing)
+    - comparison_response_generator.py (génération réponses)
+
+    Utilise:
+    - metric_calculator.py (calculs mathématiques purs - CONSERVÉ)
+    """
+
+    # ========================================================================
+    # CONFIGURATION - PRIORITÉS DE MÉTRIQUES
+    # ========================================================================
+
+    METRIC_PRIORITIES = [
+        "body_weight",
+        "feed_conversion_ratio",
+        "daily_gain",
+        "feed_intake",
+        "mortality",
+        "livability",
+        "production",
+    ]
+
+    # ========================================================================
+    # CONFIGURATION - MEILLEUR = PLUS HAUT OU PLUS BAS
+    # ========================================================================
+
+    HIGHER_IS_BETTER = {
+        "body_weight": True,
+        "daily_gain": True,
+        "livability": True,
+        "production": True,
+        "uniformity": True,
+    }
+
+    LOWER_IS_BETTER = {
+        "feed_conversion_ratio": True,
+        "fcr": True,
+        "mortality": True,
+        "cost": True,
+    }
+
+    def __init__(self, postgresql_system=None):
+        """
+        Initialise le moteur de comparaison
+
+        Args:
+            postgresql_system: Instance PostgreSQLSystem pour récupération données
+        """
+        self.postgresql_system = postgresql_system
+
+        # Import du calculateur (module séparé conservé)
+        try:
+            from .metric_calculator import MetricCalculator
+
+            self.calculator = MetricCalculator()
+        except ImportError:
+            logger.warning("MetricCalculator non disponible - calculs limités")
+            self.calculator = None
+
+        logger.info("ComparisonEngine initialisé")
+
+    async def compare(self, preprocessed_data: Dict[str, Any]) -> ComparisonResult:
+        """
+        Point d'entrée principal pour les comparaisons
+
+        Args:
+            preprocessed_data: Données preprocessées avec:
+                - comparison_entities: List[Dict] (entités à comparer)
+                - query: str (requête originale)
+                - entities: Dict (entités générales)
+
+        Returns:
+            ComparisonResult structuré avec toutes les données
+        """
+        comparison_entities = preprocessed_data.get("comparison_entities", [])
+
+        # Validation de base
+        if len(comparison_entities) < 2:
+            return ComparisonResult(
+                success=False,
+                status=ComparisonStatus.INSUFFICIENT_DATA,
+                error="Besoin d'au moins 2 entités pour comparaison",
+            )
+
+        logger.info(
+            f"Début comparaison: {len(comparison_entities)} entités, "
+            f"dimension: {self._detect_comparison_dimension(comparison_entities)}"
+        )
+
+        try:
+            # 1. Récupérer données pour chaque entité
+            entity_results = await self._fetch_all_entities_data(comparison_entities)
+
+            if len(entity_results) < 2:
+                # Tentative avec critères assouplis
+                return await self._compare_with_fallback(
+                    comparison_entities, preprocessed_data
+                )
+
+            # 2. Calculer comparaison
+            comparison_data = self._calculate_comparison(
+                entity_results, preprocessed_data
+            )
+
+            # 3. Déterminer dimension de comparaison
+            dimension = self._detect_comparison_dimension(comparison_entities)
+
+            # 4. Identifier meilleure entité
+            better_entity = self._determine_better_entity(comparison_data)
+
+            # 5. Structurer résultat
+            return ComparisonResult(
+                success=True,
+                status=ComparisonStatus.SUCCESS,
+                comparison_data=comparison_data,
+                entities_compared=[r["label"] for r in entity_results],
+                dimension=dimension,
+                metric_name=comparison_data.get("metric_name"),
+                unit=comparison_data.get("unit"),
+                better_entity=better_entity,
+                metadata={
+                    "query_type": "comparative",
+                    "entities_count": len(entity_results),
+                    "data_sources": [r["entity_set"] for r in entity_results],
+                },
+            )
+
+        except Exception as e:
+            logger.error(f"Erreur comparaison: {e}", exc_info=True)
+            return ComparisonResult(
+                success=False,
+                status=ComparisonStatus.ERROR,
+                error=str(e),
+            )
+
+    async def _fetch_all_entities_data(
+        self, comparison_entities: List[Dict[str, Any]]
+    ) -> List[Dict]:
+        """
+        Récupère données pour toutes les entités à comparer
+
+        Args:
+            comparison_entities: Liste d'entités
+
+        Returns:
+            Liste de résultats avec données
+        """
+        entity_results = []
+
+        for entity_set in comparison_entities:
+            result = await self._fetch_entity_data(entity_set)
+            if result:
+                entity_results.append(result)
+            else:
+                logger.warning(f"Aucune donnée pour entité: {entity_set}")
+
+        logger.info(
+            f"Données récupérées: {len(entity_results)}/{len(comparison_entities)} entités"
+        )
+
+        return entity_results
+
+    async def _fetch_entity_data(self, entity_set: Dict[str, Any]) -> Optional[Dict]:
+        """
+        Récupère données pour une entité spécifique
+
+        Args:
+            entity_set: Dict avec breed, age_days, sex, etc.
+
+        Returns:
+            Dict avec label, data, entity_set ou None
+        """
+        if not self.postgresql_system:
+            logger.warning("PostgreSQL système non disponible")
+            return None
+
+        try:
+            # Construction query pour logging
+            query_desc = self._build_entity_description(entity_set)
+
+            # Récupération via PostgreSQL
+            result = await self.postgresql_system.search_metrics(
+                query=f"Métrique pour {query_desc}",
+                entities=entity_set,
+                top_k=12,
+                strict_sex_match=True,
+            )
+
+            # Validation résultat
+            if result and hasattr(result, "context_docs") and result.context_docs:
+                return {
+                    "label": self._build_entity_label(entity_set),
+                    "data": result.context_docs,
+                    "entity_set": entity_set,
+                    "result_object": result,
+                }
+            else:
+                logger.debug(f"Résultat vide pour: {query_desc}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Erreur fetch entity {entity_set}: {e}")
+            return None
+
+    def _build_entity_label(self, entity_set: Dict) -> str:
+        """
+        Construit un label lisible pour l'entité
+
+        Args:
+            entity_set: Dict avec entités
+
+        Returns:
+            Label formaté (ex: "Cobb 500 mâle 21j")
+        """
+        parts = []
+
+        if entity_set.get("breed"):
+            parts.append(entity_set["breed"].upper())
+
+        if entity_set.get("sex"):
+            sex_label = {
+                "male": "mâle",
+                "female": "femelle",
+                "mixed": "mixte",
+            }.get(entity_set["sex"], entity_set["sex"])
+            parts.append(sex_label)
+
+        if entity_set.get("age_days"):
+            parts.append(f"{entity_set['age_days']}j")
+
+        # Utiliser label de comparaison si fourni
+        if entity_set.get("_comparison_label"):
+            return entity_set["_comparison_label"]
+
+        return " ".join(parts) if parts else "Entité"
+
+    def _build_entity_description(self, entity_set: Dict) -> str:
+        """Construit description pour logs"""
+        return self._build_entity_label(entity_set)
+
+    def _calculate_comparison(
+        self,
+        entity_results: List[Dict],
+        preprocessed_data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Calcule la comparaison entre entités
+
+        Args:
+            entity_results: Résultats avec données
+            preprocessed_data: Données préprocessées
+
+        Returns:
+            Dict avec données de comparaison complètes
+        """
+        if len(entity_results) < 2:
+            raise ValueError("Besoin de 2 entités minimum")
+
+        # Extraction métriques
+        metric1 = self._extract_best_metric(entity_results[0]["data"])
+        metric2 = self._extract_best_metric(entity_results[1]["data"])
+
+        if not metric1 or not metric2:
+            raise ValueError("Métriques manquantes pour comparaison")
+
+        # Validation cohérence
+        if metric1.get("metric_name") != metric2.get("metric_name"):
+            logger.warning(
+                f"Métriques différentes: {metric1.get('metric_name')} vs {metric2.get('metric_name')}"
+            )
+
+        metric_name = metric1.get("metric_name", "unknown")
+
+        # Extraction valeurs
+        value1 = self._extract_numeric_value(metric1)
+        value2 = self._extract_numeric_value(metric2)
+
+        # Validation valeurs
+        if value1 is None or value2 is None:
+            raise ValueError("Valeurs numériques manquantes")
+
+        if value1 == 0 or value2 == 0:
+            raise ValueError("Valeur nulle détectée - comparaison impossible")
+
+        # Calcul différences
+        difference_absolute = value1 - value2
+        difference_percent = (difference_absolute / value2) * 100 if value2 != 0 else 0
+
+        # Déterminer meilleur
+        is_lower_better = self._is_lower_better_metric(metric_name)
+        if is_lower_better:
+            better_label = (
+                entity_results[0]["label"]
+                if value1 < value2
+                else entity_results[1]["label"]
+            )
+        else:
+            better_label = (
+                entity_results[0]["label"]
+                if value1 > value2
+                else entity_results[1]["label"]
+            )
+
+        # Construction résultat complet
+        return {
+            "metric_name": metric_name,
+            "label1": entity_results[0]["label"],
+            "label2": entity_results[1]["label"],
+            "value1": value1,
+            "value2": value2,
+            "difference_absolute": difference_absolute,
+            "difference_percent": difference_percent,
+            "better": better_label,
+            "is_lower_better": is_lower_better,
+            "unit": metric1.get("unit", ""),
+            "age_days": entity_results[0]["entity_set"].get("age_days"),
+            "sex": entity_results[0]["entity_set"].get("sex"),
+            "context": {
+                "metric_full": metric1,
+                "entity1_data": entity_results[0],
+                "entity2_data": entity_results[1],
+            },
+        }
+
+    def _extract_best_metric(self, docs: List) -> Optional[Dict]:
+        """
+        Extrait la meilleure métrique d'une liste de documents
+
+        Args:
+            docs: Liste de documents/métriques
+
+        Returns:
+            Dict avec métrique ou None
+        """
+        # Conversion docs en dicts si nécessaire
+        docs_as_dicts = []
+        for doc in docs:
+            if isinstance(doc, dict):
+                docs_as_dicts.append(doc)
+            elif hasattr(doc, "__dict__"):
+                docs_as_dicts.append(doc.__dict__)
+            elif hasattr(doc, "to_dict"):
+                docs_as_dicts.append(doc.to_dict())
+            else:
+                logger.warning(f"Document format inconnu: {type(doc)}")
+
+        # Recherche par priorité
+        for metric_name in self.METRIC_PRIORITIES:
+            for doc_dict in docs_as_dicts:
+                if doc_dict.get("metric_name") == metric_name:
+                    logger.debug(f"Métrique sélectionnée: {metric_name}")
+                    return doc_dict
+
+        # Fallback: premier doc disponible avec valeur numérique
+        for doc_dict in docs_as_dicts:
+            if doc_dict.get("value_numeric") is not None:
+                logger.debug(f"Métrique fallback: {doc_dict.get('metric_name')}")
+                return doc_dict
+
+        logger.warning("Aucune métrique valide trouvée")
+        return None
+
+    def _extract_numeric_value(self, metric: Dict) -> Optional[float]:
+        """Extrait la valeur numérique d'une métrique"""
+        value = metric.get("value_numeric")
+
+        if value is not None:
+            try:
+                return float(value)
+            except (ValueError, TypeError):
+                logger.warning(f"Conversion valeur impossible: {value}")
+
+        return None
+
+    def _is_lower_better_metric(self, metric_name: str) -> bool:
+        """
+        Détermine si une valeur plus basse est meilleure
+
+        Args:
+            metric_name: Nom de la métrique
+
+        Returns:
+            True si plus bas = meilleur
+        """
+        metric_lower = metric_name.lower()
+
+        # Vérification explicite LOWER is better
+        if any(kw in metric_lower for kw in self.LOWER_IS_BETTER.keys()):
+            return True
+
+        # Vérification explicite HIGHER is better
+        if any(kw in metric_lower for kw in self.HIGHER_IS_BETTER.keys()):
+            return False
+
+        # Par défaut: HIGHER is better
+        logger.debug(f"Métrique {metric_name}: higher is better (défaut)")
+        return False
+
+    def _determine_better_entity(self, comparison_data: Dict) -> str:
+        """Détermine quelle entité est meilleure"""
+        return comparison_data.get("better", comparison_data.get("label1"))
+
+    def _detect_comparison_dimension(
+        self, comparison_entities: List[Dict]
+    ) -> Optional[ComparisonDimension]:
+        """
+        Détecte la dimension de comparaison (sexe, breed, âge)
+
+        Args:
+            comparison_entities: Liste d'entités à comparer
+
+        Returns:
+            ComparisonDimension ou None
+        """
+        if len(comparison_entities) < 2:
+            return None
+
+        entity1 = comparison_entities[0]
+        entity2 = comparison_entities[1]
+
+        # Comparaison SEX
+        if (
+            entity1.get("sex") != entity2.get("sex")
+            and entity1.get("breed") == entity2.get("breed")
+            and entity1.get("age_days") == entity2.get("age_days")
+        ):
+            return ComparisonDimension.SEX
+
+        # Comparaison BREED
+        if (
+            entity1.get("breed") != entity2.get("breed")
+            and entity1.get("sex") == entity2.get("sex")
+            and entity1.get("age_days") == entity2.get("age_days")
+        ):
+            return ComparisonDimension.BREED
+
+        # Comparaison AGE
+        if (
+            entity1.get("age_days") != entity2.get("age_days")
+            and entity1.get("breed") == entity2.get("breed")
+            and entity1.get("sex") == entity2.get("sex")
+        ):
+            return ComparisonDimension.AGE
+
+        return None
+
+    async def _compare_with_fallback(
+        self,
+        comparison_entities: List[Dict],
+        preprocessed_data: Dict[str, Any],
+    ) -> ComparisonResult:
+        """
+        Tentative de comparaison avec critères assouplis
+
+        Args:
+            comparison_entities: Entités à comparer
+            preprocessed_data: Données preprocessées
+
+        Returns:
+            ComparisonResult avec fallback
+        """
+        logger.info("Tentative comparaison avec fallback (critères assouplis)")
+
+        try:
+            # Relaxer les critères de recherche
+            entity_results = []
+            for entity_set in comparison_entities:
+                # Retirer strict_sex_match
+                relaxed_entity = entity_set.copy()
+
+                result = await self.postgresql_system.search_metrics(
+                    query=f"Métrique {self._build_entity_label(entity_set)}",
+                    entities=relaxed_entity,
+                    top_k=20,  # Plus de résultats
+                    strict_sex_match=False,  # Critères assouplis
+                )
+
+                if result and hasattr(result, "context_docs") and result.context_docs:
+                    entity_results.append(
+                        {
+                            "label": self._build_entity_label(entity_set),
+                            "data": result.context_docs,
+                            "entity_set": entity_set,
+                        }
+                    )
+
+            if len(entity_results) >= 2:
+                comparison_data = self._calculate_comparison(
+                    entity_results, preprocessed_data
+                )
+
+                return ComparisonResult(
+                    success=True,
+                    status=ComparisonStatus.SUCCESS,
+                    comparison_data=comparison_data,
+                    entities_compared=[r["label"] for r in entity_results],
+                    fallback_used=True,
+                    warnings=["Résultats avec critères assouplis"],
+                    metadata={"fallback": "relaxed_criteria"},
+                )
+
+        except Exception as e:
+            logger.error(f"Erreur fallback: {e}")
+
+        return ComparisonResult(
+            success=False,
+            status=ComparisonStatus.INSUFFICIENT_DATA,
+            error="Données insuffisantes même avec critères assouplis",
+        )
+
+    async def generate_response(
+        self,
+        query: str,
+        comparison_result: ComparisonResult,
+        language: str = "fr",
+        use_openai: bool = True,
+    ) -> str:
+        """
+        Génère réponse textuelle pour la comparaison
+
+        Args:
+            query: Question originale
+            comparison_result: Résultat de comparaison
+            language: Langue de réponse ('fr' ou 'en')
+            use_openai: Utiliser OpenAI pour enrichissement
+
+        Returns:
+            Texte de réponse formaté
+        """
+        if not comparison_result.success:
+            return self._generate_error_response(comparison_result, language)
+
+        data = comparison_result.comparison_data
+
+        # Tentative enrichissement OpenAI
+        if use_openai:
+            try:
+                enhanced = await self._generate_openai_response(query, data, language)
+                if enhanced:
+                    return enhanced
+            except Exception as e:
+                logger.warning(f"Enrichissement OpenAI échoué: {e}")
+
+        # Fallback sur template
+        return self._generate_template_response(data, language)
+
+    def _generate_template_response(self, data: Dict[str, Any], language: str) -> str:
+        """Génère réponse basée sur template"""
+
+        if language == "fr":
+            response = f"""Pour répondre à votre question sur la comparaison entre **{data['label1']}** et **{data['label2']}** :
+
+**{data['metric_name']}** :
+- {data['label1']} : {data['value1']:.2f} {data['unit']}
+- {data['label2']} : {data['value2']:.2f} {data['unit']}
+
+**Différence** : {abs(data['difference_absolute']):.2f} {data['unit']} ({abs(data['difference_percent']):.1f}%)
+
+**Meilleure performance** : {data['better']}"""
+
+        else:  # English
+            response = f"""To answer your question about the comparison between **{data['label1']}** and **{data['label2']}**:
+
+**{data['metric_name']}**:
+- {data['label1']}: {data['value1']:.2f} {data['unit']}
+- {data['label2']}: {data['value2']:.2f} {data['unit']}
+
+**Difference**: {abs(data['difference_absolute']):.2f} {data['unit']} ({abs(data['difference_percent']):.1f}%)
+
+**Better performance**: {data['better']}"""
+
+        return response
+
+    async def _generate_openai_response(
+        self,
+        query: str,
+        data: Dict[str, Any],
+        language: str,
+    ) -> Optional[str]:
+        """Génère réponse enrichie via OpenAI"""
+
+        # Vérifier disponibilité OpenAI
+        if not self.postgresql_system:
+            return None
+
+        try:
+            from openai import AsyncOpenAI
+            import os
+
+            client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+            system_prompt = f"""Tu es un expert en aviculture qui génère des réponses comparatives claires.
+
+RÈGLES CRITIQUES:
+1. Reformule la question au début pour donner le contexte
+2. Utilise les noms corrects: "Cobb 500", "Ross 308" (majuscules)
+3. Présente les deux entités de manière identique, SANS mettre l'une en gras
+4. Pour FCR et mortalité: valeur PLUS BASSE est MEILLEURE
+5. Pour poids et production: valeur PLUS HAUTE est MEILLEURE
+6. Fournis interprétation concise de l'écart
+7. NE termine PAS par "Impact pratique" ou "Recommandations"
+
+Langue: {language}"""
+
+            user_prompt = f"""Génère réponse concise pour cette comparaison:
+
+Données:
+- Métrique: {data['metric_name']}
+- {data['label1']}: {data['value1']:.3f} {data['unit']}
+- {data['label2']}: {data['value2']:.3f} {data['unit']}
+- Différence: {abs(data['difference_absolute']):.3f} ({abs(data['difference_percent']):.1f}%)
+- Meilleur: {data['better']}
+- Type: {"moins est mieux" if data['is_lower_better'] else "plus est mieux"}"""
+
+            response = await client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.3,
+                max_tokens=500,
+            )
+
+            return response.choices[0].message.content.strip()
+
+        except Exception as e:
+            logger.warning(f"Erreur OpenAI: {e}")
+            return None
+
+    def _generate_error_response(self, result: ComparisonResult, language: str) -> str:
+        """Génère message d'erreur lisible"""
+
+        if language == "fr":
+            if result.status == ComparisonStatus.INSUFFICIENT_DATA:
+                return f"Impossible de comparer: données insuffisantes. {result.error or ''}"
+            elif result.status == ComparisonStatus.INCOMPATIBLE_METRICS:
+                return f"Impossible de comparer: métriques incompatibles. {result.error or ''}"
+            else:
+                return f"Erreur lors de la comparaison: {result.error or 'Erreur inconnue'}"
+        else:
+            if result.status == ComparisonStatus.INSUFFICIENT_DATA:
+                return f"Cannot compare: insufficient data. {result.error or ''}"
+            elif result.status == ComparisonStatus.INCOMPATIBLE_METRICS:
+                return f"Cannot compare: incompatible metrics. {result.error or ''}"
+            else:
+                return f"Comparison error: {result.error or 'Unknown error'}"
+
+
+# Factory function
+def create_comparison_engine(postgresql_system=None) -> ComparisonEngine:
+    """Factory pour créer une instance ComparisonEngine"""
+    return ComparisonEngine(postgresql_system=postgresql_system)
+
+
+# Tests unitaires
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
+
+    print("=== TESTS COMPARISON ENGINE ===\n")
+
+    # Test sans PostgreSQL (structure seulement)
+    engine = ComparisonEngine(postgresql_system=None)
+
+    # Test détection dimension
+    test_entities = [
+        {"breed": "cobb500", "sex": "male", "age_days": 21},
+        {"breed": "cobb500", "sex": "female", "age_days": 21},
+    ]
+
+    dimension = engine._detect_comparison_dimension(test_entities)
+    print(f"✅ Dimension détectée: {dimension}")
+
+    # Test labels
+    label1 = engine._build_entity_label(test_entities[0])
+    label2 = engine._build_entity_label(test_entities[1])
+    print(f"✅ Labels: {label1} vs {label2}")
+
+    # Test is_lower_better
+    print(
+        f"✅ FCR (lower better): {engine._is_lower_better_metric('feed_conversion_ratio')}"
+    )
+    print(
+        f"✅ Weight (higher better): {not engine._is_lower_better_metric('body_weight')}"
+    )
+
+    print("\n✅ ComparisonEngine structurellement valide")
+    print("Note: Tests complets nécessitent PostgreSQLSystem fonctionnel")
