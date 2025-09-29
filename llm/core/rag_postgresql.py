@@ -190,10 +190,15 @@ class PostgreSQLSystem:
                     },
                 )
 
-            # 🔧 CORRECTION CRITIQUE: TOUJOURS utiliser les enhanced_entities
+            # 🔧 CORRECTION CRITIQUE: MERGER les enhanced_entities avec les originales
             # Le validateur enrichit les entités (auto-détection breed/age/metric)
-            # Il faut les utiliser quel que soit le statut de validation
-            entities = validation_result.get("enhanced_entities", entities or {})
+            # MAIS il faut préserver les entités originales (comme 'sex' du comparison_handler)
+            enhanced = validation_result.get("enhanced_entities", {})
+            if enhanced:
+                # Merger: garder les originales + ajouter/surcharger avec enhanced
+                entities = {**(entities or {}), **enhanced}
+            else:
+                entities = entities or {}
 
             # 🔧 CORRECTION: Vérification de sécurité pour check_data_availability_flexible
             if self.validator:
