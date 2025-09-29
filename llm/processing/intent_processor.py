@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-
 intent_processor.py - Processeur d'intentions robuste avec validation stricte
-
 """
 
 import os
@@ -473,6 +471,24 @@ class IntentProcessor:
             f"{stats.get('total_aliases', 0)} aliases"
         )
 
+    def _safe_string_lower(self, value: Any) -> Optional[str]:
+        """
+        Convertit une valeur en minuscules de manière sûre.
+        🔴 CORRECTION CRITIQUE: Évite l'erreur .lower() sur des entiers
+
+        Args:
+            value: Valeur à convertir (str, int, float, None, etc.)
+
+        Returns:
+            str en minuscules ou None si valeur None/vide
+        """
+        if value is None:
+            return None
+
+        # Convertir en string puis en minuscules
+        str_value = str(value).strip()
+        return str_value.lower() if str_value else None
+
     def process_query(
         self, query: str, explain_score: Optional[float] = None
     ) -> IntentResult:
@@ -534,13 +550,19 @@ class IntentProcessor:
                 else:
                     all_terms = [main_term]
 
+                # 🔴 CORRECTION: Utiliser _safe_string_lower au lieu de .lower() direct
+                query_lower = self._safe_string_lower(query)
+                if query_lower is None:
+                    continue
+
                 for term in all_terms:
-                    if term.lower() in query.lower():
+                    term_lower = self._safe_string_lower(term)
+                    if term_lower and term_lower in query_lower:
                         detected_entities[category] = main_term
                         break
 
         # Détection d'intent basée sur les mots-clés
-        query_lower = query.lower()
+        query_lower = self._safe_string_lower(query) or ""
 
         if any(
             word in query_lower

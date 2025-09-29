@@ -3,6 +3,7 @@
 query_preprocessor.py - Préprocesseur de requêtes avec OpenAI
 Version ENRICHIE avec détection patterns calculatoires, temporels, économiques
 et amélioration de la détection du sexe avec correspondance stricte
+🟠 CORRECTION: Ne plus écraser "male, female" pour les comparaisons
 """
 
 import logging
@@ -89,6 +90,7 @@ class QueryPreprocessor:
     - Détection des requêtes comparatives
     - Détection patterns calculatoires, temporels, optimisation, économiques
     - Amélioration de la détection du sexe avec correspondance stricte
+    🟠 CORRECTION: Protection des comparaisons de sexe
     """
 
     def __init__(self, openai_client: AsyncOpenAI):
@@ -351,9 +353,10 @@ class QueryPreprocessor:
                     query, comparative_info, query_patterns, strict_requirements
                 )
 
-            # 8. Validation et correction des entités
+            # 8. Validation et correction des entités - 🟠 CORRECTION ICI
             enhanced_result["entities"] = self._validate_and_fix_entities(
-                enhanced_result["entities"]
+                enhanced_result["entities"],
+                is_comparative=comparative_info.get("is_comparative", False),
             )
             logger.debug(f"Entités après validation: {enhanced_result['entities']}")
 
@@ -596,7 +599,7 @@ class QueryPreprocessor:
             r"\brecommande\w*\b",  # recommande (AJOUTÉ pour renforcer)
             r"\bperfect\w*\b",  # perfect, perfection
             r"\bmaximis\w*\b",  # maximiser
-            r"\bminimis\w*\b",  # minimiser
+            r"\bminimiis\w*\b",  # minimiser
             r"\baméliorer\b",  # améliorer
         ]
         if any(re.search(pattern, query_lower) for pattern in optimization_patterns):
@@ -670,7 +673,9 @@ class QueryPreprocessor:
         Construit un résultat complet à partir de l'extraction locale avec classification
         """
         # Validation et enrichissement des entités locales
-        validated_entities = self._validate_and_fix_entities(local_entities)
+        validated_entities = self._validate_and_fix_entities(
+            local_entities, is_comparative=comparative_info.get("is_comparative", False)
+        )
 
         # Routage intelligent basé sur le type de requête
         routing = self._determine_routing(query_type)
@@ -753,53 +758,21 @@ class QueryPreprocessor:
         return enhanced
 
     # ========================================================================
-    # NOUVELLE MÉTHODE: Validation des entités OpenAI
+    # 🟠 MÉTHODE CORRIGÉE: Validation des entités
     # ========================================================================
 
-    def _validate_entities_for_openai(self, entities: Dict[str, Any]) -> Dict[str, Any]:
-        """Valide les entités SANS corriger les comparaisons de sexe"""
-
-        validated = entities.copy()
-
-        # CORRECTION: Ne pas modifier le sexe si c'est une comparaison explicite
-        if entities.get("explicit_sex_request", False):
-            # Garder le sexe tel quel pour les comparaisons explicites
-            logger.debug(
-                f"Comparaison de sexe explicite détectée, conservation: {entities.get('sex')}"
-            )
-            return validated
-
-        # Validation normale pour les autres cas
-        sex = entities.get("sex", "as_hatched")
-
-        # Correction seulement si ce n'est PAS une comparaison
-        if "," in str(sex) and not entities.get("explicit_sex_request", False):
-            logger.debug(f"Correction: sex '{sex}' → 'as_hatched' (non-comparaison)")
-            validated["sex"] = "as_hatched"
-
-        # Validation des autres champs
-        age = entities.get("age_days")
-        if age and isinstance(age, str) and "," in age:
-            try:
-                # Pour les comparaisons d'âge, prendre le premier
-                validated["age_days"] = int(age.split(",")[0].strip())
-                logger.debug(
-                    f"Âge multiple détecté, utilisation: {validated['age_days']}"
-                )
-            except (ValueError, TypeError):
-                pass
-
-        # Validation race
-        breed = entities.get("breed", "")
-        if breed and isinstance(breed, str) and "," in breed:
-            # Pour les comparaisons de race, garder tel quel pour traitement ultérieur
-            logger.debug(f"Race multiple détectée: {breed}")
-
-        return validated
-
-    def _validate_and_fix_entities(self, entities: Dict[str, Any]) -> Dict[str, Any]:
+    def _validate_and_fix_entities(
+        self, entities: Dict[str, Any], is_comparative: bool = False
+    ) -> Dict[str, Any]:
         """
-        AMÉLIORÉ: Validation et correction avec suggestions intelligentes
+        🟠 CORRECTION CRITIQUE: Ne pas écraser les valeurs multiples pour les comparaisons
+
+        Args:
+            entities: Entités à valider
+            is_comparative: True si c'est une requête comparative
+
+        Returns:
+            Entités validées
         """
         if not entities:
             entities = {}
@@ -807,18 +780,24 @@ class QueryPreprocessor:
         corrected = {}
         corrections_applied = []
 
-        # Correction sexe
-        if entities.get("sex") is None or entities.get("sex") == "None":
+        # 🟠 CORRECTION: Gestion spéciale pour les comparaisons
+        sex_value = entities.get("sex")
+
+        if is_comparative and isinstance(sex_value, str) and "," in sex_value:
+            # GARDER les valeurs multiples pour les comparaisons
+            corrected["sex"] = sex_value
+            logger.debug(f"✅ Comparaison de sexe préservée: {sex_value}")
+        elif sex_value is None or str(sex_value).lower() == "none":
             corrected["sex"] = "as_hatched"
             corrections_applied.append("sex 'None' → 'as_hatched'")
         else:
-            # Normaliser les valeurs de sexe
-            sex_value = str(entities["sex"]).lower()
-            if sex_value in ["m", "male", "mâle", "males"]:
+            # Normaliser les valeurs de sexe simples
+            sex_lower = str(sex_value).lower()
+            if sex_lower in ["m", "male", "mâle", "males"]:
                 corrected["sex"] = "male"
-            elif sex_value in ["f", "female", "femelle", "females"]:
+            elif sex_lower in ["f", "female", "femelle", "females"]:
                 corrected["sex"] = "female"
-            elif sex_value in ["as_hatched", "as-hatched", "mixed", "mixte"]:
+            elif sex_lower in ["as_hatched", "as-hatched", "mixed", "mixte"]:
                 corrected["sex"] = "as_hatched"
             else:
                 corrected["sex"] = "as_hatched"
@@ -1318,7 +1297,7 @@ Respond in JSON:
         return {
             "normalized_query": self._normalize_query_text(query),
             "query_type": "general",
-            "entities": self._validate_entities_for_openai(detected_entities),
+            "entities": detected_entities,
             "routing": routing,
             "confidence": 0.5,  # Confidence réduite pour fallback
             "is_comparative": comparative_info["is_comparative"],

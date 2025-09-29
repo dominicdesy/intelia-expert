@@ -2,7 +2,7 @@
 """
 comparison_utils.py - Utilitaires pour le ComparisonHandler
 Extraction, parsing, validation et sélection de métriques
-VERSION CORRIGÉE : Validation stricte des valeurs nulles/zéro
+VERSION CORRIGÉE : Validation stricte des valeurs nulles/zéro + Détection comparaisons sexe
 """
 
 import logging
@@ -19,11 +19,37 @@ class ComparisonUtils:
     def parse_multiple_entities_from_preprocessing(
         preprocessed: Dict[str, Any],
     ) -> List[Dict[str, Any]]:
-        """Parse les entités multiples depuis le preprocessing"""
+        """
+        Parse les entités multiples depuis le preprocessing
+        🟡 AMÉLIORATION: Détection intelligente des comparaisons de sexe
+        """
         entities_list = []
         base_entities = preprocessed.get("entities", {})
-        logger.debug(f"Base entities from preprocessing: {base_entities}")
+        query = preprocessed.get("query", "")
 
+        logger.debug(f"Base entities from preprocessing: {base_entities}")
+        logger.debug(f"Query for sex detection: {query}")
+
+        # 🟡 NOUVEAU: Détection des patterns de comparaison de sexe
+        if ComparisonUtils._detect_sex_comparison_pattern(query):
+            logger.info("Sex comparison pattern detected in query")
+
+            # Créer deux jeux d'entités : male et female
+            male_entities = base_entities.copy()
+            male_entities["sex"] = "male"
+            male_entities["_comparison_label"] = "mâle"
+            male_entities["_comparison_dimension"] = "sex"
+
+            female_entities = base_entities.copy()
+            female_entities["sex"] = "female"
+            female_entities["_comparison_label"] = "femelle"
+            female_entities["_comparison_dimension"] = "sex"
+
+            entities_list = [male_entities, female_entities]
+            logger.info("Created 2 entity sets for sex comparison: male, female")
+            return entities_list
+
+        # Logique existante pour les autres comparaisons
         comparison_found = False
         for field, value in base_entities.items():
             if isinstance(value, str) and "," in value:
@@ -46,6 +72,91 @@ class ComparisonUtils:
 
         logger.info(f"Parsed {len(entities_list)} entity sets for comparison")
         return entities_list
+
+    @staticmethod
+    def _detect_sex_comparison_pattern(query: str) -> bool:
+        """
+        🟡 NOUVEAU: Détecte les patterns de comparaison entre mâles et femelles
+
+        Args:
+            query: Requête utilisateur
+
+        Returns:
+            True si un pattern de comparaison de sexe est détecté
+        """
+        if not query:
+            return False
+
+        query_lower = query.lower()
+
+        # Patterns de comparaison de sexe
+        sex_comparison_patterns = [
+            # Français
+            r"m[âa]les?\s+(et|vs|versus|contre)\s+femelles?",
+            r"entre\s+(les\s+)?m[âa]les?\s+et\s+(les\s+)?femelles?",
+            r"cohéren[ct]\w*\s+entre\s+(les\s+)?m[âa]les?\s+et\s+(les\s+)?femelles?",
+            r"compar\w+\s+(les\s+)?m[âa]les?\s+(et|aux)\s+(les\s+)?femelles?",
+            r"différence\w*\s+entre\s+(les\s+)?m[âa]les?\s+et\s+(les\s+)?femelles?",
+            r"écart\s+entre\s+(les\s+)?m[âa]les?\s+et\s+(les\s+)?femelles?",
+            r"variation\s+entre\s+(les\s+)?m[âa]les?\s+et\s+(les\s+)?femelles?",
+            # Anglais
+            r"males?\s+(and|vs|versus|against)\s+females?",
+            r"between\s+males?\s+and\s+females?",
+            r"consisten[ct]\w*\s+between\s+males?\s+and\s+females?",
+            r"compar\w+\s+males?\s+(and|to)\s+females?",
+            r"difference\w*\s+between\s+males?\s+and\s+females?",
+            r"gap\s+between\s+males?\s+and\s+females?",
+            r"variation\s+between\s+males?\s+and\s+females?",
+        ]
+
+        for pattern in sex_comparison_patterns:
+            if re.search(pattern, query_lower):
+                logger.debug(f"Sex comparison pattern matched: {pattern}")
+                return True
+
+        # Détection par mots-clés combinés
+        sex_keywords = [
+            "mâle",
+            "male",
+            "femelle",
+            "female",
+            "mâles",
+            "males",
+            "femelles",
+            "females",
+        ]
+        comparison_keywords = [
+            "entre",
+            "between",
+            "vs",
+            "versus",
+            "contre",
+            "against",
+            "et",
+            "and",
+            "cohérent",
+            "consistent",
+        ]
+
+        has_sex_keyword = any(keyword in query_lower for keyword in sex_keywords)
+        has_comparison_keyword = any(
+            keyword in query_lower for keyword in comparison_keywords
+        )
+
+        if has_sex_keyword and has_comparison_keyword:
+            # Vérifier que les deux sexes sont mentionnés
+            has_male = any(
+                kw in query_lower for kw in ["mâle", "male", "mâles", "males"]
+            )
+            has_female = any(
+                kw in query_lower for kw in ["femelle", "female", "femelles", "females"]
+            )
+
+            if has_male and has_female:
+                logger.debug("Sex comparison detected via keyword combination")
+                return True
+
+        return False
 
     @staticmethod
     def validate_comparison_entities(entities: List[Dict]) -> Dict[str, Any]:
