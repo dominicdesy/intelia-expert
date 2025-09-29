@@ -2,6 +2,7 @@
 """
 query_preprocessor.py - Préprocesseur de requêtes avec OpenAI
 Version ENRICHIE avec détection patterns calculatoires, temporels, économiques
+et amélioration de la détection du sexe avec correspondance stricte
 """
 
 import logging
@@ -46,7 +47,7 @@ class LocalEntityExtractor:
         age_patterns = [
             r"(\d+)\s*jours?",
             r"(\d+)\s*j\b",
-            r"à\s+(\d+)\s*jours?",
+            r"à \s+(\d+)\s*jours?",
             r"de\s+(\d+)\s*jours?",
         ]
         for pattern in age_patterns:
@@ -87,6 +88,7 @@ class QueryPreprocessor:
     - Extraction des métadonnées structurées
     - Détection des requêtes comparatives
     - Détection patterns calculatoires, temporels, optimisation, économiques
+    - Amélioration de la détection du sexe avec correspondance stricte
     """
 
     def __init__(self, openai_client: AsyncOpenAI):
@@ -118,11 +120,120 @@ class QueryPreprocessor:
         self._cache.clear()  # Nettoyer le cache
         logger.debug("Query Preprocessor fermé")
 
+    def extract_local_entities(self, query: str) -> Dict[str, Any]:
+        """Extraction d'entités avec détection de sexe explicite améliorée"""
+        
+        entities = {}
+        
+        # Extraction du sexe avec détection explicite
+        sex_info = self._extract_sex_with_explicit_detection(query)
+        entities.update(sex_info)
+        
+        # Extraction de la race
+        breed = self._extract_breed(query)
+        if breed:
+            entities['breed'] = breed
+        
+        # Extraction de l'âge
+        age = self._extract_age_days(query)
+        if age:
+            entities['age_days'] = age
+        
+        # Extraction du type de métrique
+        metric_type = self._extract_metric_type(query)
+        if metric_type:
+            entities['metric_type'] = metric_type
+        
+        return entities
+
+    def _extract_sex_with_explicit_detection(self, query: str) -> Dict[str, Any]:
+        """Extraction du sexe avec détection des demandes explicites"""
+        
+        result = {}
+        query_lower = query.lower()
+        
+        # Patterns pour détection explicite
+        explicit_female_patterns = [
+            r'\bfemelle\b', r'\bfemale\b', r'\bpoule\b', r'\bpoulette\b'
+        ]
+        explicit_male_patterns = [
+            r'\bmâle\b', r'\bmale\b', r'\bcoq\b', r'\bcockerel\b'
+        ]
+        
+        # Vérification des patterns explicites
+        is_explicit_female = any(re.search(pattern, query_lower) for pattern in explicit_female_patterns)
+        is_explicit_male = any(re.search(pattern, query_lower) for pattern in explicit_male_patterns)
+        
+        if is_explicit_female:
+            result['sex'] = 'female'
+            result['explicit_sex_request'] = True
+            logger.debug(f"Sexe femelle détecté explicitement dans: {query}")
+        elif is_explicit_male:
+            result['sex'] = 'male'
+            result['explicit_sex_request'] = True
+            logger.debug(f"Sexe mâle détecté explicitement dans: {query}")
+        else:
+            # Patterns implicites plus faibles
+            if re.search(r'\bof?\s+female\b|\bfemelle?\b', query_lower):
+                result['sex'] = 'female'
+                result['explicit_sex_request'] = False
+            elif re.search(r'\bof?\s+male\b|\bmâle?\b', query_lower):
+                result['sex'] = 'male'
+                result['explicit_sex_request'] = False
+            else:
+                result['sex'] = 'as_hatched'
+                result['explicit_sex_request'] = False
+        
+        return result
+
+    def _extract_breed(self, query: str) -> Optional[str]:
+        """Extraction de la race/souche"""
+        query_lower = query.lower()
+        
+        for pattern, breed in self.local_extractor.BREED_PATTERNS.items():
+            if re.search(pattern, query_lower):
+                return breed
+        return None
+
+    def _extract_age_days(self, query: str) -> Optional[int]:
+        """Extraction de l'âge en jours"""
+        query_lower = query.lower()
+        
+        age_patterns = [
+            r"(\d+)\s*jours?",
+            r"(\d+)\s*j\b",
+            r"à \s+(\d+)\s*jours?",
+            r"de\s+(\d+)\s*jours?",
+            r"day\s+(\d+)",
+            r"(\d+)\s+days?",
+        ]
+        
+        for pattern in age_patterns:
+            age_match = re.search(pattern, query_lower)
+            if age_match:
+                try:
+                    age = int(age_match.group(1))
+                    if 0 <= age <= 150:  # Validation range
+                        return age
+                except ValueError:
+                    continue
+        return None
+
+    def _extract_metric_type(self, query: str) -> Optional[str]:
+        """Extraction du type de métrique"""
+        query_lower = query.lower()
+        
+        for pattern, metric in self.local_extractor.METRIC_PATTERNS.items():
+            if re.search(pattern, query_lower):
+                return metric
+        return None
+
     async def preprocess_query(
         self, query: str, language: str = "fr"
     ) -> Dict[str, Any]:
         """
         AMÉLIORÉ: Preprocessing avec cache, extraction locale et classification améliorée
+        avec gestion des demandes strictes
 
         Returns:
             {
@@ -136,7 +247,8 @@ class QueryPreprocessor:
                 "comparative_info": Dict,
                 "requires_calculation": bool,
                 "comparison_entities": List[Dict],
-                "query_patterns": Dict
+                "query_patterns": Dict,
+                "strict_requirements": Dict
             }
         """
 
@@ -153,8 +265,8 @@ class QueryPreprocessor:
             detailed_query_type = self._classify_detailed_query_type(query)
             logger.debug(f"Type de requête classifié: {detailed_query_type}")
 
-            # 2. Essayer extraction locale d'abord (rapide)
-            local_entities = self.local_extractor.extract_entities(query)
+            # 2. Essayer extraction locale d'abord (rapide) - NOUVELLE VERSION
+            local_entities = self.extract_local_entities(query)
             logger.debug(f"Entités locales extraites: {local_entities}")
 
             # 3. Détection comparative (basée sur la classification)
@@ -169,7 +281,11 @@ class QueryPreprocessor:
             query_patterns = self._detect_query_patterns(query)
             logger.debug(f"Patterns détectés: {query_patterns}")
 
-            # 5. Si extraction locale suffisante ET requête simple, utiliser directement
+            # 5. NOUVEAU: Analyser les demandes strictes
+            strict_requirements = self._analyze_strict_requirements(query, local_entities)
+            logger.debug(f"Exigences strictes: {strict_requirements}")
+
+            # 6. Si extraction locale suffisante ET requête simple, utiliser directement
             if (
                 self.local_extractor.is_extraction_sufficient(local_entities)
                 and detailed_query_type in ["standard", "metric"]
@@ -183,11 +299,12 @@ class QueryPreprocessor:
                     query_patterns,
                     comparative_info,
                     detailed_query_type,
+                    strict_requirements,
                 )
                 self._cache[query] = result
                 return result
 
-            # 6. Sinon, utiliser OpenAI pour cas complexes
+            # 7. Sinon, utiliser OpenAI pour cas complexes
             system_prompt = self._get_system_prompt(
                 language, comparative_info["is_comparative"]
             )
@@ -224,16 +341,16 @@ class QueryPreprocessor:
             except Exception as e:
                 logger.warning(f"OpenAI normalization failed: {e}")
                 enhanced_result = self._fallback_preprocessing(
-                    query, comparative_info, query_patterns
+                    query, comparative_info, query_patterns, strict_requirements
                 )
 
-            # 7. Validation et correction des entités
+            # 8. Validation et correction des entités
             enhanced_result["entities"] = self._validate_and_fix_entities(
                 enhanced_result["entities"]
             )
             logger.debug(f"Entités après validation: {enhanced_result['entities']}")
 
-            # 8. Enrichir avec les informations de classification
+            # 9. Enrichir avec les informations de classification
             enhanced_result["query_type"] = detailed_query_type
             enhanced_result["routing"] = self._determine_routing(
                 detailed_query_type, enhanced_result.get("routing")
@@ -248,10 +365,11 @@ class QueryPreprocessor:
                 or detailed_query_type == "temporal_range"
             )
 
-            # 9. Ajouter les patterns détectés
+            # 10. Ajouter les patterns détectés et les exigences strictes
             enhanced_result["query_patterns"] = query_patterns
+            enhanced_result["strict_requirements"] = strict_requirements
 
-            # 10. Si comparaison détectée, créer les entités multiples
+            # 11. Si comparaison détectée, créer les entités multiples
             if comparative_info["is_comparative"]:
                 enhanced_result["comparison_entities"] = (
                     self._build_comparison_entities(
@@ -263,7 +381,7 @@ class QueryPreprocessor:
                     f"{len(enhanced_result['comparison_entities'])} jeux d'entités à rechercher"
                 )
 
-            # 11. Cache du résultat
+            # 12. Cache du résultat
             self._cache[query] = enhanced_result
 
             logger.info(
@@ -277,14 +395,95 @@ class QueryPreprocessor:
 
         except json.JSONDecodeError as e:
             logger.error(f"Erreur parsing JSON OpenAI: {e}")
-            return self._fallback_preprocessing(query, comparative_info, query_patterns)
+            return self._fallback_preprocessing(query, comparative_info, query_patterns, strict_requirements)
 
         except Exception as e:
             logger.error(f"Erreur preprocessing OpenAI: {e}")
-            return self._fallback_preprocessing(query, comparative_info, query_patterns)
+            return self._fallback_preprocessing(query, comparative_info, query_patterns, strict_requirements)
         finally:
             # Nettoyer la variable temporaire
             self._current_query = ""
+
+    def _analyze_strict_requirements(self, query: str, entities: Dict[str, Any]) -> Dict[str, bool]:
+        """Analyse si la requête nécessite des correspondances strictes"""
+        
+        strict_requirements = {
+            'strict_sex_match': False,
+            'strict_age_match': False,
+            'strict_breed_match': False,
+            'exclude_imperial_units': True  # Par défaut, exclure les unités impériales
+        }
+        
+        # Détection de demande de sexe stricte
+        if entities.get('explicit_sex_request', False):
+            strict_requirements['strict_sex_match'] = True
+            logger.debug("Demande de correspondance sexe stricte détectée")
+        
+        # Mots-clés indiquant une demande précise
+        precision_keywords = [
+            'exactement', 'précisément', 'spécifiquement', 'uniquement',
+            'seulement', 'exactly', 'specifically', 'only', 'precisely'
+        ]
+        
+        query_lower = query.lower()
+        if any(keyword in query_lower for keyword in precision_keywords):
+            strict_requirements.update({
+                'strict_sex_match': True,
+                'strict_age_match': True,
+                'strict_breed_match': True
+            })
+            logger.debug("Demande de correspondance stricte détectée via mots-clés")
+        
+        # Détection d'âge précis (ex: "à 28 jours" vs "vers 28 jours")
+        precise_age_patterns = [
+            r'à\s+(\d+)\s+jours?',
+            r'at\s+(\d+)\s+days?',
+            r'day\s+(\d+)',
+            r'jour\s+(\d+)'
+        ]
+        
+        if any(re.search(pattern, query_lower) for pattern in precise_age_patterns):
+            strict_requirements['strict_age_match'] = True
+            logger.debug("Demande d'âge précis détectée")
+        
+        return strict_requirements
+
+    def _normalize_query_text(self, query: str) -> str:
+        """Normalise le texte de la requête"""
+        
+        # Corrections orthographiques communes
+        corrections = {
+            'IC': 'conversion alimentaire',
+            'FCR': 'conversion alimentaire',
+            'poid': 'poids',
+            'convertion': 'conversion',
+            'aliment': 'alimentaire'
+        }
+        
+        normalized = query
+        for wrong, correct in corrections.items():
+            normalized = re.sub(rf'\b{re.escape(wrong)}\b', correct, normalized, flags=re.IGNORECASE)
+        
+        # Nettoyage basique
+        normalized = re.sub(r'\s+', ' ', normalized).strip()
+        
+        return normalized
+
+    def should_use_strict_matching(self, preprocessing_result: Dict[str, Any]) -> bool:
+        """Détermine si les requêtes doivent utiliser la correspondance stricte"""
+        
+        strict_reqs = preprocessing_result.get('strict_requirements', {})
+        
+        # Si une demande stricte est détectée
+        if any(strict_reqs.values()):
+            return True
+        
+        # Si c'est une requête comparative, moins strict par défaut
+        if preprocessing_result.get('comparative_info', {}).get('is_comparative', False):
+            return False
+        
+        # Par défaut, modérément strict
+        return preprocessing_result.get('entities', {}).get('explicit_sex_request', False)
 
     # ========================================================================
     # NOUVELLE MÉTHODE: Classification détaillée des requêtes
@@ -432,6 +631,7 @@ class QueryPreprocessor:
         query_patterns: Dict,
         comparative_info: Dict,
         query_type: str,
+        strict_requirements: Dict,
     ) -> Dict[str, Any]:
         """
         Construit un résultat complet à partir de l'extraction locale avec classification
@@ -442,8 +642,11 @@ class QueryPreprocessor:
         # Routage intelligent basé sur le type de requête
         routing = self._determine_routing(query_type)
 
+        # Normalisation du texte de la requête
+        normalized_query = self._normalize_query_text(query)
+
         return {
-            "normalized_query": query,  # Pas de normalisation complexe en local
+            "normalized_query": normalized_query,
             "query_type": query_type,
             "entities": validated_entities,
             "routing": routing,
@@ -460,6 +663,7 @@ class QueryPreprocessor:
                 [validated_entities] if not comparative_info["is_comparative"] else []
             ),
             "query_patterns": query_patterns,
+            "strict_requirements": strict_requirements,
             "preprocessing_method": "local_extraction",
             "processing_time_saved": True,
         }
@@ -545,6 +749,10 @@ class QueryPreprocessor:
             else:
                 corrected["sex"] = "as_hatched"
                 corrections_applied.append(f"sex '{sex_value}' → 'as_hatched'")
+
+        # Préserver l'information explicit_sex_request si elle existe
+        if entities.get("explicit_sex_request") is not None:
+            corrected["explicit_sex_request"] = entities["explicit_sex_request"]
 
         # Correction breed - NOUVEAU: Suggestions pour requêtes générales
         if entities.get("breed"):
@@ -660,7 +868,7 @@ class QueryPreprocessor:
 
         # NOUVEAUX patterns d'âge plus robustes
         age_patterns = [
-            r"à\s+(\d+)\s+jours?",  # "à 42 jours"
+            r"à \s+(\d+)\s+jours?",  # "à 42 jours"
             r"(\d+)\s+jours?",  # "42 jours"
             r"de\s+(\d+)\s+jours?",  # "de 42 jours"
             r"(\d+)\s*j\b",  # "42j"
@@ -1007,7 +1215,7 @@ Respond in JSON:
 }}"""
 
     def _fallback_preprocessing(
-        self, query: str, comparative_info: Dict, query_patterns: Dict
+        self, query: str, comparative_info: Dict, query_patterns: Dict, strict_requirements: Dict
     ) -> Dict[str, Any]:
         """
         AMÉLIORÉ: Preprocessing de secours avec détection locale
@@ -1044,7 +1252,7 @@ Respond in JSON:
         routing = "postgresql" if detected_entities.get("breed") else "weaviate"
 
         return {
-            "normalized_query": query,
+            "normalized_query": self._normalize_query_text(query),
             "query_type": "general",
             "entities": self._validate_and_fix_entities(detected_entities),
             "routing": routing,
@@ -1054,6 +1262,7 @@ Respond in JSON:
             "requires_calculation": comparative_info["is_comparative"],
             "comparison_entities": [],
             "query_patterns": query_patterns,
+            "strict_requirements": strict_requirements,
             "preprocessing_fallback": True,
         }
 
@@ -1066,6 +1275,8 @@ Respond in JSON:
             "local_extraction": True,
             "cache_enabled": True,
             "cache_size": len(self._cache),
+            "strict_matching_support": True,
+            "sex_explicit_detection": True,
             "supported_comparisons": list(
                 self.comparative_detector.COMPARATIVE_PATTERNS.keys()
             ),
