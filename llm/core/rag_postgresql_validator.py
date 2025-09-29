@@ -2,6 +2,7 @@
 """
 rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
 VERSION FINALE CORRIGÉE: Préserve tous les champs originaux + Logs diagnostiques
++ Invalidation des métriques invalides + Auto-détection enrichie
 """
 
 import re
@@ -13,6 +14,9 @@ logger = logging.getLogger(__name__)
 
 class PostgreSQLValidator:
     """Validateur intelligent avec auto-détection et alternatives"""
+
+    def __init__(self):
+        self.logger = logger
 
     def flexible_query_validation(
         self, query: str, entities: Dict[str, Any]
@@ -46,6 +50,9 @@ class PostgreSQLValidator:
         logger.debug(
             f"🔍 VALIDATOR INPUT - 'explicit_sex_request' present: {'explicit_sex_request' in entities}, value: {entities.get('explicit_sex_request')}"
         )
+        logger.debug(
+            f"🔍 VALIDATOR INPUT - 'metric_type' present: {'metric_type' in entities}, value: {entities.get('metric_type')}"
+        )
 
         # 🟢 CORRECTION CRITIQUE: Copier TOUTES les entités originales en priorité
         # Cela préserve automatiquement 'sex', 'explicit_sex_request', etc.
@@ -59,6 +66,28 @@ class PostgreSQLValidator:
         logger.debug(
             f"🔍 AFTER COPY - 'explicit_sex_request' present: {'explicit_sex_request' in enhanced_entities}"
         )
+        logger.debug(
+            f"🔍 AFTER COPY - 'metric_type' present: {'metric_type' in enhanced_entities}, value: {enhanced_entities.get('metric_type')}"
+        )
+
+        # 🟡 NOUVEAU : Invalider metric_type si c'est 'as_hatched' ou autre valeur invalide
+        metric = enhanced_entities.get("metric_type")
+        if metric:
+            metric_lower = str(metric).lower().strip()
+            invalid_metrics = [
+                "as_hatched",
+                "as-hatched",
+                "mixed",
+                "none",
+                "",
+                "male",
+                "female",
+            ]
+            if metric_lower in invalid_metrics:
+                logger.warning(
+                    f"⚠️ metric_type invalide '{metric}' → None, auto-détection activée"
+                )
+                enhanced_entities["metric_type"] = None
 
         # 🟢 Auto-détection breed SEULEMENT si absent dans les entités originales
         if not enhanced_entities.get("breed"):
@@ -100,10 +129,10 @@ class PostgreSQLValidator:
                 f"🔍 Age PRESENT: '{enhanced_entities.get('age_days')}', skipping auto-detection"
             )
 
-        # 🟢 Auto-détection metric SEULEMENT si absent dans les entités originales
+        # 🟡 AMÉLIORÉ : Auto-détection metric avec invalidation préalable
         if not enhanced_entities.get("metric_type"):
             logger.debug("🔍 Metric ABSENT, auto-detecting from query...")
-            detected_metric = self._detect_metric_from_query(query)
+            detected_metric = self._auto_detect_metric_type(query)
             if detected_metric:
                 enhanced_entities["metric_type"] = detected_metric
                 logger.debug(f"✅ Auto-detected metric: {detected_metric}")
@@ -121,6 +150,9 @@ class PostgreSQLValidator:
         )
         logger.debug(
             f"🔍 FINAL - 'explicit_sex_request' present: {'explicit_sex_request' in enhanced_entities}, value: {enhanced_entities.get('explicit_sex_request')}"
+        )
+        logger.debug(
+            f"🔍 FINAL - 'metric_type' present: {'metric_type' in enhanced_entities}, value: {enhanced_entities.get('metric_type')}"
         )
 
         # 🔥 VÉRIFICATION CRITIQUE : Comparaison INPUT vs OUTPUT
@@ -176,6 +208,83 @@ class PostgreSQLValidator:
                 "helpful_message": helpful_message,
             }
 
+    def validate_and_enhance(self, entities: Dict, query: str) -> Dict:
+        """
+        Valider et enrichir les entités
+        Méthode alternative avec invalidation explicite des métriques invalides
+        """
+
+        enhanced = dict(entities) if entities else {}
+        missing = []
+        message = ""
+
+        # 🟡 NOUVEAU : Invalider metric_type si c'est 'as_hatched' ou valeur invalide
+        metric = enhanced.get("metric_type")
+        if metric:
+            metric_lower = str(metric).lower().strip()
+            invalid_metrics = [
+                "as_hatched",
+                "as-hatched",
+                "mixed",
+                "none",
+                "",
+                "male",
+                "female",
+            ]
+            if metric_lower in invalid_metrics:
+                self.logger.warning(
+                    f"⚠️ metric_type invalide '{metric}' → None, auto-détection activée"
+                )
+                enhanced["metric_type"] = None
+
+        # Si metric_type est None, activer auto-détection
+        if not enhanced.get("metric_type"):
+            self.logger.debug("🔍 Metric ABSENT, auto-detecting from query...")
+            detected = self._auto_detect_metric_type(query)
+            if detected:
+                enhanced["metric_type"] = detected
+                self.logger.debug(f"✅ Auto-detected metric: {detected}")
+            else:
+                self.logger.debug("❌ No metric detected in query")
+                missing.append("metric_type")
+        else:
+            self.logger.debug(
+                f"🔍 Metric PRESENT: '{enhanced['metric_type']}', skipping auto-detection"
+            )
+
+        # Vérifier breed
+        if not enhanced.get("breed"):
+            detected_breed = self._detect_breed_from_query(query)
+            if detected_breed:
+                enhanced["breed"] = detected_breed
+            else:
+                missing.append("breed")
+
+        # Vérifier age
+        if not enhanced.get("age_days"):
+            detected_age = self._detect_age_from_query(query)
+            if detected_age:
+                enhanced["age_days"] = detected_age
+            else:
+                missing.append("age_days")
+
+        # Déterminer statut
+        if not missing:
+            status = "complete"
+        elif len(missing) <= 1:
+            status = "incomplete_but_processable"
+            message = f"Informations manquantes: {', '.join(missing)}"
+        else:
+            status = "needs_fallback"
+            message = f"Trop d'informations manquantes: {', '.join(missing)}"
+
+        return {
+            "status": status,
+            "enhanced_entities": enhanced,
+            "missing": missing,
+            "message": message,
+        }
+
     def _detect_breed_from_query(self, query: str) -> Optional[str]:
         """Détecte la race dans le texte de la requête"""
         query_lower = query.lower()
@@ -214,7 +323,10 @@ class PostgreSQLValidator:
         return None
 
     def _detect_metric_from_query(self, query: str) -> Optional[str]:
-        """Détecte le type de métrique dans la requête"""
+        """
+        Détecte le type de métrique dans la requête
+        VERSION BASIQUE - À utiliser pour compatibilité descendante
+        """
         query_lower = query.lower()
 
         metric_keywords = {
@@ -233,6 +345,57 @@ class PostgreSQLValidator:
             if any(keyword in query_lower for keyword in keywords):
                 return metric_type
 
+        return None
+
+    def _auto_detect_metric_type(self, query: str) -> Optional[str]:
+        """
+        Détecter automatiquement le type de métrique depuis la requête
+        VERSION ENRICHIE - Cohérente avec query_preprocessor
+        """
+
+        query_lower = query.lower()
+
+        # 🟡 Patterns étendus (cohérents avec query_preprocessor)
+        metric_patterns = {
+            # Poids
+            "poids": "body_weight",
+            "weight": "body_weight",
+            "poids vif": "body_weight",
+            "body weight": "body_weight",
+            # Gain
+            "gain quotidien": "daily_weight_gain",
+            "gain moyen quotidien": "average_daily_gain",
+            "gain moyen": "average_daily_gain",
+            "gmq": "average_daily_gain",
+            "gmo": "average_daily_gain",
+            "adg": "average_daily_gain",
+            # Consommation
+            "consommation cumulée": "cumulative_feed_intake",
+            "consommation cumulative": "cumulative_feed_intake",
+            "consommation totale": "cumulative_feed_intake",
+            "aliment cumulé": "cumulative_feed_intake",
+            # Conversion
+            "indice de consommation": "feed_conversion_ratio",
+            "conversion alimentaire": "feed_conversion_ratio",
+            "ic": "feed_conversion_ratio",
+            "fcr": "feed_conversion_ratio",
+            # Mortalité
+            "mortalité": "mortality",
+            "taux de mortalité": "mortality",
+            "viabilité": "mortality",
+            "mortality": "mortality",
+        }
+
+        # 🟡 Chercher par ordre de spécificité (plus long d'abord)
+        for pattern in sorted(metric_patterns.keys(), key=len, reverse=True):
+            if pattern in query_lower:
+                detected = metric_patterns[pattern]
+                self.logger.debug(
+                    f"✅ Métrique auto-détectée: '{pattern}' → {detected}"
+                )
+                return detected
+
+        self.logger.debug("❌ Aucune métrique détectée automatiquement")
         return None
 
     def _generate_validation_help_message(

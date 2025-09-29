@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 rag_engine_handlers.py - Handlers spécialisés pour différents types de requêtes
-VERSION CORRIGÉE : Compatible avec la structure harmonisée du comparison_handler
-+ MODE OPTIMISATION pour tri par pertinence (CORRIGÉ pour PostgreSQLSystem.search_metrics signature)
+VERSION OPTIMISÉE :
+- Compatible avec la structure harmonisée du comparison_handler
+- Mode optimisation pour tri par pertinence
+- Évite double appel PostgreSQL avant fallback Weaviate
+- Respecte le routage suggéré par OpenAI
 """
 
 import re
@@ -28,6 +31,28 @@ class BaseQueryHandler:
         """Configure le handler avec les modules nécessaires"""
         for key, value in kwargs.items():
             setattr(self, key, value)
+
+    def _should_skip_postgresql_for_age(self, entities: Dict[str, Any]) -> bool:
+        """
+        Vérifie si l'âge est hors plage broilers typique
+        Broilers typiquement <= 56 jours, on élargit à 60j pour sécurité
+        """
+        age = entities.get("age_days")
+        if age and age > 60:
+            logger.info(
+                f"⚠️ Âge {age}j hors plage broilers → fallback Weaviate recommandé"
+            )
+            return True
+        return False
+
+    def _is_qualitative_query(self, entities: Dict[str, Any]) -> bool:
+        """
+        Vérifie si la requête est qualitative (sans âge/métrique précis)
+        """
+        has_age = entities.get("age_days") is not None
+        has_metric = entities.get("metric_type") is not None
+
+        return not has_age and not has_metric
 
 
 class ComparativeQueryHandler(BaseQueryHandler):
@@ -314,7 +339,7 @@ class TemporalQueryHandler(BaseQueryHandler):
 
 
 class StandardQueryHandler(BaseQueryHandler):
-    """Handler pour les requêtes standard avec mode optimisation"""
+    """Handler pour les requêtes standard avec routage intelligent"""
 
     async def handle(
         self,
@@ -326,7 +351,12 @@ class StandardQueryHandler(BaseQueryHandler):
         language: str = "fr",
         **kwargs,
     ) -> RAGResult:
-        """Traite les requêtes standard avec fallback intelligent et mode optimisation"""
+        """
+        Traite les requêtes standard avec:
+        - Respect du routage suggéré par OpenAI
+        - Évitement du double appel PostgreSQL
+        - Fallback intelligent vers Weaviate
+        """
 
         query = preprocessed_data["normalized_query"]
         entities = preprocessed_data["entities"]
@@ -336,65 +366,70 @@ class StandardQueryHandler(BaseQueryHandler):
         if original_query is None:
             original_query = preprocessed_data.get("original_query", query)
 
-        # 🔧 CORRECTION CRITIQUE: Seul top_k est supporté par PostgreSQLSystem.search_metrics()
-        # Les paramètres min_confidence et sort_by n'existent pas dans la signature
+        # Configuration top_k selon mode
         if is_optimization:
             logger.info("Mode optimisation activé - priorité au tri par pertinence")
-            top_k = 5  # Limiter aux meilleurs résultats pour optimisation
+            top_k = 5
         else:
             top_k = RAG_SIMILARITY_TOP_K
+
+        # 🎯 NOUVEAU: Respect du routage suggéré par OpenAI
+        if routing_hint == "weaviate":
+            if self._is_qualitative_query(entities):
+                logger.info(
+                    "✅ Routage Weaviate (suggestion OpenAI respectée pour requête qualitative)"
+                )
+                return await self._search_weaviate_direct(
+                    query, entities, top_k, is_optimization, start_time
+                )
+            else:
+                logger.info("⚠️ Suggestion Weaviate ignorée (présence âge/métrique)")
+
+        # 🎯 NOUVEAU: Vérification âge hors plage avant PostgreSQL
+        if self.postgresql_system and self._should_skip_postgresql_for_age(entities):
+            logger.info(
+                "🔄 Âge hors plage broilers → Weaviate direct (évite double appel)"
+            )
+            if self.weaviate_core:
+                return await self._search_weaviate_direct(
+                    query, entities, top_k, is_optimization, start_time
+                )
 
         # PostgreSQL avec hint prioritaire
         if routing_hint == "postgresql" and self.postgresql_system:
             logger.info("Routage PostgreSQL (preprocessing hint)")
-            result = await self.postgresql_system.search_metrics(
-                query=query,
-                entities=entities,
-                top_k=top_k,
-                strict_sex_match=False,
+            result = await self._search_postgresql_once(
+                query, entities, top_k, is_optimization
             )
 
             if result and result.source != RAGSource.NO_RESULTS:
-                # Enrichissement des métadonnées APRÈS l'appel
-                if is_optimization:
-                    result.metadata["query_mode"] = "optimization"
-                    result.metadata["ranking_applied"] = True
-                    result.metadata["top_k_used"] = top_k
                 return result
 
-        # PostgreSQL standard
+            # 🎯 NOUVEAU: Si aucun résultat PostgreSQL, fallback direct Weaviate
+            logger.info("⚠️ PostgreSQL sans résultat → fallback Weaviate immédiat")
+            if self.weaviate_core:
+                return await self._search_weaviate_direct(
+                    query, entities, top_k, is_optimization, start_time
+                )
+
+        # PostgreSQL standard (UN SEUL APPEL)
         if self.postgresql_system:
             logger.info("Recherche PostgreSQL standard")
-            result = await self.postgresql_system.search_metrics(
-                query=query,
-                entities=entities,
-                top_k=top_k,
+            result = await self._search_postgresql_once(
+                query, entities, top_k, is_optimization
             )
 
             if result and result.source != RAGSource.NO_RESULTS:
-                # Enrichissement des métadonnées
-                if is_optimization:
-                    result.metadata["query_mode"] = "optimization"
-                    result.metadata["ranking_applied"] = True
-                    result.metadata["top_k_used"] = top_k
                 return result
 
-        # Weaviate si disponible (avec paramètres adaptés)
+            # 🎯 MODIFICATION: Pas de deuxième appel, fallback direct Weaviate
+            logger.info("⚠️ PostgreSQL sans résultat → fallback Weaviate direct")
+
+        # Weaviate fallback
         if self.weaviate_core:
-            logger.info("Recherche Weaviate fallback")
-            weaviate_top_k = 5 if is_optimization else RAG_SIMILARITY_TOP_K
-
-            result = await self.weaviate_core.search(
-                query=query,
-                top_k=weaviate_top_k,
+            return await self._search_weaviate_direct(
+                query, entities, top_k, is_optimization, start_time
             )
-
-            if result and result.source != RAGSource.NO_RESULTS:
-                if is_optimization:
-                    result.metadata["query_mode"] = "optimization"
-                    result.metadata["source"] = "weaviate_optimized"
-                    result.metadata["top_k_used"] = weaviate_top_k
-                return result
 
         return RAGResult(
             source=RAGSource.NO_RESULTS,
@@ -402,5 +437,99 @@ class StandardQueryHandler(BaseQueryHandler):
             metadata={
                 "query_type": "standard",
                 "optimization_mode": is_optimization,
+                "routing_hint": routing_hint,
             },
         )
+
+    async def _search_postgresql_once(
+        self, query: str, entities: Dict[str, Any], top_k: int, is_optimization: bool
+    ) -> Optional[RAGResult]:
+        """
+        Effectue UNE SEULE recherche PostgreSQL
+        Retourne None si aucun résultat (pas de retry)
+        """
+        try:
+            result = await self.postgresql_system.search_metrics(
+                query=query,
+                entities=entities,
+                top_k=top_k,
+            )
+
+            if result and result.source != RAGSource.NO_RESULTS:
+                # Enrichissement métadonnées
+                if is_optimization:
+                    result.metadata["query_mode"] = "optimization"
+                    result.metadata["ranking_applied"] = True
+                    result.metadata["top_k_used"] = top_k
+
+                result.metadata["search_attempt"] = "postgresql_single"
+                logger.info(
+                    f"✅ PostgreSQL: {result.metadata.get('documents_used', 0)} documents trouvés"
+                )
+                return result
+            else:
+                logger.info("⚠️ PostgreSQL: 0 documents (pas de retry)")
+                return None
+
+        except Exception as e:
+            logger.error(f"Erreur recherche PostgreSQL: {e}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+            return None
+
+    async def _search_weaviate_direct(
+        self,
+        query: str,
+        entities: Dict[str, Any],
+        top_k: int,
+        is_optimization: bool,
+        start_time: float,
+    ) -> RAGResult:
+        """
+        Recherche directe dans Weaviate (fallback ou routage suggéré)
+        """
+        try:
+            weaviate_top_k = 5 if is_optimization else top_k
+
+            logger.info(f"Recherche Weaviate (top_k={weaviate_top_k})")
+            result = await self.weaviate_core.search(
+                query=query,
+                top_k=weaviate_top_k,
+            )
+
+            if result and result.source != RAGSource.NO_RESULTS:
+                # Enrichissement métadonnées
+                if is_optimization:
+                    result.metadata["query_mode"] = "optimization"
+                    result.metadata["source"] = "weaviate_optimized"
+                else:
+                    result.metadata["source"] = "weaviate_fallback"
+
+                result.metadata["top_k_used"] = weaviate_top_k
+                result.metadata["processing_time"] = time.time() - start_time
+
+                logger.info(
+                    f"✅ Weaviate: {len(result.context_docs)} documents trouvés"
+                )
+                return result
+            else:
+                logger.info("⚠️ Weaviate: 0 documents")
+                return RAGResult(
+                    source=RAGSource.NO_RESULTS,
+                    answer="Aucune information trouvée dans Weaviate.",
+                    metadata={
+                        "source": "weaviate_fallback",
+                        "processing_time": time.time() - start_time,
+                    },
+                )
+
+        except Exception as e:
+            logger.error(f"Erreur recherche Weaviate: {e}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+            return RAGResult(
+                source=RAGSource.ERROR,
+                answer="Erreur lors de la recherche Weaviate.",
+                metadata={
+                    "error": str(e),
+                    "processing_time": time.time() - start_time,
+                },
+            )

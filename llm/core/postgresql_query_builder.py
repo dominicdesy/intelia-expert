@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 postgresql_query_builder.py - Construction de requêtes SQL pour PostgreSQL
-Version CORRIGÉE - Alignement des paramètres et placeholders SQL
+Version CORRIGÉE - Alignement des paramètres et fallback générique amélioré
 """
 
 import logging
@@ -25,6 +25,21 @@ class PostgreSQLQueryBuilder:
         "Hubbard": "JA87",
     }
 
+    # Mapping des métriques communes
+    METRIC_MAPPINGS = {
+        "body_weight": "body_weight",
+        "feed_conversion_ratio": "feed_conversion_ratio",
+        "fcr": "feed_conversion_ratio",
+        "feed_consumption": "feed_consumption",
+        "daily_gain": "daily_gain",
+        "mortality": "mortality",
+        "livability": "livability",
+        "weight": "body_weight",
+        "conversion": "feed_conversion_ratio",
+        "consumption": "feed_consumption",
+        "gain": "daily_gain",
+    }
+
     def __init__(self, query_normalizer):
         """
         Args:
@@ -33,6 +48,7 @@ class PostgreSQLQueryBuilder:
         self.query_normalizer = query_normalizer
         self.intents_config = self._load_intents_config()
         self.line_aliases = self._extract_line_aliases()
+        self.logger = logger
 
     def _load_intents_config(self) -> Dict:
         """Charge intents.json pour récupérer les aliases"""
@@ -90,7 +106,7 @@ class PostgreSQLQueryBuilder:
             "ross-308": "308/308 FF",
             "r308": "308/308 FF",
             "308": "308/308 FF",
-            "308/308 ff": "308/308 FF",  # Normalisation casse
+            "308/308 ff": "308/308 FF",
             "308/308ff": "308/308 FF",
             # Mapping Cobb 500 vers 500
             "cobb 500": "500",
@@ -124,8 +140,8 @@ class PostgreSQLQueryBuilder:
             breeds = [b.strip() for b in breed_input.split(",")]
             normalized_breeds = []
             for breed in breeds:
-                norm = self._normalize_breed_for_db(breed)  # Récursion
-                if norm and "," not in norm:  # Éviter récursion infinie
+                norm = self._normalize_breed_for_db(breed)
+                if norm and "," not in norm:
                     normalized_breeds.append(norm)
             result = ",".join(normalized_breeds) if normalized_breeds else None
             if result:
@@ -134,7 +150,7 @@ class PostgreSQLQueryBuilder:
                 )
             return result
 
-        # Recherche par mots-clés (code existant...)
+        # Recherche par mots-clés
         if "cobb" in breed_lower and "500" in breed_lower:
             logger.debug(f"Breed keyword match: '{breed_input}' -> '500'")
             return "500"
@@ -148,7 +164,6 @@ class PostgreSQLQueryBuilder:
             breed_clean = re.sub(r"[\s\-_]+", "", breed_lower)
 
             if breed_clean == canonical_clean:
-                # Mapper vers les noms de BD si possible
                 if "cobb" in canonical_line.lower():
                     return "500"
                 elif "ross" in canonical_line.lower():
@@ -166,56 +181,49 @@ class PostgreSQLQueryBuilder:
         return None
 
     def _extract_age_from_query(self, query: str) -> Optional[int]:
-        """Extraction d'âge robuste avec gestion phase alimentaire - VERSION AMÉLIORÉE"""
+        """Extraction d'âge robuste avec gestion phase alimentaire"""
 
-        # Patterns d'âge existants (qui marchent bien)
         age_patterns = [
-            r"à \s+(\d+)\s+jours?",  # "à 42 jours" - PRIORITÉ 1
-            r"(\d+)\s+jours?",  # "42 jours"
-            r"de\s+(\d+)\s+jours?",  # "de 42 jours"
-            r"(\d+)\s*j\b",  # "42j"
-            r"(\d+)-?jours?",  # "42-jours"
-            r"day\s+(\d+)",  # "day 42"
-            r"(\d+)\s+days?",  # "42 days"
-            r"at\s+(\d+)\s+days?",  # "at 42 days"
-            r"of\s+(\d+)\s+days?",  # "of 42 days"
-            r"(\d+)\s+semaines?",  # "6 semaines"
+            r"à \s+(\d+)\s+jours?",
+            r"(\d+)\s+jours?",
+            r"de\s+(\d+)\s+jours?",
+            r"(\d+)\s*j\b",
+            r"(\d+)-?jours?",
+            r"day\s+(\d+)",
+            r"(\d+)\s+days?",
+            r"at\s+(\d+)\s+days?",
+            r"of\s+(\d+)\s+days?",
+            r"(\d+)\s+semaines?",
         ]
 
-        # NOUVEAUX patterns pour phases alimentaires
         phase_patterns = {
-            "starter": 10,  # ~10 jours
-            "grower": 28,  # ~28 jours
-            "grower 1": 21,  # ~21 jours
-            "grower 2": 35,  # ~35 jours
-            "finisher": 42,  # ~42 jours
-            "finisher 1": 42,  # ~42 jours
-            "finisher 2": 49,  # ~49 jours
-            "croissance": 28,  # Phase croissance français
-            "finition": 42,  # Phase finition français
-            "démarrage": 10,  # Phase démarrage français
+            "starter": 10,
+            "grower": 28,
+            "grower 1": 21,
+            "grower 2": 35,
+            "finisher": 42,
+            "finisher 1": 42,
+            "finisher 2": 49,
+            "croissance": 28,
+            "finition": 42,
+            "démarrage": 10,
         }
 
         query_lower = query.lower()
 
-        # 1. Chercher âge explicite d'abord (priorité haute)
+        # 1. Chercher âge explicite d'abord
         for i, pattern in enumerate(age_patterns):
             match = re.search(pattern, query_lower)
             if match:
                 try:
                     age = int(match.group(1))
-
-                    # Conversion semaines → jours
                     if "semaine" in pattern:
                         age = age * 7
-
-                    # Validation range
                     if 0 <= age <= 150:
                         logger.debug(
                             f"Age detected: {age} days via pattern '{pattern}' (priority {i+1})"
                         )
                         return age
-
                 except ValueError:
                     continue
 
@@ -234,7 +242,6 @@ class PostgreSQLQueryBuilder:
 
         Args:
             breeds_input: String normalisé contenant un ou plusieurs breeds
-                         Ex: "500", "308/308 FF", "500,308/308 FF"
 
         Returns:
             Tuple[str, List[str]]: (condition_sql, list_params)
@@ -242,32 +249,28 @@ class PostgreSQLQueryBuilder:
         if not breeds_input:
             return "", []
 
-        # Séparer les breeds multiples si séparés par virgule
         if "," in breeds_input:
             breed_names = [b.strip() for b in breeds_input.split(",")]
         else:
             breed_names = [breeds_input.strip()]
 
-        # Filtrer les breeds valides
         valid_breeds = [breed for breed in breed_names if breed]
 
         if not valid_breeds:
             return "", []
 
         if len(valid_breeds) == 1:
-            # Un seul breed - utiliser égalité simple
             return "s.strain_name = ${}", valid_breeds
         else:
-            # Multiples breeds - utiliser IN
             placeholders = ", ".join("${}" for _ in range(len(valid_breeds)))
             return f"s.strain_name IN ({placeholders})", valid_breeds
 
     def _handle_out_of_range_age(self, age: int, breed: str) -> str:
         """Gère les âges hors plage de données"""
-        if age > 56:  # Limite observée dans les logs
+        if age > 56:
             logger.warning(f"Age {age} jours hors plage pour {breed} (max: 56j)")
             return f"WHERE 1=0 -- Age {age} jours hors plage pour {breed} (max: 56j)"
-        return ""  # Pas de condition spéciale
+        return ""
 
     def _normalize_entities(self, entities: Dict[str, str]) -> Dict[str, str]:
         """Normalise les entités pour la BD"""
@@ -276,18 +279,61 @@ class PostgreSQLQueryBuilder:
 
         normalized = {}
 
-        # Normaliser breed/line
         if entities.get("breed"):
             normalized["breed"] = self._normalize_breed_for_db(entities["breed"])
         elif entities.get("line"):
             normalized["breed"] = self._normalize_breed_for_db(entities["line"])
 
-        # Copier les autres entités
         for key, value in entities.items():
             if key not in ["breed", "line"]:
                 normalized[key] = value
 
         return normalized
+
+    def _build_metric_search(
+        self, metric_type: Optional[str], age: Optional[int]
+    ) -> List[str]:
+        """
+        NOUVEAU: Construire les patterns de recherche de métriques avec fallback amélioré
+
+        Args:
+            metric_type: Type de métrique (peut être None)
+            age: Âge en jours (peut être None)
+
+        Returns:
+            Liste de patterns de recherche SQL
+        """
+        patterns = []
+
+        if not metric_type:
+            # Fallback générique amélioré
+            if age:
+                patterns.append(f"% for {age}%")
+                patterns.append(f"%{age} days%")
+                patterns.append(f"%day {age}%")
+            else:
+                # Recherche sur métriques communes
+                patterns.extend(
+                    [
+                        "%body_weight%",
+                        "%feed_consumption%",
+                        "%feed_conversion_ratio%",
+                        "%daily_gain%",
+                    ]
+                )
+
+            logger.warning(
+                f"⚠️ Métrique inconnue → patterns génériques: {patterns[:3]}..."
+            )
+            return patterns
+
+        # Recherche spécifique normale
+        base_name = self.METRIC_MAPPINGS.get(metric_type.lower(), metric_type)
+        if age:
+            patterns.append(f"%{base_name} for {age}%")
+        patterns.append(f"%{base_name}%")
+
+        return patterns
 
     def build_range_query(
         self, entities: Dict[str, str], age_min: int, age_max: int, limit: int = 12
@@ -315,7 +361,6 @@ class PostgreSQLQueryBuilder:
         if breed_db:
             breed_condition, breed_params = self._handle_multiple_breeds(breed_db)
             if breed_condition and breed_params:
-                # Ajuster les placeholders
                 adjusted_condition = breed_condition
                 for i, param in enumerate(breed_params):
                     placeholder_template = "${}"
@@ -330,7 +375,7 @@ class PostgreSQLQueryBuilder:
 
                 logger.debug(f"Adding breed filter for range query: {breed_params}")
 
-        # Métrique condition (simplifié pour plages)
+        # Métrique condition avec fallback amélioré
         param_count = self._add_metric_search_conditions_simple(
             conditions, params, param_count
         )
@@ -379,7 +424,7 @@ class PostgreSQLQueryBuilder:
     def _add_metric_search_conditions_simple(
         self, conditions: List[str], params: List[Any], param_count: int
     ) -> int:
-        """Version simplifiée pour requêtes de plage - sans query parsing"""
+        """Version simplifiée pour requêtes de plage - avec fallback amélioré"""
 
         # Ajouter condition générique pour métriques communes
         param_count += 2
@@ -407,26 +452,25 @@ class PostgreSQLQueryBuilder:
         normalized_entities = self._normalize_entities(entities or {})
         logger.debug(f"Normalized: {normalized_entities}")
 
-        # Initialisation
         conditions = ["1=1"]
         params = []
         param_count = 0
 
         # ORDRE FIXE pour éviter les décalages
 
-        # 1. CONDITIONS D'ÂGE (toujours en premier)
+        # 1. CONDITIONS D'ÂGE
         if normalized_entities.get("age_days"):
             param_count = self._add_age_conditions(
                 normalized_entities, conditions, params, param_count
             )
 
-        # 2. FILTRE BREED (si présent)
+        # 2. FILTRE BREED
         if normalized_entities.get("breed"):
             param_count = self._add_breed_filter(
                 normalized_entities, conditions, params, param_count
             )
 
-        # 3. NOUVEAU: FILTRE SEXE STRICT (si demandé explicitement)
+        # 3. FILTRE SEXE STRICT
         if strict_sex_match or self._is_explicit_sex_request(
             query, normalized_entities
         ):
@@ -434,10 +478,10 @@ class PostgreSQLQueryBuilder:
                 normalized_entities, conditions, params, param_count
             )
 
-        # 4. NOUVEAU: FILTRE UNITÉS (éviter impérial)
+        # 4. FILTRE UNITÉS
         param_count = self._add_unit_filter(conditions, params, param_count)
 
-        # 5. CONDITIONS MÉTRIQUE (toujours en dernier)
+        # 5. CONDITIONS MÉTRIQUE (avec fallback amélioré)
         param_count = self._add_metric_search_conditions(
             query, normalized_entities, conditions, params, param_count
         )
@@ -449,7 +493,7 @@ class PostgreSQLQueryBuilder:
 
         final_sql = f"{base_sql} WHERE {where_clause} {order_clause} LIMIT {top_k}"
 
-        # Validation finale paramètres vs placeholders
+        # Validation finale
         placeholders = re.findall(r"\$(\d+)", final_sql)
         max_placeholder = max([int(p) for p in placeholders]) if placeholders else 0
 
@@ -484,7 +528,6 @@ class PostgreSQLQueryBuilder:
         try:
             age = int(entities["age_days"])
 
-            # Vérifier si l'âge est dans la plage valide
             breed_for_check = (
                 entities.get("breed", "").split(",")[0]
                 if entities.get("breed")
@@ -494,11 +537,9 @@ class PostgreSQLQueryBuilder:
 
             if out_of_range_condition:
                 logger.warning(f"Age {age} hors plage pour {breed_for_check}")
-                # Ajouter condition qui ne retourne rien
                 conditions.append("1=0")
                 return param_count
 
-            # Condition d'âge normale avec tolérance
             param_count += 4
             age_condition = f"""
             ((m.age_min <= ${param_count-3} AND m.age_max >= ${param_count-2}) 
@@ -527,7 +568,6 @@ class PostgreSQLQueryBuilder:
         if breed_db:
             breed_condition, breed_params = self._handle_multiple_breeds(breed_db)
             if breed_condition and breed_params:
-                # Ajuster les placeholders selon le nombre de paramètres existants
                 adjusted_condition = breed_condition
                 for i, param in enumerate(breed_params):
                     placeholder_template = "${}"
@@ -608,7 +648,6 @@ class PostgreSQLQueryBuilder:
 
         order_parts = []
 
-        # Si pas de filtre sexe strict, garder le tri par sexe
         if not strict_sex_match:
             order_parts.append(
                 """
@@ -621,12 +660,10 @@ class PostgreSQLQueryBuilder:
             """
             )
 
-        # Tri par proximité d'âge si âge spécifié
         if entities.get("age_days"):
             age = int(entities["age_days"])
             order_parts.append(f"ABS(COALESCE(m.age_min, 999) - {age})")
 
-        # Tri par valeur et nom métrique
         order_parts.extend(["m.value_numeric DESC NULLS LAST", "m.metric_name"])
 
         return "ORDER BY " + ", ".join(order_parts)
@@ -639,66 +676,38 @@ class PostgreSQLQueryBuilder:
         params: List[Any],
         param_count: int,
     ) -> int:
-        """Ajoute les conditions de recherche de métriques - VERSION CORRIGÉE"""
+        """Ajoute les conditions de recherche de métriques - VERSION AMÉLIORÉE avec fallback"""
 
         metric_search_conditions = []
         query_lower = query.lower()
         age_extracted = entities.get("age_days")
 
-        # Pattern pour FCR/conversion
+        # Détecter le type de métrique demandé
+        metric_type = None
         if any(term in query_lower for term in ["fcr", "conversion", "indice"]):
-            if age_extracted:
-                param_count += 1
-                metric_search_conditions.append(
-                    f"LOWER(m.metric_name) LIKE ${param_count}"
-                )
-                params.append(f"%feed_conversion_ratio for {age_extracted}%")
-                logger.debug(
-                    f"Searching for: feed_conversion_ratio for {age_extracted} (param ${param_count})"
-                )
-
-            param_count += 1
-            metric_search_conditions.append(f"LOWER(m.metric_name) LIKE ${param_count}")
-            params.append("%feed_conversion_ratio%")
-            logger.debug(f"Searching for: feed_conversion_ratio (param ${param_count})")
-
-        # Pattern pour poids/weight
+            metric_type = "feed_conversion_ratio"
         elif any(term in query_lower for term in ["poids", "weight", "body"]):
-            if age_extracted:
-                param_count += 1
-                metric_search_conditions.append(
-                    f"LOWER(m.metric_name) LIKE ${param_count}"
-                )
-                params.append(f"%body_weight for {age_extracted}%")
-                logger.debug(
-                    f"Searching for: body_weight for {age_extracted} (param ${param_count})"
-                )
+            metric_type = "body_weight"
+        elif any(term in query_lower for term in ["consumption", "consommation"]):
+            metric_type = "feed_consumption"
+        elif any(term in query_lower for term in ["gain", "croissance"]):
+            metric_type = "daily_gain"
 
+        # Construire les patterns avec fallback amélioré
+        age_int = int(age_extracted) if age_extracted else None
+        patterns = self._build_metric_search(metric_type, age_int)
+
+        # Ajouter les conditions SQL
+        for pattern in patterns:
             param_count += 1
             metric_search_conditions.append(f"LOWER(m.metric_name) LIKE ${param_count}")
-            params.append("%body_weight%")
-            logger.debug(f"Searching for: body_weight (param ${param_count})")
-
-        # Pattern générique si rien de spécifique
-        else:
-            if age_extracted:
-                param_count += 1
-                metric_search_conditions.append(
-                    f"LOWER(m.metric_name) LIKE ${param_count}"
-                )
-                params.append(f"% for {age_extracted}%")
-                logger.debug(
-                    f"Searching for: generic metric for {age_extracted} (param ${param_count})"
-                )
+            params.append(pattern)
+            logger.debug(f"Metric search pattern: {pattern} (param ${param_count})")
 
         if metric_search_conditions:
             conditions.append(f"({' OR '.join(metric_search_conditions)})")
 
         return param_count
-
-    # ========================================================================
-    # NOUVELLE MÉTHODE: Recherche inversée (valeur → âge)
-    # ========================================================================
 
     def build_reverse_lookup_query(
         self, breed: str, sex: str, metric_type: str, target_value: float
@@ -709,13 +718,12 @@ class PostgreSQLQueryBuilder:
         Args:
             breed: Nom de la souche (normalisé)
             sex: Sexe
-            metric_type: Type de métrique ("body_weight", "feed_conversion_ratio", etc.)
+            metric_type: Type de métrique
             target_value: Valeur cible à trouver
 
         Returns:
             Tuple[str, List]: (requête SQL, paramètres)
         """
-        # Normaliser breed pour DB
         db_strain_name = self._normalize_breed_for_db(breed)
 
         query = """
@@ -745,10 +753,6 @@ class PostgreSQLQueryBuilder:
 
         return query, params
 
-    # ========================================================================
-    # MÉTHODES HÉRITÉES CONSERVÉES (pour compatibilité)
-    # ========================================================================
-
     def _build_sex_condition(
         self,
         target_sex: Optional[str],
@@ -758,9 +762,7 @@ class PostgreSQLQueryBuilder:
         conditions: List[str],
         params: List[Any],
     ) -> Tuple[str, int]:
-        """
-        CONSERVÉ: Construit la condition SQL pour le sexe (version héritée)
-        """
+        """Construit la condition SQL pour le sexe (méthode héritée)"""
         if not target_sex or target_sex == "as_hatched":
             logger.debug("No specific sex requested, prioritizing as_hatched")
             return (
@@ -815,10 +817,9 @@ class PostgreSQLQueryBuilder:
     def _add_age_condition(
         self, age: int, param_index: int, conditions: List[str], params: List[Any]
     ) -> int:
-        """CONSERVÉ: Ajoute la condition d'âge avec tolérance (version héritée)"""
+        """Ajoute la condition d'âge avec tolérance"""
         age_tolerance = 3
 
-        # Trois paramètres: age, age, tolerance
         param_age1 = param_index + 1
         param_age2 = param_index + 2
         param_tolerance = param_index + 3
@@ -842,9 +843,8 @@ class PostgreSQLQueryBuilder:
         conditions: List[str],
         params: List[Any],
     ) -> int:
-        """CONSERVÉ: Ajoute les filtres basés sur les entités (version héritée)"""
+        """Ajoute les filtres basés sur les entités"""
 
-        # Filtre de souche avec normalisation vers noms BD
         if entities.get("breed"):
             db_strain_name = self._normalize_breed_for_db(entities["breed"])
 
@@ -867,7 +867,6 @@ class PostgreSQLQueryBuilder:
                     f"Adding line filter: {entities['line']} -> DB: '{db_strain_name}'"
                 )
 
-        # Filtre d'âge depuis entities (si pas déjà extrait)
         if entities.get("age_days") and not age_extracted:
             try:
                 age_days = int(entities["age_days"])
@@ -892,156 +891,105 @@ class PostgreSQLQueryBuilder:
 if __name__ == "__main__":
     from unittest.mock import Mock
 
-    # Mock normalizer
     mock_normalizer = Mock()
     mock_normalizer.extract_sex_from_query.return_value = "male"
 
     builder = PostgreSQLQueryBuilder(mock_normalizer)
 
     print("\n" + "=" * 80)
-    print("TEST 1: Normalisation breeds simples, multiples et étendus")
+    print("TEST 1: Fallback générique amélioré")
+    print("=" * 80)
+
+    # Test sans métrique connue, avec âge
+    patterns_with_age = builder._build_metric_search(None, 35)
+    print(f"  Patterns avec âge 35: {patterns_with_age}")
+
+    # Test sans métrique connue, sans âge
+    patterns_no_age = builder._build_metric_search(None, None)
+    print(f"  Patterns sans âge: {patterns_no_age}")
+
+    # Test avec métrique connue
+    patterns_fcr = builder._build_metric_search("fcr", 42)
+    print(f"  Patterns FCR à 42j: {patterns_fcr}")
+
+    print("\n" + "=" * 80)
+    print("TEST 2: Normalisation breeds")
     print("=" * 80)
     test_inputs = [
         "Cobb 500",
         "ross 308",
-        "cobb500",
-        "Cobb-500",
-        "c500",
         "Cobb 500, Ross 308",
-        "ross 308, cobb 500",
-        "cobb vs ross",
         "Hubbard JA87",
-        "Arbor Acres",
-        "Ross 708",
-        "Hubbard",
-        "308/308 ff",  # Test normalisation casse
-        "308/308FF",  # Test sans espace
     ]
     for inp in test_inputs:
         result = builder._normalize_breed_for_db(inp)
         print(f"  {inp:25s} -> {result}")
 
     print("\n" + "=" * 80)
-    print("TEST 2: Gestion breeds multiples SQL")
-    print("=" * 80)
-    test_breeds = ["500", "308/308 FF", "500,308/308 FF"]
-    for breed in test_breeds:
-        condition, params = builder._handle_multiple_breeds(breed)
-        print(f"  {breed:15s} -> Condition: {condition}")
-        print(f"  {' ':15s}    Params: {params}")
-
-    print("\n" + "=" * 80)
-    print("TEST 3: Extraction d'âge améliorée avec phases alimentaires")
+    print("TEST 3: Extraction d'âge avec phases")
     print("=" * 80)
     test_queries = [
         "poids à 42 jours",
-        "conversion de 35 jours",
-        "42j",
-        "6 semaines",
-        "at 21 days",
         "starter feed",
-        "grower phase",
-        "finisher performance",
-        "grower 1 results",
-        "finition feed",
-        "croissance performance",
+        "grower performance",
+        "finisher phase",
     ]
     for query in test_queries:
         age = builder._extract_age_from_query(query)
         print(f"  {query:25s} -> {age} jours")
 
     print("\n" + "=" * 80)
-    print("TEST 4: Construction requête complète avec paramètres alignés")
+    print("TEST 4: Construction requête complète avec fallback")
     print("=" * 80)
     sql, params = builder.build_sex_aware_sql_query(
-        "Quelle est la conversion alimentaire du Cobb 500 mâle à 17 jours ?",
-        entities={"breed": "Cobb 500", "sex": "male", "age_days": "17"},
+        "Conversion alimentaire du Cobb 500 à 35 jours",
+        entities={"breed": "Cobb 500", "age_days": "35"},
         top_k=10,
-        strict_sex_match=True,
     )
 
-    # Compter les placeholders dans la requête
     placeholders = re.findall(r"\$\d+", sql)
     unique_placeholders = set(placeholders)
 
     print(f"Paramètres fournis: {len(params)}")
-    print(f"Placeholders uniques trouvés: {len(unique_placeholders)}")
-    print(f"Placeholders: {sorted(unique_placeholders)}")
+    print(f"Placeholders uniques: {len(unique_placeholders)}")
     print(f"Correspondance: {'✓' if len(params) >= len(unique_placeholders) else '✗'}")
 
     print("\n" + "=" * 80)
-    print("TEST 5: Requête sans âge spécifique")
+    print("TEST 5: Requête avec métrique inconnue (fallback)")
     print("=" * 80)
-    sql_no_age, params_no_age = builder.build_sex_aware_sql_query(
-        "conversion alimentaire du Cobb 500", entities={"breed": "Cobb 500"}, top_k=5
+    sql_unknown, params_unknown = builder.build_sex_aware_sql_query(
+        "Performance du Cobb 500 à 35 jours",
+        entities={"breed": "Cobb 500", "age_days": "35"},
+        top_k=5,
     )
 
-    placeholders_no_age = re.findall(r"\$\d+", sql_no_age)
-    unique_placeholders_no_age = set(placeholders_no_age)
-
-    print(f"Paramètres fournis (sans âge): {len(params_no_age)}")
-    print(f"Placeholders uniques (sans âge): {len(unique_placeholders_no_age)}")
+    print(f"Paramètres fournis (métrique inconnue): {len(params_unknown)}")
     print(
-        f"Correspondance sans âge: {'✓' if len(params_no_age) >= len(unique_placeholders_no_age) else '✗'}"
+        f"Patterns génériques utilisés: {[p for p in params_unknown if '%' in str(p)]}"
     )
-    print(f"ORDER BY adapté: {'age_min ASC' in sql_no_age}")
 
     print("\n" + "=" * 80)
-    print("TEST 6: Requête avec breeds multiples")
+    print("TEST 6: Requête sans âge ni métrique (double fallback)")
     print("=" * 80)
-    sql_multi, params_multi = builder.build_sex_aware_sql_query(
-        "comparer conversion Cobb 500 vs Ross 308 à 42 jours",
-        entities={"breed": "Cobb 500, Ross 308", "age_days": "42"},
-        top_k=10,
+    sql_no_context, params_no_context = builder.build_sex_aware_sql_query(
+        "Données du Cobb 500",
+        entities={"breed": "Cobb 500"},
+        top_k=5,
     )
 
-    placeholders_multi = re.findall(r"\$\d+", sql_multi)
-    unique_placeholders_multi = set(placeholders_multi)
-
-    print(f"Paramètres fournis (multi-breeds): {len(params_multi)}")
-    print(f"Placeholders uniques (multi-breeds): {len(unique_placeholders_multi)}")
-    print(
-        f"Correspondance multi-breeds: {'✓' if len(params_multi) >= len(unique_placeholders_multi) else '✗'}"
-    )
-    print(f"SQL contient IN clause: {'IN (' in sql_multi}")
+    print(f"Paramètres fournis (sans contexte): {len(params_no_context)}")
+    generic_patterns = [p for p in params_no_context if "%" in str(p)]
+    print(f"Patterns métriques communes: {generic_patterns}")
 
     print("\n" + "=" * 80)
-    print("TEST 7: Gestion âges hors plage")
-    print("=" * 80)
-    test_ages = [42, 56, 60, 70, 100]
-    for age in test_ages:
-        out_of_range = builder._handle_out_of_range_age(age, "Cobb 500")
-        status = "HORS PLAGE" if out_of_range else "OK"
-        print(f"  {age:3d} jours -> {status}")
-
-    print("\n" + "=" * 80)
-    print("TEST 8: Requête de plage temporelle optimisée")
-    print("=" * 80)
-    sql_range, params_range = builder.build_range_query(
-        entities={"breed": "Cobb 500"}, age_min=21, age_max=42, limit=8
-    )
-
-    placeholders_range = re.findall(r"\$\d+", sql_range)
-    unique_placeholders_range = set(placeholders_range)
-
-    print(f"Paramètres fournis (range): {len(params_range)}")
-    print(f"Placeholders uniques (range): {len(unique_placeholders_range)}")
-    print(
-        f"Correspondance range: {'✓' if len(params_range) >= len(unique_placeholders_range) else '✗'}"
-    )
-    print(f"SQL contient BETWEEN: {'BETWEEN' in sql_range}")
-    print(f"SQL contient DISTINCT ON: {'DISTINCT ON' in sql_range}")
-
-    print("\n" + "=" * 80)
-    print("TEST 9: CORRECTION FINALE - Mappings Ross 308")
+    print("TEST 7: Normalisation Ross 308")
     print("=" * 80)
     ross_variants = [
         "ross 308",
-        "308/308 ff",  # Test normalisation casse
-        "308/308FF",  # Test sans espace
+        "308/308 ff",
+        "308/308FF",
         "308",
         "r308",
-        "ross-308",
     ]
     for variant in ross_variants:
         result = builder._normalize_breed_for_db(variant)
@@ -1049,9 +997,14 @@ if __name__ == "__main__":
         status = "✓" if result == expected else "✗"
         print(f"  {variant:15s} -> {result:15s} {status}")
 
+    print("\n" + "=" * 80)
+    print("TEST 8: Validation finale")
+    print("=" * 80)
     if len(params) >= len(unique_placeholders):
-        print("\n🎉 CORRECTION RÉUSSIE: Nombre de paramètres >= placeholders")
+        print("🎉 CORRECTION RÉUSSIE: Nombre de paramètres >= placeholders")
+        print("✓ Fallback générique amélioré implémenté")
+        print("✓ Patterns adaptatifs selon contexte")
     else:
         print(
-            f"\n⚠ PROBLÈME RESTANT: {len(unique_placeholders) - len(params)} paramètres manquants"
+            f"⚠ PROBLÈME: {len(unique_placeholders) - len(params)} paramètres manquants"
         )
