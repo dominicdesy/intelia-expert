@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
-VERSION CORRIGÉE: Préserve tous les champs originaux non détectés
+VERSION FINALE CORRIGÉE: Préserve tous les champs originaux en priorité
 """
 
 import re
@@ -20,7 +20,9 @@ class PostgreSQLValidator:
         """
         Validation flexible qui essaie de compléter les requêtes incomplètes
 
-        CORRECTION CRITIQUE: Préserve TOUS les champs originaux qui ne sont pas auto-détectés
+        CORRECTION FINALE: Commence toujours par les entités ORIGINALES,
+        puis enrichit SEULEMENT les champs manquants avec auto-détection.
+        Cela garantit que 'sex' et autres champs du comparison_handler sont préservés.
 
         Returns:
             Dict avec status: "complete" | "incomplete_but_processable" | "needs_fallback"
@@ -30,11 +32,12 @@ class PostgreSQLValidator:
         missing = []
         suggestions = []
 
-        # 🔧 CORRECTION: Créer une vraie copie des entités originales
+        # 🟢 CORRECTION CRITIQUE: Copier TOUTES les entités originales en priorité
+        # Cela préserve automatiquement 'sex', 'explicit_sex_request', etc.
         enhanced_entities = dict(entities) if entities else {}
 
-        # Vérifier breed
-        if not entities.get("breed"):
+        # 🟢 Auto-détection breed SEULEMENT si absent dans les entités originales
+        if not enhanced_entities.get("breed"):
             detected_breed = self._detect_breed_from_query(query)
             if detected_breed:
                 enhanced_entities["breed"] = detected_breed
@@ -43,8 +46,8 @@ class PostgreSQLValidator:
                 missing.append("breed")
                 suggestions.append("Spécifiez une race (Cobb 500, Ross 308, etc.)")
 
-        # Vérifier âge
-        if not entities.get("age_days"):
+        # 🟢 Auto-détection age SEULEMENT si absent dans les entités originales
+        if not enhanced_entities.get("age_days"):
             detected_age = self._detect_age_from_query(query)
             if detected_age:
                 enhanced_entities["age_days"] = detected_age
@@ -60,19 +63,18 @@ class PostgreSQLValidator:
                     missing.append("age")
                     suggestions.append("Précisez un âge (21 jours, 42 jours, etc.)")
 
-        # Vérifier métrique
-        if not entities.get("metric_type"):
+        # 🟢 Auto-détection metric SEULEMENT si absent dans les entités originales
+        if not enhanced_entities.get("metric_type"):
             detected_metric = self._detect_metric_from_query(query)
             if detected_metric:
                 enhanced_entities["metric_type"] = detected_metric
                 logger.debug(f"Auto-detected metric: {detected_metric}")
 
-        # 🔧 CORRECTION CRITIQUE: Préserver TOUS les champs originaux non détectés
-        # Ceci est essentiel pour les comparaisons où 'sex' vient du comparison_handler
-        for key, value in (entities or {}).items():
-            if key not in enhanced_entities and value is not None:
-                enhanced_entities[key] = value
-                logger.debug(f"Preserved original field: {key} = {value}")
+        # 🟢 Log de debug pour vérifier que tous les champs sont préservés
+        if entities:
+            preserved_fields = [k for k in entities.keys() if k in enhanced_entities]
+            if preserved_fields:
+                logger.debug(f"Preserved original fields: {preserved_fields}")
 
         # Déterminer le statut
         if not missing:
