@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_retriever.py - Récupérateur de données PostgreSQL
+Version corrigée avec mapping breed → nom PostgreSQL via breeds_registry
 """
 
 import logging
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Optional
 
 from .rag_postgresql_config import ASYNCPG_AVAILABLE
 from .rag_postgresql_models import MetricResult
@@ -17,13 +18,30 @@ logger = logging.getLogger(__name__)
 
 
 class PostgreSQLRetriever:
-    """Récupérateur de données PostgreSQL avec normalisation"""
+    """Récupérateur de données PostgreSQL avec normalisation et mapping breeds"""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(
+        self, config: Dict[str, Any], intents_file_path: str = "llm/config/intents.json"
+    ):
         self.config = config
         self.pool = None
         self.query_normalizer = SQLQueryNormalizer()
         self.is_initialized = False
+
+        # Charger le breeds registry pour mapping vers noms PostgreSQL
+        self.breeds_registry = None
+        try:
+            from utils.breeds_registry import get_breeds_registry
+
+            self.breeds_registry = get_breeds_registry(intents_file_path)
+            logger.info(
+                f"Breeds registry loaded: {len(self.breeds_registry.get_all_breeds())} breeds"
+            )
+        except Exception as e:
+            logger.warning(
+                f"Breeds registry not available: {e}. Will use fallback LIKE queries."
+            )
+            self.breeds_registry = None
 
     async def initialize(self):
         """Initialise la connexion PostgreSQL"""
@@ -58,6 +76,26 @@ class PostgreSQLRetriever:
             self.pool = None
             self.is_initialized = False
             raise
+
+    def _get_db_breed_name(self, canonical_breed: str) -> Optional[str]:
+        """
+        Convertit le nom de race canonique vers le nom PostgreSQL
+
+        Args:
+            canonical_breed: Nom canonique (ex: "ross 308")
+
+        Returns:
+            Nom PostgreSQL (ex: "308/308 FF") ou None si pas de mapping
+        """
+        if not self.breeds_registry:
+            return None
+
+        try:
+            db_name = self.breeds_registry.get_db_name(canonical_breed)
+            return db_name if db_name else None
+        except Exception as e:
+            logger.warning(f"Error getting DB name for '{canonical_breed}': {e}")
+            return None
 
     def _normalize_entities(self, entities: Dict[str, Any] = None) -> Dict[str, str]:
         """Normalise les entités en dict string simple"""
@@ -164,11 +202,28 @@ class PostgreSQLRetriever:
         params = []
         param_count = 0
 
-        # Filtres de base
+        # CORRECTION: Filtres de base avec mapping vers noms PostgreSQL
         if entities.get("breed"):
-            param_count += 1
-            conditions.append(f"LOWER(s.strain_name) LIKE LOWER(${param_count})")
-            params.append(f"%{entities['breed']}%")
+            canonical_breed = entities["breed"]
+            db_breed_name = self._get_db_breed_name(canonical_breed)
+
+            if db_breed_name and db_breed_name != canonical_breed:
+                # Mapping trouvé - utiliser recherche exacte
+                param_count += 1
+                conditions.append(f"s.strain_name = ${param_count}")
+                params.append(db_breed_name)
+                logger.debug(
+                    f"Breed DB mapping: '{canonical_breed}' → '{db_breed_name}'"
+                )
+            else:
+                # Pas de mapping ou breeds_registry non disponible - fallback LIKE
+                param_count += 1
+                conditions.append(f"LOWER(s.strain_name) LIKE LOWER(${param_count})")
+                params.append(f"%{canonical_breed}%")
+                if db_breed_name is None and self.breeds_registry:
+                    logger.warning(
+                        f"No DB mapping found for breed: '{canonical_breed}', using LIKE fallback"
+                    )
 
         # Filtre d'âge
         if entities.get("age_days"):

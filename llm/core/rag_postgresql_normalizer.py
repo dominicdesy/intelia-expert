@@ -49,7 +49,7 @@ class SQLQueryNormalizer:
     def _build_concept_mappings(self) -> Dict[str, List[str]]:
         """
         Construit les mappings de concepts depuis la terminologie chargée
-        
+
         CORRECTION: Gère correctement la structure JSON avec:
         - Accès via lang_terms["domains"]["performance_metrics"]
         - Structure {canonical, confidence, variants} au lieu de listes simples
@@ -62,9 +62,9 @@ class SQLQueryNormalizer:
             if "domains" not in lang_terms:
                 logger.warning(f"No 'domains' key found in terminology for {lang}")
                 continue
-            
+
             domains = lang_terms["domains"]
-            
+
             # CORRECTION 2: Accéder à performance_metrics via domains
             if "performance_metrics" not in domains:
                 logger.warning(f"No 'performance_metrics' in domains for {lang}")
@@ -78,34 +78,34 @@ class SQLQueryNormalizer:
                 if not isinstance(metric_data, dict):
                     logger.debug(f"Skipping {metric_key} - not a dict structure")
                     continue
-                
+
                 # Extraire les variants de la structure
                 variants = metric_data.get("variants", [])
                 canonical = metric_data.get("canonical", "")
-                
+
                 if not variants:
                     logger.debug(f"No variants found for {metric_key} in {lang}")
                     continue
-                
+
                 # Créer mapping pour la clé de base (premier mot)
                 base_key = metric_key.split("_")[0] if "_" in metric_key else metric_key
-                
+
                 if base_key not in mappings:
                     mappings[base_key] = []
                 mappings[base_key].extend(variants)
-                
+
                 # Ajouter aussi le canonical si présent
                 if canonical and canonical not in mappings[base_key]:
                     mappings[base_key].append(canonical)
-                
+
                 # Créer mapping pour la clé complète
                 if metric_key not in mappings:
                     mappings[metric_key] = []
                 mappings[metric_key].extend(variants)
-                
+
                 if canonical and canonical not in mappings[metric_key]:
                     mappings[metric_key].append(canonical)
-                
+
                 lang_concepts_count += 1
 
             logger.debug(f"Loaded {lang_concepts_count} concepts from {lang}")
@@ -121,14 +121,14 @@ class SQLQueryNormalizer:
             f"Built concept mappings for {len(mappings)} concepts "
             f"({total_concepts_found} total entries from all languages)"
         )
-        
+
         # Log détaillé si aucun concept trouvé (debugging)
         if len(mappings) == 0:
             logger.error(
                 "No concept mappings built! Check JSON structure. "
                 "Expected: {domains: {performance_metrics: {metric_key: {variants: [...]}}}}"
             )
-        
+
         return mappings
 
     def get_search_terms(self, query: str) -> Tuple[List[str], List[str]]:
@@ -193,26 +193,22 @@ class SQLQueryNormalizer:
     def get_concept_info(self, concept_key: str) -> Dict[str, Any]:
         """
         Retourne les informations détaillées sur un concept
-        
+
         Args:
             concept_key: Clé du concept (ex: "feed_conversion_ratio")
-        
+
         Returns:
             Dict avec variants et statistiques
         """
         if concept_key not in self.CONCEPT_MAPPINGS:
-            return {
-                "exists": False,
-                "variants": [],
-                "count": 0
-            }
-        
+            return {"exists": False, "variants": [], "count": 0}
+
         variants = self.CONCEPT_MAPPINGS[concept_key]
         return {
             "exists": True,
             "variants": variants,
             "count": len(variants),
-            "sample": variants[:5] if len(variants) > 5 else variants
+            "sample": variants[:5] if len(variants) > 5 else variants,
         }
 
     def debug_mappings(self) -> str:
@@ -220,15 +216,15 @@ class SQLQueryNormalizer:
         lines = [
             "=== CONCEPT MAPPINGS DEBUG ===",
             f"Total concepts: {len(self.CONCEPT_MAPPINGS)}",
-            ""
+            "",
         ]
-        
+
         for concept, variants in sorted(self.CONCEPT_MAPPINGS.items()):
             lines.append(f"{concept}:")
             lines.append(f"  - {len(variants)} variants")
             lines.append(f"  - Sample: {', '.join(variants[:3])}...")
             lines.append("")
-        
+
         return "\n".join(lines)
 
 
@@ -239,59 +235,62 @@ class SQLQueryNormalizer:
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
-    
+
     print("=" * 70)
     print("TESTS SQL QUERY NORMALIZER - VERSION CORRIGÉE")
     print("=" * 70)
-    
+
     # Test 1: Initialisation
     print("\nTest 1: Initialisation")
     try:
         normalizer = SQLQueryNormalizer()
         print(f"✅ Normalizer initialisé: {len(normalizer.CONCEPT_MAPPINGS)} concepts")
-        
+
         if len(normalizer.CONCEPT_MAPPINGS) == 0:
             print("⚠️  ATTENTION: Aucun concept chargé!")
             print("    Vérifiez la structure des fichiers JSON")
         else:
-            print(f"✅ Concepts disponibles: {list(normalizer.CONCEPT_MAPPINGS.keys())[:5]}...")
+            print(
+                f"✅ Concepts disponibles: {list(normalizer.CONCEPT_MAPPINGS.keys())[:5]}..."
+            )
     except Exception as e:
         print(f"❌ ERREUR: {e}")
         import traceback
+
         traceback.print_exc()
-    
+
     # Test 2: Normalisation de requêtes
     print("\nTest 2: Normalisation de requêtes")
     test_queries = [
         "What is the optimal FCR for Ross 308?",
         "Quelle est la consommation d'eau moyenne?",
-        "Average daily gain for broilers"
+        "Average daily gain for broilers",
     ]
-    
+
     for query in test_queries:
         concepts = normalizer.normalize_query_concepts(query)
         print(f"Query: {query}")
         print(f"  Concepts: {concepts[:5] if len(concepts) > 5 else concepts}")
-    
+
     # Test 3: Extraction du sexe
     print("\nTest 3: Extraction du sexe")
     sex_queries = [
         ("Ross 308 male performance", "male"),
         ("Poules pondeuses femelles", "female"),
-        ("As-hatched broilers", "as_hatched")
+        ("As-hatched broilers", "as_hatched"),
     ]
-    
+
     for query, expected in sex_queries:
         result = normalizer.extract_sex_from_query(query)
         status = "✅" if result == expected else "❌"
         print(f"{status} '{query}' → {result} (expected: {expected})")
-    
+
     # Test 4: Info sur un concept
     print("\nTest 4: Info détaillée sur les concepts")
     test_concepts = ["feed_conversion_ratio", "body_weight", "mortality"]
-    
+
     for concept in test_concepts:
         info = normalizer.get_concept_info(concept)
         if info["exists"]:
@@ -299,11 +298,11 @@ if __name__ == "__main__":
             print(f"   Sample: {', '.join(info['sample'])}")
         else:
             print(f"❌ {concept}: Non trouvé")
-    
+
     # Test 5: Debug complet
     print("\nTest 5: Résumé complet des mappings")
     print(normalizer.debug_mappings())
-    
+
     print("\n" + "=" * 70)
     print("TESTS TERMINÉS")
     print("=" * 70)
