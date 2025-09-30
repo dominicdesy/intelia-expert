@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 system_prompts.py - Helper pour charger et utiliser les prompts système
-Version: 1.0.0
+Version: 1.1.0 - Résolution de chemin robuste
 """
 
 import json
@@ -15,20 +15,73 @@ logger = logging.getLogger(__name__)
 class SystemPromptsManager:
     """
     Gestionnaire centralisé pour les prompts système
-    Charge depuis system_prompts.json
+    Charge depuis system_prompts.json avec résolution de chemin robuste
     """
 
-    def __init__(self, prompts_path: str = "llm/config/system_prompts.json"):
+    def __init__(self, prompts_path: Optional[str] = None):
         """
         Initialise le gestionnaire de prompts
 
         Args:
-            prompts_path: Chemin vers system_prompts.json
+            prompts_path: Chemin vers system_prompts.json (optionnel)
+                         Si None, utilise une résolution automatique
         """
-        self.prompts_path = Path(prompts_path)
+        self.prompts_path = self._resolve_config_path(prompts_path)
         self.prompts = self._load_prompts()
 
-        logger.info(f"✅ SystemPromptsManager chargé depuis {self.prompts_path}")
+        # Log conditionnel pour éviter messages contradictoires
+        if self.prompts:
+            logger.info(f"✅ SystemPromptsManager chargé depuis {self.prompts_path}")
+        else:
+            logger.error(
+                "❌ SystemPromptsManager non chargé - fichier absent ou invalide"
+            )
+
+    def _resolve_config_path(self, prompts_path: Optional[str]) -> Path:
+        """
+        Résolution robuste du chemin de configuration
+
+        Args:
+            prompts_path: Chemin fourni par l'utilisateur ou None
+
+        Returns:
+            Path résolu et validé
+
+        Raises:
+            FileNotFoundError: Si aucun fichier valide n'est trouvé
+        """
+        # Si un chemin est fourni, l'utiliser en priorité
+        if prompts_path:
+            path = Path(prompts_path)
+            if path.exists():
+                return path.resolve()
+
+        # Chemins à tester par ordre de priorité
+        alternative_paths = [
+            # 1. Même dossier que ce fichier Python
+            Path(__file__).parent / "system_prompts.json",
+            # 2. Depuis la racine du projet
+            Path.cwd() / "config" / "system_prompts.json",
+            # 3. Ancien chemin pour compatibilité
+            Path.cwd() / "llm" / "config" / "system_prompts.json",
+            # 4. Chemin absolu si déployé dans /app
+            Path("/app/config/system_prompts.json"),
+        ]
+
+        # Tester chaque chemin
+        for alt_path in alternative_paths:
+            if alt_path.exists():
+                logger.info(f"Fichier trouvé: {alt_path}")
+                return alt_path.resolve()
+
+        # Si aucun fichier trouvé, lever une exception explicite
+        tested_paths = [prompts_path] if prompts_path else []
+        tested_paths.extend([str(p) for p in alternative_paths])
+
+        raise FileNotFoundError(
+            "system_prompts.json introuvable.\n"
+            "Chemins testés:\n" + "\n".join(f"  - {p}" for p in tested_paths)
+        )
 
     def _load_prompts(self) -> Dict:
         """Charge system_prompts.json avec gestion d'erreurs"""
@@ -238,13 +291,13 @@ _global_prompts_manager: Optional[SystemPromptsManager] = None
 
 
 def get_prompts_manager(
-    prompts_path: str = "llm/config/system_prompts.json", force_reload: bool = False
+    prompts_path: Optional[str] = None, force_reload: bool = False
 ) -> SystemPromptsManager:
     """
     Factory pour obtenir l'instance globale du gestionnaire (singleton)
 
     Args:
-        prompts_path: Chemin vers system_prompts.json
+        prompts_path: Chemin vers system_prompts.json (optionnel)
         force_reload: Si True, recharge même si existe
 
     Returns:
@@ -267,12 +320,12 @@ def get_prompts_manager(
 # ============================================================================
 
 
-def load_system_prompts(prompts_path: str = "llm/config/system_prompts.json") -> Dict:
+def load_system_prompts(prompts_path: Optional[str] = None) -> Dict:
     """
     Charge directement le fichier JSON (pour compatibilité)
 
     Args:
-        prompts_path: Chemin vers system_prompts.json
+        prompts_path: Chemin vers system_prompts.json (optionnel)
 
     Returns:
         Dict complet des prompts
@@ -321,29 +374,29 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 
     print("=" * 70)
-    print("🧪 TESTS SYSTEM PROMPTS MANAGER")
+    print("TESTS SYSTEM PROMPTS MANAGER")
     print("=" * 70)
 
     # Test 1: Chargement
-    print("\n📥 Test 1: Chargement du gestionnaire")
+    print("\nTest 1: Chargement du gestionnaire")
     try:
         manager = get_prompts_manager()
-        print("  ✅ Gestionnaire chargé")
-        print(f"  📊 Sections disponibles: {list(manager.prompts.keys())}")
+        print("  OK Gestionnaire chargé")
+        print(f"  Sections disponibles: {list(manager.prompts.keys())}")
     except Exception as e:
-        print(f"  ❌ Erreur: {e}")
+        print(f"  ERREUR: {e}")
         sys.exit(1)
 
     # Test 2: Prompts spécialisés
-    print("\n🎯 Test 2: Prompts spécialisés")
+    print("\nTest 2: Prompts spécialisés")
     intent_types = ["metric_query", "environment_setting", "diagnosis_triage"]
 
     for intent in intent_types:
         prompt_fr = manager.get_specialized_prompt(intent, "fr")
         prompt_en = manager.get_specialized_prompt(intent, "en")
 
-        status_fr = "✅" if prompt_fr else "❌"
-        status_en = "✅" if prompt_en else "❌"
+        status_fr = "OK" if prompt_fr else "MANQUANT"
+        status_en = "OK" if prompt_en else "MANQUANT"
 
         print(
             f"  {status_fr} {intent} (FR): {len(prompt_fr) if prompt_fr else 0} chars"
@@ -353,22 +406,22 @@ if __name__ == "__main__":
         )
 
     # Test 3: Prompts de base
-    print("\n🔤 Test 3: Prompts de base")
+    print("\nTest 3: Prompts de base")
     base_keys = ["expert_identity", "response_guidelines"]
 
     for key in base_keys:
         prompt_fr = manager.get_base_prompt(key, "fr")
-        status = "✅" if prompt_fr else "❌"
+        status = "OK" if prompt_fr else "MANQUANT"
         print(f"  {status} {key} (FR): {len(prompt_fr) if prompt_fr else 0} chars")
 
     # Test 4: Normalisation
-    print("\n🔄 Test 4: Prompt de normalisation")
+    print("\nTest 4: Prompt de normalisation")
     norm_prompt = manager.get_normalization_prompt("fr", is_comparative=True)
-    status = "✅" if norm_prompt and len(norm_prompt) > 100 else "❌"
+    status = "OK" if norm_prompt and len(norm_prompt) > 100 else "MANQUANT"
     print(f"  {status} Normalisation comparative (FR): {len(norm_prompt)} chars")
 
     # Test 5: Messages d'erreur
-    print("\n⚠️  Test 5: Messages d'erreur")
+    print("\nTest 5: Messages d'erreur")
     error_msg = manager.get_error_message(
         "species_mismatch",
         "fr",
@@ -377,15 +430,15 @@ if __name__ == "__main__":
         breed2="Hy-Line Brown",
         species2="layer",
     )
-    status = "✅" if error_msg else "❌"
+    status = "OK" if error_msg else "MANQUANT"
     print(f"  {status} Message erreur: {error_msg[:80]}...")
 
     # Test 6: Prompt complet
-    print("\n📋 Test 6: Construction prompt complet")
+    print("\nTest 6: Construction prompt complet")
     complete = manager.build_complete_prompt("metric_query", "fr")
-    status = "✅" if complete and len(complete) > 200 else "❌"
+    status = "OK" if complete and len(complete) > 200 else "MANQUANT"
     print(f"  {status} Prompt complet: {len(complete)} chars")
 
     print("\n" + "=" * 70)
-    print("✅ TESTS TERMINÉS")
+    print("TESTS TERMINÉS")
     print("=" * 70)
