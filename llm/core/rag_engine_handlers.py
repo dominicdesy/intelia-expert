@@ -62,6 +62,8 @@ class ComparativeQueryHandler(BaseQueryHandler):
         """Configure avec ComparisonHandler"""
         super().configure(**kwargs)
         self.comparison_handler = kwargs.get("comparison_handler")
+        self.weaviate_core = kwargs.get("weaviate_core")  # AJOUT
+        self.postgresql_system = kwargs.get("postgresql_system")  # AJOUT
 
     async def handle(
         self, preprocessed_data: Dict[str, Any], start_time: float
@@ -166,31 +168,50 @@ class ComparativeQueryHandler(BaseQueryHandler):
         entities = preprocessed_data.get("entities", {})
         query = preprocessed_data["normalized_query"]
 
+        # Initialisation des métadonnées de disponibilité
+        availability_metadata = {
+            "postgresql_available": self.postgresql_system is not None,
+            "weaviate_available": self.weaviate_core is not None,
+        }
+
         # 1. Tentative PostgreSQL
         if self.postgresql_system and entities:
-            logger.info("Fallback comparative: tentative PostgreSQL")
-            result = await self.postgresql_system.search_metrics(
-                query=query,
-                entities=entities,
-                top_k=RAG_SIMILARITY_TOP_K,
-            )
-
-            if result and result.source != RAGSource.NO_RESULTS:
-                result.metadata.update(
-                    {
-                        "source_type": "comparative_fallback_postgresql",
-                        "fallback_applied": True,
-                        "processing_time": time.time() - start_time,
-                    }
+            logger.info("🔍 Fallback comparative: tentative PostgreSQL")
+            try:
+                result = await self.postgresql_system.search_metrics(
+                    query=query,
+                    entities=entities,
+                    top_k=RAG_SIMILARITY_TOP_K,
                 )
-                logger.info(f"✅ Fallback PostgreSQL: {len(result.context_docs)} docs")
-                return result
 
-            logger.info("⚠️ PostgreSQL fallback: 0 résultats")
+                if result and result.source != RAGSource.NO_RESULTS:
+                    result.metadata.update(
+                        {
+                            "source_type": "comparative_fallback_postgresql",
+                            "fallback_applied": True,
+                            "processing_time": time.time() - start_time,
+                            **availability_metadata,
+                        }
+                    )
+                    logger.info(
+                        f"✅ Fallback PostgreSQL: {len(result.context_docs)} docs"
+                    )
+                    return result
+
+                logger.info("⚠️ PostgreSQL fallback: 0 résultats")
+
+            except Exception as e:
+                logger.error(f"❌ Erreur PostgreSQL fallback: {e}")
+                availability_metadata["postgresql_error"] = str(e)
+        else:
+            if not self.postgresql_system:
+                logger.warning("⚠️ PostgreSQL non disponible pour fallback comparative")
+            if not entities:
+                logger.info("ℹ️ Pas d'entités détectées, skip PostgreSQL")
 
         # 2. ✅ NOUVEAU: Tentative Weaviate si PostgreSQL échoue
         if self.weaviate_core:
-            logger.info("Fallback comparative: tentative Weaviate")
+            logger.info("🔍 Fallback comparative: tentative Weaviate")
             try:
                 weaviate_result = await self.weaviate_core.search(
                     query=query,
@@ -203,6 +224,7 @@ class ComparativeQueryHandler(BaseQueryHandler):
                             "source_type": "comparative_fallback_weaviate",
                             "fallback_applied": True,
                             "processing_time": time.time() - start_time,
+                            **availability_metadata,
                         }
                     )
                     logger.info(
@@ -213,7 +235,10 @@ class ComparativeQueryHandler(BaseQueryHandler):
                 logger.info("⚠️ Weaviate fallback: 0 résultats")
 
             except Exception as e:
-                logger.error(f"Erreur Weaviate fallback: {e}")
+                logger.error(f"❌ Erreur Weaviate fallback: {e}")
+                availability_metadata["weaviate_error"] = str(e)
+        else:
+            logger.warning("⚠️ Weaviate non disponible pour fallback comparative")
 
         # 3. Si tout échoue
         logger.warning("❌ Tous les fallbacks comparative ont échoué")
@@ -226,6 +251,7 @@ class ComparativeQueryHandler(BaseQueryHandler):
                 "result_type": "no_results",
                 "is_success": False,
                 "is_error": True,
+                **availability_metadata,
             },
         )
 

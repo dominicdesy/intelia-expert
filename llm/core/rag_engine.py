@@ -219,17 +219,19 @@ class InteliaRAGEngine:
                 logger.warning(f"⚠️ Weaviate Core échoué: {e}")
                 self.initialization_errors.append(f"WeaviateCore: {e}")
 
-        # Comparison Handler (wrapper vers ComparisonEngine)
-        if (
-            COMPARISON_HANDLER_AVAILABLE
-            and ComparisonHandler
-            and self.postgresql_system
-        ):
+        # 🔧 MODIFICATION 1: Comparison Handler (wrapper vers ComparisonEngine)
+        # Permettre l'initialisation même si PostgreSQL est None
+        if COMPARISON_HANDLER_AVAILABLE and ComparisonHandler:
             try:
                 self.comparison_handler = ComparisonHandler(self.postgresql_system)
-                logger.info(
-                    "✅ Comparison Handler initialisé (wrapper → ComparisonEngine)"
-                )
+                if not self.postgresql_system:
+                    logger.warning(
+                        "⚠️ Comparison Handler initialisé en mode dégradé (PostgreSQL absent, utilisera Weaviate comme fallback)"
+                    )
+                else:
+                    logger.info(
+                        "✅ Comparison Handler initialisé (wrapper → ComparisonEngine)"
+                    )
             except Exception as e:
                 logger.warning(f"⚠️ Comparison Handler échoué: {e}")
                 self.initialization_errors.append(f"ComparisonHandler: {e}")
@@ -239,8 +241,13 @@ class InteliaRAGEngine:
         # Configuration temporal handler
         self.temporal_handler.configure(postgresql_system=self.postgresql_system)
 
-        # Configuration comparative handler
-        self.comparative_handler.configure(comparison_handler=self.comparison_handler)
+        # 🔧 MODIFICATION 2: Configuration comparative handler
+        # Passer weaviate_core et postgresql_system
+        self.comparative_handler.configure(
+            comparison_handler=self.comparison_handler,
+            weaviate_core=self.weaviate_core,  # AJOUT
+            postgresql_system=self.postgresql_system,  # AJOUT
+        )
 
         # Configuration standard handler
         self.standard_handler.configure(
@@ -469,7 +476,7 @@ class InteliaRAGEngine:
             "rag_enabled": RAG_ENABLED,
             "initialized": self.is_initialized,
             "degraded_mode": self.degraded_mode,
-            "version": "v2.0.1_fixed",  # ✅ Version mise à jour
+            "version": "v2.0.2_fallback_enhanced",  # ✅ Version mise à jour
             "architecture": "modular_centralized",
             "modules": {
                 # Core modules
@@ -493,6 +500,7 @@ class InteliaRAGEngine:
             "capabilities": {
                 "temporal_range_queries": True,
                 "comparative_queries": bool(self.comparison_handler),
+                "comparative_fallback_to_weaviate": True,  # Nouveau
                 "optimization_queries": True,
                 "calculation_queries": True,
                 "economic_queries": False,  # Non supporté
@@ -516,6 +524,7 @@ class InteliaRAGEngine:
                 "removed_files": 6,
                 "code_reduction": "~47%",
                 "compatibility": "100% (wrappers)",
+                "fallback_support": "Weaviate fallback for comparisons without PostgreSQL",
             },
         }
 
