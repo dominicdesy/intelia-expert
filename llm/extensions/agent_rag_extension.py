@@ -3,17 +3,23 @@
 agent_rag_extension.py - Extension Agent RAG pour Intelia Expert
 Implémente un Agent RAG avec décomposition de requêtes et synthèse multi-documents
 Compatible avec votre architecture existante
+
+VERSION CORRIGÉE: Utilise composition au lieu d'héritage pour éviter import circulaire
 """
 
 import asyncio
 import time
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional, TYPE_CHECKING
 from dataclasses import dataclass, field
 from enum import Enum
 
-# Imports de votre système existant - CORRIGÉS
-from core.rag_engine import InteliaRAGEngine, RAGResult, RAGSource
+# Import conditionnel pour éviter l'import circulaire
+if TYPE_CHECKING:
+    from core.rag_engine import InteliaRAGEngine
+
+# Imports sûrs (pas de risque d'import circulaire)
+from core.data_models import RAGResult, RAGSource
 from processing.intent_processor import IntentProcessor, IntentResult, IntentType
 
 logger = logging.getLogger(__name__)
@@ -364,7 +370,6 @@ RÉPONSE SYNTHÉTISÉE:"""
 
         except Exception as e:
             logger.error(f"Erreur synthèse multi-métrique: {e}")
-            # Fallback: concaténation simple
             return self._fallback_concatenation(results)
 
     async def _synthesize_comparative(
@@ -505,11 +510,21 @@ RÉPONSE:"""
         return "\n\n".join(response_parts)
 
 
-class InteliaAgentRAG(InteliaRAGEngine):
-    """Agent RAG intelligent pour Intelia Expert - Extension de votre RAG Engine"""
+class InteliaAgentRAG:
+    """
+    Agent RAG intelligent pour Intelia Expert
 
-    def __init__(self, openai_client=None):
-        super().__init__(openai_client)
+    ARCHITECTURE: Utilise composition au lieu d'héritage pour éviter import circulaire
+    """
+
+    def __init__(self, rag_engine: Optional["InteliaRAGEngine"] = None):
+        """
+        Initialise l'agent avec un RAG Engine existant
+
+        Args:
+            rag_engine: Instance de InteliaRAGEngine (composition, pas héritage)
+        """
+        self.rag_engine = rag_engine
         self.decomposer = None
         self.synthesizer = None
 
@@ -522,13 +537,42 @@ class InteliaAgentRAG(InteliaRAGEngine):
             "synthesis_success_rate": 0.0,
         }
 
-    async def initialize(self):
-        """Initialisation de l'agent RAG"""
-        await super().initialize()
+    async def initialize(self, rag_engine: Optional["InteliaRAGEngine"] = None):
+        """
+        Initialisation de l'agent RAG
+
+        Args:
+            rag_engine: Instance de InteliaRAGEngine si non fournie au __init__
+        """
+        if rag_engine:
+            self.rag_engine = rag_engine
+
+        if not self.rag_engine:
+            raise ValueError("RAG Engine requis pour initialiser l'agent")
+
+        # Vérifier que le RAG engine est initialisé
+        if not self.rag_engine.is_initialized:
+            await self.rag_engine.initialize()
 
         # Initialiser les composants agent
-        self.decomposer = QueryDecomposer(self.intent_processor)
-        self.synthesizer = MultiDocumentSynthesizer(self.openai_client)
+        # Accéder à intent_processor via le RAG engine
+        if hasattr(self.rag_engine, "weaviate_core") and self.rag_engine.weaviate_core:
+            intent_processor = self.rag_engine.weaviate_core.intent_processor
+        else:
+            raise ValueError("Intent processor non disponible dans RAG engine")
+
+        self.decomposer = QueryDecomposer(intent_processor)
+
+        # Accéder au client OpenAI via le RAG engine
+        openai_client = (
+            self.rag_engine.core.openai_client
+            if hasattr(self.rag_engine, "core")
+            else None
+        )
+        if not openai_client:
+            raise ValueError("Client OpenAI non disponible dans RAG engine")
+
+        self.synthesizer = MultiDocumentSynthesizer(openai_client)
 
         logger.info("Agent RAG Intelia initialisé avec décomposition et synthèse")
 
@@ -541,8 +585,19 @@ class InteliaAgentRAG(InteliaRAGEngine):
         self.agent_stats["total_agent_queries"] += 1
 
         try:
-            # 1. Analyse d'intention (utilise votre système existant)
-            intent_result = self.intent_processor.process_query(query)
+            # Vérifier que le RAG engine est disponible
+            if not self.rag_engine:
+                raise ValueError("RAG Engine non initialisé")
+
+            # 1. Analyse d'intention via le RAG engine
+            if (
+                hasattr(self.rag_engine, "weaviate_core")
+                and self.rag_engine.weaviate_core
+            ):
+                intent_processor = self.rag_engine.weaviate_core.intent_processor
+                intent_result = intent_processor.process_query(query)
+            else:
+                raise ValueError("Intent processor non disponible")
 
             # 2. Analyse de complexité
             complexity = self.decomposer.analyze_complexity(query, intent_result)
@@ -553,8 +608,10 @@ class InteliaAgentRAG(InteliaRAGEngine):
                 self.agent_stats["simple_queries"] += 1
                 agent_decisions.append("Traitement direct (requête simple)")
 
-                # Utiliser le flux RAG standard
-                rag_result = await super().process_query(query, language, tenant_id)
+                # Utiliser le RAG engine via generate_response
+                rag_result = await self.rag_engine.generate_response(
+                    query=query, tenant_id=tenant_id, language=language
+                )
 
                 return AgentResult(
                     final_answer=rag_result.answer or "Aucune réponse trouvée",
@@ -639,7 +696,9 @@ class InteliaAgentRAG(InteliaRAGEngine):
 
             # Fallback gracieux vers RAG standard
             try:
-                rag_result = await super().process_query(query, language, tenant_id)
+                rag_result = await self.rag_engine.generate_response(
+                    query=query, tenant_id=tenant_id, language=language
+                )
                 return AgentResult(
                     final_answer=rag_result.answer
                     or f"Erreur agent, fallback utilisé: {str(e)}",
@@ -672,8 +731,10 @@ class InteliaAgentRAG(InteliaRAGEngine):
     ) -> RAGResult:
         """Traite une sous-requête individuelle"""
         try:
-            # Utiliser le RAG engine standard pour chaque sous-requête
-            result = await super().process_query(sub_query.query, language, tenant_id)
+            # Utiliser le RAG engine pour chaque sous-requête
+            result = await self.rag_engine.generate_response(
+                query=sub_query.query, tenant_id=tenant_id, language=language
+            )
 
             # Enrichir avec le contexte de la sous-requête
             if result.metadata is None:
@@ -690,7 +751,6 @@ class InteliaAgentRAG(InteliaRAGEngine):
 
         except Exception as e:
             logger.error(f"Erreur traitement sous-requête '{sub_query.query}': {e}")
-            # Retourner un résultat d'erreur plutôt que de lever l'exception
             return RAGResult(
                 source=RAGSource.ERROR,
                 answer=f"Erreur traitement: {str(e)}",
@@ -722,7 +782,7 @@ class InteliaAgentRAG(InteliaRAGEngine):
 
     def get_agent_status(self) -> Dict:
         """Status détaillé de l'agent"""
-        base_status = super().get_status()
+        base_status = self.rag_engine.get_status() if self.rag_engine else {}
 
         agent_status = {
             **base_status,
@@ -738,17 +798,23 @@ class InteliaAgentRAG(InteliaRAGEngine):
                 "graceful_fallback",
                 "decision_logging",
             ],
+            "architecture": "composition_based",  # Pas d'héritage
         }
 
         return agent_status
 
 
 # Fonctions utilitaires pour l'intégration avec votre système
-async def create_agent_rag_engine(openai_client=None) -> InteliaAgentRAG:
-    """Factory pour créer l'agent RAG"""
-    engine = InteliaAgentRAG(openai_client)
-    await engine.initialize()
-    return engine
+async def create_agent_rag_engine(rag_engine: "InteliaRAGEngine") -> InteliaAgentRAG:
+    """
+    Factory pour créer l'agent RAG
+
+    Args:
+        rag_engine: Instance existante de InteliaRAGEngine
+    """
+    agent = InteliaAgentRAG(rag_engine)
+    await agent.initialize()
+    return agent
 
 
 async def process_query_with_agent(
