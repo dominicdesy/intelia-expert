@@ -189,14 +189,10 @@ class InteliaRAGEngine:
 
     async def _initialize_external_modules(self):
         """Initialise les modules externes"""
-        # Query Preprocessor (refactorisé pour utiliser les nouveaux modules)
-        if (
-            QUERY_PREPROCESSOR_AVAILABLE
-            and QueryPreprocessor
-            and self.core.openai_client
-        ):
+        # Query Preprocessor (refactorisé - n'accepte plus de paramètres)
+        if QUERY_PREPROCESSOR_AVAILABLE and QueryPreprocessor:
             try:
-                self.query_preprocessor = QueryPreprocessor(self.core.openai_client)
+                self.query_preprocessor = QueryPreprocessor()  # ✅ CORRECTION ICI
                 await self.query_preprocessor.initialize()
                 logger.info("✅ Query Preprocessor initialisé (refactorisé)")
             except Exception as e:
@@ -473,7 +469,7 @@ class InteliaRAGEngine:
             "rag_enabled": RAG_ENABLED,
             "initialized": self.is_initialized,
             "degraded_mode": self.degraded_mode,
-            "version": "v2.0_refactored_architecture",
+            "version": "v2.0.1_fixed",  # ✅ Version mise à jour
             "architecture": "modular_centralized",
             "modules": {
                 # Core modules
