@@ -11,7 +11,7 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 
-from llm.utils.breeds_registry import get_breeds_registry
+from utils.breeds_registry import get_breeds_registry
 
 logger = logging.getLogger(__name__)
 
