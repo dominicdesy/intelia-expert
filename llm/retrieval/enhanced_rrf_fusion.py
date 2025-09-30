@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 # Import du breeds_registry
 try:
-    from llm.utils.breeds_registry import get_breeds_registry
+    from utils.breeds_registry import get_breeds_registry
 except ImportError:
     logger.warning("BreedsRegistry non disponible - utilisation des patterns hardcodés")
     get_breeds_registry = None
