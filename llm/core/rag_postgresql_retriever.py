@@ -18,7 +18,7 @@ from processing.intent_processor import IntentProcessor, IntentResult, IntentTyp
 
 # Import du gestionnaire de prompts centralisé
 try:
-    from llm.config.system_prompts import get_prompts_manager
+    from config.system_prompts import get_prompts_manager
 
     PROMPTS_AVAILABLE = True
 except ImportError:

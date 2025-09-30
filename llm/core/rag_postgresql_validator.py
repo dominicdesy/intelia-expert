@@ -12,7 +12,7 @@ import re
 import logging
 from typing import Dict, List, Optional, Any
 
-from llm.utils.breeds_registry import get_breeds_registry
+from utils.breeds_registry import get_breeds_registry
 
 logger = logging.getLogger(__name__)
 
