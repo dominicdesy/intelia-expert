@@ -12,7 +12,7 @@ from processing.intent_types import IntentType, IntentResult
 # Import du gestionnaire de prompts centralisé
 try:
     # ✅ CORRECTION: Import relatif au lieu d'import absolu
-    from generation.config.system_prompts import get_prompts_manager
+    from config.system_prompts import get_prompts_manager
 
     PROMPTS_AVAILABLE = True
     logger = logging.getLogger(__name__)
