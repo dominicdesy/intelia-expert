@@ -27,7 +27,7 @@ class BreedsRegistry:
     - Gestion des aliases
     """
 
-    def __init__(self, intents_path: str = "llm/config/intents.json"):
+    def __init__(self, intents_path: str = "config/intents.json"):
         """
         Initialise le registre depuis intents.json
 
@@ -379,7 +379,7 @@ _global_registry: Optional[BreedsRegistry] = None
 
 
 def get_breeds_registry(
-    intents_path: str = "llm/config/intents.json", force_reload: bool = False
+    intents_path: str = "config/intents.json", force_reload: bool = False
 ) -> BreedsRegistry:
     """
     Factory pour obtenir l'instance globale du registre (singleton)

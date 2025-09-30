@@ -172,7 +172,7 @@ class EntityExtractor:
         ],
     }
 
-    def __init__(self, intents_config_path: str = "llm/config/intents.json"):
+    def __init__(self, intents_config_path: str = "config/intents.json"):
         """
         Initialise l'extracteur avec breeds_registry
 
