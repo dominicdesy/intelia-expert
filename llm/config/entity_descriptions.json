@@ -1,0 +1,38 @@
+{
+  "_comment": "Descriptions d'entités pour le générateur de réponses",
+  "version": "1.0.0",
+  "last_updated": "2025-09-30",
+  
+  "entity_contexts": {
+    "line": {
+      "ross": "lignée à croissance rapide, optimisée pour le rendement carcasse",
+      "ross_308": "lignée à croissance rapide, optimisée pour le rendement carcasse",
+      "ross_708": "lignée haute performance pour marchés premium",
+      "cobb": "lignée équilibrée performance/robustesse, bonne conversion alimentaire",
+      "cobb_500": "lignée équilibrée performance/robustesse, bonne conversion alimentaire",
+      "hubbard": "lignée rustique, adaptée à l'élevage extensif et labels qualité",
+      "isa": "lignée ponte, optimisée pour la production d'œufs",
+      "lohmann": "lignée ponte, excellence en persistance de ponte"
+    },
+    "species": {
+      "broiler": "poulet de chair, objectifs: poids vif, FCR, rendement carcasse",
+      "layer": "poule pondeuse, objectifs: intensité de ponte, qualité œuf, persistance",
+      "breeder": "reproducteur, objectifs: fertilité, éclosabilité, viabilité descendance"
+    },
+    "phase": {
+      "starter": "phase démarrage (0-10j), croissance critique, thermorégulation",
+      "grower": "phase croissance (11-24j), développement squelettique et musculaire",
+      "finisher": "phase finition (25j+), optimisation du poids final et FCR",
+      "laying": "phase ponte, maintien de la production et qualité œuf",
+      "breeding": "phase reproduction, optimisation fertilité et éclosabilité"
+    }
+  },
+  
+  "performance_metrics": {
+    "weight": ["poids vif", "gain de poids", "homogénéité", "courbe de croissance"],
+    "fcr": ["indice de consommation", "efficacité alimentaire", "coût alimentaire"],
+    "mortality": ["mortalité", "viabilité", "causes de mortalité", "prévention"],
+    "production": ["intensité de ponte", "pic de ponte", "persistance", "qualité œuf"],
+    "feed": ["consommation", "appétence", "digestibilité", "conversion"]
+  }
+}

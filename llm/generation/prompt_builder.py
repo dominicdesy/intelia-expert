@@ -14,11 +14,16 @@ try:
     from llm.config.system_prompts import get_prompts_manager
 
     PROMPTS_AVAILABLE = True
-except ImportError:
-    logging.warning("SystemPromptsManager non disponible, utilisation prompts fallback")
+    logger = logging.getLogger(__name__)
+    logger.info("SystemPromptsManager chargé avec succès")
+except ImportError as e:
+    logger = logging.getLogger(__name__)
+    logger.warning(f"SystemPromptsManager import error: {e}")
     PROMPTS_AVAILABLE = False
-
-logger = logging.getLogger(__name__)
+except Exception as e:
+    logger = logging.getLogger(__name__)
+    logger.warning(f"SystemPromptsManager error: {e}")
+    PROMPTS_AVAILABLE = False
 
 
 class PromptBuilder:
@@ -51,13 +56,13 @@ class PromptBuilder:
                     self.prompts_manager = get_prompts_manager(prompts_path)
                 else:
                     self.prompts_manager = get_prompts_manager()
-                logger.info("✅ PromptBuilder initialisé avec system_prompts.json")
+                logger.info("PromptBuilder initialisé avec system_prompts.json")
             except Exception as e:
-                logger.error(f"❌ Erreur chargement prompts: {e}")
+                logger.error(f"Erreur chargement prompts: {e}")
                 self.prompts_manager = None
         else:
             self.prompts_manager = None
-            logger.warning("⚠️ PromptBuilder en mode fallback (prompts hardcodés)")
+            logger.warning("PromptBuilder en mode fallback (prompts hardcodés)")
 
     def build_specialized_prompt(
         self, intent_result: IntentResult, language: Optional[str] = None
@@ -363,20 +368,20 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 
     print("=" * 70)
-    print("🧪 TESTS PROMPT BUILDER")
+    print("TESTS PROMPT BUILDER")
     print("=" * 70)
 
     # Test 1: Initialisation
-    print("\n📥 Test 1: Initialisation")
+    print("\nTest 1: Initialisation")
     try:
         builder = PromptBuilder({}, language="fr")
-        print("  ✅ PromptBuilder créé")
-        print(f"  📊 Gestionnaire prompts: {builder.prompts_manager is not None}")
+        print("  OK - PromptBuilder créé")
+        print(f"  INFO - Gestionnaire prompts: {builder.prompts_manager is not None}")
     except Exception as e:
-        print(f"  ❌ Erreur: {e}")
+        print(f"  ERREUR: {e}")
 
     # Test 2: Génération prompts spécialisés
-    print("\n🎯 Test 2: Génération prompts spécialisés")
+    print("\nTest 2: Génération prompts spécialisés")
 
     from processing.intent_types import IntentResult, IntentType
 
@@ -399,9 +404,9 @@ if __name__ == "__main__":
         )
 
         prompt = builder.build_specialized_prompt(intent_result)
-        status = "✅" if prompt and len(prompt) > 50 else "❌"
+        status = "OK" if prompt and len(prompt) > 50 else "ERREUR"
 
-        print(f"  {status} {intent_type.value}: {len(prompt) if prompt else 0} chars")
+        print(f"  {status} - {intent_type.value}: {len(prompt) if prompt else 0} chars")
 
         if prompt and len(prompt) > 0:
             # Afficher les 100 premiers caractères
@@ -409,13 +414,13 @@ if __name__ == "__main__":
             print(f"      Preview: {preview}...")
 
     # Test 3: Fonction helper legacy
-    print("\n🔧 Test 3: Compatibilité legacy")
+    print("\nTest 3: Compatibilité legacy")
     legacy_prompt = build_prompt_for_intent(
         IntentType.METRIC_QUERY, {"line": "Ross 308"}, "fr"
     )
-    status = "✅" if legacy_prompt else "❌"
-    print(f"  {status} build_prompt_for_intent: {len(legacy_prompt)} chars")
+    status = "OK" if legacy_prompt else "ERREUR"
+    print(f"  {status} - build_prompt_for_intent: {len(legacy_prompt)} chars")
 
     print("\n" + "=" * 70)
-    print("✅ TESTS TERMINÉS")
+    print("TESTS TERMINÉS")
     print("=" * 70)

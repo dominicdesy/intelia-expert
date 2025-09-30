@@ -1,28 +1,28 @@
 # -*- coding: utf-8 -*-
-
-
 """
-
-
 main.py - Intelia Expert Backend - ARCHITECTURE MODULAIRE PURE
 Point d'entrée minimaliste avec délégation complète aux modules
-
-
 """
-
 
 import os
 import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 # === IMPORTS MODULAIRES ===
-from config.config import validate_config, BASE_PATH, ALLOWED_ORIGINS, STARTUP_TIMEOUT
+from config.config import (
+    validate_config,
+    BASE_PATH,
+    ALLOWED_ORIGINS,
+    STARTUP_TIMEOUT,
+    SUPPORTED_LANGUAGES,
+)
 from utils.imports_and_dependencies import require_critical_dependencies
 from utils.monitoring import create_health_monitor
 from utils.utilities import setup_logging
@@ -31,7 +31,7 @@ from api.endpoints import create_router
 # === DEBUG DEPLOYMENT - MESSAGES VISIBLES ===
 print("=" * 80)
 print("🔥 VERSION FINALE MAIN.PY CHARGÉE - TOUS ENDPOINTS DANS ROUTER")
-print("🔥 VERSION: 4.0.3-endpoints-centralized")
+print("🔥 VERSION: 4.0.4-translation-service-fixed")
 print("🔥 TIMESTAMP CHARGEMENT:", time.time())
 print("=" * 80)
 
@@ -42,16 +42,17 @@ logger = logging.getLogger(__name__)
 
 # Message de log immédiat
 logger.critical(
-    "🚨 VERSION FINALE DÉTECTÉE - main.py version 4.0.3-endpoints-centralized"
+    "🚨 VERSION FINALE DÉTECTÉE - main.py version 4.0.4-translation-service-fixed"
 )
 logger.critical("🚨 Tous les endpoints sont maintenant dans le router !")
+logger.critical("🚨 Service de traduction initialisé au démarrage !")
 logger.critical("🚨 TIMESTAMP LOGGER: %s", time.time())
 
 # Services globaux (injectés dans les endpoints)
 services = {}
 
 # ============================================================================
-# GESTION DU CYCLE DE VIE - VERSION FINALE
+# GESTION DU CYCLE DE VIE - VERSION FINALE AVEC TRADUCTION
 # ============================================================================
 
 
@@ -86,7 +87,6 @@ async def lifespan(app: FastAPI):
         try:
             from utils.utilities import _load_fasttext_model
             from config.config import FASTTEXT_MODEL_PATH
-            import os
 
             # Vérifier si le modèle existe, sinon le télécharger
             if not os.path.exists(FASTTEXT_MODEL_PATH):
@@ -138,12 +138,66 @@ async def lifespan(app: FastAPI):
 
             logger.debug(f"Traceback FastText: {traceback.format_exc()}")
 
-        # 4. Créer health monitor
+        # 4. NOUVEAU: Initialisation du service de traduction universel
+        logger.info("Initialisation du service de traduction universel...")
+        try:
+            from utils.translation_service import init_global_translation_service
+
+            # Chemin absolu vers les dictionnaires
+            dict_path = Path(__file__).parent / "config"
+
+            logger.info(f"Chemin dictionnaires: {dict_path}")
+
+            # Initialiser le service global
+            translation_service = init_global_translation_service(
+                dict_path=str(dict_path),
+                supported_languages=SUPPORTED_LANGUAGES,
+                enable_google_fallback=os.getenv(
+                    "ENABLE_GOOGLE_TRANSLATE", "false"
+                ).lower()
+                == "true",
+                google_api_key=os.getenv("GOOGLE_TRANSLATE_API_KEY"),
+                enable_technical_exclusion=True,
+            )
+
+            if translation_service:
+                # Vérifier que les dictionnaires sont bien chargés
+                num_dicts = len(translation_service._language_dictionaries)
+                logger.info(
+                    f"✅ Service de traduction initialisé - {num_dicts} dictionnaires chargés"
+                )
+
+                # Vérifier les domaines disponibles pour debug
+                try:
+                    available_domains = translation_service.get_available_domains()
+                    logger.info(
+                        f"📚 Domaines disponibles: {len(available_domains)} domaines"
+                    )
+                    if available_domains:
+                        logger.debug(
+                            f"Domaines: {', '.join(list(available_domains)[:5])}"
+                        )
+                except Exception as domain_err:
+                    logger.warning(f"Impossible de lister les domaines: {domain_err}")
+
+                services["translation_service"] = translation_service
+            else:
+                logger.warning("⚠️ Service de traduction retourné None")
+
+        except ImportError as e:
+            logger.error(f"❌ Import error service traduction: {e}")
+        except Exception as e:
+            logger.error(f"❌ Erreur initialisation service traduction: {e}")
+            import traceback
+
+            logger.debug(f"Traceback traduction: {traceback.format_exc()}")
+
+        # 5. Créer health monitor
         logger.info("Initialisation SystemHealthMonitor...")
         health_monitor = await create_health_monitor()
         services["health_monitor"] = health_monitor
 
-        # 5. Validation startup complète
+        # 6. Validation startup complète
         logger.info("Validation startup requirements...")
         validation_result = await asyncio.wait_for(
             health_monitor.validate_startup_requirements(), timeout=STARTUP_TIMEOUT
@@ -176,7 +230,7 @@ async def lifespan(app: FastAPI):
         else:
             logger.info("✅ Application démarrée avec succès")
 
-        # 5. Vérifications post-startup des services
+        # 7. Vérifications post-startup des services
         logger.info("Vérification des services initialisés...")
 
         # Vérification explicite du cache
@@ -201,6 +255,13 @@ async def lifespan(app: FastAPI):
         else:
             logger.warning("⚠️ RAG Engine non disponible")
 
+        # Vérification service de traduction
+        translation_service = services.get("translation_service")
+        if translation_service:
+            logger.info("✅ Service de traduction opérationnel")
+        else:
+            logger.warning("⚠️ Service de traduction non disponible")
+
         # Log statut des intégrations avancées
         langsmith_status = validation_result.get("langsmith_validation", {})
         if langsmith_status.get("status") == "configured":
@@ -214,7 +275,7 @@ async def lifespan(app: FastAPI):
                 f"⚡ RRF Intelligent actif - Learning: {rrf_status.get('learning_mode')}"
             )
 
-        # 6. CORRECTION FINALE : Re-créer le router avec les services initialisés
+        # 8. CORRECTION FINALE : Re-créer le router avec les services initialisés
         logger.critical("🔧 INJECTION DES SERVICES - ARCHITECTURE CENTRALISÉE 🔧")
         logger.info("Mise à jour du router avec services initialisés...")
 
@@ -228,7 +289,7 @@ async def lifespan(app: FastAPI):
         logger.critical("✅ ROUTER CENTRALISÉ MIS À JOUR AVEC SERVICES INJECTÉS ✅")
         logger.info("✅ Router mis à jour avec services injectés")
 
-        # 7. Application prête
+        # 9. Application prête
         logger.info(f"🌐 API disponible sur {BASE_PATH}")
         logger.info("📊 Services initialisés:")
         for service_name, service in services.items():
@@ -241,9 +302,9 @@ async def lifespan(app: FastAPI):
         if validation_result["overall_status"] == "healthy":
             logger.info("🎯 Mode: COMPLET (tous services opérationnels)")
         elif validation_result["overall_status"] == "degraded":
-            logger.info("🔶 Mode: DÉGRADÉ (services essentiels seulement)")
+            logger.info("📶 Mode: DÉGRADÉ (services essentiels seulement)")
         else:
-            logger.info("🔶 Mode: MINIMAL (fonctionnalités de base)")
+            logger.info("📶 Mode: MINIMAL (fonctionnalités de base)")
 
         logger.critical(
             "🎉 APPLICATION VERSION FINALE PRÊTE - ARCHITECTURE CENTRALISÉE 🎉"
@@ -335,7 +396,7 @@ logger.critical("🗂️ CRÉATION FASTAPI APP - VERSION FINALE 🗂️")
 app = FastAPI(
     title="Intelia Expert Backend",
     description="API RAG Enhanced avec LangSmith et RRF Intelligent - Architecture Centralisée",
-    version="4.0.3-endpoints-centralized",
+    version="4.0.4-translation-service-fixed",
     lifespan=lifespan,
 )
 
@@ -371,6 +432,7 @@ if __name__ == "__main__":
     logger.info("🔧 Architecture modulaire centralisée activée")
     logger.info("🛡️ Mode dégradé supporté pour cache/Redis")
     logger.info("🔧 Injection des services corrigée")
-    logger.critical("🔥 VERSION FINALE: 4.0.3-endpoints-centralized 🔥")
+    logger.info("🌐 Service de traduction initialisé au démarrage")
+    logger.critical("🔥 VERSION FINALE: 4.0.4-translation-service-fixed 🔥")
 
     uvicorn.run("main:app", host=host, port=port, reload=False, log_level="info")

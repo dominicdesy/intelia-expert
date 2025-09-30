@@ -2,7 +2,7 @@
 """
 monitoring.py - Module de surveillance et monitoring du système
 SystemHealthMonitor déplacé depuis main.py pour architecture modulaire
-VERSION CORRIGÉE: Gestion robuste du cache et des erreurs de connectivité Weaviate
+VERSION CORRIGÉE: Gestion robuste du cache et des erreurs de connectivité Weaviate + Agent RAG
 """
 
 import time
@@ -335,7 +335,7 @@ class SystemHealthMonitor:
                 }
 
     async def _initialize_core_services(self) -> list:
-        """Initialise les services principaux - VERSION CORRIGÉE POUR LE CACHE"""
+        """Initialise les services principaux - VERSION CORRIGÉE POUR LE CACHE + AGENT RAG"""
         errors = []
 
         try:
@@ -425,13 +425,22 @@ class SystemHealthMonitor:
                 errors.append(f"RAG Engine: {e}")
                 logger.error(f"RAG Engine erreur: {e}")
 
-            # Agent RAG (optionnel)
+            # CORRECTION: Agent RAG (optionnel) - NOUVEAU CODE
+            logger.info("  Initialisation Agent RAG...")
             try:
                 from extensions.agent_rag_extension import create_agent_rag_engine
 
-                agent_rag_engine = create_agent_rag_engine()
-                self._critical_services["agent_rag_engine"] = agent_rag_engine
-                logger.info("✅ Agent RAG disponible")
+                # Récupérer le rag_engine déjà initialisé
+                rag_engine = self._critical_services.get("rag_engine_enhanced")
+
+                if rag_engine and getattr(rag_engine, "is_initialized", False):
+                    # Passer le rag_engine au factory + await car c'est async
+                    agent_rag_engine = await create_agent_rag_engine(rag_engine)
+                    self._critical_services["agent_rag_engine"] = agent_rag_engine
+                    logger.info("✅ Agent RAG disponible")
+                else:
+                    logger.warning("Agent RAG: RAG Engine requis mais non initialisé")
+
             except ImportError:
                 logger.info("Agent RAG non disponible (optionnel)")
             except Exception as e:
@@ -777,7 +786,7 @@ class SystemHealthMonitor:
             global_status["environment"] = {
                 "platform": "digital_ocean",
                 "python_version": f"{__import__('sys').version_info.major}.{__import__('sys').version_info.minor}",
-                "monitoring_version": "1.0.3-connectivity-fixed",
+                "monitoring_version": "1.0.4-agent-rag-fixed",
             }
 
             # Déterminer statut global final
