@@ -2,7 +2,7 @@
 """
 entity_extractor.py - Extracteur d'entités centralisé
 Remplace la logique éparpillée dans comparative_detector, query_preprocessor, etc.
-Version 1.0 - Extraction unifiée avec patterns optimisés
+Version 2.0 - Migration vers breeds_registry dynamique
 """
 
 import re
@@ -10,6 +10,8 @@ import logging
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from enum import Enum
+
+from llm.utils.breeds_registry import get_breeds_registry
 
 logger = logging.getLogger(__name__)
 
@@ -85,36 +87,15 @@ class EntityExtractor:
     Extracteur d'entités unifié pour toutes les requêtes avicoles
 
     Fonctionnalités:
-    - Extraction breed, age, sex, metric avec patterns regex optimisés
+    - Extraction breed, age, sex, metric avec patterns dynamiques depuis breeds_registry
     - Détection de confiance par entité
     - Support multi-patterns pour robustesse
     - Normalisation automatique des valeurs
+
+    Version 2.0: Utilise breeds_registry au lieu de patterns hardcodés
     """
 
-    # Patterns centralisés - Breeds
-    BREED_PATTERNS = {
-        "cobb500": [
-            r"cobb\s*500",
-            r"cobb-500",
-            r"\b500\b(?!\s*(?:g|grammes?|kg))",  # Éviter confusion avec poids
-        ],
-        "ross308": [
-            r"ross\s*308",
-            r"ross-308",
-            r"308(?:\s*ff)?",
-            r"\b308\b(?!\s*(?:g|grammes?))",
-        ],
-        "hubbard": [
-            r"hubbard",
-            r"hub\s*(?:classic|flex)",
-        ],
-        "arbor_acres": [
-            r"arbor\s*acres",
-            r"aa\s*\d+",
-        ],
-    }
-
-    # Patterns centralisés - Sex
+    # Patterns centralisés - Sex (statiques, pas de races)
     SEX_PATTERNS = {
         "male": [
             r"\bm[aâ]les?\b",
@@ -135,7 +116,7 @@ class EntityExtractor:
         ],
     }
 
-    # Patterns centralisés - Age
+    # Patterns centralisés - Age (statiques)
     AGE_PATTERNS = [
         r"(\d+)\s*(?:jours?|days?|j)\b",
         r"à\s+(\d+)\s*(?:jours?|j)\b",
@@ -144,7 +125,7 @@ class EntityExtractor:
         r"(\d+)(?:e|ème|eme)?\s+jour",
     ]
 
-    # Patterns centralisés - Metrics
+    # Patterns centralisés - Metrics (statiques)
     METRIC_PATTERNS = {
         "weight": [
             "poids",
@@ -191,34 +172,95 @@ class EntityExtractor:
         ],
     }
 
-    def __init__(self):
-        """Initialise l'extracteur et compile les regex"""
+    def __init__(self, intents_config_path: str = "llm/config/intents.json"):
+        """
+        Initialise l'extracteur avec breeds_registry
+
+        Args:
+            intents_config_path: Chemin vers intents.json
+        """
+        # Charger le breeds_registry
+        self.breeds_registry = get_breeds_registry(intents_config_path)
+
+        # Compiler les patterns
         self._compile_patterns()
-        logger.info("EntityExtractor initialisé avec patterns compilés")
+
+        logger.info(
+            f"EntityExtractor initialisé avec breeds_registry "
+            f"({len(self.breeds_registry.get_all_breeds())} races)"
+        )
 
     def _compile_patterns(self):
         """Compile tous les patterns regex pour performance"""
-        # Compilation breeds
-        self.compiled_breed = {}
-        for breed_name, patterns in self.BREED_PATTERNS.items():
-            self.compiled_breed[breed_name] = [
-                re.compile(p, re.IGNORECASE) for p in patterns
-            ]
 
-        # Compilation sex
+        # Compilation breeds depuis breeds_registry
+        self.compiled_breed = {}
+        self._build_breed_patterns_from_registry()
+
+        # Compilation sex (statique)
         self.compiled_sex = {}
         for sex_value, patterns in self.SEX_PATTERNS.items():
             self.compiled_sex[sex_value] = [
                 re.compile(p, re.IGNORECASE) for p in patterns
             ]
 
-        # Compilation age
+        # Compilation age (statique)
         self.compiled_age = [re.compile(p, re.IGNORECASE) for p in self.AGE_PATTERNS]
 
         logger.debug(
             f"Patterns compilés: {len(self.compiled_breed)} breeds, "
             f"{len(self.compiled_sex)} sexes, {len(self.compiled_age)} age patterns"
         )
+
+    def _build_breed_patterns_from_registry(self):
+        """
+        Construit les patterns de breeds depuis le breeds_registry
+        Remplace les patterns hardcodés
+        """
+        for breed in self.breeds_registry.get_all_breeds():
+            # Récupérer tous les aliases pour cette race
+            aliases = self.breeds_registry.get_aliases(breed)
+
+            # Créer des patterns regex pour chaque alias
+            patterns = []
+
+            # Pattern pour le nom canonique
+            canonical_pattern = self._create_pattern_from_text(breed)
+            patterns.append(re.compile(canonical_pattern, re.IGNORECASE))
+
+            # Patterns pour les aliases
+            for alias in aliases:
+                alias_pattern = self._create_pattern_from_text(alias)
+                patterns.append(re.compile(alias_pattern, re.IGNORECASE))
+
+            # Stocker les patterns compilés
+            self.compiled_breed[breed] = patterns
+
+        logger.debug(
+            f"Patterns de breeds générés pour {len(self.compiled_breed)} races"
+        )
+
+    def _create_pattern_from_text(self, text: str) -> str:
+        """
+        Crée un pattern regex flexible depuis un texte
+
+        Args:
+            text: Texte source (ex: "ross 308", "cobb500")
+
+        Returns:
+            Pattern regex string
+        """
+        # Échapper les caractères spéciaux
+        escaped = re.escape(text)
+
+        # Remplacer les espaces par des patterns flexibles
+        # "ross 308" -> "ross\s*308" (permet "ross308", "ross 308", "ross-308")
+        pattern = escaped.replace(r"\ ", r"[\s\-_]*")
+
+        # Ajouter des word boundaries pour éviter les faux positifs
+        pattern = r"\b" + pattern + r"\b"
+
+        return pattern
 
     def extract(
         self, query: str, entities_hint: Dict[str, Any] = None
@@ -282,7 +324,7 @@ class EntityExtractor:
         if metric_result["value"]:
             entities.raw_matches["metric"] = metric_result["match_text"]
 
-        # Extraction genetic line (dérivé du breed)
+        # Extraction genetic line (dérivé du breed via registry)
         if entities.breed:
             entities.genetic_line = self._derive_genetic_line(entities.breed)
 
@@ -290,7 +332,7 @@ class EntityExtractor:
         entities.confidence = self._calculate_overall_confidence(entities)
 
         logger.debug(
-            f"Extraction complétée: {entities.get_entity_count()} entités, "
+            f"Extraction completée: {entities.get_entity_count()} entités, "
             f"confiance={entities.confidence:.2f}"
         )
 
@@ -298,7 +340,7 @@ class EntityExtractor:
 
     def _extract_breed(self, query: str) -> Dict[str, Any]:
         """
-        Extrait la souche avec confiance
+        Extrait la souche avec confiance en utilisant breeds_registry
 
         Returns:
             Dict avec 'value', 'confidence', 'explicit', 'match_text'
@@ -307,10 +349,16 @@ class EntityExtractor:
             for idx, pattern in enumerate(patterns):
                 match = pattern.search(query)
                 if match:
+                    # Normaliser via breeds_registry pour obtenir le nom canonique
+                    normalized = self.breeds_registry.normalize_breed_name(
+                        match.group(0)
+                    )
+
                     # Confiance basée sur la spécificité du pattern
                     confidence = 0.95 if idx == 0 else 0.85 - (idx * 0.1)
+
                     return {
-                        "value": breed_name,
+                        "value": normalized or breed_name,
                         "confidence": max(confidence, 0.6),
                         "explicit": True,
                         "match_text": match.group(0),
@@ -416,14 +464,23 @@ class EntityExtractor:
         }
 
     def _derive_genetic_line(self, breed: str) -> str:
-        """Dérive la lignée génétique du breed"""
-        breed_to_line = {
-            "cobb500": "Cobb",
-            "ross308": "Ross",
-            "hubbard": "Hubbard",
-            "arbor_acres": "Arbor Acres",
-        }
-        return breed_to_line.get(breed, breed)
+        """
+        Dérive la lignée génétique du breed via breeds_registry
+
+        Args:
+            breed: Nom de breed normalisé
+
+        Returns:
+            Nom de la lignée génétique (ex: "broiler", "layer")
+        """
+        # Utiliser get_species pour obtenir le type
+        species = self.breeds_registry.get_species(breed)
+
+        if species:
+            return species.capitalize()
+
+        # Fallback: utiliser le breed lui-même
+        return breed.capitalize() if breed else "Unknown"
 
     def _calculate_overall_confidence(self, entities: ExtractedEntities) -> float:
         """
@@ -491,8 +548,12 @@ class EntityExtractor:
             for breed_name, patterns in self.compiled_breed.items():
                 for pattern in patterns:
                     if pattern.search(query_lower):
-                        if breed_name not in values:
-                            values.append(breed_name)
+                        # Normaliser via registry
+                        normalized = self.breeds_registry.normalize_breed_name(
+                            breed_name
+                        )
+                        if normalized and normalized not in values:
+                            values.append(normalized)
                         break
 
         elif entity_type == EntityType.AGE:
@@ -510,13 +571,21 @@ class EntityExtractor:
 
     def validate_extraction(self, entities: ExtractedEntities) -> Dict[str, Any]:
         """
-        Valide les entités extraites
+        Valide les entités extraites en utilisant breeds_registry
 
         Returns:
             Dict avec 'is_valid', 'errors', 'warnings'
         """
         errors = []
         warnings = []
+
+        # Validation breed via registry
+        if entities.breed:
+            is_valid, canonical = self.breeds_registry.validate_breed(entities.breed)
+            if not is_valid:
+                errors.append(f"Race non reconnue: {entities.breed}")
+            elif canonical != entities.breed:
+                warnings.append(f"Race normalisée: {entities.breed} -> {canonical}")
 
         # Validation âge
         if entities.age_days is not None:
@@ -528,16 +597,18 @@ class EntityExtractor:
         # Validation confiance
         if entities.confidence < 0.3:
             warnings.append(
-                f"Confiance faible ({entities.confidence:.2f}) - " "vérifier la requête"
+                f"Confiance faible ({entities.confidence:.2f}) - vérifier la requête"
             )
 
-        # Validation cohérence breed + genetic_line
-        if entities.breed and entities.genetic_line:
-            expected_line = self._derive_genetic_line(entities.breed)
-            if expected_line != entities.genetic_line:
-                warnings.append(
-                    f"Incohérence breed/line: {entities.breed} / {entities.genetic_line}"
-                )
+        # Validation cohérence breed + genetic_line via registry
+        if entities.breed:
+            expected_species = self.breeds_registry.get_species(entities.breed)
+            if expected_species and entities.genetic_line:
+                if expected_species.lower() != entities.genetic_line.lower():
+                    warnings.append(
+                        f"Incohérence breed/species: {entities.breed} "
+                        f"(attendu: {expected_species}, trouvé: {entities.genetic_line})"
+                    )
 
         return {
             "is_valid": len(errors) == 0,
@@ -548,9 +619,11 @@ class EntityExtractor:
 
 
 # Factory function
-def create_entity_extractor() -> EntityExtractor:
+def create_entity_extractor(
+    intents_config_path: str = "llm/config/intents.json",
+) -> EntityExtractor:
     """Factory pour créer une instance EntityExtractor"""
-    return EntityExtractor()
+    return EntityExtractor(intents_config_path)
 
 
 # Tests unitaires
@@ -564,22 +637,47 @@ if __name__ == "__main__":
         "FCR du Ross 308 femelle à 35j",
         "Différence de mortalité entre mâle et femelle",
         "Croissance d'un poulet de 0 à 42 jours",
+        "Comparer ross308 et cobb500",
+        "ISA Brown pondeuse",
     ]
 
-    print("=== TESTS ENTITY EXTRACTOR ===\n")
+    print("=" * 70)
+    print("🧪 TESTS ENTITY EXTRACTOR - VERSION BREEDS_REGISTRY")
+    print("=" * 70)
+
+    # Test 1: Résumé breeds_registry
+    print(
+        f"\n📊 Breeds Registry: {len(extractor.breeds_registry.get_all_breeds())} races chargées"
+    )
+    summary = extractor.breeds_registry.get_breeds_summary()
+    print(f"  - Broilers: {summary['broilers']}")
+    print(f"  - Layers: {summary['layers']}")
+    print(f"  - Breeders: {summary['breeders']}")
+
+    print("\n" + "=" * 70)
+    print("EXTRACTION TESTS")
+    print("=" * 70)
 
     for query in test_queries:
-        print(f"Query: {query}")
+        print(f"\n Query: {query}")
         entities = extractor.extract(query)
         print(f"  Breed: {entities.breed}")
         print(f"  Age: {entities.age_days}")
         print(f"  Sex: {entities.sex}")
         print(f"  Metric: {entities.metric_type}")
+        print(f"  Genetic Line: {entities.genetic_line}")
         print(f"  Confidence: {entities.confidence:.2f}")
         print(f"  Count: {entities.get_entity_count()}")
 
         validation = extractor.validate_extraction(entities)
-        print(f"  Valid: {validation['is_valid']}")
+        status = "✅" if validation["is_valid"] else "❌"
+        print(f"  {status} Valid: {validation['is_valid']}")
+
+        if validation["errors"]:
+            print(f"  ❌ Errors: {validation['errors']}")
         if validation["warnings"]:
-            print(f"  Warnings: {validation['warnings']}")
-        print()
+            print(f"  ⚠️  Warnings: {validation['warnings']}")
+
+    print("\n" + "=" * 70)
+    print("✅ TESTS TERMINÉS - Entity Extractor avec Breeds Registry")
+    print("=" * 70)

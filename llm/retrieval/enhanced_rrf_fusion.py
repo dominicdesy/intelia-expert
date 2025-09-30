@@ -3,6 +3,7 @@
 enhanced_rrf_fusion.py - RRF Intelligent avec apprentissage contextuel pour l'aviculture
 Optimisé pour Digital Ocean App Platform avec Redis externe
 VERSION CORRIGÉE - Gestion robuste des types intent_result et boost lignée génétique amélioré
+VERSION 2.0 - Intégration breeds_registry pour détection dynamique des lignées
 """
 
 import os
@@ -16,6 +17,13 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 
 logger = logging.getLogger(__name__)
+
+# Import du breeds_registry
+try:
+    from llm.utils.breeds_registry import get_breeds_registry
+except ImportError:
+    logger.warning("BreedsRegistry non disponible - utilisation des patterns hardcodés")
+    get_breeds_registry = None
 
 
 class QueryType(Enum):
@@ -61,6 +69,15 @@ class IntelligentRRFFusion:
     def __init__(self, redis_client=None, intent_processor=None):
         self.redis = redis_client
         self.intent_processor = intent_processor
+
+        # Initialiser le breeds_registry si disponible
+        self.breeds_registry = None
+        if get_breeds_registry:
+            try:
+                self.breeds_registry = get_breeds_registry()
+                logger.info("BreedsRegistry initialisé avec succès")
+            except Exception as e:
+                logger.error(f"Erreur initialisation BreedsRegistry: {e}")
 
         # Configuration aviculture spécialisée - MODIFIÉE POUR BOOST LIGNÉE
         self.genetic_line_profiles = {
@@ -164,7 +181,7 @@ class IntelligentRRFFusion:
 
         logger.info(
             f"IntelligentRRF initialisé - Enabled: {self.enabled}, Learning: {self.learning_mode}, "
-            f"Genetic Boost: {self.genetic_boost_factor}x"
+            f"Genetic Boost: {self.genetic_boost_factor}x, BreedsRegistry: {self.breeds_registry is not None}"
         )
 
     async def enhanced_fusion(
@@ -310,7 +327,7 @@ class IntelligentRRFFusion:
                 intent_confidence = 0.0
                 intent_type_value = "general_poultry"
 
-        # Detection lignée génétique - VERSION ÉTENDUE
+        # Detection lignée génétique - VERSION ÉTENDUE avec breeds_registry
         genetic_line = entities.get("line", "") or self._detect_genetic_line(
             query_lower
         )
@@ -647,7 +664,43 @@ class IntelligentRRFFusion:
     # === MÉTHODES UTILITAIRES ===
 
     def _detect_genetic_line(self, query_lower: str) -> str:
-        """NOUVELLE VERSION ÉTENDUE: Détecte la lignée génétique dans la requête"""
+        """
+        Détecte la lignée génétique via breeds_registry ou patterns fallback
+
+        Returns:
+            Nom normalisé de la lignée (avec underscore): "ross_308", "cobb_500", etc.
+        """
+
+        # PRIORITÉ 1: Utiliser le breeds_registry si disponible
+        if self.breeds_registry:
+            try:
+                # Obtenir toutes les races du registry
+                all_breeds = self.breeds_registry.get_all_breeds()
+
+                # Chercher chaque race et ses aliases dans la requête
+                for breed in all_breeds:
+                    # Normaliser le nom de la race
+                    normalized = self.breeds_registry.normalize_breed_name(breed)
+                    if normalized:
+                        # Vérifier le nom normalisé
+                        if normalized.lower() in query_lower:
+                            logger.debug(f"Lignée détectée via registry: {normalized}")
+                            return normalized.replace(" ", "_").replace("-", "_")
+
+                        # Vérifier aussi tous les aliases
+                        aliases = self.breeds_registry.get_aliases(normalized)
+                        for alias in aliases:
+                            if alias.lower() in query_lower:
+                                logger.debug(
+                                    f"Lignée détectée via alias '{alias}': {normalized}"
+                                )
+                                return normalized.replace(" ", "_").replace("-", "_")
+
+            except Exception as e:
+                logger.warning(f"Erreur détection lignée via registry: {e}")
+
+        # FALLBACK: Patterns hardcodés si breeds_registry non disponible
+        logger.debug("Utilisation patterns fallback pour détection lignée")
         genetic_patterns = {
             "ross_308": [
                 "ross 308",
@@ -667,6 +720,7 @@ class IntelligentRRFFusion:
 
         for genetic_line, patterns in genetic_patterns.items():
             if any(pattern in query_lower for pattern in patterns):
+                logger.debug(f"Lignée détectée via patterns fallback: {genetic_line}")
                 return genetic_line
 
         return ""
@@ -826,6 +880,7 @@ class IntelligentRRFFusion:
             "genetic_boost_enabled": self.genetic_boost_enabled,
             "genetic_boost_factor": self.genetic_boost_factor,
             "genetic_priority_enabled": self.genetic_priority_enabled,
+            "breeds_registry_active": self.breeds_registry is not None,
             "cache_size": len(self.adaptation_cache),
             "history_size": len(self.performance_history),
         }

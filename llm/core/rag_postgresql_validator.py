@@ -1,13 +1,18 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
-VERSION FINALE CORRIGÉE: Préserve tous les champs originaux + Logs diagnostiques
-+ Invalidation des métriques invalides + Auto-détection enrichie
+VERSION 3.0: Migration vers breeds_registry
+- Préserve tous les champs originaux
+- Logs diagnostiques
+- Invalidation des métriques invalides
+- Auto-détection enrichie dynamique
 """
 
 import re
 import logging
 from typing import Dict, List, Optional, Any
+
+from llm.utils.breeds_registry import get_breeds_registry
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +20,20 @@ logger = logging.getLogger(__name__)
 class PostgreSQLValidator:
     """Validateur intelligent avec auto-détection et alternatives"""
 
-    def __init__(self):
+    def __init__(self, intents_config_path: str = "llm/config/intents.json"):
+        """
+        Initialise le validateur avec breeds_registry
+
+        Args:
+            intents_config_path: Chemin vers intents.json
+        """
         self.logger = logger
+        self.breeds_registry = get_breeds_registry(intents_config_path)
+
+        logger.info(
+            f"PostgreSQLValidator initialisé avec breeds_registry "
+            f"({len(self.breeds_registry.get_all_breeds())} races)"
+        )
 
     def flexible_query_validation(
         self, query: str, entities: Dict[str, Any]
@@ -252,7 +269,7 @@ class PostgreSQLValidator:
                 f"🔍 Metric PRESENT: '{enhanced['metric_type']}', skipping auto-detection"
             )
 
-        # Vérifier breed
+        # Vérifier breed avec breeds_registry
         if not enhanced.get("breed"):
             detected_breed = self._detect_breed_from_query(query)
             if detected_breed:
@@ -286,20 +303,29 @@ class PostgreSQLValidator:
         }
 
     def _detect_breed_from_query(self, query: str) -> Optional[str]:
-        """Détecte la race dans le texte de la requête"""
+        """
+        Détecte la race dans le texte de la requête via breeds_registry
+        Version 3.0: Utilise breeds_registry au lieu de patterns hardcodés
+        """
         query_lower = query.lower()
 
-        breed_patterns = {
-            "cobb 500": ["cobb 500", "cobb500", "c500"],
-            "ross 308": ["ross 308", "ross308", "r308"],
-            "hubbard ja87": ["hubbard", "ja87", "j87"],
-        }
+        # Itérer sur toutes les races connues
+        for breed in self.breeds_registry.get_all_breeds():
+            # Récupérer les aliases pour cette race
+            aliases = self.breeds_registry.get_aliases(breed)
 
-        for canonical_breed, patterns in breed_patterns.items():
-            for pattern in patterns:
-                if pattern in query_lower:
-                    return canonical_breed
+            # Vérifier le nom canonique
+            if breed.lower() in query_lower:
+                logger.debug(f"✅ Breed détecté (canonical): {breed}")
+                return breed
 
+            # Vérifier les aliases
+            for alias in aliases:
+                if alias.lower() in query_lower:
+                    logger.debug(f"✅ Breed détecté (alias '{alias}'): {breed}")
+                    return breed
+
+        logger.debug("❌ Aucun breed détecté")
         return None
 
     def _detect_age_from_query(self, query: str) -> Optional[int]:
@@ -412,16 +438,8 @@ class PostgreSQLValidator:
     ) -> Dict[str, Any]:
         """
         Vérifie si les données demandées sont disponibles
-        Version flexible avec alternatives
+        Version 3.0: Utilise breeds_registry pour obtenir les plages d'âges
         """
-
-        # Plages d'âges disponibles par race (approximatif)
-        age_ranges = {
-            "cobb 500": (0, 56),
-            "ross 308": (0, 56),
-            "hubbard ja87": (0, 56),
-        }
-
         breed = entities.get("breed", "").lower() if entities.get("breed") else None
         age_days = entities.get("age_days")
 
@@ -432,23 +450,98 @@ class PostgreSQLValidator:
         if not age:
             return {"available": True}
 
-        # Vérifier la plage d'âge
-        for breed_key, (min_age, max_age) in age_ranges.items():
-            if breed_key in breed:
-                if min_age <= age <= max_age:
-                    return {"available": True}
-                else:
-                    # Proposer des alternatives
-                    alternatives = []
-                    if age < min_age:
-                        alternatives.append(f"{min_age} jours (âge minimum)")
-                    if age > max_age:
-                        alternatives.append(f"{max_age} jours (âge maximum)")
+        # Utiliser breeds_registry pour valider la race
+        is_valid, canonical_breed = self.breeds_registry.validate_breed(breed)
 
-                    return {
-                        "available": False,
-                        "alternatives": alternatives,
-                        "helpful_response": f"Données non disponibles pour {breed} à {age} jours. Alternatives : {', '.join(alternatives)}",
-                    }
+        if not is_valid:
+            return {
+                "available": False,
+                "error": f"Race non reconnue: {breed}",
+                "helpful_response": f"La race '{breed}' n'est pas dans notre base de données.",
+            }
+
+        # Plages d'âges génériques par species
+        species = self.breeds_registry.get_species(canonical_breed)
+
+        age_ranges = {
+            "broiler": (0, 56),
+            "layer": (0, 600),  # Layers ont une durée de vie plus longue
+            "breeder": (0, 60),
+        }
+
+        if species in age_ranges:
+            min_age, max_age = age_ranges[species]
+
+            if min_age <= age <= max_age:
+                return {"available": True}
+            else:
+                # Proposer des alternatives
+                alternatives = []
+                if age < min_age:
+                    alternatives.append(f"{min_age} jours (âge minimum)")
+                if age > max_age:
+                    alternatives.append(f"{max_age} jours (âge maximum)")
+
+                return {
+                    "available": False,
+                    "alternatives": alternatives,
+                    "helpful_response": f"Données non disponibles pour {canonical_breed} à {age} jours. Alternatives : {', '.join(alternatives)}",
+                }
 
         return {"available": True}
+
+
+# Tests unitaires
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
+
+    print("=" * 70)
+    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION BREEDS_REGISTRY")
+    print("=" * 70)
+
+    validator = PostgreSQLValidator()
+
+    # Test 1: Détection breed
+    print("\n🔍 Test 1: Détection de breed depuis requête")
+    test_queries = [
+        "Quel est le poids du Cobb 500 à 21 jours ?",
+        "FCR ross308 à 35j",
+        "Performance ISA Brown",
+        "Hubbard classic 42 jours",
+    ]
+
+    for query in test_queries:
+        detected = validator._detect_breed_from_query(query)
+        print(f"  Query: {query}")
+        print(f"  → Breed: {detected}")
+
+    # Test 2: Validation avec enrichissement
+    print("\n✅ Test 2: Validation et enrichissement")
+    test_cases = [
+        {
+            "query": "Poids à 21 jours pour Cobb 500",
+            "entities": {"breed": "cobb 500"},
+        },
+        {
+            "query": "FCR du Ross 308",
+            "entities": {},
+        },
+        {
+            "query": "Mortalité",
+            "entities": {"age_days": 35},
+        },
+    ]
+
+    for test in test_cases:
+        print(f"\n  Query: {test['query']}")
+        print(f"  Input entities: {test['entities']}")
+
+        result = validator.flexible_query_validation(test["query"], test["entities"])
+
+        print(f"  → Status: {result['status']}")
+        if "enhanced_entities" in result:
+            print(f"  → Enhanced: {result['enhanced_entities']}")
+
+    print("\n" + "=" * 70)
+    print("✅ TESTS TERMINÉS - PostgreSQL Validator avec Breeds Registry")
+    print("=" * 70)
