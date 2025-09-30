@@ -2,7 +2,7 @@
 """
 query_classifier.py - Classificateur de requêtes unifié
 Fusionne: comparative_detector + rag_engine_query_classifier + partie de query_preprocessor
-Version 1.0 - Classification unifiée avec détection multi-patterns
+Version 1.1 - Ajout des types METRIC, GENERAL, RECOMMENDATION manquants
 """
 
 import re
@@ -18,8 +18,11 @@ class QueryType(Enum):
     """Types de requêtes supportés"""
 
     STANDARD = "standard"
+    METRIC = "metric"  # ← AJOUTÉ pour requêtes de métriques spécifiques
+    GENERAL = "general"  # ← AJOUTÉ pour requêtes générales/documentaires
     COMPARATIVE = "comparative"
     TEMPORAL_RANGE = "temporal_range"
+    RECOMMENDATION = "recommendation"  # ← AJOUTÉ pour recommandations/suggestions
     OPTIMIZATION = "optimization"
     CALCULATION = "calculation"
     ECONOMIC = "economic"
@@ -140,6 +143,48 @@ class UnifiedQueryClassifier:
     ]
 
     # ========================================================================
+    # PATTERNS RECOMMENDATION (NOUVEAU)
+    # ========================================================================
+
+    RECOMMENDATION_PATTERNS = [
+        r"recommand\w*",
+        r"sugg[ée]r\w*",
+        r"conseil\w*",
+        r"que\s+me\s+(?:conseillez?|recommandez?)",
+        r"(?:quel(?:le)?|quoi)\s+(?:choisir|utiliser|faire)",
+        r"mieux\s+de\b",
+        r"devr(?:ais?|ions?)\b",
+    ]
+
+    # ========================================================================
+    # PATTERNS METRIC (NOUVEAU)
+    # ========================================================================
+
+    METRIC_PATTERNS = [
+        r"(?:quel(?:le)?)\s+(?:est|sont)\s+(?:le|la|les)\s+(?:poids|fcr|ic|mortalité|gain)",
+        r"valeur\s+(?:de|du|de\s+la)",
+        r"donn[ée]es?\s+(?:de|pour)",
+        r"chiffres?\s+(?:de|pour)",
+        r"m[ée]trique",
+        r"performance",
+    ]
+
+    # ========================================================================
+    # PATTERNS GENERAL (NOUVEAU)
+    # ========================================================================
+
+    GENERAL_PATTERNS = [
+        r"(?:comment|pourquoi|qu['']est-ce\s+que)",
+        r"expliqu\w*",
+        r"d[ée]cri\w*",
+        r"d[ée]finition",
+        r"c['']est\s+quoi",
+        r"qu['']est-ce",
+        r"guide",
+        r"information",
+    ]
+
+    # ========================================================================
     # PATTERNS OPTIMISATION
     # ========================================================================
 
@@ -148,7 +193,6 @@ class UnifiedQueryClassifier:
         r"id[ée]al\w*",
         r"meilleur\w*",
         r"choisir",
-        r"recommand\w*",
         r"quel(?:le)?\s+(?:est|sont)\s+(?:le|la)\s+meilleur",
         r"perfection",
         r"maxim(?:is|al)\w*",
@@ -202,7 +246,7 @@ class UnifiedQueryClassifier:
     def __init__(self):
         """Initialise le classificateur et compile les patterns"""
         self._compile_all_patterns()
-        logger.info("UnifiedQueryClassifier initialisé")
+        logger.info("UnifiedQueryClassifier initialisé avec types étendus")
 
     def _compile_all_patterns(self):
         """Compile tous les patterns regex pour performance"""
@@ -217,6 +261,19 @@ class UnifiedQueryClassifier:
         # Temporels
         self.compiled_temporal = [
             re.compile(p, re.IGNORECASE) for p in self.TEMPORAL_RANGE_PATTERNS
+        ]
+
+        # NOUVEAUX: Recommendation, Metric, General
+        self.compiled_recommendation = [
+            re.compile(p, re.IGNORECASE) for p in self.RECOMMENDATION_PATTERNS
+        ]
+
+        self.compiled_metric = [
+            re.compile(p, re.IGNORECASE) for p in self.METRIC_PATTERNS
+        ]
+
+        self.compiled_general = [
+            re.compile(p, re.IGNORECASE) for p in self.GENERAL_PATTERNS
         ]
 
         # Optimisation
@@ -242,7 +299,9 @@ class UnifiedQueryClassifier:
         logger.debug(
             f"Patterns compilés: {len(self.compiled_comparative)} types comparatifs, "
             f"{len(self.compiled_temporal)} temporels, "
-            f"{len(self.compiled_optimization)} optimisation"
+            f"{len(self.compiled_recommendation)} recommendation, "
+            f"{len(self.compiled_metric)} metric, "
+            f"{len(self.compiled_general)} general"
         )
 
     def classify(self, query: str) -> ClassificationResult:
@@ -313,7 +372,19 @@ class UnifiedQueryClassifier:
                 detection_method="diagnostic_patterns",
             )
 
-        # PRIORITÉ 5: Détection OPTIMIZATION
+        # PRIORITÉ 5: Détection RECOMMENDATION (NOUVEAU)
+        if self._matches_patterns(query_lower, self.compiled_recommendation):
+            matched_patterns.append("recommendation")
+
+            return ClassificationResult(
+                query_type=QueryType.RECOMMENDATION,
+                confidence=0.83,
+                is_comparative=False,
+                matched_patterns=matched_patterns,
+                detection_method="recommendation_patterns",
+            )
+
+        # PRIORITÉ 6: Détection OPTIMIZATION
         if self._matches_patterns(query_lower, self.compiled_optimization):
             matched_patterns.append("optimization")
 
@@ -325,7 +396,7 @@ class UnifiedQueryClassifier:
                 detection_method="optimization_patterns",
             )
 
-        # PRIORITÉ 6: Détection CALCULATION
+        # PRIORITÉ 7: Détection CALCULATION
         if self._matches_patterns(query_lower, self.compiled_calculation):
             matched_patterns.append("calculation")
 
@@ -335,6 +406,30 @@ class UnifiedQueryClassifier:
                 is_comparative=False,
                 matched_patterns=matched_patterns,
                 detection_method="calculation_patterns",
+            )
+
+        # PRIORITÉ 8: Détection METRIC (NOUVEAU)
+        if self._matches_patterns(query_lower, self.compiled_metric):
+            matched_patterns.append("metric")
+
+            return ClassificationResult(
+                query_type=QueryType.METRIC,
+                confidence=0.78,
+                is_comparative=False,
+                matched_patterns=matched_patterns,
+                detection_method="metric_patterns",
+            )
+
+        # PRIORITÉ 9: Détection GENERAL (NOUVEAU)
+        if self._matches_patterns(query_lower, self.compiled_general):
+            matched_patterns.append("general")
+
+            return ClassificationResult(
+                query_type=QueryType.GENERAL,
+                confidence=0.75,
+                is_comparative=False,
+                matched_patterns=matched_patterns,
+                detection_method="general_patterns",
             )
 
         # PAR DÉFAUT: STANDARD
@@ -532,7 +627,7 @@ if __name__ == "__main__":
     classifier = UnifiedQueryClassifier()
 
     test_queries = [
-        ("Quel est le poids d'un Cobb 500 mâle à 21 jours ?", QueryType.STANDARD),
+        ("Quel est le poids d'un Cobb 500 mâle à 21 jours ?", QueryType.METRIC),
         (
             "Quelle est la différence de FCR entre mâle et femelle ?",
             QueryType.COMPARATIVE,
@@ -542,12 +637,17 @@ if __name__ == "__main__":
             "Quelle est la meilleure souche pour l'efficacité alimentaire ?",
             QueryType.OPTIMIZATION,
         ),
+        (
+            "Que me recommandez-vous comme alimentation ?",
+            QueryType.RECOMMENDATION,
+        ),
         ("Calculer le poids total de 10000 poulets à 35 jours", QueryType.CALCULATION),
         ("Quel est le coût d'alimentation pour un troupeau ?", QueryType.ECONOMIC),
         ("Symptômes de la maladie de Newcastle", QueryType.DIAGNOSTIC),
+        ("Comment améliorer le FCR ?", QueryType.GENERAL),
     ]
 
-    print("=== TESTS QUERY CLASSIFIER ===\n")
+    print("=== TESTS QUERY CLASSIFIER (VERSION ÉTENDUE) ===\n")
 
     for query, expected_type in test_queries:
         result = classifier.classify(query)
