@@ -1,202 +1,703 @@
 {
-  "_comment": "FICHIER: universal_terms_id.json - VERSION ENRICHIE",
-  
   "metadata": {
     "language": "id",
-    "version": "2.1.0",
-    "last_updated": "2025-01-15",
-    "total_terms": 365
-  },
-  
-  "messages": {
-    "out_of_domain": "Intelia Expert adalah sistem ahli yang mengkhususkan diri dalam produksi unggas dan tidak dapat menangani pertanyaan di luar domain ini. Saya di sini untuk mendukung Anda dalam semua aspek peternakan unggas. Bagaimana saya bisa membantu Anda dengan unggas?",
-    "error_generic": "Terjadi kesalahan saat memproses permintaan Anda. Silakan coba lagi.",
-    "welcome": "Halo! Saya Intelia Expert, asisten khusus Anda dalam peternakan unggas. Bagaimana saya bisa membantu Anda hari ini?",
-    "clarification_needed": "Bisakah Anda memperjelas pertanyaan Anda sehingga saya dapat memberikan jawaban yang lebih akurat?",
-    "no_results": "Saya tidak menemukan informasi yang relevan untuk menjawab pertanyaan Anda. Bisakah Anda merumuskan ulang?",
-    "processing": "Memproses permintaan Anda, harap tunggu...",
-    "farewell": "Selamat tinggal! Jangan ragu untuk kembali jika Anda memiliki lebih banyak pertanyaan tentang unggas.",
-    "error_connection": "Kesalahan koneksi ke sistem. Silakan periksa koneksi Anda.",
-    "error_timeout": "Permintaan memakan waktu terlalu lama. Silakan coba lagi.",
-    "success_generic": "Operasi berhasil diselesaikan."
+    "version": "3.0.0",
+    "last_updated": "2025-09-30",
+    "total_domains": 19,
+    "description": "Terminologi universal untuk sistem pakar produksi unggas - Versi Bahasa Indonesia"
   },
 
-  "equipment_types": {
-    "chain_feeder": ["rantai pakan", "sistem pakan rantai", "feeder rantai", "chain feeder"],
-    "pan_feeder": ["feeder panci", "panci pakan", "feeder bundar", "pan feeder"],
-    "tube_feeder": ["feeder tabung", "pakan tabung", "feeder pipa", "tube feeder"],
-    "bell_drinker": ["bell drinker", "minum gantung", "tempat minum lonceng"],
-    "cup_drinker": ["cup drinker", "cangkir air", "tempat minum cangkir"],
-    "tunnel_ventilation": ["ventilasi terowongan", "efek terowongan", "ventilasi memanjang"],
-    "cross_ventilation": ["ventilasi silang", "aliran silang", "ventilasi transversal"],
-    "radiant_heaters": ["pemanas radiasi", "pemanasan radiant", "tabung radiant", "pemanas infrared"],
-    "hot_air_blowers": ["blower udara panas", "kipas udara hangat", "pemanas udara", "blower panas"]
-  },
-  
-  "substrate_materials": {
-    "litter": ["sekam", "alas kandang", "bahan alas", "substrat", "litter"],
-    "wood_shavings": ["serutan kayu", "serbuk gergaji", "serpihan kayu", "gergaji kayu"],
-    "rice_husks": ["sekam padi", "kulit padi", "dedak padi", "sekam"],
-    "straw": ["jerami", "jerami gandum", "jerami padi", "jerami kering"]
-  },
-  
-  "additional_pathologies": {
-    "avian_influenza": ["flu burung", "avian influenza", "AI", "H5N1", "influenza unggas"],
-    "mareks_disease": ["penyakit marek", "marek disease", "tumor limfoid", "paralisis marek"],
-    "lameness": ["pincang", "masalah lokomotor", "gangguan berjalan", "kelainan gait"],
-    "pododermatitis": ["pododermatitis", "dermatitis kaki", "luka bakar hock", "radang telapak kaki"],
-    "crossbeak": ["paruh silang", "kelainan paruh", "paruh bengkok", "crossbeak"]
-  },
-  
-  "production_systems": {
-    "enriched_cage": ["kandang diperkaya", "kandang furnished", "kandang yang ditingkatkan"],
-    "aviary_system": ["sistem aviary", "kandang aviary", "sistem multi-tingkat"],
-    "free_range": ["free range", "akses luar", "sistem padang", "pemeliharaan lepas"]
-  },
-  
-  "biosecurity_health": {
-    "biosecurity": ["biosekuritas", "keamanan biologis", "sanitasi", "all-in all-out"],
-    "probiotics": ["probiotik", "mikroorganisme menguntungkan", "kultur hidup"],
-    "antibiotics": ["antibiotik", "antimikroba", "terapi", "AGP", "growth promoter"],
-    "vaccine": ["vaksin", "vaksinasi", "imunisasi", "profilaksis"]
-  },
-  
-  "egg_defects": {
-    "cracked_shell": ["kerabang retak", "telur retak", "retakan kerabang", "crack telur"],
-    "soft_shelled_egg": ["telur berkerabang lunak", "kerabang lembek", "telur tanpa kerabang"],
-    "misshapen_egg": ["telur cacat bentuk", "telur abnormal", "bentuk tidak beraturan"]
-  },
-  
-  "genetic_lines": {
-    "ross_308": ["ross 308", "ross308", "ross-308", "R308", "broiler ross"],
-    "ross_708": ["ross 708", "ross708", "ross-708", "R708"],
-    "cobb_500": ["cobb 500", "cobb500", "cobb-500", "C500", "cobb"],
-    "hubbard_classic": ["hubbard classic", "classic", "hubbard-classic", "hubbard"],
-    "freedom_ranger": ["freedom ranger", "freedom", "ranger", "redbro"],
-    "isa_brown": ["isa brown", "isa", "isa-brown", "layer isa", "ayam isa"],
-    "lohmann_brown": ["lohmann brown", "lohmann", "lohmann-brown", "LB", "layer lohmann"],
-    "hy_line": ["hy-line", "hyline", "hy line", "HL"]
-  },
-  
-  "site_types": {
-    "broiler_farm": ["broiler", "farm broiler", "ayam pedaging", "peternakan ayam", "farm unggas"],
-    "layer_farm": ["layer", "farm layer", "ayam petelur", "kandang layer", "peternakan telur"],
-    "breeder_farm": ["farm breeder", "induk", "parent stock", "peternakan induk", "breeding"],
-    "hatchery": ["hatchery", "penetasan", "tempat penetasan", "inkubasi"],
-    "feed_mill": ["pabrik pakan", "feed mill", "mill", "pabrik feed"]
-  },
-  
-  "performance_metrics": {
-    "feed_conversion_ratio": ["FCR", "konversi pakan", "rasio konversi", "feed conversion"],
-    "average_daily_gain": ["ADG", "pertambahan harian", "gain harian", "g/hari"],
-    "feed_intake": ["konsumsi pakan", "FI", "asupan pakan", "g/ekor/hari"],
-    "water_intake": ["konsumsi air", "asupan air", "l/1000/hari", "ml/ekor/hari"],
-    "body_weight": ["berat", "berat badan", "berat hidup", "berat rata-rata", "berat target"],
-    "mortality": ["mortalitas", "tingkat kematian", "kematian", "kerugian", "kehilangan"],
-    "egg_production": ["produksi telur", "tingkat bertelur", "rate produksi", "lay rate", "output telur"],
-    "uniformity": ["uniformitas", "keseragaman", "koefisien variasi", "CV"],
-    "epef": ["EPEF", "faktor efisiensi produksi", "indeks performa", "efficiency index"]
-  },
-  
-  "nutrition_detailed": {
-    "crude_protein": ["protein kasar", "CP", "protein", "crude protein"],
-    "metabolizable_energy": ["energi metabolis", "ME", "kcal/kg", "energi"],
-    "lysine": ["lisin", "lisin tercerna", "lys", "digestible lysine"],
-    "methionine": ["metionin", "met", "metionin+sistein", "met+cys", "TSAA"],
-    "calcium": ["kalsium", "ca", "kapur", "kalsium karbonat"],
-    "phosphorus": ["fosfor", "P", "fosfor tercerna", "P dig", "available phosphorus"],
-    "digestible_phosphorus": ["fosfor tercerna", "DP", "available phosphorus", "dig P"],
-    "electrolyte_balance": ["keseimbangan elektrolit", "DEB", "dietary electrolyte balance"],
-    "sodium": ["natrium", "na", "garam", "sodium"],
-    "chloride": ["klorida", "cl", "klorin", "chloride"],
-    "potassium": ["kalium", "K", "potash", "potassium"]
-  },
-  
-  "pathology_specific": {
-    "gumboro": ["gumboro", "penyakit gumboro", "infectious bursal disease", "IBDV", "IBD"],
-    "newcastle": ["newcastle", "penyakit newcastle", "ND", "tetelo", "avian paramyxovirus"],
-    "coccidiosis": ["koksidiosis", "coccidia", "eimeria", "coccidiostat"],
-    "colibacillosis": ["kolibacilosis", "e.coli", "escherichia coli", "e coli"],
-    "necrotic_enteritis": ["necrotic enteritis", "clostridium perfringens", "NE", "nekrosis usus"],
-    "eimeria_tenella": ["eimeria tenella", "koksidiosis sekum", "coccidia sekum"],
-    "salmonella": ["salmonella", "salmonellosis", "paratifoid", "pullorum"],
-    "mycoplasma": ["mikoplasma", "mycoplasmosis", "chronic respiratory disease", "CRD"],
-    "infectious_bronchitis_virus": ["IBV", "infectious bronchitis", "IB", "virus bronkitis"]
-  },
-  
-  "infrastructure_environment": {
-    "ventilation_rate": ["laju ventilasi", "airflow rate", "m3/j/kg", "pertukaran udara", "ventilasi minimum"],
-    "static_pressure": ["tekanan statis", "pa", "pascal", "tekanan negatif", "tekanan bangunan"],
-    "ammonia": ["amonia", "nh3", "ppm", "konsentrasi amonia", "level amonia"],
-    "co2_concentration": ["co2", "karbon dioksida", "ppm co2", "konsentrasi co2", "level co2"],
-    "relative_humidity": ["kelembaban relatif", "RH", "%RH", "humidity", "kelembaban"],
-    "feeder_space": ["ruang feeder", "cm/ekor", "panjang feeder", "ruang pakan"],
-    "drinker_flow_rate": ["flow rate minum", "aliran nipple", "ml/menit/nipple", "tekanan air"],
-    "lighting_hours": ["jam penerangan", "fotoperiod", "jam cahaya", "j/hari"],
-    "light_intensity": ["intensitas cahaya", "lux", "pencahayaan", "brightness"]
-  },
-  
-  "welfare_management": {
-    "stocking_density": ["kepadatan kandang", "densitas", "kg/m2", "ekor/m2", "kepadatan ayam"],
-    "heat_stress": ["stress panas", "thermal stress", "hipertermia", "heat stroke", "kepanasan"],
-    "feather_pecking": ["patuk bulu", "pecking", "kanibalisme", "patuk-patuk bulu"]
-  },
-  
-  "equipment_settings": {
-    "nipple_height": ["tinggi nipple", "ketinggian minum", "tinggi waterer", "cm tinggi"],
-    "brooding_temperature": ["kurva suhu", "program pemanasan", "suhu brooding", "°c start"],
-    "minimum_ventilation": ["ventilasi minimum", "program ventilasi", "airflow minimum", "m3/j/kg"],
-    "static_pressure_setpoints": ["setpoint tekanan statis", "target pressure", "setting tekanan", "target pa"],
-    "co2_maximum_ppm": ["co2 maksimum", "batas co2", "threshold co2", "maksimum ppm co2"]
-  },
-  
-  "reproduction_laying": {
-    "sexual_maturity": ["kedewasaan seksual", "umur telur pertama", "fotostimulasi", "point of lay"],
-    "laying_rate": ["tingkat bertelur", "lay rate", "rate produksi", "% lay", "persentase bertelur"],
-    "egg_weight": ["berat telur", "massa telur", "berat rata-rata telur", "ukuran telur", "kaliber telur"],
-    "shell_quality": ["kualitas kerabang", "ketebalan kerabang", "kekuatan kerabang", "kerabang tipis"]
-  },
-  
-  "phases": {
-    "starter": ["starter", "start", "fase starter", "fase 1", "pre-starter", "prestarter"],
-    "grower": ["grower", "fase pertumbuhan", "fase 2", "developer", "growth"],
-    "finisher": ["finisher", "fase akhir", "finish", "fase 3", "final"]
-  },
-  
-  "taxonomy_classification": {
-    "commercial_strain": ["strain komersial", "strain", "breed", "galur", "varietas"],
-    "sex_class": ["jantan", "betina", "campuran", "straight-run", "sr"],
-    "age_brackets": ["0-10h", "11-35h", "36-42h", "fase 1", "fase 2", "fase 3"]
-  },
-  
-  "question_patterns": {
-    "weight_query": ["berapa beratnya", "berat target", "berat rata-rata", "seberapa berat", "berat berapa"],
-    "fcr_query": ["FCR optimal", "konversi pakan", "rasio konversi", "FCR rata-rata"],
-    "water_query": ["konsumsi air", "asupan air", "liter per hari", "ml per ekor"],
-    "nutrient_requirement_query": ["level protein", "kebutuhan lisin", "kebutuhan kalsium", "kandungan fosfor"],
-    "environment_setpoint_query": ["suhu optimal", "target kelembaban", "maksimum co2", "setting ventilasi"],
-    "production_index_query": ["rata-rata EPEF", "IEP normal", "indeks efisiensi", "performa keseluruhan"],
-    "vaccination_protocol_query": ["protokol vaksinasi", "jadwal vaksin", "program vaksinasi", "rencana imunisasi"],
-    "space_equipment_query": ["ruang feeder", "setting nipple", "tinggi drinker", "cm per ekor"],
-    "problem_report": ["ayam saya", "saya amati", "ayam betina saya", "masalah dengan", "unggas saya"],
-    "health_diagnosis": ["gejala apa", "diagnosis", "penyakit", "apa penyebab", "tanda klinis"],
-    "management_how": ["bagaimana mengelola", "bagaimana mengobati", "apa yang harus dilakukan", "bagaimana memperbaiki"]
-  },
-  
-  "units_measures": {
-    "days": ["hari", "h", "d"],
-    "weeks": ["minggu", "pekan", "mg", "w"],
-    "grams": ["gram", "gr", "g"],
-    "kilograms": ["kilogram", "kg", "kilo"],
-    "percentage": ["persentase", "persen", "%", "pct"],
-    "liters": ["liter", "lt", "l"],
-    "celsius": ["celsius", "derajat celsius", "°c", "derajat"]
-  },
-  
-  "health_symptoms": {
-    "respiratory": ["pernapasan", "batuk", "sesak napas", "gangguan napas", "discharge hidung"],
-    "digestive": ["pencernaan", "diare", "muntah", "anoreksia", "kehilangan nafsu makan"],
-    "nervous": ["saraf", "ataksia", "paralisis", "kejang", "tremor"],
-    "general": ["umum", "lesu", "demam", "lemah", "depresi"]
+  "domains": {
+    "general_terms": {
+      "poultry": {
+        "canonical": "peternakan_unggas",
+        "confidence": 0.95,
+        "variants": ["peternakan unggas", "unggas", "ternak unggas", "produksi unggas", "ayam"]
+      },
+      "farm": {
+        "canonical": "peternakan",
+        "confidence": 0.95,
+        "variants": ["peternakan", "farm", "kandang", "usaha ternak", "lokasi produksi"]
+      },
+      "management": {
+        "canonical": "manajemen",
+        "confidence": 0.90,
+        "variants": ["manajemen", "pengelolaan", "tata kelola", "administrasi", "pengurusan"]
+      },
+      "production": {
+        "canonical": "produksi",
+        "confidence": 0.90,
+        "variants": ["produksi", "hasil", "produktivitas", "performa", "output"]
+      },
+      "quality": {
+        "canonical": "kualitas",
+        "confidence": 0.90,
+        "variants": ["kualitas", "mutu", "standar", "klasifikasi", "grade"]
+      }
+    },
+
+    "question_patterns": {
+      "weight_query": {
+        "canonical": "pertanyaan_bobot",
+        "confidence": 0.92,
+        "variants": ["berapa berat", "bobot target", "bobot rata-rata", "berat berapa", "bobot"]
+      },
+      "fcr_query": {
+        "canonical": "pertanyaan_fcr",
+        "confidence": 0.92,
+        "variants": ["fcr optimal", "konversi pakan", "fcr", "rasio konversi pakan", "fcr rata-rata"]
+      },
+      "water_query": {
+        "canonical": "pertanyaan_air",
+        "confidence": 0.92,
+        "variants": ["konsumsi air", "minum air", "liter per hari", "ml per ekor"]
+      },
+      "nutrient_requirement_query": {
+        "canonical": "pertanyaan_nutrisi",
+        "confidence": 0.92,
+        "variants": ["kadar protein", "kebutuhan lisin", "kebutuhan kalsium", "kandungan fosfor"]
+      },
+      "environment_setpoint_query": {
+        "canonical": "pertanyaan_lingkungan",
+        "confidence": 0.92,
+        "variants": ["suhu optimal", "target suhu", "kelembaban target", "co2 maksimal", "pengaturan ventilasi"]
+      },
+      "production_index_query": {
+        "canonical": "pertanyaan_indeks",
+        "confidence": 0.92,
+        "variants": ["epef rata-rata", "ip normal", "indeks efisiensi", "performa keseluruhan"]
+      },
+      "vaccination_protocol_query": {
+        "canonical": "pertanyaan_vaksinasi",
+        "confidence": 0.92,
+        "variants": ["protokol vaksinasi", "program vaksinasi", "jadwal vaksinasi", "rencana imunisasi"]
+      },
+      "space_equipment_query": {
+        "canonical": "pertanyaan_peralatan",
+        "confidence": 0.92,
+        "variants": ["ruang feeder", "pengaturan nipple", "tinggi tempat minum", "cm per ekor"]
+      },
+      "problem_report": {
+        "canonical": "laporan_masalah",
+        "confidence": 0.90,
+        "variants": ["ayam saya", "saya mengamati", "masalah dengan", "ternak saya"]
+      },
+      "health_diagnosis": {
+        "canonical": "diagnosis_kesehatan",
+        "confidence": 0.92,
+        "variants": ["gejala apa", "diagnosis", "penyakit", "apa penyebabnya", "tanda klinis"]
+      },
+      "management_how": {
+        "canonical": "manajemen_cara",
+        "confidence": 0.90,
+        "variants": ["bagaimana mengelola", "cara menangani", "apa yang harus dilakukan", "cara memperbaiki"]
+      }
+    },
+
+    "genetic_lines": {
+      "ross_308": {
+        "canonical": "ross_308",
+        "confidence": 0.95,
+        "variants": ["ross 308", "ross308", "ross-308", "r308", "ross", "ross 308 broiler"]
+      },
+      "ross_708": {
+        "canonical": "ross_708",
+        "confidence": 0.95,
+        "variants": ["ross 708", "ross708", "ross-708", "r708"]
+      },
+      "cobb_500": {
+        "canonical": "cobb_500",
+        "confidence": 0.95,
+        "variants": ["cobb 500", "cobb500", "cobb-500", "c500", "cobb", "cobb 500 broiler"]
+      },
+      "cobb_700": {
+        "canonical": "cobb_700",
+        "confidence": 0.95,
+        "variants": ["cobb 700", "cobb700", "cobb-700", "c700"]
+      },
+      "cobb_400": {
+        "canonical": "cobb_400",
+        "confidence": 0.95,
+        "variants": ["cobb 400", "cobb400", "cobb-400", "c400"]
+      },
+      "hubbard_classic": {
+        "canonical": "hubbard_classic",
+        "confidence": 0.95,
+        "variants": ["hubbard classic", "classic", "hubbard-classic", "hclassic", "hubbard"]
+      },
+      "hubbard_flex": {
+        "canonical": "hubbard_flex",
+        "confidence": 0.95,
+        "variants": ["hubbard flex", "flex", "hubbard-flex", "hflex"]
+      },
+      "hubbard_ja87": {
+        "canonical": "hubbard_ja87",
+        "confidence": 0.95,
+        "variants": ["hubbard ja87", "ja87", "hubbard-ja87", "ja 87", "ja-87"]
+      },
+      "freedom_ranger": {
+        "canonical": "freedom_ranger",
+        "confidence": 0.95,
+        "variants": ["freedom ranger", "freedom", "ranger", "redbro", "freedom-ranger"]
+      },
+      "isa_brown": {
+        "canonical": "isa_brown",
+        "confidence": 0.95,
+        "variants": ["isa brown", "isa", "isa-brown", "isa brown layer", "ayam isa"]
+      },
+      "lohmann_brown": {
+        "canonical": "lohmann_brown",
+        "confidence": 0.95,
+        "variants": ["lohmann brown", "lohmann", "lohmann-brown", "lb", "lohmann brown layer"]
+      },
+      "hy_line": {
+        "canonical": "hy_line",
+        "confidence": 0.95,
+        "variants": ["hy-line", "hyline", "hy line", "hl"]
+      }
+    },
+
+    "performance_metrics": {
+      "feed_conversion_ratio": {
+        "canonical": "rasio_konversi_pakan",
+        "confidence": 0.95,
+        "variants": ["fcr", "rasio konversi pakan", "konversi pakan", "efisiensi pakan", "fcr kumulatif", "konversi kumulatif"]
+      },
+      "average_daily_gain": {
+        "canonical": "pertambahan_bobot_harian",
+        "confidence": 0.95,
+        "variants": ["adg", "pertambahan bobot harian", "pbh", "pertambahan harian", "g/hari", "pertambahan bobot per hari", "laju pertumbuhan"]
+      },
+      "feed_intake": {
+        "canonical": "konsumsi_pakan",
+        "confidence": 0.95,
+        "variants": ["konsumsi pakan", "intake pakan", "fi", "asupan pakan", "g/ekor/hari", "konsumsi harian", "pakan yang dikonsumsi", "konsumsi kumulatif"]
+      },
+      "water_intake": {
+        "canonical": "konsumsi_air",
+        "confidence": 0.95,
+        "variants": ["konsumsi air", "intake air", "minum air", "l/1000/hari", "ml/ekor/hari", "konsumsi air harian", "air yang dikonsumsi", "air per ekor"]
+      },
+      "body_weight": {
+        "canonical": "bobot_badan",
+        "confidence": 0.95,
+        "variants": ["bobot", "berat", "body weight", "bobot badan", "berat badan", "bobot hidup", "bobot rata-rata", "bobot target", "bb", "berat ekor"]
+      },
+      "mortality": {
+        "canonical": "mortalitas",
+        "confidence": 0.95,
+        "variants": ["mortalitas", "kematian", "tingkat kematian", "deplesi", "mortality rate", "persentase mortalitas", "mortalitas kumulatif", "mortalitas harian", "ayam mati", "tingkat deplesi"]
+      },
+      "egg_production": {
+        "canonical": "produksi_telur",
+        "confidence": 0.95,
+        "variants": ["produksi telur", "hen day production", "hdp", "produksi harian", "tingkat produksi", "telur per ekor", "persentase produksi", "hasil telur"]
+      },
+      "uniformity": {
+        "canonical": "keseragaman",
+        "confidence": 0.95,
+        "variants": ["keseragaman", "uniformity", "koefisien variasi", "cv", "homogenitas", "keseragaman flock", "keseragaman bobot", "konsistensi"]
+      },
+      "epef": {
+        "canonical": "epef",
+        "confidence": 0.95,
+        "variants": ["epef", "indeks performa", "ip", "indeks produksi", "faktor efisiensi produksi", "performance index"]
+      }
+    },
+
+    "site_types": {
+      "broiler_farm": {
+        "canonical": "peternakan_broiler",
+        "confidence": 0.95,
+        "variants": ["broiler", "peternakan broiler", "ayam pedaging", "farm broiler", "kandang broiler"]
+      },
+      "layer_farm": {
+        "canonical": "peternakan_layer",
+        "confidence": 0.95,
+        "variants": ["layer", "peternakan layer", "ayam petelur", "farm layer", "kandang layer"]
+      },
+      "breeder_farm": {
+        "canonical": "peternakan_breeder",
+        "confidence": 0.95,
+        "variants": ["breeder", "peternakan breeder", "parent stock", "ps", "breeding stock", "induk"]
+      },
+      "hatchery": {
+        "canonical": "hatchery",
+        "confidence": 0.95,
+        "variants": ["hatchery", "penetasan", "breeding farm", "farm penetasan"]
+      },
+      "feed_mill": {
+        "canonical": "pabrik_pakan",
+        "confidence": 0.95,
+        "variants": ["pabrik pakan", "feed mill", "mill pakan", "pabrik ransum"]
+      }
+    },
+
+    "production_phases": {
+      "starter": {
+        "canonical": "starter",
+        "confidence": 0.95,
+        "variants": ["starter", "pre-starter", "fase starter", "fase awal", "fase 1", "periode starter"]
+      },
+      "grower": {
+        "canonical": "grower",
+        "confidence": 0.95,
+        "variants": ["grower", "fase grower", "fase pertumbuhan", "fase 2", "periode grower"]
+      },
+      "finisher": {
+        "canonical": "finisher",
+        "confidence": 0.95,
+        "variants": ["finisher", "fase finisher", "fase akhir", "fase 3", "periode finisher", "fase finishing"]
+      }
+    },
+
+    "sex_categories": {
+      "male": {
+        "canonical": "jantan",
+        "confidence": 0.95,
+        "variants": ["jantan", "male", "jago", "ayam jantan", "m"]
+      },
+      "female": {
+        "canonical": "betina",
+        "confidence": 0.95,
+        "variants": ["betina", "female", "ayam betina", "f"]
+      },
+      "as_hatched": {
+        "canonical": "campuran",
+        "confidence": 0.95,
+        "variants": ["campuran", "mixed", "unsexed", "straight run", "sr", "tidak di-sex", "campur"]
+      }
+    },
+
+    "bird_types": {
+      "broiler": {
+        "canonical": "broiler",
+        "confidence": 0.95,
+        "variants": ["broiler", "ayam pedaging", "ayam potong", "chicken broiler"]
+      },
+      "layer": {
+        "canonical": "layer",
+        "confidence": 0.95,
+        "variants": ["layer", "ayam petelur", "laying hen", "ayam layer"]
+      },
+      "breeder": {
+        "canonical": "breeder",
+        "confidence": 0.95,
+        "variants": ["breeder", "parent stock", "ps", "induk", "ayam induk"]
+      },
+      "pullet": {
+        "canonical": "pullet",
+        "confidence": 0.95,
+        "variants": ["pullet", "grower layer", "ayam dara", "pullet layer"]
+      },
+      "chick": {
+        "canonical": "doc",
+        "confidence": 0.95,
+        "variants": ["doc", "day old chick", "anak ayam", "chick", "ayam umur sehari"]
+      }
+    },
+
+    "equipment_types": {
+      "chain_feeder": {
+        "canonical": "feeder_rantai",
+        "confidence": 0.95,
+        "variants": ["feeder rantai", "chain feeder", "tempat pakan rantai", "sistem rantai"]
+      },
+      "pan_feeder": {
+        "canonical": "feeder_pan",
+        "confidence": 0.95,
+        "variants": ["feeder pan", "pan feeder", "tempat pakan pan", "feeder bulat"]
+      },
+      "tube_feeder": {
+        "canonical": "feeder_tube",
+        "confidence": 0.95,
+        "variants": ["feeder tube", "tube feeder", "tempat pakan tube", "feeder tabung"]
+      },
+      "bell_drinker": {
+        "canonical": "tempat_minum_bell",
+        "confidence": 0.95,
+        "variants": ["tempat minum bell", "bell drinker", "drinker bell", "tempat minum gantung"]
+      },
+      "cup_drinker": {
+        "canonical": "tempat_minum_cup",
+        "confidence": 0.95,
+        "variants": ["tempat minum cup", "cup drinker", "drinker cup"]
+      },
+      "nipple_drinker": {
+        "canonical": "tempat_minum_nipple",
+        "confidence": 0.95,
+        "variants": ["tempat minum nipple", "nipple drinker", "drinker nipple", "sistem nipple"]
+      },
+      "tunnel_ventilation": {
+        "canonical": "ventilasi_tunnel",
+        "confidence": 0.95,
+        "variants": ["ventilasi tunnel", "tunnel ventilation", "efek terowongan", "ventilasi longitudinal"]
+      },
+      "cross_ventilation": {
+        "canonical": "ventilasi_silang",
+        "confidence": 0.95,
+        "variants": ["ventilasi silang", "cross ventilation", "ventilasi transversal", "cross flow"]
+      },
+      "radiant_heaters": {
+        "canonical": "pemanas_radiant",
+        "confidence": 0.95,
+        "variants": ["pemanas radiant", "radiant heaters", "pemanas radiasi", "infrared heaters"]
+      },
+      "hot_air_blowers": {
+        "canonical": "blower_udara_panas",
+        "confidence": 0.95,
+        "variants": ["blower udara panas", "hot air blowers", "pemanas blower", "forced air heaters"]
+      }
+    },
+
+    "pathologies": {
+      "avian_influenza": {
+        "canonical": "avian_influenza",
+        "confidence": 0.95,
+        "variants": ["avian influenza", "flu burung", "ai", "h5n1", "h7n9", "influenza unggas"]
+      },
+      "mareks_disease": {
+        "canonical": "penyakit_marek",
+        "confidence": 0.95,
+        "variants": ["penyakit marek", "mareks disease", "marek disease", "md", "tumor limfoid"]
+      },
+      "gumboro": {
+        "canonical": "gumboro",
+        "confidence": 0.95,
+        "variants": ["gumboro", "penyakit gumboro", "infectious bursal disease", "ibd", "ibdv"]
+      },
+      "newcastle": {
+        "canonical": "newcastle",
+        "confidence": 0.95,
+        "variants": ["newcastle", "nd", "tetelo", "penyakit tetelo", "newcastle disease"]
+      },
+      "coccidiosis": {
+        "canonical": "koksidiosis",
+        "confidence": 0.95,
+        "variants": ["koksidiosis", "coccidiosis", "coccidia", "berak darah", "eimeria"]
+      },
+      "colibacillosis": {
+        "canonical": "kolibaksilosis",
+        "confidence": 0.95,
+        "variants": ["kolibaksilosis", "colibacillosis", "e.coli", "e coli", "escherichia coli"]
+      },
+      "necrotic_enteritis": {
+        "canonical": "enteritis_nekrotik",
+        "confidence": 0.95,
+        "variants": ["enteritis nekrotik", "necrotic enteritis", "ne", "clostridium perfringens"]
+      },
+      "salmonella": {
+        "canonical": "salmonelosis",
+        "confidence": 0.95,
+        "variants": ["salmonelosis", "salmonellosis", "salmonella", "pullorum"]
+      },
+      "mycoplasma": {
+        "canonical": "mikoplasmosis",
+        "confidence": 0.95,
+        "variants": ["mikoplasmosis", "mycoplasmosis", "mycoplasma", "crd", "chronic respiratory disease"]
+      },
+      "infectious_bronchitis": {
+        "canonical": "bronkitis_infeksius",
+        "confidence": 0.95,
+        "variants": ["bronkitis infeksius", "infectious bronchitis", "ib", "ibv"]
+      }
+    },
+
+    "clinical_signs": {
+      "respiratory": {
+        "canonical": "respirasi",
+        "confidence": 0.95,
+        "variants": ["respirasi", "respiratory", "pernapasan", "batuk", "ngorok", "sesak napas", "discharge hidung"]
+      },
+      "digestive": {
+        "canonical": "pencernaan",
+        "confidence": 0.95,
+        "variants": ["pencernaan", "digestive", "diare", "mencret", "muntah", "anoreksia", "hilang nafsu makan"]
+      },
+      "nervous": {
+        "canonical": "saraf",
+        "confidence": 0.95,
+        "variants": ["saraf", "nervous", "neurologis", "ataksia", "kelumpuhan", "kejang", "tremor"]
+      },
+      "general": {
+        "canonical": "umum",
+        "confidence": 0.90,
+        "variants": ["umum", "general", "lesu", "lemah", "demam", "depresi", "tidak aktif"]
+      },
+      "lameness": {
+        "canonical": "pincang",
+        "confidence": 0.95,
+        "variants": ["pincang", "lameness", "lumpuh", "gangguan gerak", "problem kaki"]
+      },
+      "pododermatitis": {
+        "canonical": "pododermatitis",
+        "confidence": 0.95,
+        "variants": ["pododermatitis", "footpad dermatitis", "fhd", "hock burn", "luka telapak kaki"]
+      }
+    },
+
+    "nutrition_parameters": {
+      "crude_protein": {
+        "canonical": "protein_kasar",
+        "confidence": 0.95,
+        "variants": ["protein kasar", "crude protein", "cp", "protein", "pk"]
+      },
+      "metabolizable_energy": {
+        "canonical": "energi_metabolis",
+        "confidence": 0.95,
+        "variants": ["energi metabolis", "metabolizable energy", "me", "em", "kcal/kg", "densitas energi"]
+      },
+      "lysine": {
+        "canonical": "lisin",
+        "confidence": 0.95,
+        "variants": ["lisin", "lysine", "lisin tercerna", "digestible lysine", "lys"]
+      },
+      "methionine": {
+        "canonical": "metionin",
+        "confidence": 0.95,
+        "variants": ["metionin", "methionine", "met", "metionin+sistin", "met+cys", "tsaa"]
+      },
+      "calcium": {
+        "canonical": "kalsium",
+        "confidence": 0.95,
+        "variants": ["kalsium", "calcium", "ca", "kapur"]
+      },
+      "phosphorus": {
+        "canonical": "fosfor",
+        "confidence": 0.95,
+        "variants": ["fosfor", "phosphorus", "p", "fosfor tercerna", "digestible phosphorus", "fosfor tersedia"]
+      },
+      "digestible_phosphorus": {
+        "canonical": "fosfor_tercerna",
+        "confidence": 0.95,
+        "variants": ["fosfor tercerna", "digestible phosphorus", "dp", "fosfor tersedia", "available phosphorus"]
+      },
+      "electrolyte_balance": {
+        "canonical": "keseimbangan_elektrolit",
+        "confidence": 0.95,
+        "variants": ["keseimbangan elektrolit", "electrolyte balance", "deb", "dietary electrolyte balance"]
+      },
+      "sodium": {
+        "canonical": "natrium",
+        "confidence": 0.95,
+        "variants": ["natrium", "sodium", "na", "garam"]
+      },
+      "chloride": {
+        "canonical": "klorida",
+        "confidence": 0.95,
+        "variants": ["klorida", "chloride", "cl", "klor"]
+      },
+      "potassium": {
+        "canonical": "kalium",
+        "confidence": 0.95,
+        "variants": ["kalium", "potassium", "k"]
+      }
+    },
+
+    "environment_parameters": {
+      "temperature": {
+        "canonical": "suhu",
+        "confidence": 0.95,
+        "variants": ["suhu", "temperature", "temperatur", "derajat", "celsius", "suhu kandang"]
+      },
+      "humidity": {
+        "canonical": "kelembaban",
+        "confidence": 0.95,
+        "variants": ["kelembaban", "humidity", "kelembaban relatif", "rh", "%rh"]
+      },
+      "ventilation_rate": {
+        "canonical": "laju_ventilasi",
+        "confidence": 0.95,
+        "variants": ["laju ventilasi", "ventilation rate", "aliran udara", "m3/h/kg", "pertukaran udara", "ventilasi minimum"]
+      },
+      "static_pressure": {
+        "canonical": "tekanan_statis",
+        "confidence": 0.95,
+        "variants": ["tekanan statis", "static pressure", "pa", "pascal", "tekanan negatif", "tekanan kandang"]
+      },
+      "ammonia": {
+        "canonical": "amonia",
+        "confidence": 0.95,
+        "variants": ["amonia", "ammonia", "nh3", "ppm", "konsentrasi amonia", "kadar amonia"]
+      },
+      "co2": {
+        "canonical": "co2",
+        "confidence": 0.95,
+        "variants": ["co2", "karbon dioksida", "ppm co2", "konsentrasi co2", "kadar co2"]
+      },
+      "light_intensity": {
+        "canonical": "intensitas_cahaya",
+        "confidence": 0.95,
+        "variants": ["intensitas cahaya", "light intensity", "lux", "pencahayaan", "kecerahan"]
+      },
+      "lighting_hours": {
+        "canonical": "jam_pencahayaan",
+        "confidence": 0.95,
+        "variants": ["jam pencahayaan", "lighting hours", "lama cahaya", "photoperiod", "jam/hari", "program pencahayaan"]
+      }
+    },
+
+    "biosecurity_health": {
+      "biosecurity": {
+        "canonical": "biosekuriti",
+        "confidence": 0.95,
+        "variants": ["biosekuriti", "biosecurity", "keamanan hayati", "all in all out", "sanitasi"]
+      },
+      "probiotics": {
+        "canonical": "probiotik",
+        "confidence": 0.95,
+        "variants": ["probiotik", "probiotics", "mikroorganisme menguntungkan", "kultur hidup", "kesehatan usus"]
+      },
+      "antibiotics": {
+        "canonical": "antibiotik",
+        "confidence": 0.95,
+        "variants": ["antibiotik", "antibiotics", "antimikroba", "obat", "agp"]
+      },
+      "vaccine": {
+        "canonical": "vaksin",
+        "confidence": 0.95,
+        "variants": ["vaksin", "vaccine", "vaksinasi", "vaccination", "imunisasi", "immunization"]
+      }
+    },
+
+    "welfare_indicators": {
+      "stocking_density": {
+        "canonical": "kepadatan_kandang",
+        "confidence": 0.95,
+        "variants": ["kepadatan kandang", "stocking density", "densitas", "density", "kg/m2", "ekor/m2", "populasi kandang"]
+      },
+      "heat_stress": {
+        "canonical": "stress_panas",
+        "confidence": 0.95,
+        "variants": ["stress panas", "heat stress", "stres panas", "kepanasan", "hipertermia"]
+      },
+      "feather_pecking": {
+        "canonical": "patuk_bulu",
+        "confidence": 0.95,
+        "variants": ["patuk bulu", "feather pecking", "kanibalisme", "mematuk bulu"]
+      },
+      "feeder_space": {
+        "canonical": "ruang_feeder",
+        "confidence": 0.95,
+        "variants": ["ruang feeder", "feeder space", "jarak tempat pakan", "cm/ekor", "panjang feeder"]
+      },
+      "drinker_flow_rate": {
+        "canonical": "laju_aliran_air",
+        "confidence": 0.95,
+        "variants": ["laju aliran air", "drinker flow rate", "aliran nipple", "ml/min/nipple", "tekanan air"]
+      }
+    },
+
+    "substrate_materials": {
+      "litter": {
+        "canonical": "litter",
+        "confidence": 0.95,
+        "variants": ["litter", "alas kandang", "bedding", "sekam", "material alas"]
+      },
+      "wood_shavings": {
+        "canonical": "serutan_kayu",
+        "confidence": 0.95,
+        "variants": ["serutan kayu", "wood shavings", "serbuk kayu", "sawdust"]
+      },
+      "rice_husks": {
+        "canonical": "sekam_padi",
+        "confidence": 0.95,
+        "variants": ["sekam padi", "rice husks", "kulit padi", "sekam"]
+      },
+      "straw": {
+        "canonical": "jerami",
+        "confidence": 0.95,
+        "variants": ["jerami", "straw", "merang", "jerami padi"]
+      }
+    },
+
+    "egg_quality": {
+      "egg_weight": {
+        "canonical": "bobot_telur",
+        "confidence": 0.95,
+        "variants": ["bobot telur", "egg weight", "berat telur", "bobot rata-rata telur", "ukuran telur"]
+      },
+      "shell_quality": {
+        "canonical": "kualitas_kerabang",
+        "confidence": 0.95,
+        "variants": ["kualitas kerabang", "shell quality", "ketebalan kerabang", "kekuatan kerabang", "kerabang tipis"]
+      },
+      "cracked_shell": {
+        "canonical": "kerabang_retak",
+        "confidence": 0.95,
+        "variants": ["kerabang retak", "cracked shell", "telur retak", "retak rambut"]
+      },
+      "soft_shelled_egg": {
+        "canonical": "telur_kerabang_lunak",
+        "confidence": 0.95,
+        "variants": ["telur kerabang lunak", "soft shelled egg", "kerabang lunak", "telur tanpa kerabang"]
+      },
+      "misshapen_egg": {
+        "canonical": "telur_abnormal",
+        "confidence": 0.95,
+        "variants": ["telur abnormal", "misshapen egg", "bentuk tidak normal", "telur cacat"]
+      }
+    },
+
+    "protocol_types": {
+      "vaccination": {
+        "canonical": "vaksinasi",
+        "confidence": 0.95,
+        "variants": ["vaksinasi", "vaccination", "vaksin", "vaccine", "imunisasi", "immunization"]
+      },
+      "biosecurity_protocol": {
+        "canonical": "protokol_biosekuriti",
+        "confidence": 0.95,
+        "variants": ["biosekuriti", "biosecurity", "desinfeksi", "disinfection", "pembersihan", "karantina"]
+      },
+      "treatment": {
+        "canonical": "pengobatan",
+        "confidence": 0.95,
+        "variants": ["pengobatan", "treatment", "terapi", "therapy", "medikasi", "medication"]
+      },
+      "lab_diagnostics": {
+        "canonical": "diagnostik_lab",
+        "confidence": 0.95,
+        "variants": ["diagnostik", "diagnostic", "tes", "test", "analisa", "analysis", "laboratorium", "lab"]
+      }
+    },
+
+    "system_messages": {
+      "out_of_domain": {
+        "canonical": "di_luar_domain",
+        "confidence": 1.0,
+        "variants": ["di luar domain", "out of domain", "bukan dalam domain", "di luar cakupan"]
+      },
+      "error_generic": {
+        "canonical": "kesalahan_umum",
+        "confidence": 1.0,
+        "variants": ["kesalahan", "error", "kesalahan umum", "error pemrosesan"]
+      },
+      "welcome": {
+        "canonical": "selamat_datang",
+        "confidence": 1.0,
+        "variants": ["selamat datang", "welcome", "halo", "hello"]
+      },
+      "clarification_needed": {
+        "canonical": "perlu_klarifikasi",
+        "confidence": 1.0,
+        "variants": ["perlu klarifikasi", "clarification needed", "tolong perjelas", "butuh informasi lebih"]
+      },
+      "no_results": {
+        "canonical": "tidak_ada_hasil",
+        "confidence": 1.0,
+        "variants": ["tidak ada hasil", "no results", "tidak ditemukan", "tidak ada data"]
+      },
+      "processing": {
+        "canonical": "memproses",
+        "confidence": 1.0,
+        "variants": ["memproses", "processing", "mohon tunggu", "sedang diproses"]
+      },
+      "farewell": {
+        "canonical": "sampai_jumpa",
+        "confidence": 1.0,
+        "variants": ["sampai jumpa", "goodbye", "selamat tinggal", "bye"]
+      }
+    }
   }
 }

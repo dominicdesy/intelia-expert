@@ -1,202 +1,703 @@
 {
-  "_comment": "FICHIER: universal_terms_pl.json - VERSION ENRICHIE",
-  
   "metadata": {
     "language": "pl",
-    "version": "2.1.0",
-    "last_updated": "2025-01-15",
-    "total_terms": 365
-  },
-  
-  "messages": {
-    "out_of_domain": "Intelia Expert to system ekspercki specjalizujący się w produkcji drobiu i nie może odpowiadać na pytania spoza tej dziedziny. Jestem tutaj, aby pomóc we wszystkich aspektach hodowli drobiu. Jak mogę pomóc w drobiarstwie?",
-    "error_generic": "Wystąpił błąd podczas przetwarzania żądania. Spróbuj ponownie.",
-    "welcome": "Cześć! Jestem Intelia Expert, Twoim specjalistycznym asystentem w drobiarstwie. Jak mogę Ci dzisiaj pomóc?",
-    "clarification_needed": "Czy mógłbyś sprecyzować swoje pytanie, abym mógł udzielić dokładniejszej odpowiedzi?",
-    "no_results": "Nie znalazłem istotnych informacji, aby odpowiedzieć na Twoje pytanie. Czy mógłbyś przeformułować?",
-    "processing": "Przetwarzam Twoje żądanie, proszę czekać...",
-    "farewell": "Do widzenia! Nie wahaj się wrócić, jeśli masz więcej pytań o drobierstwie.",
-    "error_connection": "Błąd połączenia z systemem. Sprawdź swoje połączenie.",
-    "error_timeout": "Żądanie trwało zbyt długo. Spróbuj ponownie.",
-    "success_generic": "Operacja zakończona pomyślnie."
+    "version": "3.0.0",
+    "last_updated": "2025-09-30",
+    "total_domains": 19,
+    "description": "Uniwersalna terminologia dla systemu eksperckiego w produkcji drobiu - Wersja polska"
   },
 
-  "equipment_types": {
-    "chain_feeder": ["karmnik łańcuchowy", "łańcuch paszowy", "system łańcuchowy"],
-    "pan_feeder": ["karmnik talerzowy", "talerz paszowy", "okrągły karmnik"],
-    "tube_feeder": ["karmnik rurowy", "rura paszowa", "system rurowy"],
-    "bell_drinker": ["pojnik dzwonowy", "dzwon pojny", "pojnik wiszący"],
-    "cup_drinker": ["pojnik kubkowy", "kubek pojny", "miseczka na wodę"],
-    "tunnel_ventilation": ["wentylacja tunelowa", "efekt tunelu", "wentylacja podłużna"],
-    "cross_ventilation": ["wentylacja poprzeczna", "wentylacja krzyżowa", "przepływ poprzeczny"],
-    "radiant_heaters": ["grzejniki promieniowe", "ogrzewanie promieniowe", "rury promieniowe"],
-    "hot_air_blowers": ["dmuchawy gorącego powietrza", "nagrzewnice powietrza"]
-  },
-  
-  "substrate_materials": {
-    "litter": ["ściółka", "podściółka", "materiał podłogowy"],
-    "wood_shavings": ["wióry drzewne", "trociny", "wiórki"],
-    "rice_husks": ["łuski ryżowe", "plewy ryżowe", "otręby ryżowe"],
-    "straw": ["słoma", "słoma pszenna", "słoma jęczmienna"]
-  },
-  
-  "additional_pathologies": {
-    "avian_influenza": ["grypa ptaków", "grypa drobiu", "h5n1", "ptasia grypa"],
-    "mareks_disease": ["choroba mareka", "marek", "chłoniaki", "paraliż"],
-    "lameness": ["kulawizna", "problemy lokomotoryczne", "zaburzenia chodu"],
-    "pododermatitis": ["zapalenie opuszek", "dermatoza stóp", "oparzenia staw skokowy"],
-    "crossbeak": ["krzyżowy dziób", "deformacja dzioba", "krzywizna dzioba"]
-  },
-  
-  "production_systems": {
-    "enriched_cage": ["klatka wzbogacona", "klatka ulepszona", "klatka zmodyfikowana"],
-    "aviary_system": ["system woliery", "system wielopoziomowy", "woliera"],
-    "free_range": ["wolny wybieg", "system ekstensywny", "hodowla na pastwisku"]
-  },
-  
-  "biosecurity_health": {
-    "biosecurity": ["bioasekuracja", "bezpieczeństwo biologiczne", "system zamknięty"],
-    "probiotics": ["probiotyki", "korzystne mikroorganizmy", "bakterie kwasu mlekowego"],
-    "antibiotics": ["antybiotyki", "przeciwdrobnoustroje", "terapeutyczne"],
-    "vaccine": ["szczepionka", "szczepienie", "immunizacja", "profilaktyka"]
-  },
-  
-  "egg_defects": {
-    "cracked_shell": ["pęknięta skorupa", "rysa skorupy", "uszkodzona skorupa"],
-    "soft_shelled_egg": ["miękka skorupa", "jajo bez skorupy", "jajo gumowate"],
-    "misshapen_egg": ["zniekształcone jajo", "nieprawidłowy kształt", "deformacja jaja"]
-  },
-  
-  "genetic_lines": {
-    "ross_308": ["ross 308", "ross308", "kurczak ross", "brojler ross"],
-    "ross_708": ["ross 708", "ross708", "kurczak ross 708"],
-    "cobb_500": ["cobb 500", "cobb500", "kurczak cobb", "brojler cobb"],
-    "hubbard_classic": ["hubbard classic", "hubbard klasyczny", "classic"],
-    "freedom_ranger": ["freedom ranger", "ranger wolny", "kurczak wiejski"],
-    "isa_brown": ["isa brown", "isa brązowa", "kura isa", "nioska isa"],
-    "lohmann_brown": ["lohmann brown", "lohmann brązowa", "kura lohmann", "nioska lohmann"],
-    "hy_line": ["hy-line", "hyline", "hy line"]
-  },
-  
-  "site_types": {
-    "broiler_farm": ["broiler", "kurczak brojler", "ferma broiler", "kurczak mięsny"],
-    "layer_farm": ["nioska", "kura nioska", "ferma jaj", "jaja"],
-    "breeder_farm": ["ferma rozpłodowa", "stado rodzicielskie", "rozpłodniki"],
-    "hatchery": ["wylęgarnia", "inkubatorium", "lęgnia"],
-    "feed_mill": ["wytwórnia pasz", "mieszalnia", "młyn paszowy"]
-  },
-  
-  "performance_metrics": {
-    "feed_conversion_ratio": ["współczynnik konwersji", "fcr", "przelicznik paszowy"],
-    "average_daily_gain": ["przyrost dzienny", "adg", "średni przyrost"],
-    "feed_intake": ["spożycie paszy", "konsumpcja", "g/sztuka/dzień"],
-    "water_intake": ["spożycie wody", "konsumpcja wody", "l/1000/dzień"],
-    "body_weight": ["waga", "masa ciała", "waga żywa", "średnia waga", "waga docelowa"],
-    "mortality": ["śmiertelność", "wskaźnik śmiertelności", "śmierć", "straty", "upadki"],
-    "egg_production": ["produkcja jaj", "nośność", "wskaźnik nośności", "wydajność jaj", "znoszenie"],
-    "uniformity": ["jednorodność", "uniformność", "współczynnik zmienności"],
-    "epef": ["epef", "wskaźnik efektywności produkcji", "indeks wydajności"]
-  },
-  
-  "nutrition_detailed": {
-    "crude_protein": ["białko surowe", "bs", "białko", "proteina"],
-    "metabolizable_energy": ["energia metaboliczna", "em", "kcal/kg", "gęstość energetyczna"],
-    "lysine": ["lizyna", "lizyna strawna", "lizyna dig"],
-    "methionine": ["metionina", "met", "metionina+cysteina", "met+cys"],
-    "calcium": ["wapń", "calcium", "ca", "węglan wapnia"],
-    "phosphorus": ["fosfor", "p", "fosfor strawny", "p dig"],
-    "digestible_phosphorus": ["fosfor strawny", "dp", "fosfor dostępny"],
-    "electrolyte_balance": ["równowaga elektrolitowa", "deb", "balans elektrolitowy"],
-    "sodium": ["sód", "na", "sól"],
-    "chloride": ["chlorek", "cl", "chlor"],
-    "potassium": ["potas", "k", "potaz"]
-  },
-  
-  "pathology_specific": {
-    "gumboro": ["gumboro", "choroba gumboro", "zakaźne zapalenie"],
-    "newcastle": ["newcastle", "choroba newcastle", "pseudozachorka"],
-    "coccidiosis": ["kokcydioza", "kokcydia", "eimeria", "kokcydiostatyk"],
-    "colibacillosis": ["kolibacyloza", "e.coli", "escherichia coli"],
-    "necrotic_enteritis": ["martwicze zapalenie", "clostridium perfringens", "martwica jelit"],
-    "eimeria_tenella": ["eimeria tenella", "kokcydioza kątnicza", "kokcydia kątnicza"],
-    "salmonella": ["salmonella", "salmoneloza", "paratyfus"],
-    "mycoplasma": ["mykoplazma", "mykoplazma", "chroniczna choroba oddechowa"],
-    "infectious_bronchitis_virus": ["ibv", "zakaźne zapalenie oskrzeli", "zzo"]
-  },
-  
-  "infrastructure_environment": {
-    "ventilation_rate": ["natężenie wentylacji", "wydajność wentylacji", "m3/h/kg"],
-    "static_pressure": ["ciśnienie statyczne", "pa", "pascal", "podciśnienie"],
-    "ammonia": ["amoniak", "nh3", "ppm", "stężenie amoniaku"],
-    "co2_concentration": ["co2", "dwutlenek węgla", "ppm co2", "stężenie co2"],
-    "relative_humidity": ["wilgotność względna", "rh", "wilgotność"],
-    "feeder_space": ["miejsce przy karmiku", "cm/sztuka", "długość karmika"],
-    "drinker_flow_rate": ["przepływ pojnika", "wydajność smoczka", "ml/min/smoczek"],
-    "lighting_hours": ["długość oświetlenia", "fotoperiod", "godziny światła"],
-    "light_intensity": ["natężenie światła", "lux", "oświetlenie", "jasność"]
-  },
-  
-  "welfare_management": {
-    "stocking_density": ["zagęszczenie", "gęstość", "kg/m2", "sztuk/m2"],
-    "heat_stress": ["stres cieplny", "stres termiczny", "przegrzanie", "hipertermia"],
-    "feather_pecking": ["skubanie piór", "kanibalizm", "dziobanie", "wyrywanie piór"]
-  },
-  
-  "equipment_settings": {
-    "nipple_height": ["wysokość smoczków", "wysokość pojników"],
-    "brooding_temperature": ["krzywa temperatury", "program grzewczy", "temperatura odchowu"],
-    "minimum_ventilation": ["wentylacja minimalna", "program wentylacji", "minimalny przepływ"],
-    "static_pressure_setpoints": ["nastawy ciśnienia", "ciśnienie docelowe", "regulacja ciśnienia"],
-    "co2_maximum_ppm": ["co2 maksimum", "limit co2", "próg co2"]
-  },
-  
-  "reproduction_laying": {
-    "sexual_maturity": ["dojrzałość płciowa", "wiek pierwszego jaja", "fotostymulacja"],
-    "laying_rate": ["wskaźnik nośności", "% nośność", "produkcja jaj"],
-    "egg_weight": ["waga jaja", "masa jaja", "kaliber jaja", "średnia waga jaja"],
-    "shell_quality": ["jakość skorupy", "grubość skorupy", "wytrzymałość skorupy"]
-  },
-  
-  "phases": {
-    "starter": ["starter", "początek", "faza startowa", "faza 1", "przed-starter"],
-    "grower": ["wzrost", "faza wzrostu", "odchów", "fase 2"],
-    "finisher": ["finisher", "faza końcowa", "wykańczanie", "faza 3"]
-  },
-  
-  "taxonomy_classification": {
-    "commercial_strain": ["linia handlowa", "szczep", "rasa", "odmiana"],
-    "sex_class": ["samce", "samice", "mieszane", "nieselektowane"],
-    "age_brackets": ["0-10 dni", "11-35 dni", "36-42 dni", "faza 1", "faza 2", "faza 3"]
-  },
-  
-  "question_patterns": {
-    "weight_query": ["jaka jest waga", "waga docelowa", "średnia waga", "ile waży", "jaka waga"],
-    "fcr_query": ["optymalne fcr", "konwersja paszowa", "przelicznik"],
-    "water_query": ["zużycie wody", "spożycie wody", "litry dziennie"],
-    "nutrient_requirement_query": ["poziom białka", "zapotrzebowanie lizyny", "potrzeba wapnia"],
-    "environment_setpoint_query": ["optymalna temperatura", "docelowa wilgotność", "maksymalne co2"],
-    "production_index_query": ["średnia epef", "normalna iep", "wskaźnik wydajności"],
-    "vaccination_protocol_query": ["protokół szczepień", "schemat szczepień", "program szczepień"],
-    "space_equipment_query": ["miejsce karmika", "ustawienia smoczka", "wysokość pojnika"],
-    "problem_report": ["moje kurczaki", "obserwuję", "moje kury", "problem z", "moje ptaki"],
-    "health_diagnosis": ["jakie objawy", "diagnoza", "choroba", "co powoduje"],
-    "management_how": ["jak zarządzać", "jak leczyć", "co robić", "jak poprawić"]
-  },
-  
-  "units_measures": {
-    "days": ["dni", "dzień", "d"],
-    "weeks": ["tygodnie", "tydzień", "tyg", "t"],
-    "grams": ["gramy", "gram", "g"],
-    "kilograms": ["kilogramy", "kilogram", "kg"],
-    "percentage": ["procent", "procenty", "%"],
-    "liters": ["litry", "litr", "l"],
-    "celsius": ["celsius", "stopnie celsjusza", "°c", "stopnie"]
-  },
-  
-  "health_symptoms": {
-    "respiratory": ["oddechowy", "kaszel", "duszność", "oddychanie", "wyciek z nosa"],
-    "digestive": ["trawienny", "biegunka", "wymioty", "anoreksja", "utrata apetytu"],
-    "nervous": ["nerwowy", "ataksja", "paraliż", "drgawki", "drżenia"],
-    "general": ["ogólny", "letarg", "gorączka", "słabość", "depresja"]
+  "domains": {
+    "general_terms": {
+      "poultry": {
+        "canonical": "drob",
+        "confidence": 0.95,
+        "variants": ["drób", "drob", "hodowla drobiu", "produkcja drobiarska", "drobiarstwo"]
+      },
+      "farm": {
+        "canonical": "ferma",
+        "confidence": 0.95,
+        "variants": ["ferma", "gospodarstwo", "kurnik", "zaklad", "zakład", "obiekt produkcyjny"]
+      },
+      "management": {
+        "canonical": "zarzadzanie",
+        "confidence": 0.90,
+        "variants": ["zarządzanie", "zarzadzanie", "management", "kierowanie", "administracja"]
+      },
+      "production": {
+        "canonical": "produkcja",
+        "confidence": 0.90,
+        "variants": ["produkcja", "wydajnosc", "wydajność", "produktywnosc", "produktywność"]
+      },
+      "quality": {
+        "canonical": "jakosc",
+        "confidence": 0.90,
+        "variants": ["jakość", "jakosc", "standard", "klasyfikacja", "klasa"]
+      }
+    },
+
+    "question_patterns": {
+      "weight_query": {
+        "canonical": "pytanie_waga",
+        "confidence": 0.92,
+        "variants": ["jaka jest waga", "waga docelowa", "srednia waga", "średnia waga", "ile wazy", "ile waży"]
+      },
+      "fcr_query": {
+        "canonical": "pytanie_fcr",
+        "confidence": 0.92,
+        "variants": ["optymalne fcr", "wspolczynnik konwersji", "współczynnik konwersji", "fcr", "konwersja paszy"]
+      },
+      "water_query": {
+        "canonical": "pytanie_woda",
+        "confidence": 0.92,
+        "variants": ["zuzycie wody", "zużycie wody", "pobor wody", "pobór wody", "litrow na dzien", "litrów na dzień"]
+      },
+      "nutrient_requirement_query": {
+        "canonical": "pytanie_skladniki",
+        "confidence": 0.92,
+        "variants": ["poziom bialka", "poziom białka", "zapotrzebowanie na lizyne", "zapotrzebowanie na lizynę", "zawartosc wapnia", "zawartość wapnia"]
+      },
+      "environment_setpoint_query": {
+        "canonical": "pytanie_klimat",
+        "confidence": 0.92,
+        "variants": ["optymalna temperatura", "docelowa temperatura", "docelowa wilgotnosc", "docelowa wilgotność", "maksymalne co2"]
+      },
+      "production_index_query": {
+        "canonical": "pytanie_indeks",
+        "confidence": 0.92,
+        "variants": ["sredni epef", "średni epef", "normalny indeks", "indeks efektywnosci", "indeks efektywności"]
+      },
+      "vaccination_protocol_query": {
+        "canonical": "pytanie_szczepienia",
+        "confidence": 0.92,
+        "variants": ["protokol szczepien", "protokół szczepień", "program szczepien", "program szczepień", "plan szczepien", "plan szczepień"]
+      },
+      "space_equipment_query": {
+        "canonical": "pytanie_wyposazenie",
+        "confidence": 0.92,
+        "variants": ["przestrzen przy zarnach", "przestrzeń przy żarnach", "ustawienie smoczka", "wysokosc pojnika", "wysokość pojnika"]
+      },
+      "problem_report": {
+        "canonical": "zgloszenie_problemu",
+        "confidence": 0.90,
+        "variants": ["moje kury", "zauwazam", "zauważam", "problem z", "moje ptaki"]
+      },
+      "health_diagnosis": {
+        "canonical": "diagnoza_zdrowia",
+        "confidence": 0.92,
+        "variants": ["jakie objawy", "diagnoza", "choroba", "co powoduje", "objawy kliniczne"]
+      },
+      "management_how": {
+        "canonical": "zarzadzanie_jak",
+        "confidence": 0.90,
+        "variants": ["jak zarzadzac", "jak zarządzać", "jak leczyc", "jak leczyć", "co robic", "co robić", "jak poprawic", "jak poprawić"]
+      }
+    },
+
+    "genetic_lines": {
+      "ross_308": {
+        "canonical": "ross_308",
+        "confidence": 0.95,
+        "variants": ["ross 308", "ross308", "ross-308", "r308", "ross", "ross 308 brojler"]
+      },
+      "ross_708": {
+        "canonical": "ross_708",
+        "confidence": 0.95,
+        "variants": ["ross 708", "ross708", "ross-708", "r708"]
+      },
+      "cobb_500": {
+        "canonical": "cobb_500",
+        "confidence": 0.95,
+        "variants": ["cobb 500", "cobb500", "cobb-500", "c500", "cobb", "cobb 500 brojler"]
+      },
+      "cobb_700": {
+        "canonical": "cobb_700",
+        "confidence": 0.95,
+        "variants": ["cobb 700", "cobb700", "cobb-700", "c700"]
+      },
+      "cobb_400": {
+        "canonical": "cobb_400",
+        "confidence": 0.95,
+        "variants": ["cobb 400", "cobb400", "cobb-400", "c400"]
+      },
+      "hubbard_classic": {
+        "canonical": "hubbard_classic",
+        "confidence": 0.95,
+        "variants": ["hubbard classic", "classic", "hubbard-classic", "hclassic", "hubbard"]
+      },
+      "hubbard_flex": {
+        "canonical": "hubbard_flex",
+        "confidence": 0.95,
+        "variants": ["hubbard flex", "flex", "hubbard-flex", "hflex"]
+      },
+      "hubbard_ja87": {
+        "canonical": "hubbard_ja87",
+        "confidence": 0.95,
+        "variants": ["hubbard ja87", "ja87", "hubbard-ja87", "ja 87", "ja-87"]
+      },
+      "freedom_ranger": {
+        "canonical": "freedom_ranger",
+        "confidence": 0.95,
+        "variants": ["freedom ranger", "freedom", "ranger", "redbro", "freedom-ranger"]
+      },
+      "isa_brown": {
+        "canonical": "isa_brown",
+        "confidence": 0.95,
+        "variants": ["isa brown", "isa", "isa-brown", "isa brown nioska", "kura isa"]
+      },
+      "lohmann_brown": {
+        "canonical": "lohmann_brown",
+        "confidence": 0.95,
+        "variants": ["lohmann brown", "lohmann", "lohmann-brown", "lb", "lohmann brown nioska"]
+      },
+      "hy_line": {
+        "canonical": "hy_line",
+        "confidence": 0.95,
+        "variants": ["hy-line", "hyline", "hy line", "hl"]
+      }
+    },
+
+    "performance_metrics": {
+      "feed_conversion_ratio": {
+        "canonical": "wspolczynnik_konwersji",
+        "confidence": 0.95,
+        "variants": ["fcr", "wspolczynnik konwersji paszy", "współczynnik konwersji paszy", "konwersja paszy", "sprawnosc wykorzystania paszy", "sprawność wykorzystania paszy", "kumulacyjny fcr"]
+      },
+      "average_daily_gain": {
+        "canonical": "sredni_przyrost_dzienny",
+        "confidence": 0.95,
+        "variants": ["adg", "sredni przyrost dzienny", "średni przyrost dzienny", "przyrost dzienny", "g/dzien", "g/dzień", "przyrost masy dziennej", "tempo wzrostu"]
+      },
+      "feed_intake": {
+        "canonical": "spozycie_paszy",
+        "confidence": 0.95,
+        "variants": ["spozycie paszy", "spożycie paszy", "pobor paszy", "pobór paszy", "fi", "g/sztuka/dzien", "g/sztuka/dzień", "dzienne spozycie", "dzienne spożycie", "kumulacyjne spozycie", "kumulacyjne spożycie"]
+      },
+      "water_intake": {
+        "canonical": "spozycie_wody",
+        "confidence": 0.95,
+        "variants": ["spozycie wody", "spożycie wody", "pobor wody", "pobór wody", "l/1000/dzien", "l/1000/dzień", "ml/sztuka/dzien", "ml/sztuka/dzień", "dzienne spozycie wody", "dzienne spożycie wody"]
+      },
+      "body_weight": {
+        "canonical": "masa_ciala",
+        "confidence": 0.95,
+        "variants": ["waga", "masa ciala", "masa ciała", "masa zywa", "masa żywa", "srednia waga", "średnia waga", "waga docelowa", "mc", "waga ptaka"]
+      },
+      "mortality": {
+        "canonical": "padlina",
+        "confidence": 0.95,
+        "variants": ["padlina", "padlość", "smiertelnosc", "śmiertelność", "wskaznik smiertelnosci", "wskaźnik śmiertelności", "ubytek", "procent padliny", "kumulacyjna padlina", "dzienna padlina"]
+      },
+      "egg_production": {
+        "canonical": "niesosc",
+        "confidence": 0.95,
+        "variants": ["niesosc", "niesność", "wskaznik niesosc", "wskaźnik niesność", "produkcja jaj", "intensywnosc niesienia", "intensywność niesienia", "jajka na nioskę", "nioskosc", "nioskość"]
+      },
+      "uniformity": {
+        "canonical": "wyrownanie",
+        "confidence": 0.95,
+        "variants": ["wyrownanie", "wyrównanie", "wspolczynnik zmiennosci", "współczynnik zmienności", "cv", "jednorodnosc", "jednorodność", "wyrownanie stada", "wyrównanie stada"]
+      },
+      "epef": {
+        "canonical": "epef",
+        "confidence": 0.95,
+        "variants": ["epef", "europejski wskaznik efektywnosci", "europejski wskaźnik efektywności", "indeks produkcyjny", "wskaznik efektywnosci", "wskaźnik efektywności"]
+      }
+    },
+
+    "site_types": {
+      "broiler_farm": {
+        "canonical": "ferma_brojlerow",
+        "confidence": 0.95,
+        "variants": ["brojler", "ferma brojlerow", "ferma brojlerów", "kurczak miesny", "kurczak mięsny", "kurnik brojlerowy"]
+      },
+      "layer_farm": {
+        "canonical": "ferma_niosek",
+        "confidence": 0.95,
+        "variants": ["nioska", "nioska", "ferma niosek", "ferma niosek", "kura nioska", "kura nieśna", "kurnik niosek"]
+      },
+      "breeder_farm": {
+        "canonical": "ferma_rodzicielska",
+        "confidence": 0.95,
+        "variants": ["rodziciele", "ferma rodzicielska", "stado rodzicielskie", "ptaki rodzicielskie", "parent stock"]
+      },
+      "hatchery": {
+        "canonical": "wylegernia",
+        "confidence": 0.95,
+        "variants": ["wylęgarnia", "wylegernia", "wylęg", "wyleg", "zaklad wylegu", "zakład wylęgu"]
+      },
+      "feed_mill": {
+        "canonical": "zaklad_paszowy",
+        "confidence": 0.95,
+        "variants": ["zaklad paszowy", "zakład paszowy", "mlyn paszowy", "młyn paszowy", "fabryka paszy"]
+      }
+    },
+
+    "production_phases": {
+      "starter": {
+        "canonical": "starter",
+        "confidence": 0.95,
+        "variants": ["starter", "poczatkowa", "początkowa", "faza startowa", "faza 1", "pre-starter"]
+      },
+      "grower": {
+        "canonical": "grower",
+        "confidence": 0.95,
+        "variants": ["grower", "wzrostowa", "faza wzrostowa", "faza 2", "rozwojowa"]
+      },
+      "finisher": {
+        "canonical": "finisher",
+        "confidence": 0.95,
+        "variants": ["finisher", "tuczowa", "faza tuczowa", "faza 3", "koncowa", "końcowa"]
+      }
+    },
+
+    "sex_categories": {
+      "male": {
+        "canonical": "kogut",
+        "confidence": 0.95,
+        "variants": ["kogut", "samiec", "kogucik", "samce", "m"]
+      },
+      "female": {
+        "canonical": "kura",
+        "confidence": 0.95,
+        "variants": ["kura", "samica", "kurka", "samice", "k", "f"]
+      },
+      "as_hatched": {
+        "canonical": "mieszane",
+        "confidence": 0.95,
+        "variants": ["mieszane", "bez sexingu", "straight run", "sr", "mix", "obie plcie", "obie płcie"]
+      }
+    },
+
+    "bird_types": {
+      "broiler": {
+        "canonical": "brojler",
+        "confidence": 0.95,
+        "variants": ["brojler", "kurczak miesny", "kurczak mięsny", "kura miesna", "kura mięsna"]
+      },
+      "layer": {
+        "canonical": "nioska",
+        "confidence": 0.95,
+        "variants": ["nioska", "nioska", "kura nioska", "kura niosna", "kura nieśna"]
+      },
+      "breeder": {
+        "canonical": "ptak_rodzicielski",
+        "confidence": 0.95,
+        "variants": ["ptak rodzicielski", "rodzic", "reproduktor", "parent stock", "stado rodzicielskie"]
+      },
+      "pullet": {
+        "canonical": "mloda_nioska",
+        "confidence": 0.95,
+        "variants": ["mloda nioska", "młoda nioska", "pullet", "mloda kura", "młoda kura", "remontowa"]
+      },
+      "chick": {
+        "canonical": "pisklak",
+        "confidence": 0.95,
+        "variants": ["pisklę", "piskle", "pisklak", "jednodniowy pisklak", "jednodniowe pisklę", "jednodniowe piskle", "doc"]
+      }
+    },
+
+    "equipment_types": {
+      "chain_feeder": {
+        "canonical": "zarna_lancuchowe",
+        "confidence": 0.95,
+        "variants": ["żarna lancuchowe", "żarna łańcuchowe", "zarna lancuchowe", "system lancuchowy", "system łańcuchowy"]
+      },
+      "pan_feeder": {
+        "canonical": "zarna_tarczowe",
+        "confidence": 0.95,
+        "variants": ["żarna tarczowe", "zarna tarczowe", "tarcze paszowe", "okragle zarna", "okrągłe żarna"]
+      },
+      "tube_feeder": {
+        "canonical": "zarna_rurowe",
+        "confidence": 0.95,
+        "variants": ["żarna rurowe", "zarna rurowe", "rury paszowe", "tubowe zarna", "tubowe żarna"]
+      },
+      "bell_drinker": {
+        "canonical": "pojnik_dzwonowy",
+        "confidence": 0.95,
+        "variants": ["pojnik dzwonowy", "dzwonek", "pojnik zawieszany"]
+      },
+      "cup_drinker": {
+        "canonical": "pojnik_kubkowy",
+        "confidence": 0.95,
+        "variants": ["pojnik kubkowy", "kubek", "pojnik miseczkowy"]
+      },
+      "nipple_drinker": {
+        "canonical": "pojnik_smoczkowy",
+        "confidence": 0.95,
+        "variants": ["pojnik smoczkowy", "smoczek", "nipple", "system smoczkowy"]
+      },
+      "tunnel_ventilation": {
+        "canonical": "wentylacja_tunelowa",
+        "confidence": 0.95,
+        "variants": ["wentylacja tunelowa", "tunel", "efekt tunelowy", "wentylacja podluzna", "wentylacja podłużna"]
+      },
+      "cross_ventilation": {
+        "canonical": "wentylacja_poprzeczna",
+        "confidence": 0.95,
+        "variants": ["wentylacja poprzeczna", "wentylacja krzyzowa", "wentylacja krzyżowa", "poprzeczna"]
+      },
+      "radiant_heaters": {
+        "canonical": "promienniki",
+        "confidence": 0.95,
+        "variants": ["promienniki", "ogrzewanie promiennikowe", "promienniki podczerwieni", "rury promiennikowe"]
+      },
+      "hot_air_blowers": {
+        "canonical": "nagrzewnice",
+        "confidence": 0.95,
+        "variants": ["nagrzewnice", "dmuchawy goracego powietrza", "dmuchawy gorącego powietrza", "ogrzewanie wymuszone"]
+      }
+    },
+
+    "pathologies": {
+      "avian_influenza": {
+        "canonical": "grypa_ptakow",
+        "confidence": 0.95,
+        "variants": ["grypa ptakow", "grypa ptaków", "avian influenza", "ptasia grypa", "ai", "h5n1", "h7n9"]
+      },
+      "mareks_disease": {
+        "canonical": "choroba_mareka",
+        "confidence": 0.95,
+        "variants": ["choroba mareka", "marek", "md", "guzy limfoidalne", "porazenie"]
+      },
+      "gumboro": {
+        "canonical": "gumboro",
+        "confidence": 0.95,
+        "variants": ["gumboro", "choroba gumboro", "zapalenie kaletki fabriciusza", "ibd", "ibdv"]
+      },
+      "newcastle": {
+        "canonical": "choroba_newcastle",
+        "confidence": 0.95,
+        "variants": ["choroba newcastle", "newcastle", "nd", "pseudopomor drobiu"]
+      },
+      "coccidiosis": {
+        "canonical": "kokcydioza",
+        "confidence": 0.95,
+        "variants": ["kokcydioza", "kokcydia", "eimeria", "kokcydiostatyk"]
+      },
+      "colibacillosis": {
+        "canonical": "kolibakterioza",
+        "confidence": 0.95,
+        "variants": ["kolibakterioza", "e.coli", "e coli", "escherichia coli"]
+      },
+      "necrotic_enteritis": {
+        "canonical": "martwicze_zapalenie_jelit",
+        "confidence": 0.95,
+        "variants": ["martwicze zapalenie jelit", "necrotic enteritis", "ne", "clostridium perfringens"]
+      },
+      "salmonella": {
+        "canonical": "salmoneloza",
+        "confidence": 0.95,
+        "variants": ["salmoneloza", "salmonellosis", "salmonella", "biegunka biala", "biegunka biała"]
+      },
+      "mycoplasma": {
+        "canonical": "mykoplazma",
+        "confidence": 0.95,
+        "variants": ["mykoplazma", "mycoplasmosis", "mycoplasma", "crd", "przewlekle zapalenie ukladu oddechowego", "przewlekłe zapalenie układu oddechowego"]
+      },
+      "infectious_bronchitis": {
+        "canonical": "zakazne_zapalenie_oskrzeli",
+        "confidence": 0.95,
+        "variants": ["zakazne zapalenie oskrzeli", "zakaźne zapalenie oskrzeli", "infectious bronchitis", "ib", "ibv"]
+      }
+    },
+
+    "clinical_signs": {
+      "respiratory": {
+        "canonical": "oddechowe",
+        "confidence": 0.95,
+        "variants": ["oddechowe", "respiratory", "oddychanie", "kaszel", "dusznosc", "duszność", "wydzielina z nosa", "chrypka"]
+      },
+      "digestive": {
+        "canonical": "pokarmowe",
+        "confidence": 0.95,
+        "variants": ["pokarmowe", "digestive", "trawienie", "biegunka", "wymioty", "anoreksja", "utrata apetytu"]
+      },
+      "nervous": {
+        "canonical": "nerwowe",
+        "confidence": 0.95,
+        "variants": ["nerwowe", "nervous", "neurologiczne", "ataksja", "porazenie", "drgawki", "drzenie"]
+      },
+      "general": {
+        "canonical": "ogolne",
+        "confidence": 0.90,
+        "variants": ["ogólne", "ogolne", "general", "apatia", "goraczka", "gorączka", "oslabianie", "osłabianie", "depresja"]
+      },
+      "lameness": {
+        "canonical": "kulawizna",
+        "confidence": 0.95,
+        "variants": ["kulawizna", "lameness", "utykanie", "problemy z chodzeniem", "problemy nog"]
+      },
+      "pododermatitis": {
+        "canonical": "zapalenie_podeszew",
+        "confidence": 0.95,
+        "variants": ["zapalenie podeszew", "pododermatitis", "footpad dermatitis", "fhd", "oparzenia stawow skokowych", "oparzenia stawów skokowych"]
+      }
+    },
+
+    "nutrition_parameters": {
+      "crude_protein": {
+        "canonical": "bialko_ogolne",
+        "confidence": 0.95,
+        "variants": ["bialko ogolne", "białko ogólne", "crude protein", "bp", "bialko", "białko"]
+      },
+      "metabolizable_energy": {
+        "canonical": "energia_metaboliczna",
+        "confidence": 0.95,
+        "variants": ["energia metaboliczna", "metabolizable energy", "em", "me", "kcal/kg", "gestosc energetyczna", "gęstość energetyczna"]
+      },
+      "lysine": {
+        "canonical": "lizyna",
+        "confidence": 0.95,
+        "variants": ["lizyna", "lysine", "lizyna strawna", "lys"]
+      },
+      "methionine": {
+        "canonical": "metionina",
+        "confidence": 0.95,
+        "variants": ["metionina", "methionine", "met", "metionina+cysteina", "met+cys", "tsaa"]
+      },
+      "calcium": {
+        "canonical": "wapn",
+        "confidence": 0.95,
+        "variants": ["wapń", "wapn", "calcium", "ca", "wapienny", "weglan wapnia", "węglan wapnia"]
+      },
+      "phosphorus": {
+        "canonical": "fosfor",
+        "confidence": 0.95,
+        "variants": ["fosfor", "phosphorus", "p", "fosfor strawny", "p str", "fosfor przyswajalny"]
+      },
+      "digestible_phosphorus": {
+        "canonical": "fosfor_strawny",
+        "confidence": 0.95,
+        "variants": ["fosfor strawny", "digestible phosphorus", "fs", "fosfor przyswajalny", "str p"]
+      },
+      "electrolyte_balance": {
+        "canonical": "rownowaga_elektrolitowa",
+        "confidence": 0.95,
+        "variants": ["rownowaga elektrolitowa", "równowaga elektrolitowa", "electrolyte balance", "deb", "bilans elektrolitow", "bilans elektrolitów"]
+      },
+      "sodium": {
+        "canonical": "sod",
+        "confidence": 0.95,
+        "variants": ["sód", "sod", "sodium", "na", "sol", "sól"]
+      },
+      "chloride": {
+        "canonical": "chlorek",
+        "confidence": 0.95,
+        "variants": ["chlorek", "chloride", "cl", "chlor"]
+      },
+      "potassium": {
+        "canonical": "potas",
+        "confidence": 0.95,
+        "variants": ["potas", "potassium", "k"]
+      }
+    },
+
+    "environment_parameters": {
+      "temperature": {
+        "canonical": "temperatura",
+        "confidence": 0.95,
+        "variants": ["temperatura", "temperature", "temp", "stopnie", "celsius", "temperatura w kurnikach"]
+      },
+      "humidity": {
+        "canonical": "wilgotnosc",
+        "confidence": 0.95,
+        "variants": ["wilgotność", "wilgotnosc", "humidity", "wilgotnosc wzgledna", "wilgotność względna", "rh", "%rh"]
+      },
+      "ventilation_rate": {
+        "canonical": "wydajnosc_wentylacji",
+        "confidence": 0.95,
+        "variants": ["wydajnosc wentylacji", "wydajność wentylacji", "ventilation rate", "przeplyw powietrza", "przepływ powietrza", "m3/h/kg", "wymiana powietrza", "wentylacja minimalna"]
+      },
+      "static_pressure": {
+        "canonical": "cisnienie_statyczne",
+        "confidence": 0.95,
+        "variants": ["ciśnienie statyczne", "cisnienie statyczne", "static pressure", "pa", "pascal", "podciśnienie", "podciśnienie", "ciśnienie w budynku", "cisnienie w budynku"]
+      },
+      "ammonia": {
+        "canonical": "amoniak",
+        "confidence": 0.95,
+        "variants": ["amoniak", "ammonia", "nh3", "ppm", "stezenie amoniaku", "stężenie amoniaku", "poziom amoniaku"]
+      },
+      "co2": {
+        "canonical": "co2",
+        "confidence": 0.95,
+        "variants": ["co2", "dwutlenek wegla", "dwutlenek węgla", "ppm co2", "stezenie co2", "stężenie co2", "poziom co2"]
+      },
+      "light_intensity": {
+        "canonical": "natezenie_swiatla",
+        "confidence": 0.95,
+        "variants": ["natężenie światła", "natezenie swiatla", "light intensity", "lux", "oswietlenie", "oświetlenie", "jasnosc", "jasność"]
+      },
+      "lighting_hours": {
+        "canonical": "czas_swiecenia",
+        "confidence": 0.95,
+        "variants": ["czas swiecenia", "czas świecenia", "lighting hours", "dlugosc dnia", "długość dnia", "fotoperiod", "h/dzien", "h/dzień", "program oswietlenia", "program oświetlenia"]
+      }
+    },
+
+    "biosecurity_health": {
+      "biosecurity": {
+        "canonical": "biobezpieczenstwo",
+        "confidence": 0.95,
+        "variants": ["biobezpieczeństwo", "biobezpieczenstwo", "biosecurity", "bezpieczenstwo biologiczne", "bezpieczeństwo biologiczne", "wszystko wchodzi wszystko wychodzi", "dezynfekcja"]
+      },
+      "probiotics": {
+        "canonical": "probiotyki",
+        "confidence": 0.95,
+        "variants": ["probiotyki", "probiotics", "korzystne mikroorganizmy", "zywe kultury", "żywe kultury", "zdrowie jelit"]
+      },
+      "antibiotics": {
+        "canonical": "antybiotyki",
+        "confidence": 0.95,
+        "variants": ["antybiotyki", "antibiotics", "srodki przeciwdroboustrojowe", "środki przeciwdroboustrojowe", "terapeutyczne", "promotory wzrostu"]
+      },
+      "vaccine": {
+        "canonical": "szczepionka",
+        "confidence": 0.95,
+        "variants": ["szczepionka", "vaccine", "szczepienie", "vaccination", "immunizacja", "profilaktyka"]
+      }
+    },
+
+    "welfare_indicators": {
+      "stocking_density": {
+        "canonical": "obsada",
+        "confidence": 0.95,
+        "variants": ["obsada", "stocking density", "gestosc obsadzenia", "gęstość obsadzenia", "density", "kg/m2", "sztuk/m2", "obsada ptakow", "obsada ptaków"]
+      },
+      "heat_stress": {
+        "canonical": "stres_cieplny",
+        "confidence": 0.95,
+        "variants": ["stres cieplny", "heat stress", "stres termiczny", "hipertermia", "przegrzanie"]
+      },
+      "feather_pecking": {
+        "canonical": "dziobanie_pior",
+        "confidence": 0.95,
+        "variants": ["dziobanie pior", "dziobanie piór", "feather pecking", "kanibalizm", "wyskubywanie pior", "wyskubywanie piór"]
+      },
+      "feeder_space": {
+        "canonical": "dlugosc_zaren",
+        "confidence": 0.95,
+        "variants": ["dlugosc zaren", "długość żaren", "feeder space", "cm/sztuka", "cm/ptak", "przestrzen przy zarnie", "przestrzeń przy żarnach"]
+      },
+      "drinker_flow_rate": {
+        "canonical": "przeplyw_pojnika",
+        "confidence": 0.95,
+        "variants": ["przeplyw pojnika", "przepływ pojnika", "drinker flow rate", "przeplyw smoczka", "przepływ smoczka", "ml/min/smoczek", "ciśnienie wody", "cisnienie wody"]
+      }
+    },
+
+    "substrate_materials": {
+      "litter": {
+        "canonical": "sciólka",
+        "confidence": 0.95,
+        "variants": ["ściółka", "sciolka", "litter", "podsciolka", "podściółka", "material podlozowy", "materiał podłożowy"]
+      },
+      "wood_shavings": {
+        "canonical": "wiory_drzewne",
+        "confidence": 0.95,
+        "variants": ["wiory drzewne", "wood shavings", "trociny", "wiory"]
+      },
+      "rice_husks": {
+        "canonical": "luski_ryzu",
+        "confidence": 0.95,
+        "variants": ["łuski ryżu", "luski ryzu", "rice husks", "plewa ryzowa", "płewa ryżowa"]
+      },
+      "straw": {
+        "canonical": "sloma",
+        "confidence": 0.95,
+        "variants": ["słoma", "sloma", "straw", "sloma pszenna", "słoma pszenna", "sloma jeczeinna", "słoma jęczmienna"]
+      }
+    },
+
+    "egg_quality": {
+      "egg_quality": {
+        "canonical": "jakosc_jaja",
+        "confidence": 0.95,
+        "variants": ["jakosc jaja", "jakość jaja", "egg quality", "jakosc jaj", "jakość jaj"]
+      },
+      "shell_quality": {
+        "canonical": "jakosc_skorupy",
+        "confidence": 0.95,
+        "variants": ["jakosc skorupy", "jakość skorupy", "shell quality", "grubosc skorupy", "grubość skorupy", "wytrzymalosc skorupy", "wytrzymałość skorupy", "cienka skorupa"]
+      },
+      "cracked_shell": {
+        "canonical": "pecnieta_skorupa",
+        "confidence": 0.95,
+        "variants": ["pęknięta skorupa", "pecnieta skorupa", "cracked shell", "pecniecie", "pęknięcie", "uszkodzone jajo"]
+      },
+      "soft_shelled_egg": {
+        "canonical": "jajo_mieksoskorupowe",
+        "confidence": 0.95,
+        "variants": ["jajo miekoskorupowe", "jajo miękoskorupowe", "soft shelled egg", "miekka skorupa", "miękka skorupa", "jajo bez skorupy"]
+      },
+      "misshapen_egg": {
+        "canonical": "jajo_znieksztalcone",
+        "confidence": 0.95,
+        "variants": ["jajo znieksztalcone", "jajo zniekształcone", "misshapen egg", "nieprawidlowy ksztalt", "nieprawidłowy kształt", "jajo nieregularne"]
+      }
+    },
+
+    "protocol_types": {
+      "vaccination": {
+        "canonical": "szczepienie",
+        "confidence": 0.95,
+        "variants": ["szczepienie", "vaccination", "szczepionka", "vaccine", "immunizacja", "immunization"]
+      },
+      "biosecurity_protocol": {
+        "canonical": "protokol_biobezpieczenstwa",
+        "confidence": 0.95,
+        "variants": ["biobezpieczenstwo", "biobezpieczeństwo", "biosecurity", "dezynfekcja", "disinfection", "czyszczenie", "kwarantanna"]
+      },
+      "treatment": {
+        "canonical": "leczenie",
+        "confidence": 0.95,
+        "variants": ["leczenie", "treatment", "terapia", "therapy", "podawanie lekow", "podawanie leków", "medication"]
+      },
+      "lab_diagnostics": {
+        "canonical": "diagnostyka_laboratoryjna",
+        "confidence": 0.95,
+        "variants": ["diagnostyka", "diagnostic", "test", "analiza", "analysis", "laboratorium", "lab"]
+      }
+    },
+
+    "system_messages": {
+      "out_of_domain": {
+        "canonical": "poza_zakresem",
+        "confidence": 1.0,
+        "variants": ["poza zakresem", "out of domain", "nie w zakresie", "poza dziedzina", "poza dziedziną"]
+      },
+      "error_generic": {
+        "canonical": "blad_ogolny",
+        "confidence": 1.0,
+        "variants": ["błąd", "blad", "error", "blad ogolny", "błąd ogólny", "blad przetwarzania", "błąd przetwarzania"]
+      },
+      "welcome": {
+        "canonical": "witaj",
+        "confidence": 1.0,
+        "variants": ["witaj", "welcome", "powitanie", "czesc", "cześć"]
+      },
+      "clarification_needed": {
+        "canonical": "wymaga_wyjasnienia",
+        "confidence": 1.0,
+        "variants": ["wymaga wyjaśnienia", "wymaga wyjasnienia", "clarification needed", "prosze wyjasnic", "proszę wyjaśnić", "potrzeba wiecej informacji", "potrzeba więcej informacji"]
+      },
+      "no_results": {
+        "canonical": "brak_wynikow",
+        "confidence": 1.0,
+        "variants": ["brak wyników", "brak wynikow", "no results", "nic nie znaleziono", "brak danych"]
+      },
+      "processing": {
+        "canonical": "przetwarzanie",
+        "confidence": 1.0,
+        "variants": ["przetwarzanie", "processing", "prosze czekac", "proszę czekać", "w trakcie"]
+      },
+      "farewell": {
+        "canonical": "pozegnanie",
+        "confidence": 1.0,
+        "variants": ["pożegnanie", "pozegnanie", "goodbye", "do widzenia", "czesc", "cześć"]
+      }
+    }
   }
 }
