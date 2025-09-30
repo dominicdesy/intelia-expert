@@ -2,7 +2,7 @@
 """
 breeds_registry.py - Gestionnaire centralisé du registre des races
 Charge et utilise intents.json comme source unique de vérité
-Version: 1.0.0
+Version: 1.0.1 - Ajout méthode get_breed()
 """
 
 import json
@@ -115,6 +115,54 @@ class BreedsRegistry:
 
         logger.debug(f"Alias index construit: {len(index)} entrées")
         return index
+
+    @lru_cache(maxsize=512)
+    def get_breed(self, breed_input: str) -> Optional[Dict]:
+        """
+        Retourne les informations complètes d'une race (NOUVELLE MÉTHODE)
+
+        Cette méthode est requise par validation_core.py
+
+        Args:
+            breed_input: "Ross 308", "ross308", "Cobb 500", etc.
+
+        Returns:
+            Dict avec breed_id, name, species, db_name, aliases
+            ou None si la race n'existe pas
+
+        Examples:
+            >>> registry = BreedsRegistry()
+            >>> info = registry.get_breed("Ross 308")
+            >>> info["species"]
+            'broiler'
+            >>> info["breed_id"]
+            'ross 308'
+        """
+        if not breed_input:
+            return None
+
+        # Normaliser vers le nom canonique
+        canonical = self.normalize_breed_name(breed_input)
+        if not canonical:
+            logger.debug(f"Breed inconnu: '{breed_input}'")
+            return None
+
+        # Construire l'objet complet
+        breed_info = {
+            "breed_id": canonical,
+            "name": canonical,
+            "species": self.get_species(canonical),
+            "db_name": self.get_db_name(canonical),
+            "aliases": self.get_aliases(canonical),
+            "normalized_from": (
+                breed_input if breed_input.lower() != canonical else None
+            ),
+        }
+
+        logger.debug(
+            f"Breed info: '{breed_input}' → {breed_info['breed_id']} ({breed_info['species']})"
+        )
+        return breed_info
 
     @lru_cache(maxsize=512)
     def get_species(self, breed_input: str) -> Optional[str]:
@@ -449,7 +497,7 @@ if __name__ == "__main__":
         print(f"  {status} '{input_name}' → '{result}' (attendu: '{expected}')")
 
     # Test 3: Species
-    print("\n🐔 Test 3: Détection species")
+    print("\n🔍 Test 3: Détection species")
     test_species = [
         ("Ross 308", "broiler"),
         ("Cobb 500", "broiler"),
@@ -504,6 +552,19 @@ if __name__ == "__main__":
         is_valid, canonical = registry.validate_breed(breed)
         status = "✅" if is_valid == should_be_valid else "❌"
         print(f"  {status} '{breed}' → valide={is_valid}, canonical='{canonical}'")
+
+    # Test 7: NOUVELLE MÉTHODE get_breed()
+    print("\n🆕 Test 7: Nouvelle méthode get_breed()")
+    test_get_breed = ["Ross 308", "ross308", "c500", "UnknownBreed"]
+
+    for breed in test_get_breed:
+        result = registry.get_breed(breed)
+        if result:
+            print(
+                f"  ✅ '{breed}' → breed_id='{result['breed_id']}', species='{result['species']}'"
+            )
+        else:
+            print(f"  ❌ '{breed}' → None (breed inconnu)")
 
     print("\n" + "=" * 70)
     print("✅ TESTS TERMINÉS")

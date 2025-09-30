@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
-VERSION 3.0: Migration vers breeds_registry
+VERSION 3.1: Correction détection breed - get_all_breeds() retourne Set[str]
 - Préserve tous les champs originaux
 - Logs diagnostiques
 - Invalidation des métriques invalides
@@ -305,25 +305,25 @@ class PostgreSQLValidator:
     def _detect_breed_from_query(self, query: str) -> Optional[str]:
         """
         Détecte la race dans le texte de la requête via breeds_registry
-        Version 3.0: Utilise breeds_registry au lieu de patterns hardcodés
+        Version 3.1: CORRIGÉ - get_all_breeds() retourne Set[str], pas des objets
         """
         query_lower = query.lower()
 
-        # Itérer sur toutes les races connues
-        for breed in self.breeds_registry.get_all_breeds():
-            # Récupérer les aliases pour cette race
-            aliases = self.breeds_registry.get_aliases(breed)
+        # Itérer sur toutes les races connues (Set[str] de noms canoniques)
+        for breed_name in self.breeds_registry.get_all_breeds():
+            # breed_name est une string comme "ross 308", "cobb 500"
 
             # Vérifier le nom canonique
-            if breed.lower() in query_lower:
-                logger.debug(f"✅ Breed détecté (canonical): {breed}")
-                return breed
+            if breed_name.lower() in query_lower:
+                logger.debug(f"✅ Breed détecté (canonical): {breed_name}")
+                return breed_name
 
-            # Vérifier les aliases
+            # Récupérer et vérifier les aliases pour cette race
+            aliases = self.breeds_registry.get_aliases(breed_name)
             for alias in aliases:
                 if alias.lower() in query_lower:
-                    logger.debug(f"✅ Breed détecté (alias '{alias}'): {breed}")
-                    return breed
+                    logger.debug(f"✅ Breed détecté (alias '{alias}'): {breed_name}")
+                    return breed_name
 
         logger.debug("❌ Aucun breed détecté")
         return None
@@ -438,7 +438,7 @@ class PostgreSQLValidator:
     ) -> Dict[str, Any]:
         """
         Vérifie si les données demandées sont disponibles
-        Version 3.0: Utilise breeds_registry pour obtenir les plages d'âges
+        Version 3.1: Utilise breeds_registry pour obtenir les plages d'âges
         """
         breed = entities.get("breed", "").lower() if entities.get("breed") else None
         age_days = entities.get("age_days")

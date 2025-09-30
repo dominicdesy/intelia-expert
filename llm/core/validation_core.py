@@ -2,7 +2,7 @@
 """
 validation_core.py - Validation centralisée
 Remplace: data_availability_checker + query_validator + partie de rag_postgresql_validator
-Version 2.0 - Migration vers breeds_registry dynamique
+Version 2.1 - Correction des appels à breeds_registry pour utiliser get_breed()
 """
 
 import logging
@@ -120,7 +120,7 @@ class ValidationCore:
     - query_validator.py (validation requêtes)
     - Partie validation de rag_postgresql_validator.py
 
-    Version 2.0: Utilise breeds_registry pour la gestion dynamique des races
+    Version 2.1: Utilise breeds_registry.get_breed() au lieu de méthodes inexistantes
     """
 
     # ========================================================================
@@ -296,56 +296,56 @@ class ValidationCore:
         issues = []
         alternatives = []
 
-        # Recherche via le registry
+        # Recherche via le registry - UTILISE LA NOUVELLE MÉTHODE get_breed()
         breed_info = self.breeds_registry.get_breed(breed)
 
         if breed_info:
             # Race trouvée directement
+            logger.debug(
+                f"Breed validé: '{breed}' → {breed_info['breed_id']} ({breed_info['species']})"
+            )
             return {"issues": [], "alternatives": []}
 
-        # Recherche par alias via le registry
-        matched_breed = self.breeds_registry.find_breed_by_alias(breed)
+        # Race non trouvée - suggérer des alternatives
+        # Utiliser validate_breed pour vérifier l'existence
+        is_valid, canonical = self.breeds_registry.validate_breed(breed)
 
-        if matched_breed:
+        if is_valid and canonical:
+            # La race existe mais sous un autre nom
             issues.append(
                 ValidationIssue(
                     field="breed",
                     severity=ValidationSeverity.INFO,
-                    message=f"Souche '{breed}' reconnue comme {matched_breed.name}",
+                    message=f"Souche '{breed}' reconnue comme '{canonical}'",
                 )
             )
             return {"issues": issues, "alternatives": []}
 
-        # Recherche floue pour suggestions
-        similar_breeds = self.breeds_registry.find_similar_breeds(breed, max_results=3)
+        # Race vraiment inconnue - proposer des alternatives
+        # Récupérer quelques races similaires ou populaires
+        all_breeds = self.breeds_registry.get_all_breeds()
 
-        if similar_breeds:
-            alternatives = [b.breed_id for b in similar_breeds]
-            issues.append(
-                ValidationIssue(
-                    field="breed",
-                    severity=(
-                        ValidationSeverity.WARNING
-                        if not self.strict_mode
-                        else ValidationSeverity.ERROR
-                    ),
-                    message=f"Souche '{breed}' non reconnue exactement",
-                    suggestion=f"Souches similaires: {', '.join([b.name for b in similar_breeds])}",
-                )
-            )
-        else:
-            # Aucune correspondance - proposer toutes les races disponibles
-            all_breeds = self.breeds_registry.get_all_breeds()
-            available_breeds = [b.name for b in all_breeds[:5]]  # Top 5
+        if all_breeds:
+            # Proposer les 5 premières races comme alternatives
+            breed_list = list(all_breeds)[:5]
+            alternatives = breed_list
+
             issues.append(
                 ValidationIssue(
                     field="breed",
                     severity=ValidationSeverity.ERROR,
                     message=f"Souche inconnue: '{breed}'",
-                    suggestion=f"Souches disponibles: {', '.join(available_breeds)}...",
+                    suggestion=f"Souches disponibles: {', '.join(breed_list)}...",
                 )
             )
-            alternatives = [b.breed_id for b in all_breeds]
+        else:
+            issues.append(
+                ValidationIssue(
+                    field="breed",
+                    severity=ValidationSeverity.ERROR,
+                    message=f"Souche inconnue: '{breed}' et aucune alternative disponible",
+                )
+            )
 
         return {"issues": issues, "alternatives": alternatives}
 
@@ -386,8 +386,19 @@ class ValidationCore:
             breed_info = self.breeds_registry.get_breed(breed)
 
             if breed_info:
-                min_age, max_age = breed_info.age_range
-                breed_name = breed_info.name
+                # Déterminer les plages d'âge typiques selon l'espèce
+                species = breed_info.get("species", "")
+                breed_name = breed_info.get("name", breed)
+
+                # Plages par défaut selon l'espèce
+                if species == "broiler":
+                    min_age, max_age = 0, 60
+                elif species == "layer":
+                    min_age, max_age = 0, 80
+                elif species == "breeder":
+                    min_age, max_age = 0, 65
+                else:
+                    min_age, max_age = 0, 60
 
                 if age < min_age:
                     issues.append(
@@ -555,7 +566,7 @@ class ValidationCore:
                 result.add_issue(
                     field="breed_compatibility",
                     severity=ValidationSeverity.INFO,
-                    message=f"Races compatibles: {breed1_info.name} et {breed2_info.name} (même espèce: {breed1_info.species})",
+                    message=f"Races compatibles: {breed1_info['name']} et {breed2_info['name']} (même espèce: {breed1_info['species']})",
                 )
 
         result.confidence = 1.0 if compatible else 0.0
@@ -697,11 +708,11 @@ class ValidationCore:
         # Détection requêtes nutritionnelles Ross (données limitées)
         if self._is_nutrition_query(query_lower) and entities.get("breed"):
             breed_info = self.breeds_registry.get_breed(entities["breed"])
-            if breed_info and "ross" in breed_info.name.lower():
+            if breed_info and "ross" in breed_info["name"].lower():
                 result.add_issue(
                     field="query_type",
                     severity=ValidationSeverity.WARNING,
-                    message=f"Données nutritionnelles limitées pour {breed_info.name}",
+                    message=f"Données nutritionnelles limitées pour {breed_info['name']}",
                     suggestion="Les spécifications nutritionnelles détaillées sont plus disponibles pour Cobb 500",
                 )
 

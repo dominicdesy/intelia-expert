@@ -4,7 +4,7 @@ query_preprocessor.py - Préprocesseur de requêtes refactoré
 Version REFACTORÉE avec délégation aux modules spécialisés
 ✅ Conservation des méthodes non listées pour suppression
 ✅ Délégation à EntityExtractor, QueryClassifier, ValidationCore
-Version 2.1 - Migration vers breeds_registry dynamique
+Version 2.2 - Correction du fallback pour utiliser get_all_breeds() correctement
 """
 
 import logging
@@ -27,7 +27,7 @@ class QueryPreprocessor:
     Délègue l'extraction/validation/classification aux modules spécialisés,
     mais conserve les méthodes utilitaires et de détection de patterns.
 
-    Version 2.1: Utilise breeds_registry pour la détection dynamique des races
+    Version 2.2: Correction du fallback - get_all_breeds() retourne Set[str], pas des objets
     """
 
     # Constantes conservées (non mentionnées dans la liste de suppression)
@@ -89,7 +89,7 @@ class QueryPreprocessor:
     }
 
     PROJECTION_PATTERNS = [
-        r"si (?:je|on) pars? (?:de|d\') (\d+)",
+        r"si (?:je|on) pars? (?:de|d') (\d+)",
         r"en partant de (\d+)",
         r"à partir de (\d+)",
         r"starting from (\d+)",
@@ -719,7 +719,7 @@ class QueryPreprocessor:
     ) -> Dict[str, Any]:
         """
         Preprocessing de secours en cas d'erreur
-        Utilise breeds_registry pour détecter les races dynamiquement
+        CORRIGÉ: get_all_breeds() retourne Set[str], pas des objets
         """
 
         logger.warning("Utilisation du preprocessing de secours")
@@ -728,38 +728,37 @@ class QueryPreprocessor:
         query_lower = query.lower()
 
         # ====================================================================
-        # NOUVEAU: Détection dynamique des races via breeds_registry
+        # CORRIGÉ: Détection dynamique des races via breeds_registry
+        # get_all_breeds() retourne un Set[str] de noms canoniques
         # ====================================================================
         try:
-            # Itérer sur toutes les races connues au lieu de hardcoder
-            for breed in self.breeds_registry.get_all_breeds():
-                breed_normalized = (
-                    breed.breed_id.lower().replace(" ", "").replace("-", "")
-                )
+            # Itérer sur les noms de races (strings), pas des objets
+            for breed_name in self.breeds_registry.get_all_breeds():
+                # breed_name est une string comme "ross 308", "cobb 500", etc.
+                breed_normalized = breed_name.lower().replace(" ", "").replace("-", "")
 
-                # Vérifier le breed_id
-                if breed_normalized in query_lower:
-                    detected_entities["breed"] = breed.breed_id
-                    logger.debug(f"Race détectée (fallback): {breed.name} via breed_id")
+                # Vérifier le nom canonique dans la requête
+                if breed_normalized in query_lower.replace(" ", "").replace("-", ""):
+                    detected_entities["breed"] = breed_name
+                    logger.debug(
+                        f"Race détectée (fallback): {breed_name} via nom canonique"
+                    )
                     break
 
-                # Vérifier le nom officiel
-                name_normalized = breed.name.lower().replace(" ", "").replace("-", "")
-                if name_normalized in query_lower:
-                    detected_entities["breed"] = breed.breed_id
-                    logger.debug(f"Race détectée (fallback): {breed.name} via name")
-                    break
-
-                # Vérifier les alias
-                for alias in breed.aliases:
+                # Vérifier les aliases pour cette race
+                aliases = self.breeds_registry.get_aliases(breed_name)
+                for alias in aliases:
                     alias_normalized = alias.lower().replace(" ", "").replace("-", "")
-                    if alias_normalized in query_lower:
-                        detected_entities["breed"] = breed.breed_id
+                    if alias_normalized in query_lower.replace(" ", "").replace(
+                        "-", ""
+                    ):
+                        detected_entities["breed"] = breed_name
                         logger.debug(
-                            f"Race détectée (fallback): {breed.name} via alias '{alias}'"
+                            f"Race détectée (fallback): {breed_name} via alias '{alias}'"
                         )
                         break
 
+                # Si breed trouvé, sortir de la boucle principale
                 if "breed" in detected_entities:
                     break
 
@@ -823,6 +822,17 @@ class QueryPreprocessor:
 
     def get_status(self) -> Dict[str, Any]:
         """Status du preprocessor"""
+
+        # Récupérer toutes les races pour calculer les species
+        all_breeds_set = self.breeds_registry.get_all_breeds()
+        species_set = set()
+
+        # Récupérer les species de chaque race
+        for breed_name in all_breeds_set:
+            species = self.breeds_registry.get_species(breed_name)
+            if species:
+                species_set.add(species)
+
         return {
             "initialized": self._is_initialized,
             "cache_size": len(self._cache),
@@ -833,10 +843,8 @@ class QueryPreprocessor:
                 "breeds_registry": self.breeds_registry is not None,
             },
             "breeds_registry_info": {
-                "total_breeds": len(self.breeds_registry.get_all_breeds()),
-                "species": list(
-                    set(b.species for b in self.breeds_registry.get_all_breeds())
-                ),
+                "total_breeds": len(all_breeds_set),
+                "species": list(species_set),
             },
             "capabilities": {
                 "entity_extraction": True,
@@ -852,5 +860,5 @@ class QueryPreprocessor:
             },
             "supported_french_metrics": len(self.FRENCH_METRICS),
             "architecture": "modular_refactored_with_registry",
-            "version": "2.1.0",
+            "version": "2.2.0",
         }
