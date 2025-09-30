@@ -161,14 +161,12 @@ class ComparativeQueryHandler(BaseQueryHandler):
     async def _fallback_to_standard(
         self, preprocessed_data: Dict[str, Any], start_time: float
     ) -> RAGResult:
-        """Fallback vers traitement standard avec cascade PostgreSQL → Weaviate"""
+        """Fallback vers traitement standard"""
 
         entities = preprocessed_data.get("entities", {})
         query = preprocessed_data["normalized_query"]
 
-        # 1. Tentative PostgreSQL
         if self.postgresql_system and entities:
-            logger.info("Fallback comparative: tentative PostgreSQL")
             result = await self.postgresql_system.search_metrics(
                 query=query,
                 entities=entities,
@@ -178,54 +176,19 @@ class ComparativeQueryHandler(BaseQueryHandler):
             if result and result.source != RAGSource.NO_RESULTS:
                 result.metadata.update(
                     {
-                        "source_type": "comparative_fallback_postgresql",
+                        "source_type": "comparative_fallback",
                         "fallback_applied": True,
                         "processing_time": time.time() - start_time,
                     }
                 )
-                logger.info(f"✅ Fallback PostgreSQL: {len(result.context_docs)} docs")
                 return result
 
-            logger.info("⚠️ PostgreSQL fallback: 0 résultats")
-
-        # 2. ✅ NOUVEAU: Tentative Weaviate si PostgreSQL échoue
-        if self.weaviate_core:
-            logger.info("Fallback comparative: tentative Weaviate")
-            try:
-                weaviate_result = await self.weaviate_core.search(
-                    query=query,
-                    top_k=RAG_SIMILARITY_TOP_K,
-                )
-
-                if weaviate_result and weaviate_result.source == RAGSource.RAG_SUCCESS:
-                    weaviate_result.metadata.update(
-                        {
-                            "source_type": "comparative_fallback_weaviate",
-                            "fallback_applied": True,
-                            "processing_time": time.time() - start_time,
-                        }
-                    )
-                    logger.info(
-                        f"✅ Fallback Weaviate: {len(weaviate_result.context_docs)} docs"
-                    )
-                    return weaviate_result
-
-                logger.info("⚠️ Weaviate fallback: 0 résultats")
-
-            except Exception as e:
-                logger.error(f"Erreur Weaviate fallback: {e}")
-
-        # 3. Si tout échoue
-        logger.warning("❌ Tous les fallbacks comparative ont échoué")
         return RAGResult(
             source=RAGSource.NO_RESULTS,
-            answer="Je n'ai pas trouvé suffisamment d'informations pour répondre à cette comparaison.",
+            answer="Impossible de traiter cette demande de comparaison.",
             metadata={
-                "source_type": "comparative_no_results",
+                "source_type": "comparative_error",
                 "processing_time": time.time() - start_time,
-                "result_type": "no_results",
-                "is_success": False,
-                "is_error": True,
             },
         )
 
