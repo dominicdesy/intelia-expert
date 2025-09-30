@@ -2,15 +2,13 @@
 """
 validation_core.py - Validation centralisée
 Remplace: data_availability_checker + query_validator + partie de rag_postgresql_validator
-Version 2.0 - Migration vers breeds_registry dynamique
+Version 1.1 - Corrections appliquées
 """
 
 import logging
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, field
 from enum import Enum
-
-from llm.utils.breeds_registry import get_breeds_registry
 
 logger = logging.getLogger(__name__)
 
@@ -119,9 +117,38 @@ class ValidationCore:
     - data_availability_checker.py (validation disponibilité données)
     - query_validator.py (validation requêtes)
     - Partie validation de rag_postgresql_validator.py
-
-    Version 2.0: Utilise breeds_registry pour la gestion dynamique des races
     """
+
+    # ========================================================================
+    # CONFIGURATION CENTRALISÉE - BREEDS
+    # ========================================================================
+
+    KNOWN_BREEDS = {
+        "cobb500": {
+            "name": "Cobb 500",
+            "age_range": (1, 57),
+            "aliases": ["cobb 500", "cobb-500", "500"],
+            "genetic_line": "Cobb",
+        },
+        "ross308": {
+            "name": "Ross 308",
+            "age_range": (0, 56),
+            "aliases": ["ross 308", "ross-308", "308", "308 ff"],
+            "genetic_line": "Ross",
+        },
+        "hubbard": {
+            "name": "Hubbard",
+            "age_range": (1, 56),
+            "aliases": ["hubbard classic", "hubbard flex"],
+            "genetic_line": "Hubbard",
+        },
+        "arbor_acres": {
+            "name": "Arbor Acres",
+            "age_range": (1, 56),
+            "aliases": ["arbor acres", "aa"],
+            "genetic_line": "Arbor Acres",
+        },
+    }
 
     # ========================================================================
     # CONFIGURATION CENTRALISÉE - SEXES
@@ -200,14 +227,7 @@ class ValidationCore:
             strict_mode: Si True, erreurs au lieu de warnings pour problèmes mineurs
         """
         self.strict_mode = strict_mode
-
-        # Charger le registre des races de manière dynamique
-        self.breeds_registry = get_breeds_registry()
-
-        logger.info(
-            f"ValidationCore initialisé (strict_mode={strict_mode}, "
-            f"breeds_registry chargé avec {len(self.breeds_registry.get_all_breeds())} races)"
-        )
+        logger.info(f"ValidationCore initialisé (strict_mode={strict_mode})")
 
     def validate_entities(
         self,
@@ -288,39 +308,40 @@ class ValidationCore:
 
     def _validate_breed(self, breed: str) -> Dict[str, Any]:
         """
-        Valide la souche en utilisant le breeds_registry
+        Valide la souche
 
         Returns:
             Dict avec 'issues', 'alternatives'
         """
+        breed_normalized = breed.lower().replace(" ", "").replace("-", "")
         issues = []
         alternatives = []
 
-        # Recherche via le registry
-        breed_info = self.breeds_registry.get_breed(breed)
-
-        if breed_info:
-            # Race trouvée directement
+        # Recherche exacte
+        if breed_normalized in self.KNOWN_BREEDS:
             return {"issues": [], "alternatives": []}
 
-        # Recherche par alias via le registry
-        matched_breed = self.breeds_registry.find_breed_by_alias(breed)
+        # Recherche par alias
+        for breed_key, breed_info in self.KNOWN_BREEDS.items():
+            for alias in breed_info["aliases"]:
+                alias_normalized = alias.lower().replace(" ", "").replace("-", "")
+                if breed_normalized == alias_normalized:
+                    issues.append(
+                        ValidationIssue(
+                            field="breed",
+                            severity=ValidationSeverity.INFO,
+                            message=f"Souche '{breed}' reconnue comme {breed_info['name']}",
+                        )
+                    )
+                    return {"issues": issues, "alternatives": []}
 
-        if matched_breed:
-            issues.append(
-                ValidationIssue(
-                    field="breed",
-                    severity=ValidationSeverity.INFO,
-                    message=f"Souche '{breed}' reconnue comme {matched_breed.name}",
-                )
-            )
-            return {"issues": issues, "alternatives": []}
+        # Recherche partielle (similitude)
+        for breed_key, breed_info in self.KNOWN_BREEDS.items():
+            if breed_normalized in breed_key or breed_key in breed_normalized:
+                alternatives.append(breed_key)
 
-        # Recherche floue pour suggestions
-        similar_breeds = self.breeds_registry.find_similar_breeds(breed, max_results=3)
-
-        if similar_breeds:
-            alternatives = [b.breed_id for b in similar_breeds]
+        # Si alternatives trouvées
+        if alternatives:
             issues.append(
                 ValidationIssue(
                     field="breed",
@@ -330,28 +351,27 @@ class ValidationCore:
                         else ValidationSeverity.ERROR
                     ),
                     message=f"Souche '{breed}' non reconnue exactement",
-                    suggestion=f"Souches similaires: {', '.join([b.name for b in similar_breeds])}",
+                    suggestion=f"Souches similaires: {', '.join(alternatives)}",
                 )
             )
         else:
-            # Aucune correspondance - proposer toutes les races disponibles
-            all_breeds = self.breeds_registry.get_all_breeds()
-            available_breeds = [b.name for b in all_breeds[:5]]  # Top 5
+            # Aucune correspondance
+            available_breeds = [info["name"] for info in self.KNOWN_BREEDS.values()]
             issues.append(
                 ValidationIssue(
                     field="breed",
                     severity=ValidationSeverity.ERROR,
                     message=f"Souche inconnue: '{breed}'",
-                    suggestion=f"Souches disponibles: {', '.join(available_breeds)}...",
+                    suggestion=f"Souches disponibles: {', '.join(available_breeds)}",
                 )
             )
-            alternatives = [b.breed_id for b in all_breeds]
+            alternatives = list(self.KNOWN_BREEDS.keys())
 
         return {"issues": issues, "alternatives": alternatives}
 
     def _validate_age(self, age: int, breed: Optional[str] = None) -> Dict[str, Any]:
         """
-        Valide l'âge avec contexte de souche en utilisant le breeds_registry
+        Valide l'âge avec contexte de souche
 
         Returns:
             Dict avec 'issues', 'alternatives'
@@ -381,21 +401,19 @@ class ValidationCore:
                 )
             )
 
-        # Validation avec contexte breed via registry
+        # Validation avec contexte breed
         if breed:
-            breed_info = self.breeds_registry.get_breed(breed)
-
-            if breed_info:
-                min_age, max_age = breed_info.age_range
-                breed_name = breed_info.name
+            breed_normalized = breed.lower().replace(" ", "")
+            if breed_normalized in self.KNOWN_BREEDS:
+                min_age, max_age = self.KNOWN_BREEDS[breed_normalized]["age_range"]
 
                 if age < min_age:
                     issues.append(
                         ValidationIssue(
                             field="age_days",
                             severity=ValidationSeverity.WARNING,
-                            message=f"Âge {age}j inférieur à la plage typique pour {breed_name} ({min_age}-{max_age}j)",
-                            suggestion=f"Les données pour {breed_name} commencent généralement à {min_age}j",
+                            message=f"Âge {age}j inférieur à la plage typique pour {breed} ({min_age}-{max_age}j)",
+                            suggestion=f"Les données pour {breed} commencent généralement à {min_age}j",
                         )
                     )
                     alternatives = list(range(min_age, min(min_age + 10, max_age)))
@@ -405,8 +423,8 @@ class ValidationCore:
                         ValidationIssue(
                             field="age_days",
                             severity=ValidationSeverity.WARNING,
-                            message=f"Âge {age}j supérieur à la plage typique pour {breed_name} ({min_age}-{max_age}j)",
-                            suggestion=f"Les données pour {breed_name} vont généralement jusqu'à {max_age}j",
+                            message=f"Âge {age}j supérieur à la plage typique pour {breed} ({min_age}-{max_age}j)",
+                            suggestion=f"Les données pour {breed} vont généralement jusqu'à {max_age}j",
                         )
                     )
                     alternatives = list(range(max(min_age, max_age - 10), max_age + 1))
@@ -515,52 +533,6 @@ class ValidationCore:
             alternatives = list(self.VALID_METRICS.keys())
 
         return {"issues": issues, "alternatives": alternatives}
-
-    def validate_species_compatibility(
-        self, breed1: str, breed2: str
-    ) -> ValidationResult:
-        """
-        Valide que deux races sont comparables (même species)
-
-        Args:
-            breed1: Première race à comparer
-            breed2: Deuxième race à comparer
-
-        Returns:
-            ValidationResult indiquant si les races sont comparables
-        """
-        result = ValidationResult(
-            status=ValidationStatus.VALID,
-            is_valid=True,
-        )
-
-        # Vérifier la compatibilité via le registry
-        compatible, reason = self.breeds_registry.are_comparable(breed1, breed2)
-
-        if not compatible:
-            result.add_issue(
-                field="breed_compatibility",
-                severity=ValidationSeverity.ERROR,
-                message=f"Races incomparables: {reason}",
-                suggestion="Veuillez comparer des races de la même espèce (poulets avec poulets, dindes avec dindes, etc.)",
-            )
-            result.status = ValidationStatus.INVALID
-            result.is_valid = False
-        else:
-            # Récupérer les informations des races pour le message
-            breed1_info = self.breeds_registry.get_breed(breed1)
-            breed2_info = self.breeds_registry.get_breed(breed2)
-
-            if breed1_info and breed2_info:
-                result.add_issue(
-                    field="breed_compatibility",
-                    severity=ValidationSeverity.INFO,
-                    message=f"Races compatibles: {breed1_info.name} et {breed2_info.name} (même espèce: {breed1_info.species})",
-                )
-
-        result.confidence = 1.0 if compatible else 0.0
-
-        return result
 
     def _identify_phase(self, age: int) -> Optional[str]:
         """Identifie la phase de croissance selon l'âge"""
@@ -695,15 +667,15 @@ class ValidationCore:
             )
 
         # Détection requêtes nutritionnelles Ross (données limitées)
-        if self._is_nutrition_query(query_lower) and entities.get("breed"):
-            breed_info = self.breeds_registry.get_breed(entities["breed"])
-            if breed_info and "ross" in breed_info.name.lower():
-                result.add_issue(
-                    field="query_type",
-                    severity=ValidationSeverity.WARNING,
-                    message=f"Données nutritionnelles limitées pour {breed_info.name}",
-                    suggestion="Les spécifications nutritionnelles détaillées sont plus disponibles pour Cobb 500",
-                )
+        if self._is_nutrition_query(query_lower) and entities.get(
+            "breed", ""
+        ).lower().startswith("ross"):
+            result.add_issue(
+                field="query_type",
+                severity=ValidationSeverity.WARNING,
+                message="Données nutritionnelles limitées pour Ross 308",
+                suggestion="Les spécifications nutritionnelles détaillées sont plus disponibles pour Cobb 500",
+            )
 
         # Validation des entités de base
         entities_validation = self.validate_entities(entities)
@@ -945,26 +917,4 @@ if __name__ == "__main__":
     corrections = validator.suggest_corrections(invalid_entities)
     print("Entités corrigées:", corrections["corrected_entities"])
     print("Corrections appliquées:", corrections["corrections"])
-    print()
-
-    # Test validation compatibilité espèces
-    print("\n=== TEST VALIDATION COMPATIBILITÉ ESPÈCES ===\n")
-
-    # Test 1: Deux poulets comparables
-    comp_result1 = validator.validate_species_compatibility("cobb500", "ross308")
-    print(f"Cobb500 vs Ross308: {comp_result1.is_valid}")
-    print(
-        f"  Message: {comp_result1.issues[0].message if comp_result1.issues else 'Aucun'}"
-    )
-
-    # Test 2: Poulet vs Dinde (si disponible dans le registry)
-    try:
-        comp_result2 = validator.validate_species_compatibility("cobb500", "but6")
-        print(f"\nCobb500 vs BUT6 (dinde): {comp_result2.is_valid}")
-        print(
-            f"  Message: {comp_result2.issues[0].message if comp_result2.issues else 'Aucun'}"
-        )
-    except Exception as e:
-        print(f"\nTest poulet vs dinde: {e}")
-
     print()

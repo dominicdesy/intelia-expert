@@ -1,402 +1,863 @@
 # -*- coding: utf-8 -*-
 """
-rag_postgresql_retriever.py - Récupérateur de données PostgreSQL
-VERSION CORRIGÉE - Utilise PostgreSQLQueryBuilder pour le mapping des souches
-avec gestion améliorée des unités et validation stricte
+agent_rag_extension.py - Extension Agent RAG pour Intelia Expert
+Version 2.0 - Utilise system_prompts.json centralisé
+Implémente un Agent RAG avec décomposition de requêtes et synthèse multi-documents
 """
 
+import asyncio
+import time
 import logging
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass, field
+from enum import Enum
 
-from .rag_postgresql_config import ASYNCPG_AVAILABLE
-from .rag_postgresql_models import MetricResult
-from .rag_postgresql_normalizer import SQLQueryNormalizer
-from .postgresql_query_builder import PostgreSQLQueryBuilder
+# Imports du système existant
+from core.rag_engine import InteliaRAGEngine, RAGResult, RAGSource
+from processing.intent_processor import IntentProcessor, IntentResult, IntentType
 
-if ASYNCPG_AVAILABLE:
-    import asyncpg
+# Import du gestionnaire de prompts centralisé
+try:
+    from llm.config.system_prompts import get_prompts_manager
+
+    PROMPTS_AVAILABLE = True
+except ImportError:
+    logging.warning("SystemPromptsManager non disponible pour agent_rag_extension")
+    PROMPTS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
 
-class PostgreSQLRetriever:
-    """Récupérateur de données PostgreSQL avec normalisation et mapping des souches"""
+class QueryComplexity(Enum):
+    """Types de complexité de requête pour l'agent"""
 
-    def __init__(self, config: Dict[str, Any]):
-        self.config = config
-        self.pool = None
-        self.query_normalizer = SQLQueryNormalizer()
-        # NOUVEAU: Utiliser PostgreSQLQueryBuilder pour le mapping correct
-        self.query_builder = PostgreSQLQueryBuilder(self.query_normalizer)
-        self.is_initialized = False
-
-    async def initialize(self):
-        """Initialise la connexion PostgreSQL"""
-        if not ASYNCPG_AVAILABLE:
-            logger.error("asyncpg not available")
-            raise ImportError("asyncpg required")
-
-        if self.is_initialized:
-            return
-
-        try:
-            self.pool = await asyncpg.create_pool(
-                user=self.config["user"],
-                password=self.config["password"],
-                host=self.config["host"],
-                port=self.config["port"],
-                database=self.config["database"],
-                ssl=self.config["ssl"],
-                min_size=2,
-                max_size=10,
-                command_timeout=30,
-            )
-
-            async with self.pool.acquire() as conn:
-                await conn.execute("SELECT 1")
-
-            self.is_initialized = True
-            logger.info("PostgreSQL Retriever initialized")
-
-        except Exception as e:
-            logger.error(f"PostgreSQL initialization error: {e}")
-            self.pool = None
-            self.is_initialized = False
-            raise
-
-    def _normalize_entities(self, entities: Dict[str, Any] = None) -> Dict[str, str]:
-        """Normalise les entités en dict string simple"""
-        if not entities:
-            return {}
-
-        normalized = {}
-        for key, value in entities.items():
-            if value is None:
-                continue
-
-            if isinstance(value, str):
-                normalized[key] = value
-            elif isinstance(value, bool):
-                normalized[key] = "true" if value else "false"
-            elif isinstance(value, (int, float)):
-                normalized[key] = str(value)
-            elif hasattr(value, "value"):
-                normalized[key] = str(value.value)
-            else:
-                normalized[key] = str(value)
-
-        return normalized
-
-    async def search_metrics(
-        self,
-        query: str,
-        entities: Dict[str, Any] = None,
-        top_k: int = 10,
-        strict_sex_match: bool = False,
-    ) -> List[MetricResult]:
-        """
-        Recherche de métriques avec gestion des unités et correspondance de sexe stricte
-
-        Args:
-            strict_sex_match: Si True, correspondance exacte du sexe uniquement
-        """
-
-        if not self.is_initialized or not self.pool:
-            logger.warning("PostgreSQL not initialized")
-            try:
-                await self.initialize()
-            except Exception as e:
-                logger.error(f"Initialization failed: {e}")
-                return []
-
-        try:
-            normalized_entities = self._normalize_entities(entities)
-            logger.debug(f"Entities: {entities}")
-            logger.debug(f"Normalized: {normalized_entities}")
-
-            # NOUVEAU: Détecter si c'est une demande de sexe explicite
-            if not strict_sex_match:
-                strict_sex_match = self._detect_explicit_sex_request(
-                    query, normalized_entities
-                )
-
-            # Utiliser PostgreSQLQueryBuilder pour construction SQL
-            sql_query, params = self.query_builder.build_sex_aware_sql_query(
-                query=query,
-                entities=normalized_entities,
-                top_k=top_k,
-                strict_sex_match=strict_sex_match,
-            )
-
-            logger.debug(f"SQL Query: {sql_query}")
-            logger.debug(f"Parameters: {params}")
-
-            async with self.pool.acquire() as conn:
-                try:
-                    rows = await conn.fetch(sql_query, *params)
-                    logger.info(
-                        f"PostgreSQL: {len(rows)} metrics found from {len(rows)} rows"
-                    )
-
-                    # NOUVEAU: Traitement des résultats avec filtrage unités
-                    metrics = []
-                    for row in rows:
-                        metric = self._row_to_metric_result(dict(row))
-                        if metric:
-                            metrics.append(metric)
-
-                    # NOUVEAU: Filtrer les conflits d'unités
-                    filtered_metrics = self._filter_unit_conflicts(metrics)
-
-                    # NOUVEAU: Validation des résultats
-                    validated_metrics = self._validate_metric_results(
-                        filtered_metrics, normalized_entities
-                    )
-
-                    return validated_metrics
-
-                except Exception as query_error:
-                    logger.error(f"Query execution error: {query_error}")
-                    logger.error(f"SQL: {sql_query}")
-                    logger.error(f"Params: {params}")
-                    return []
-
-        except Exception as e:
-            logger.error(f"Search metrics error: {e}")
-            return []
-
-    def _detect_explicit_sex_request(
-        self, query: str, entities: Dict[str, str]
-    ) -> bool:
-        """Détecte si l'utilisateur demande explicitement un sexe"""
-        # Si sexe spécifié dans entités et pas 'as_hatched'
-        if entities.get("sex") and entities["sex"] != "as_hatched":
-            return True
-
-        # Recherche dans le texte de la requête
-        query_lower = query.lower()
-        explicit_markers = ["femelle", "female", "mâle", "male", "poule", "coq"]
-        return any(marker in query_lower for marker in explicit_markers)
-
-    def _filter_unit_conflicts(self, metrics: List[MetricResult]) -> List[MetricResult]:
-        """Supprime les doublons métrique/impérial, préfère les données métriques"""
-        seen_metrics = {}
-        filtered = []
-
-        # Premier passage : garder seulement les données métriques
-        for metric in metrics:
-            key = f"{metric.metric_name}_{metric.age_min}_{metric.sex}"
-            sheet_name = getattr(metric, "sheet_name", "").lower()
-
-            if "imperial" not in sheet_name:
-                if key not in seen_metrics:
-                    seen_metrics[key] = metric
-                    filtered.append(metric)
-
-        # Si pas de données métriques trouvées, garder les impériales
-        if not filtered:
-            logger.warning(
-                "Aucune donnée métrique trouvée, utilisation des données impériales"
-            )
-            for metric in metrics:
-                key = f"{metric.metric_name}_{metric.age_min}_{metric.sex}"
-                if key not in seen_metrics:
-                    seen_metrics[key] = metric
-                    filtered.append(metric)
-
-        logger.debug(f"Filtrage unités: {len(metrics)} -> {len(filtered)} métriques")
-        return filtered
-
-    def _validate_metric_results(
-        self, metrics: List[MetricResult], entities: Dict[str, str]
-    ) -> List[MetricResult]:
-        """Valide les résultats par rapport aux entités demandées"""
-        if not metrics:
-            return metrics
-
-        validated = []
-        target_sex = entities.get("sex", "as_hatched")
-        target_age = entities.get("age_days")
-
-        for metric in metrics:
-            # Validation du sexe si spécifié
-            if target_sex != "as_hatched":
-                if metric.sex.lower() != target_sex.lower():
-                    logger.debug(f"Métrique exclue: sexe {metric.sex} != {target_sex}")
-                    continue
-
-            # Validation de l'âge si spécifié (tolérance ±3 jours)
-            if target_age:
-                age_target = int(target_age)
-                age_metric = metric.age_min or metric.age_max or 0
-                if abs(age_metric - age_target) > 3:
-                    logger.debug(
-                        f"Métrique exclue: âge {age_metric} trop éloigné de {age_target}"
-                    )
-                    continue
-
-            # Validation des valeurs aberrantes
-            if metric.value_numeric is not None:
-                if (
-                    metric.value_numeric <= 0 or metric.value_numeric > 10000
-                ):  # Seuils raisonnables
-                    logger.warning(f"Valeur aberrante détectée: {metric.value_numeric}")
-                    # Ne pas exclure mais logger
-
-            validated.append(metric)
-
-        logger.debug(
-            f"Validation: {len(metrics)} -> {len(validated)} métriques validées"
-        )
-        return validated
-
-    def _row_to_metric_result(self, row: dict) -> Optional[MetricResult]:
-        """Convertit une ligne de résultat en MetricResult avec validation"""
-        try:
-            # Extraire les valeurs avec gestion des erreurs
-            value_numeric = row.get("value_numeric")
-            if isinstance(value_numeric, str):
-                try:
-                    value_numeric = float(value_numeric)
-                except (ValueError, TypeError):
-                    value_numeric = None
-
-            return MetricResult(
-                company=row.get("company_name", ""),
-                breed=row.get("breed_name", ""),
-                strain=row.get("strain_name", ""),
-                species=row.get("species", ""),
-                metric_name=row.get("metric_name", ""),
-                value_numeric=value_numeric,
-                value_text=row.get("value_text"),
-                unit=row.get("unit", ""),
-                age_min=row.get("age_min"),
-                age_max=row.get("age_max"),
-                sheet_name=row.get("sheet_name", ""),
-                category=row.get("category_name", ""),
-                sex=row.get("sex", "as_hatched"),
-                housing_system=row.get("housing_system", ""),
-                data_type=row.get("data_type", ""),
-                confidence=self._calculate_relevance(
-                    query="", dict_row=row, entities={}
-                ),
-            )
-        except Exception as e:
-            logger.error(f"Erreur conversion MetricResult: {e}")
-            return None
-
-    def _build_query(
-        self, query: str, entities: Dict[str, str], top_k: int, strict_sex_match: bool
-    ) -> Tuple[str, List]:
-        """
-        DEPRECATED: Cette méthode est remplacée par PostgreSQLQueryBuilder
-        Conservée pour compatibilité mais redirige vers le builder
-        """
-        logger.warning(
-            "_build_query is deprecated, using PostgreSQLQueryBuilder instead"
-        )
-
-        return self.query_builder.build_sex_aware_sql_query(
-            query=query,
-            entities=entities,
-            top_k=top_k,
-            strict_sex_match=strict_sex_match,
-        )
-
-    def _calculate_relevance(
-        self, query: str, dict_row: Dict, entities: Dict[str, str] = None
-    ) -> float:
-        """Calcule le score de pertinence"""
-        score = 0.5
-
-        # Score basé sur le sexe
-        sex_from_entities = entities.get("sex") if entities else None
-        row_sex = (dict_row.get("sex") or "as_hatched").lower()
-
-        if sex_from_entities and sex_from_entities != "as_hatched":
-            if row_sex == sex_from_entities.lower():
-                score += 0.3
-            elif row_sex in ["as_hatched", "mixed"]:
-                score += 0.1
-        else:
-            if row_sex in ["as_hatched", "mixed"]:
-                score += 0.2
-
-        # Score basé sur les concepts normalisés
-        normalized_concepts, _ = self.query_normalizer.get_search_terms(query)
-        metric_name_lower = (dict_row.get("metric_name") or "").lower()
-
-        for concept in normalized_concepts:
-            if concept in metric_name_lower:
-                score += 0.3
-                break
-
-        # Bonus pour valeurs numériques
-        if dict_row.get("value_numeric") is not None:
-            score += 0.1
-
-        return min(1.0, score)
-
-    async def close(self):
-        """Ferme la connexion PostgreSQL"""
-        if self.pool:
-            try:
-                await self.pool.close()
-                logger.info("PostgreSQL connection closed")
-            except Exception as e:
-                logger.error(f"PostgreSQL close error: {e}")
-            finally:
-                self.pool = None
-                self.is_initialized = False
+    SIMPLE = "simple"  # Requête directe, un seul concept
+    MULTI_METRIC = "multi_metric"  # Plusieurs métriques demandées
+    COMPARATIVE = "comparative"  # Comparaison entre lignées/âges
+    CONDITIONAL = "conditional"  # "Si... alors..." ou dépendances
+    SEQUENTIAL = "sequential"  # Étapes successives à expliquer
+    DIAGNOSTIC = "diagnostic"  # Analyse cause-effet complexe
 
 
-# Tests unitaires pour vérifier la correction
-if __name__ == "__main__":
-    import asyncio
+@dataclass
+class SubQuery:
+    """Sous-requête décomposée"""
 
-    async def test_mapping_correction():
-        """Test pour vérifier que le mapping fonctionne"""
+    query: str
+    intent_type: IntentType
+    priority: int = 1  # 1=haute, 2=moyenne, 3=basse
+    dependencies: List[str] = field(
+        default_factory=list
+    )  # IDs de sous-requêtes prérequisites
+    context_needed: Dict[str, Any] = field(default_factory=dict)
 
-        # Mock config
-        mock_config = {
-            "user": "test",
-            "password": "test",
-            "host": "localhost",
-            "port": 5432,
-            "database": "test",
-            "ssl": False,
+
+@dataclass
+class AgentResult:
+    """Résultat de traitement par agent - compatible avec RAGResult"""
+
+    final_answer: str
+    confidence: float
+    sub_results: List[RAGResult]
+    synthesis_method: str
+    processing_time: float
+    complexity: QueryComplexity
+    decomposition_used: bool
+    agent_decisions: List[str] = field(default_factory=list)  # Log des décisions
+
+
+class QueryDecomposer:
+    """Décompose les requêtes complexes en sous-requêtes"""
+
+    def __init__(self, intent_processor: IntentProcessor):
+        self.intent_processor = intent_processor
+
+        # Patterns de complexité basés sur le domaine avicole
+        self.complexity_patterns = {
+            QueryComplexity.MULTI_METRIC: [
+                r"\b(poids|fcr|eau|aliment)\b.*\b(et|and)\b.*\b(poids|fcr|eau|aliment)\b",
+                r"\b(performance|résultat)s?\b.*\b(complet|global|détaillé)\b",
+            ],
+            QueryComplexity.COMPARATIVE: [
+                r"\b(ross|cobb|hubbard)\b.*\b(vs|versus|contre|par rapport)\b",
+                r"\b(différence|comparer|comparison)\b.*\b(lignée|souche|breed)\b",
+                r"\b(meilleur|optimal|plus)\b.*\b(que|than)\b",
+            ],
+            QueryComplexity.CONDITIONAL: [
+                r"\bsi\b.*\b(alors|donc|therefore)\b",
+                r"\b(dans le cas|au cas|if)\b.*\b(what|que faire)\b",
+                r"\b(dépend|depends)\b.*\b(de|on)\b",
+            ],
+            QueryComplexity.DIAGNOSTIC: [
+                r"\b(problème|symptôme|maladie)\b.*\b(cause|origine|reason)\b",
+                r"\b(pourquoi|why)\b.*\b(mortalité|mortality|performance)\b",
+            ],
         }
 
-        # Créer retriever
-        retriever = PostgreSQLRetriever(mock_config)
+    def analyze_complexity(
+        self, query: str, intent_result: IntentResult
+    ) -> QueryComplexity:
+        """Analyse la complexité d'une requête"""
+        import re
 
-        # Vérifier que query_builder est initialisé
-        assert hasattr(
-            retriever, "query_builder"
-        ), "PostgreSQLQueryBuilder non initialisé"
+        query_lower = query.lower()
 
-        # Test du mapping via query_builder
-        test_breeds = ["Ross 308", "Cobb 500", "ross 308", "cobb 500"]
+        # Vérification par patterns regex
+        for complexity, patterns in self.complexity_patterns.items():
+            for pattern in patterns:
+                if re.search(pattern, query_lower):
+                    return complexity
 
-        print("Test du mapping des souches:")
-        for breed in test_breeds:
-            mapped = retriever.query_builder._normalize_breed_for_db(breed)
-            print(f"  {breed:15s} -> {mapped}")
+        # Analyse basée sur le nombre d'entités détectées
+        entities = intent_result.detected_entities
+        if len(entities) >= 4:  # Beaucoup d'entités = complexe
+            return QueryComplexity.MULTI_METRIC
 
-        # Vérifier mappings corrects
-        assert (
-            retriever.query_builder._normalize_breed_for_db("Ross 308") == "308/308 FF"
+        # Analyse par longueur et mots-clés
+        words = query.split()
+        if len(words) > 20 and any(
+            word in query_lower for word in ["et", "and", "aussi", "également"]
+        ):
+            return QueryComplexity.MULTI_METRIC
+
+        return QueryComplexity.SIMPLE
+
+    async def decompose_query(
+        self, query: str, intent_result: IntentResult, complexity: QueryComplexity
+    ) -> List[SubQuery]:
+        """Décompose une requête selon sa complexité"""
+
+        sub_queries = []
+        entities = intent_result.detected_entities
+
+        if complexity == QueryComplexity.MULTI_METRIC:
+            sub_queries = await self._decompose_multi_metric(query, entities)
+
+        elif complexity == QueryComplexity.COMPARATIVE:
+            sub_queries = await self._decompose_comparative(query, entities)
+
+        elif complexity == QueryComplexity.CONDITIONAL:
+            sub_queries = await self._decompose_conditional(query, entities)
+
+        elif complexity == QueryComplexity.DIAGNOSTIC:
+            sub_queries = await self._decompose_diagnostic(query, entities)
+
+        else:  # SIMPLE ou autres cas
+            # Requête simple -> une seule sous-requête
+            sub_queries = [
+                SubQuery(query=query, intent_type=intent_result.intent_type, priority=1)
+            ]
+
+        return sub_queries
+
+    async def _decompose_multi_metric(
+        self, query: str, entities: Dict
+    ) -> List[SubQuery]:
+        """Décompose les requêtes multi-métriques"""
+        sub_queries = []
+
+        # Identifier les métriques mentionnées
+        metrics_mentioned = []
+        metric_keywords = {
+            "poids": ["poids", "weight", "gramme", "kg"],
+            "fcr": ["fcr", "conversion", "efficacité"],
+            "eau": ["eau", "water", "consommation"],
+            "mortalité": ["mortalité", "mortality", "mort"],
+        }
+
+        query_lower = query.lower()
+        for metric, keywords in metric_keywords.items():
+            if any(kw in query_lower for kw in keywords):
+                metrics_mentioned.append(metric)
+
+        # Créer une sous-requête par métrique
+        base_context = (
+            f"lignée {entities.get('line', '')}" if "line" in entities else ""
         )
-        assert retriever.query_builder._normalize_breed_for_db("Cobb 500") == "500"
-        assert (
-            retriever.query_builder._normalize_breed_for_db("ross 308") == "308/308 FF"
-        )
-        assert retriever.query_builder._normalize_breed_for_db("cobb 500") == "500"
-
-        print("\n✅ CORRECTION VALIDÉE: Le mapping fonctionne correctement!")
-        print(
-            "Les requêtes utiliseront maintenant '308/308 FF' et '500' au lieu de 'Ross 308' et 'Cobb 500'"
+        age_context = (
+            f"âge {entities.get('age_days', entities.get('age_weeks', ''))} jours"
+            if "age_days" in entities or "age_weeks" in entities
+            else ""
         )
 
-    # Exécuter le test
-    asyncio.run(test_mapping_correction())
+        for i, metric in enumerate(metrics_mentioned):
+            sub_query = SubQuery(
+                query=f"Quelle est la valeur optimale de {metric} pour {base_context} {age_context}?",
+                intent_type=IntentType.METRIC_QUERY,
+                priority=1,
+                context_needed={"metric": metric, **entities},
+            )
+            sub_queries.append(sub_query)
+
+        return sub_queries
+
+    async def _decompose_comparative(
+        self, query: str, entities: Dict
+    ) -> List[SubQuery]:
+        """Décompose les requêtes comparatives"""
+        sub_queries = []
+
+        # Extraire les lignées à comparer
+        lines_to_compare = []
+        line_keywords = ["ross", "cobb", "hubbard"]
+
+        for line_kw in line_keywords:
+            if line_kw in query.lower():
+                lines_to_compare.append(line_kw)
+
+        # Si pas de lignées spécifiques, utiliser celle détectée vs "standards"
+        if not lines_to_compare and "line" in entities:
+            lines_to_compare = [entities["line"], "standard industrie"]
+
+        # Créer des requêtes pour chaque lignée
+        base_question = query.split("vs")[0].strip() if "vs" in query else query
+
+        for line in lines_to_compare:
+            sub_query = SubQuery(
+                query=f"{base_question} pour {line}",
+                intent_type=IntentType.METRIC_QUERY,
+                priority=1,
+                context_needed={"comparative_line": line, **entities},
+            )
+            sub_queries.append(sub_query)
+
+        return sub_queries
+
+    async def _decompose_conditional(
+        self, query: str, entities: Dict
+    ) -> List[SubQuery]:
+        """Décompose les requêtes conditionnelles"""
+        # Séparer condition et action
+        if "si" in query.lower():
+            parts = query.lower().split("si")
+            if len(parts) > 1:
+                condition = parts[1].split("alors")[0].strip()
+                action = (
+                    parts[1].split("alors")[1].strip()
+                    if "alors" in parts[1]
+                    else "que faire?"
+                )
+
+                return [
+                    SubQuery(
+                        query=f"Conditions normales pour {condition}",
+                        intent_type=IntentType.METRIC_QUERY,
+                        priority=1,
+                    ),
+                    SubQuery(
+                        query=f"Actions recommandées: {action}",
+                        intent_type=IntentType.PROTOCOL_QUERY,
+                        priority=2,
+                        dependencies=["condition_check"],
+                    ),
+                ]
+
+        # Fallback: traiter comme requête simple
+        return [
+            SubQuery(query=query, intent_type=IntentType.GENERAL_POULTRY, priority=1)
+        ]
+
+    async def _decompose_diagnostic(self, query: str, entities: Dict) -> List[SubQuery]:
+        """Décompose les requêtes de diagnostic"""
+        sub_queries = []
+
+        # 1. Collecte des symptômes/signes
+        sub_queries.append(
+            SubQuery(
+                query=f"Signes cliniques et symptômes observés: {query}",
+                intent_type=IntentType.DIAGNOSIS_TRIAGE,
+                priority=1,
+            )
+        )
+
+        # 2. Causes possibles
+        sub_queries.append(
+            SubQuery(
+                query="Causes possibles des symptômes décrits",
+                intent_type=IntentType.DIAGNOSIS_TRIAGE,
+                priority=2,
+                dependencies=["symptom_analysis"],
+            )
+        )
+
+        # 3. Actions recommandées
+        sub_queries.append(
+            SubQuery(
+                query="Protocole d'action pour ces symptômes",
+                intent_type=IntentType.PROTOCOL_QUERY,
+                priority=3,
+                dependencies=["cause_analysis"],
+            )
+        )
+
+        return sub_queries
+
+
+class MultiDocumentSynthesizer:
+    """
+    Synthétise les réponses de plusieurs documents
+    Version 2.0: Utilise system_prompts.json pour les prompts de synthèse
+    """
+
+    def __init__(self, openai_client, language: str = "fr"):
+        self.client = openai_client
+        self.language = language
+
+        # Charger le gestionnaire de prompts
+        if PROMPTS_AVAILABLE:
+            try:
+                self.prompts_manager = get_prompts_manager()
+                logger.info(
+                    "✅ MultiDocumentSynthesizer initialisé avec system_prompts.json"
+                )
+            except Exception as e:
+                logger.error(f"❌ Erreur chargement prompts: {e}")
+                self.prompts_manager = None
+        else:
+            self.prompts_manager = None
+
+    async def synthesize_results(
+        self,
+        original_query: str,
+        sub_results: List[RAGResult],
+        complexity: QueryComplexity,
+        language: Optional[str] = None,
+    ) -> str:
+        """Synthétise plusieurs résultats RAG en une réponse cohérente"""
+
+        lang = language or self.language
+
+        if not sub_results:
+            return "Aucune information trouvée pour répondre à votre question."
+
+        # Filtrer les résultats valides
+        valid_results = [r for r in sub_results if r.answer and r.confidence > 0.3]
+
+        if not valid_results:
+            return "Les informations trouvées ne sont pas suffisamment fiables pour répondre à votre question."
+
+        # Stratégie de synthèse selon la complexité
+        if complexity == QueryComplexity.MULTI_METRIC:
+            return await self._synthesize_multi_metric(
+                original_query, valid_results, lang
+            )
+        elif complexity == QueryComplexity.COMPARATIVE:
+            return await self._synthesize_comparative(
+                original_query, valid_results, lang
+            )
+        elif complexity == QueryComplexity.DIAGNOSTIC:
+            return await self._synthesize_diagnostic(
+                original_query, valid_results, lang
+            )
+        else:
+            return await self._synthesize_general(original_query, valid_results, lang)
+
+    async def _synthesize_multi_metric(
+        self, query: str, results: List[RAGResult], language: str
+    ) -> str:
+        """Synthèse pour requêtes multi-métriques"""
+
+        # Organiser par métrique
+        context_by_metric = {}
+        for result in results:
+            # Extraire la métrique du contexte
+            metric = self._extract_metric_from_result(result)
+            if metric not in context_by_metric:
+                context_by_metric[metric] = []
+            context_by_metric[metric].append(result.answer)
+
+        # Construire le contexte pour le prompt
+        context_text = ""
+        for metric, answers in context_by_metric.items():
+            context_text += f"\n{metric.upper()}:\n"
+            for i, answer in enumerate(answers, 1):
+                context_text += f"- Source {i}: {answer[:200]}...\n"
+
+        # Utiliser system_prompts.json si disponible
+        if self.prompts_manager:
+            synthesis_prompt = self.prompts_manager.get_synthesis_prompt(
+                "multi_metric", language, query=query, context_by_metric=context_text
+            )
+        else:
+            # Fallback prompt hardcodé
+            synthesis_prompt = self._get_fallback_multi_metric_prompt(
+                query, context_text, language
+            )
+
+        try:
+            response = await self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": synthesis_prompt}],
+                temperature=0.1,
+                max_tokens=600,
+            )
+            return response.choices[0].message.content.strip()
+
+        except Exception as e:
+            logger.error(f"Erreur synthèse multi-métrique: {e}")
+            return self._fallback_concatenation(results)
+
+    async def _synthesize_comparative(
+        self, query: str, results: List[RAGResult], language: str
+    ) -> str:
+        """Synthèse pour requêtes comparatives"""
+
+        # Construire le contexte
+        comparison_data = ""
+        for i, result in enumerate(results, 1):
+            comparison_data += (
+                f"\nSOURCE {i} (Confiance: {result.confidence:.2f}):\n{result.answer}\n"
+            )
+
+        # Utiliser system_prompts.json si disponible
+        if self.prompts_manager:
+            synthesis_prompt = self.prompts_manager.get_synthesis_prompt(
+                "comparative", language, query=query, comparison_data=comparison_data
+            )
+        else:
+            synthesis_prompt = self._get_fallback_comparative_prompt(
+                query, comparison_data, language
+            )
+
+        try:
+            response = await self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": synthesis_prompt}],
+                temperature=0.1,
+                max_tokens=650,
+            )
+            return response.choices[0].message.content.strip()
+
+        except Exception as e:
+            logger.error(f"Erreur synthèse comparative: {e}")
+            return self._fallback_concatenation(results)
+
+    async def _synthesize_diagnostic(
+        self, query: str, results: List[RAGResult], language: str
+    ) -> str:
+        """Synthèse pour requêtes de diagnostic"""
+
+        # Construire le contexte
+        diagnostic_data = ""
+        for i, result in enumerate(results, 1):
+            diagnostic_data += f"\nÉLÉMENT {i}:\n{result.answer}\n"
+
+        # Utiliser system_prompts.json si disponible
+        if self.prompts_manager:
+            synthesis_prompt = self.prompts_manager.get_synthesis_prompt(
+                "diagnostic", language, query=query, diagnostic_data=diagnostic_data
+            )
+        else:
+            synthesis_prompt = self._get_fallback_diagnostic_prompt(
+                query, diagnostic_data, language
+            )
+
+        try:
+            response = await self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": synthesis_prompt}],
+                temperature=0.1,
+                max_tokens=700,
+            )
+            return response.choices[0].message.content.strip()
+
+        except Exception as e:
+            logger.error(f"Erreur synthèse diagnostic: {e}")
+            return self._fallback_concatenation(results)
+
+    async def _synthesize_general(
+        self, query: str, results: List[RAGResult], language: str
+    ) -> str:
+        """Synthèse générale"""
+
+        # Sélectionner les meilleurs résultats
+        sorted_results = sorted(results, key=lambda r: r.confidence, reverse=True)[:3]
+
+        synthesis_prompt = f"""Synthétise ces informations avicoles pour répondre précisément à cette question:
+
+QUESTION: {query}
+
+INFORMATIONS DISPONIBLES:
+"""
+
+        for i, result in enumerate(sorted_results, 1):
+            synthesis_prompt += (
+                f"\nSource {i} (Confiance: {result.confidence:.2f}):\n{result.answer}\n"
+            )
+
+        synthesis_prompt += """\nFournis une réponse synthétique, précise et pratique en maximum 300 mots.
+
+RÉPONSE:"""
+
+        try:
+            response = await self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": synthesis_prompt}],
+                temperature=0.2,
+                max_tokens=500,
+            )
+            return response.choices[0].message.content.strip()
+
+        except Exception as e:
+            logger.error(f"Erreur synthèse générale: {e}")
+            return self._fallback_concatenation(results)
+
+    def _get_fallback_multi_metric_prompt(
+        self, query: str, context: str, language: str
+    ) -> str:
+        """Prompt fallback pour multi-métrique"""
+        if language == "fr":
+            return f"""Synthétise ces informations pour répondre à cette question complexe:
+
+QUESTION: {query}
+
+INFORMATIONS PAR MÉTRIQUE:
+{context}
+
+Fournis une réponse structurée couvrant toutes les métriques. Maximum 400 mots."""
+        else:
+            return f"""Synthesize this information to answer this complex question:
+
+QUESTION: {query}
+
+INFORMATION BY METRIC:
+{context}
+
+Provide a structured response covering all metrics. Maximum 400 words."""
+
+    def _get_fallback_comparative_prompt(
+        self, query: str, context: str, language: str
+    ) -> str:
+        """Prompt fallback pour comparaison"""
+        if language == "fr":
+            return f"""Compare ces informations pour répondre:
+
+QUESTION: {query}
+
+INFORMATIONS:
+{context}
+
+Compare point par point. Maximum 450 mots."""
+        else:
+            return f"""Compare this information to answer:
+
+QUESTION: {query}
+
+INFORMATION:
+{context}
+
+Compare point by point. Maximum 450 words."""
+
+    def _get_fallback_diagnostic_prompt(
+        self, query: str, context: str, language: str
+    ) -> str:
+        """Prompt fallback pour diagnostic"""
+        if language == "fr":
+            return f"""Analyse diagnostique pour:
+
+QUESTION: {query}
+
+INFORMATIONS:
+{context}
+
+Analyse différentielle structurée. Maximum 400 mots."""
+        else:
+            return f"""Diagnostic analysis for:
+
+QUESTION: {query}
+
+INFORMATION:
+{context}
+
+Structured differential analysis. Maximum 400 words."""
+
+    def _extract_metric_from_result(self, result: RAGResult) -> str:
+        """Extrait la métrique principale d'un résultat"""
+        answer_lower = result.answer.lower()
+
+        metric_indicators = {
+            "poids": ["poids", "weight", "gramme", "kg"],
+            "fcr": ["fcr", "conversion", "efficacité"],
+            "eau": ["eau", "water", "consommation"],
+            "température": ["température", "temp", "°c"],
+            "mortalité": ["mortalité", "mortality"],
+        }
+
+        for metric, indicators in metric_indicators.items():
+            if any(ind in answer_lower for ind in indicators):
+                return metric
+
+        return "général"
+
+    def _fallback_concatenation(self, results: List[RAGResult]) -> str:
+        """Fallback: concaténation simple des résultats"""
+        sorted_results = sorted(results, key=lambda r: r.confidence, reverse=True)
+
+        response_parts = []
+        for i, result in enumerate(sorted_results[:3], 1):
+            response_parts.append(f"**Point {i}:** {result.answer}")
+
+        return "\n\n".join(response_parts)
+
+
+class InteliaAgentRAG(InteliaRAGEngine):
+    """
+    Agent RAG intelligent pour Intelia Expert - Extension du RAG Engine
+    Version 2.0: Utilise system_prompts.json
+    """
+
+    def __init__(self, openai_client=None, language: str = "fr"):
+        super().__init__(openai_client)
+        self.language = language
+        self.decomposer = None
+        self.synthesizer = None
+
+        # Statistiques agent
+        self.agent_stats = {
+            "total_agent_queries": 0,
+            "complex_queries": 0,
+            "simple_queries": 0,
+            "avg_sub_queries": 0.0,
+            "synthesis_success_rate": 0.0,
+        }
+
+    async def initialize(self):
+        """Initialisation de l'agent RAG"""
+        await super().initialize()
+
+        # Initialiser les composants agent
+        self.decomposer = QueryDecomposer(self.intent_processor)
+        self.synthesizer = MultiDocumentSynthesizer(self.openai_client, self.language)
+
+        logger.info("Agent RAG Intelia initialisé avec décomposition et synthèse")
+
+    async def process_query_agent(
+        self, query: str, language: str = "fr", tenant_id: str = ""
+    ) -> AgentResult:
+        """Interface agent principale - point d'entrée pour le traitement intelligent"""
+
+        start_time = time.time()
+        self.agent_stats["total_agent_queries"] += 1
+
+        try:
+            # 1. Analyse d'intention (utilise votre système existant)
+            intent_result = self.intent_processor.process_query(query)
+
+            # 2. Analyse de complexité
+            complexity = self.decomposer.analyze_complexity(query, intent_result)
+            agent_decisions = [f"Complexité détectée: {complexity.value}"]
+
+            # 3. Décision: décomposer ou traiter directement
+            if complexity == QueryComplexity.SIMPLE:
+                self.agent_stats["simple_queries"] += 1
+                agent_decisions.append("Traitement direct (requête simple)")
+
+                # Utiliser le flux RAG standard
+                rag_result = await super().process_query(query, language, tenant_id)
+
+                return AgentResult(
+                    final_answer=rag_result.answer or "Aucune réponse trouvée",
+                    confidence=rag_result.confidence,
+                    sub_results=[rag_result],
+                    synthesis_method="direct",
+                    processing_time=time.time() - start_time,
+                    complexity=complexity,
+                    decomposition_used=False,
+                    agent_decisions=agent_decisions,
+                )
+
+            else:
+                # Traitement complexe avec décomposition
+                self.agent_stats["complex_queries"] += 1
+                agent_decisions.append("Décomposition requise")
+
+                # 4. Décomposition en sous-requêtes
+                sub_queries = await self.decomposer.decompose_query(
+                    query, intent_result, complexity
+                )
+                agent_decisions.append(f"Décomposé en {len(sub_queries)} sous-requêtes")
+                self.agent_stats["avg_sub_queries"] = self._update_avg_sub_queries(
+                    len(sub_queries)
+                )
+
+                # 5. Traitement parallèle des sous-requêtes
+                agent_decisions.append("Traitement parallèle démarré")
+                sub_results = await asyncio.gather(
+                    *[
+                        self._process_sub_query(sub_q, language, tenant_id)
+                        for sub_q in sub_queries
+                    ],
+                    return_exceptions=True,
+                )
+
+                # Filtrer les exceptions
+                valid_sub_results = [r for r in sub_results if isinstance(r, RAGResult)]
+                agent_decisions.append(
+                    f"{len(valid_sub_results)}/{len(sub_queries)} sous-requêtes réussies"
+                )
+
+                # 6. Synthèse multi-documents
+                if valid_sub_results:
+                    agent_decisions.append("Synthèse multi-documents")
+                    final_answer = await self.synthesizer.synthesize_results(
+                        query, valid_sub_results, complexity, language
+                    )
+
+                    # Calcul de confiance globale
+                    avg_confidence = sum(r.confidence for r in valid_sub_results) / len(
+                        valid_sub_results
+                    )
+                    synthesis_bonus = 0.1 if len(valid_sub_results) > 1 else 0
+                    final_confidence = min(0.95, avg_confidence + synthesis_bonus)
+
+                    self.agent_stats["synthesis_success_rate"] = (
+                        self._update_success_rate(True)
+                    )
+
+                else:
+                    agent_decisions.append("Synthèse échouée - fallback")
+                    final_answer = "Je n'ai pas pu trouver suffisamment d'informations fiables pour répondre à cette question complexe."
+                    final_confidence = 0.2
+                    self.agent_stats["synthesis_success_rate"] = (
+                        self._update_success_rate(False)
+                    )
+
+                return AgentResult(
+                    final_answer=final_answer,
+                    confidence=final_confidence,
+                    sub_results=valid_sub_results,
+                    synthesis_method=f"multi_document_{complexity.value}",
+                    processing_time=time.time() - start_time,
+                    complexity=complexity,
+                    decomposition_used=True,
+                    agent_decisions=agent_decisions,
+                )
+
+        except Exception as e:
+            logger.error(f"Erreur agent RAG: {e}")
+
+            # Fallback gracieux vers RAG standard
+            try:
+                rag_result = await super().process_query(query, language, tenant_id)
+                return AgentResult(
+                    final_answer=rag_result.answer
+                    or f"Erreur agent, fallback utilisé: {str(e)}",
+                    confidence=max(0.3, rag_result.confidence - 0.2),
+                    sub_results=[rag_result],
+                    synthesis_method="fallback",
+                    processing_time=time.time() - start_time,
+                    complexity=QueryComplexity.SIMPLE,
+                    decomposition_used=False,
+                    agent_decisions=[
+                        f"Erreur agent: {str(e)}",
+                        "Fallback vers RAG standard",
+                    ],
+                )
+            except Exception as e2:
+                logger.error(f"Erreur fallback RAG: {e2}")
+                return AgentResult(
+                    final_answer=f"Une erreur système est survenue. Erreur principale: {str(e)}",
+                    confidence=0.1,
+                    sub_results=[],
+                    synthesis_method="error",
+                    processing_time=time.time() - start_time,
+                    complexity=QueryComplexity.SIMPLE,
+                    decomposition_used=False,
+                    agent_decisions=[f"Erreur système: {str(e)}"],
+                )
+
+    async def _process_sub_query(
+        self, sub_query: SubQuery, language: str, tenant_id: str
+    ) -> RAGResult:
+        """Traite une sous-requête individuelle"""
+        try:
+            # Utiliser le RAG engine standard pour chaque sous-requête
+            result = await super().process_query(sub_query.query, language, tenant_id)
+
+            # Enrichir avec le contexte de la sous-requête
+            if result.metadata is None:
+                result.metadata = {}
+            result.metadata.update(
+                {
+                    "sub_query_priority": sub_query.priority,
+                    "sub_query_context": sub_query.context_needed,
+                    "agent_processed": True,
+                }
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Erreur traitement sous-requête '{sub_query.query}': {e}")
+            # Retourner un résultat d'erreur plutôt que de lever l'exception
+            return RAGResult(
+                source=RAGSource.ERROR,
+                answer=f"Erreur traitement: {str(e)}",
+                confidence=0.1,
+                processing_time=0.0,
+                metadata={"sub_query_error": str(e)},
+            )
+
+    def _update_avg_sub_queries(self, new_count: int) -> float:
+        """Met à jour la moyenne du nombre de sous-requêtes"""
+        total_complex = self.agent_stats["complex_queries"]
+        if total_complex <= 1:
+            return float(new_count)
+
+        current_avg = self.agent_stats["avg_sub_queries"]
+        return ((current_avg * (total_complex - 1)) + new_count) / total_complex
+
+    def _update_success_rate(self, success: bool) -> float:
+        """Met à jour le taux de succès de synthèse"""
+        total_complex = self.agent_stats["complex_queries"]
+        if total_complex <= 1:
+            return 1.0 if success else 0.0
+
+        current_rate = self.agent_stats["synthesis_success_rate"]
+        current_successes = current_rate * (total_complex - 1)
+        new_successes = current_successes + (1 if success else 0)
+
+        return new_successes / total_complex
+
+    def get_agent_status(self) -> Dict:
+        """Status détaillé de l'agent"""
+        base_status = super().get_status()
+
+        agent_status = {
+            **base_status,
+            "agent_enabled": True,
+            "decomposer_loaded": self.decomposer is not None,
+            "synthesizer_loaded": self.synthesizer is not None,
+            "agent_stats": self.agent_stats,
+            "agent_features": [
+                "query_decomposition",
+                "parallel_processing",
+                "multi_document_synthesis",
+                "complexity_analysis",
+                "graceful_fallback",
+                "decision_logging",
+            ],
+        }
+
+        return agent_status
+
+
+# ============================================================================
+# FONCTIONS UTILITAIRES
+# ============================================================================
+
+
+async def create_agent_rag_engine(
+    openai_client=None, language: str = "fr"
+) -> InteliaAgentRAG:
+    """Factory pour créer l'agent RAG"""
+    engine = InteliaAgentRAG(openai_client, language)
+    await engine.initialize()
+    return engine
+
+
+async def process_query_with_agent(
+    agent_engine: InteliaAgentRAG, query: str, language: str = "fr", tenant_id: str = ""
+) -> AgentResult:
+    """Interface compatible pour traitement avec agent"""
+    return await agent_engine.process_query_agent(query, language, tenant_id)

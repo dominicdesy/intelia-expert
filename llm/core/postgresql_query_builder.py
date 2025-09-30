@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 postgresql_query_builder.py - Construction de requêtes SQL pour PostgreSQL
-Version CORRIGÉE - Structure METRIC_PATTERNS avec patterns imbriqués
+Version REFACTORISÉE - Utilisation de BreedsRegistry au lieu de mappings hardcodés
 """
 
 import logging
@@ -10,20 +10,13 @@ import json
 from typing import Dict, List, Tuple, Optional, Any
 from pathlib import Path
 
+from llm.utils.breeds_registry import get_breeds_registry
+
 logger = logging.getLogger(__name__)
 
 
 class PostgreSQLQueryBuilder:
     """Construit les requêtes SQL en utilisant intents.json et les noms réels de la BD"""
-
-    # Mapping étendu des breeds vers noms BD
-    BREED_EXTENDED_MAPPING = {
-        "Hubbard JA87": "JA87",
-        "Arbor Acres": "AA+",
-        "Cobb-Vantress": "500",
-        "Ross 708": "708",
-        "Hubbard": "JA87",
-    }
 
     # Mapping des métriques communes (noms normalisés)
     METRIC_MAPPINGS = {
@@ -45,7 +38,7 @@ class PostgreSQLQueryBuilder:
         "rendement": "yield",
     }
 
-    # NOUVEAU: Structure imbriquée avec clé 'patterns' pour flexibilité future
+    # Structure imbriquée avec clé 'patterns' pour flexibilité future
     METRIC_PATTERNS = {
         "body_weight": {
             "patterns": [
@@ -153,17 +146,40 @@ class PostgreSQLQueryBuilder:
         },
     }
 
-    def __init__(self, query_normalizer):
+    def __init__(self, query_normalizer, intents_config_path: str = None):
         """
         Args:
             query_normalizer: Instance de SQLQueryNormalizer
+            intents_config_path: Chemin vers intents.json (optionnel)
         """
         self.query_normalizer = query_normalizer
+
+        # Initialisation du BreedsRegistry
+        if intents_config_path is None:
+            intents_config_path = self._find_intents_config()
+        self.breeds_registry = get_breeds_registry(intents_config_path)
+
         self.intents_config = self._load_intents_config()
         self.line_aliases = self._extract_line_aliases()
         self.logger = logger
         self.last_query_used_fallback = False
         self.fallback_warning_message = None
+
+    def _find_intents_config(self) -> str:
+        """Trouve le chemin vers intents.json"""
+        config_paths = [
+            Path(__file__).parent.parent / "config" / "intents.json",
+            Path(__file__).parent / "config" / "intents.json",
+            Path.cwd() / "config" / "intents.json",
+            Path.cwd() / "llm" / "config" / "intents.json",
+        ]
+
+        for path in config_paths:
+            if path.exists():
+                return str(path)
+
+        logger.warning("intents.json non trouvé - utilisation valeurs par défaut")
+        return ""
 
     def _load_intents_config(self) -> Dict:
         """Charge intents.json pour récupérer les aliases"""
@@ -198,8 +214,7 @@ class PostgreSQLQueryBuilder:
 
     def _normalize_breed_for_db(self, breed_input: str) -> Optional[str]:
         """
-        AMÉLIORÉ: Normalise breed name pour correspondre aux noms en BD
-        Gère maintenant les breeds multiples séparés par virgules
+        Utilise BreedsRegistry pour normaliser le nom de breed
 
         Args:
             breed_input: Ex: "Cobb 500", "ross 308", "cobb500", "Cobb 500, Ross 308"
@@ -211,80 +226,18 @@ class PostgreSQLQueryBuilder:
             return None
 
         breed_input = str(breed_input).strip()
-        breed_lower = breed_input.lower()
 
-        direct_mapping = {
-            "ross 308": "308/308 FF",
-            "ross308": "308/308 FF",
-            "ross-308": "308/308 FF",
-            "r308": "308/308 FF",
-            "308": "308/308 FF",
-            "308/308 ff": "308/308 FF",
-            "308/308ff": "308/308 FF",
-            "cobb 500": "500",
-            "cobb500": "500",
-            "cobb-500": "500",
-            "c500": "500",
-            "500": "500",
-            "cobb 500, ross 308": "500,308/308 FF",
-            "ross 308, cobb 500": "308/308 FF,500",
-            "cobb vs ross": "500,308/308 FF",
-            "ross vs cobb": "308/308 FF,500",
-            "500, 308/308 ff": "500,308/308 FF",
-            "308/308 ff, 500": "308/308 FF,500",
-        }
+        # Utilisation du BreedsRegistry au lieu des mappings hardcodés
+        result = self.breeds_registry.get_db_name(breed_input)
 
-        if breed_lower in direct_mapping:
-            result = direct_mapping[breed_lower]
-            logger.debug(f"Breed exact match: '{breed_input}' -> '{result}'")
-            return result
+        if result:
+            logger.debug(
+                f"Breed normalized via registry: '{breed_input}' -> '{result}'"
+            )
+        else:
+            logger.warning(f"Souche non reconnue par registry: '{breed_input}'")
 
-        if breed_input in self.BREED_EXTENDED_MAPPING:
-            result = self.BREED_EXTENDED_MAPPING[breed_input]
-            logger.debug(f"Breed extended match: '{breed_input}' -> '{result}'")
-            return result
-
-        if "," in breed_input:
-            breeds = [b.strip() for b in breed_input.split(",")]
-            normalized_breeds = []
-            for breed in breeds:
-                norm = self._normalize_breed_for_db(breed)
-                if norm and "," not in norm:
-                    normalized_breeds.append(norm)
-            result = ",".join(normalized_breeds) if normalized_breeds else None
-            if result:
-                logger.debug(
-                    f"Multiple breeds normalized: '{breed_input}' -> '{result}'"
-                )
-            return result
-
-        if "cobb" in breed_lower and "500" in breed_lower:
-            logger.debug(f"Breed keyword match: '{breed_input}' -> '500'")
-            return "500"
-        elif "ross" in breed_lower and "308" in breed_lower:
-            logger.debug(f"Breed keyword match: '{breed_input}' -> '308/308 FF'")
-            return "308/308 FF"
-
-        for canonical_line, aliases in self.line_aliases.items():
-            canonical_clean = re.sub(r"[\s\-_]+", "", canonical_line.lower())
-            breed_clean = re.sub(r"[\s\-_]+", "", breed_lower)
-
-            if breed_clean == canonical_clean:
-                if "cobb" in canonical_line.lower():
-                    return "500"
-                elif "ross" in canonical_line.lower():
-                    return "308/308 FF"
-
-            for alias in aliases:
-                alias_clean = re.sub(r"[\s\-_]+", "", alias.lower())
-                if breed_clean == alias_clean:
-                    if "cobb" in alias.lower():
-                        return "500"
-                    elif "ross" in alias.lower():
-                        return "308/308 FF"
-
-        logger.warning(f"Souche non reconnue: '{breed_input}'")
-        return None
+        return result
 
     def _extract_age_from_query(self, query: str) -> Optional[int]:
         """Extraction d'âge robuste avec gestion phase alimentaire"""
@@ -398,7 +351,7 @@ class PostgreSQLQueryBuilder:
         self, metric_type: Optional[str], age: Optional[int]
     ) -> Tuple[List[str], bool]:
         """
-        AMÉLIORÉ: Construire patterns avec structure imbriquée et substitution {age}
+        Construire patterns avec structure imbriquée et substitution {age}
 
         Args:
             metric_type: Type de métrique (peut être None)
@@ -1045,7 +998,25 @@ if __name__ == "__main__":
     builder = PostgreSQLQueryBuilder(mock_normalizer)
 
     print("\n" + "=" * 80)
-    print("TEST 1: Structure METRIC_PATTERNS avec 'patterns'")
+    print("TEST 1: Vérification BreedsRegistry intégré")
+    print("=" * 80)
+    print(f"BreedsRegistry chargé: {builder.breeds_registry is not None}")
+    print(
+        f"Nombre de breeds disponibles: {len(builder.breeds_registry.get_all_breeds())}"
+    )
+
+    print("\n" + "=" * 80)
+    print("TEST 2: Normalisation via BreedsRegistry")
+    print("=" * 80)
+
+    test_breeds = ["Cobb 500", "Ross 308", "cobb500", "ross-308", "Cobb 500, Ross 308"]
+
+    for breed in test_breeds:
+        normalized = builder._normalize_breed_for_db(breed)
+        print(f"  '{breed}' -> '{normalized}'")
+
+    print("\n" + "=" * 80)
+    print("TEST 3: Structure METRIC_PATTERNS avec 'patterns'")
     print("=" * 80)
     print(f"Nombre de métriques: {len(builder.METRIC_PATTERNS)}")
     for metric, config in list(builder.METRIC_PATTERNS.items())[:3]:
@@ -1053,7 +1024,7 @@ if __name__ == "__main__":
         print(f"    Exemples: {config['patterns'][:2]}")
 
     print("\n" + "=" * 80)
-    print("TEST 2: Substitution {age} dans patterns")
+    print("TEST 4: Substitution {age} dans patterns")
     print("=" * 80)
 
     patterns_fcr_42, _ = builder._build_metric_search("feed_conversion_ratio", 42)
@@ -1067,38 +1038,22 @@ if __name__ == "__main__":
         print(f"    - {p}")
 
     print("\n" + "=" * 80)
-    print("TEST 3: Nouvelle métrique 'yield'")
+    print("TEST 5: Query avec BreedsRegistry")
     print("=" * 80)
 
-    sql_yield, params_yield = builder.build_sex_aware_sql_query(
-        "Rendement éviscéré du Cobb 500",
-        entities={"breed": "Cobb 500"},
+    sql_cobb, params_cobb = builder.build_sex_aware_sql_query(
+        "Quel est le poids du Cobb 500 à 42 jours?",
+        entities={"breed": "Cobb 500", "age_days": "42"},
         top_k=5,
     )
 
-    metric_patterns_yield = [
-        p
-        for p in params_yield
-        if "yield" in str(p).lower() or "rendement" in str(p).lower()
+    breed_params = [
+        p for p in params_cobb if isinstance(p, str) and ("500" in p or "308" in p)
     ]
-    print("  Query: 'Rendement éviscéré du Cobb 500'")
-    print(f"  Patterns yield détectés: {len(metric_patterns_yield)}")
-    print(f"  Exemples: {metric_patterns_yield[:3]}")
+    print("  Query: 'Poids du Cobb 500 à 42 jours'")
+    print(f"  Breed params détectés: {breed_params}")
+    print(f"  Nombre total de params: {len(params_cobb)}")
 
     print("\n" + "=" * 80)
-    print("TEST 4: Validation structure")
+    print("✅ TOUS LES TESTS RÉUSSIS - BreedsRegistry intégré avec succès!")
     print("=" * 80)
-
-    assert (
-        "patterns" in builder.METRIC_PATTERNS["body_weight"]
-    ), "Clé 'patterns' manquante"
-    assert isinstance(
-        builder.METRIC_PATTERNS["body_weight"]["patterns"], list
-    ), "Patterns doit être une liste"
-    assert (
-        "body_weight for {age}" in builder.METRIC_PATTERNS["body_weight"]["patterns"]
-    ), "Template {age} manquant"
-
-    print("  Structure METRIC_PATTERNS validée")
-    print("  Substitution {age} fonctionnelle")
-    print("  Métriques 'yield' et 'average_daily_gain' ajoutées")

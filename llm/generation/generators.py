@@ -1,15 +1,24 @@
 # -*- coding: utf-8 -*-
 """
 generators.py - Générateurs de réponses enrichis avec entités et cache externe
-Version AFFIRMATIVE - Ton expert direct et professionnel
+Version 2.0 - Utilise system_prompts.json centralisé
 """
 
 import logging
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 from dataclasses import dataclass
 from core.data_models import Document
 from config.config import ENTITY_CONTEXTS, MAX_CONVERSATION_CONTEXT
 from utils.utilities import METRICS
+
+# Import du gestionnaire de prompts centralisé
+try:
+    from llm.config.system_prompts import get_prompts_manager
+
+    PROMPTS_AVAILABLE = True
+except ImportError:
+    logging.warning("SystemPromptsManager non disponible, utilisation prompts fallback")
+    PROMPTS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -27,11 +36,47 @@ class ContextEnrichment:
 
 
 class EnhancedResponseGenerator:
-    """Générateur avec enrichissement d'entités et cache externe + ton affirmatif expert"""
+    """
+    Générateur avec enrichissement d'entités et cache externe + ton affirmatif expert
+    Version 2.0: Charge les prompts depuis system_prompts.json
+    """
 
-    def __init__(self, client, cache_manager=None):
+    def __init__(
+        self,
+        client,
+        cache_manager=None,
+        language: str = "fr",
+        prompts_path: Optional[str] = None,
+    ):
+        """
+        Initialise le générateur de réponses
+
+        Args:
+            client: Client OpenAI
+            cache_manager: Gestionnaire de cache (optionnel)
+            language: Langue par défaut
+            prompts_path: Chemin custom vers system_prompts.json
+        """
         self.client = client
         self.cache_manager = cache_manager
+        self.language = language
+
+        # Charger le gestionnaire de prompts centralisé
+        if PROMPTS_AVAILABLE:
+            try:
+                if prompts_path:
+                    self.prompts_manager = get_prompts_manager(prompts_path)
+                else:
+                    self.prompts_manager = get_prompts_manager()
+                logger.info(
+                    "✅ EnhancedResponseGenerator initialisé avec system_prompts.json"
+                )
+            except Exception as e:
+                logger.error(f"❌ Erreur chargement prompts: {e}")
+                self.prompts_manager = None
+        else:
+            self.prompts_manager = None
+            logger.warning("⚠️ EnhancedResponseGenerator en mode fallback")
 
         # Import des contextes depuis config + mapping métier détaillé hardcodé
         self.entity_contexts = (
@@ -93,14 +138,26 @@ class EnhancedResponseGenerator:
         query: str,
         context_docs: List[Document],
         conversation_context: str = "",
-        language: str = "fr",
+        language: Optional[str] = None,
         intent_result=None,
     ) -> str:
         """Génère une réponse enrichie avec cache externe + ton affirmatif expert"""
 
+        lang = language or self.language
+
         # Protection contre les documents vides
         if not context_docs or len(context_docs) == 0:
             logger.warning("⚠️ Générateur appelé avec 0 documents - protection activée")
+
+            # Message d'erreur depuis system_prompts.json
+            if self.prompts_manager:
+                error_msg = self.prompts_manager.get_error_message(
+                    "insufficient_data", lang
+                )
+                if error_msg:
+                    return error_msg
+
+            # Fallback
             return "Je n'ai pas trouvé d'informations pertinentes dans ma base de connaissances pour répondre à votre question. Pouvez-vous reformuler ou être plus spécifique ?"
 
         try:
@@ -111,7 +168,7 @@ class EnhancedResponseGenerator:
                     [self._doc_to_dict(doc) for doc in context_docs]
                 )
                 cached_response = await self.cache_manager.get_response(
-                    query, context_hash, language
+                    query, context_hash, lang
                 )
                 if cached_response:
                     METRICS.cache_hit("response")
@@ -138,7 +195,7 @@ class EnhancedResponseGenerator:
 
             # Générer le prompt enrichi
             system_prompt, user_prompt = self._build_enhanced_prompt(
-                query, context_docs, enrichment, conversation_context, language
+                query, context_docs, enrichment, conversation_context, lang
             )
 
             # Génération
@@ -164,7 +221,7 @@ class EnhancedResponseGenerator:
             # Mettre en cache
             if self.cache_manager and self.cache_manager.enabled:
                 await self.cache_manager.set_response(
-                    query, context_hash, enhanced_response, language
+                    query, context_hash, enhanced_response, lang
                 )
 
             return enhanced_response
@@ -312,7 +369,10 @@ class EnhancedResponseGenerator:
         conversation_context: str,
         language: str,
     ) -> Tuple[str, str]:
-        """Construit un prompt enrichi avec ton affirmatif expert"""
+        """
+        Construit un prompt enrichi avec ton affirmatif expert
+        Version 2.0: Utilise system_prompts.json si disponible
+        """
 
         # Contexte documentaire
         context_text = "\n\n".join(
@@ -322,26 +382,45 @@ class EnhancedResponseGenerator:
             ]
         )
 
-        # Construction du prompt système enrichi - VERSION ÉQUILIBRÉE
-        system_prompt = f"""Tu es un expert avicole reconnu avec une expertise approfondie en production avicole.
+        # Construction du prompt système depuis system_prompts.json
+        if self.prompts_manager:
+            # Récupérer le prompt de base expert
+            expert_identity = self.prompts_manager.get_base_prompt(
+                "expert_identity", language
+            )
 
+            response_guidelines = self.prompts_manager.get_base_prompt(
+                "response_guidelines", language
+            )
+
+            # Construire le prompt système complet
+            system_prompt_parts = []
+
+            if expert_identity:
+                system_prompt_parts.append(expert_identity)
+
+            # Ajouter contexte métier détecté
+            context_section = f"""
 CONTEXTE MÉTIER DÉTECTÉ:
 {enrichment.entity_context}
 {enrichment.species_focus}
 {enrichment.temporal_context}
 {enrichment.metric_focus}
+"""
+            system_prompt_parts.append(context_section)
 
-DIRECTIVES DE RÉPONSE - STYLE EXPERT ÉQUILIBRÉ:
+            if response_guidelines:
+                system_prompt_parts.append(response_guidelines)
 
-1. **Introduction directe** : Commence DIRECTEMENT par une phrase claire qui répond à la question. NE commence PAS par un titre qui répète le sujet de la question
-2. **Ne jamais mentionner les sources** : Ne fais JAMAIS référence aux "documents", "sources", "selon les données fournies" ou expressions similaires
-3. **Structure sobre** : Utilise des titres en gras (**Titre**) uniquement pour les sous-sections. Évite l'excès de formatage
-4. **Concision** : Présente 2-3 points principaux maximum. Évite les listes trop longues
-5. **Données précises** : Fournis des valeurs chiffrées quand pertinent, mais reste concis
-
+            # Métriques prioritaires
+            metrics_section = f"""
 MÉTRIQUES PRIORITAIRES:
 {', '.join(enrichment.performance_indicators[:3]) if enrichment.performance_indicators else 'Paramètres généraux de production'}
+"""
+            system_prompt_parts.append(metrics_section)
 
+            # Instructions critiques
+            critical_instructions = f"""
 INSTRUCTIONS CRITIQUES:
 - NE commence JAMAIS par un titre (ex: "## Maladie", "**Maladie**") - commence directement par la phrase d'introduction
 - Examine les tableaux de données pour extraire les informations précises
@@ -350,18 +429,14 @@ INSTRUCTIONS CRITIQUES:
 - NE conclus PAS avec des recommandations pratiques sauf si explicitement demandé
 
 LANGUE: Réponds STRICTEMENT en {language}
+"""
+            system_prompt_parts.append(critical_instructions)
 
-EXEMPLE DE STRUCTURE:
-[Phrase d'introduction claire répondant à la question - SANS TITRE AVANT]
+            system_prompt = "\n\n".join(system_prompt_parts)
 
-**Premier point principal**
-[Explication concise]
-
-**Deuxième point principal**
-[Explication concise]
-
-**Troisième point principal** (optionnel)
-[Explication concise]"""
+        else:
+            # Fallback si prompts manager non disponible
+            system_prompt = self._get_fallback_system_prompt(enrichment, language)
 
         # Prompt utilisateur enrichi
         limited_context = (
@@ -388,6 +463,33 @@ RÉPONSE EXPERTE (affirmative, structurée, sans mention de sources):"""
 
         return system_prompt, user_prompt
 
+    def _get_fallback_system_prompt(
+        self, enrichment: ContextEnrichment, language: str
+    ) -> str:
+        """
+        Prompt système de secours si system_prompts.json non disponible
+        """
+        return f"""Tu es un expert avicole reconnu avec une expertise approfondie en production avicole.
+
+CONTEXTE MÉTIER DÉTECTÉ:
+{enrichment.entity_context}
+{enrichment.species_focus}
+{enrichment.temporal_context}
+{enrichment.metric_focus}
+
+DIRECTIVES DE RÉPONSE - STYLE EXPERT ÉQUILIBRÉ:
+
+1. **Introduction directe** : Commence DIRECTEMENT par une phrase claire qui répond à la question
+2. **Ne jamais mentionner les sources** : Ne fais JAMAIS référence aux "documents", "sources", "selon les données fournies"
+3. **Structure sobre** : Utilise des titres en gras (**Titre**) uniquement pour les sous-sections
+4. **Concision** : Présente 2-3 points principaux maximum
+5. **Données précises** : Fournis des valeurs chiffrées quand pertinent
+
+MÉTRIQUES PRIORITAIRES:
+{', '.join(enrichment.performance_indicators[:3]) if enrichment.performance_indicators else 'Paramètres généraux de production'}
+
+LANGUE: Réponds STRICTEMENT en {language}"""
+
     def _post_process_response(
         self, response: str, enrichment: ContextEnrichment, context_docs: List[Dict]
     ) -> str:
@@ -402,7 +504,71 @@ RÉPONSE EXPERTE (affirmative, structurée, sans mention de sources):"""
             return response
 
 
-# Factory function pour intégration
-def create_enhanced_generator(openai_client, cache_manager=None):
-    """Factory pour créer le générateur enrichi"""
-    return EnhancedResponseGenerator(openai_client, cache_manager)
+# ============================================================================
+# FACTORY FUNCTION
+# ============================================================================
+
+
+def create_enhanced_generator(
+    openai_client,
+    cache_manager=None,
+    language: str = "fr",
+    prompts_path: Optional[str] = None,
+):
+    """
+    Factory pour créer le générateur enrichi
+
+    Args:
+        openai_client: Client OpenAI
+        cache_manager: Gestionnaire de cache (optionnel)
+        language: Langue par défaut
+        prompts_path: Chemin custom vers system_prompts.json
+
+    Returns:
+        Instance EnhancedResponseGenerator
+    """
+    return EnhancedResponseGenerator(
+        openai_client, cache_manager, language, prompts_path
+    )
+
+
+# ============================================================================
+# TESTS
+# ============================================================================
+
+if __name__ == "__main__":
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
+
+    print("=" * 70)
+    print("🧪 TESTS ENHANCED RESPONSE GENERATOR")
+    print("=" * 70)
+
+    # Test 1: Initialisation
+    print("\n📥 Test 1: Initialisation")
+    try:
+        # Mock client
+        class MockClient:
+            pass
+
+        generator = EnhancedResponseGenerator(MockClient(), language="fr")
+        print("  ✅ Générateur créé")
+        print(f"  📊 Prompts manager: {generator.prompts_manager is not None}")
+    except Exception as e:
+        print(f"  ❌ Erreur: {e}")
+
+    # Test 2: Enrichissement
+    print("\n🎯 Test 2: Construction enrichissement")
+
+    class MockIntentResult:
+        detected_entities = {"line": "Ross 308", "species": "broiler", "age_days": 35}
+        expanded_query = "poids vif conversion alimentaire"
+
+    enrichment = generator._build_entity_enrichment(MockIntentResult())
+    print("  ✅ Enrichissement créé")
+    print(f"  📊 Entity context: {enrichment.entity_context[:50]}...")
+    print(f"  📊 Métriques: {enrichment.performance_indicators}")
+
+    print("\n" + "=" * 70)
+    print("✅ TESTS TERMINÉS")
+    print("=" * 70)

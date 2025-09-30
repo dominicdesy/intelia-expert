@@ -1,81 +1,162 @@
 # -*- coding: utf-8 -*-
 """
 prompt_builder.py - Constructeur de prompts spécialisés
-Version AFFIRMATIVE - Ton expert direct et professionnel
+Version 2.0 - Utilise system_prompts.json centralisé
 """
 
+import logging
 from typing import Dict, Optional, Any
+
 from processing.intent_types import IntentType, IntentResult
+
+# Import du gestionnaire de prompts centralisé
+try:
+    from llm.config.system_prompts import get_prompts_manager
+
+    PROMPTS_AVAILABLE = True
+except ImportError:
+    logging.warning("SystemPromptsManager non disponible, utilisation prompts fallback")
+    PROMPTS_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
 
 
 class PromptBuilder:
-    """Constructeur de prompts spécialisés pour les différents types d'intentions"""
+    """
+    Constructeur de prompts spécialisés pour les différents types d'intentions
+    Version 2.0: Charge les prompts depuis system_prompts.json
+    """
 
-    def __init__(self, intents_config: dict):
+    def __init__(
+        self,
+        intents_config: dict,
+        language: str = "fr",
+        prompts_path: Optional[str] = None,
+    ):
+        """
+        Initialise le constructeur de prompts
+
+        Args:
+            intents_config: Configuration des intentions (héritage)
+            language: Langue par défaut ("fr" ou "en")
+            prompts_path: Chemin custom vers system_prompts.json (optionnel)
+        """
         self.intents_config = intents_config
+        self.language = language
 
-    def build_specialized_prompt(self, intent_result: IntentResult) -> Optional[str]:
-        """Génère un prompt spécialisé - Version affirmative avec ton expert"""
+        # Charger le gestionnaire de prompts centralisé
+        if PROMPTS_AVAILABLE:
+            try:
+                if prompts_path:
+                    self.prompts_manager = get_prompts_manager(prompts_path)
+                else:
+                    self.prompts_manager = get_prompts_manager()
+                logger.info("✅ PromptBuilder initialisé avec system_prompts.json")
+            except Exception as e:
+                logger.error(f"❌ Erreur chargement prompts: {e}")
+                self.prompts_manager = None
+        else:
+            self.prompts_manager = None
+            logger.warning("⚠️ PromptBuilder en mode fallback (prompts hardcodés)")
+
+    def build_specialized_prompt(
+        self, intent_result: IntentResult, language: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        Génère un prompt spécialisé selon le type d'intention
+
+        Args:
+            intent_result: Résultat de la classification d'intention
+            language: Langue (override du défaut)
+
+        Returns:
+            Prompt spécialisé ou None
+        """
         intent_type = intent_result.intent_type
         entities = intent_result.detected_entities
+        lang = language or self.language
 
-        prompts = {
-            IntentType.METRIC_QUERY: self._build_metric_prompt(entities, intent_result),
-            IntentType.ENVIRONMENT_SETTING: self._build_environment_prompt(
-                entities, intent_result
-            ),
-            IntentType.DIAGNOSIS_TRIAGE: self._build_diagnosis_prompt(
-                entities, intent_result
-            ),
-            IntentType.ECONOMICS_COST: self._build_economics_prompt(
-                entities, intent_result
-            ),
-            IntentType.PROTOCOL_QUERY: self._build_protocol_prompt(
-                entities, intent_result
-            ),
-            IntentType.GENERAL_POULTRY: self._build_general_prompt(
-                entities, intent_result
-            ),
+        # Mapping IntentType → clé prompt
+        intent_to_prompt_key = {
+            IntentType.METRIC_QUERY: "metric_query",
+            IntentType.ENVIRONMENT_SETTING: "environment_setting",
+            IntentType.DIAGNOSIS_TRIAGE: "diagnosis_triage",
+            IntentType.ECONOMICS_COST: "economics_cost",
+            IntentType.PROTOCOL_QUERY: "protocol_query",
+            IntentType.GENERAL_POULTRY: "general_poultry",
         }
 
-        base_prompt = prompts.get(intent_type)
+        prompt_key = intent_to_prompt_key.get(intent_type)
+
+        if not prompt_key:
+            logger.warning(f"Type d'intention non supporté: {intent_type}")
+            return None
+
+        # Récupérer le prompt depuis le gestionnaire centralisé
+        if self.prompts_manager:
+            base_prompt = self.prompts_manager.get_specialized_prompt(prompt_key, lang)
+
+            if not base_prompt:
+                logger.warning(
+                    f"Prompt non trouvé pour {prompt_key}/{lang}, "
+                    f"utilisation fallback"
+                )
+                base_prompt = self._get_fallback_prompt(prompt_key)
+        else:
+            # Fallback si gestionnaire non disponible
+            base_prompt = self._get_fallback_prompt(prompt_key)
+
+        if not base_prompt:
+            logger.error(f"Impossible de générer prompt pour {prompt_key}")
+            return None
 
         # Enrichissement contextuel avec entités et métriques
-        if base_prompt and entities:
+        if entities:
             entity_context = self._build_entity_context(entities)
             expansion_context = self._build_expansion_context(
                 intent_result.expansion_quality
             )
             cache_context = self._build_cache_context(intent_result)
 
+            # Ajouter contexte si présent
+            enrichments = []
             if entity_context:
-                base_prompt += f"\n\nContexte détecté: {entity_context}"
+                enrichments.append(f"Contexte détecté: {entity_context}")
             if expansion_context:
-                base_prompt += f"\nExpansion appliquée: {expansion_context}"
+                enrichments.append(f"Expansion appliquée: {expansion_context}")
             if cache_context:
-                base_prompt += f"\nCache: {cache_context}"
+                enrichments.append(f"Cache: {cache_context}")
+
+            if enrichments:
+                base_prompt += "\n\n" + "\n".join(enrichments)
+
+        # Ajouter contexte métrique spécifique si nécessaire
+        if prompt_key == "metric_query" and "metrics" in entities:
+            metrics_list = [
+                m.strip() for m in entities["metrics"].split(",") if m.strip()
+            ]
+            base_prompt += f"\n\nMÉTRIQUES À TRAITER: {', '.join(metrics_list)}"
+
+        # Ajouter contexte haute confiance
+        adaptive_factors = intent_result.vocabulary_coverage.get("adaptive_factors", {})
+        if adaptive_factors.get("high_confidence", False):
+            base_prompt += (
+                "\n\nCONTEXTE: Question technique précise - "
+                "données détaillées attendues"
+            )
 
         return base_prompt
 
-    def _build_cache_context(self, intent_result: IntentResult) -> str:
-        """Construit le contexte cache pour le prompt"""
-        context_parts = []
-
-        if intent_result.cache_key_normalized:
-            context_parts.append(f"clé={intent_result.cache_key_normalized}")
-
-        if intent_result.semantic_fallback_candidates:
-            fallback_count = len(intent_result.semantic_fallback_candidates)
-            context_parts.append(f"fallback={fallback_count}")
-
-        explain_score = intent_result.metadata.get("explain_score_used")
-        if explain_score is not None:
-            context_parts.append(f"evidence={explain_score:.2f}")
-
-        return " | ".join(context_parts)
-
     def _build_entity_context(self, entities: Dict[str, str]) -> str:
-        """Construit un contexte enrichi à partir des entités"""
+        """
+        Construit un contexte enrichi à partir des entités détectées
+
+        Args:
+            entities: Dictionnaire des entités extraites
+
+        Returns:
+            String de contexte formaté
+        """
         context_parts = []
 
         if "line" in entities:
@@ -101,7 +182,15 @@ class PromptBuilder:
         return " | ".join(context_parts)
 
     def _build_expansion_context(self, expansion_quality: Dict[str, Any]) -> str:
-        """Construit le contexte d'expansion pour le prompt"""
+        """
+        Construit le contexte d'expansion de requête
+
+        Args:
+            expansion_quality: Métadonnées sur l'expansion
+
+        Returns:
+            String décrivant l'expansion appliquée
+        """
         if expansion_quality.get("terms_added", 0) > 0:
             ratio = expansion_quality.get("expansion_ratio", 1.0)
             normalization = (
@@ -109,134 +198,224 @@ class PromptBuilder:
                 if expansion_quality.get("normalization_applied", False)
                 else ""
             )
-            return f"{expansion_quality['terms_added']} termes ajoutés (ratio: {ratio:.1f}){normalization}"
+            return (
+                f"{expansion_quality['terms_added']} termes ajoutés "
+                f"(ratio: {ratio:.1f}){normalization}"
+            )
         return ""
 
-    def _build_metric_prompt(
-        self, entities: Dict[str, str], intent_result: IntentResult
-    ) -> str:
-        """Prompt spécialisé pour les métriques - VERSION AFFIRMATIVE"""
-        base_prompt = """Tu es un expert en zootechnie et performances avicoles.
+    def _build_cache_context(self, intent_result: IntentResult) -> str:
+        """
+        Construit le contexte cache pour debug/monitoring
+
+        Args:
+            intent_result: Résultat de l'analyse d'intention
+
+        Returns:
+            String avec infos cache
+        """
+        context_parts = []
+
+        if intent_result.cache_key_normalized:
+            context_parts.append(f"clé={intent_result.cache_key_normalized}")
+
+        if intent_result.semantic_fallback_candidates:
+            fallback_count = len(intent_result.semantic_fallback_candidates)
+            context_parts.append(f"fallback={fallback_count}")
+
+        explain_score = intent_result.metadata.get("explain_score_used")
+        if explain_score is not None:
+            context_parts.append(f"evidence={explain_score:.2f}")
+
+        return " | ".join(context_parts)
+
+    def _get_fallback_prompt(self, prompt_key: str) -> Optional[str]:
+        """
+        Prompts de secours hardcodés si system_prompts.json non disponible
+
+        Args:
+            prompt_key: Clé du type de prompt
+
+        Returns:
+            Prompt fallback ou None
+        """
+        # Prompts simplifiés de secours
+        fallback_prompts = {
+            "metric_query": """Tu es un expert en zootechnie et performances avicoles.
 
 STYLE DE RÉPONSE:
 - Affirmatif et direct : présente les standards de l'industrie avec autorité
 - Structure claire : utilise des titres (##) et listes (-) pour la lisibilité
 - Données chiffrées : fournis valeurs cibles, plages optimales et facteurs d'influence
-- JAMAIS de références aux sources ou documents
-
-ANALYSE DES DONNÉES:
-- Examine tous les tableaux de performances disponibles
-- Utilise les valeurs numériques correspondant précisément aux paramètres demandés
-- Présente les informations comme des standards établis de l'industrie avicole"""
-
-        if "metrics" in entities:
-            metrics_list = [
-                m.strip() for m in entities["metrics"].split(",") if m.strip()
-            ]
-            base_prompt += f"\n\nMÉTRIQUES À TRAITER: {', '.join(metrics_list)}"
-
-        adaptive_factors = intent_result.vocabulary_coverage.get("adaptive_factors", {})
-        if adaptive_factors.get("high_confidence", False):
-            base_prompt += "\n\nCONTEXTE: Question technique précise - données détaillées attendues"
-
-        return base_prompt
-
-    def _build_environment_prompt(
-        self, entities: Dict[str, str], intent_result: IntentResult
-    ) -> str:
-        """Prompt pour l'environnement - VERSION AFFIRMATIVE"""
-        return """Tu es un expert en ambiance et gestion d'environnement avicole.
+- JAMAIS de références aux sources ou documents""",
+            "environment_setting": """Tu es un expert en ambiance et gestion d'environnement avicole.
 
 PARAMÈTRES À FOURNIR:
 - Valeurs optimales de température, humidité, ventilation
 - Courbes d'ambiance selon l'âge et la saison
-- Réglages techniques des équipements
-- Ajustements en fonction des observations terrain
-
-PRÉSENTATION: 
-- Affirme les paramètres standards avec assurance
-- Structure avec des titres clairs (##) et listes (-)
-- Fournis des plages précises et recommandations actionnables
-- Aucune mention de sources ou documents
-
-STYLE: Professionnel, technique, direct. Tu es l'autorité sur le sujet."""
-
-    def _build_diagnosis_prompt(
-        self, entities: Dict[str, str], intent_result: IntentResult
-    ) -> str:
-        """Prompt pour le diagnostic - VERSION AFFIRMATIVE"""
-        return """Tu es un vétérinaire expert en pathologie avicole.
+- Réglages techniques des équipements""",
+            "diagnosis_triage": """Tu es un vétérinaire expert en pathologie avicole.
 
 APPROCHE DIAGNOSTIQUE:
-- Présente un diagnostic différentiel structuré et affirmatif
+- Présente un diagnostic différentiel structuré
 - Liste les principales hypothèses par ordre de probabilité
-- Indique les examens complémentaires nécessaires
-- Propose un plan d'action immédiat
-
-STRUCTURE DE RÉPONSE:
-## Diagnostic probable
-## Signes cliniques caractéristiques  
-## Examens recommandés
-## Mesures à prendre
-
-STYLE: Direct, professionnel, sans référence aux sources. Tu es l'expert qui pose le diagnostic."""
-
-    def _build_economics_prompt(
-        self, entities: Dict[str, str], intent_result: IntentResult
-    ) -> str:
-        """Prompt pour l'économie - VERSION AFFIRMATIVE"""
-        return """Tu es un expert en économie de l'élevage avicole.
+- Indique les examens complémentaires nécessaires""",
+            "economics_cost": """Tu es un expert en économie de l'élevage avicole.
 
 ANALYSE ÉCONOMIQUE:
 - Fournis des données chiffrées précises sur les coûts et marges
-- Compare avec les standards du marché et benchmarks
-- Identifie les leviers d'optimisation économique
-- Propose des calculs de rentabilité
-
-PRÉSENTATION:
-- Affirmatif et structuré (##, -, **)
-- Données précises avec contexte économique actuel
-- Recommandations concrètes pour améliorer la rentabilité
-- Aucune référence aux sources
-
-STYLE: Expert financier du secteur avicole. Ton assuré et professionnel."""
-
-    def _build_protocol_prompt(
-        self, entities: Dict[str, str], intent_result: IntentResult
-    ) -> str:
-        """Prompt pour les protocoles - VERSION AFFIRMATIVE"""
-        return """Tu es un expert en protocoles vétérinaires et biosécurité avicole.
+- Compare avec les standards du marché et benchmarks""",
+            "protocol_query": """Tu es un expert en protocoles vétérinaires et biosécurité avicole.
 
 PROTOCOLES À FOURNIR:
 - Calendriers de vaccination détaillés
-- Mesures de biosécurité et prévention
-- Protocoles d'intervention et traitements
-- Adaptations selon l'âge et type d'élevage
-
-PRÉSENTATION:
-- Structure claire avec étapes numérotées
-- Calendrier précis (âges, doses, voies d'administration)
-- Recommandations assertives basées sur les meilleures pratiques
-- Aucune mention de documents sources
-
-STYLE: Expert en santé avicole. Directives claires et actionnables."""
-
-    def _build_general_prompt(
-        self, entities: Dict[str, str], intent_result: IntentResult
-    ) -> str:
-        """Prompt général - VERSION AFFIRMATIVE"""
-        return """Tu es un expert avicole polyvalent reconnu dans l'industrie.
+- Mesures de biosécurité et prévention""",
+            "general_poultry": """Tu es un expert avicole polyvalent reconnu dans l'industrie.
 
 STYLE DE RÉPONSE:
 - Affirmatif et professionnel : tu es l'autorité sur le sujet
 - Structuré : titres (##), listes (-), gras (**) pour la lisibilité
-- Pratique : conclus avec des recommandations actionnables
-- Aucune référence aux documents ou sources consultées
+- Pratique : conclus avec des recommandations actionnables""",
+        }
 
-APPROCHE:
-1. Réponds directement à la question posée
-2. Fournis des informations techniques précises
-3. Structure la réponse pour une compréhension rapide
-4. Conclus par des recommandations ou prochaines étapes si pertinent
+        return fallback_prompts.get(prompt_key)
 
-STYLE: Expert reconnu qui partage son expertise avec assurance et clarté."""
+    def get_complete_prompt(
+        self, intent_type: IntentType, language: Optional[str] = None
+    ) -> str:
+        """
+        Construit un prompt complet avec identité + guidelines
+
+        Args:
+            intent_type: Type d'intention
+            language: Langue (override du défaut)
+
+        Returns:
+            Prompt complet combiné
+        """
+        lang = language or self.language
+
+        # Mapping IntentType → clé
+        intent_to_key = {
+            IntentType.METRIC_QUERY: "metric_query",
+            IntentType.ENVIRONMENT_SETTING: "environment_setting",
+            IntentType.DIAGNOSIS_TRIAGE: "diagnosis_triage",
+            IntentType.ECONOMICS_COST: "economics_cost",
+            IntentType.PROTOCOL_QUERY: "protocol_query",
+            IntentType.GENERAL_POULTRY: "general_poultry",
+        }
+
+        prompt_key = intent_to_key.get(intent_type)
+
+        if self.prompts_manager and prompt_key:
+            return self.prompts_manager.build_complete_prompt(
+                prompt_key, lang, include_base_guidelines=True
+            )
+        else:
+            # Fallback
+            return self._get_fallback_prompt(prompt_key) or ""
+
+
+# ============================================================================
+# COMPATIBILITÉ - Fonctions helper legacy
+# ============================================================================
+
+
+def build_prompt_for_intent(
+    intent_type: IntentType, entities: Dict[str, str], language: str = "fr"
+) -> str:
+    """
+    Fonction helper pour compatibilité avec ancien code
+
+    Args:
+        intent_type: Type d'intention
+        entities: Entités détectées
+        language: Langue
+
+    Returns:
+        Prompt spécialisé
+    """
+    # Créer un IntentResult minimal
+    from processing.intent_types import IntentResult
+
+    intent_result = IntentResult(
+        intent_type=intent_type,
+        confidence=0.8,
+        detected_entities=entities,
+        vocabulary_coverage={},
+        expansion_quality={},
+        semantic_fallback_candidates=[],
+        cache_key_normalized=None,
+        metadata={},
+    )
+
+    builder = PromptBuilder({}, language=language)
+    return builder.build_specialized_prompt(intent_result, language) or ""
+
+
+# ============================================================================
+# TESTS
+# ============================================================================
+
+if __name__ == "__main__":
+    import logging
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
+
+    print("=" * 70)
+    print("🧪 TESTS PROMPT BUILDER")
+    print("=" * 70)
+
+    # Test 1: Initialisation
+    print("\n📥 Test 1: Initialisation")
+    try:
+        builder = PromptBuilder({}, language="fr")
+        print("  ✅ PromptBuilder créé")
+        print(f"  📊 Gestionnaire prompts: {builder.prompts_manager is not None}")
+    except Exception as e:
+        print(f"  ❌ Erreur: {e}")
+
+    # Test 2: Génération prompts spécialisés
+    print("\n🎯 Test 2: Génération prompts spécialisés")
+
+    from processing.intent_types import IntentResult, IntentType
+
+    test_cases = [
+        (IntentType.METRIC_QUERY, {"line": "Ross 308", "age_days": 35}),
+        (IntentType.ENVIRONMENT_SETTING, {"site_type": "broiler_farm"}),
+        (IntentType.DIAGNOSIS_TRIAGE, {"line": "Cobb 500"}),
+    ]
+
+    for intent_type, entities in test_cases:
+        intent_result = IntentResult(
+            intent_type=intent_type,
+            confidence=0.9,
+            detected_entities=entities,
+            vocabulary_coverage={},
+            expansion_quality={"terms_added": 3},
+            semantic_fallback_candidates=[],
+            cache_key_normalized="test_key",
+            metadata={},
+        )
+
+        prompt = builder.build_specialized_prompt(intent_result)
+        status = "✅" if prompt and len(prompt) > 50 else "❌"
+
+        print(f"  {status} {intent_type.value}: {len(prompt) if prompt else 0} chars")
+
+        if prompt and len(prompt) > 0:
+            # Afficher les 100 premiers caractères
+            preview = prompt[:100].replace("\n", " ")
+            print(f"      Preview: {preview}...")
+
+    # Test 3: Fonction helper legacy
+    print("\n🔧 Test 3: Compatibilité legacy")
+    legacy_prompt = build_prompt_for_intent(
+        IntentType.METRIC_QUERY, {"line": "Ross 308"}, "fr"
+    )
+    status = "✅" if legacy_prompt else "❌"
+    print(f"  {status} build_prompt_for_intent: {len(legacy_prompt)} chars")
+
+    print("\n" + "=" * 70)
+    print("✅ TESTS TERMINÉS")
+    print("=" * 70)

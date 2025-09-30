@@ -3,13 +3,15 @@
 comparison_engine.py - Moteur de comparaison unifié
 Fusionne: comparison_handler + comparison_utils + comparison_response_generator
 Utilise: metric_calculator (conservé pour calculs purs)
-Version 1.0 - Moteur complet pour toutes les comparaisons avicoles
+Version 1.1 - Ajout validation compatibilité species
 """
 
 import logging
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 from enum import Enum
+
+from llm.utils.breeds_registry import get_breeds_registry
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +22,7 @@ class ComparisonStatus(Enum):
     SUCCESS = "success"
     INSUFFICIENT_DATA = "insufficient_data"
     INCOMPATIBLE_METRICS = "incompatible_metrics"
+    INCOMPATIBLE_SPECIES = "incompatible_species"
     ERROR = "error"
 
 
@@ -86,6 +89,7 @@ class ComparisonEngine:
 
     Utilise:
     - metric_calculator.py (calculs mathématiques purs - CONSERVÉ)
+    - breeds_registry (validation compatibilité species)
     """
 
     # ========================================================================
@@ -130,6 +134,9 @@ class ComparisonEngine:
         """
         self.postgresql_system = postgresql_system
 
+        # Charger le registre des races pour validation species
+        self.breeds_registry = get_breeds_registry()
+
         # Import du calculateur (module séparé conservé)
         try:
             from .metric_calculator import MetricCalculator
@@ -139,7 +146,10 @@ class ComparisonEngine:
             logger.warning("MetricCalculator non disponible - calculs limités")
             self.calculator = None
 
-        logger.info("ComparisonEngine initialisé")
+        logger.info(
+            f"ComparisonEngine initialisé "
+            f"(breeds_registry: {len(self.breeds_registry.get_all_breeds())} races)"
+        )
 
     async def compare(self, preprocessed_data: Dict[str, Any]) -> ComparisonResult:
         """
@@ -163,6 +173,63 @@ class ComparisonEngine:
                 status=ComparisonStatus.INSUFFICIENT_DATA,
                 error="Besoin d'au moins 2 entités pour comparaison",
             )
+
+        # ====================================================================
+        # NOUVEAU: VALIDATION SPECIES AVANT COMPARAISON
+        # ====================================================================
+        if len(comparison_entities) >= 2:
+            breed1 = comparison_entities[0].get("breed")
+            breed2 = comparison_entities[1].get("breed")
+
+            if breed1 and breed2:
+                # Vérifier la compatibilité des espèces via le registry
+                compatible, reason = self.breeds_registry.are_comparable(breed1, breed2)
+
+                if not compatible:
+                    logger.warning(
+                        f"Tentative de comparaison entre espèces incompatibles: "
+                        f"{breed1} vs {breed2} - {reason}"
+                    )
+
+                    # Récupérer les informations des races pour le message d'erreur
+                    breed1_info = self.breeds_registry.get_breed(breed1)
+                    breed2_info = self.breeds_registry.get_breed(breed2)
+
+                    error_message = f"Cannot compare different species: {reason}"
+                    if breed1_info and breed2_info:
+                        error_message = (
+                            f"Cannot compare {breed1_info.name} ({breed1_info.species}) "
+                            f"with {breed2_info.name} ({breed2_info.species}). "
+                            "Please compare breeds from the same species."
+                        )
+
+                    return ComparisonResult(
+                        success=False,
+                        status=ComparisonStatus.INCOMPATIBLE_SPECIES,
+                        error=error_message,
+                        entities_compared=[breed1, breed2],
+                        metadata={
+                            "breed1": breed1,
+                            "breed2": breed2,
+                            "species1": (
+                                breed1_info.species if breed1_info else "unknown"
+                            ),
+                            "species2": (
+                                breed2_info.species if breed2_info else "unknown"
+                            ),
+                            "incompatibility_reason": reason,
+                        },
+                    )
+                else:
+                    # Log de validation réussie
+                    breed1_info = self.breeds_registry.get_breed(breed1)
+                    breed2_info = self.breeds_registry.get_breed(breed2)
+                    if breed1_info and breed2_info:
+                        logger.info(
+                            f"Species validation OK: {breed1_info.name} vs {breed2_info.name} "
+                            f"(both {breed1_info.species})"
+                        )
+        # ====================================================================
 
         logger.info(
             f"Début comparaison: {len(comparison_entities)} entités, "
@@ -297,7 +364,12 @@ class ComparisonEngine:
         parts = []
 
         if entity_set.get("breed"):
-            parts.append(entity_set["breed"].upper())
+            # Utiliser le nom officiel depuis le registry si possible
+            breed_info = self.breeds_registry.get_breed(entity_set["breed"])
+            if breed_info:
+                parts.append(breed_info.name)
+            else:
+                parts.append(entity_set["breed"].upper())
 
         if entity_set.get("sex"):
             sex_label = {
@@ -718,6 +790,10 @@ Données:
                 return f"Impossible de comparer: données insuffisantes. {result.error or ''}"
             elif result.status == ComparisonStatus.INCOMPATIBLE_METRICS:
                 return f"Impossible de comparer: métriques incompatibles. {result.error or ''}"
+            elif result.status == ComparisonStatus.INCOMPATIBLE_SPECIES:
+                return (
+                    f"Impossible de comparer: espèces différentes. {result.error or ''}"
+                )
             else:
                 return f"Erreur lors de la comparaison: {result.error or 'Erreur inconnue'}"
         else:
@@ -725,6 +801,8 @@ Données:
                 return f"Cannot compare: insufficient data. {result.error or ''}"
             elif result.status == ComparisonStatus.INCOMPATIBLE_METRICS:
                 return f"Cannot compare: incompatible metrics. {result.error or ''}"
+            elif result.status == ComparisonStatus.INCOMPATIBLE_SPECIES:
+                return f"Cannot compare: different species. {result.error or ''}"
             else:
                 return f"Comparison error: {result.error or 'Unknown error'}"
 
@@ -766,5 +844,25 @@ if __name__ == "__main__":
         f"✅ Weight (higher better): {not engine._is_lower_better_metric('body_weight')}"
     )
 
-    print("\n✅ ComparisonEngine structurellement valide")
+    # Test validation species
+    print("\n=== TEST VALIDATION SPECIES ===")
+    test_comparison_same_species = [
+        {"breed": "cobb500", "sex": "male", "age_days": 21},
+        {"breed": "ross308", "sex": "male", "age_days": 21},
+    ]
+
+    # Simuler une comparaison pour vérifier la validation
+    print("Test: Cobb500 vs Ross308 (même espèce - poulet)")
+    compatible1, reason1 = engine.breeds_registry.are_comparable("cobb500", "ross308")
+    print(f"  Compatible: {compatible1} - {reason1 if not compatible1 else 'OK'}")
+
+    # Test avec espèces différentes (si disponibles)
+    try:
+        print("\nTest: Cobb500 vs BUT6 (espèces différentes)")
+        compatible2, reason2 = engine.breeds_registry.are_comparable("cobb500", "but6")
+        print(f"  Compatible: {compatible2} - {reason2 if not compatible2 else 'OK'}")
+    except Exception as e:
+        print(f"  Note: {e}")
+
+    print("\n✅ ComparisonEngine structurellement valide avec validation species")
     print("Note: Tests complets nécessitent PostgreSQLSystem fonctionnel")

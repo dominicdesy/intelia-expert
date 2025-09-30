@@ -1,5 +1,118 @@
 {
-  "version": "1.4",
+  "version": "1.5",
+  
+  "breed_registry": {
+    "metadata": {
+      "description": "Registre centralisé des races avec classification species",
+      "last_updated": "2025-01-15",
+      "total_breeds": 51
+    },
+    
+    "broilers": [
+      "ross 308",
+      "ross 708",
+      "cobb 500",
+      "cobb 700",
+      "cobb 400",
+      "hubbard_ja87",
+      "hubbard ja757",
+      "hubbard ja787",
+      "hubbard ja957",
+      "hubbard classic",
+      "hubbard flex",
+      "hubbard color",
+      "arbor_acres",
+      "cobb_vantress",
+      "ranger classic",
+      "ranger gold",
+      "ranger premium",
+      "freedom ranger",
+      "sasso x44",
+      "sasso t44",
+      "sasso pla",
+      "rowan range"
+    ],
+    
+    "layers": [
+      "isa brown",
+      "isa white",
+      "lohmann brown",
+      "lohmann white",
+      "hy-line brown",
+      "hy-line w-36",
+      "hy-line w-80",
+      "dekalb white",
+      "dekalb brown",
+      "bovans brown",
+      "bovans white",
+      "shaver brown",
+      "shaver white",
+      "novogen brown",
+      "novogen white",
+      "hisex brown",
+      "hisex white",
+      "nick chick"
+    ],
+    
+    "breeders": [
+      "ross 308 ps",
+      "cobb 500 ps"
+    ],
+    
+    "db_name_mapping": {
+      "ross 308": "308/308 FF",
+      "ross 708": "708",
+      "cobb 500": "500",
+      "cobb 700": "700",
+      "cobb 400": "400",
+      "hubbard_ja87": "JA87",
+      "hubbard ja757": "JA757",
+      "hubbard ja787": "JA787",
+      "hubbard ja957": "JA957",
+      "hubbard classic": "Classic",
+      "hubbard flex": "Flex",
+      "hubbard color": "Color",
+      "arbor_acres": "AA+",
+      "cobb_vantress": "500",
+      "hy-line brown": "Brown",
+      "hy-line w-36": "W-36",
+      "hy-line w-80": "W-80",
+      "isa brown": "Brown",
+      "isa white": "White",
+      "lohmann brown": "Brown",
+      "lohmann white": "White",
+      "dekalb white": "White",
+      "dekalb brown": "Brown",
+      "bovans brown": "Brown",
+      "bovans white": "White",
+      "shaver brown": "Brown",
+      "shaver white": "White",
+      "novogen brown": "Brown",
+      "novogen white": "White",
+      "hisex brown": "Brown",
+      "hisex white": "White",
+      "ross 308 ps": "308 PS",
+      "cobb 500 ps": "500 PS"
+    },
+    
+    "comparison_rules": {
+      "allow_cross_species": false,
+      "require_same_species": true,
+      "description": "Comparisons are only allowed between breeds of the same species",
+      "compatible_groups": {
+        "broiler": ["broiler"],
+        "layer": ["layer"],
+        "breeder": ["breeder"]
+      },
+      "error_messages": {
+        "cross_species_fr": "Impossible de comparer des races de types différents (broiler vs layer)",
+        "cross_species_en": "Cannot compare breeds of different species (broiler vs layer)",
+        "incompatible_fr": "Ces races ne sont pas comparables",
+        "incompatible_en": "These breeds are not comparable"
+      }
+    }
+  },
+  
   "aliases": {
     "line": {
       "ross 308": ["ross308","ross-308","r308","ross","ross 308 broiler","ross308 ap","ross 308 ap","308/308 FF","308/308ff","308 ff"],
@@ -335,6 +448,13 @@
   },
 
   "notes": [
+    "VERSION 1.5: Ajout du breed_registry centralisé avec classification species",
+    "NOUVEAUTÉ: Section breed_registry avec broilers, layers, breeders",
+    "NOUVEAUTÉ: Mapping db_name_mapping pour conversion vers noms PostgreSQL",
+    "NOUVEAUTÉ: comparison_rules pour validation species dans les comparaisons",
+    "AMÉLIORATION: 51 races supportées avec classification complète",
+    "COMPATIBILITÉ: Maintien de toutes les sections existantes (aliases, sex_handling_logic, etc.)",
+    "MIGRATION: Les fichiers existants doivent utiliser breeds_registry via llm/utils/breeds_registry.py",
     "VERSION 1.4: Lignées génétiques étendues et tranches d'âge ajoutées",
     "NOUVEAUTÉ: Lignées Hubbard JA87, Arbor Acres, Cobb Vantress, Ross 708",
     "NOUVEAUTÉ: Section age_ranges avec tranches prédéfinies",

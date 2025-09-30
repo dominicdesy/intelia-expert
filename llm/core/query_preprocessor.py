@@ -4,6 +4,7 @@ query_preprocessor.py - Préprocesseur de requêtes refactoré
 Version REFACTORÉE avec délégation aux modules spécialisés
 ✅ Conservation des méthodes non listées pour suppression
 ✅ Délégation à EntityExtractor, QueryClassifier, ValidationCore
+Version 2.1 - Migration vers breeds_registry dynamique
 """
 
 import logging
@@ -14,6 +15,7 @@ from typing import Dict, Any, List, Optional
 from .entity_extractor import EntityExtractor
 from .query_classifier import UnifiedQueryClassifier, QueryType, ClassificationResult
 from .validation_core import ValidationCore
+from llm.utils.breeds_registry import get_breeds_registry
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +26,8 @@ class QueryPreprocessor:
 
     Délègue l'extraction/validation/classification aux modules spécialisés,
     mais conserve les méthodes utilitaires et de détection de patterns.
+
+    Version 2.1: Utilise breeds_registry pour la détection dynamique des races
     """
 
     # Constantes conservées (non mentionnées dans la liste de suppression)
@@ -101,20 +105,31 @@ class QueryPreprocessor:
         r"at (\d+)\s*grams?",
     ]
 
-    def __init__(self):
-        """Initialisation avec modules centralisés"""
+    def __init__(self, intents_file_path: str = "llm/config/intents.json"):
+        """
+        Initialisation avec modules centralisés
+
+        Args:
+            intents_file_path: Chemin vers le fichier intents.json pour le registry
+        """
 
         # Modules spécialisés
         self.entity_extractor = EntityExtractor()
         self.query_classifier = UnifiedQueryClassifier()
         self.validator = ValidationCore()
 
+        # Charger le registre des races pour détection dynamique
+        self.breeds_registry = get_breeds_registry(intents_file_path)
+
         # État interne
         self._cache = {}
         self._is_initialized = False
         self._current_query = ""
 
-        logger.info("QueryPreprocessor initialisé avec modules spécialisés")
+        logger.info(
+            f"QueryPreprocessor initialisé avec modules spécialisés "
+            f"(breeds_registry: {len(self.breeds_registry.get_all_breeds())} races)"
+        )
 
     async def initialize(self):
         """Initialisation et validation du preprocessor"""
@@ -702,14 +717,81 @@ class QueryPreprocessor:
         query_patterns: Dict,
         strict_requirements: Dict,
     ) -> Dict[str, Any]:
-        """Preprocessing de secours en cas d'erreur"""
+        """
+        Preprocessing de secours en cas d'erreur
+        Utilise breeds_registry pour détecter les races dynamiquement
+        """
 
         logger.warning("Utilisation du preprocessing de secours")
+
+        detected_entities = {}
+        query_lower = query.lower()
+
+        # ====================================================================
+        # NOUVEAU: Détection dynamique des races via breeds_registry
+        # ====================================================================
+        try:
+            # Itérer sur toutes les races connues au lieu de hardcoder
+            for breed in self.breeds_registry.get_all_breeds():
+                breed_normalized = (
+                    breed.breed_id.lower().replace(" ", "").replace("-", "")
+                )
+
+                # Vérifier le breed_id
+                if breed_normalized in query_lower:
+                    detected_entities["breed"] = breed.breed_id
+                    logger.debug(f"Race détectée (fallback): {breed.name} via breed_id")
+                    break
+
+                # Vérifier le nom officiel
+                name_normalized = breed.name.lower().replace(" ", "").replace("-", "")
+                if name_normalized in query_lower:
+                    detected_entities["breed"] = breed.breed_id
+                    logger.debug(f"Race détectée (fallback): {breed.name} via name")
+                    break
+
+                # Vérifier les alias
+                for alias in breed.aliases:
+                    alias_normalized = alias.lower().replace(" ", "").replace("-", "")
+                    if alias_normalized in query_lower:
+                        detected_entities["breed"] = breed.breed_id
+                        logger.debug(
+                            f"Race détectée (fallback): {breed.name} via alias '{alias}'"
+                        )
+                        break
+
+                if "breed" in detected_entities:
+                    break
+
+        except Exception as e:
+            logger.error(f"Erreur détection race dans fallback: {e}")
+
+        # Détection basique des autres entités
+        # Âge
+        age_match = re.search(r"(\d+)\s*(?:jours?|days?|j\b)", query_lower)
+        if age_match:
+            try:
+                age = int(age_match.group(1))
+                if 0 <= age <= 150:
+                    detected_entities["age_days"] = age
+                    logger.debug(f"Âge détecté (fallback): {age}")
+            except ValueError:
+                pass
+
+        # Sexe
+        if any(word in query_lower for word in ["mâle", "male", "coq"]):
+            detected_entities["sex"] = "male"
+        elif any(word in query_lower for word in ["femelle", "female", "poule"]):
+            detected_entities["sex"] = "female"
+        elif any(word in query_lower for word in ["mixte", "mixed"]):
+            detected_entities["sex"] = "mixed"
+
+        # ====================================================================
 
         return {
             "normalized_query": self._normalize_query_text(query),
             "query_type": "general",
-            "entities": {},
+            "entities": detected_entities,
             "routing": "postgresql",
             "confidence": 0.5,
             "is_comparative": False,
@@ -719,6 +801,7 @@ class QueryPreprocessor:
             "query_patterns": query_patterns,
             "strict_requirements": strict_requirements,
             "preprocessing_fallback": True,
+            "fallback_breed_detection": "breed" in detected_entities,
         }
 
     def should_use_strict_matching(self, preprocessing_result: Dict[str, Any]) -> bool:
@@ -747,6 +830,13 @@ class QueryPreprocessor:
                 "entity_extractor": self.entity_extractor is not None,
                 "query_classifier": self.query_classifier is not None,
                 "validator": self.validator is not None,
+                "breeds_registry": self.breeds_registry is not None,
+            },
+            "breeds_registry_info": {
+                "total_breeds": len(self.breeds_registry.get_all_breeds()),
+                "species": list(
+                    set(b.species for b in self.breeds_registry.get_all_breeds())
+                ),
             },
             "capabilities": {
                 "entity_extraction": True,
@@ -758,8 +848,9 @@ class QueryPreprocessor:
                 "strict_matching_support": True,
                 "french_metrics_dictionary": True,
                 "advanced_pattern_extraction": True,
+                "dynamic_breed_detection": True,
             },
             "supported_french_metrics": len(self.FRENCH_METRICS),
-            "architecture": "modular_refactored",
-            "version": "2.0.0",
+            "architecture": "modular_refactored_with_registry",
+            "version": "2.1.0",
         }
