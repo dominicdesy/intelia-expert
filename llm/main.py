@@ -161,11 +161,28 @@ async def lifespan(app: FastAPI):
             )
 
             if translation_service:
+                # CORRECTION: Précharger les dictionnaires pour toutes les langues supportées
+                logger.info(
+                    f"Préchargement des dictionnaires pour {len(SUPPORTED_LANGUAGES)} langues..."
+                )
+                preload_results = translation_service.preload_languages(
+                    list(SUPPORTED_LANGUAGES)
+                )
+
+                # Comptabiliser les succès
+                loaded_count = sum(1 for success in preload_results.values() if success)
+                failed_langs = [
+                    lang for lang, success in preload_results.items() if not success
+                ]
+
                 # Vérifier que les dictionnaires sont bien chargés
                 num_dicts = len(translation_service._language_dictionaries)
                 logger.info(
-                    f"✅ Service de traduction initialisé - {num_dicts} dictionnaires chargés"
+                    f"✅ Service de traduction initialisé - {num_dicts} dictionnaires chargés ({loaded_count}/{len(SUPPORTED_LANGUAGES)} langues)"
                 )
+
+                if failed_langs:
+                    logger.warning(f"⚠️ Langues non chargées: {', '.join(failed_langs)}")
 
                 # Vérifier les domaines disponibles pour debug
                 try:
