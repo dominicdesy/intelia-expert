@@ -11,7 +11,8 @@ from processing.intent_types import IntentType, IntentResult
 
 # Import du gestionnaire de prompts centralisé
 try:
-    from llm.config.system_prompts import get_prompts_manager
+    # ✅ CORRECTION: Import relatif au lieu d'import absolu
+    from ..config.system_prompts import get_prompts_manager
 
     PROMPTS_AVAILABLE = True
     logger = logging.getLogger(__name__)
@@ -356,71 +357,3 @@ def build_prompt_for_intent(
 
     builder = PromptBuilder({}, language=language)
     return builder.build_specialized_prompt(intent_result, language) or ""
-
-
-# ============================================================================
-# TESTS
-# ============================================================================
-
-if __name__ == "__main__":
-    import logging
-
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
-
-    print("=" * 70)
-    print("TESTS PROMPT BUILDER")
-    print("=" * 70)
-
-    # Test 1: Initialisation
-    print("\nTest 1: Initialisation")
-    try:
-        builder = PromptBuilder({}, language="fr")
-        print("  OK - PromptBuilder créé")
-        print(f"  INFO - Gestionnaire prompts: {builder.prompts_manager is not None}")
-    except Exception as e:
-        print(f"  ERREUR: {e}")
-
-    # Test 2: Génération prompts spécialisés
-    print("\nTest 2: Génération prompts spécialisés")
-
-    from processing.intent_types import IntentResult, IntentType
-
-    test_cases = [
-        (IntentType.METRIC_QUERY, {"line": "Ross 308", "age_days": 35}),
-        (IntentType.ENVIRONMENT_SETTING, {"site_type": "broiler_farm"}),
-        (IntentType.DIAGNOSIS_TRIAGE, {"line": "Cobb 500"}),
-    ]
-
-    for intent_type, entities in test_cases:
-        intent_result = IntentResult(
-            intent_type=intent_type,
-            confidence=0.9,
-            detected_entities=entities,
-            vocabulary_coverage={},
-            expansion_quality={"terms_added": 3},
-            semantic_fallback_candidates=[],
-            cache_key_normalized="test_key",
-            metadata={},
-        )
-
-        prompt = builder.build_specialized_prompt(intent_result)
-        status = "OK" if prompt and len(prompt) > 50 else "ERREUR"
-
-        print(f"  {status} - {intent_type.value}: {len(prompt) if prompt else 0} chars")
-
-        if prompt and len(prompt) > 0:
-            # Afficher les 100 premiers caractères
-            preview = prompt[:100].replace("\n", " ")
-            print(f"      Preview: {preview}...")
-
-    # Test 3: Fonction helper legacy
-    print("\nTest 3: Compatibilité legacy")
-    legacy_prompt = build_prompt_for_intent(
-        IntentType.METRIC_QUERY, {"line": "Ross 308"}, "fr"
-    )
-    status = "OK" if legacy_prompt else "ERREUR"
-    print(f"  {status} - build_prompt_for_intent: {len(legacy_prompt)} chars")
-
-    print("\n" + "=" * 70)
-    print("TESTS TERMINÉS")
-    print("=" * 70)

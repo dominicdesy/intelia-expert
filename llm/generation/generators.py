@@ -15,11 +15,14 @@ from utils.utilities import METRICS
 
 # Import du gestionnaire de prompts centralisé
 try:
-    from llm.config.system_prompts import get_prompts_manager
+    # ✅ CORRECTION: Import relatif au lieu d'import absolu
+    from ..config.system_prompts import get_prompts_manager
 
     PROMPTS_AVAILABLE = True
-except ImportError:
-    logging.warning("SystemPromptsManager non disponible, utilisation prompts fallback")
+except ImportError as e:
+    logging.warning(
+        f"SystemPromptsManager non disponible: {e}, utilisation prompts fallback"
+    )
     PROMPTS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
@@ -591,58 +594,3 @@ def create_enhanced_generator(
     return EnhancedResponseGenerator(
         openai_client, cache_manager, language, prompts_path, descriptions_path
     )
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
-
-    print("=" * 70)
-    print("🧪 TESTS ENHANCED RESPONSE GENERATOR v3.0")
-    print("=" * 70)
-
-    # Test 1: EntityDescriptionsManager
-    print("\n🔥 Test 1: EntityDescriptionsManager")
-    try:
-        desc_manager = EntityDescriptionsManager()
-        print("  ✅ Manager créé")
-
-        # Test récupération description
-        ross_desc = desc_manager.get_entity_description("line", "Ross")
-        print(f"  📊 Ross description: {ross_desc[:50]}...")
-
-        # Test métriques
-        weight_keywords = desc_manager.get_metric_keywords("weight")
-        print(f"  📊 Weight keywords: {weight_keywords}")
-    except Exception as e:
-        print(f"  ❌ Erreur: {e}")
-
-    # Test 2: EnhancedResponseGenerator
-    print("\n🎯 Test 2: EnhancedResponseGenerator")
-    try:
-
-        class MockClient:
-            pass
-
-        generator = EnhancedResponseGenerator(MockClient(), language="fr")
-        print("  ✅ Générateur créé")
-        print(
-            f"  📊 Entity descriptions loaded: {len(generator.entity_descriptions.descriptions)}"
-        )
-    except Exception as e:
-        print(f"  ❌ Erreur: {e}")
-
-    # Test 3: Enrichissement
-    print("\n🔬 Test 3: Construction enrichissement")
-
-    class MockIntentResult:
-        detected_entities = {"line": "Ross 308", "species": "broiler", "age_days": 35}
-        expanded_query = "poids vif conversion alimentaire"
-
-    enrichment = generator._build_entity_enrichment(MockIntentResult())
-    print("  ✅ Enrichissement créé")
-    print(f"  📊 Entity context: {enrichment.entity_context[:80]}...")
-    print(f"  📊 Métriques: {enrichment.performance_indicators}")
-
-    print("\n" + "=" * 70)
-    print("✅ TESTS TERMINÉS")
-    print("=" * 70)
