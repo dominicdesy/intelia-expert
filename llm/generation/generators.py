@@ -16,7 +16,7 @@ from utils.utilities import METRICS
 # Import du gestionnaire de prompts centralisé
 try:
     # ✅ CORRECTION: Import relatif au lieu d'import absolu
-    from ..config.system_prompts import get_prompts_manager
+    from generation.config.system_prompts import get_prompts_manager
 
     PROMPTS_AVAILABLE = True
 except ImportError as e:
