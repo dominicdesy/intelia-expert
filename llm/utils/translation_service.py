@@ -3,8 +3,7 @@
 translation_service.py - Service de traduction universel hybride
 Combine dictionnaire local + Google Translate avec cache intelligent
 Version avec chargement dynamique des dictionnaires par langue
-CORRECTION: Gestion variable d'environnement pour clé API Google
-CORRECTION CRITIQUE: Chargement des exclusions techniques depuis JSON au lieu de constantes hardcodées
+CORRECTION MAJEURE: Support d'une langue par fichier avec clés canonical communes
 """
 
 import json
@@ -66,7 +65,7 @@ class UniversalTranslationService:
     Service de traduction hybride avec dictionnaire local + Google Translate
     Architecture à 3 niveaux: Cache → Dictionnaire local → Google API
     Chargement dynamique des dictionnaires par langue
-    NOUVEAU: Exclusion automatique des termes techniques depuis fichier JSON externe
+    NOUVEAU: Support d'une langue par fichier avec clés canonical communes
     """
 
     def __init__(
@@ -80,7 +79,6 @@ class UniversalTranslationService:
         confidence_threshold: float = 0.7,
         enable_technical_exclusion: bool = True,
     ):
-
         self.dict_path = Path(dict_path)
         self.supported_languages = supported_languages
         self.google_api_key = google_api_key
@@ -587,10 +585,18 @@ class UniversalTranslationService:
         source_lang: Optional[str] = None,
         domain: Optional[str] = None,
     ) -> Optional[TranslationResult]:
-        """Recherche dans le dictionnaire local avec logique de domaine et langue source"""
-        start_time = time.time()
+        """
+        MÉTHODE REÉCRITE: Recherche avec une langue par fichier via clés canonical communes
 
-        # Normalisation du terme
+        Logique:
+        1. Charger le dictionnaire de la langue source (ou toutes si non spécifiée)
+        2. Trouver le terme dans canonical ou variants
+        3. Récupérer la clé canonical commune
+        4. Charger le dictionnaire de la langue cible
+        5. Trouver le même canonical dans la langue cible
+        6. Retourner le canonical ou premier variant de la langue cible
+        """
+        start_time = time.time()
         term_lower = term.lower().strip()
 
         # Déterminer les langues à examiner pour la recherche
@@ -598,13 +604,16 @@ class UniversalTranslationService:
         if source_lang and source_lang != "auto":
             search_languages.append(source_lang)
         else:
-            # Rechercher dans toutes les langues supportées
             search_languages.extend(self.supported_languages)
 
-        # Recherche dans les dictionnaires des langues sources potentielles
+        # Étape 1: Trouver le canonical dans la langue source
+        found_canonical = None
+        found_domain = None
+        found_confidence = 0.9
+
         for search_lang in search_languages:
-            lang_dict = self._get_language_dictionary(search_lang)
-            domains_data = lang_dict.get("domains", {})
+            source_dict = self._get_language_dictionary(search_lang)
+            domains_data = source_dict.get("domains", {})
 
             # Recherche par domaine si spécifié
             domains_to_search = [domain] if domain else domains_data.keys()
@@ -615,36 +624,83 @@ class UniversalTranslationService:
 
                 domain_data = domains_data[domain_key]
 
-                for term_key, term_data in domain_data.items():
+                # Parcourir tous les termes du domaine
+                for canonical_key, term_data in domain_data.items():
                     if not isinstance(term_data, dict):
                         continue
 
-                    translations = term_data.get("translations", {})
+                    # Vérifier le canonical lui-même
+                    canonical = term_data.get("canonical", canonical_key)
+                    if canonical.lower() == term_lower:
+                        found_canonical = canonical_key
+                        found_domain = domain_key
+                        found_confidence = term_data.get("confidence", 0.9)
+                        break
 
-                    # Recherche dans toutes les langues du terme
-                    for lang, variants in translations.items():
-                        if isinstance(variants, list):
-                            for variant in variants:
-                                if variant.lower() == term_lower:
-                                    # Trouvé! Récupérer la traduction cible
-                                    target_variants = translations.get(target_lang, [])
-                                    if target_variants:
-                                        processing_time = int(
-                                            (time.time() - start_time) * 1000
-                                        )
-                                        confidence = term_data.get("confidence", 0.9)
+                    # Vérifier dans les variants
+                    variants = term_data.get("variants", [])
+                    if isinstance(variants, list):
+                        for variant in variants:
+                            if variant.lower() == term_lower:
+                                found_canonical = canonical_key
+                                found_domain = domain_key
+                                found_confidence = term_data.get("confidence", 0.9)
+                                break
 
-                                        return TranslationResult(
-                                            text=target_variants[
-                                                0
-                                            ],  # Première variante
-                                            source="local",
-                                            confidence=confidence,
-                                            language=target_lang,
-                                            processing_time_ms=processing_time,
-                                        )
+                if found_canonical:
+                    break
 
-        return None
+            if found_canonical:
+                break
+
+        # Si terme non trouvé dans les dictionnaires source
+        if not found_canonical:
+            return None
+
+        # Étape 2: Charger le dictionnaire de la langue cible
+        target_dict = self._get_language_dictionary(target_lang)
+        target_domains = target_dict.get("domains", {})
+
+        # Étape 3: Trouver le même canonical dans la langue cible
+        if found_domain not in target_domains:
+            logger.debug(
+                f"Domaine {found_domain} non trouvé dans langue cible {target_lang}"
+            )
+            return None
+
+        target_domain_data = target_domains[found_domain]
+
+        if found_canonical not in target_domain_data:
+            logger.debug(
+                f"Canonical {found_canonical} non trouvé dans {target_lang}/{found_domain}"
+            )
+            return None
+
+        target_term_data = target_domain_data[found_canonical]
+
+        # Étape 4: Récupérer la traduction (canonical ou premier variant)
+        target_canonical = target_term_data.get("canonical", found_canonical)
+        target_variants = target_term_data.get("variants", [])
+
+        # Choisir le meilleur terme à retourner
+        if (
+            target_variants
+            and isinstance(target_variants, list)
+            and len(target_variants) > 0
+        ):
+            translated_text = target_variants[0]
+        else:
+            translated_text = target_canonical
+
+        processing_time = int((time.time() - start_time) * 1000)
+
+        return TranslationResult(
+            text=translated_text,
+            source="local",
+            confidence=found_confidence,
+            language=target_lang,
+            processing_time_ms=processing_time,
+        )
 
     def _translate_with_google(
         self, term: str, target_lang: str, source_lang: str = "auto"
@@ -836,9 +892,11 @@ class UniversalTranslationService:
 
         for term_key, term_data in domain_data.items():
             if isinstance(term_data, dict):
-                translations = term_data.get("translations", {})
-                lang_variants = translations.get(language, [])
-                terms.extend(lang_variants)
+                canonical = term_data.get("canonical", term_key)
+                variants = term_data.get("variants", [])
+                terms.append(canonical)
+                if isinstance(variants, list):
+                    terms.extend(variants)
 
         return list(set(terms))  # Déduplication
 
