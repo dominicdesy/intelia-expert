@@ -664,21 +664,11 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                                         language=language,
                                     )
 
-                                    # ✅ CORRECTION: Utiliser le message déjà généré par le validator
-                                    clarification_msg = rag_result.answer
-
-                                    # Fallback si pas de message dans answer (sécurité)
-                                    if not clarification_msg:
-                                        clarification_msg = (
-                                            generate_clarification_question(
-                                                missing_fields=missing_fields,
-                                                suggestions=suggestions,
-                                                language=language,
-                                            )
-                                        )
-
-                                    logger.info(
-                                        f"❓ Question de clarification: {clarification_msg[:100]}..."
+                                    # Générer question de clarification
+                                    clarification_msg = generate_clarification_question(
+                                        missing_fields=missing_fields,
+                                        suggestions=suggestions,
+                                        language=language,
                                     )
 
                                     # Créer un résultat spécial pour la clarification
