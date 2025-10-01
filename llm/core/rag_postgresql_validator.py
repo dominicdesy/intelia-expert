@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
-VERSION 3.1: Correction détection breed - get_all_breeds() retourne Set[str]
+VERSION 4.0: Contextualisation intelligente - Messages conversationnels
 - Préserve tous les champs originaux
 - Logs diagnostiques
 - Invalidation des métriques invalides
 - Auto-détection enrichie dynamique
+- 🆕 Messages de clarification conversationnels multilingues
+- 🆕 Génération de questions plutôt que de simples messages d'erreur
 """
 
 import re
@@ -18,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class PostgreSQLValidator:
-    """Validateur intelligent avec auto-détection et alternatives"""
+    """Validateur intelligent avec auto-détection, alternatives et contextualisation"""
 
     def __init__(self, intents_config_path: str = "llm/config/intents.json"):
         """
@@ -36,7 +38,7 @@ class PostgreSQLValidator:
         )
 
     def flexible_query_validation(
-        self, query: str, entities: Dict[str, Any]
+        self, query: str, entities: Dict[str, Any], language: str = "fr"
     ) -> Dict[str, Any]:
         """
         Validation flexible qui essaie de compléter les requêtes incomplètes
@@ -44,6 +46,11 @@ class PostgreSQLValidator:
         CORRECTION FINALE: Commence toujours par les entités ORIGINALES,
         puis enrichit SEULEMENT les champs manquants avec auto-détection.
         Cela garantit que 'sex' et autres champs du comparison_handler sont préservés.
+
+        Args:
+            query: Requête utilisateur
+            entities: Entités extraites
+            language: Langue détectée (fr, en, es, etc.)
 
         Returns:
             Dict avec status: "complete" | "incomplete_but_processable" | "needs_fallback"
@@ -116,7 +123,8 @@ class PostgreSQLValidator:
             else:
                 logger.debug("❌ No breed detected in query")
                 missing.append("breed")
-                suggestions.append("Spécifiez une race (Cobb 500, Ross 308, etc.)")
+                # 🆕 Suggestion conversationnelle selon la langue
+                suggestions.append(self._get_breed_suggestion(language))
         else:
             logger.debug(
                 f"🔍 Breed PRESENT: '{enhanced_entities.get('breed')}', skipping auto-detection"
@@ -134,13 +142,23 @@ class PostgreSQLValidator:
                 # Pour certaines requêtes, l'âge n'est pas critique
                 if any(
                     word in query.lower()
-                    for word in ["recommande", "meilleur", "compare", "général"]
+                    for word in [
+                        "recommande",
+                        "meilleur",
+                        "compare",
+                        "général",
+                        "recommend",
+                        "best",
+                        "compare",
+                        "general",
+                    ]
                 ):
                     logger.debug("🔍 General query, age not critical")
                     pass  # Requête générale - pas besoin d'âge spécifique
                 else:
                     missing.append("age")
-                    suggestions.append("Précisez un âge (21 jours, 42 jours, etc.)")
+                    # 🆕 Suggestion conversationnelle selon la langue
+                    suggestions.append(self._get_age_suggestion(language))
         else:
             logger.debug(
                 f"🔍 Age PRESENT: '{enhanced_entities.get('age_days')}', skipping auto-detection"
@@ -155,6 +173,9 @@ class PostgreSQLValidator:
                 logger.debug(f"✅ Auto-detected metric: {detected_metric}")
             else:
                 logger.debug("❌ No metric detected in query")
+                missing.append("metric")
+                # 🆕 Suggestion conversationnelle selon la langue
+                suggestions.append(self._get_metric_suggestion(language))
         else:
             logger.debug(
                 f"🔍 Metric PRESENT: '{enhanced_entities.get('metric_type')}', skipping auto-detection"
@@ -213,10 +234,10 @@ class PostgreSQLValidator:
             }
 
         else:
-            # Trop d'informations manquantes
+            # Trop d'informations manquantes - 🆕 Message conversationnel
             logger.debug(f"❌ Validation needs fallback, missing: {missing}")
-            helpful_message = self._generate_validation_help_message(
-                query, missing, suggestions
+            helpful_message = self._generate_conversational_question(
+                query, missing, suggestions, language
             )
             return {
                 "status": "needs_fallback",
@@ -224,6 +245,95 @@ class PostgreSQLValidator:
                 "suggestions": suggestions,
                 "helpful_message": helpful_message,
             }
+
+    def _get_breed_suggestion(self, language: str) -> str:
+        """Retourne une suggestion pour la race selon la langue"""
+        suggestions = {
+            "fr": "Quelle race/souche élevez-vous ? (Ross 308, Cobb 500, Hubbard, etc.)",
+            "en": "Which breed/strain are you raising? (Ross 308, Cobb 500, Hubbard, etc.)",
+            "es": "¿Qué raza/cepa está criando? (Ross 308, Cobb 500, Hubbard, etc.)",
+        }
+        return suggestions.get(language, suggestions["fr"])
+
+    def _get_age_suggestion(self, language: str) -> str:
+        """Retourne une suggestion pour l'âge selon la langue"""
+        suggestions = {
+            "fr": "À quel âge (en jours) souhaitez-vous cette information ?",
+            "en": "At what age (in days) would you like this information?",
+            "es": "¿A qué edad (en días) desea esta información?",
+        }
+        return suggestions.get(language, suggestions["fr"])
+
+    def _get_metric_suggestion(self, language: str) -> str:
+        """Retourne une suggestion pour la métrique selon la langue"""
+        suggestions = {
+            "fr": "Quelle métrique vous intéresse ? (poids vif, conversion alimentaire, gain quotidien, mortalité)",
+            "en": "Which metric are you interested in? (body weight, feed conversion, daily gain, mortality)",
+            "es": "¿Qué métrica le interesa? (peso vivo, conversión alimenticia, ganancia diaria, mortalidad)",
+        }
+        return suggestions.get(language, suggestions["fr"])
+
+    def _generate_conversational_question(
+        self,
+        query: str,
+        missing: List[str],
+        suggestions: List[str],
+        language: str = "fr",
+    ) -> str:
+        """
+        🆕 NOUVEAU: Génère une question de clarification conversationnelle
+
+        Args:
+            query: Requête originale
+            missing: Champs manquants
+            suggestions: Suggestions détaillées
+            language: Langue de la réponse
+
+        Returns:
+            Question conversationnelle formatée
+        """
+
+        # Templates d'introduction selon la langue
+        intros = {
+            "fr": "Pour vous donner une réponse précise, j'ai besoin de quelques informations supplémentaires.",
+            "en": "To provide you with an accurate answer, I need some additional information.",
+            "es": "Para darle una respuesta precisa, necesito información adicional.",
+        }
+
+        # Templates pour plusieurs champs manquants
+        multiple_intros = {
+            "fr": "Pourriez-vous préciser :",
+            "en": "Could you please specify:",
+            "es": "¿Podría especificar:",
+        }
+
+        intro = intros.get(language, intros["fr"])
+
+        # Construction de la question
+        parts = [intro]
+
+        if len(missing) > 1:
+            # Plusieurs champs manquants
+            parts.append(f"\n\n{multiple_intros.get(language, multiple_intros['fr'])}")
+            for suggestion in suggestions:
+                parts.append(f"\n• {suggestion}")
+        else:
+            # Un seul champ manquant
+            parts.append(f"\n\n{suggestions[0] if suggestions else ''}")
+
+        return "".join(parts)
+
+    def _generate_validation_help_message(
+        self, query: str, missing: List[str], suggestions: List[str]
+    ) -> str:
+        """
+        Génère un message d'aide pour validation
+        🆕 DÉPRÉCIÉE: Utiliser _generate_conversational_question à la place
+        """
+        return (
+            f"Informations manquantes pour traiter votre requête : {', '.join(missing)}. "
+            f"Suggestions : {' '.join(suggestions)}"
+        )
 
     def validate_and_enhance(self, entities: Dict, query: str) -> Dict:
         """
@@ -424,15 +534,6 @@ class PostgreSQLValidator:
         self.logger.debug("❌ Aucune métrique détectée automatiquement")
         return None
 
-    def _generate_validation_help_message(
-        self, query: str, missing: List[str], suggestions: List[str]
-    ) -> str:
-        """Génère un message d'aide pour validation"""
-        return (
-            f"Informations manquantes pour traiter votre requête : {', '.join(missing)}. "
-            f"Suggestions : {' '.join(suggestions)}"
-        )
-
     def check_data_availability_flexible(
         self, entities: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -496,7 +597,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     print("=" * 70)
-    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION BREEDS_REGISTRY")
+    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION CONTEXTUALISATION")
     print("=" * 70)
 
     validator = PostgreSQLValidator()
@@ -542,6 +643,38 @@ if __name__ == "__main__":
         if "enhanced_entities" in result:
             print(f"  → Enhanced: {result['enhanced_entities']}")
 
+    # 🆕 Test 3: Messages de clarification multilingues
+    print("\n🆕 Test 3: Messages de clarification conversationnels")
+    test_clarifications = [
+        {
+            "query": "Quel est le poids d'un poulet de 12 jours ?",
+            "entities": {},
+            "language": "fr",
+        },
+        {
+            "query": "What is the weight at 12 days?",
+            "entities": {},
+            "language": "en",
+        },
+        {
+            "query": "¿Cuál es el peso?",
+            "entities": {"age_days": 15},
+            "language": "es",
+        },
+    ]
+
+    for test in test_clarifications:
+        print(f"\n  Query: {test['query']}")
+        print(f"  Language: {test['language']}")
+
+        result = validator.flexible_query_validation(
+            test["query"], test["entities"], test["language"]
+        )
+
+        print(f"  → Status: {result['status']}")
+        if result["status"] == "needs_fallback":
+            print(f"  → Question: {result['helpful_message']}")
+
     print("\n" + "=" * 70)
-    print("✅ TESTS TERMINÉS - PostgreSQL Validator avec Breeds Registry")
+    print("✅ TESTS TERMINÉS - PostgreSQL Validator avec Contextualisation")
     print("=" * 70)

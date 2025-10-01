@@ -4,6 +4,7 @@ rag_postgresql.py - PostgreSQL System Principal Refactorisé
 Point d'entrée principal avec délégation vers modules spécialisés
 VERSION REFACTORISÉE: Utilisation de ValidationCore centralisé + QueryInterpreter OpenAI
 CORRECTION: Support du paramètre language pour détection automatique
+NOUVEAU: Gestion de la contextualisation - Demande de précisions si informations manquantes
 """
 
 import logging
@@ -151,7 +152,7 @@ Réponds en JSON."""
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message},
                 ],
-                temperature=0.1,  # Très bas pour cohérence et déterminisme
+                temperature=0.1,
                 response_format={"type": "json_object"},
             )
 
@@ -305,11 +306,12 @@ class PostgreSQLSystem:
         top_k: int = 12,
         entities: Dict[str, Any] = None,
         strict_sex_match: bool = False,
-        language: str = "en",  # ✅ AJOUTÉ: Paramètre language avec défaut anglais
+        language: str = "en",
     ) -> RAGResult:
         """
         Recherche de métriques avec validation centralisée + interprétation OpenAI
         VERSION REFACTORISÉE: Utilisation de ValidationCore + QueryInterpreter
+        🆕 CONTEXTUALISATION: Demande des précisions si informations manquantes
 
         Args:
             query: Requête utilisateur
@@ -402,24 +404,31 @@ class PostgreSQLSystem:
                 f"🔍 Validation result: valid={validation_result.is_valid}, confidence={validation_result.confidence}"
             )
 
-            # Si validation échoue ET qu'on n'autorise pas les requêtes partielles
+            # 🆕 CONTEXTUALISATION: Détection du besoin de clarification
             if not validation_result.is_valid and not validation_result.allow_partial:
-                error_message = "Validation échouée: " + ", ".join(
-                    validation_result.errors
+                # Générer une question de clarification
+                clarification_question = self._generate_clarification_question(
+                    validation_result.errors,
+                    validation_result.suggestions,
+                    entities,
+                    language,
                 )
 
-                if validation_result.suggestions:
-                    error_message += "\n\nSuggestions: " + ", ".join(
-                        validation_result.suggestions
-                    )
+                logger.info(
+                    f"❓ CONTEXTUALISATION: Besoin de clarification détecté - {validation_result.errors}"
+                )
 
+                # Retourner un résultat spécial pour demander des précisions
                 return RAGResult(
-                    source=RAGSource.ERROR,
-                    answer=error_message,
+                    source=RAGSource.INSUFFICIENT_CONTEXT,
+                    answer=clarification_question,
                     metadata={
-                        "validation_errors": validation_result.errors,
+                        "validation_status": "needs_clarification",
+                        "missing_fields": validation_result.errors,
                         "suggestions": validation_result.suggestions,
+                        "original_query": query,
                         "processing_time": time.time() - start_time,
+                        "awaiting_user_input": True,
                     },
                 )
 
@@ -492,7 +501,7 @@ class PostgreSQLSystem:
                             age_max=temporal_range["age_max"],
                             top_k=top_k,
                             strict_sex_match=strict_sex_match,
-                            language=language,  # ✅ TRANSMISSION DU LANGUAGE
+                            language=language,
                         )
                 except Exception as temporal_error:
                     logger.warning(f"Erreur détection temporelle: {temporal_error}")
@@ -524,7 +533,7 @@ class PostgreSQLSystem:
                 documents,
                 metric_results,
                 entities,
-                language,  # ✅ TRANSMISSION DU LANGUAGE
+                language,
             )
             avg_confidence = sum(m.confidence for m in metric_results) / len(
                 metric_results
@@ -555,6 +564,85 @@ class PostgreSQLSystem:
                 metadata={"error": str(e), "processing_time": time.time() - start_time},
             )
 
+    def _generate_clarification_question(
+        self,
+        missing_fields: List[str],
+        suggestions: List[str],
+        entities: Dict[str, Any],
+        language: str,
+    ) -> str:
+        """
+        🆕 NOUVEAU: Génère une question de clarification conversationnelle
+
+        Args:
+            missing_fields: Liste des champs manquants
+            suggestions: Suggestions pour compléter
+            entities: Entités déjà extraites
+            language: Langue de la réponse
+
+        Returns:
+            Question de clarification formatée
+        """
+
+        # Templates multilingues
+        templates = {
+            "fr": {
+                "intro": "Pour vous donner une réponse précise, j'ai besoin de quelques informations supplémentaires.",
+                "breed": "Quelle race/souche élevez-vous ? (par exemple : Ross 308, Cobb 500, Hubbard)",
+                "age": "À quel âge (en jours) souhaitez-vous connaître cette information ?",
+                "metric": "Quelle métrique vous intéresse ? (poids vif, conversion alimentaire, gain quotidien, mortalité)",
+                "multiple": "Pourriez-vous préciser :",
+            },
+            "en": {
+                "intro": "To provide you with an accurate answer, I need some additional information.",
+                "breed": "Which breed/strain are you raising? (e.g., Ross 308, Cobb 500, Hubbard)",
+                "age": "At what age (in days) would you like this information?",
+                "metric": "Which metric are you interested in? (body weight, feed conversion, daily gain, mortality)",
+                "multiple": "Could you please specify:",
+            },
+            "es": {
+                "intro": "Para darle una respuesta precisa, necesito información adicional.",
+                "breed": "¿Qué raza/cepa está criando? (por ejemplo: Ross 308, Cobb 500, Hubbard)",
+                "age": "¿A qué edad (en días) desea esta información?",
+                "metric": "¿Qué métrica le interesa? (peso vivo, conversión alimenticia, ganancia diaria, mortalidad)",
+                "multiple": "¿Podría especificar:",
+            },
+        }
+
+        # Utiliser templates français par défaut si langue non supportée
+        lang_templates = templates.get(language, templates["fr"])
+
+        # Construire la question
+        parts = [lang_templates["intro"]]
+
+        # Si plusieurs champs manquants
+        if len(missing_fields) > 1:
+            parts.append(f"\n\n{lang_templates['multiple']}")
+            for field in missing_fields:
+                if "breed" in field.lower() or "race" in field.lower():
+                    parts.append(f"\n- {lang_templates['breed']}")
+                elif "age" in field.lower() or "âge" in field.lower():
+                    parts.append(f"\n- {lang_templates['age']}")
+                elif "metric" in field.lower() or "métrique" in field.lower():
+                    parts.append(f"\n- {lang_templates['metric']}")
+        else:
+            # Un seul champ manquant
+            field = missing_fields[0]
+            parts.append("\n")
+            if "breed" in field.lower() or "race" in field.lower():
+                parts.append(lang_templates["breed"])
+            elif "age" in field.lower() or "âge" in field.lower():
+                parts.append(lang_templates["age"])
+            elif "metric" in field.lower() or "métrique" in field.lower():
+                parts.append(lang_templates["metric"])
+
+        # Ajouter suggestions si disponibles
+        if suggestions:
+            suggestions_text = " | ".join(suggestions[:3])
+            parts.append(f"\n\n💡 {suggestions_text}")
+
+        return "".join(parts)
+
     async def search_metrics_range(
         self,
         query: str,
@@ -563,7 +651,7 @@ class PostgreSQLSystem:
         age_max: int,
         top_k: int = 12,
         strict_sex_match: bool = False,
-        language: str = "en",  # ✅ AJOUTÉ: Paramètre language
+        language: str = "en",
     ) -> RAGResult:
         """Recherche optimisée pour plages temporelles"""
 
@@ -573,7 +661,7 @@ class PostgreSQLSystem:
                 entities=entities,
                 top_k=top_k,
                 strict_sex_match=strict_sex_match,
-                language=language,  # ✅ TRANSMISSION DU LANGUAGE
+                language=language,
             )
 
         return await self.temporal_processor.search_metrics_range(
@@ -630,7 +718,7 @@ class PostgreSQLSystem:
         documents: List,
         metric_results: List[MetricResult],
         entities: Dict,
-        language: str = "en",  # ✅ AJOUTÉ: Paramètre language avec défaut anglais
+        language: str = "en",
     ) -> str:
         """
         Génère une réponse enrichie avec EnhancedResponseGenerator
@@ -658,20 +746,18 @@ class PostgreSQLSystem:
                     "🎨 Utilisation EnhancedResponseGenerator pour réponse de qualité"
                 )
 
-                # ✅ CORRECTION: Utiliser le paramètre language au lieu de "fr" hardcodé
                 generator = create_enhanced_generator(
                     openai_client=self.openai_client,
                     cache_manager=None,
-                    language=language,  # ✅ CORRIGÉ
+                    language=language,
                 )
 
                 # Générer réponse enrichie avec contexte
-                # ✅ CORRECTION: Utiliser le paramètre language au lieu de "fr" hardcodé
                 response = await generator.generate_response(
                     query=query,
                     context_docs=documents,
                     conversation_context="",
-                    language=language,  # ✅ CORRIGÉ
+                    language=language,
                     intent_result=None,
                 )
 
@@ -781,6 +867,17 @@ class PostgreSQLSystem:
                     else "disabled"
                 ),
             },
+            "contextualization": {
+                "enabled": True,
+                "description": "Demande de clarification si informations manquantes",
+                "features": [
+                    "Détection automatique des champs manquants",
+                    "Questions de clarification multilingues",
+                    "Suggestions contextuelles",
+                    "Maintien du contexte conversationnel",
+                ],
+                "status": "active",
+            },
             "language_support": {
                 "enabled": True,
                 "description": "Support automatique de la langue détectée",
@@ -813,6 +910,6 @@ class PostgreSQLSystem:
                 "description": "Optimisation SQL pour plages temporelles",
                 "status": "active",
             },
-            "implementation_phase": "modular_architecture_with_openai_interpreter_and_language_support",
-            "version": "v10.1_language_detection_fixed",
+            "implementation_phase": "modular_architecture_with_contextualization",
+            "version": "v11.0_contextualization_integrated",
         }

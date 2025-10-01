@@ -2,7 +2,7 @@
 """
 api/endpoints_chat.py - Endpoints de chat et streaming avec Système RAG JSON
 Gestion des conversations, streaming SSE, validation JSON, ingestion avicole
-Version 4.1 - Intégration preprocessing activé
+Version 4.2 - Intégration preprocessing + CONTEXTUALISATION
 """
 
 import time
@@ -94,7 +94,6 @@ class ExpertQueryRequest(BaseModel):
     response_format: str = Field(
         "detailed", pattern="^(ultra_concise|concise|standard|detailed)$"
     )
-    # NOUVEAUX PARAMÈTRES JSON
     use_json_search: bool = Field(
         True, description="Utiliser la recherche JSON prioritaire"
     )
@@ -127,7 +126,6 @@ class ChatRequest(BaseModel):
     )
     language: Optional[str] = Field(None, description="Langue de la réponse")
     tenant_id: Optional[str] = Field(None, description="Identifiant du tenant")
-    # NOUVEAUX PARAMÈTRES JSON
     genetic_line_filter: Optional[str] = Field(
         None, description="Filtre lignée génétique"
     )
@@ -135,6 +133,126 @@ class ChatRequest(BaseModel):
     performance_context: Optional[Dict[str, Any]] = Field(
         None, description="Contexte performance"
     )
+
+
+# === SYSTÈME DE MÉMOIRE CONVERSATIONNELLE POUR CONTEXTUALISATION ===
+
+
+class ConversationContextManager:
+    """Gestionnaire de contexte conversationnel pour clarifications"""
+
+    def __init__(self):
+        self.pending_clarifications = {}
+
+    def mark_pending(
+        self,
+        tenant_id: str,
+        original_query: str,
+        missing_fields: List[str],
+        suggestions: Dict,
+        language: str,
+    ):
+        """Marque une conversation en attente de clarification"""
+        self.pending_clarifications[tenant_id] = {
+            "original_query": original_query,
+            "missing_fields": missing_fields,
+            "suggestions": suggestions,
+            "language": language,
+            "timestamp": time.time(),
+        }
+        logger.info(f"🔔 Clarification en attente pour {tenant_id}: {missing_fields}")
+
+    def get_pending(self, tenant_id: str) -> Optional[Dict]:
+        """Récupère le contexte en attente"""
+        return self.pending_clarifications.get(tenant_id)
+
+    def clear_pending(self, tenant_id: str):
+        """Efface le contexte en attente"""
+        if tenant_id in self.pending_clarifications:
+            del self.pending_clarifications[tenant_id]
+            logger.info(f"✅ Clarification résolue pour {tenant_id}")
+
+    def is_clarification_response(self, message: str, pending_context: Dict) -> bool:
+        """Détecte si le message est une réponse à une clarification"""
+        if not pending_context:
+            return False
+
+        missing = pending_context.get("missing_fields", [])
+        message_lower = message.lower()
+
+        # Détection de races communes
+        common_breeds = ["ross", "cobb", "hubbard", "aviagen", "308", "500", "700"]
+        if "breed" in missing:
+            return any(breed in message_lower for breed in common_breeds)
+
+        # Détection d'âge
+        if "age_days" in missing:
+            import re
+
+            return bool(re.search(r"\d+\s*(jour|day|j\b)", message_lower))
+
+        return False
+
+
+# Instance globale du gestionnaire
+context_manager = ConversationContextManager()
+
+
+def generate_clarification_question(
+    missing_fields: List[str], suggestions: Dict, language: str
+) -> str:
+    """Génère une question de clarification naturelle selon la langue"""
+
+    clarification_templates = {
+        "fr": {
+            "breed": "Pour vous donner une réponse précise, pourriez-vous me dire quelle race/souche vous élevez ? (par exemple : Ross 308, Cobb 500, Hubbard)",
+            "age_days": "À quel âge (en jours) souhaitez-vous connaître cette information ?",
+            "sex": "Cette information concerne-t-elle des mâles, des femelles, ou un élevage mixte ?",
+            "metric_type": "Quelle métrique spécifique vous intéresse ? (poids, FCR, mortalité, etc.)",
+            "multiple": "Pour vous aider au mieux, j'ai besoin de quelques précisions :\n{details}",
+        },
+        "en": {
+            "breed": "To give you an accurate answer, could you tell me which breed/strain you're raising? (e.g., Ross 308, Cobb 500, Hubbard)",
+            "age_days": "At what age (in days) would you like this information?",
+            "sex": "Is this information for males, females, or mixed flock?",
+            "metric_type": "Which specific metric are you interested in? (weight, FCR, mortality, etc.)",
+            "multiple": "To help you best, I need a few clarifications:\n{details}",
+        },
+    }
+
+    # Fallback en français si langue non supportée
+    templates = clarification_templates.get(language, clarification_templates["fr"])
+
+    # Une seule info manquante
+    if len(missing_fields) == 1:
+        field = missing_fields[0]
+        question = templates.get(field, templates.get("breed"))
+
+        # Ajouter suggestions si disponibles
+        if suggestions and field in suggestions:
+            field_suggestions = suggestions[field]
+            if field_suggestions:
+                if language == "fr":
+                    question += f"\n\nSuggestions : {', '.join(field_suggestions[:5])}"
+                else:
+                    question += f"\n\nSuggestions: {', '.join(field_suggestions[:5])}"
+
+        return question
+
+    # Plusieurs infos manquantes
+    else:
+        details = []
+        for field in missing_fields:
+            field_template = templates.get(field, "")
+            if field_template and field != "multiple":
+                # Extraire juste la question sans le préambule
+                question_part = field_template.split("?")[0] + "?"
+                details.append(f"- {question_part}")
+
+        if details:
+            return templates["multiple"].format(details="\n".join(details))
+        else:
+            return templates.get("breed", "Pouvez-vous préciser votre question ?")
 
 
 def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
@@ -176,12 +294,11 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                 json_data=request.json_data, strict_mode=request.strict_mode
             )
 
-            # Enrichissement de la réponse
             response = {
                 **result,
                 "processing_time": time.time() - start_time,
                 "timestamp": time.time(),
-                "version": "4.1_preprocessed",
+                "version": "4.2_contextualized",
             }
 
             return JSONResponse(content=safe_serialize_for_json(response))
@@ -218,7 +335,6 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                 json_files=request.json_files, batch_size=request.batch_size
             )
 
-            # Enrichissement de la réponse
             response = {
                 **result,
                 "processing_time": time.time() - start_time,
@@ -246,8 +362,8 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
     async def search_json_enhanced(
         query: str = Form(...),
         genetic_line: Optional[str] = Form(None),
-        performance_metrics: Optional[str] = Form(None),  # JSON string
-        age_range: Optional[str] = Form(None),  # JSON string
+        performance_metrics: Optional[str] = Form(None),
+        age_range: Optional[str] = Form(None),
     ):
         """Recherche avancée dans les documents JSON avec filtres avicoles"""
         start_time = time.time()
@@ -262,13 +378,12 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     status_code=501, detail="Recherche JSON non disponible"
                 )
 
-            # Parsing des paramètres JSON
             parsed_metrics = None
             if performance_metrics:
                 try:
                     parsed_metrics = json.loads(performance_metrics)
                 except json.JSONDecodeError:
-                    parsed_metrics = [performance_metrics]  # Fallback single string
+                    parsed_metrics = [performance_metrics]
 
             parsed_age_range = None
             if age_range:
@@ -331,7 +446,6 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             json_files = []
             errors = []
 
-            # Lecture et parsing des fichiers
             for file in files:
                 try:
                     if not file.filename.endswith(".json"):
@@ -361,7 +475,6 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     status_code=400, detail="Aucun fichier JSON valide trouvé"
                 )
 
-            # Validation automatique si demandée
             validation_results = []
             if auto_validate:
                 rag_engine = get_rag_engine()
@@ -388,7 +501,6 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                                 }
                             )
 
-            # Ingestion si validation OK
             ingestion_result = None
             if auto_validate and validation_results:
                 valid_files = [
@@ -436,16 +548,15 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             )
 
     # ========================================================================
-    # ENDPOINT CHAT PRINCIPAL AMÉLIORÉ
+    # ENDPOINT CHAT PRINCIPAL AVEC CONTEXTUALISATION
     # ========================================================================
 
     @router.post(f"{BASE_PATH}/chat")
     async def chat(request: Request):
-        """Chat endpoint avec système JSON intégré - LOGS DEBUG NETTOYÉS"""
+        """Chat endpoint avec contextualisation intelligente"""
         total_start_time = time.time()
 
         try:
-            # Validation de la requête
             try:
                 body = await request.json()
             except Exception as e:
@@ -455,12 +566,10 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             language = body.get("language", "").strip()
             tenant_id = body.get("tenant_id", str(uuid.uuid4())[:8])
 
-            # NOUVEAUX PARAMÈTRES JSON
             genetic_line_filter = body.get("genetic_line_filter")
             use_json_search = body.get("use_json_search", True)
             performance_context = body.get("performance_context")
 
-            # Validations
             if not message:
                 raise HTTPException(status_code=400, detail="Message vide")
 
@@ -470,9 +579,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     detail=f"Message trop long (max {MAX_REQUEST_SIZE})",
                 )
 
-            # ✅ DÉTECTION AUTOMATIQUE DE LA LANGUE (TOUJOURS)
-            # Force la détection automatique basée sur le contenu du message
-            # pour garantir que la réponse est dans la même langue que la question
+            # Détection automatique de la langue
             language_result = detect_language_enhanced(message)
             detected_language = (
                 language_result.language
@@ -480,31 +587,46 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                 else language_result
             )
 
-            # Log de la détection pour monitoring
             logger.info(
                 f"Langue détectée: {detected_language} "
                 f"(confiance: {getattr(language_result, 'confidence', 'N/A')})"
             )
 
-            # Override du paramètre language avec la langue détectée automatiquement
             language = detected_language
 
-            # Validation tenant_id
             if not tenant_id or len(tenant_id) > 50:
                 tenant_id = str(uuid.uuid4())[:8]
+
+            # 🆕 ÉTAPE 1: Vérifier si c'est une réponse à une clarification
+            pending_context = context_manager.get_pending(tenant_id)
+
+            if pending_context and context_manager.is_clarification_response(
+                message, pending_context
+            ):
+                logger.info(f"🔄 Détection réponse clarification pour {tenant_id}")
+
+                # Fusionner la question originale avec la nouvelle info
+                original_query = pending_context["original_query"]
+                combined_query = f"{original_query} {message}"
+
+                logger.info(f"📝 Requête combinée: {combined_query}")
+
+                # Effacer le contexte en attente
+                context_manager.clear_pending(tenant_id)
+
+                # Traiter la requête complète
+                message = combined_query
 
             # Logique de réponse avec système JSON
             rag_result = None
             use_fallback = False
             fallback_reason = ""
 
-            # Essayer le RAG Engine avec système JSON
             rag_engine = get_rag_engine()
             if rag_engine and safe_get_attribute(rag_engine, "is_initialized", False):
                 try:
                     if hasattr(rag_engine, "generate_response"):
                         try:
-                            # ✅ MODIFICATION 1: Ajout de enable_preprocessing=True
                             rag_result = await rag_engine.generate_response(
                                 query=message,
                                 tenant_id=tenant_id,
@@ -512,8 +634,67 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                                 use_json_search=use_json_search,
                                 genetic_line_filter=genetic_line_filter,
                                 performance_context=performance_context,
-                                enable_preprocessing=True,  # ✅ AJOUTÉ
+                                enable_preprocessing=True,
                             )
+
+                            # 🆕 ÉTAPE 2: Vérifier si contexte insuffisant
+                            if hasattr(rag_result, "metadata"):
+                                validation_status = rag_result.metadata.get(
+                                    "validation_status"
+                                )
+
+                                if validation_status == "needs_fallback":
+                                    logger.warning(
+                                        f"⚠️ Contexte insuffisant détecté pour {tenant_id}"
+                                    )
+
+                                    missing_fields = rag_result.metadata.get(
+                                        "missing_fields", []
+                                    )
+                                    suggestions = rag_result.metadata.get(
+                                        "suggestions", {}
+                                    )
+
+                                    # Marquer comme en attente de clarification
+                                    context_manager.mark_pending(
+                                        tenant_id=tenant_id,
+                                        original_query=message,
+                                        missing_fields=missing_fields,
+                                        suggestions=suggestions,
+                                        language=language,
+                                    )
+
+                                    # Générer question de clarification
+                                    clarification_msg = generate_clarification_question(
+                                        missing_fields=missing_fields,
+                                        suggestions=suggestions,
+                                        language=language,
+                                    )
+
+                                    # Créer un résultat spécial pour la clarification
+                                    class ClarificationResult:
+                                        def __init__(self, question, missing):
+                                            self.answer = question
+                                            self.source = "needs_clarification"
+                                            self.confidence = 0.9
+                                            self.processing_time = (
+                                                time.time() - total_start_time
+                                            )
+                                            self.metadata = {
+                                                "needs_clarification": True,
+                                                "missing_fields": missing,
+                                                "original_query": message,
+                                                "clarification_pending": True,
+                                            }
+                                            self.context_docs = []
+
+                                    rag_result = ClarificationResult(
+                                        clarification_msg, missing_fields
+                                    )
+                                    logger.info(
+                                        f"❓ Question de clarification générée: {clarification_msg[:100]}..."
+                                    )
+
                             logger.info(
                                 f"RAG generate_response réussi (JSON: {use_json_search}, preprocessing: enabled)"
                             )
@@ -538,7 +719,6 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                 use_fallback = True
                 fallback_reason = "rag_not_initialized"
 
-            # Utiliser réponses aviculture au lieu de OOD
             if use_fallback or not rag_result:
                 logger.info(
                     f"Utilisation fallback aviculture - Raison: {fallback_reason}"
@@ -546,7 +726,6 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
 
                 aviculture_response = get_aviculture_response(message, language)
 
-                # Créer un objet résultat simulé
                 class FallbackResult:
                     def __init__(self, answer, reason):
                         self.answer = answer
@@ -565,7 +744,6 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
 
                 rag_result = FallbackResult(aviculture_response, fallback_reason)
 
-            # Enregistrer métriques
             total_processing_time = time.time() - total_start_time
             metrics_collector.record_query(
                 rag_result, "rag_enhanced_json", total_processing_time
@@ -574,7 +752,6 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             # Streaming de la réponse
             async def generate_response():
                 try:
-                    # Informations de début avec sérialisation sécurisée
                     metadata = safe_get_attribute(rag_result, "metadata", {}) or {}
                     source = safe_get_attribute(rag_result, "source", "unknown")
                     confidence = safe_get_attribute(rag_result, "confidence", 0.5)
@@ -582,7 +759,6 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                         rag_result, "processing_time", 0
                     )
 
-                    # Convertir source enum si nécessaire
                     if hasattr(source, "value"):
                         source = source.value
                     else:
@@ -596,10 +772,12 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                         "fallback_used": safe_dict_get(
                             metadata, "fallback_used", False
                         ),
-                        "architecture": "modular-endpoints-json",
+                        "architecture": "modular-endpoints-json-contextualized",
                         "serialization_version": "optimized_cached",
                         "preprocessing_enabled": True,
-                        # NOUVELLES MÉTADONNÉES JSON
+                        "needs_clarification": metadata.get(
+                            "needs_clarification", False
+                        ),
                         "json_system_used": metadata.get("json_system", {}).get(
                             "used", False
                         ),
@@ -611,10 +789,8 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                         ),
                     }
 
-                    # Sérialisation sécurisée du message de début
                     yield sse_event(safe_serialize_for_json(start_data))
 
-                    # Contenu de la réponse
                     answer = safe_get_attribute(rag_result, "answer", "")
                     if not answer:
                         answer = safe_get_attribute(rag_result, "response", "")
@@ -631,21 +807,17 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                             )
                             await asyncio.sleep(0.01)
 
-                    # Informations finales
                     context_docs = safe_get_attribute(rag_result, "context_docs", [])
                     if not isinstance(context_docs, list):
                         context_docs = []
 
-                    # Extraire documents_used des métadonnées
                     documents_used = 0
                     if hasattr(rag_result, "metadata") and rag_result.metadata:
                         documents_used = rag_result.metadata.get("documents_used", 0)
 
-                    # Si pas trouvé dans metadata, fallback sur context_docs
                     if documents_used == 0:
                         documents_used = len(context_docs)
 
-                    # Logs debug niveau DEBUG
                     logger.debug(
                         f"DEBUG API: documents_used dans la réponse = {documents_used}"
                     )
@@ -662,9 +834,14 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                         "confidence": float(confidence),
                         "documents_used": documents_used,
                         "source": source,
-                        "architecture": "modular-endpoints-json",
+                        "architecture": "modular-endpoints-json-contextualized",
                         "preprocessing_enabled": True,
-                        # NOUVELLES MÉTADONNÉES FINALES
+                        "needs_clarification": metadata.get(
+                            "needs_clarification", False
+                        ),
+                        "clarification_pending": metadata.get(
+                            "clarification_pending", False
+                        ),
                         "json_system_used": metadata.get("json_system", {}).get(
                             "used", False
                         ),
@@ -678,8 +855,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
 
                     yield sse_event(safe_serialize_for_json(end_data))
 
-                    # Enregistrer en mémoire si tout est OK
-                    if answer and source:
+                    if answer and source and not metadata.get("needs_clarification"):
                         add_to_conversation_memory(
                             tenant_id, message, str(answer), "rag_enhanced_json"
                         )
@@ -707,7 +883,6 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
         total_start_time = time.time()
 
         try:
-            # Conversion du contexte performance
             performance_context = None
             if request.performance_metrics or request.age_range:
                 performance_context = {}
@@ -716,13 +891,11 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                 if request.age_range:
                     performance_context["age_range"] = request.age_range
 
-            # Logique de réponse avec RAG Engine
             rag_result = None
             rag_engine = get_rag_engine()
 
             if rag_engine and safe_get_attribute(rag_engine, "is_initialized", False):
                 try:
-                    # ✅ MODIFICATION 2: Ajout de enable_preprocessing=True
                     rag_result = await rag_engine.generate_response(
                         query=request.question,
                         tenant_id=request.user_id or str(uuid.uuid4())[:8],
@@ -730,7 +903,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                         use_json_search=request.use_json_search,
                         genetic_line_filter=request.genetic_line,
                         performance_context=performance_context,
-                        enable_preprocessing=True,  # ✅ AJOUTÉ
+                        enable_preprocessing=True,
                     )
                 except Exception as e:
                     logger.error(f"Erreur expert chat: {e}")
@@ -740,12 +913,10 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             else:
                 raise HTTPException(status_code=503, detail="RAG Engine non disponible")
 
-            # Streaming de la réponse expert
             async def generate_expert_response():
                 try:
                     metadata = safe_get_attribute(rag_result, "metadata", {}) or {}
 
-                    # Métadonnées expert enrichies
                     expert_metadata = {
                         "type": "expert_start",
                         "question": request.question,
@@ -759,15 +930,13 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                             safe_get_attribute(rag_result, "confidence", 0.5)
                         ),
                         "json_system": metadata.get("json_system", {}),
-                        "architecture": "expert_chat_json",
+                        "architecture": "expert_chat_json_contextualized",
                     }
 
                     yield sse_event(safe_serialize_for_json(expert_metadata))
 
-                    # Contenu de la réponse
                     answer = safe_get_attribute(rag_result, "answer", "")
                     if answer:
-                        # Adaptation du format de réponse
                         if request.response_format == "ultra_concise":
                             chunks = smart_chunk_text(
                                 str(answer)[:200] + "...", STREAM_CHUNK_LEN
@@ -790,7 +959,6 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                             )
                             await asyncio.sleep(0.01)
 
-                    # Fin expert avec métadonnées détaillées
                     end_metadata = {
                         "type": "expert_end",
                         "total_time": time.time() - total_start_time,
@@ -828,7 +996,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             )
 
     # ========================================================================
-    # ENDPOINT OOD (CONSERVÉ)
+    # ENDPOINT OOD
     # ========================================================================
 
     @router.post(f"{BASE_PATH}/ood")
@@ -844,7 +1012,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     {
                         "type": "start",
                         "reason": "out_of_domain",
-                        "architecture": "modular-endpoints-json",
+                        "architecture": "modular-endpoints-json-contextualized",
                     }
                 )
 
@@ -857,7 +1025,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     {
                         "type": "end",
                         "confidence": 1.0,
-                        "architecture": "modular-endpoints-json",
+                        "architecture": "modular-endpoints-json-contextualized",
                     }
                 )
 
@@ -868,7 +1036,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             return JSONResponse(status_code=500, content={"error": str(e)})
 
     # ========================================================================
-    # ENDPOINTS DE TEST AVEC SYSTÈME JSON
+    # ENDPOINTS DE TEST
     # ========================================================================
 
     @router.post(f"{BASE_PATH}/chat/test-json-system")
@@ -881,7 +1049,6 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             if not rag_engine:
                 return {"error": "RAG Engine non disponible"}
 
-            # Test 1: Validation JSON
             try:
                 test_json = {
                     "title": "Test Ross 308 Performance",
@@ -907,7 +1074,6 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             except Exception as e:
                 test_results["json_validation"] = {"success": False, "error": str(e)}
 
-            # Test 2: Recherche JSON
             try:
                 if hasattr(rag_engine, "search_json_enhanced"):
                     search_results = await rag_engine.search_json_enhanced(
@@ -926,14 +1092,12 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             except Exception as e:
                 test_results["json_search"] = {"success": False, "error": str(e)}
 
-            # Test 3: Génération avec JSON
             try:
-                # ✅ MODIFICATION 3: Ajout de enable_preprocessing=True
                 generation_result = await rag_engine.generate_response(
                     query="Quel est le poids cible Ross 308 à 35 jours ?",
                     use_json_search=True,
                     genetic_line_filter="ross308",
-                    enable_preprocessing=True,  # ✅ AJOUTÉ
+                    enable_preprocessing=True,
                 )
 
                 metadata = getattr(generation_result, "metadata", {})
@@ -950,7 +1114,6 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             except Exception as e:
                 test_results["json_generation"] = {"success": False, "error": str(e)}
 
-            # Test 4: Status système JSON
             try:
                 status = rag_engine.get_status()
                 json_system_status = status.get("json_system", {})
@@ -962,7 +1125,6 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             except Exception as e:
                 test_results["json_system_status"] = {"success": False, "error": str(e)}
 
-            # Analyse globale
             successful_tests = sum(
                 1 for result in test_results.values() if result.get("success", False)
             )
@@ -981,7 +1143,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     if successful_tests == total_tests
                     else "DEGRADED" if successful_tests > 0 else "FAILED"
                 ),
-                "version": "4.1_preprocessed",
+                "version": "4.2_contextualized",
             }
 
             return safe_serialize_for_json(analysis)
@@ -1011,19 +1173,17 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                 try:
                     start_time = time.time()
 
-                    # ✅ MODIFICATION 4: Ajout de enable_preprocessing=True
                     result = await rag_engine.generate_response(
                         query=query,
                         tenant_id="test_ross308",
                         language="fr",
                         use_json_search=True,
                         genetic_line_filter="ross308",
-                        enable_preprocessing=True,  # ✅ AJOUTÉ
+                        enable_preprocessing=True,
                     )
 
                     processing_time = time.time() - start_time
 
-                    # Analyse du résultat
                     source = getattr(result, "source", None)
                     source_value = (
                         source.value if hasattr(source, "value") else str(source)
@@ -1039,7 +1199,6 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                         result, "response", ""
                     )
 
-                    # Analyse du contenu
                     has_specific_data = any(
                         term in response_text.lower()
                         for term in ["gramme", "kg", "g)", "poids", "weight", "17"]
@@ -1078,7 +1237,6 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                 except Exception as e:
                     results[query] = {"error": str(e), "success": False}
 
-            # Analyse globale avec système JSON
             total_docs_used = sum(
                 r.get("documents_used", 0)
                 for r in results.values()
@@ -1114,10 +1272,9 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     "json_system_effectiveness": queries_with_json / len(test_queries),
                 },
                 "recommendations": [],
-                "version": "4.1_preprocessed",
+                "version": "4.2_contextualized",
             }
 
-            # Recommandations basées sur les résultats
             if total_json_results == 0 and queries_with_json == 0:
                 analysis["recommendations"].append(
                     "CRITIQUE: Système JSON non utilisé - vérifier l'intégration"
@@ -1149,19 +1306,17 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
 
             stats = conversation_memory.get_stats()
 
-            # Informations détaillées si disponibles
             detailed_stats = {**stats, "recent_tenants": [], "memory_usage_bytes": 0}
 
-            # Échantillon des tenants récents (sans exposer les données)
             recent_count = 0
             for tenant_id, tenant_data in conversation_memory.items():
-                if recent_count >= 5:  # Limite à 5 exemples
+                if recent_count >= 5:
                     break
 
                 if isinstance(tenant_data, dict):
                     detailed_stats["recent_tenants"].append(
                         {
-                            "tenant_id": tenant_id[:8] + "...",  # Partiellement masqué
+                            "tenant_id": tenant_id[:8] + "...",
                             "conversation_count": len(tenant_data.get("data", [])),
                             "last_query_preview": tenant_data.get("last_query", "")[:50]
                             + "...",
@@ -1170,7 +1325,6 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     )
                     recent_count += 1
 
-            # Estimation de l'usage mémoire
             try:
                 import sys
 

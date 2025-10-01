@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 data_models.py - Classes et structures de données pour RAG Engine
-VERSION CORRIGÉE COMPLÈTE - Tous les RAGSource nécessaires ajoutés
+VERSION 4.2 - Support contextualisation + tous les RAGSource nécessaires
 """
 
 from typing import Dict, List, Optional, Any
@@ -23,9 +23,14 @@ class RAGSource(Enum):
     FALLBACK_NEEDED = "fallback_needed"
     OOD_FILTERED = "ood_filtered"
 
-    # CORRECTION CRITIQUE - Sources manquantes qui causaient les erreurs
+    # Sources de résultats vides
     NO_RESULTS = "no_results"
     NO_DOCUMENTS_FOUND = "no_documents_found"
+
+    # 🆕 NOUVEAUX STATUTS POUR CONTEXTUALISATION
+    INSUFFICIENT_CONTEXT = "insufficient_context"
+    NEEDS_CLARIFICATION = "needs_clarification"
+    AWAITING_USER_INPUT = "awaiting_user_input"
 
     # Erreurs spécifiques par étape
     EMBEDDING_FAILED = "embedding_failed"
@@ -58,13 +63,22 @@ class RAGSource(Enum):
             self.GENERATION_FAILED,
             self.INTERNAL_ERROR,
             self.ERROR,
-            self.NO_RESULTS,  # Ajouté dans les erreurs
+            self.NO_RESULTS,
         }
 
     @property
     def is_fallback(self) -> bool:
         """Indique si la source nécessite un fallback"""
         return self in {self.FALLBACK_NEEDED, self.OOD_FILTERED}
+
+    @property
+    def is_clarification_needed(self) -> bool:
+        """🆕 Indique si la source nécessite une clarification utilisateur"""
+        return self in {
+            self.INSUFFICIENT_CONTEXT,
+            self.NEEDS_CLARIFICATION,
+            self.AWAITING_USER_INPUT,
+        }
 
     @property
     def needs_retry(self) -> bool:
@@ -83,9 +97,7 @@ class RAGResult:
     source: RAGSource
     answer: Optional[str] = None
     confidence: float = 0.0
-    context_docs: List[Dict] = field(
-        default_factory=list
-    )  # CORRECTION: context_docs pas documents
+    context_docs: List[Dict] = field(default_factory=list)
     processing_time: float = 0.0
     metadata: Dict[str, Any] = field(default_factory=dict)
     verification_status: Optional[Dict] = None
@@ -103,6 +115,9 @@ class RAGResult:
         self.metadata.setdefault("result_type", self.source.value)
         self.metadata.setdefault("is_success", self.source.is_success)
         self.metadata.setdefault("is_error", self.source.is_error)
+        self.metadata.setdefault(
+            "is_clarification_needed", self.source.is_clarification_needed
+        )
         self.metadata.setdefault("timestamp", self.timestamp)
 
     @property
@@ -119,6 +134,11 @@ class RAGResult:
     def should_retry(self) -> bool:
         """Indique si la requête devrait être retentée"""
         return self.source.needs_retry
+
+    @property
+    def needs_clarification(self) -> bool:
+        """🆕 Indique si le résultat nécessite une clarification utilisateur"""
+        return self.source.is_clarification_needed
 
     @property
     def documents(self) -> List[Dict]:
@@ -143,6 +163,7 @@ class RAGResult:
             "timestamp": self.timestamp,
             "is_valid": self.is_valid,
             "should_retry": self.should_retry,
+            "needs_clarification": self.needs_clarification,
         }
 
 
@@ -236,11 +257,79 @@ class QueryContext:
     session_id: Optional[str] = None
     timestamp: float = field(default_factory=time.time)
 
+    # 🆕 NOUVEAUX CHAMPS POUR CONTEXTUALISATION
+    pending_clarification: bool = False
+    missing_fields: List[str] = field(default_factory=list)
+    original_query: Optional[str] = None
+
     def __post_init__(self):
         if self.conversation_history is None:
             self.conversation_history = []
         if self.user_preferences is None:
             self.user_preferences = {}
+        if self.missing_fields is None:
+            self.missing_fields = []
+
+    def mark_clarification_needed(self, missing: List[str], original: str):
+        """🆕 Marque le contexte comme nécessitant une clarification"""
+        self.pending_clarification = True
+        self.missing_fields = missing
+        self.original_query = original
+
+    def clear_clarification(self):
+        """🆕 Efface l'état de clarification"""
+        self.pending_clarification = False
+        self.missing_fields = []
+        self.original_query = None
+
+
+@dataclass
+class ValidationResult:
+    """🆕 Résultat de validation d'entités pour contextualisation"""
+
+    status: str  # "complete", "incomplete_but_processable", "needs_fallback"
+    enhanced_entities: Dict[str, Any] = field(default_factory=dict)
+    missing_fields: List[str] = field(default_factory=list)
+    suggestions: Dict[str, List[str]] = field(default_factory=dict)
+    helpful_message: Optional[str] = None
+    confidence: float = 0.0
+
+    def __post_init__(self):
+        if self.enhanced_entities is None:
+            self.enhanced_entities = {}
+        if self.missing_fields is None:
+            self.missing_fields = []
+        if self.suggestions is None:
+            self.suggestions = {}
+
+    @property
+    def is_complete(self) -> bool:
+        """Vérifie si la validation est complète"""
+        return self.status == "complete"
+
+    @property
+    def needs_clarification(self) -> bool:
+        """Vérifie si une clarification est nécessaire"""
+        return self.status == "needs_fallback"
+
+    @property
+    def can_proceed(self) -> bool:
+        """Vérifie si on peut procéder malgré des infos manquantes"""
+        return self.status in ["complete", "incomplete_but_processable"]
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convertit en dictionnaire"""
+        return {
+            "status": self.status,
+            "enhanced_entities": self.enhanced_entities,
+            "missing_fields": self.missing_fields,
+            "suggestions": self.suggestions,
+            "helpful_message": self.helpful_message,
+            "confidence": self.confidence,
+            "is_complete": self.is_complete,
+            "needs_clarification": self.needs_clarification,
+            "can_proceed": self.can_proceed,
+        }
 
 
 # Aliases pour compatibilité avec l'ancien code

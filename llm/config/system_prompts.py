@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 system_prompts.py - Helper pour charger et utiliser les prompts système
-Version: 1.1.0 - Résolution de chemin robuste
+Version: 4.2.0 - Support contextualisation et clarifications
 """
 
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 logger = logging.getLogger(__name__)
 
@@ -245,6 +245,129 @@ class SystemPromptsManager:
             logger.error(f"Variable manquante dans message erreur: {e}")
             return message
 
+    # 🆕 ================================================================
+    # NOUVELLES MÉTHODES POUR CONTEXTUALISATION
+    # ================================================================
+
+    def get_clarification_template(
+        self,
+        missing_field: str,
+        language: str = "fr",
+        suggestions: Optional[List[str]] = None,
+    ) -> str:
+        """
+        🆕 Récupère un template de question de clarification
+
+        Args:
+            missing_field: Champ manquant ("breed", "age_days", "sex", etc.)
+            language: Langue de la question
+            suggestions: Liste de suggestions à inclure (optionnel)
+
+        Returns:
+            Question de clarification formatée
+
+        Examples:
+            >>> manager = SystemPromptsManager()
+            >>> question = manager.get_clarification_template(
+            ...     "breed",
+            ...     "fr",
+            ...     suggestions=["Ross 308", "Cobb 500"]
+            ... )
+        """
+        clarifications = self.prompts.get("clarification_prompts", {})
+
+        # Construire la clé: missing_breed_fr, missing_age_fr, etc.
+        template_key = f"missing_{missing_field}_{language}"
+
+        template = clarifications.get(template_key)
+
+        if not template:
+            logger.warning(f"Template de clarification non trouvé: {template_key}")
+            # Fallback générique
+            if language == "fr":
+                template = f"Pourriez-vous préciser {missing_field} ?"
+            else:
+                template = f"Could you specify {missing_field}?"
+
+        # Ajouter suggestions si fournies
+        if suggestions and len(suggestions) > 0:
+            suggestions_text = ", ".join(suggestions[:5])  # Max 5 suggestions
+            if language == "fr":
+                template += f"\n\nSuggestions : {suggestions_text}"
+            else:
+                template += f"\n\nSuggestions: {suggestions_text}"
+
+        return template
+
+    def get_multiple_clarifications_template(
+        self, missing_fields: List[str], language: str = "fr"
+    ) -> str:
+        """
+        🆕 Génère un template pour plusieurs champs manquants
+
+        Args:
+            missing_fields: Liste des champs manquants
+            language: Langue
+
+        Returns:
+            Question de clarification combinée
+        """
+        clarifications = self.prompts.get("clarification_prompts", {})
+
+        # Template pour plusieurs champs
+        multi_key = f"multiple_{language}"
+        multi_template = clarifications.get(multi_key, "")
+
+        if not multi_template:
+            if language == "fr":
+                multi_template = "Pour vous aider au mieux, j'ai besoin de quelques précisions :\n{details}"
+            else:
+                multi_template = (
+                    "To help you best, I need a few clarifications:\n{details}"
+                )
+
+        # Construire la liste des questions
+        details = []
+        for field in missing_fields:
+            # Récupérer template individuel sans suggestions
+            field_question = self.get_clarification_template(field, language)
+            # Extraire juste la question (avant les suggestions)
+            main_question = field_question.split("\n\n")[0]
+            details.append(f"- {main_question}")
+
+        details_text = "\n".join(details)
+
+        return multi_template.format(details=details_text)
+
+    def get_clarification_confirmation(self, language: str = "fr") -> str:
+        """
+        🆕 Message de confirmation après clarification
+
+        Args:
+            language: Langue
+
+        Returns:
+            Message de confirmation
+        """
+        clarifications = self.prompts.get("clarification_prompts", {})
+
+        confirm_key = f"confirmation_{language}"
+        confirmation = clarifications.get(confirm_key)
+
+        if not confirmation:
+            if language == "fr":
+                confirmation = (
+                    "Merci pour ces précisions ! Je peux maintenant vous répondre."
+                )
+            else:
+                confirmation = (
+                    "Thank you for the clarification! I can now answer your question."
+                )
+
+        return confirmation
+
+    # ================================================================
+
     def build_complete_prompt(
         self,
         intent_type: str,
@@ -364,6 +487,27 @@ def get_prompt(
         return None
 
 
+def get_clarification_question(
+    missing_field: str, language: str = "fr", suggestions: Optional[List[str]] = None
+) -> str:
+    """
+    🆕 Helper simplifié pour générer une question de clarification
+
+    Args:
+        missing_field: Champ manquant
+        language: Langue
+        suggestions: Suggestions optionnelles
+
+    Returns:
+        Question de clarification
+
+    Examples:
+        >>> question = get_clarification_question("breed", "fr", ["Ross 308", "Cobb 500"])
+    """
+    manager = get_prompts_manager()
+    return manager.get_clarification_template(missing_field, language, suggestions)
+
+
 # ============================================================================
 # TESTS
 # ============================================================================
@@ -374,7 +518,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 
     print("=" * 70)
-    print("TESTS SYSTEM PROMPTS MANAGER")
+    print("TESTS SYSTEM PROMPTS MANAGER v4.2")
     print("=" * 70)
 
     # Test 1: Chargement
@@ -439,6 +583,36 @@ if __name__ == "__main__":
     status = "OK" if complete and len(complete) > 200 else "MANQUANT"
     print(f"  {status} Prompt complet: {len(complete)} chars")
 
+    # 🆕 Test 7: Templates de clarification
+    print("\nTest 7: Templates de clarification (NOUVEAU)")
+
+    # Test clarification simple
+    clarif_breed = manager.get_clarification_template(
+        "breed", "fr", suggestions=["Ross 308", "Cobb 500", "Hubbard"]
+    )
+    status = "OK" if clarif_breed else "MANQUANT"
+    print(f"  {status} Clarification breed (FR):")
+    print(f"    {clarif_breed[:100]}...")
+
+    # Test clarification multiple
+    clarif_multi = manager.get_multiple_clarifications_template(
+        ["breed", "age_days"], "fr"
+    )
+    status = "OK" if clarif_multi else "MANQUANT"
+    print(f"  {status} Clarification multiple (FR):")
+    print(f"    {clarif_multi[:100]}...")
+
+    # Test confirmation
+    confirmation = manager.get_clarification_confirmation("fr")
+    status = "OK" if confirmation else "MANQUANT"
+    print(f"  {status} Confirmation: {confirmation}")
+
+    # 🆕 Test 8: Helper function
+    print("\nTest 8: Helper function get_clarification_question")
+    question = get_clarification_question("breed", "en", ["Ross 308", "Cobb 500"])
+    status = "OK" if question else "MANQUANT"
+    print(f"  {status} Helper result: {question[:80]}...")
+
     print("\n" + "=" * 70)
-    print("TESTS TERMINÉS")
+    print("TESTS TERMINÉS - Version 4.2 avec contextualisation")
     print("=" * 70)
