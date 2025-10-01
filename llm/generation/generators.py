@@ -455,6 +455,12 @@ class EnhancedResponseGenerator:
     ) -> Tuple[str, str]:
         """Construit un prompt enrichi avec instructions de langue renforcées"""
 
+        # DEBUG CRITIQUE : Logger la langue reçue
+        logger.info(
+            f"🌍 _build_enhanced_prompt received language parameter: '{language}'"
+        )
+        logger.debug(f"Query: '{query[:50]}...'")
+
         # Contexte documentaire
         context_text = "\n\n".join(
             [
@@ -531,9 +537,22 @@ RÉPONSE EXPERTE (affirmative, structurée, sans mention de sources):"""
 
     def _get_critical_language_instructions(self, language: str) -> str:
         """
-        ✅ NOUVEAU: Instructions de langue ULTRA-RENFORCÉES + Comportement conversationnel
-        Garantit que le LLM répond dans la langue de la question avec ton approprié
+        Instructions de langue ULTRA-RENFORCÉES avec vérification et logs
+        Garantit que le LLM répond dans la langue de la question
         """
+
+        # DEBUG CRITIQUE : Logger la langue reçue
+        logger.info(f"🌍 _get_critical_language_instructions received: '{language}'")
+
+        # VÉRIFICATION DÉFENSIVE : Alerter si langue suspecte
+        if not language:
+            logger.error("❌ CRITICAL: language parameter is empty/None!")
+            language = "en"  # Fallback sécurisé
+        elif language == "fr":
+            logger.warning(
+                "⚠️ WARNING: language='fr' received - might be unwanted default"
+            )
+
         # Mapping des noms de langue
         language_names = {
             "en": "ENGLISH",
@@ -551,6 +570,9 @@ RÉPONSE EXPERTE (affirmative, structurée, sans mention de sources):"""
         }
 
         language_name = language_names.get(language, language.upper())
+
+        # DEBUG : Logger le résultat du mapping
+        logger.info(f"🌍 Language mapped: '{language}' → '{language_name}'")
 
         return f"""
 INSTRUCTIONS CRITIQUES - STRUCTURE ET FORMAT:
