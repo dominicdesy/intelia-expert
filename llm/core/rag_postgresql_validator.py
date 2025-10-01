@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
-VERSION 4.0: Contextualisation intelligente - Messages conversationnels
+VERSION 4.1: Fusion OpenAI + Contextualisation intelligente
 - Préserve tous les champs originaux
 - Logs diagnostiques
 - Invalidation des métriques invalides
 - Auto-détection enrichie dynamique
 - 🆕 Messages de clarification conversationnels multilingues
 - 🆕 Génération de questions plutôt que de simples messages d'erreur
+- 🆕 FUSION avec OpenAI interpretation avant validation
 """
 
 import re
@@ -37,11 +38,65 @@ class PostgreSQLValidator:
             f"({len(self.breeds_registry.get_all_breeds())} races)"
         )
 
+    def validate_context(
+        self, entities: Dict, query: str, language: str = "fr"
+    ) -> Dict:
+        """
+        🆕 Valide le contexte avec fusion OpenAI AVANT validation
+
+        Args:
+            entities: Entités extraites (peut contenir _openai_interpretation)
+            query: Requête utilisateur
+            language: Langue détectée
+
+        Returns:
+            Dict avec status et missing_fields après fusion
+        """
+        # ✅ FUSION: Récupérer les entités OpenAI si disponibles
+        openai_interp = entities.get("_openai_interpretation", {})
+
+        # Enrichir avec OpenAI AVANT validation
+        if openai_interp:
+            if not entities.get("age_days") and "age_days" in openai_interp:
+                entities["age_days"] = openai_interp["age_days"]
+                logger.info(
+                    f"✅ Age récupéré depuis OpenAI: {openai_interp['age_days']}"
+                )
+
+            if not entities.get("breed") and "breed" in openai_interp:
+                entities["breed"] = openai_interp["breed"]
+                logger.info(
+                    f"✅ Breed récupéré depuis OpenAI: {openai_interp['breed']}"
+                )
+
+            if not entities.get("metric_type") and "metric_type" in openai_interp:
+                entities["metric_type"] = openai_interp["metric_type"]
+                logger.info(
+                    f"✅ Metric récupéré depuis OpenAI: {openai_interp['metric_type']}"
+                )
+
+        # MAINTENANT valider ce qui manque vraiment
+        missing_fields = []
+        if not entities.get("breed"):
+            missing_fields.append("breed")
+        if not entities.get("age_days"):  # Ne sera plus None car fusionné!
+            missing_fields.append("age")
+        if not entities.get("metric") and not entities.get("metric_type"):
+            missing_fields.append("metric")
+
+        return {
+            "status": "complete" if not missing_fields else "needs_fallback",
+            "missing_fields": missing_fields,
+            "enhanced_entities": entities,
+        }
+
     def flexible_query_validation(
         self, query: str, entities: Dict[str, Any], language: str = "fr"
     ) -> Dict[str, Any]:
         """
         Validation flexible qui essaie de compléter les requêtes incomplètes
+
+        🆕 VERSION 4.1: Fusion avec OpenAI interpretation AVANT validation
 
         CORRECTION FINALE: Commence toujours par les entités ORIGINALES,
         puis enrichit SEULEMENT les champs manquants avec auto-détection.
@@ -49,7 +104,7 @@ class PostgreSQLValidator:
 
         Args:
             query: Requête utilisateur
-            entities: Entités extraites
+            entities: Entités extraites (peut contenir _openai_interpretation)
             language: Langue détectée (fr, en, es, etc.)
 
         Returns:
@@ -82,8 +137,38 @@ class PostgreSQLValidator:
         # Cela préserve automatiquement 'sex', 'explicit_sex_request', etc.
         enhanced_entities = dict(entities) if entities else {}
 
-        # 🔥 LOG CRITIQUE #2 : Juste après dict(entities)
-        logger.debug(f"🔍 enhanced_entities AFTER dict(entities): {enhanced_entities}")
+        # 🆕 FUSION OpenAI: Récupérer les entités OpenAI si disponibles
+        openai_interp = enhanced_entities.get("_openai_interpretation", {})
+
+        if openai_interp:
+            logger.debug(f"🔍 OpenAI interpretation trouvée: {openai_interp}")
+
+            # Enrichir UNIQUEMENT les champs manquants avec OpenAI
+            if not enhanced_entities.get("age_days") and "age_days" in openai_interp:
+                enhanced_entities["age_days"] = openai_interp["age_days"]
+                logger.info(
+                    f"✅ Age récupéré depuis OpenAI: {openai_interp['age_days']}"
+                )
+
+            if not enhanced_entities.get("breed") and "breed" in openai_interp:
+                enhanced_entities["breed"] = openai_interp["breed"]
+                logger.info(
+                    f"✅ Breed récupéré depuis OpenAI: {openai_interp['breed']}"
+                )
+
+            if (
+                not enhanced_entities.get("metric_type")
+                and "metric_type" in openai_interp
+            ):
+                enhanced_entities["metric_type"] = openai_interp["metric_type"]
+                logger.info(
+                    f"✅ Metric récupéré depuis OpenAI: {openai_interp['metric_type']}"
+                )
+
+        # 🔥 LOG CRITIQUE #2 : Juste après dict(entities) et fusion OpenAI
+        logger.debug(
+            f"🔍 enhanced_entities AFTER dict(entities) + OpenAI fusion: {enhanced_entities}"
+        )
         logger.debug(
             f"🔍 AFTER COPY - 'sex' present: {'sex' in enhanced_entities}, value: {enhanced_entities.get('sex')}"
         )
@@ -113,7 +198,7 @@ class PostgreSQLValidator:
                 )
                 enhanced_entities["metric_type"] = None
 
-        # 🟢 Auto-détection breed SEULEMENT si absent dans les entités originales
+        # 🟢 Auto-détection breed SEULEMENT si absent dans les entités originales ET OpenAI
         if not enhanced_entities.get("breed"):
             logger.debug("🔍 Breed ABSENT, auto-detecting from query...")
             detected_breed = self._detect_breed_from_query(query)
@@ -130,7 +215,7 @@ class PostgreSQLValidator:
                 f"🔍 Breed PRESENT: '{enhanced_entities.get('breed')}', skipping auto-detection"
             )
 
-        # 🟢 Auto-détection age SEULEMENT si absent dans les entités originales
+        # 🟢 Auto-détection age SEULEMENT si absent dans les entités originales ET OpenAI
         if not enhanced_entities.get("age_days"):
             logger.debug("🔍 Age ABSENT, auto-detecting from query...")
             detected_age = self._detect_age_from_query(query)
@@ -645,7 +730,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     print("=" * 70)
-    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION CONTEXTUALISATION")
+    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION FUSION OPENAI")
     print("=" * 70)
 
     validator = PostgreSQLValidator()
@@ -723,6 +808,72 @@ if __name__ == "__main__":
         if result["status"] == "needs_fallback":
             print(f"  → Question: {result['helpful_message']}")
 
+    # 🆕 Test 4: Fusion avec OpenAI interpretation
+    print("\n🆕 Test 4: Fusion avec OpenAI interpretation")
+    test_openai_fusion = [
+        {
+            "query": "Quel est le poids?",
+            "entities": {
+                "_openai_interpretation": {
+                    "breed": "Ross 308",
+                    "age_days": 21,
+                    "metric_type": "body_weight",
+                }
+            },
+            "language": "fr",
+        },
+        {
+            "query": "FCR comparison",
+            "entities": {
+                "sex": "male",
+                "_openai_interpretation": {"breed": "Cobb 500", "age_days": 35},
+            },
+            "language": "en",
+        },
+    ]
+
+    for test in test_openai_fusion:
+        print(f"\n  Query: {test['query']}")
+        print(f"  Input entities: {test['entities']}")
+
+        result = validator.flexible_query_validation(
+            test["query"], test["entities"], test["language"]
+        )
+
+        print(f"  → Status: {result['status']}")
+        if "enhanced_entities" in result:
+            print(f"  → Enhanced: {result['enhanced_entities']}")
+            print(f"  → Sex preserved: {result['enhanced_entities'].get('sex')}")
+
+    # 🆕 Test 5: validate_context avec fusion
+    print("\n🆕 Test 5: validate_context avec fusion OpenAI")
+    test_validate_context = {
+        "query": "Compare weight",
+        "entities": {
+            "sex": "female",
+            "_openai_interpretation": {
+                "breed": "Ross 308",
+                "age_days": 28,
+                "metric_type": "body_weight",
+            },
+        },
+        "language": "en",
+    }
+
+    print(f"\n  Query: {test_validate_context['query']}")
+    print(f"  Input entities: {test_validate_context['entities']}")
+
+    result = validator.validate_context(
+        test_validate_context["entities"],
+        test_validate_context["query"],
+        test_validate_context["language"],
+    )
+
+    print(f"  → Status: {result['status']}")
+    print(f"  → Missing fields: {result.get('missing_fields', [])}")
+    print(f"  → Enhanced entities: {result['enhanced_entities']}")
+    print(f"  → Sex preserved: {result['enhanced_entities'].get('sex')}")
+
     print("\n" + "=" * 70)
-    print("✅ TESTS TERMINÉS - PostgreSQL Validator avec Contextualisation")
+    print("✅ TESTS TERMINÉS - PostgreSQL Validator avec Fusion OpenAI")
     print("=" * 70)
