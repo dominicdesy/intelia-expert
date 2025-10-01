@@ -2,7 +2,7 @@
 """
 rag_engine.py - RAG Engine Principal Refactorisé
 Point d'entrée principal avec délégation vers modules spécialisés
-VERSION REFACTORISÉE: Utilise les nouveaux modules centralisés
+VERSION REFACTORISÉE + MULTILINGUE : Transmission correcte du paramètre language
 """
 
 import asyncio
@@ -92,6 +92,7 @@ class InteliaRAGEngine:
     - Intègre EntityExtractor pour extraction centralisée
     - Utilise ValidationCore pour validation unifiée
     - ComparisonHandler est maintenant un wrapper vers ComparisonEngine
+    - ✅ CORRECTION MULTILINGUE: Transmission du paramètre language à tous les handlers
     """
 
     def __init__(self, openai_client: AsyncOpenAI = None):
@@ -131,9 +132,9 @@ class InteliaRAGEngine:
             "comparative_fallbacks": 0,
             "temporal_queries": 0,
             "optimization_queries": 0,
-            "calculation_queries": 0,  # Ajouté
-            "economic_queries": 0,  # Ajouté
-            "diagnostic_queries": 0,  # Ajouté
+            "calculation_queries": 0,
+            "economic_queries": 0,
+            "diagnostic_queries": 0,
             "postgresql_queries": 0,
             "errors_count": 0,
         }
@@ -143,7 +144,7 @@ class InteliaRAGEngine:
         if self.is_initialized:
             return
 
-        logger.info("🚀 Initialisation RAG Engine modulaire v2.0")
+        logger.info("🚀 Initialisation RAG Engine modulaire v2.0 (multilingue)")
         self.initialization_errors = []
 
         try:
@@ -192,7 +193,7 @@ class InteliaRAGEngine:
         # Query Preprocessor (refactorisé - n'accepte plus de paramètres)
         if QUERY_PREPROCESSOR_AVAILABLE and QueryPreprocessor:
             try:
-                self.query_preprocessor = QueryPreprocessor()  # ✅ CORRECTION ICI
+                self.query_preprocessor = QueryPreprocessor()
                 await self.query_preprocessor.initialize()
                 logger.info("✅ Query Preprocessor initialisé (refactorisé)")
             except Exception as e:
@@ -219,8 +220,7 @@ class InteliaRAGEngine:
                 logger.warning(f"⚠️ Weaviate Core échoué: {e}")
                 self.initialization_errors.append(f"WeaviateCore: {e}")
 
-        # 🔧 MODIFICATION 1: Comparison Handler (wrapper vers ComparisonEngine)
-        # Permettre l'initialisation même si PostgreSQL est None
+        # Comparison Handler (wrapper vers ComparisonEngine)
         if COMPARISON_HANDLER_AVAILABLE and ComparisonHandler:
             try:
                 self.comparison_handler = ComparisonHandler(self.postgresql_system)
@@ -241,12 +241,11 @@ class InteliaRAGEngine:
         # Configuration temporal handler
         self.temporal_handler.configure(postgresql_system=self.postgresql_system)
 
-        # 🔧 MODIFICATION 2: Configuration comparative handler
-        # Passer weaviate_core et postgresql_system
+        # Configuration comparative handler
         self.comparative_handler.configure(
             comparison_handler=self.comparison_handler,
-            weaviate_core=self.weaviate_core,  # AJOUT
-            postgresql_system=self.postgresql_system,  # AJOUT
+            weaviate_core=self.weaviate_core,
+            postgresql_system=self.postgresql_system,
         )
 
         # Configuration standard handler
@@ -282,6 +281,10 @@ class InteliaRAGEngine:
                 metadata={"error": "Query vide"},
             )
 
+        # ✅ CORRECTION: Utiliser langue fournie ou défaut "fr"
+        effective_language = language or "fr"
+        logger.info(f"🌍 generate_response reçoit langue: {effective_language}")
+
         # Fallback si système indisponible
         if self.degraded_mode and not self.postgresql_system:
             return RAGResult(
@@ -292,7 +295,7 @@ class InteliaRAGEngine:
 
         try:
             return await self._process_query(
-                query, language or "fr", enable_preprocessing, start_time
+                query, effective_language, enable_preprocessing, start_time
             )
         except Exception as e:
             logger.error(f"❌ Erreur generate_response: {e}")
@@ -311,10 +314,17 @@ class InteliaRAGEngine:
     ) -> RAGResult:
         """Pipeline de traitement modulaire avec nouveaux composants"""
 
+        logger.info(f"🌍 _process_query traite avec langue: {language}")
+
         # 1. Preprocessing (utilise les nouveaux modules en interne)
         preprocessed_data = await self._apply_preprocessing(
             query, language, enable_preprocessing
         )
+
+        # ✅ CORRECTION CRITIQUE: S'assurer que language est dans preprocessed_data
+        if "language" not in preprocessed_data:
+            preprocessed_data["language"] = language
+            logger.info(f"🌍 Langue ajoutée à preprocessed_data: {language}")
 
         # 2. Classification avec UnifiedQueryClassifier
         classification = self.query_classifier.classify(
@@ -344,8 +354,10 @@ class InteliaRAGEngine:
         preprocessed_data["query_type"] = query_type
         preprocessed_data["classification"] = classification.to_dict()
 
-        # 4. Routage vers handler approprié
-        result = await self._route_to_handler(query_type, preprocessed_data, start_time)
+        # 4. Routage vers handler approprié avec language
+        result = await self._route_to_handler(
+            query_type, preprocessed_data, start_time, language  # ✅ AJOUT language
+        )
 
         # 5. Enrichir avec métadonnées de preprocessing et classification
         result.metadata.update(preprocessed_data["metadata"])
@@ -358,6 +370,8 @@ class InteliaRAGEngine:
     ) -> Dict[str, Any]:
         """Applique le preprocessing avec nouveaux modules"""
 
+        logger.debug(f"🌍 _apply_preprocessing avec langue: {language}")
+
         if not enable_preprocessing or not self.query_preprocessor:
             # Preprocessing minimal avec nouveaux modules
             logger.debug("📋 Preprocessing minimal (sans Query Preprocessor)")
@@ -369,6 +383,7 @@ class InteliaRAGEngine:
                 "normalized_query": query,
                 "original_query": query,
                 "entities": entities_dict,
+                "language": language,  # ✅ AJOUT CRITIQUE
                 "routing_hint": None,
                 "is_comparative": False,
                 "comparison_entities": [],
@@ -376,6 +391,7 @@ class InteliaRAGEngine:
                     "preprocessing_applied": False,
                     "extraction_confidence": extracted.confidence,
                     "entities_found": extracted.get_entity_count(),
+                    "language_detected": language,  # ✅ TRAÇABILITÉ
                 },
             }
 
@@ -391,6 +407,7 @@ class InteliaRAGEngine:
                 "normalized_query": preprocessed.get("normalized_query", query),
                 "original_query": query,
                 "entities": preprocessed.get("entities", {}),
+                "language": language,  # ✅ AJOUT CRITIQUE
                 "routing_hint": preprocessed.get("routing"),
                 "is_comparative": preprocessed.get("is_comparative", False),
                 "comparison_entities": preprocessed.get("comparison_entities", []),
@@ -402,6 +419,7 @@ class InteliaRAGEngine:
                     "is_comparative": preprocessed.get("is_comparative", False),
                     "preprocessing_applied": True,
                     "confidence": preprocessed.get("confidence", 1.0),
+                    "language_detected": language,  # ✅ TRAÇABILITÉ
                 },
             }
 
@@ -419,6 +437,7 @@ class InteliaRAGEngine:
                 "normalized_query": query,
                 "original_query": query,
                 "entities": entities_dict,
+                "language": language,  # ✅ AJOUT CRITIQUE
                 "routing_hint": None,
                 "is_comparative": False,
                 "comparison_entities": [],
@@ -427,13 +446,20 @@ class InteliaRAGEngine:
                     "preprocessing_error": str(e),
                     "fallback_extraction": True,
                     "extraction_confidence": extracted.confidence,
+                    "language_detected": language,  # ✅ TRAÇABILITÉ
                 },
             }
 
     async def _route_to_handler(
-        self, query_type: str, preprocessed_data: Dict[str, Any], start_time: float
+        self,
+        query_type: str,
+        preprocessed_data: Dict[str, Any],
+        start_time: float,
+        language: str,  # ✅ AJOUT PARAMÈTRE
     ) -> RAGResult:
         """Route vers le handler approprié selon le type de requête"""
+
+        logger.info(f"🌍 _route_to_handler avec langue: {language}")
 
         if query_type == "temporal_range":
             logger.debug("→ Routage vers TemporalQueryHandler")
@@ -447,11 +473,13 @@ class InteliaRAGEngine:
             logger.debug(f"→ Routage vers StandardHandler (type={query_type})")
             preprocessed_data["is_optimization"] = query_type == "optimization"
             preprocessed_data["is_calculation"] = query_type == "calculation"
-            return await self.standard_handler.handle(preprocessed_data, start_time)
+            # ✅ CORRECTION: Transmission explicite du language
+            return await self.standard_handler.handle(
+                preprocessed_data, start_time, language=language  # ✅ AJOUT CRITIQUE
+            )
 
         elif query_type == "economic":
             logger.debug("→ Requête économique détectée")
-            # Les requêtes économiques ne sont pas supportées
             return RAGResult(
                 source=RAGSource.ERROR,
                 answer="Les données économiques ne sont pas disponibles dans notre système.",
@@ -463,12 +491,18 @@ class InteliaRAGEngine:
 
         elif query_type == "diagnostic":
             logger.debug("→ Routage vers StandardHandler (diagnostic)")
-            preprocessed_data["routing_hint"] = "weaviate"  # Force Weaviate pour docs
-            return await self.standard_handler.handle(preprocessed_data, start_time)
+            preprocessed_data["routing_hint"] = "weaviate"
+            # ✅ CORRECTION: Transmission explicite du language
+            return await self.standard_handler.handle(
+                preprocessed_data, start_time, language=language  # ✅ AJOUT CRITIQUE
+            )
 
         else:  # standard
             logger.debug("→ Routage vers StandardHandler (standard)")
-            return await self.standard_handler.handle(preprocessed_data, start_time)
+            # ✅ CORRECTION: Transmission explicite du language
+            return await self.standard_handler.handle(
+                preprocessed_data, start_time, language=language  # ✅ AJOUT CRITIQUE
+            )
 
     def get_status(self) -> Dict:
         """Status système complet avec nouveaux modules"""
@@ -476,7 +510,7 @@ class InteliaRAGEngine:
             "rag_enabled": RAG_ENABLED,
             "initialized": self.is_initialized,
             "degraded_mode": self.degraded_mode,
-            "version": "v2.0.2_fallback_enhanced",  # ✅ Version mise à jour
+            "version": "v2.0.3_multilang_fixed",  # ✅ Version mise à jour
             "architecture": "modular_centralized",
             "modules": {
                 # Core modules
@@ -500,18 +534,19 @@ class InteliaRAGEngine:
             "capabilities": {
                 "temporal_range_queries": True,
                 "comparative_queries": bool(self.comparison_handler),
-                "comparative_fallback_to_weaviate": True,  # Nouveau
+                "comparative_fallback_to_weaviate": True,
                 "optimization_queries": True,
                 "calculation_queries": True,
-                "economic_queries": False,  # Non supporté
+                "economic_queries": False,
                 "diagnostic_queries": True,
                 "comparative_fallback": True,
                 "intelligent_preprocessing": bool(self.query_preprocessor),
                 "metrics_queries": bool(self.postgresql_system),
                 "weaviate_search": bool(self.weaviate_core),
-                "entity_extraction": True,  # Toujours disponible
-                "query_classification": True,  # Toujours disponible
-                "validation": True,  # Toujours disponible
+                "entity_extraction": True,
+                "query_classification": True,
+                "validation": True,
+                "multilingual_support": True,  # ✅ NOUVEAU
             },
             "initialization_errors": self.initialization_errors,
             "refactoring_info": {
@@ -525,6 +560,7 @@ class InteliaRAGEngine:
                 "code_reduction": "~47%",
                 "compatibility": "100% (wrappers)",
                 "fallback_support": "Weaviate fallback for comparisons without PostgreSQL",
+                "multilingual_fix": "Language parameter correctly transmitted to all handlers",  # ✅ NOUVEAU
             },
         }
 
