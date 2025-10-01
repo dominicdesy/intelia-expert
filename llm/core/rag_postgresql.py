@@ -404,33 +404,47 @@ class PostgreSQLSystem:
                 f"🔍 Validation result: valid={validation_result.is_valid}, confidence={validation_result.confidence}"
             )
 
-            # 🆕 CONTEXTUALISATION: Détection du besoin de clarification
-            if not validation_result.is_valid and not validation_result.allow_partial:
-                # Générer une question de clarification
-                clarification_question = self._generate_clarification_question(
-                    validation_result.errors,
-                    validation_result.suggestions,
-                    entities,
-                    language,
+            # 🆕 ÉTAPE 2.5: VÉRIFICATION CONTEXTUALISATION
+            logger.info("🔍 Step 2.5: Contextual Validation")
+            if self.postgres_validator:
+                context_validation = self.postgres_validator.flexible_query_validation(
+                    query, entities or {}, language
                 )
 
-                logger.info(
-                    f"❓ CONTEXTUALISATION: Besoin de clarification détecté - {validation_result.errors}"
+                logger.debug(
+                    f"🔍 Context validation status: {context_validation.get('status')}"
                 )
 
-                # Retourner un résultat spécial pour demander des précisions
-                return RAGResult(
-                    source=RAGSource.INSUFFICIENT_CONTEXT,
-                    answer=clarification_question,
-                    metadata={
-                        "validation_status": "needs_clarification",
-                        "missing_fields": validation_result.errors,
-                        "suggestions": validation_result.suggestions,
-                        "original_query": query,
-                        "processing_time": time.time() - start_time,
-                        "awaiting_user_input": True,
-                    },
-                )
+                if context_validation.get("status") == "needs_fallback":
+                    logger.warning(
+                        f"⚠️ Contexte insuffisant détecté: {context_validation.get('missing')}"
+                    )
+
+                    # Retourner un résultat spécial pour clarification
+                    return RAGResult(
+                        source=RAGSource.INSUFFICIENT_CONTEXT,
+                        answer=None,  # Pas de réponse générée
+                        confidence=0.0,
+                        metadata={
+                            "validation_status": "needs_fallback",
+                            "missing_fields": context_validation.get("missing", []),
+                            "suggestions": context_validation.get("suggestions", []),
+                            "helpful_message": context_validation.get(
+                                "helpful_message", ""
+                            ),
+                            "enhanced_entities": context_validation.get(
+                                "enhanced_entities", {}
+                            ),
+                            "original_query": query,
+                            "processing_time": time.time() - start_time,
+                            "awaiting_user_input": True,
+                        },
+                    )
+
+                # Si statut OK ou incomplete_but_processable, enrichir les entités
+                if context_validation.get("enhanced_entities"):
+                    entities = context_validation["enhanced_entities"]
+                    logger.info(f"✅ Entités enrichies par contexte: {entities}")
 
             # 🔧 ÉTAPE 3: Merge intelligent des entités
             logger.info("🔧 Step 3: Entity Merge Strategy")
