@@ -224,7 +224,42 @@ class PostgreSQLValidator:
             return {"status": "complete", "enhanced_entities": enhanced_entities}
 
         elif len(missing) <= 1 and ("breed" not in missing):
-            # Si juste l'âge ou métrique manque, on peut souvent traiter
+            # 🆕 CORRECTION CRITIQUE : Vérifier si l'âge manquant est critique
+            if "age" in missing:
+                # Pour des métriques qui varient fortement avec l'âge, c'est critique
+                critical_metrics = [
+                    "weight",
+                    "body_weight",
+                    "poids",
+                    "feed_conversion",
+                    "conversion",
+                    "fcr",
+                    "daily_gain",
+                    "gain",
+                ]
+                metric = enhanced_entities.get("metric_type", "").lower()
+                metric_name = enhanced_entities.get("metric", "").lower()
+
+                # Vérifier si la métrique est critique
+                is_critical_metric = any(m in metric for m in critical_metrics) or any(
+                    m in metric_name for m in critical_metrics
+                )
+
+                if is_critical_metric:
+                    logger.debug(
+                        f"❌ Age manquant pour métrique critique '{metric}' - needs_fallback"
+                    )
+                    helpful_message = self._generate_conversational_question(
+                        query, missing, suggestions, language
+                    )
+                    return {
+                        "status": "needs_fallback",
+                        "missing": missing,
+                        "suggestions": suggestions,
+                        "helpful_message": helpful_message,
+                    }
+
+            # Si ce n'est pas critique (ex: mortalité générale), on peut traiter
             logger.debug(f"⚠️ Validation incomplete but processable, missing: {missing}")
             return {
                 "status": "incomplete_but_processable",
