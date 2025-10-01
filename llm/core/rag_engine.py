@@ -51,7 +51,7 @@ ComparisonHandler = None
 WeaviateCore = None
 
 try:
-    from .rag_postgresql import PostgreSQLSystem
+    from .rag_postgresql_validator import PostgreSQLValidator as PostgreSQLSystem
 
     POSTGRESQL_INTEGRATION_AVAILABLE = True
     logger.info("✅ PostgreSQL System importé")
