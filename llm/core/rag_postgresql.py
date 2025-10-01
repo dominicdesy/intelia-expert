@@ -2,7 +2,8 @@
 """
 rag_postgresql.py - PostgreSQL System Principal Refactorisé
 Point d'entrée principal avec délégation vers modules spécialisés
-VERSION REFACTORÉE: Utilisation de ValidationCore centralisé + QueryInterpreter OpenAI
+VERSION REFACTORISÉE: Utilisation de ValidationCore centralisé + QueryInterpreter OpenAI
+CORRECTION: Support du paramètre language pour détection automatique
 """
 
 import logging
@@ -304,10 +305,19 @@ class PostgreSQLSystem:
         top_k: int = 12,
         entities: Dict[str, Any] = None,
         strict_sex_match: bool = False,
+        language: str = "en",  # ✅ AJOUTÉ: Paramètre language avec défaut anglais
     ) -> RAGResult:
         """
         Recherche de métriques avec validation centralisée + interprétation OpenAI
-        VERSION REFACTORÉE: Utilisation de ValidationCore + QueryInterpreter
+        VERSION REFACTORISÉE: Utilisation de ValidationCore + QueryInterpreter
+
+        Args:
+            query: Requête utilisateur
+            intent_result: Résultat d'analyse d'intention (optionnel)
+            top_k: Nombre maximum de résultats
+            entities: Entités extraites (breed, age, sex, etc.)
+            strict_sex_match: Forcer correspondance exacte du sexe
+            language: Langue de réponse détectée automatiquement (en, fr, es, etc.)
         """
 
         if not self.is_initialized or not self.postgres_retriever:
@@ -319,11 +329,12 @@ class PostgreSQLSystem:
         start_time = time.time()
 
         try:
-            # 📝 LOG: Entités entrantes
+            # 🔍 LOG: Entités entrantes
             logger.debug(f"🔍 search_metrics INPUT entities: {entities}")
             logger.debug(
                 f"🔍 INPUT - 'sex' present: {'sex' in (entities or {})}, value: {(entities or {}).get('sex')}"
             )
+            logger.debug(f"🌍 search_metrics language parameter: {language}")
 
             # 🆕 ÉTAPE 1: Interprétation OpenAI de la requête
             if self.query_interpreter:
@@ -481,6 +492,7 @@ class PostgreSQLSystem:
                             age_max=temporal_range["age_max"],
                             top_k=top_k,
                             strict_sex_match=strict_sex_match,
+                            language=language,  # ✅ TRANSMISSION DU LANGUAGE
                         )
                 except Exception as temporal_error:
                     logger.warning(f"Erreur détection temporelle: {temporal_error}")
@@ -508,7 +520,11 @@ class PostgreSQLSystem:
             # ÉTAPE 7: Conversion et génération de réponse
             documents = self._convert_metrics_to_documents(metric_results)
             answer_text = await self._generate_response(
-                query, documents, metric_results, entities
+                query,
+                documents,
+                metric_results,
+                entities,
+                language,  # ✅ TRANSMISSION DU LANGUAGE
             )
             avg_confidence = sum(m.confidence for m in metric_results) / len(
                 metric_results
@@ -547,12 +563,17 @@ class PostgreSQLSystem:
         age_max: int,
         top_k: int = 12,
         strict_sex_match: bool = False,
+        language: str = "en",  # ✅ AJOUTÉ: Paramètre language
     ) -> RAGResult:
         """Recherche optimisée pour plages temporelles"""
 
         if not self.temporal_processor:
             return await self.search_metrics(
-                query, entities=entities, top_k=top_k, strict_sex_match=strict_sex_match
+                query,
+                entities=entities,
+                top_k=top_k,
+                strict_sex_match=strict_sex_match,
+                language=language,  # ✅ TRANSMISSION DU LANGUAGE
             )
 
         return await self.temporal_processor.search_metrics_range(
@@ -609,11 +630,24 @@ class PostgreSQLSystem:
         documents: List,
         metric_results: List[MetricResult],
         entities: Dict,
+        language: str = "en",  # ✅ AJOUTÉ: Paramètre language avec défaut anglais
     ) -> str:
-        """Génère une réponse enrichie avec EnhancedResponseGenerator"""
+        """
+        Génère une réponse enrichie avec EnhancedResponseGenerator
+
+        Args:
+            query: Requête utilisateur
+            documents: Documents contextuels
+            metric_results: Résultats métriques
+            entities: Entités extraites
+            language: Langue de réponse (en, fr, es, etc.)
+        """
 
         if not metric_results:
             return f"Aucune donnée trouvée pour '{query}'."
+
+        # Log pour debug
+        logger.debug(f"🌍 _generate_response received language: {language}")
 
         # Utiliser le générateur enrichi si OpenAI disponible
         if self.openai_client:
@@ -624,16 +658,20 @@ class PostgreSQLSystem:
                     "🎨 Utilisation EnhancedResponseGenerator pour réponse de qualité"
                 )
 
+                # ✅ CORRECTION: Utiliser le paramètre language au lieu de "fr" hardcodé
                 generator = create_enhanced_generator(
-                    openai_client=self.openai_client, cache_manager=None, language="fr"
+                    openai_client=self.openai_client,
+                    cache_manager=None,
+                    language=language,  # ✅ CORRIGÉ
                 )
 
                 # Générer réponse enrichie avec contexte
+                # ✅ CORRECTION: Utiliser le paramètre language au lieu de "fr" hardcodé
                 response = await generator.generate_response(
                     query=query,
                     context_docs=documents,
                     conversation_context="",
-                    language="fr",
+                    language=language,  # ✅ CORRIGÉ
                     intent_result=None,
                 )
 
@@ -743,6 +781,25 @@ class PostgreSQLSystem:
                     else "disabled"
                 ),
             },
+            "language_support": {
+                "enabled": True,
+                "description": "Support automatique de la langue détectée",
+                "supported_languages": [
+                    "en",
+                    "fr",
+                    "es",
+                    "de",
+                    "it",
+                    "pt",
+                    "nl",
+                    "pl",
+                    "zh",
+                    "hi",
+                    "th",
+                    "id",
+                ],
+                "default": "en",
+            },
             "sex_aware_search": True,
             "openai_enabled": self.openai_client is not None,
             "strict_sex_match_supported": True,
@@ -756,6 +813,6 @@ class PostgreSQLSystem:
                 "description": "Optimisation SQL pour plages temporelles",
                 "status": "active",
             },
-            "implementation_phase": "modular_architecture_with_openai_interpreter",
-            "version": "v10.0_openai_query_interpretation",
+            "implementation_phase": "modular_architecture_with_openai_interpreter_and_language_support",
+            "version": "v10.1_language_detection_fixed",
         }
