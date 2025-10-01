@@ -124,7 +124,9 @@ class PostgreSQLValidator:
                 logger.debug("❌ No breed detected in query")
                 missing.append("breed")
                 # 🆕 Suggestion conversationnelle selon la langue
-                suggestions.append(self._get_breed_suggestion(language))
+                suggestions.append(
+                    self._get_breed_suggestion(language)
+                )
         else:
             logger.debug(
                 f"🔍 Breed PRESENT: '{enhanced_entities.get('breed')}', skipping auto-detection"
@@ -142,23 +144,16 @@ class PostgreSQLValidator:
                 # Pour certaines requêtes, l'âge n'est pas critique
                 if any(
                     word in query.lower()
-                    for word in [
-                        "recommande",
-                        "meilleur",
-                        "compare",
-                        "général",
-                        "recommend",
-                        "best",
-                        "compare",
-                        "general",
-                    ]
+                    for word in ["recommande", "meilleur", "compare", "général", "recommend", "best", "compare", "general"]
                 ):
                     logger.debug("🔍 General query, age not critical")
                     pass  # Requête générale - pas besoin d'âge spécifique
                 else:
                     missing.append("age")
                     # 🆕 Suggestion conversationnelle selon la langue
-                    suggestions.append(self._get_age_suggestion(language))
+                    suggestions.append(
+                        self._get_age_suggestion(language)
+                    )
         else:
             logger.debug(
                 f"🔍 Age PRESENT: '{enhanced_entities.get('age_days')}', skipping auto-detection"
@@ -175,7 +170,9 @@ class PostgreSQLValidator:
                 logger.debug("❌ No metric detected in query")
                 missing.append("metric")
                 # 🆕 Suggestion conversationnelle selon la langue
-                suggestions.append(self._get_metric_suggestion(language))
+                suggestions.append(
+                    self._get_metric_suggestion(language)
+                )
         else:
             logger.debug(
                 f"🔍 Metric PRESENT: '{enhanced_entities.get('metric_type')}', skipping auto-detection"
@@ -227,28 +224,15 @@ class PostgreSQLValidator:
             # 🆕 CORRECTION CRITIQUE : Vérifier si l'âge manquant est critique
             if "age" in missing:
                 # Pour des métriques qui varient fortement avec l'âge, c'est critique
-                critical_metrics = [
-                    "weight",
-                    "body_weight",
-                    "poids",
-                    "feed_conversion",
-                    "conversion",
-                    "fcr",
-                    "daily_gain",
-                    "gain",
-                ]
+                critical_metrics = ["weight", "body_weight", "poids", "feed_conversion", "conversion", "fcr", "daily_gain", "gain"]
                 metric = enhanced_entities.get("metric_type", "").lower()
                 metric_name = enhanced_entities.get("metric", "").lower()
-
+                
                 # Vérifier si la métrique est critique
-                is_critical_metric = any(m in metric for m in critical_metrics) or any(
-                    m in metric_name for m in critical_metrics
-                )
-
+                is_critical_metric = any(m in metric for m in critical_metrics) or any(m in metric_name for m in critical_metrics)
+                
                 if is_critical_metric:
-                    logger.debug(
-                        f"❌ Age manquant pour métrique critique '{metric}' - needs_fallback"
-                    )
+                    logger.debug(f"❌ Age manquant pour métrique critique '{metric}' - needs_fallback")
                     helpful_message = self._generate_conversational_question(
                         query, missing, suggestions, language
                     )
@@ -258,7 +242,7 @@ class PostgreSQLValidator:
                         "suggestions": suggestions,
                         "helpful_message": helpful_message,
                     }
-
+            
             # Si ce n'est pas critique (ex: mortalité générale), on peut traiter
             logger.debug(f"⚠️ Validation incomplete but processable, missing: {missing}")
             return {
@@ -309,53 +293,62 @@ class PostgreSQLValidator:
         return suggestions.get(language, suggestions["fr"])
 
     def _generate_conversational_question(
-        self,
-        query: str,
-        missing: List[str],
-        suggestions: List[str],
-        language: str = "fr",
+        self, query: str, missing: List[str], suggestions: List[str], language: str = "fr"
     ) -> str:
         """
         🆕 NOUVEAU: Génère une question de clarification conversationnelle
-
+        
         Args:
             query: Requête originale
             missing: Champs manquants
-            suggestions: Suggestions détaillées
+            suggestions: Suggestions détaillées (non utilisées directement)
             language: Langue de la réponse
-
+            
         Returns:
             Question conversationnelle formatée
         """
-
+        
         # Templates d'introduction selon la langue
         intros = {
             "fr": "Pour vous donner une réponse précise, j'ai besoin de quelques informations supplémentaires.",
             "en": "To provide you with an accurate answer, I need some additional information.",
             "es": "Para darle una respuesta precisa, necesito información adicional.",
         }
-
+        
         # Templates pour plusieurs champs manquants
         multiple_intros = {
             "fr": "Pourriez-vous préciser :",
             "en": "Could you please specify:",
             "es": "¿Podría especificar:",
         }
-
+        
         intro = intros.get(language, intros["fr"])
-
+        
+        # 🔧 CORRECTION : Générer les bonnes suggestions basées sur les champs MISSING
+        contextual_suggestions = []
+        for field in missing:
+            if "breed" in field.lower() or "race" in field.lower():
+                contextual_suggestions.append(self._get_breed_suggestion(language))
+            elif "age" in field.lower() or "âge" in field.lower():
+                contextual_suggestions.append(self._get_age_suggestion(language))
+            elif "metric" in field.lower() or "métrique" in field.lower():
+                contextual_suggestions.append(self._get_metric_suggestion(language))
+        
         # Construction de la question
         parts = [intro]
-
-        if len(missing) > 1:
+        
+        if len(contextual_suggestions) > 1:
             # Plusieurs champs manquants
             parts.append(f"\n\n{multiple_intros.get(language, multiple_intros['fr'])}")
-            for suggestion in suggestions:
+            for suggestion in contextual_suggestions:
                 parts.append(f"\n• {suggestion}")
-        else:
+        elif len(contextual_suggestions) == 1:
             # Un seul champ manquant
-            parts.append(f"\n\n{suggestions[0] if suggestions else ''}")
-
+            parts.append(f"\n\n{contextual_suggestions[0]}")
+        else:
+            # Fallback si aucune suggestion générée
+            parts.append("\n\nVeuillez fournir les informations manquantes.")
+        
         return "".join(parts)
 
     def _generate_validation_help_message(
@@ -701,13 +694,13 @@ if __name__ == "__main__":
     for test in test_clarifications:
         print(f"\n  Query: {test['query']}")
         print(f"  Language: {test['language']}")
-
+        
         result = validator.flexible_query_validation(
             test["query"], test["entities"], test["language"]
         )
-
+        
         print(f"  → Status: {result['status']}")
-        if result["status"] == "needs_fallback":
+        if result['status'] == 'needs_fallback':
             print(f"  → Question: {result['helpful_message']}")
 
     print("\n" + "=" * 70)
