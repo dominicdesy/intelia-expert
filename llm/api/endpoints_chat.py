@@ -269,11 +269,14 @@ class ConversationContextManager:
             "original_query": original_query,
             "missing_fields": missing_fields,
             "suggestions": suggestions,
-            "language": language,
+            "language": language,  # ✅ Langue de la requête originale préservée
+            "original_language": language,  # ✅ NOUVEAU: Sauvegarde explicite
             "timestamp": time.time(),
-            "clarification_count": 0,  # ✅ NOUVEAU: Compteur de clarifications
+            "clarification_count": 0,
         }
-        logger.info(f"🔐 Clarification en attente pour {tenant_id}: {missing_fields}")
+        logger.info(
+            f"🔐 Clarification en attente pour {tenant_id}: {missing_fields} (langue: {language})"
+        )
 
     def get_pending(self, tenant_id: str) -> Optional[Dict]:
         """Récupère le contexte en attente"""
@@ -726,6 +729,18 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                 else language_result
             )
 
+            # ✅ CORRECTION: Vérifier si on est en contexte de clarification
+            # Si oui, utiliser la langue de la requête originale
+            pending_context = context_manager.get_pending(tenant_id)
+            if pending_context:
+                original_language = pending_context.get("original_language")
+                if original_language:
+                    logger.info(
+                        f"🌍 Langue préservée du contexte: {original_language} "
+                        f"(détection actuelle ignorée: {detected_language})"
+                    )
+                    detected_language = original_language
+
             logger.info(
                 f"Langue détectée: {detected_language} "
                 f"(confiance: {getattr(language_result, 'confidence', 'N/A')})"
@@ -750,6 +765,14 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                 # Récupérer la requête accumulée mise à jour
                 pending_context = context_manager.get_pending(tenant_id)
                 combined_query = pending_context["original_query"]
+
+                # ✅ CRITIQUE: Préserver la langue originale
+                original_language = pending_context.get("original_language")
+                if original_language:
+                    language = original_language
+                    logger.info(
+                        f"🌍 Langue restaurée depuis contexte: {original_language}"
+                    )
 
                 logger.info(f"📝 Requête accumulée complète: {combined_query}")
 
