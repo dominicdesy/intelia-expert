@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 rag_engine_handlers.py - Handlers spécialisés pour différents types de requêtes
-VERSION 4.3 - CORRECTION COMPLÈTE TRANSMISSION LANGUE + ROUTING HINT POSTGRESQL:
+VERSION 4.4 - CORRECTION VALIDATION AVANT SEARCH:
+- ✅ NOUVEAU: Validation PostgreSQLValidator AVANT appel search_metrics()
+- ✅ CORRECTION: Retour immédiat sur needs_fallback avec message de clarification
 - Compatible avec la structure harmonisée du comparison_handler
 - Mode optimisation pour tri par pertinence
 - Évite double appel PostgreSQL avant fallback Weaviate
 - Respecte le routage suggéré par OpenAI avec priorité à PostgreSQL routing hint
-- ✅ CORRECTION: Transmission du paramètre 'language' à TOUS les appels (PostgreSQL + Weaviate)
-- ✅ NOUVEAU: Gestion routing_hint postgresql avec retour immédiat sur INSUFFICIENT_CONTEXT
 """
 
 import re
@@ -28,6 +28,7 @@ class BaseQueryHandler:
     def __init__(self):
         self.postgresql_system = None
         self.weaviate_core = None
+        self.postgresql_validator = None  # ✅ AJOUT
 
     def configure(self, **kwargs):
         """Configure le handler avec les modules nécessaires"""
@@ -79,7 +80,6 @@ class ComparativeQueryHandler(BaseQueryHandler):
         try:
             logger.info("Executing comparative query via ComparisonHandler")
 
-            # Appel au ComparisonHandler
             comparison_result = await self.comparison_handler.handle_comparison_query(
                 preprocessed_data
             )
@@ -89,11 +89,8 @@ class ComparativeQueryHandler(BaseQueryHandler):
                     "error", "Erreur comparative inconnue"
                 )
                 logger.warning(f"Comparison failed: {error_msg}")
-
-                # Fallback intelligent vers requête standard
                 return await self._fallback_to_standard(preprocessed_data, start_time)
 
-            # Succès: générer la réponse comparative
             answer_text = await self.comparison_handler.generate_comparative_response(
                 preprocessed_data.get(
                     "original_query", preprocessed_data["normalized_query"]
@@ -168,18 +165,16 @@ class ComparativeQueryHandler(BaseQueryHandler):
 
         entities = preprocessed_data.get("entities", {})
         query = preprocessed_data["normalized_query"]
-
-        # Extraction de la langue
         language = preprocessed_data.get("language", "fr")
-        logger.info(f"🌐 Fallback comparative avec langue: {language}")
 
-        # Initialisation des métadonnées de disponibilité
+        logger.info(f"🌍 Fallback comparative avec langue: {language}")
+
         availability_metadata = {
             "postgresql_available": self.postgresql_system is not None,
             "weaviate_available": self.weaviate_core is not None,
         }
 
-        # 1. Tentative PostgreSQL avec langue
+        # 1. Tentative PostgreSQL
         if self.postgresql_system and entities:
             logger.info(
                 f"🔍 Fallback comparative: tentative PostgreSQL (langue={language})"
@@ -189,7 +184,6 @@ class ComparativeQueryHandler(BaseQueryHandler):
                     query=query,
                     entities=entities,
                     top_k=RAG_SIMILARITY_TOP_K,
-                    language=language,
                 )
 
                 if result and result.source != RAGSource.NO_RESULTS:
@@ -212,13 +206,8 @@ class ComparativeQueryHandler(BaseQueryHandler):
             except Exception as e:
                 logger.error(f"❌ Erreur PostgreSQL fallback: {e}")
                 availability_metadata["postgresql_error"] = str(e)
-        else:
-            if not self.postgresql_system:
-                logger.warning("⚠️ PostgreSQL non disponible pour fallback comparative")
-            if not entities:
-                logger.info("ℹ️ Pas d'entités détectées, skip PostgreSQL")
 
-        # 2. Tentative Weaviate avec langue
+        # 2. Tentative Weaviate
         if self.weaviate_core:
             logger.info(
                 f"🔍 Fallback comparative: tentative Weaviate (langue={language})"
@@ -250,8 +239,6 @@ class ComparativeQueryHandler(BaseQueryHandler):
             except Exception as e:
                 logger.error(f"❌ Erreur Weaviate fallback: {e}")
                 availability_metadata["weaviate_error"] = str(e)
-        else:
-            logger.warning("⚠️ Weaviate non disponible pour fallback comparative")
 
         # 3. Si tout échoue
         logger.warning("❌ Tous les fallbacks comparative ont échoué")
@@ -325,7 +312,6 @@ class TemporalQueryHandler(BaseQueryHandler):
                     age_min=age_range[0],
                     age_max=age_range[1],
                     top_k=RAG_SIMILARITY_TOP_K,
-                    language=language,
                 )
 
                 if result and result.source != RAGSource.NO_RESULTS:
@@ -394,7 +380,6 @@ class TemporalQueryHandler(BaseQueryHandler):
                 query=query,
                 entities=age_entities,
                 top_k=3,
-                language=language,
             )
 
             if result and result.context_docs:
@@ -425,9 +410,7 @@ class StandardQueryHandler(BaseQueryHandler):
 
     async def handle(
         self,
-        preprocessed_data: Dict[
-            str, Any
-        ] = None,  # ✅ PREMIER PARAMÈTRE (compatibilité rag_engine.py)
+        preprocessed_data: Dict[str, Any] = None,
         start_time: float = None,
         query: str = None,
         entities: Dict[str, Any] = None,
@@ -437,8 +420,7 @@ class StandardQueryHandler(BaseQueryHandler):
     ) -> RAGResult:
         """
         Traite une requête standard avec routage intelligent
-        ✅ CORRECTION CRITIQUE: Ordre des paramètres corrigé pour correspondre à l'appel depuis rag_engine.py
-        L'appel est: await self.standard_handler.handle(preprocessed_data, start_time, language=language)
+        ✅ VERSION 4.4: Validation AVANT appel search_metrics()
         """
         # Extraction des données depuis preprocessed_data si disponible
         if preprocessed_data:
@@ -462,7 +444,7 @@ class StandardQueryHandler(BaseQueryHandler):
         if entities is None:
             entities = {}
 
-        logger.info(f"🌐 StandardQueryHandler traite requête en langue: {language}")
+        logger.info(f"🌍 StandardQueryHandler traite requête en langue: {language}")
         logger.info(f"🎯 ROUTING_HINT REÇU: '{routing_hint}'")
         logger.info(f"📊 ENTITIES REÇUES: {entities}")
 
@@ -473,30 +455,74 @@ class StandardQueryHandler(BaseQueryHandler):
         else:
             top_k = RAG_SIMILARITY_TOP_K
 
-        # 🆕 ÉTAPE 1: Vérifier le routing hint PostgreSQL en PRIORITÉ ABSOLUE
+        # ✅ ÉTAPE 1: Vérifier le routing hint PostgreSQL avec VALIDATION PRÉALABLE
         if routing_hint == "postgresql":
             logger.info("=" * 80)
-            logger.info(
-                "🎯 ROUTING HINT POSTGRESQL DÉTECTÉ - APPEL POSTGRESQL PRIORITAIRE"
-            )
+            logger.info("🎯 ROUTING HINT POSTGRESQL DÉTECTÉ - VALIDATION PUIS APPEL")
             logger.info("=" * 80)
-            logger.info(
-                "🎯 PostgreSQL routing hint détecté - tentative PostgreSQL d'abord"
-            )
 
             if self.postgresql_system:
+                # ✅ NOUVEAU: VALIDER D'ABORD avec PostgreSQLValidator
+                if self.postgresql_validator:
+                    logger.info("🔍 Validation des entités avant appel PostgreSQL...")
+
+                    validation_result = (
+                        self.postgresql_validator.flexible_query_validation(
+                            query=query, entities=entities, language=language
+                        )
+                    )
+
+                    logger.info(
+                        f"📋 Résultat validation: {validation_result['status']}"
+                    )
+
+                    # ✅ Si clarification nécessaire, retourner IMMÉDIATEMENT
+                    if validation_result["status"] == "needs_fallback":
+                        logger.info("❓ Clarification nécessaire - retour immédiat")
+
+                        helpful_message = validation_result.get(
+                            "helpful_message",
+                            "Informations manquantes pour traiter votre requête.",
+                        )
+
+                        return RAGResult(
+                            source=RAGSource.INSUFFICIENT_CONTEXT,
+                            answer=helpful_message,
+                            metadata={
+                                "source_type": "postgresql_validation_clarification",
+                                "routing_hint": "postgresql",
+                                "missing_fields": validation_result.get("missing", []),
+                                "processing_time": time.time() - start_time,
+                                "language_used": language,
+                            },
+                        )
+
+                    # ✅ Enrichir les entités avec la validation
+                    if "enhanced_entities" in validation_result:
+                        entities = validation_result["enhanced_entities"]
+                        logger.info(f"✅ Entités enrichies par validation: {entities}")
+
+                else:
+                    logger.warning(
+                        "⚠️ PostgreSQLValidator non disponible - skip validation"
+                    )
+
+                # ✅ MAINTENANT: Appeler search_metrics() avec entités validées
                 try:
+                    logger.info(
+                        "🔍 Appel PostgreSQL search_metrics() après validation..."
+                    )
+
                     pg_result = await self.postgresql_system.search_metrics(
                         query=query,
                         entities=entities,
-                        language=language,
                         top_k=top_k,
                     )
 
-                    # Si contexte insuffisant, retourner la clarification immédiatement
+                    # Si contexte insuffisant (ne devrait plus arriver après validation)
                     if pg_result.source == RAGSource.INSUFFICIENT_CONTEXT:
-                        logger.info(
-                            "❓ Contexte insuffisant - demande de clarification"
+                        logger.warning(
+                            "⚠️ INSUFFICIENT_CONTEXT après validation (inattendu)"
                         )
                         pg_result.metadata.update(
                             {
@@ -519,6 +545,7 @@ class StandardQueryHandler(BaseQueryHandler):
                                 "routing_hint": "postgresql",
                                 "processing_time": time.time() - start_time,
                                 "language_used": language,
+                                "validation_applied": True,
                             }
                         )
                         return pg_result
@@ -610,14 +637,12 @@ class StandardQueryHandler(BaseQueryHandler):
         """
         Effectue UNE SEULE recherche PostgreSQL
         Retourne None si aucun résultat (pas de retry)
-        ✅ CORRECTION: Supporte maintenant le paramètre language
         """
         try:
             result = await self.postgresql_system.search_metrics(
                 query=query,
                 entities=entities,
                 top_k=top_k,
-                language=language,
             )
 
             if result and result.source != RAGSource.NO_RESULTS:
