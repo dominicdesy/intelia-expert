@@ -5,6 +5,7 @@ Point d'entrée principal avec délégation vers modules spécialisés
 VERSION REFACTORISÉE: Utilisation de ValidationCore centralisé + QueryInterpreter OpenAI
 CORRECTION: Support du paramètre language pour détection automatique
 NOUVEAU: Gestion de la contextualisation - Demande de précisions si informations manquantes
+VERSION 11.1: Fusion OpenAI optimisée - Enrichissement breed/age/sex peu importe la confiance
 """
 
 import logging
@@ -312,6 +313,7 @@ class PostgreSQLSystem:
         Recherche de métriques avec validation centralisée + interprétation OpenAI
         VERSION REFACTORISÉE: Utilisation de ValidationCore + QueryInterpreter
         🆕 CONTEXTUALISATION: Demande des précisions si informations manquantes
+        VERSION 11.1: Fusion OpenAI optimisée - breed/age/sex enrichis peu importe la confiance
 
         Args:
             query: Requête utilisateur
@@ -350,38 +352,46 @@ class PostgreSQLSystem:
                     # Enrichir/corriger les entités avec l'interprétation OpenAI
                     entities = entities or {}
 
-                    # Merge intelligent : OpenAI override si haute confiance
-                    if interpreted.get("confidence", 0) > 0.8:
+                    # ✅ CORRECTION: Toujours fusionner age_days/breed/sex si OpenAI les a trouvés
+                    # (peu importe la confiance, car OpenAI est meilleur que le preprocessing local)
+
+                    if "age_days" in interpreted and interpreted["age_days"]:
+                        age_value = interpreted["age_days"]
+                        entities["age_days"] = (
+                            age_value if isinstance(age_value, int) else int(age_value)
+                        )
                         logger.info(
-                            f"✅ High confidence OpenAI interpretation (>{0.8}), using OpenAI entities"
+                            f"✅ Age enrichi depuis OpenAI: {entities['age_days']}"
                         )
 
+                    if (
+                        "breed" in interpreted
+                        and interpreted["breed"]
+                        and interpreted["breed"] != "unknown"
+                    ):
+                        entities["breed"] = interpreted["breed"]
+                        logger.info(
+                            f"✅ Breed enrichi depuis OpenAI: {interpreted['breed']}"
+                        )
+
+                    if "sex" in interpreted and interpreted["sex"]:
+                        if not entities.get("explicit_sex_request"):
+                            entities["sex"] = interpreted["sex"]
+                            logger.info(
+                                f"✅ Sex enrichi depuis OpenAI: {interpreted['sex']}"
+                            )
+
+                    # Merge intelligent de la métrique selon confiance
+                    if interpreted.get("confidence", 0) > 0.8:
+                        logger.info(
+                            f"✅ High confidence OpenAI interpretation (>{0.8}), using OpenAI metric"
+                        )
                         if "metric" in interpreted and interpreted["metric"]:
                             entities["metric"] = interpreted["metric"]
                             logger.info(f"  → metric: {interpreted['metric']}")
-
-                        if "breed" in interpreted and interpreted["breed"]:
-                            entities["breed"] = interpreted["breed"]
-                            logger.info(f"  → breed: {interpreted['breed']}")
-
-                        if "age_days" in interpreted and interpreted["age_days"]:
-                            # ✅ FIX: Garder age_days comme int si déjà int, sinon convertir
-                            age_value = interpreted["age_days"]
-                            entities["age_days"] = (
-                                age_value
-                                if isinstance(age_value, int)
-                                else int(age_value)
-                            )
-                            logger.info(f"  → age_days: {entities['age_days']}")
-
-                        if "sex" in interpreted and interpreted["sex"]:
-                            # Préserver sex si explicitement demandé
-                            if not entities.get("explicit_sex_request"):
-                                entities["sex"] = interpreted["sex"]
-                                logger.info(f"  → sex: {interpreted['sex']}")
                     else:
                         logger.info(
-                            f"⚠️ Medium confidence OpenAI ({interpreted.get('confidence')}), hybrid merge"
+                            f"⚠️ Medium confidence OpenAI ({interpreted.get('confidence')}), partial merge"
                         )
                         # Merge partiel : seulement metric si manquant
                         if "metric" in interpreted and "metric" not in entities:
@@ -928,5 +938,5 @@ class PostgreSQLSystem:
                 "status": "active",
             },
             "implementation_phase": "modular_architecture_with_contextualization",
-            "version": "v11.0_contextualization_integrated",
+            "version": "v11.1_openai_fusion_optimized",
         }
