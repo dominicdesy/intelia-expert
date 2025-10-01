@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 generators.py - Générateurs de réponses enrichis avec entités et cache externe
-Version 3.0 - Utilise system_prompts.json + entity_descriptions.json centralisés
+Version 3.1 - Instructions de langue renforcées + system_prompts.json centralisés
 """
 
 import logging
@@ -15,7 +15,6 @@ from utils.utilities import METRICS
 
 # Import du gestionnaire de prompts centralisé
 try:
-    # ✅ CORRECTION: Import relatif au lieu d'import absolu
     from config.system_prompts import get_prompts_manager
 
     PROMPTS_AVAILABLE = True
@@ -168,7 +167,7 @@ class EntityDescriptionsManager:
 class EnhancedResponseGenerator:
     """
     Générateur avec enrichissement d'entités et cache externe + ton affirmatif expert
-    Version 3.0: Charge les prompts depuis system_prompts.json + entity_descriptions.json
+    Version 3.1: Instructions de langue renforcées
     """
 
     def __init__(
@@ -454,7 +453,7 @@ class EnhancedResponseGenerator:
         conversation_context: str,
         language: str,
     ) -> Tuple[str, str]:
-        """Construit un prompt enrichi avec ton affirmatif expert"""
+        """Construit un prompt enrichi avec instructions de langue renforcées"""
 
         # Contexte documentaire
         context_text = "\n\n".join(
@@ -464,7 +463,7 @@ class EnhancedResponseGenerator:
             ]
         )
 
-        # Construction du prompt système
+        # Construction du prompt système avec instructions de langue RENFORCÉES
         if self.prompts_manager:
             expert_identity = self.prompts_manager.get_base_prompt(
                 "expert_identity", language
@@ -496,16 +495,8 @@ MÉTRIQUES PRIORITAIRES:
 """
             system_prompt_parts.append(metrics_section)
 
-            critical_instructions = f"""
-INSTRUCTIONS CRITIQUES:
-- NE commence JAMAIS par un titre (ex: "## Maladie", "**Maladie**") - commence directement par la phrase d'introduction
-- Examine les tableaux de données pour extraire les informations précises
-- Présente 2-3 éléments principaux, pas plus
-- Utilise un ton affirmatif mais sobre, sans formatage excessif
-- NE conclus PAS avec des recommandations pratiques sauf si explicitement demandé
-
-LANGUE: Réponds STRICTEMENT en {language}
-"""
+            # ✅ INSTRUCTIONS DE LANGUE RENFORCÉES
+            critical_instructions = self._get_critical_language_instructions(language)
             system_prompt_parts.append(critical_instructions)
 
             system_prompt = "\n\n".join(system_prompt_parts)
@@ -538,10 +529,116 @@ RÉPONSE EXPERTE (affirmative, structurée, sans mention de sources):"""
 
         return system_prompt, user_prompt
 
+    def _get_critical_language_instructions(self, language: str) -> str:
+        """
+        ✅ NOUVEAU: Instructions de langue ULTRA-RENFORCÉES + Comportement conversationnel
+        Garantit que le LLM répond dans la langue de la question avec ton approprié
+        """
+        # Mapping des noms de langue
+        language_names = {
+            "en": "ENGLISH",
+            "fr": "FRENCH / FRANÇAIS",
+            "es": "SPANISH / ESPAÑOL",
+            "de": "GERMAN / DEUTSCH",
+            "it": "ITALIAN / ITALIANO",
+            "pt": "PORTUGUESE / PORTUGUÊS",
+            "nl": "DUTCH / NEDERLANDS",
+            "pl": "POLISH / POLSKI",
+            "zh": "CHINESE / 中文",
+            "hi": "HINDI / हिन्दी",
+            "th": "THAI / ไทย",
+            "id": "INDONESIAN / BAHASA INDONESIA",
+        }
+
+        language_name = language_names.get(language, language.upper())
+
+        return f"""
+INSTRUCTIONS CRITIQUES - STRUCTURE ET FORMAT:
+- NE commence JAMAIS par un titre (ex: "## Maladie", "**Maladie**") - commence directement par la phrase d'introduction
+- Examine les tableaux de données pour extraire les informations précises
+- Présente 2-3 éléments principaux, pas plus
+- Utilise un ton affirmatif mais sobre, sans formatage excessif
+- NE conclus PAS avec des recommandations pratiques sauf si explicitement demandé
+
+COMPORTEMENT CONVERSATIONNEL:
+- Pour questions techniques: réponse structurée et détaillée avec données chiffrées
+- Pour questions générales ou clarifications: ton professionnel mais accessible, réponses plus courtes acceptables
+- Évite de poser trop de questions - réponds d'abord à la requête, même si ambiguë, puis demande clarification si nécessaire
+- Si question vague: fournis la meilleure réponse possible puis propose de préciser
+- N'utilise PAS d'emojis sauf si l'utilisateur en utilise dans sa question
+- Si l'utilisateur semble insatisfait: maintiens le professionnalisme et rappelle qu'il peut utiliser le feedback pour améliorer les réponses
+
+{"="*80}
+⚠️ CRITICAL LANGUAGE REQUIREMENT - IMPÉRATIF ABSOLU DE LANGUE ⚠️
+{"="*80}
+
+DETECTED QUESTION LANGUAGE / LANGUE DÉTECTÉE: {language_name}
+
+🔴 MANDATORY RULE - RÈGLE OBLIGATOIRE:
+YOU MUST RESPOND EXCLUSIVELY IN THE SAME LANGUAGE AS THE QUESTION.
+VOUS DEVEZ RÉPONDRE EXCLUSIVEMENT DANS LA MÊME LANGUE QUE LA QUESTION.
+
+DO NOT translate. DO NOT switch languages. DO NOT mix languages.
+NE PAS traduire. NE PAS changer de langue. NE PAS mélanger les langues.
+
+If question is in ENGLISH → Answer 100% in ENGLISH
+If question is in FRENCH → Answer 100% in FRENCH  
+If question is in SPANISH → Answer 100% in SPANISH
+If question is in GERMAN → Answer 100% in GERMAN
+If question is in ITALIAN → Answer 100% in ITALIAN
+If question is in PORTUGUESE → Answer 100% in PORTUGUESE
+If question is in DUTCH → Answer 100% in DUTCH
+If question is in POLISH → Answer 100% in POLISH
+If question is in CHINESE → Answer 100% in CHINESE
+If question is in HINDI → Answer 100% in HINDI
+If question is in THAI → Answer 100% in THAI
+If question is in INDONESIAN → Answer 100% in INDONESIAN
+
+Si question en ANGLAIS → Réponse 100% en ANGLAIS
+Si question en FRANÇAIS → Réponse 100% en FRANÇAIS
+Si question en ESPAGNOL → Réponse 100% en ESPAGNOL
+Si question en ALLEMAND → Réponse 100% en ALLEMAND
+Si question en ITALIEN → Réponse 100% en ITALIEN
+Si question en PORTUGAIS → Réponse 100% en PORTUGAIS
+Si question en NÉERLANDAIS → Réponse 100% en NÉERLANDAIS
+Si question en POLONAIS → Réponse 100% en POLONAIS
+Si question en CHINOIS → Réponse 100% en CHINOIS
+Si question en HINDI → Réponse 100% en HINDI
+Si question en THAÏ → Réponse 100% en THAÏ
+Si question en INDONÉSIEN → Réponse 100% en INDONÉSIEN
+
+THIS INSTRUCTION OVERRIDES ALL OTHER INSTRUCTIONS.
+CETTE INSTRUCTION PRÉVAUT SUR TOUTES LES AUTRES INSTRUCTIONS.
+
+YOUR RESPONSE LANGUAGE MUST BE: {language_name}
+LANGUE DE VOTRE RÉPONSE DOIT ÊTRE: {language_name}
+
+{"="*80}
+"""
+
     def _get_fallback_system_prompt(
         self, enrichment: ContextEnrichment, language: str
     ) -> str:
-        """Prompt système de secours"""
+        """Prompt système de secours avec instructions de langue renforcées"""
+
+        # Mapping des noms de langue
+        language_names = {
+            "en": "ENGLISH",
+            "fr": "FRENCH / FRANÇAIS",
+            "es": "SPANISH / ESPAÑOL",
+            "de": "GERMAN / DEUTSCH",
+            "it": "ITALIAN / ITALIANO",
+            "pt": "PORTUGUESE / PORTUGUÊS",
+            "nl": "DUTCH / NEDERLANDS",
+            "pl": "POLISH / POLSKI",
+            "zh": "CHINESE / 中文",
+            "hi": "HINDI / हिन्दी",
+            "th": "THAI / ไทย",
+            "id": "INDONESIAN / BAHASA INDONESIA",
+        }
+
+        language_name = language_names.get(language, language.upper())
+
         return f"""Tu es un expert avicole reconnu avec une expertise approfondie en production avicole.
 
 CONTEXTE MÉTIER DÉTECTÉ:
@@ -561,7 +658,21 @@ DIRECTIVES DE RÉPONSE - STYLE EXPERT ÉQUILIBRÉ:
 MÉTRIQUES PRIORITAIRES:
 {', '.join(enrichment.performance_indicators[:3]) if enrichment.performance_indicators else 'Paramètres généraux de production'}
 
-LANGUE: Réponds STRICTEMENT en {language}"""
+{"="*80}
+⚠️ CRITICAL LANGUAGE INSTRUCTION - IMPÉRATIF ABSOLU ⚠️
+{"="*80}
+
+YOU MUST RESPOND EXCLUSIVELY IN: {language_name}
+VOUS DEVEZ RÉPONDRE EXCLUSIVEMENT EN: {language_name}
+
+DO NOT translate or switch languages under ANY circumstances.
+NE traduisez PAS ou ne changez PAS de langue sous AUCUNE circonstance.
+
+THIS IS THE MOST IMPORTANT INSTRUCTION.
+CECI EST L'INSTRUCTION LA PLUS IMPORTANTE.
+
+{"="*80}
+"""
 
     def _post_process_response(
         self, response: str, enrichment: ContextEnrichment, context_docs: List[Dict]
