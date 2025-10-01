@@ -38,33 +38,6 @@ class PostgreSQLValidator:
             f"({len(self.breeds_registry.get_all_breeds())} races)"
         )
 
-    async def initialize(self):
-        """
-        Initialise le PostgreSQL Validator de manière asynchrone
-
-        Cette méthode assure la compatibilité avec l'architecture RAG Engine
-        qui attend une méthode initialize() async pour tous les modules externes.
-
-        Note: L'initialisation principale se fait déjà dans __init__,
-        cette méthode sert principalement à la compatibilité architecturale.
-        """
-        try:
-            # Vérifier que breeds_registry est bien initialisé
-            if not self.breeds_registry:
-                raise RuntimeError("breeds_registry non initialisé")
-
-            breed_count = len(self.breeds_registry.get_all_breeds())
-
-            self.logger.info(
-                f"✅ PostgreSQLValidator initialized - {breed_count} breeds loaded"
-            )
-
-            return True
-
-        except Exception as e:
-            self.logger.error(f"❌ Erreur initialisation PostgreSQLValidator: {e}")
-            raise
-
     def validate_context(
         self, entities: Dict, query: str, language: str = "fr"
     ) -> Dict:
