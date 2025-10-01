@@ -2,7 +2,7 @@
 """
 api/endpoints_chat.py - Endpoints de chat et streaming avec Système RAG JSON
 Gestion des conversations, streaming SSE, validation JSON, ingestion avicole
-Version 4.2 - Intégration preprocessing + CONTEXTUALISATION
+Version 4.2.1 - ACCUMULATION CONTEXTUELLE (corrigée)
 """
 
 import time
@@ -139,7 +139,7 @@ class ChatRequest(BaseModel):
 
 
 class ConversationContextManager:
-    """Gestionnaire de contexte conversationnel pour clarifications"""
+    """Gestionnaire de contexte conversationnel pour clarifications - VERSION ACCUMULÉE"""
 
     def __init__(self):
         self.pending_clarifications = {}
@@ -159,8 +159,9 @@ class ConversationContextManager:
             "suggestions": suggestions,
             "language": language,
             "timestamp": time.time(),
+            "clarification_count": 0,  # ✅ NOUVEAU: Compteur de clarifications
         }
-        logger.info(f"🔔 Clarification en attente pour {tenant_id}: {missing_fields}")
+        logger.info(f"🔐 Clarification en attente pour {tenant_id}: {missing_fields}")
 
     def get_pending(self, tenant_id: str) -> Optional[Dict]:
         """Récupère le contexte en attente"""
@@ -171,6 +172,21 @@ class ConversationContextManager:
         if tenant_id in self.pending_clarifications:
             del self.pending_clarifications[tenant_id]
             logger.info(f"✅ Clarification résolue pour {tenant_id}")
+
+    def update_accumulated_query(self, tenant_id: str, new_info: str):
+        """✅ NOUVEAU: Met à jour la requête accumulée sans effacer le contexte"""
+        if tenant_id in self.pending_clarifications:
+            context = self.pending_clarifications[tenant_id]
+            original = context["original_query"]
+
+            # Accumuler avec séparateur
+            context["original_query"] = f"{original} | {new_info}"
+            context["clarification_count"] = context.get("clarification_count", 0) + 1
+            context["timestamp"] = time.time()
+
+            logger.info(
+                f"📝 Requête accumulée (tour {context['clarification_count']}): {context['original_query'][:100]}..."
+            )
 
     def is_clarification_response(self, message: str, pending_context: Dict) -> bool:
         """Détecte si le message est une réponse à une clarification"""
@@ -190,6 +206,11 @@ class ConversationContextManager:
             import re
 
             return bool(re.search(r"\d+\s*(jour|day|j\b)", message_lower))
+
+        # Détection de sexe
+        if "sex" in missing:
+            sex_keywords = ["mâle", "femelle", "male", "female", "mixte", "mixed"]
+            return any(kw in message_lower for kw in sex_keywords)
 
         return False
 
@@ -298,7 +319,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                 **result,
                 "processing_time": time.time() - start_time,
                 "timestamp": time.time(),
-                "version": "4.2_contextualized",
+                "version": "4.2.1_accumulated",
             }
 
             return JSONResponse(content=safe_serialize_for_json(response))
@@ -548,12 +569,12 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             )
 
     # ========================================================================
-    # ENDPOINT CHAT PRINCIPAL AVEC CONTEXTUALISATION
+    # ENDPOINT CHAT PRINCIPAL AVEC CONTEXTUALISATION ACCUMULÉE
     # ========================================================================
 
     @router.post(f"{BASE_PATH}/chat")
     async def chat(request: Request):
-        """Chat endpoint avec contextualisation intelligente"""
+        """Chat endpoint avec contextualisation intelligente et accumulation"""
         total_start_time = time.time()
 
         try:
@@ -597,7 +618,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             if not tenant_id or len(tenant_id) > 50:
                 tenant_id = str(uuid.uuid4())[:8]
 
-            # 🆕 ÉTAPE 1: Vérifier si c'est une réponse à une clarification
+            # ✅ ÉTAPE 1: Vérifier si c'est une réponse à une clarification
             pending_context = context_manager.get_pending(tenant_id)
 
             if pending_context and context_manager.is_clarification_response(
@@ -605,14 +626,14 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             ):
                 logger.info(f"🔄 Détection réponse clarification pour {tenant_id}")
 
-                # Fusionner la question originale avec la nouvelle info
-                original_query = pending_context["original_query"]
-                combined_query = f"{original_query} {message}"
+                # ✅ CORRECTION: ACCUMULER au lieu de remplacer
+                context_manager.update_accumulated_query(tenant_id, message)
 
-                logger.info(f"📝 Requête combinée: {combined_query}")
+                # Récupérer la requête accumulée mise à jour
+                pending_context = context_manager.get_pending(tenant_id)
+                combined_query = pending_context["original_query"]
 
-                # Effacer le contexte en attente
-                context_manager.clear_pending(tenant_id)
+                logger.info(f"📝 Requête accumulée complète: {combined_query}")
 
                 # Traiter la requête complète
                 message = combined_query
@@ -637,7 +658,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                                 enable_preprocessing=True,
                             )
 
-                            # 🆕 ÉTAPE 2: Vérifier si contexte insuffisant
+                            # ✅ ÉTAPE 2: Vérifier si contexte insuffisant
                             if hasattr(rag_result, "metadata"):
                                 validation_status = rag_result.metadata.get(
                                     "validation_status"
@@ -655,16 +676,25 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                                         "suggestions", {}
                                     )
 
-                                    # Marquer comme en attente de clarification
-                                    context_manager.mark_pending(
-                                        tenant_id=tenant_id,
-                                        original_query=message,
-                                        missing_fields=missing_fields,
-                                        suggestions=suggestions,
-                                        language=language,
-                                    )
+                                    # ✅ Si pas encore en attente, marquer maintenant
+                                    if not pending_context:
+                                        context_manager.mark_pending(
+                                            tenant_id=tenant_id,
+                                            original_query=message,
+                                            missing_fields=missing_fields,
+                                            suggestions=suggestions,
+                                            language=language,
+                                        )
+                                    # ✅ Sinon, mettre à jour les champs manquants
+                                    else:
+                                        context_manager.pending_clarifications[
+                                            tenant_id
+                                        ]["missing_fields"] = missing_fields
+                                        context_manager.pending_clarifications[
+                                            tenant_id
+                                        ]["suggestions"] = suggestions
 
-                                    # ✅ CORRECTION: Utiliser le message déjà généré par le validator
+                                    # Utiliser le message déjà généré par le validator
                                     clarification_msg = rag_result.answer
 
                                     # Fallback si pas de message dans answer (sécurité)
@@ -701,9 +731,14 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                                     rag_result = ClarificationResult(
                                         clarification_msg, missing_fields
                                     )
-                                    logger.info(
-                                        f"❓ Question de clarification générée: {clarification_msg[:100]}..."
-                                    )
+
+                                else:
+                                    # ✅ Validation réussie: effacer le contexte en attente
+                                    if pending_context:
+                                        logger.info(
+                                            f"✅ Requête complète validée pour {tenant_id}"
+                                        )
+                                        context_manager.clear_pending(tenant_id)
 
                             logger.info(
                                 f"RAG generate_response réussi (JSON: {use_json_search}, preprocessing: enabled)"
@@ -782,11 +817,16 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                         "fallback_used": safe_dict_get(
                             metadata, "fallback_used", False
                         ),
-                        "architecture": "modular-endpoints-json-contextualized",
+                        "architecture": "modular-endpoints-json-accumulated",
                         "serialization_version": "optimized_cached",
                         "preprocessing_enabled": True,
                         "needs_clarification": metadata.get(
                             "needs_clarification", False
+                        ),
+                        "clarification_count": (
+                            pending_context.get("clarification_count", 0)
+                            if pending_context
+                            else 0
                         ),
                         "json_system_used": metadata.get("json_system", {}).get(
                             "used", False
@@ -844,13 +884,18 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                         "confidence": float(confidence),
                         "documents_used": documents_used,
                         "source": source,
-                        "architecture": "modular-endpoints-json-contextualized",
+                        "architecture": "modular-endpoints-json-accumulated",
                         "preprocessing_enabled": True,
                         "needs_clarification": metadata.get(
                             "needs_clarification", False
                         ),
                         "clarification_pending": metadata.get(
                             "clarification_pending", False
+                        ),
+                        "clarification_count": (
+                            pending_context.get("clarification_count", 0)
+                            if pending_context
+                            else 0
                         ),
                         "json_system_used": metadata.get("json_system", {}).get(
                             "used", False
@@ -940,7 +985,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                             safe_get_attribute(rag_result, "confidence", 0.5)
                         ),
                         "json_system": metadata.get("json_system", {}),
-                        "architecture": "expert_chat_json_contextualized",
+                        "architecture": "expert_chat_json_accumulated",
                     }
 
                     yield sse_event(safe_serialize_for_json(expert_metadata))
@@ -1022,7 +1067,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     {
                         "type": "start",
                         "reason": "out_of_domain",
-                        "architecture": "modular-endpoints-json-contextualized",
+                        "architecture": "modular-endpoints-json-accumulated",
                     }
                 )
 
@@ -1035,7 +1080,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     {
                         "type": "end",
                         "confidence": 1.0,
-                        "architecture": "modular-endpoints-json-contextualized",
+                        "architecture": "modular-endpoints-json-accumulated",
                     }
                 )
 
@@ -1153,7 +1198,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     if successful_tests == total_tests
                     else "DEGRADED" if successful_tests > 0 else "FAILED"
                 ),
-                "version": "4.2_contextualized",
+                "version": "4.2.1_accumulated",
             }
 
             return safe_serialize_for_json(analysis)
@@ -1282,7 +1327,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     "json_system_effectiveness": queries_with_json / len(test_queries),
                 },
                 "recommendations": [],
-                "version": "4.2_contextualized",
+                "version": "4.2.1_accumulated",
             }
 
             if total_json_results == 0 and queries_with_json == 0:
