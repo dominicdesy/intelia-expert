@@ -1,942 +1,914 @@
 # -*- coding: utf-8 -*-
 """
-rag_postgresql.py - PostgreSQL System Principal Refactorisé
-Point d'entrée principal avec délégation vers modules spécialisés
-VERSION REFACTORISÉE: Utilisation de ValidationCore centralisé + QueryInterpreter OpenAI
-CORRECTION: Support du paramètre language pour détection automatique
-NOUVEAU: Gestion de la contextualisation - Demande de précisions si informations manquantes
-VERSION 11.1: Fusion OpenAI optimisée - Enrichissement breed/age/sex peu importe la confiance
+rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
+VERSION 4.1: Fusion OpenAI + Contextualisation intelligente
+- Préserve tous les champs originaux
+- Logs diagnostiques
+- Invalidation des métriques invalides
+- Auto-détection enrichie dynamique
+- 🆕 Messages de clarification conversationnels multilingues
+- 🆕 Génération de questions plutôt que de simples messages d'erreur
+- 🆕 FUSION avec OpenAI interpretation avant validation
 """
 
+import re
 import logging
-import time
-import json
-from typing import Dict, List, Any
+from typing import Dict, List, Optional, Any
 
-from .data_models import RAGResult, RAGSource
-
-# Import des modules refactorisés
-from .rag_postgresql_config import POSTGRESQL_CONFIG
-from .rag_postgresql_models import MetricResult, QueryType
-from .rag_postgresql_router import QueryRouter
-from .rag_postgresql_retriever import PostgreSQLRetriever
-from .rag_postgresql_validator import PostgreSQLValidator
-from .rag_postgresql_temporal import TemporalQueryProcessor
-
-# Import du module de validation centralisé
-from .validation_core import ValidationCore
+from utils.breeds_registry import get_breeds_registry
 
 logger = logging.getLogger(__name__)
 
 
-class QueryInterpreter:
-    """Interprète les requêtes utilisateur avec OpenAI pour extraction précise des métriques"""
+class PostgreSQLValidator:
+    """Validateur intelligent avec auto-détection, alternatives et contextualisation"""
 
-    def __init__(self, openai_client):
-        self.openai_client = openai_client
-        self.enabled = openai_client is not None
-
-        # Mapping des métriques avec patterns explicites
-        self.metric_keywords = {
-            "feed_conversion_ratio": [
-                "feed conversion ratio",
-                "fcr",
-                "indice de conversion",
-                "conversion alimentaire",
-                "taux de conversion",
-                "ic ",
-                "ratio de conversion",
-                "conversion ratio",
-            ],
-            "cumulative_feed_intake": [
-                "cumulative feed intake",
-                "total feed",
-                "feed intake",
-                "consommation cumulée",
-                "consommation totale",
-                "aliment total",
-                "quantité d'aliment",
-                "besoin en aliment",
-            ],
-            "body_weight": [
-                "body weight",
-                "poids vif",
-                "poids corporel",
-                "weight",
-                "masse corporelle",
-            ],
-            "daily_gain": [
-                "daily gain",
-                "gain quotidien",
-                "gain journalier",
-                "average daily gain",
-                "adg",
-                "gmq",
-            ],
-            "mortality": ["mortality", "mortalité", "taux de mortalité", "death rate"],
-        }
-
-    async def interpret_query(
-        self, query: str, fallback_entities: Dict = None
-    ) -> Dict[str, Any]:
+    def __init__(self, intents_config_path: str = "llm/config/intents.json"):
         """
-        Utilise OpenAI pour interpréter précisément la requête
+        Initialise le validateur avec breeds_registry
 
         Args:
+            intents_config_path: Chemin vers intents.json
+        """
+        self.logger = logger
+        self.breeds_registry = get_breeds_registry(intents_config_path)
+
+        logger.info(
+            f"PostgreSQLValidator initialisé avec breeds_registry "
+            f"({len(self.breeds_registry.get_all_breeds())} races)"
+        )
+
+    def validate_context(
+        self, entities: Dict, query: str, language: str = "fr"
+    ) -> Dict:
+        """
+        🆕 Valide le contexte avec fusion OpenAI AVANT validation
+
+        Args:
+            entities: Entités extraites (peut contenir _openai_interpretation)
             query: Requête utilisateur
-            fallback_entities: Entités détectées par le système classique (fallback)
+            language: Langue détectée
 
         Returns:
-            {
-                "metric": "feed_conversion_ratio" | "cumulative_feed_intake" | ...,
-                "breed": "Ross 308",
-                "age_days": 31,
-                "sex": "male",
-                "confidence": 0.95,
-                "interpretation_source": "openai" | "fallback" | "hybrid"
-            }
+            Dict avec status et missing_fields après fusion
         """
+        # ✅ FUSION: Récupérer les entités OpenAI si disponibles
+        openai_interp = entities.get("_openai_interpretation", {})
 
-        if not self.enabled:
-            logger.warning("QueryInterpreter disabled - OpenAI client not available")
-            return self._fallback_interpretation(query, fallback_entities)
-
-        try:
-            logger.info("🤖 QueryInterpreter: Analyzing query with OpenAI...")
-
-            system_prompt = """Tu es un expert en aviculture qui extrait les informations précises des requêtes.
-
-MÉTRIQUES POSSIBLES (IMPORTANT - ne confonds JAMAIS) :
-- feed_conversion_ratio : FCR, indice de conversion, conversion alimentaire, ratio de conversion
-- cumulative_feed_intake : consommation cumulée, total feed intake, quantité totale d'aliment
-- body_weight : poids vif, body weight, poids corporel
-- daily_gain : gain quotidien, average daily gain, ADG, GMQ
-- mortality : mortalité, taux de mortalité, death rate
-
-RÈGLES CRITIQUES ABSOLUES :
-1. Si la requête contient "feed conversion", "FCR", "indice de conversion", "conversion alimentaire" ou "ratio de conversion" → TOUJOURS feed_conversion_ratio
-2. Si la requête contient "feed intake", "consommation", "total feed" SANS mention de "conversion" → cumulative_feed_intake  
-3. Si la requête mentionne "conversion" OU "ratio" → TOUJOURS feed_conversion_ratio (priorité absolue)
-4. Si ambiguïté entre FCR et feed intake, privilégier feed_conversion_ratio si "conversion" apparaît
-
-RACES COMMUNES :
-- Ross 308, Ross 708, Cobb 500, Cobb 700, Hubbard
-
-SEXE :
-- male, female, as_hatched (mixte)
-
-Réponds UNIQUEMENT en JSON strict :
-{
-  "metric": "nom_métrique_exact",
-  "breed": "nom_race",
-  "age_days": nombre_entier,
-  "sex": "male|female|as_hatched",
-  "confidence": nombre_entre_0_et_1,
-  "reasoning": "explication_courte"
-}"""
-
-            user_message = f"""Analyse cette requête avicole et extrais les informations :
-
-REQUÊTE: "{query}"
-
-Identifie avec précision :
-1. La métrique demandée (feed_conversion_ratio vs cumulative_feed_intake - ATTENTION à ne pas confondre !)
-2. La race/souche (Ross 308, Cobb 500, etc.)
-3. L'âge en jours
-4. Le sexe (male/female/as_hatched)
-
-Réponds en JSON."""
-
-            response = await self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message},
-                ],
-                temperature=0.1,
-                response_format={"type": "json_object"},
-            )
-
-            result = json.loads(response.choices[0].message.content)
-            result["interpretation_source"] = "openai"
-
-            # Validation de la métrique extraite
-            detected_metric = result.get("metric", "")
-            if detected_metric not in self.metric_keywords:
-                logger.warning(
-                    f"⚠️ Métrique inconnue d'OpenAI: {detected_metric}, fallback"
+        # Enrichir avec OpenAI AVANT validation
+        if openai_interp:
+            if not entities.get("age_days") and "age_days" in openai_interp:
+                entities["age_days"] = openai_interp["age_days"]
+                logger.info(
+                    f"✅ Age récupéré depuis OpenAI: {openai_interp['age_days']}"
                 )
-                return self._fallback_interpretation(query, fallback_entities)
 
-            logger.info(
-                f"✅ OpenAI interpretation: metric={result.get('metric')}, confidence={result.get('confidence')}"
-            )
-            logger.debug(f"Full OpenAI result: {result}")
+            if not entities.get("breed") and "breed" in openai_interp:
+                entities["breed"] = openai_interp["breed"]
+                logger.info(
+                    f"✅ Breed récupéré depuis OpenAI: {openai_interp['breed']}"
+                )
 
-            return result
+            if not entities.get("metric_type") and "metric_type" in openai_interp:
+                entities["metric_type"] = openai_interp["metric_type"]
+                logger.info(
+                    f"✅ Metric récupéré depuis OpenAI: {openai_interp['metric_type']}"
+                )
 
-        except Exception as e:
-            logger.error(f"❌ Erreur interprétation OpenAI: {e}", exc_info=True)
-            return self._fallback_interpretation(query, fallback_entities)
+        # MAINTENANT valider ce qui manque vraiment
+        missing_fields = []
+        if not entities.get("breed"):
+            missing_fields.append("breed")
+        if not entities.get("age_days"):  # Ne sera plus None car fusionné!
+            missing_fields.append("age")
+        if not entities.get("metric") and not entities.get("metric_type"):
+            missing_fields.append("metric")
 
-    def _fallback_interpretation(
-        self, query: str, fallback_entities: Dict = None
-    ) -> Dict[str, Any]:
-        """Interprétation de secours basée sur mots-clés + entités existantes"""
-
-        logger.info("🔄 Using fallback interpretation (keyword-based)")
-
-        query_lower = query.lower()
-        detected_metric = None
-        confidence = 0.5
-
-        # Détection par mots-clés avec priorité
-        for metric, keywords in self.metric_keywords.items():
-            for keyword in keywords:
-                if keyword in query_lower:
-                    detected_metric = metric
-                    confidence = 0.7
-                    break
-            if detected_metric:
-                break
-
-        # Si FCR détecté par fallback, haute confiance
-        if detected_metric == "feed_conversion_ratio":
-            confidence = 0.85
-
-        result = {
-            "metric": detected_metric,
-            "confidence": confidence,
-            "interpretation_source": "fallback",
+        return {
+            "status": "complete" if not missing_fields else "needs_fallback",
+            "missing_fields": missing_fields,
+            "enhanced_entities": entities,
         }
 
-        # Merger avec les entités existantes si disponibles
-        if fallback_entities:
-            if "breed" in fallback_entities:
-                result["breed"] = fallback_entities["breed"]
-            if "age_days" in fallback_entities:
-                result["age_days"] = fallback_entities["age_days"]
-            if "sex" in fallback_entities:
-                result["sex"] = fallback_entities["sex"]
-
-            result["interpretation_source"] = "hybrid"
-
-        logger.debug(f"Fallback interpretation result: {result}")
-        return result
-
-
-class PostgreSQLSystem:
-    """Système PostgreSQL principal avec architecture modulaire et interprétation OpenAI"""
-
-    def __init__(self):
-        # Modules core
-        self.query_router = None
-        self.postgres_retriever = None
-        self.postgres_validator = None
-        self.temporal_processor = None
-
-        # 🆕 NOUVEAU: Query Interpreter avec OpenAI
-        self.query_interpreter = None
-
-        # Validation centralisée
-        self.validator = ValidationCore()
-
-        # État
-        self.is_initialized = False
-        self.openai_client = None
-
-    async def initialize(self):
-        """Initialisation modulaire du système PostgreSQL"""
-        if self.is_initialized:
-            return
-
-        try:
-            # Initialiser les modules core
-            await self._initialize_core_modules()
-
-            self.is_initialized = True
-            logger.info("PostgreSQL System initialisé avec modules + QueryInterpreter")
-
-        except Exception as e:
-            logger.error(f"PostgreSQL System initialization error: {e}")
-            self.is_initialized = False
-            raise
-
-    async def _initialize_core_modules(self):
-        """Initialise les modules core"""
-        self.query_router = QueryRouter()
-
-        self.postgres_retriever = PostgreSQLRetriever(POSTGRESQL_CONFIG)
-        await self.postgres_retriever.initialize()
-
-        self.postgres_validator = PostgreSQLValidator()
-        self.temporal_processor = TemporalQueryProcessor(self.postgres_retriever)
-
-        # Initialiser OpenAI si disponible
-        try:
-            import openai
-            import os
-
-            OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-            if OPENAI_API_KEY:
-                self.openai_client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
-
-                # 🆕 Initialiser le QueryInterpreter avec le client OpenAI
-                self.query_interpreter = QueryInterpreter(self.openai_client)
-
-                logger.info("OpenAI client initialized")
-                logger.info("✅ QueryInterpreter initialized with OpenAI")
-            else:
-                logger.warning("OPENAI_API_KEY not found - QueryInterpreter disabled")
-                self.query_interpreter = QueryInterpreter(None)
-
-        except Exception as e:
-            logger.warning(f"OpenAI initialization failed: {e}")
-            self.query_interpreter = QueryInterpreter(None)
-
-    def route_query(self, query: str, intent_result=None) -> QueryType:
-        """Route une requête"""
-        if not self.query_router:
-            return QueryType.KNOWLEDGE
-        return self.query_router.route_query(query, intent_result)
-
-    async def search_metrics(
-        self,
-        query: str,
-        intent_result=None,
-        top_k: int = 12,
-        entities: Dict[str, Any] = None,
-        strict_sex_match: bool = False,
-        language: str = "en",
-    ) -> RAGResult:
+    def flexible_query_validation(
+        self, query: str, entities: Dict[str, Any], language: str = "fr"
+    ) -> Dict[str, Any]:
         """
-        Recherche de métriques avec validation centralisée + interprétation OpenAI
-        VERSION REFACTORISÉE: Utilisation de ValidationCore + QueryInterpreter
-        🆕 CONTEXTUALISATION: Demande des précisions si informations manquantes
-        VERSION 11.1: Fusion OpenAI optimisée - breed/age/sex enrichis peu importe la confiance
+        Validation flexible qui essaie de compléter les requêtes incomplètes
+
+        🆕 VERSION 4.1: Fusion avec OpenAI interpretation AVANT validation
+
+        CORRECTION FINALE: Commence toujours par les entités ORIGINALES,
+        puis enrichit SEULEMENT les champs manquants avec auto-détection.
+        Cela garantit que 'sex' et autres champs du comparison_handler sont préservés.
 
         Args:
             query: Requête utilisateur
-            intent_result: Résultat d'analyse d'intention (optionnel)
-            top_k: Nombre maximum de résultats
-            entities: Entités extraites (breed, age, sex, etc.)
-            strict_sex_match: Forcer correspondance exacte du sexe
-            language: Langue de réponse détectée automatiquement (en, fr, es, etc.)
+            entities: Entités extraites (peut contenir _openai_interpretation)
+            language: Langue détectée (fr, en, es, etc.)
+
+        Returns:
+            Dict avec status: "complete" | "incomplete_but_processable" | "needs_fallback"
         """
 
-        if not self.is_initialized or not self.postgres_retriever:
-            logger.warning("PostgreSQL retriever non initialisé")
-            return RAGResult(
-                source=RAGSource.ERROR, answer="Système de métriques non disponible."
-            )
+        entities = entities or {}
+        missing = []
+        suggestions = []
 
-        start_time = time.time()
+        # 🔥 LOG CRITIQUE #1 : Ce qui ARRIVE au validator
+        logger.debug(f"🔍 VALIDATOR INPUT entities: {entities}")
+        logger.debug(
+            f"🔍 VALIDATOR INPUT - 'sex' present: {'sex' in entities}, value: {entities.get('sex')}"
+        )
+        logger.debug(
+            f"🔍 VALIDATOR INPUT - 'breed' present: {'breed' in entities}, value: {entities.get('breed')}"
+        )
+        logger.debug(
+            f"🔍 VALIDATOR INPUT - 'age_days' present: {'age_days' in entities}, value: {entities.get('age_days')}"
+        )
+        logger.debug(
+            f"🔍 VALIDATOR INPUT - 'explicit_sex_request' present: {'explicit_sex_request' in entities}, value: {entities.get('explicit_sex_request')}"
+        )
+        logger.debug(
+            f"🔍 VALIDATOR INPUT - 'metric_type' present: {'metric_type' in entities}, value: {entities.get('metric_type')}"
+        )
 
-        try:
-            # 🔍 LOG: Entités entrantes
-            logger.debug(f"🔍 search_metrics INPUT entities: {entities}")
-            logger.debug(
-                f"🔍 INPUT - 'sex' present: {'sex' in (entities or {})}, value: {(entities or {}).get('sex')}"
-            )
-            logger.debug(f"🌍 search_metrics language parameter: {language}")
+        # 🟢 CORRECTION CRITIQUE: Copier TOUTES les entités originales en priorité
+        # Cela préserve automatiquement 'sex', 'explicit_sex_request', etc.
+        enhanced_entities = dict(entities) if entities else {}
 
-            # 🆕 ÉTAPE 1: Interprétation OpenAI de la requête
-            if self.query_interpreter:
-                logger.info("🤖 Step 1: OpenAI Query Interpretation")
+        # 🆕 FUSION OpenAI: Récupérer les entités OpenAI si disponibles
+        openai_interp = enhanced_entities.get("_openai_interpretation", {})
 
-                interpreted = await self.query_interpreter.interpret_query(
-                    query, fallback_entities=entities
+        if openai_interp:
+            logger.debug(f"🔍 OpenAI interpretation trouvée: {openai_interp}")
+
+            # Enrichir UNIQUEMENT les champs manquants avec OpenAI
+            if not enhanced_entities.get("age_days") and "age_days" in openai_interp:
+                enhanced_entities["age_days"] = openai_interp["age_days"]
+                logger.info(
+                    f"✅ Age récupéré depuis OpenAI: {openai_interp['age_days']}"
                 )
 
-                if interpreted and interpreted.get("confidence", 0) > 0.6:
-                    # Enrichir/corriger les entités avec l'interprétation OpenAI
-                    entities = entities or {}
+            if not enhanced_entities.get("breed") and "breed" in openai_interp:
+                enhanced_entities["breed"] = openai_interp["breed"]
+                logger.info(
+                    f"✅ Breed récupéré depuis OpenAI: {openai_interp['breed']}"
+                )
 
-                    # ✅ CORRECTION: Toujours fusionner age_days/breed/sex si OpenAI les a trouvés
-                    # (peu importe la confiance, car OpenAI est meilleur que le preprocessing local)
+            if (
+                not enhanced_entities.get("metric_type")
+                and "metric_type" in openai_interp
+            ):
+                enhanced_entities["metric_type"] = openai_interp["metric_type"]
+                logger.info(
+                    f"✅ Metric récupéré depuis OpenAI: {openai_interp['metric_type']}"
+                )
 
-                    if "age_days" in interpreted and interpreted["age_days"]:
-                        age_value = interpreted["age_days"]
-                        entities["age_days"] = (
-                            age_value if isinstance(age_value, int) else int(age_value)
-                        )
-                        logger.info(
-                            f"✅ Age enrichi depuis OpenAI: {entities['age_days']}"
-                        )
+        # 🔥 LOG CRITIQUE #2 : Juste après dict(entities) et fusion OpenAI
+        logger.debug(
+            f"🔍 enhanced_entities AFTER dict(entities) + OpenAI fusion: {enhanced_entities}"
+        )
+        logger.debug(
+            f"🔍 AFTER COPY - 'sex' present: {'sex' in enhanced_entities}, value: {enhanced_entities.get('sex')}"
+        )
+        logger.debug(
+            f"🔍 AFTER COPY - 'explicit_sex_request' present: {'explicit_sex_request' in enhanced_entities}"
+        )
+        logger.debug(
+            f"🔍 AFTER COPY - 'metric_type' present: {'metric_type' in enhanced_entities}, value: {enhanced_entities.get('metric_type')}"
+        )
 
-                    if (
-                        "breed" in interpreted
-                        and interpreted["breed"]
-                        and interpreted["breed"] != "unknown"
-                    ):
-                        entities["breed"] = interpreted["breed"]
-                        logger.info(
-                            f"✅ Breed enrichi depuis OpenAI: {interpreted['breed']}"
-                        )
+        # 🟡 NOUVEAU : Invalider metric_type si c'est 'as_hatched' ou autre valeur invalide
+        # ✅ CORRECTION: Vérifier les DEUX champs
+        metric = enhanced_entities.get("metric_type") or enhanced_entities.get("metric")
+        if metric:
+            metric_lower = str(metric).lower().strip()
+            invalid_metrics = [
+                "as_hatched",
+                "as-hatched",
+                "mixed",
+                "none",
+                "",
+                "male",
+                "female",
+            ]
+            if metric_lower in invalid_metrics:
+                logger.warning(
+                    f"⚠️ metric invalide '{metric}' → None, auto-détection activée"
+                )
+                enhanced_entities["metric_type"] = None
+                enhanced_entities["metric"] = None  # ✅ Effacer les deux
 
-                    if "sex" in interpreted and interpreted["sex"]:
-                        if not entities.get("explicit_sex_request"):
-                            entities["sex"] = interpreted["sex"]
-                            logger.info(
-                                f"✅ Sex enrichi depuis OpenAI: {interpreted['sex']}"
-                            )
+        # 🟢 Auto-détection breed SEULEMENT si absent dans les entités originales ET OpenAI
+        if not enhanced_entities.get("breed"):
+            logger.debug("🔍 Breed ABSENT, auto-detecting from query...")
+            detected_breed = self._detect_breed_from_query(query)
+            if detected_breed:
+                enhanced_entities["breed"] = detected_breed
+                logger.debug(f"✅ Auto-detected breed: {detected_breed}")
+            else:
+                logger.debug("❌ No breed detected in query")
+                missing.append("breed")
+                # 🆕 Suggestion conversationnelle selon la langue
+                suggestions.append(self._get_breed_suggestion(language))
+        else:
+            logger.debug(
+                f"🔍 Breed PRESENT: '{enhanced_entities.get('breed')}', skipping auto-detection"
+            )
 
-                    # Merge intelligent de la métrique selon confiance
-                    if interpreted.get("confidence", 0) > 0.8:
-                        logger.info(
-                            f"✅ High confidence OpenAI interpretation (>{0.8}), using OpenAI metric"
-                        )
-                        if "metric" in interpreted and interpreted["metric"]:
-                            entities["metric"] = interpreted["metric"]
-                            logger.info(f"  → metric: {interpreted['metric']}")
-                    else:
-                        logger.info(
-                            f"⚠️ Medium confidence OpenAI ({interpreted.get('confidence')}), partial merge"
-                        )
-                        # Merge partiel : seulement metric si manquant
-                        if "metric" in interpreted and "metric" not in entities:
-                            entities["metric"] = interpreted["metric"]
+        # 🟢 Auto-détection age SEULEMENT si absent dans les entités originales ET OpenAI
+        if not enhanced_entities.get("age_days"):
+            logger.debug("🔍 Age ABSENT, auto-detecting from query...")
+            detected_age = self._detect_age_from_query(query)
+            if detected_age:
+                enhanced_entities["age_days"] = detected_age
+                logger.debug(f"✅ Auto-detected age: {detected_age} days")
+            else:
+                logger.debug("❌ No age detected in query")
+                # Pour certaines requêtes, l'âge n'est pas critique
+                if any(
+                    word in query.lower()
+                    for word in [
+                        "recommande",
+                        "meilleur",
+                        "compare",
+                        "général",
+                        "recommend",
+                        "best",
+                        "compare",
+                        "general",
+                    ]
+                ):
+                    logger.debug("🔍 General query, age not critical")
+                    pass  # Requête générale - pas besoin d'âge spécifique
+                else:
+                    missing.append("age")
+                    # 🆕 Suggestion conversationnelle selon la langue
+                    suggestions.append(self._get_age_suggestion(language))
+        else:
+            logger.debug(
+                f"🔍 Age PRESENT: '{enhanced_entities.get('age_days')}', skipping auto-detection"
+            )
 
-                    # Ajouter metadata d'interprétation
-                    entities["_openai_interpretation"] = {
-                        "confidence": interpreted.get("confidence"),
-                        "source": interpreted.get("interpretation_source"),
-                        "reasoning": interpreted.get("reasoning", ""),
+        # 🟡 AMÉLIORÉ : Auto-détection metric avec vérification de 'metric' OU 'metric_type'
+        if not enhanced_entities.get("metric_type") and not enhanced_entities.get(
+            "metric"
+        ):
+            logger.debug("🔍 Metric ABSENT, auto-detecting from query...")
+            detected_metric = self._auto_detect_metric_type(query)
+            if detected_metric:
+                enhanced_entities["metric_type"] = detected_metric
+                logger.debug(f"✅ Auto-detected metric: {detected_metric}")
+            else:
+                logger.debug("❌ No metric detected in query")
+                missing.append("metric")
+                suggestions.append(self._get_metric_suggestion(language))
+        else:
+            # Métrique présente (soit metric, soit metric_type)
+            metric_value = enhanced_entities.get("metric") or enhanced_entities.get(
+                "metric_type"
+            )
+            logger.debug(
+                f"🔍 Metric PRESENT: '{metric_value}', skipping auto-detection"
+            )
+
+        # 🔥 LOG CRITIQUE #3 : Avant de retourner
+        logger.debug(f"🔍 enhanced_entities FINAL before return: {enhanced_entities}")
+        logger.debug(
+            f"🔍 FINAL - 'sex' present: {'sex' in enhanced_entities}, value: {enhanced_entities.get('sex')}"
+        )
+        logger.debug(
+            f"🔍 FINAL - 'explicit_sex_request' present: {'explicit_sex_request' in enhanced_entities}, value: {enhanced_entities.get('explicit_sex_request')}"
+        )
+        logger.debug(
+            f"🔍 FINAL - 'metric_type' present: {'metric_type' in enhanced_entities}, value: {enhanced_entities.get('metric_type')}"
+        )
+
+        # 🔥 VÉRIFICATION CRITIQUE : Comparaison INPUT vs OUTPUT
+        input_keys = set(entities.keys())
+        output_keys = set(enhanced_entities.keys())
+        lost_keys = input_keys - output_keys
+
+        if lost_keys:
+            logger.error(f"❌❌❌ VALIDATOR LOST KEYS: {lost_keys}")
+            logger.error(f"❌ INPUT had: {input_keys}")
+            logger.error(f"❌ OUTPUT has: {output_keys}")
+
+            # 🟢 CORRECTION : RESTAURER les champs perdus
+            for key in lost_keys:
+                enhanced_entities[key] = entities[key]
+                logger.warning(f"⚠️ RESTORED lost key '{key}': {entities[key]}")
+
+            logger.debug(f"🔍 enhanced_entities AFTER restoration: {enhanced_entities}")
+        else:
+            logger.debug("✅ No keys lost, all fields preserved")
+
+        # 🟢 Log de debug pour vérifier que tous les champs sont préservés
+        if entities:
+            preserved_fields = [k for k in entities.keys() if k in enhanced_entities]
+            if preserved_fields:
+                logger.debug(f"✅ Preserved original fields: {preserved_fields}")
+
+        # Déterminer le statut
+        if not missing:
+            logger.debug("✅ Validation complete, returning enhanced_entities")
+            return {"status": "complete", "enhanced_entities": enhanced_entities}
+
+        elif len(missing) == 1 and "breed" in missing:
+            # 🆕 NOUVEAU: Si l'utilisateur accepte explicitement une moyenne générale
+            acceptance_patterns = [
+                "peu importe",
+                "n'importe",
+                "moyenne",
+                "général",
+                "doesn't matter",
+                "any",
+                "average",
+                "all breeds",
+                "don't care",
+            ]
+            user_accepts_general = any(
+                pattern in query.lower() for pattern in acceptance_patterns
+            )
+
+            if user_accepts_general:
+                logger.info("✅ Utilisateur accepte moyenne générale - breed optionnel")
+                # Marquer breed comme "all" pour signaler une requête multi-races
+                enhanced_entities["breed"] = "all"
+                enhanced_entities["is_general_average"] = True
+
+                return {
+                    "status": "complete",
+                    "enhanced_entities": enhanced_entities,
+                    "message": "Requête générale acceptée - moyenne toutes races",
+                }
+
+            # 🆕 CORRECTION CRITIQUE : Vérifier si l'âge manquant est critique
+            if "age" in missing:
+                # Pour des métriques qui varient fortement avec l'âge, c'est critique
+                critical_metrics = [
+                    "weight",
+                    "body_weight",
+                    "poids",
+                    "feed_conversion",
+                    "conversion",
+                    "fcr",
+                    "daily_gain",
+                    "gain",
+                ]
+                metric = enhanced_entities.get("metric_type", "").lower()
+                metric_name = enhanced_entities.get("metric", "").lower()
+
+                # Vérifier si la métrique est critique
+                is_critical_metric = any(m in metric for m in critical_metrics) or any(
+                    m in metric_name for m in critical_metrics
+                )
+
+                if is_critical_metric:
+                    logger.debug(
+                        f"❌ Age manquant pour métrique critique '{metric}' - needs_fallback"
+                    )
+                    helpful_message = self._generate_conversational_question(
+                        query, missing, suggestions, language
+                    )
+                    return {
+                        "status": "needs_fallback",
+                        "missing": missing,
+                        "suggestions": suggestions,
+                        "helpful_message": helpful_message,
                     }
 
-                    logger.info(f"✅ Entities enriched by OpenAI: {entities}")
+            # Si ce n'est pas critique (ex: mortalité générale), on peut traiter
+            logger.debug(f"⚠️ Validation incomplete but processable, missing: {missing}")
+            return {
+                "status": "incomplete_but_processable",
+                "message": f"Autoriser la requête sans {', '.join(missing)} spécifique",
+                "enhanced_entities": enhanced_entities,
+                "missing": missing,
+            }
 
-            # ÉTAPE 2: Validation des entités avec ValidationCore
-            logger.info("🔍 Step 2: Entity Validation")
-            validation_result = self.validator.validate_entities(entities or {})
-
-            logger.debug(
-                f"🔍 Validation result: valid={validation_result.is_valid}, confidence={validation_result.confidence}"
+        else:
+            # Trop d'informations manquantes - 🆕 Message conversationnel
+            logger.debug(f"❌ Validation needs fallback, missing: {missing}")
+            helpful_message = self._generate_conversational_question(
+                query, missing, suggestions, language
             )
+            return {
+                "status": "needs_fallback",
+                "missing": missing,
+                "suggestions": suggestions,
+                "helpful_message": helpful_message,
+            }
 
-            # 🆕 ÉTAPE 2.5: VÉRIFICATION CONTEXTUALISATION
-            logger.info("🔍 Step 2.5: Contextual Validation")
-            if self.postgres_validator:
-                context_validation = self.postgres_validator.flexible_query_validation(
-                    query, entities or {}, language
-                )
+    def _get_breed_suggestion(self, language: str) -> str:
+        """Retourne une suggestion pour la race selon la langue"""
+        suggestions = {
+            "fr": "Quelle race/souche élevez-vous ? (Ross 308, Cobb 500, Hubbard, etc.)",
+            "en": "Which breed/strain are you raising? (Ross 308, Cobb 500, Hubbard, etc.)",
+            "es": "¿Qué raza/cepa está criando? (Ross 308, Cobb 500, Hubbard, etc.)",
+        }
+        return suggestions.get(language, suggestions["fr"])
 
-                logger.debug(
-                    f"🔍 Context validation status: {context_validation.get('status')}"
-                )
+    def _get_age_suggestion(self, language: str) -> str:
+        """Retourne une suggestion pour l'âge selon la langue"""
+        suggestions = {
+            "fr": "À quel âge (en jours) souhaitez-vous cette information ?",
+            "en": "At what age (in days) would you like this information?",
+            "es": "¿A qué edad (en días) desea esta información?",
+        }
+        return suggestions.get(language, suggestions["fr"])
 
-                if context_validation.get("status") == "needs_fallback":
-                    helpful_message = context_validation.get("helpful_message", "")
+    def _get_metric_suggestion(self, language: str) -> str:
+        """Retourne une suggestion pour la métrique selon la langue"""
+        suggestions = {
+            "fr": "Quelle métrique vous intéresse ? (poids vif, conversion alimentaire, gain quotidien, mortalité)",
+            "en": "Which metric are you interested in? (body weight, feed conversion, daily gain, mortality)",
+            "es": "¿Qué métrica le interesa? (peso vivo, conversión alimenticia, ganancia diaria, mortalidad)",
+        }
+        return suggestions.get(language, suggestions["fr"])
 
-                    logger.warning(
-                        f"⚠️ Contexte insuffisant détecté: {context_validation.get('missing')}"
-                    )
-                    logger.info(
-                        f"💬 Message de clarification: {helpful_message[:100]}..."
-                    )
-
-                    # Retourner un résultat spécial pour clarification
-                    return RAGResult(
-                        source=RAGSource.INSUFFICIENT_CONTEXT,
-                        answer=helpful_message,  # ✅ CORRECTION: Mettre le message ici
-                        confidence=0.0,
-                        metadata={
-                            "validation_status": "needs_fallback",
-                            "missing_fields": context_validation.get("missing", []),
-                            "suggestions": context_validation.get("suggestions", []),
-                            "helpful_message": helpful_message,
-                            "enhanced_entities": context_validation.get(
-                                "enhanced_entities", {}
-                            ),
-                            "original_query": query,
-                            "processing_time": time.time() - start_time,
-                            "awaiting_user_input": True,
-                        },
-                    )
-
-                # Si statut OK ou incomplete_but_processable, enrichir les entités
-                if context_validation.get("enhanced_entities"):
-                    entities = context_validation["enhanced_entities"]
-                    logger.info(f"✅ Entités enrichies par contexte: {entities}")
-
-            # 🔧 ÉTAPE 3: Merge intelligent des entités
-            logger.info("🔧 Step 3: Entity Merge Strategy")
-            original_entities = entities or {}
-            validated_entities = original_entities.copy()
-
-            # Préserver les champs critiques
-            critical_keys_to_preserve = [
-                "sex",
-                "explicit_sex_request",
-                "_comparison_label",
-                "_comparison_dimension",
-            ]
-
-            for key in critical_keys_to_preserve:
-                if key in original_entities and original_entities[key] is not None:
-                    validated_entities[key] = original_entities[key]
-                    logger.debug(
-                        f"🔍 PRESERVED critical key '{key}': {original_entities[key]}"
-                    )
-
-            entities = validated_entities
-
-            # ÉTAPE 4: Vérification de disponibilité des données
-            if self.postgres_validator:
-                try:
-                    availability_check = (
-                        self.postgres_validator.check_data_availability_flexible(
-                            entities
-                        )
-                    )
-
-                    if availability_check and isinstance(availability_check, dict):
-                        if not availability_check.get(
-                            "available", True
-                        ) and availability_check.get("alternatives"):
-                            return RAGResult(
-                                source=RAGSource.NO_RESULTS,
-                                answer=availability_check.get(
-                                    "helpful_response", "Données non disponibles"
-                                ),
-                                metadata={
-                                    "processing_time": time.time() - start_time,
-                                    "alternatives": availability_check.get(
-                                        "alternatives", []
-                                    ),
-                                },
-                            )
-                except Exception as availability_error:
-                    logger.warning(
-                        f"Erreur vérification disponibilité: {availability_error}"
-                    )
-
-            # ÉTAPE 5: Détection de requête temporelle
-            if self.temporal_processor:
-                try:
-                    temporal_range = self.temporal_processor.detect_temporal_range(
-                        query, entities
-                    )
-                    if temporal_range:
-                        logger.info(
-                            f"Temporal range query detected: {temporal_range['age_min']}-{temporal_range['age_max']} days"
-                        )
-                        return await self.search_metrics_range(
-                            query=query,
-                            entities=entities,
-                            age_min=temporal_range["age_min"],
-                            age_max=temporal_range["age_max"],
-                            top_k=top_k,
-                            strict_sex_match=strict_sex_match,
-                            language=language,
-                        )
-                except Exception as temporal_error:
-                    logger.warning(f"Erreur détection temporelle: {temporal_error}")
-
-            # ÉTAPE 6: Exécution de la requête PostgreSQL
-            logger.info("🔍 Step 6: PostgreSQL Query Execution")
-            logger.debug(
-                f"🔍 CALLING postgres_retriever.search_metrics with entities: {entities}"
-            )
-
-            metric_results = await self.postgres_retriever.search_metrics(
-                query=query,
-                entities=entities,
-                top_k=top_k,
-                strict_sex_match=strict_sex_match,
-            )
-
-            if not metric_results:
-                return RAGResult(
-                    source=RAGSource.NO_RESULTS,
-                    answer="Aucune métrique trouvée pour cette requête.",
-                    metadata={"processing_time": time.time() - start_time},
-                )
-
-            # ÉTAPE 7: Conversion et génération de réponse
-            documents = self._convert_metrics_to_documents(metric_results)
-            answer_text = await self._generate_response(
-                query,
-                documents,
-                metric_results,
-                entities,
-                language,
-            )
-            avg_confidence = sum(m.confidence for m in metric_results) / len(
-                metric_results
-            )
-
-            logger.info(f"✅ PostgreSQL SUCCESS: {len(documents)} documents retrieved")
-
-            return RAGResult(
-                source=RAGSource.RAG_SUCCESS,
-                answer=answer_text,
-                context_docs=[doc.to_dict() for doc in documents],
-                confidence=avg_confidence,
-                metadata={
-                    "source_type": "metrics",
-                    "data_source": "postgresql",
-                    "metric_count": len(metric_results),
-                    "openai_interpretation": entities.get("_openai_interpretation"),
-                    "validation_passed": validation_result.is_valid,
-                    "processing_time": time.time() - start_time,
-                },
-            )
-
-        except Exception as e:
-            logger.error(f"PostgreSQL search error: {e}", exc_info=True)
-            return RAGResult(
-                source=RAGSource.ERROR,
-                answer="Erreur lors de la recherche de métriques.",
-                metadata={"error": str(e), "processing_time": time.time() - start_time},
-            )
-
-    def _generate_clarification_question(
+    def _generate_conversational_question(
         self,
-        missing_fields: List[str],
+        query: str,
+        missing: List[str],
         suggestions: List[str],
-        entities: Dict[str, Any],
-        language: str,
+        language: str = "fr",
     ) -> str:
         """
         🆕 NOUVEAU: Génère une question de clarification conversationnelle
 
         Args:
-            missing_fields: Liste des champs manquants
-            suggestions: Suggestions pour compléter
-            entities: Entités déjà extraites
+            query: Requête originale
+            missing: Champs manquants
+            suggestions: Suggestions détaillées (non utilisées directement)
             language: Langue de la réponse
 
         Returns:
-            Question de clarification formatée
+            Question conversationnelle formatée
         """
 
-        # Templates multilingues
-        templates = {
-            "fr": {
-                "intro": "Pour vous donner une réponse précise, j'ai besoin de quelques informations supplémentaires.",
-                "breed": "Quelle race/souche élevez-vous ? (par exemple : Ross 308, Cobb 500, Hubbard)",
-                "age": "À quel âge (en jours) souhaitez-vous connaître cette information ?",
-                "metric": "Quelle métrique vous intéresse ? (poids vif, conversion alimentaire, gain quotidien, mortalité)",
-                "multiple": "Pourriez-vous préciser :",
-            },
-            "en": {
-                "intro": "To provide you with an accurate answer, I need some additional information.",
-                "breed": "Which breed/strain are you raising? (e.g., Ross 308, Cobb 500, Hubbard)",
-                "age": "At what age (in days) would you like this information?",
-                "metric": "Which metric are you interested in? (body weight, feed conversion, daily gain, mortality)",
-                "multiple": "Could you please specify:",
-            },
-            "es": {
-                "intro": "Para darle una respuesta precisa, necesito información adicional.",
-                "breed": "¿Qué raza/cepa está criando? (por ejemplo: Ross 308, Cobb 500, Hubbard)",
-                "age": "¿A qué edad (en días) desea esta información?",
-                "metric": "¿Qué métrica le interesa? (peso vivo, conversión alimenticia, ganancia diaria, mortalidad)",
-                "multiple": "¿Podría especificar:",
-            },
+        # Templates d'introduction selon la langue
+        intros = {
+            "fr": "Pour vous donner une réponse précise, j'ai besoin de quelques informations supplémentaires.",
+            "en": "To provide you with an accurate answer, I need some additional information.",
+            "es": "Para darle una respuesta precisa, necesito información adicional.",
         }
 
-        # Utiliser templates français par défaut si langue non supportée
-        lang_templates = templates.get(language, templates["fr"])
+        # Templates pour plusieurs champs manquants
+        multiple_intros = {
+            "fr": "Pourriez-vous préciser :",
+            "en": "Could you please specify:",
+            "es": "¿Podría especificar:",
+        }
 
-        # Construire la question
-        parts = [lang_templates["intro"]]
+        intro = intros.get(language, intros["fr"])
 
-        # Si plusieurs champs manquants
-        if len(missing_fields) > 1:
-            parts.append(f"\n\n{lang_templates['multiple']}")
-            for field in missing_fields:
-                if "breed" in field.lower() or "race" in field.lower():
-                    parts.append(f"\n- {lang_templates['breed']}")
-                elif "age" in field.lower() or "âge" in field.lower():
-                    parts.append(f"\n- {lang_templates['age']}")
-                elif "metric" in field.lower() or "métrique" in field.lower():
-                    parts.append(f"\n- {lang_templates['metric']}")
-        else:
-            # Un seul champ manquant
-            field = missing_fields[0]
-            parts.append("\n")
+        # 🔧 CORRECTION : Générer les bonnes suggestions basées sur les champs MISSING
+        contextual_suggestions = []
+        for field in missing:
             if "breed" in field.lower() or "race" in field.lower():
-                parts.append(lang_templates["breed"])
+                contextual_suggestions.append(self._get_breed_suggestion(language))
             elif "age" in field.lower() or "âge" in field.lower():
-                parts.append(lang_templates["age"])
+                contextual_suggestions.append(self._get_age_suggestion(language))
             elif "metric" in field.lower() or "métrique" in field.lower():
-                parts.append(lang_templates["metric"])
+                contextual_suggestions.append(self._get_metric_suggestion(language))
 
-        # Ajouter suggestions si disponibles
-        if suggestions:
-            suggestions_text = " | ".join(suggestions[:3])
-            parts.append(f"\n\n💡 {suggestions_text}")
+        # Construction de la question
+        parts = [intro]
+
+        if len(contextual_suggestions) > 1:
+            # Plusieurs champs manquants
+            parts.append(f"\n\n{multiple_intros.get(language, multiple_intros['fr'])}")
+            for suggestion in contextual_suggestions:
+                parts.append(f"\n• {suggestion}")
+        elif len(contextual_suggestions) == 1:
+            # Un seul champ manquant
+            parts.append(f"\n\n{contextual_suggestions[0]}")
+        else:
+            # Fallback si aucune suggestion générée
+            parts.append("\n\nVeuillez fournir les informations manquantes.")
 
         return "".join(parts)
 
-    async def search_metrics_range(
-        self,
-        query: str,
-        entities: Dict[str, str],
-        age_min: int,
-        age_max: int,
-        top_k: int = 12,
-        strict_sex_match: bool = False,
-        language: str = "en",
-    ) -> RAGResult:
-        """Recherche optimisée pour plages temporelles"""
-
-        if not self.temporal_processor:
-            return await self.search_metrics(
-                query,
-                entities=entities,
-                top_k=top_k,
-                strict_sex_match=strict_sex_match,
-                language=language,
-            )
-
-        return await self.temporal_processor.search_metrics_range(
-            query, entities, age_min, age_max, top_k, strict_sex_match
-        )
-
-    def _convert_metrics_to_documents(self, metric_results: List[MetricResult]) -> List:
-        """Convertit les métriques en documents"""
-        from .data_models import Document
-
-        documents = []
-        for metric in metric_results:
-            try:
-                content = self._format_metric_content(metric)
-                doc = Document(
-                    content=content,
-                    metadata={
-                        "strain": metric.strain,
-                        "metric_name": metric.metric_name,
-                        "sex": metric.sex,
-                        "source_type": "metrics",
-                    },
-                    score=metric.confidence,
-                    source_type="metrics",
-                    retrieval_method="postgresql",
-                )
-                documents.append(doc)
-            except Exception as e:
-                logger.error(f"Document creation error: {e}")
-                continue
-        return documents
-
-    def _format_metric_content(self, metric: MetricResult) -> str:
-        """Formate une métrique en texte"""
-        parts = [f"**{metric.metric_name}**", f"Strain: {metric.strain}"]
-
-        if metric.sex:
-            parts.append(f"Sex: {metric.sex}")
-
-        if metric.value_numeric is not None:
-            parts.append(f"Value: {metric.value_numeric} {metric.unit or ''}")
-
-        if metric.age_min is not None:
-            if metric.age_min == metric.age_max:
-                parts.append(f"Age: {metric.age_min} days")
-            else:
-                parts.append(f"Age: {metric.age_min}-{metric.age_max} days")
-
-        return "\n".join(parts)
-
-    async def _generate_response(
-        self,
-        query: str,
-        documents: List,
-        metric_results: List[MetricResult],
-        entities: Dict,
-        language: str = "en",
+    def _generate_validation_help_message(
+        self, query: str, missing: List[str], suggestions: List[str]
     ) -> str:
         """
-        Génère une réponse enrichie avec EnhancedResponseGenerator
+        Génère un message d'aide pour validation
+        🆕 DÉPRÉCIÉE: Utiliser _generate_conversational_question à la place
+        """
+        return (
+            f"Informations manquantes pour traiter votre requête : {', '.join(missing)}. "
+            f"Suggestions : {' '.join(suggestions)}"
+        )
 
-        Args:
-            query: Requête utilisateur
-            documents: Documents contextuels
-            metric_results: Résultats métriques
-            entities: Entités extraites
-            language: Langue de réponse (en, fr, es, etc.)
+    def validate_and_enhance(self, entities: Dict, query: str) -> Dict:
+        """
+        Valider et enrichir les entités
+        Méthode alternative avec invalidation explicite des métriques invalides
         """
 
-        if not metric_results:
-            return f"Aucune donnée trouvée pour '{query}'."
+        enhanced = dict(entities) if entities else {}
+        missing = []
+        message = ""
 
-        # Log pour debug
-        logger.debug(f"🌍 _generate_response received language: {language}")
-
-        # Utiliser le générateur enrichi si OpenAI disponible
-        if self.openai_client:
-            try:
-                from generation.generators import create_enhanced_generator
-
-                logger.info(
-                    "🎨 Utilisation EnhancedResponseGenerator pour réponse de qualité"
+        # 🟡 NOUVEAU : Invalider metric_type si c'est 'as_hatched' ou valeur invalide
+        metric = enhanced.get("metric_type")
+        if metric:
+            metric_lower = str(metric).lower().strip()
+            invalid_metrics = [
+                "as_hatched",
+                "as-hatched",
+                "mixed",
+                "none",
+                "",
+                "male",
+                "female",
+            ]
+            if metric_lower in invalid_metrics:
+                self.logger.warning(
+                    f"⚠️ metric_type invalide '{metric}' → None, auto-détection activée"
                 )
+                enhanced["metric_type"] = None
 
-                generator = create_enhanced_generator(
-                    openai_client=self.openai_client,
-                    cache_manager=None,
-                    language=language,
-                )
-
-                # Générer réponse enrichie avec contexte
-                response = await generator.generate_response(
-                    query=query,
-                    context_docs=documents,
-                    conversation_context="",
-                    language=language,
-                    intent_result=None,
-                )
-
-                logger.info("✅ Réponse générée par EnhancedResponseGenerator")
-                return response
-
-            except Exception as e:
-                logger.warning(f"⚠️ Fallback sur génération basique: {e}")
-                # Continuer avec fallback ci-dessous
-
-        # Fallback : génération basique si OpenAI indisponible
-        return self._generate_basic_response(metric_results, entities)
-
-    def _generate_basic_response(
-        self,
-        metric_results: List[MetricResult],
-        entities: Dict,
-    ) -> str:
-        """Génération basique de secours (fallback)"""
-
-        best_metric = metric_results[0]
-
-        # Formater le nom de la métrique
-        metric_display_names = {
-            "feed_conversion_ratio": "Feed Conversion Ratio (FCR)",
-            "body_weight": "Poids vif",
-            "daily_gain": "Gain quotidien",
-            "feed_intake": "Consommation alimentaire cumulée",
-            "mortality": "Mortalité",
-        }
-
-        metric_base = (
-            best_metric.metric_name.split(" for ")[0]
-            if " for " in best_metric.metric_name
-            else best_metric.metric_name
-        )
-        metric_display = metric_display_names.get(metric_base, metric_base)
-
-        # Formater la valeur
-        if best_metric.value_numeric is not None:
-            if "conversion" in metric_base.lower() or "fcr" in metric_base.lower():
-                value_str = f"{best_metric.value_numeric:.2f}"
-            elif "weight" in metric_base.lower() or "gain" in metric_base.lower():
-                value_str = f"{best_metric.value_numeric:.0f}g"
+        # Si metric_type est None, activer auto-détection
+        if not enhanced.get("metric_type"):
+            self.logger.debug("🔍 Metric ABSENT, auto-detecting from query...")
+            detected = self._auto_detect_metric_type(query)
+            if detected:
+                enhanced["metric_type"] = detected
+                self.logger.debug(f"✅ Auto-detected metric: {detected}")
             else:
-                value_str = f"{best_metric.value_numeric:.2f}"
-
-            if best_metric.unit and best_metric.unit not in value_str:
-                value_str += f" {best_metric.unit}"
+                self.logger.debug("❌ No metric detected in query")
+                missing.append("metric_type")
         else:
-            value_str = best_metric.value_text or "N/A"
-
-        # Sexe et âge
-        sex_info = ""
-        if best_metric.sex and best_metric.sex != "as_hatched":
-            sex_labels = {"male": "mâles", "female": "femelles"}
-            sex_info = f" ({sex_labels.get(best_metric.sex, best_metric.sex)})"
-
-        age_info = ""
-        if best_metric.age_min is not None:
-            age_info = (
-                f" à {best_metric.age_min} jours"
-                if best_metric.age_min == best_metric.age_max
-                else f" entre {best_metric.age_min}-{best_metric.age_max} jours"
+            self.logger.debug(
+                f"🔍 Metric PRESENT: '{enhanced['metric_type']}', skipping auto-detection"
             )
 
-        breed_display = best_metric.strain.replace("/", " ")
+        # Vérifier breed avec breeds_registry
+        if not enhanced.get("breed"):
+            detected_breed = self._detect_breed_from_query(query)
+            if detected_breed:
+                enhanced["breed"] = detected_breed
+            else:
+                missing.append("breed")
 
-        return f"**{metric_display}** pour Ross {breed_display}{sex_info}{age_info} : **{value_str}**"
+        # Vérifier age
+        if not enhanced.get("age_days"):
+            detected_age = self._detect_age_from_query(query)
+            if detected_age:
+                enhanced["age_days"] = detected_age
+            else:
+                missing.append("age_days")
 
-    async def close(self):
-        """Fermeture du système"""
-        if self.postgres_retriever:
-            await self.postgres_retriever.close()
-        self.is_initialized = False
-
-    def get_normalization_status(self) -> Dict[str, Any]:
-        """Retourne le statut du système avec tous les modules"""
-        if not self.postgres_retriever:
-            return {"available": False}
+        # Déterminer statut
+        if not missing:
+            status = "complete"
+        elif len(missing) <= 1:
+            status = "incomplete_but_processable"
+            message = f"Informations manquantes: {', '.join(missing)}"
+        else:
+            status = "needs_fallback"
+            message = f"Trop d'informations manquantes: {', '.join(missing)}"
 
         return {
-            "available": True,
-            "modules": {
-                "query_router": bool(self.query_router),
-                "postgres_retriever": bool(self.postgres_retriever),
-                "postgres_validator": bool(self.postgres_validator),
-                "temporal_processor": bool(self.temporal_processor),
-                "validation_core": bool(self.validator),
-                "query_interpreter": bool(self.query_interpreter),
-            },
-            "query_interpreter": {
-                "enabled": (
-                    self.query_interpreter.enabled if self.query_interpreter else False
-                ),
-                "description": "Interprétation intelligente des requêtes via OpenAI GPT-4",
-                "features": [
-                    "Distinction précise FCR vs Feed Intake",
-                    "Extraction race/souche automatique",
-                    "Détection âge et sexe",
-                    "Score de confiance de l'interprétation",
-                    "Fallback keyword-based si OpenAI indisponible",
-                ],
-                "status": (
-                    "active"
-                    if (self.query_interpreter and self.query_interpreter.enabled)
-                    else "disabled"
-                ),
-            },
-            "contextualization": {
-                "enabled": True,
-                "description": "Demande de clarification si informations manquantes",
-                "features": [
-                    "Détection automatique des champs manquants",
-                    "Questions de clarification multilingues",
-                    "Suggestions contextuelles",
-                    "Maintien du contexte conversationnel",
-                ],
-                "status": "active",
-            },
-            "language_support": {
-                "enabled": True,
-                "description": "Support automatique de la langue détectée",
-                "supported_languages": [
-                    "en",
-                    "fr",
-                    "es",
-                    "de",
-                    "it",
-                    "pt",
-                    "nl",
-                    "pl",
-                    "zh",
-                    "hi",
-                    "th",
-                    "id",
-                ],
-                "default": "en",
-            },
-            "sex_aware_search": True,
-            "openai_enabled": self.openai_client is not None,
-            "strict_sex_match_supported": True,
-            "validation_centralized": {
-                "applied": True,
-                "description": "Validation centralisée via ValidationCore",
-                "status": "active",
-            },
-            "temporal_optimization": {
-                "applied": True,
-                "description": "Optimisation SQL pour plages temporelles",
-                "status": "active",
-            },
-            "implementation_phase": "modular_architecture_with_contextualization",
-            "version": "v11.1_openai_fusion_optimized",
+            "status": status,
+            "enhanced_entities": enhanced,
+            "missing": missing,
+            "message": message,
         }
+
+    def _detect_breed_from_query(self, query: str) -> Optional[str]:
+        """
+        Détecte la race dans le texte de la requête via breeds_registry
+        Version 3.1: CORRIGÉ - get_all_breeds() retourne Set[str], pas des objets
+        """
+        query_lower = query.lower()
+
+        # Itérer sur toutes les races connues (Set[str] de noms canoniques)
+        for breed_name in self.breeds_registry.get_all_breeds():
+            # breed_name est une string comme "ross 308", "cobb 500"
+
+            # Vérifier le nom canonique
+            if breed_name.lower() in query_lower:
+                logger.debug(f"✅ Breed détecté (canonical): {breed_name}")
+                return breed_name
+
+            # Récupérer et vérifier les aliases pour cette race
+            aliases = self.breeds_registry.get_aliases(breed_name)
+            for alias in aliases:
+                if alias.lower() in query_lower:
+                    logger.debug(f"✅ Breed détecté (alias '{alias}'): {breed_name}")
+                    return breed_name
+
+        logger.debug("❌ Aucun breed détecté")
+        return None
+
+    def _detect_age_from_query(self, query: str) -> Optional[int]:
+        """Détecte l'âge dans le texte de la requête"""
+        age_patterns = [
+            r"à\s+(\d+)\s+jours?",
+            r"(\d+)\s+jours?",
+            r"(\d+)\s*j\b",
+            r"(\d+)\s+semaines?",
+            r"at\s+(\d+)\s+days?",
+        ]
+
+        for pattern in age_patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                age = int(match.group(1))
+                if "semaine" in pattern.lower() or "week" in pattern.lower():
+                    age = age * 7
+                return age
+
+        return None
+
+    def _detect_metric_from_query(self, query: str) -> Optional[str]:
+        """
+        Détecte le type de métrique dans la requête
+        VERSION BASIQUE - À utiliser pour compatibilité descendante
+        """
+        query_lower = query.lower()
+
+        metric_keywords = {
+            "weight": ["poids", "weight", "body weight"],
+            "feed_conversion": [
+                "conversion",
+                "fcr",
+                "ic",
+                "feed conversion",
+                "conversion alimentaire",
+            ],
+            "mortality": ["mortalité", "mortality", "viabilité", "viability"],
+        }
+
+        for metric_type, keywords in metric_keywords.items():
+            if any(keyword in query_lower for keyword in keywords):
+                return metric_type
+
+        return None
+
+    def _auto_detect_metric_type(self, query: str) -> Optional[str]:
+        """
+        Détecter automatiquement le type de métrique depuis la requête
+        VERSION ENRICHIE - Cohérente avec query_preprocessor
+        """
+
+        query_lower = query.lower()
+
+        # 🟡 Patterns étendus (cohérents avec query_preprocessor)
+        metric_patterns = {
+            # Poids
+            "poids": "body_weight",
+            "weight": "body_weight",
+            "poids vif": "body_weight",
+            "body weight": "body_weight",
+            # Gain
+            "gain quotidien": "daily_weight_gain",
+            "gain moyen quotidien": "average_daily_gain",
+            "gain moyen": "average_daily_gain",
+            "gmq": "average_daily_gain",
+            "gmo": "average_daily_gain",
+            "adg": "average_daily_gain",
+            # Consommation
+            "consommation cumulée": "cumulative_feed_intake",
+            "consommation cumulative": "cumulative_feed_intake",
+            "consommation totale": "cumulative_feed_intake",
+            "aliment cumulé": "cumulative_feed_intake",
+            # Conversion
+            "indice de consommation": "feed_conversion_ratio",
+            "conversion alimentaire": "feed_conversion_ratio",
+            "ic": "feed_conversion_ratio",
+            "fcr": "feed_conversion_ratio",
+            # Mortalité
+            "mortalité": "mortality",
+            "taux de mortalité": "mortality",
+            "viabilité": "mortality",
+            "mortality": "mortality",
+        }
+
+        # 🟡 Chercher par ordre de spécificité (plus long d'abord)
+        for pattern in sorted(metric_patterns.keys(), key=len, reverse=True):
+            if pattern in query_lower:
+                detected = metric_patterns[pattern]
+                self.logger.debug(
+                    f"✅ Métrique auto-détectée: '{pattern}' → {detected}"
+                )
+                return detected
+
+        self.logger.debug("❌ Aucune métrique détectée automatiquement")
+        return None
+
+    def check_data_availability_flexible(
+        self, entities: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Vérifie si les données demandées sont disponibles
+        Version 3.1: Utilise breeds_registry pour obtenir les plages d'âges
+        """
+        breed = entities.get("breed", "").lower() if entities.get("breed") else None
+        age_days = entities.get("age_days")
+
+        if not breed or not age_days:
+            return {"available": True}
+
+        age = int(age_days) if isinstance(age_days, (int, str)) else None
+        if not age:
+            return {"available": True}
+
+        # Utiliser breeds_registry pour valider la race
+        is_valid, canonical_breed = self.breeds_registry.validate_breed(breed)
+
+        if not is_valid:
+            return {
+                "available": False,
+                "error": f"Race non reconnue: {breed}",
+                "helpful_response": f"La race '{breed}' n'est pas dans notre base de données.",
+            }
+
+        # Plages d'âges génériques par species
+        species = self.breeds_registry.get_species(canonical_breed)
+
+        age_ranges = {
+            "broiler": (0, 56),
+            "layer": (0, 600),  # Layers ont une durée de vie plus longue
+            "breeder": (0, 60),
+        }
+
+        if species in age_ranges:
+            min_age, max_age = age_ranges[species]
+
+            if min_age <= age <= max_age:
+                return {"available": True}
+            else:
+                # Proposer des alternatives
+                alternatives = []
+                if age < min_age:
+                    alternatives.append(f"{min_age} jours (âge minimum)")
+                if age > max_age:
+                    alternatives.append(f"{max_age} jours (âge maximum)")
+
+                return {
+                    "available": False,
+                    "alternatives": alternatives,
+                    "helpful_response": f"Données non disponibles pour {canonical_breed} à {age} jours. Alternatives : {', '.join(alternatives)}",
+                }
+
+        return {"available": True}
+
+
+# Tests unitaires
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
+
+    print("=" * 70)
+    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION FUSION OPENAI")
+    print("=" * 70)
+
+    validator = PostgreSQLValidator()
+
+    # Test 1: Détection breed
+    print("\n🔍 Test 1: Détection de breed depuis requête")
+    test_queries = [
+        "Quel est le poids du Cobb 500 à 21 jours ?",
+        "FCR ross308 à 35j",
+        "Performance ISA Brown",
+        "Hubbard classic 42 jours",
+    ]
+
+    for query in test_queries:
+        detected = validator._detect_breed_from_query(query)
+        print(f"  Query: {query}")
+        print(f"  → Breed: {detected}")
+
+    # Test 2: Validation avec enrichissement
+    print("\n✅ Test 2: Validation et enrichissement")
+    test_cases = [
+        {
+            "query": "Poids à 21 jours pour Cobb 500",
+            "entities": {"breed": "cobb 500"},
+        },
+        {
+            "query": "FCR du Ross 308",
+            "entities": {},
+        },
+        {
+            "query": "Mortalité",
+            "entities": {"age_days": 35},
+        },
+    ]
+
+    for test in test_cases:
+        print(f"\n  Query: {test['query']}")
+        print(f"  Input entities: {test['entities']}")
+
+        result = validator.flexible_query_validation(test["query"], test["entities"])
+
+        print(f"  → Status: {result['status']}")
+        if "enhanced_entities" in result:
+            print(f"  → Enhanced: {result['enhanced_entities']}")
+
+    # 🆕 Test 3: Messages de clarification multilingues
+    print("\n🆕 Test 3: Messages de clarification conversationnels")
+    test_clarifications = [
+        {
+            "query": "Quel est le poids d'un poulet de 12 jours ?",
+            "entities": {},
+            "language": "fr",
+        },
+        {
+            "query": "What is the weight at 12 days?",
+            "entities": {},
+            "language": "en",
+        },
+        {
+            "query": "¿Cuál es el peso?",
+            "entities": {"age_days": 15},
+            "language": "es",
+        },
+    ]
+
+    for test in test_clarifications:
+        print(f"\n  Query: {test['query']}")
+        print(f"  Language: {test['language']}")
+
+        result = validator.flexible_query_validation(
+            test["query"], test["entities"], test["language"]
+        )
+
+        print(f"  → Status: {result['status']}")
+        if result["status"] == "needs_fallback":
+            print(f"  → Question: {result['helpful_message']}")
+
+    # 🆕 Test 4: Fusion avec OpenAI interpretation
+    print("\n🆕 Test 4: Fusion avec OpenAI interpretation")
+    test_openai_fusion = [
+        {
+            "query": "Quel est le poids?",
+            "entities": {
+                "_openai_interpretation": {
+                    "breed": "Ross 308",
+                    "age_days": 21,
+                    "metric_type": "body_weight",
+                }
+            },
+            "language": "fr",
+        },
+        {
+            "query": "FCR comparison",
+            "entities": {
+                "sex": "male",
+                "_openai_interpretation": {"breed": "Cobb 500", "age_days": 35},
+            },
+            "language": "en",
+        },
+    ]
+
+    for test in test_openai_fusion:
+        print(f"\n  Query: {test['query']}")
+        print(f"  Input entities: {test['entities']}")
+
+        result = validator.flexible_query_validation(
+            test["query"], test["entities"], test["language"]
+        )
+
+        print(f"  → Status: {result['status']}")
+        if "enhanced_entities" in result:
+            print(f"  → Enhanced: {result['enhanced_entities']}")
+            print(f"  → Sex preserved: {result['enhanced_entities'].get('sex')}")
+
+    # 🆕 Test 5: validate_context avec fusion
+    print("\n🆕 Test 5: validate_context avec fusion OpenAI")
+    test_validate_context = {
+        "query": "Compare weight",
+        "entities": {
+            "sex": "female",
+            "_openai_interpretation": {
+                "breed": "Ross 308",
+                "age_days": 28,
+                "metric_type": "body_weight",
+            },
+        },
+        "language": "en",
+    }
+
+    print(f"\n  Query: {test_validate_context['query']}")
+    print(f"  Input entities: {test_validate_context['entities']}")
+
+    result = validator.validate_context(
+        test_validate_context["entities"],
+        test_validate_context["query"],
+        test_validate_context["language"],
+    )
+
+    print(f"  → Status: {result['status']}")
+    print(f"  → Missing fields: {result.get('missing_fields', [])}")
+    print(f"  → Enhanced entities: {result['enhanced_entities']}")
+    print(f"  → Sex preserved: {result['enhanced_entities'].get('sex')}")
+
+    print("\n" + "=" * 70)
+    print("✅ TESTS TERMINÉS - PostgreSQL Validator avec Fusion OpenAI")
+    print("=" * 70)
