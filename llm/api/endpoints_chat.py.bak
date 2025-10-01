@@ -470,24 +470,14 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     detail=f"Message trop long (max {MAX_REQUEST_SIZE})",
                 )
 
-            # ✅ DÉTECTION AUTOMATIQUE DE LA LANGUE (TOUJOURS)
-            # Force la détection automatique basée sur le contenu du message
-            # pour garantir que la réponse est dans la même langue que la question
-            language_result = detect_language_enhanced(message)
-            detected_language = (
-                language_result.language
-                if hasattr(language_result, "language")
-                else language_result
-            )
-
-            # Log de la détection pour monitoring
-            logger.info(
-                f"Langue détectée: {detected_language} "
-                f"(confiance: {getattr(language_result, 'confidence', 'N/A')})"
-            )
-
-            # Override du paramètre language avec la langue détectée automatiquement
-            language = detected_language
+            # Détection de langue si non fournie
+            if not language:
+                language_result = detect_language_enhanced(message)
+                language = (
+                    language_result.language
+                    if hasattr(language_result, "language")
+                    else language_result
+                )
 
             # Validation tenant_id
             if not tenant_id or len(tenant_id) > 50:
