@@ -2,6 +2,7 @@
 """
 rag_postgresql_retriever.py - Récupérateur de données PostgreSQL
 Version corrigée avec mapping breed → nom PostgreSQL via breeds_registry
+Version 2.0: Ajout filtre métrique basé sur interprétation OpenAI
 """
 
 import logging
@@ -148,7 +149,7 @@ class PostgreSQLRetriever:
             logger.debug(f"Normalized: {normalized_entities}")
 
             sql_query, params = self._build_query(
-                query, normalized_entities, top_k, strict_sex_match
+                query, normalized_entities, entities, top_k, strict_sex_match
             )
 
             logger.debug(f"SQL Query: {sql_query}")
@@ -195,7 +196,12 @@ class PostgreSQLRetriever:
             return []
 
     def _build_query(
-        self, query: str, entities: Dict[str, str], top_k: int, strict_sex_match: bool
+        self,
+        query: str,
+        entities: Dict[str, str],
+        original_entities: Dict[str, Any],
+        top_k: int,
+        strict_sex_match: bool,
     ) -> Tuple[str, List]:
         """Construit une requête SQL avec filtres"""
         conditions = []
@@ -236,6 +242,33 @@ class PostgreSQLRetriever:
                 params.append(age)
             except (ValueError, TypeError):
                 logger.warning(f"Invalid age_days: {entities.get('age_days')}")
+
+        # 🆕 NOUVEAU: Filtre métrique basé sur interprétation OpenAI
+        if (
+            original_entities
+            and "metric" in original_entities
+            and original_entities["metric"]
+        ):
+            metric_name = original_entities["metric"]
+
+            # Mapping métrique OpenAI → pattern base de données
+            metric_to_db_pattern = {
+                "feed_conversion_ratio": "feed_conversion_ratio for %",
+                "cumulative_feed_intake": "feed_intake for %",
+                "body_weight": "body_weight for %",
+                "daily_gain": "daily_gain for %",
+                "mortality": "mortality for %",
+                "livability": "livability for %",
+            }
+
+            db_pattern = metric_to_db_pattern.get(metric_name)
+            if db_pattern:
+                param_count += 1
+                conditions.append(f"m.metric_name LIKE ${param_count}")
+                params.append(db_pattern)
+                logger.info(f"🎯 Filtering by metric: {metric_name} → {db_pattern}")
+            else:
+                logger.warning(f"⚠️ Unknown metric type from OpenAI: {metric_name}")
 
         # Filtres pour sexe
         if entities.get("sex") and entities["sex"] != "as_hatched":

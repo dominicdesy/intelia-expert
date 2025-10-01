@@ -352,19 +352,19 @@ class ValidationCore:
     def _validate_age(self, age: Any, breed: Optional[str] = None) -> Dict[str, Any]:
         """
         Valide l'âge avec contexte de souche en utilisant le breeds_registry
-        
+
         ✅ FIX v2.2: Accepte int, str, ou float et convertit automatiquement
-        
+
         Args:
             age: Âge en jours (peut être int, str, ou float)
             breed: Race optionnelle pour validation contextuelle
-        
+
         Returns:
             Dict avec 'issues', 'alternatives'
         """
         issues = []
         alternatives = []
-        
+
         # ✅ NOUVEAU: Conversion automatique du type
         try:
             if isinstance(age, str):
