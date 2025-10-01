@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 rag_engine_handlers.py - Handlers spécialisés pour différents types de requêtes
-VERSION OPTIMISÉE :
+VERSION OPTIMISÉE + MULTILINGUE :
 - Compatible avec la structure harmonisée du comparison_handler
 - Mode optimisation pour tri par pertinence
 - Évite double appel PostgreSQL avant fallback Weaviate
 - Respecte le routage suggéré par OpenAI
+- ✅ CORRECTION: Transmission du paramètre 'language' à tous les fallbacks Weaviate
 """
 
 import re
@@ -62,8 +63,8 @@ class ComparativeQueryHandler(BaseQueryHandler):
         """Configure avec ComparisonHandler"""
         super().configure(**kwargs)
         self.comparison_handler = kwargs.get("comparison_handler")
-        self.weaviate_core = kwargs.get("weaviate_core")  # AJOUT
-        self.postgresql_system = kwargs.get("postgresql_system")  # AJOUT
+        self.weaviate_core = kwargs.get("weaviate_core")
+        self.postgresql_system = kwargs.get("postgresql_system")
 
     async def handle(
         self, preprocessed_data: Dict[str, Any], start_time: float
@@ -168,6 +169,10 @@ class ComparativeQueryHandler(BaseQueryHandler):
         entities = preprocessed_data.get("entities", {})
         query = preprocessed_data["normalized_query"]
 
+        # ✅ CORRECTION MULTILINGUE: Extraction de la langue
+        language = preprocessed_data.get("language", "fr")
+        logger.info(f"🌍 Fallback comparative avec langue: {language}")
+
         # Initialisation des métadonnées de disponibilité
         availability_metadata = {
             "postgresql_available": self.postgresql_system is not None,
@@ -209,13 +214,16 @@ class ComparativeQueryHandler(BaseQueryHandler):
             if not entities:
                 logger.info("ℹ️ Pas d'entités détectées, skip PostgreSQL")
 
-        # 2. ✅ NOUVEAU: Tentative Weaviate si PostgreSQL échoue
+        # 2. ✅ CORRECTION: Tentative Weaviate avec langue
         if self.weaviate_core:
-            logger.info("🔍 Fallback comparative: tentative Weaviate")
+            logger.info(
+                f"🔍 Fallback comparative: tentative Weaviate (langue={language})"
+            )
             try:
                 weaviate_result = await self.weaviate_core.search(
                     query=query,
                     top_k=RAG_SIMILARITY_TOP_K,
+                    language=language,  # ✅ AJOUT CRITIQUE
                 )
 
                 if weaviate_result and weaviate_result.source == RAGSource.RAG_SUCCESS:
@@ -224,11 +232,12 @@ class ComparativeQueryHandler(BaseQueryHandler):
                             "source_type": "comparative_fallback_weaviate",
                             "fallback_applied": True,
                             "processing_time": time.time() - start_time,
+                            "language_used": language,  # ✅ TRAÇABILITÉ
                             **availability_metadata,
                         }
                     )
                     logger.info(
-                        f"✅ Fallback Weaviate: {len(weaviate_result.context_docs)} docs"
+                        f"✅ Fallback Weaviate ({language}): {len(weaviate_result.context_docs)} docs"
                     )
                     return weaviate_result
 
@@ -251,6 +260,7 @@ class ComparativeQueryHandler(BaseQueryHandler):
                 "result_type": "no_results",
                 "is_success": False,
                 "is_error": True,
+                "language_attempted": language,  # ✅ DEBUG
                 **availability_metadata,
             },
         )
@@ -419,6 +429,7 @@ class StandardQueryHandler(BaseQueryHandler):
         - Respect du routage suggéré par OpenAI
         - Évitement du double appel PostgreSQL
         - Fallback intelligent vers Weaviate
+        - ✅ CORRECTION: Transmission correcte du paramètre language
         """
 
         query = preprocessed_data["normalized_query"]
@@ -428,6 +439,12 @@ class StandardQueryHandler(BaseQueryHandler):
 
         if original_query is None:
             original_query = preprocessed_data.get("original_query", query)
+
+        # ✅ CORRECTION: Extraction langue depuis preprocessed_data si disponible
+        if "language" in preprocessed_data:
+            language = preprocessed_data["language"]
+
+        logger.info(f"🌍 StandardQueryHandler traite requête en langue: {language}")
 
         # Configuration top_k selon mode
         if is_optimization:
@@ -443,7 +460,12 @@ class StandardQueryHandler(BaseQueryHandler):
                     "✅ Routage Weaviate (suggestion OpenAI respectée pour requête qualitative)"
                 )
                 return await self._search_weaviate_direct(
-                    query, entities, top_k, is_optimization, start_time
+                    query,
+                    entities,
+                    top_k,
+                    is_optimization,
+                    start_time,
+                    language,  # ✅ LANGUE
                 )
             else:
                 logger.info("⚠️ Suggestion Weaviate ignorée (présence âge/métrique)")
@@ -455,7 +477,12 @@ class StandardQueryHandler(BaseQueryHandler):
             )
             if self.weaviate_core:
                 return await self._search_weaviate_direct(
-                    query, entities, top_k, is_optimization, start_time
+                    query,
+                    entities,
+                    top_k,
+                    is_optimization,
+                    start_time,
+                    language,  # ✅ LANGUE
                 )
 
         # PostgreSQL avec hint prioritaire
@@ -472,7 +499,12 @@ class StandardQueryHandler(BaseQueryHandler):
             logger.info("⚠️ PostgreSQL sans résultat → fallback Weaviate immédiat")
             if self.weaviate_core:
                 return await self._search_weaviate_direct(
-                    query, entities, top_k, is_optimization, start_time
+                    query,
+                    entities,
+                    top_k,
+                    is_optimization,
+                    start_time,
+                    language,  # ✅ LANGUE
                 )
 
         # PostgreSQL standard (UN SEUL APPEL)
@@ -491,7 +523,12 @@ class StandardQueryHandler(BaseQueryHandler):
         # Weaviate fallback
         if self.weaviate_core:
             return await self._search_weaviate_direct(
-                query, entities, top_k, is_optimization, start_time
+                query,
+                entities,
+                top_k,
+                is_optimization,
+                start_time,
+                language,  # ✅ LANGUE
             )
 
         return RAGResult(
@@ -501,6 +538,7 @@ class StandardQueryHandler(BaseQueryHandler):
                 "query_type": "standard",
                 "optimization_mode": is_optimization,
                 "routing_hint": routing_hint,
+                "language_attempted": language,  # ✅ DEBUG
             },
         )
 
@@ -546,17 +584,24 @@ class StandardQueryHandler(BaseQueryHandler):
         top_k: int,
         is_optimization: bool,
         start_time: float,
+        language: str = "fr",  # ✅ CORRECTION: Ajout paramètre language
     ) -> RAGResult:
         """
         Recherche directe dans Weaviate (fallback ou routage suggéré)
+        ✅ CORRECTION: Supporte maintenant le paramètre language
         """
         try:
             weaviate_top_k = 5 if is_optimization else top_k
 
-            logger.info(f"Recherche Weaviate (top_k={weaviate_top_k})")
+            logger.info(
+                f"Recherche Weaviate (top_k={weaviate_top_k}, langue={language})"
+            )
+
+            # ✅ CORRECTION CRITIQUE: Ajout du paramètre language
             result = await self.weaviate_core.search(
                 query=query,
                 top_k=weaviate_top_k,
+                language=language,  # ✅ TRANSMISSION LANGUE
             )
 
             if result and result.source != RAGSource.NO_RESULTS:
@@ -569,24 +614,26 @@ class StandardQueryHandler(BaseQueryHandler):
 
                 result.metadata["top_k_used"] = weaviate_top_k
                 result.metadata["processing_time"] = time.time() - start_time
+                result.metadata["language_used"] = language  # ✅ TRAÇABILITÉ
 
                 logger.info(
-                    f"✅ Weaviate: {len(result.context_docs)} documents trouvés"
+                    f"✅ Weaviate ({language}): {len(result.context_docs)} documents trouvés"
                 )
                 return result
             else:
-                logger.info("⚠️ Weaviate: 0 documents")
+                logger.info(f"⚠️ Weaviate ({language}): 0 documents")
                 return RAGResult(
                     source=RAGSource.NO_RESULTS,
                     answer="Aucune information trouvée dans Weaviate.",
                     metadata={
                         "source": "weaviate_fallback",
                         "processing_time": time.time() - start_time,
+                        "language_attempted": language,  # ✅ DEBUG
                     },
                 )
 
         except Exception as e:
-            logger.error(f"Erreur recherche Weaviate: {e}")
+            logger.error(f"Erreur recherche Weaviate ({language}): {e}")
             logger.error(f"Full traceback:\n{traceback.format_exc()}")
             return RAGResult(
                 source=RAGSource.ERROR,
@@ -594,5 +641,6 @@ class StandardQueryHandler(BaseQueryHandler):
                 metadata={
                     "error": str(e),
                     "processing_time": time.time() - start_time,
+                    "language_attempted": language,  # ✅ DEBUG
                 },
             )
