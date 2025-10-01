@@ -4,7 +4,7 @@ query_interpreter.py - Interprétation intelligente des requêtes via OpenAI
 """
 
 import logging
-from typing import Dict, Optional
+from typing import Dict
 from openai import AsyncOpenAI
 import os
 
@@ -13,14 +13,14 @@ logger = logging.getLogger(__name__)
 
 class QueryInterpreter:
     """Interprète les requêtes utilisateur avec OpenAI pour extraction précise"""
-    
+
     def __init__(self):
         self.openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    
+
     async def interpret_query(self, query: str) -> Dict[str, any]:
         """
         Utilise OpenAI pour interpréter précisément la requête
-        
+
         Returns:
             {
                 "metric": "feed_conversion_ratio" | "cumulative_feed_intake" | ...,
@@ -30,7 +30,7 @@ class QueryInterpreter:
                 "confidence": 0.95
             }
         """
-        
+
         system_prompt = """Tu es un expert en aviculture qui extrait les informations précises des requêtes.
 
 MÉTRIQUES POSSIBLES (IMPORTANT - ne confonds JAMAIS) :
@@ -60,18 +60,19 @@ Réponds en JSON :
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": query}
+                    {"role": "user", "content": query},
                 ],
                 temperature=0.1,  # Très bas pour cohérence
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
             )
-            
+
             import json
+
             result = json.loads(response.choices[0].message.content)
-            
+
             logger.info(f"✅ OpenAI interprétation: {result}")
             return result
-            
+
         except Exception as e:
             logger.error(f"❌ Erreur interprétation OpenAI: {e}")
             return {}

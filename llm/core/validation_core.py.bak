@@ -349,128 +349,91 @@ class ValidationCore:
 
         return {"issues": issues, "alternatives": alternatives}
 
-        def _validate_age(
-            self, age: Any, breed: Optional[str] = None
-        ) -> Dict[str, Any]:
-            """
-            Valide l'âge avec contexte de souche en utilisant le breeds_registry
+    def _validate_age(self, age: int, breed: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Valide l'âge avec contexte de souche en utilisant le breeds_registry
 
-            ✅ FIX: Accepte int, str, ou float et convertit automatiquement
+        Returns:
+            Dict avec 'issues', 'alternatives'
+        """
+        issues = []
+        alternatives = []
 
-            Args:
-                age: Âge en jours (peut être int, str, ou float)
-                breed: Race optionnelle pour validation contextuelle
+        # Validation basique
+        if age < 0:
+            issues.append(
+                ValidationIssue(
+                    field="age_days",
+                    severity=ValidationSeverity.CRITICAL,
+                    message=f"Âge négatif: {age}",
+                    suggestion="L'âge doit être positif",
+                )
+            )
+            return {"issues": issues, "alternatives": []}
 
-            Returns:
-                Dict avec 'issues', 'alternatives'
-            """
-            issues = []
-            alternatives = []
+        if age > 100:
+            issues.append(
+                ValidationIssue(
+                    field="age_days",
+                    severity=ValidationSeverity.WARNING,
+                    message=f"Âge inhabituel: {age} jours",
+                    suggestion="La plupart des données concernent 0-60 jours",
+                )
+            )
 
-            # ✅ NOUVEAU: Conversion automatique du type
-            try:
-                if isinstance(age, str):
-                    age = int(age)
-                elif isinstance(age, float):
-                    age = int(age)
-                elif not isinstance(age, int):
+        # Validation avec contexte breed via registry
+        if breed:
+            breed_info = self.breeds_registry.get_breed(breed)
+
+            if breed_info:
+                # Déterminer les plages d'âge typiques selon l'espèce
+                species = breed_info.get("species", "")
+                breed_name = breed_info.get("name", breed)
+
+                # Plages par défaut selon l'espèce
+                if species == "broiler":
+                    min_age, max_age = 0, 60
+                elif species == "layer":
+                    min_age, max_age = 0, 80
+                elif species == "breeder":
+                    min_age, max_age = 0, 65
+                else:
+                    min_age, max_age = 0, 60
+
+                if age < min_age:
                     issues.append(
                         ValidationIssue(
                             field="age_days",
-                            severity=ValidationSeverity.ERROR,
-                            message=f"Type d'âge invalide: {type(age).__name__}",
-                            suggestion="L'âge doit être un nombre entier",
+                            severity=ValidationSeverity.WARNING,
+                            message=f"Âge {age}j inférieur à la plage typique pour {breed_name} ({min_age}-{max_age}j)",
+                            suggestion=f"Les données pour {breed_name} commencent généralement à {min_age}j",
                         )
                     )
-                    return {"issues": issues, "alternatives": []}
-            except (ValueError, TypeError) as e:
-                issues.append(
-                    ValidationIssue(
-                        field="age_days",
-                        severity=ValidationSeverity.ERROR,
-                        message=f"Impossible de convertir l'âge en entier: {age} ({e})",
-                        suggestion="L'âge doit être un nombre valide",
-                    )
-                )
-                return {"issues": issues, "alternatives": []}
+                    alternatives = list(range(min_age, min(min_age + 10, max_age)))
 
-            # Validation basique (maintenant age est garanti int)
-            if age < 0:
-                issues.append(
-                    ValidationIssue(
-                        field="age_days",
-                        severity=ValidationSeverity.CRITICAL,
-                        message=f"Âge négatif: {age}",
-                        suggestion="L'âge doit être positif",
-                    )
-                )
-                return {"issues": issues, "alternatives": []}
-
-            if age > 100:
-                issues.append(
-                    ValidationIssue(
-                        field="age_days",
-                        severity=ValidationSeverity.WARNING,
-                        message=f"Âge inhabituel: {age} jours",
-                        suggestion="La plupart des données concernent 0-60 jours",
-                    )
-                )
-
-            # Validation avec contexte breed via registry
-            if breed:
-                breed_info = self.breeds_registry.get_breed(breed)
-
-                if breed_info:
-                    # Déterminer les plages d'âge typiques selon l'espèce
-                    species = breed_info.get("species", "")
-                    breed_name = breed_info.get("name", breed)
-
-                    # Plages par défaut selon l'espèce
-                    if species == "broiler":
-                        min_age, max_age = 0, 60
-                    elif species == "layer":
-                        min_age, max_age = 0, 80
-                    elif species == "breeder":
-                        min_age, max_age = 0, 65
-                    else:
-                        min_age, max_age = 0, 60
-
-                    if age < min_age:
-                        issues.append(
-                            ValidationIssue(
-                                field="age_days",
-                                severity=ValidationSeverity.WARNING,
-                                message=f"Âge {age}j inférieur à la plage typique pour {breed_name} ({min_age}-{max_age}j)",
-                                suggestion=f"Les données pour {breed_name} commencent généralement à {min_age}j",
-                            )
+                elif age > max_age:
+                    issues.append(
+                        ValidationIssue(
+                            field="age_days",
+                            severity=ValidationSeverity.WARNING,
+                            message=f"Âge {age}j supérieur à la plage typique pour {breed_name} ({min_age}-{max_age}j)",
+                            suggestion=f"Les données pour {breed_name} vont généralement jusqu'à {max_age}j",
                         )
-                        alternatives = list(range(min_age, min(min_age + 10, max_age)))
-
-                    elif age > max_age:
-                        issues.append(
-                            ValidationIssue(
-                                field="age_days",
-                                severity=ValidationSeverity.WARNING,
-                                message=f"Âge {age}j supérieur à la plage typique pour {breed_name} ({min_age}-{max_age}j)",
-                                suggestion=f"Les données pour {breed_name} vont généralement jusqu'à {max_age}j",
-                            )
-                        )
-                        alternatives = list(
-                            range(max(min_age, max_age - 10), max_age + 1)
-                        )
-
-            # Identifier la phase
-            phase = self._identify_phase(age)
-            if phase:
-                issues.append(
-                    ValidationIssue(
-                        field="age_days",
-                        severity=ValidationSeverity.INFO,
-                        message=f"Âge {age}j correspond à la phase: {phase}",
                     )
-                )
+                    alternatives = list(range(max(min_age, max_age - 10), max_age + 1))
 
-            return {"issues": issues, "alternatives": alternatives}
+        # Identifier la phase
+        phase = self._identify_phase(age)
+        if phase:
+            issues.append(
+                ValidationIssue(
+                    field="age_days",
+                    severity=ValidationSeverity.INFO,
+                    message=f"Âge {age}j correspond à la phase: {phase}",
+                )
+            )
+
+        return {"issues": issues, "alternatives": alternatives}
 
     def _validate_sex(self, sex: str) -> Dict[str, Any]:
         """
