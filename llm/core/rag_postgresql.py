@@ -28,61 +28,44 @@ logger = logging.getLogger(__name__)
 
 class QueryInterpreter:
     """Interprète les requêtes utilisateur avec OpenAI pour extraction précise des métriques"""
-
+    
     def __init__(self, openai_client):
         self.openai_client = openai_client
         self.enabled = openai_client is not None
-
+        
         # Mapping des métriques avec patterns explicites
         self.metric_keywords = {
             "feed_conversion_ratio": [
-                "feed conversion ratio",
-                "fcr",
-                "indice de conversion",
-                "conversion alimentaire",
-                "taux de conversion",
-                "ic ",
-                "ratio de conversion",
-                "conversion ratio",
+                "feed conversion ratio", "fcr", "indice de conversion",
+                "conversion alimentaire", "taux de conversion", "ic ",
+                "ratio de conversion", "conversion ratio"
             ],
             "cumulative_feed_intake": [
-                "cumulative feed intake",
-                "total feed",
-                "feed intake",
-                "consommation cumulée",
-                "consommation totale",
-                "aliment total",
-                "quantité d'aliment",
-                "besoin en aliment",
+                "cumulative feed intake", "total feed", "feed intake",
+                "consommation cumulée", "consommation totale", 
+                "aliment total", "quantité d'aliment", "besoin en aliment"
             ],
             "body_weight": [
-                "body weight",
-                "poids vif",
-                "poids corporel",
-                "weight",
-                "masse corporelle",
+                "body weight", "poids vif", "poids corporel", 
+                "weight", "masse corporelle"
             ],
             "daily_gain": [
-                "daily gain",
-                "gain quotidien",
-                "gain journalier",
-                "average daily gain",
-                "adg",
-                "gmq",
+                "daily gain", "gain quotidien", "gain journalier",
+                "average daily gain", "adg", "gmq"
             ],
-            "mortality": ["mortality", "mortalité", "taux de mortalité", "death rate"],
+            "mortality": [
+                "mortality", "mortalité", "taux de mortalité", "death rate"
+            ]
         }
-
-    async def interpret_query(
-        self, query: str, fallback_entities: Dict = None
-    ) -> Dict[str, Any]:
+    
+    async def interpret_query(self, query: str, fallback_entities: Dict = None) -> Dict[str, Any]:
         """
         Utilise OpenAI pour interpréter précisément la requête
-
+        
         Args:
             query: Requête utilisateur
             fallback_entities: Entités détectées par le système classique (fallback)
-
+        
         Returns:
             {
                 "metric": "feed_conversion_ratio" | "cumulative_feed_intake" | ...,
@@ -93,14 +76,14 @@ class QueryInterpreter:
                 "interpretation_source": "openai" | "fallback" | "hybrid"
             }
         """
-
+        
         if not self.enabled:
             logger.warning("QueryInterpreter disabled - OpenAI client not available")
             return self._fallback_interpretation(query, fallback_entities)
-
+        
         try:
             logger.info("🤖 QueryInterpreter: Analyzing query with OpenAI...")
-
+            
             system_prompt = """Tu es un expert en aviculture qui extrait les informations précises des requêtes.
 
 MÉTRIQUES POSSIBLES (IMPORTANT - ne confonds JAMAIS) :
@@ -148,45 +131,39 @@ Réponds en JSON."""
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message},
+                    {"role": "user", "content": user_message}
                 ],
                 temperature=0.1,  # Très bas pour cohérence et déterminisme
-                response_format={"type": "json_object"},
+                response_format={"type": "json_object"}
             )
-
+            
             result = json.loads(response.choices[0].message.content)
             result["interpretation_source"] = "openai"
-
+            
             # Validation de la métrique extraite
             detected_metric = result.get("metric", "")
             if detected_metric not in self.metric_keywords:
-                logger.warning(
-                    f"⚠️ Métrique inconnue d'OpenAI: {detected_metric}, fallback"
-                )
+                logger.warning(f"⚠️ Métrique inconnue d'OpenAI: {detected_metric}, fallback")
                 return self._fallback_interpretation(query, fallback_entities)
-
-            logger.info(
-                f"✅ OpenAI interpretation: metric={result.get('metric')}, confidence={result.get('confidence')}"
-            )
+            
+            logger.info(f"✅ OpenAI interpretation: metric={result.get('metric')}, confidence={result.get('confidence')}")
             logger.debug(f"Full OpenAI result: {result}")
-
+            
             return result
-
+            
         except Exception as e:
             logger.error(f"❌ Erreur interprétation OpenAI: {e}", exc_info=True)
             return self._fallback_interpretation(query, fallback_entities)
-
-    def _fallback_interpretation(
-        self, query: str, fallback_entities: Dict = None
-    ) -> Dict[str, Any]:
+    
+    def _fallback_interpretation(self, query: str, fallback_entities: Dict = None) -> Dict[str, Any]:
         """Interprétation de secours basée sur mots-clés + entités existantes"""
-
+        
         logger.info("🔄 Using fallback interpretation (keyword-based)")
-
+        
         query_lower = query.lower()
         detected_metric = None
         confidence = 0.5
-
+        
         # Détection par mots-clés avec priorité
         for metric, keywords in self.metric_keywords.items():
             for keyword in keywords:
@@ -196,17 +173,17 @@ Réponds en JSON."""
                     break
             if detected_metric:
                 break
-
+        
         # Si FCR détecté par fallback, haute confiance
         if detected_metric == "feed_conversion_ratio":
             confidence = 0.85
-
+        
         result = {
             "metric": detected_metric,
             "confidence": confidence,
-            "interpretation_source": "fallback",
+            "interpretation_source": "fallback"
         }
-
+        
         # Merger avec les entités existantes si disponibles
         if fallback_entities:
             if "breed" in fallback_entities:
@@ -215,9 +192,9 @@ Réponds en JSON."""
                 result["age_days"] = fallback_entities["age_days"]
             if "sex" in fallback_entities:
                 result["sex"] = fallback_entities["sex"]
-
+            
             result["interpretation_source"] = "hybrid"
-
+        
         logger.debug(f"Fallback interpretation result: {result}")
         return result
 
@@ -231,7 +208,7 @@ class PostgreSQLSystem:
         self.postgres_retriever = None
         self.postgres_validator = None
         self.temporal_processor = None
-
+        
         # 🆕 NOUVEAU: Query Interpreter avec OpenAI
         self.query_interpreter = None
 
@@ -277,16 +254,16 @@ class PostgreSQLSystem:
             OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
             if OPENAI_API_KEY:
                 self.openai_client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
-
+                
                 # 🆕 Initialiser le QueryInterpreter avec le client OpenAI
                 self.query_interpreter = QueryInterpreter(self.openai_client)
-
+                
                 logger.info("OpenAI client initialized")
                 logger.info("✅ QueryInterpreter initialized with OpenAI")
             else:
                 logger.warning("OPENAI_API_KEY not found - QueryInterpreter disabled")
                 self.query_interpreter = QueryInterpreter(None)
-
+                
         except Exception as e:
             logger.warning(f"OpenAI initialization failed: {e}")
             self.query_interpreter = QueryInterpreter(None)
@@ -324,63 +301,56 @@ class PostgreSQLSystem:
             logger.debug(
                 f"🔍 INPUT - 'sex' present: {'sex' in (entities or {})}, value: {(entities or {}).get('sex')}"
             )
-
+            
             # 🆕 ÉTAPE 1: Interprétation OpenAI de la requête
             if self.query_interpreter:
                 logger.info("🤖 Step 1: OpenAI Query Interpretation")
-
+                
                 interpreted = await self.query_interpreter.interpret_query(
-                    query, fallback_entities=entities
+                    query, 
+                    fallback_entities=entities
                 )
-
+                
                 if interpreted and interpreted.get("confidence", 0) > 0.6:
                     # Enrichir/corriger les entités avec l'interprétation OpenAI
                     entities = entities or {}
-
+                    
                     # Merge intelligent : OpenAI override si haute confiance
                     if interpreted.get("confidence", 0) > 0.8:
-                        logger.info(
-                            f"✅ High confidence OpenAI interpretation (>{0.8}), using OpenAI entities"
-                        )
-
+                        logger.info(f"✅ High confidence OpenAI interpretation (>{0.8}), using OpenAI entities")
+                        
                         if "metric" in interpreted and interpreted["metric"]:
                             entities["metric"] = interpreted["metric"]
                             logger.info(f"  → metric: {interpreted['metric']}")
-
+                        
                         if "breed" in interpreted and interpreted["breed"]:
                             entities["breed"] = interpreted["breed"]
                             logger.info(f"  → breed: {interpreted['breed']}")
-
+                        
                         if "age_days" in interpreted and interpreted["age_days"]:
                             # ✅ FIX: Garder age_days comme int si déjà int, sinon convertir
                             age_value = interpreted["age_days"]
-                            entities["age_days"] = (
-                                age_value
-                                if isinstance(age_value, int)
-                                else int(age_value)
-                            )
+                            entities["age_days"] = age_value if isinstance(age_value, int) else int(age_value)
                             logger.info(f"  → age_days: {entities['age_days']}")
-
+                        
                         if "sex" in interpreted and interpreted["sex"]:
                             # Préserver sex si explicitement demandé
                             if not entities.get("explicit_sex_request"):
                                 entities["sex"] = interpreted["sex"]
                                 logger.info(f"  → sex: {interpreted['sex']}")
                     else:
-                        logger.info(
-                            f"⚠️ Medium confidence OpenAI ({interpreted.get('confidence')}), hybrid merge"
-                        )
+                        logger.info(f"⚠️ Medium confidence OpenAI ({interpreted.get('confidence')}), hybrid merge")
                         # Merge partiel : seulement metric si manquant
                         if "metric" in interpreted and "metric" not in entities:
                             entities["metric"] = interpreted["metric"]
-
+                    
                     # Ajouter metadata d'interprétation
                     entities["_openai_interpretation"] = {
                         "confidence": interpreted.get("confidence"),
                         "source": interpreted.get("interpretation_source"),
-                        "reasoning": interpreted.get("reasoning", ""),
+                        "reasoning": interpreted.get("reasoning", "")
                     }
-
+                    
                     logger.info(f"✅ Entities enriched by OpenAI: {entities}")
 
             # ÉTAPE 2: Validation des entités avec ValidationCore
@@ -621,14 +591,14 @@ class PostgreSQLSystem:
             if best_metric.sex and best_metric.sex != "as_hatched"
             else ""
         )
-
+        
         # Inclure info sur l'interprétation OpenAI si disponible
         interpretation_info = ""
         if entities.get("_openai_interpretation"):
             source = entities["_openai_interpretation"].get("source", "unknown")
             if source == "openai":
                 interpretation_info = " (interprété par IA)"
-
+        
         return f"Données trouvées{sex_info}{interpretation_info}: {best_metric.metric_name} = {best_metric.value_numeric or best_metric.value_text} pour {best_metric.strain}."
 
     async def close(self):
@@ -653,22 +623,16 @@ class PostgreSQLSystem:
                 "query_interpreter": bool(self.query_interpreter),
             },
             "query_interpreter": {
-                "enabled": (
-                    self.query_interpreter.enabled if self.query_interpreter else False
-                ),
+                "enabled": self.query_interpreter.enabled if self.query_interpreter else False,
                 "description": "Interprétation intelligente des requêtes via OpenAI GPT-4",
                 "features": [
                     "Distinction précise FCR vs Feed Intake",
                     "Extraction race/souche automatique",
                     "Détection âge et sexe",
                     "Score de confiance de l'interprétation",
-                    "Fallback keyword-based si OpenAI indisponible",
+                    "Fallback keyword-based si OpenAI indisponible"
                 ],
-                "status": (
-                    "active"
-                    if (self.query_interpreter and self.query_interpreter.enabled)
-                    else "disabled"
-                ),
+                "status": "active" if (self.query_interpreter and self.query_interpreter.enabled) else "disabled"
             },
             "sex_aware_search": True,
             "openai_enabled": self.openai_client is not None,
