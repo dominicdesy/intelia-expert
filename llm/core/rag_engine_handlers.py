@@ -425,27 +425,22 @@ class StandardQueryHandler(BaseQueryHandler):
 
     async def handle(
         self,
-        query: str = None,
-        entities: Dict = None,
-        preprocessed_data: Dict[str, Any] = None,
+        preprocessed_data: Dict[
+            str, Any
+        ] = None,  # ✅ PREMIER PARAMÈTRE (compatibilité rag_engine.py)
         start_time: float = None,
+        query: str = None,
+        entities: Dict[str, Any] = None,
         original_query: str = None,
-        tenant_id: str = None,
-        conversation_context: list = None,
+        preprocessing_result: Dict[str, Any] = None,
         language: str = "fr",
-        preprocessing_result: Dict = None,
-        **kwargs,
     ) -> RAGResult:
         """
-        Traite les requêtes standard avec:
-        - Respect du routage suggéré par OpenAI
-        - Priorité au routing hint 'postgresql' avec retour immédiat si INSUFFICIENT_CONTEXT
-        - Évitement du double appel PostgreSQL
-        - Fallback intelligent vers Weaviate
-        - ✅ CORRECTION: Transmission correcte du paramètre language partout
+        Traite une requête standard avec routage intelligent
+        ✅ CORRECTION CRITIQUE: Ordre des paramètres corrigé pour correspondre à l'appel depuis rag_engine.py
+        L'appel est: await self.standard_handler.handle(preprocessed_data, start_time, language=language)
         """
-
-        # Support des deux modes d'appel (legacy et nouveau)
+        # Extraction des données depuis preprocessed_data si disponible
         if preprocessed_data:
             query = preprocessed_data.get("normalized_query", query)
             entities = preprocessed_data.get("entities", entities)
@@ -468,6 +463,8 @@ class StandardQueryHandler(BaseQueryHandler):
             entities = {}
 
         logger.info(f"🌐 StandardQueryHandler traite requête en langue: {language}")
+        logger.info(f"🎯 ROUTING_HINT REÇU: '{routing_hint}'")
+        logger.info(f"📊 ENTITIES REÇUES: {entities}")
 
         # Configuration top_k selon mode
         if is_optimization:
@@ -476,8 +473,13 @@ class StandardQueryHandler(BaseQueryHandler):
         else:
             top_k = RAG_SIMILARITY_TOP_K
 
-        # 🆕 ÉTAPE 1: Vérifier le routing hint PostgreSQL en PRIORITÉ
+        # 🆕 ÉTAPE 1: Vérifier le routing hint PostgreSQL en PRIORITÉ ABSOLUE
         if routing_hint == "postgresql":
+            logger.info("=" * 80)
+            logger.info(
+                "🎯 ROUTING HINT POSTGRESQL DÉTECTÉ - APPEL POSTGRESQL PRIORITAIRE"
+            )
+            logger.info("=" * 80)
             logger.info(
                 "🎯 PostgreSQL routing hint détecté - tentative PostgreSQL d'abord"
             )
