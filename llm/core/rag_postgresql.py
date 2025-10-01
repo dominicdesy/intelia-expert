@@ -2,12 +2,13 @@
 """
 rag_postgresql.py - PostgreSQL System Principal Refactorisé
 Point d'entrée principal avec délégation vers modules spécialisés
-VERSION REFACTORÉE: Utilisation de ValidationCore centralisé
+VERSION REFACTORÉE: Utilisation de ValidationCore centralisé + QueryInterpreter OpenAI
 """
 
 import logging
 import time
-from typing import Dict, List, Any
+import json
+from typing import Dict, List, Any, Optional
 
 from .data_models import RAGResult, RAGSource
 
@@ -19,21 +20,197 @@ from .rag_postgresql_retriever import PostgreSQLRetriever
 from .rag_postgresql_validator import PostgreSQLValidator
 from .rag_postgresql_temporal import TemporalQueryProcessor
 
-# NOUVEAU: Import du module de validation centralisé
+# Import du module de validation centralisé
 from .validation_core import ValidationCore
 
 logger = logging.getLogger(__name__)
 
 
+class QueryInterpreter:
+    """Interprète les requêtes utilisateur avec OpenAI pour extraction précise des métriques"""
+    
+    def __init__(self, openai_client):
+        self.openai_client = openai_client
+        self.enabled = openai_client is not None
+        
+        # Mapping des métriques avec patterns explicites
+        self.metric_keywords = {
+            "feed_conversion_ratio": [
+                "feed conversion ratio", "fcr", "indice de conversion",
+                "conversion alimentaire", "taux de conversion", "ic ",
+                "ratio de conversion", "conversion ratio"
+            ],
+            "cumulative_feed_intake": [
+                "cumulative feed intake", "total feed", "feed intake",
+                "consommation cumulée", "consommation totale", 
+                "aliment total", "quantité d'aliment", "besoin en aliment"
+            ],
+            "body_weight": [
+                "body weight", "poids vif", "poids corporel", 
+                "weight", "masse corporelle"
+            ],
+            "daily_gain": [
+                "daily gain", "gain quotidien", "gain journalier",
+                "average daily gain", "adg", "gmq"
+            ],
+            "mortality": [
+                "mortality", "mortalité", "taux de mortalité", "death rate"
+            ]
+        }
+    
+    async def interpret_query(self, query: str, fallback_entities: Dict = None) -> Dict[str, Any]:
+        """
+        Utilise OpenAI pour interpréter précisément la requête
+        
+        Args:
+            query: Requête utilisateur
+            fallback_entities: Entités détectées par le système classique (fallback)
+        
+        Returns:
+            {
+                "metric": "feed_conversion_ratio" | "cumulative_feed_intake" | ...,
+                "breed": "Ross 308",
+                "age_days": 31,
+                "sex": "male",
+                "confidence": 0.95,
+                "interpretation_source": "openai" | "fallback" | "hybrid"
+            }
+        """
+        
+        if not self.enabled:
+            logger.warning("QueryInterpreter disabled - OpenAI client not available")
+            return self._fallback_interpretation(query, fallback_entities)
+        
+        try:
+            logger.info(f"🤖 QueryInterpreter: Analyzing query with OpenAI...")
+            
+            system_prompt = """Tu es un expert en aviculture qui extrait les informations précises des requêtes.
+
+MÉTRIQUES POSSIBLES (IMPORTANT - ne confonds JAMAIS) :
+- feed_conversion_ratio : FCR, indice de conversion, conversion alimentaire, ratio de conversion
+- cumulative_feed_intake : consommation cumulée, total feed intake, quantité totale d'aliment
+- body_weight : poids vif, body weight, poids corporel
+- daily_gain : gain quotidien, average daily gain, ADG, GMQ
+- mortality : mortalité, taux de mortalité, death rate
+
+RÈGLES CRITIQUES ABSOLUES :
+1. Si la requête contient "feed conversion", "FCR", "indice de conversion", "conversion alimentaire" ou "ratio de conversion" → TOUJOURS feed_conversion_ratio
+2. Si la requête contient "feed intake", "consommation", "total feed" SANS mention de "conversion" → cumulative_feed_intake  
+3. Si la requête mentionne "conversion" OU "ratio" → TOUJOURS feed_conversion_ratio (priorité absolue)
+4. Si ambiguïté entre FCR et feed intake, privilégier feed_conversion_ratio si "conversion" apparaît
+
+RACES COMMUNES :
+- Ross 308, Ross 708, Cobb 500, Cobb 700, Hubbard
+
+SEXE :
+- male, female, as_hatched (mixte)
+
+Réponds UNIQUEMENT en JSON strict :
+{
+  "metric": "nom_métrique_exact",
+  "breed": "nom_race",
+  "age_days": nombre_entier,
+  "sex": "male|female|as_hatched",
+  "confidence": nombre_entre_0_et_1,
+  "reasoning": "explication_courte"
+}"""
+
+            user_message = f"""Analyse cette requête avicole et extrais les informations :
+
+REQUÊTE: "{query}"
+
+Identifie avec précision :
+1. La métrique demandée (feed_conversion_ratio vs cumulative_feed_intake - ATTENTION à ne pas confondre !)
+2. La race/souche (Ross 308, Cobb 500, etc.)
+3. L'âge en jours
+4. Le sexe (male/female/as_hatched)
+
+Réponds en JSON."""
+
+            response = await self.openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message}
+                ],
+                temperature=0.1,  # Très bas pour cohérence et déterminisme
+                response_format={"type": "json_object"}
+            )
+            
+            result = json.loads(response.choices[0].message.content)
+            result["interpretation_source"] = "openai"
+            
+            # Validation de la métrique extraite
+            detected_metric = result.get("metric", "")
+            if detected_metric not in self.metric_keywords:
+                logger.warning(f"⚠️ Métrique inconnue d'OpenAI: {detected_metric}, fallback")
+                return self._fallback_interpretation(query, fallback_entities)
+            
+            logger.info(f"✅ OpenAI interpretation: metric={result.get('metric')}, confidence={result.get('confidence')}")
+            logger.debug(f"Full OpenAI result: {result}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Erreur interprétation OpenAI: {e}", exc_info=True)
+            return self._fallback_interpretation(query, fallback_entities)
+    
+    def _fallback_interpretation(self, query: str, fallback_entities: Dict = None) -> Dict[str, Any]:
+        """Interprétation de secours basée sur mots-clés + entités existantes"""
+        
+        logger.info("🔄 Using fallback interpretation (keyword-based)")
+        
+        query_lower = query.lower()
+        detected_metric = None
+        confidence = 0.5
+        
+        # Détection par mots-clés avec priorité
+        for metric, keywords in self.metric_keywords.items():
+            for keyword in keywords:
+                if keyword in query_lower:
+                    detected_metric = metric
+                    confidence = 0.7
+                    break
+            if detected_metric:
+                break
+        
+        # Si FCR détecté par fallback, haute confiance
+        if detected_metric == "feed_conversion_ratio":
+            confidence = 0.85
+        
+        result = {
+            "metric": detected_metric,
+            "confidence": confidence,
+            "interpretation_source": "fallback"
+        }
+        
+        # Merger avec les entités existantes si disponibles
+        if fallback_entities:
+            if "breed" in fallback_entities:
+                result["breed"] = fallback_entities["breed"]
+            if "age_days" in fallback_entities:
+                result["age_days"] = fallback_entities["age_days"]
+            if "sex" in fallback_entities:
+                result["sex"] = fallback_entities["sex"]
+            
+            result["interpretation_source"] = "hybrid"
+        
+        logger.debug(f"Fallback interpretation result: {result}")
+        return result
+
+
 class PostgreSQLSystem:
-    """Système PostgreSQL principal avec architecture modulaire"""
+    """Système PostgreSQL principal avec architecture modulaire et interprétation OpenAI"""
 
     def __init__(self):
         # Modules core
         self.query_router = None
         self.postgres_retriever = None
-        self.postgres_validator = None  # Renommé pour clarté
+        self.postgres_validator = None
         self.temporal_processor = None
+        
+        # 🆕 NOUVEAU: Query Interpreter avec OpenAI
+        self.query_interpreter = None
 
         # Validation centralisée
         self.validator = ValidationCore()
@@ -52,7 +229,7 @@ class PostgreSQLSystem:
             await self._initialize_core_modules()
 
             self.is_initialized = True
-            logger.info("PostgreSQL System initialisé avec modules")
+            logger.info("PostgreSQL System initialisé avec modules + QueryInterpreter")
 
         except Exception as e:
             logger.error(f"PostgreSQL System initialization error: {e}")
@@ -77,9 +254,19 @@ class PostgreSQLSystem:
             OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
             if OPENAI_API_KEY:
                 self.openai_client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
+                
+                # 🆕 Initialiser le QueryInterpreter avec le client OpenAI
+                self.query_interpreter = QueryInterpreter(self.openai_client)
+                
                 logger.info("OpenAI client initialized")
+                logger.info("✅ QueryInterpreter initialized with OpenAI")
+            else:
+                logger.warning("OPENAI_API_KEY not found - QueryInterpreter disabled")
+                self.query_interpreter = QueryInterpreter(None)
+                
         except Exception as e:
             logger.warning(f"OpenAI initialization failed: {e}")
+            self.query_interpreter = QueryInterpreter(None)
 
     def route_query(self, query: str, intent_result=None) -> QueryType:
         """Route une requête"""
@@ -96,8 +283,8 @@ class PostgreSQLSystem:
         strict_sex_match: bool = False,
     ) -> RAGResult:
         """
-        Recherche de métriques avec validation centralisée
-        VERSION REFACTORÉE: Utilisation de ValidationCore
+        Recherche de métriques avec validation centralisée + interprétation OpenAI
+        VERSION REFACTORÉE: Utilisation de ValidationCore + QueryInterpreter
         """
 
         if not self.is_initialized or not self.postgres_retriever:
@@ -114,18 +301,63 @@ class PostgreSQLSystem:
             logger.debug(
                 f"🔍 INPUT - 'sex' present: {'sex' in (entities or {})}, value: {(entities or {}).get('sex')}"
             )
-            logger.debug(
-                f"🔍 INPUT - 'explicit_sex_request' present: {'explicit_sex_request' in (entities or {})}, value: {(entities or {}).get('explicit_sex_request')}"
-            )
+            
+            # 🆕 ÉTAPE 1: Interprétation OpenAI de la requête
+            if self.query_interpreter:
+                logger.info("🤖 Step 1: OpenAI Query Interpretation")
+                
+                interpreted = await self.query_interpreter.interpret_query(
+                    query, 
+                    fallback_entities=entities
+                )
+                
+                if interpreted and interpreted.get("confidence", 0) > 0.6:
+                    # Enrichir/corriger les entités avec l'interprétation OpenAI
+                    entities = entities or {}
+                    
+                    # Merge intelligent : OpenAI override si haute confiance
+                    if interpreted.get("confidence", 0) > 0.8:
+                        logger.info(f"✅ High confidence OpenAI interpretation (>{0.8}), using OpenAI entities")
+                        
+                        if "metric" in interpreted and interpreted["metric"]:
+                            entities["metric"] = interpreted["metric"]
+                            logger.info(f"  → metric: {interpreted['metric']}")
+                        
+                        if "breed" in interpreted and interpreted["breed"]:
+                            entities["breed"] = interpreted["breed"]
+                            logger.info(f"  → breed: {interpreted['breed']}")
+                        
+                        if "age_days" in interpreted and interpreted["age_days"]:
+                            entities["age_days"] = str(interpreted["age_days"])
+                            logger.info(f"  → age_days: {interpreted['age_days']}")
+                        
+                        if "sex" in interpreted and interpreted["sex"]:
+                            # Préserver sex si explicitement demandé
+                            if not entities.get("explicit_sex_request"):
+                                entities["sex"] = interpreted["sex"]
+                                logger.info(f"  → sex: {interpreted['sex']}")
+                    else:
+                        logger.info(f"⚠️ Medium confidence OpenAI ({interpreted.get('confidence')}), hybrid merge")
+                        # Merge partiel : seulement metric si manquant
+                        if "metric" in interpreted and "metric" not in entities:
+                            entities["metric"] = interpreted["metric"]
+                    
+                    # Ajouter metadata d'interprétation
+                    entities["_openai_interpretation"] = {
+                        "confidence": interpreted.get("confidence"),
+                        "source": interpreted.get("interpretation_source"),
+                        "reasoning": interpreted.get("reasoning", "")
+                    }
+                    
+                    logger.info(f"✅ Entities enriched by OpenAI: {entities}")
 
-            # Validation des entités avec ValidationCore
+            # ÉTAPE 2: Validation des entités avec ValidationCore
+            logger.info("🔍 Step 2: Entity Validation")
             validation_result = self.validator.validate_entities(entities or {})
 
             logger.debug(
                 f"🔍 Validation result: valid={validation_result.is_valid}, confidence={validation_result.confidence}"
             )
-            logger.debug(f"🔍 Validation errors: {validation_result.errors}")
-            logger.debug(f"🔍 Validation warnings: {validation_result.warnings}")
 
             # Si validation échoue ET qu'on n'autorise pas les requêtes partielles
             if not validation_result.is_valid and not validation_result.allow_partial:
@@ -133,7 +365,6 @@ class PostgreSQLSystem:
                     validation_result.errors
                 )
 
-                # Si on a des suggestions, les inclure
                 if validation_result.suggestions:
                     error_message += "\n\nSuggestions: " + ", ".join(
                         validation_result.suggestions
@@ -145,32 +376,22 @@ class PostgreSQLSystem:
                     metadata={
                         "validation_errors": validation_result.errors,
                         "suggestions": validation_result.suggestions,
-                        "alternatives": validation_result.alternatives,
-                        "confidence": validation_result.confidence,
                         "processing_time": time.time() - start_time,
                     },
                 )
 
-            # Si warnings seulement, continuer avec avertissement
-            if validation_result.warnings:
-                logger.warning(f"Warnings validation: {validation_result.warnings}")
-
-            # 🔧 CORRECTION: Merge intelligent des entités
+            # 🔧 ÉTAPE 3: Merge intelligent des entités
+            logger.info("🔧 Step 3: Entity Merge Strategy")
             original_entities = entities or {}
-
-            # Utiliser les entités validées mais préserver les champs critiques
             validated_entities = original_entities.copy()
 
-            # Liste des champs critiques à ne JAMAIS écraser
+            # Préserver les champs critiques
             critical_keys_to_preserve = [
                 "sex",
                 "explicit_sex_request",
                 "_comparison_label",
                 "_comparison_dimension",
             ]
-
-            # Logger le merge
-            logger.debug(f"🔍 BEFORE merge - original_entities: {original_entities}")
 
             for key in critical_keys_to_preserve:
                 if key in original_entities and original_entities[key] is not None:
@@ -179,15 +400,9 @@ class PostgreSQLSystem:
                         f"🔍 PRESERVED critical key '{key}': {original_entities[key]}"
                     )
 
-            # Utiliser les entités validées pour la suite
             entities = validated_entities
 
-            logger.debug(f"🔍 AFTER merge - entities: {entities}")
-            logger.debug(
-                f"🔍 FINAL - 'sex' present: {'sex' in entities}, value: {entities.get('sex')}"
-            )
-
-            # Vérification de disponibilité des données avec postgres_validator
+            # ÉTAPE 4: Vérification de disponibilité des données
             if self.postgres_validator:
                 try:
                     availability_check = (
@@ -207,7 +422,6 @@ class PostgreSQLSystem:
                                 ),
                                 metadata={
                                     "processing_time": time.time() - start_time,
-                                    "availability_status": "out_of_range",
                                     "alternatives": availability_check.get(
                                         "alternatives", []
                                     ),
@@ -218,7 +432,7 @@ class PostgreSQLSystem:
                         f"Erreur vérification disponibilité: {availability_error}"
                     )
 
-            # Détection de requête temporelle
+            # ÉTAPE 5: Détection de requête temporelle
             if self.temporal_processor:
                 try:
                     temporal_range = self.temporal_processor.detect_temporal_range(
@@ -239,16 +453,12 @@ class PostgreSQLSystem:
                 except Exception as temporal_error:
                     logger.warning(f"Erreur détection temporelle: {temporal_error}")
 
-            # 📝 LOG: Juste avant l'appel au retriever
+            # ÉTAPE 6: Exécution de la requête PostgreSQL
+            logger.info("🔍 Step 6: PostgreSQL Query Execution")
             logger.debug(
                 f"🔍 CALLING postgres_retriever.search_metrics with entities: {entities}"
             )
-            logger.debug(f"🔍 Entities 'sex': {entities.get('sex')}")
-            logger.debug(
-                f"🔍 Entities 'explicit_sex_request': {entities.get('explicit_sex_request')}"
-            )
 
-            # Exécution normale de la requête
             metric_results = await self.postgres_retriever.search_metrics(
                 query=query,
                 entities=entities,
@@ -263,7 +473,7 @@ class PostgreSQLSystem:
                     metadata={"processing_time": time.time() - start_time},
                 )
 
-            # Conversion et génération de réponse
+            # ÉTAPE 7: Conversion et génération de réponse
             documents = self._convert_metrics_to_documents(metric_results)
             answer_text = await self._generate_response(
                 query, documents, metric_results, entities
@@ -272,7 +482,7 @@ class PostgreSQLSystem:
                 metric_results
             )
 
-            logger.info(f"PostgreSQL SUCCESS: {len(documents)} documents")
+            logger.info(f"✅ PostgreSQL SUCCESS: {len(documents)} documents retrieved")
 
             return RAGResult(
                 source=RAGSource.RAG_SUCCESS,
@@ -283,10 +493,8 @@ class PostgreSQLSystem:
                     "source_type": "metrics",
                     "data_source": "postgresql",
                     "metric_count": len(metric_results),
-                    "strict_sex_match": strict_sex_match,
-                    "openai_model": OPENAI_MODEL,
+                    "openai_interpretation": entities.get("_openai_interpretation"),
                     "validation_passed": validation_result.is_valid,
-                    "validation_confidence": validation_result.confidence,
                     "processing_time": time.time() - start_time,
                 },
             )
@@ -308,13 +516,9 @@ class PostgreSQLSystem:
         top_k: int = 12,
         strict_sex_match: bool = False,
     ) -> RAGResult:
-        """
-        Recherche optimisée pour plages temporelles
-        Délègue au TemporalQueryProcessor
-        """
+        """Recherche optimisée pour plages temporelles"""
 
         if not self.temporal_processor:
-            # Fallback vers méthode standard
             return await self.search_metrics(
                 query, entities=entities, top_k=top_k, strict_sex_match=strict_sex_match
             )
@@ -385,7 +589,15 @@ class PostgreSQLSystem:
             if best_metric.sex and best_metric.sex != "as_hatched"
             else ""
         )
-        return f"Données trouvées{sex_info}: {best_metric.metric_name} = {best_metric.value_numeric or best_metric.value_text} pour {best_metric.strain}."
+        
+        # Inclure info sur l'interprétation OpenAI si disponible
+        interpretation_info = ""
+        if entities.get("_openai_interpretation"):
+            source = entities["_openai_interpretation"].get("source", "unknown")
+            if source == "openai":
+                interpretation_info = " (interprété par IA)"
+        
+        return f"Données trouvées{sex_info}{interpretation_info}: {best_metric.metric_name} = {best_metric.value_numeric or best_metric.value_text} pour {best_metric.strain}."
 
     async def close(self):
         """Fermeture du système"""
@@ -406,6 +618,19 @@ class PostgreSQLSystem:
                 "postgres_validator": bool(self.postgres_validator),
                 "temporal_processor": bool(self.temporal_processor),
                 "validation_core": bool(self.validator),
+                "query_interpreter": bool(self.query_interpreter),
+            },
+            "query_interpreter": {
+                "enabled": self.query_interpreter.enabled if self.query_interpreter else False,
+                "description": "Interprétation intelligente des requêtes via OpenAI GPT-4",
+                "features": [
+                    "Distinction précise FCR vs Feed Intake",
+                    "Extraction race/souche automatique",
+                    "Détection âge et sexe",
+                    "Score de confiance de l'interprétation",
+                    "Fallback keyword-based si OpenAI indisponible"
+                ],
+                "status": "active" if (self.query_interpreter and self.query_interpreter.enabled) else "disabled"
             },
             "sex_aware_search": True,
             "openai_enabled": self.openai_client is not None,
@@ -413,50 +638,13 @@ class PostgreSQLSystem:
             "validation_centralized": {
                 "applied": True,
                 "description": "Validation centralisée via ValidationCore",
-                "features": [
-                    "Validation unifiée des entités",
-                    "Support des requêtes partielles",
-                    "Suggestions automatiques",
-                    "Alternatives intelligentes",
-                    "Score de confiance",
-                ],
                 "status": "active",
             },
             "temporal_optimization": {
                 "applied": True,
-                "description": "Optimisation SQL pour plages temporelles avec BETWEEN",
-                "features": [
-                    "Détection automatique plages temporelles",
-                    "Une seule requête SQL au lieu de boucles",
-                    "Support patterns 'entre X et Y jours'",
-                    "Traitement groupé par âge",
-                    "Réponses temporelles spécialisées",
-                ],
-                "performance_improvement": "~95% réduction requêtes SQL pour plages",
+                "description": "Optimisation SQL pour plages temporelles",
                 "status": "active",
             },
-            "error_handling": {
-                "applied": True,
-                "description": "Gestion robuste des erreurs avec fallbacks",
-                "features": [
-                    "Validation avant traitement",
-                    "Fallback sur entités brutes si validation échoue",
-                    "Protection contre NoneType errors",
-                    "Logging détaillé des erreurs",
-                ],
-                "status": "active",
-            },
-            "entity_merge_strategy": {
-                "applied": True,
-                "description": "Préservation des champs critiques",
-                "features": [
-                    "Priorité aux entités originales pour 'sex'",
-                    "Préservation de 'explicit_sex_request'",
-                    "Protection des metadata de comparaison",
-                    "Traçage complet du flux des entités",
-                ],
-                "status": "active",
-            },
-            "implementation_phase": "modular_architecture_with_validation_core",
-            "version": "v9.0_validation_centralized",
+            "implementation_phase": "modular_architecture_with_openai_interpreter",
+            "version": "v10.0_openai_query_interpretation",
         }
