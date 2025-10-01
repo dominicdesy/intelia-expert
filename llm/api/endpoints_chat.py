@@ -189,28 +189,54 @@ class ConversationContextManager:
             )
 
     def is_clarification_response(self, message: str, pending_context: Dict) -> bool:
-        """Détecte si le message est une réponse à une clarification"""
+        """Détecte si le message est une réponse à une clarification avec patterns robustes"""
         if not pending_context:
             return False
 
         missing = pending_context.get("missing_fields", [])
-        message_lower = message.lower()
+        msg = message.lower()
 
-        # Détection de races communes
-        common_breeds = ["ross", "cobb", "hubbard", "aviagen", "308", "500", "700"]
-        if "breed" in missing:
-            return any(breed in message_lower for breed in common_breeds)
+        # Patterns par type d'info manquante
+        patterns = {
+            "age": r"\d+\s*(jour|day|j\b|d\b|semaine|week|sem)",
+            "breed": ["ross", "cobb", "hubbard", "aviagen", "308", "500", "700"],
+            "sex": [
+                "mâle",
+                "femelle",
+                "male",
+                "female",
+                "mixte",
+                "mixed",
+                "mâles",
+                "femelles",
+            ],
+            "metric": [
+                "poids",
+                "weight",
+                "fcr",
+                "conversion",
+                "mortalité",
+                "mortality",
+                "gain",
+                "consommation",
+            ],
+        }
 
-        # Détection d'âge
-        if "age_days" in missing:
-            import re
+        # Vérifier chaque champ manquant
+        for field in missing:
+            # Normaliser les noms (age_days → age, metric_type → metric)
+            normalized = field.replace("_days", "").replace("_type", "")
 
-            return bool(re.search(r"\d+\s*(jour|day|j\b)", message_lower))
+            if normalized in patterns:
+                pattern = patterns[normalized]
+                if isinstance(pattern, str):  # regex
+                    import re
 
-        # Détection de sexe
-        if "sex" in missing:
-            sex_keywords = ["mâle", "femelle", "male", "female", "mixte", "mixed"]
-            return any(kw in message_lower for kw in sex_keywords)
+                    if re.search(pattern, msg):
+                        return True
+                elif isinstance(pattern, list):  # keywords
+                    if any(kw in msg for kw in pattern):
+                        return True
 
         return False
 
