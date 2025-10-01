@@ -180,7 +180,8 @@ class PostgreSQLValidator:
         )
 
         # 🟡 NOUVEAU : Invalider metric_type si c'est 'as_hatched' ou autre valeur invalide
-        metric = enhanced_entities.get("metric_type")
+        # ✅ CORRECTION: Vérifier les DEUX champs
+        metric = enhanced_entities.get("metric_type") or enhanced_entities.get("metric")
         if metric:
             metric_lower = str(metric).lower().strip()
             invalid_metrics = [
@@ -194,9 +195,10 @@ class PostgreSQLValidator:
             ]
             if metric_lower in invalid_metrics:
                 logger.warning(
-                    f"⚠️ metric_type invalide '{metric}' → None, auto-détection activée"
+                    f"⚠️ metric invalide '{metric}' → None, auto-détection activée"
                 )
                 enhanced_entities["metric_type"] = None
+                enhanced_entities["metric"] = None  # ✅ Effacer les deux
 
         # 🟢 Auto-détection breed SEULEMENT si absent dans les entités originales ET OpenAI
         if not enhanced_entities.get("breed"):
@@ -249,8 +251,10 @@ class PostgreSQLValidator:
                 f"🔍 Age PRESENT: '{enhanced_entities.get('age_days')}', skipping auto-detection"
             )
 
-        # 🟡 AMÉLIORÉ : Auto-détection metric avec invalidation préalable
-        if not enhanced_entities.get("metric_type"):
+        # 🟡 AMÉLIORÉ : Auto-détection metric avec vérification de 'metric' OU 'metric_type'
+        if not enhanced_entities.get("metric_type") and not enhanced_entities.get(
+            "metric"
+        ):
             logger.debug("🔍 Metric ABSENT, auto-detecting from query...")
             detected_metric = self._auto_detect_metric_type(query)
             if detected_metric:
@@ -259,11 +263,14 @@ class PostgreSQLValidator:
             else:
                 logger.debug("❌ No metric detected in query")
                 missing.append("metric")
-                # 🆕 Suggestion conversationnelle selon la langue
                 suggestions.append(self._get_metric_suggestion(language))
         else:
+            # Métrique présente (soit metric, soit metric_type)
+            metric_value = enhanced_entities.get("metric") or enhanced_entities.get(
+                "metric_type"
+            )
             logger.debug(
-                f"🔍 Metric PRESENT: '{enhanced_entities.get('metric_type')}', skipping auto-detection"
+                f"🔍 Metric PRESENT: '{metric_value}', skipping auto-detection"
             )
 
         # 🔥 LOG CRITIQUE #3 : Avant de retourner
