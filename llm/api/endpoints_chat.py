@@ -141,8 +141,120 @@ class ChatRequest(BaseModel):
 class ConversationContextManager:
     """Gestionnaire de contexte conversationnel pour clarifications - VERSION ACCUMULÉE"""
 
-    def __init__(self):
+    def __init__(self, intents_config_path: str = None):
         self.pending_clarifications = {}
+        self.clarification_patterns = self._load_clarification_patterns(
+            intents_config_path
+        )
+
+    def _load_clarification_patterns(self, config_path: str = None) -> Dict:
+        """Charge les patterns de clarification depuis intents.json"""
+        from pathlib import Path
+        import json
+
+        if config_path is None:
+            # Chemins par défaut
+            possible_paths = [
+                Path(__file__).parent.parent / "config" / "intents.json",
+                Path(__file__).parent / "config" / "intents.json",
+                Path.cwd() / "config" / "intents.json",
+                Path.cwd() / "llm" / "config" / "intents.json",
+            ]
+
+            for path in possible_paths:
+                if path.exists():
+                    config_path = str(path)
+                    break
+
+        if not config_path or not Path(config_path).exists():
+            logger.warning("intents.json non trouvé - utilisation patterns par défaut")
+            return self._get_default_patterns()
+
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+
+            # Extraire les patterns pertinents
+            patterns = {
+                "age": self._extract_age_patterns(config),
+                "breed": self._extract_breed_patterns(config),
+                "sex": self._extract_sex_patterns(config),
+                "metric": self._extract_metric_patterns(config),
+            }
+
+            logger.info(f"Patterns de clarification chargés depuis {config_path}")
+            return patterns
+
+        except Exception as e:
+            logger.error(f"Erreur chargement intents.json: {e}")
+            return self._get_default_patterns()
+
+    def _extract_age_patterns(self, config: Dict) -> Dict:
+        """Extrait les patterns d'âge depuis intents.json"""
+        return {"regex": r"\d+\s*(jour|day|j\b|d\b|semaine|week|sem)", "keywords": []}
+
+    def _extract_breed_patterns(self, config: Dict) -> Dict:
+        """Extrait les patterns de races depuis intents.json"""
+        breeds = []
+        aliases = config.get("aliases", {}).get("line", {})
+
+        for line, line_breeds in aliases.items():
+            if isinstance(line_breeds, list):
+                breeds.extend([b.lower() for b in line_breeds])
+
+        # Ajouter patterns communs
+        breeds.extend(
+            ["ross", "cobb", "hubbard", "aviagen", "308", "500", "700", "708"]
+        )
+
+        return {"regex": None, "keywords": list(set(breeds))}  # Dédupliquer
+
+    def _extract_sex_patterns(self, config: Dict) -> Dict:
+        """Extrait les patterns de sexe depuis intents.json"""
+        sex_aliases = config.get("aliases", {}).get("sex", {})
+
+        keywords = []
+        for sex_type, variants in sex_aliases.items():
+            if isinstance(variants, list):
+                keywords.extend([v.lower() for v in variants])
+
+        return {"regex": None, "keywords": keywords}
+
+    def _extract_metric_patterns(self, config: Dict) -> Dict:
+        """Extrait les patterns de métriques depuis intents.json"""
+        metric_aliases = config.get("aliases", {}).get("metric", {})
+
+        keywords = []
+        for metric_type, variants in metric_aliases.items():
+            if isinstance(variants, list):
+                keywords.extend([v.lower() for v in variants])
+
+        return {"regex": None, "keywords": keywords}
+
+    def _get_default_patterns(self) -> Dict:
+        """Patterns par défaut en cas d'échec de chargement"""
+        return {
+            "age": {"regex": r"\d+\s*(jour|day|j\b|d\b|semaine|week)", "keywords": []},
+            "breed": {
+                "regex": None,
+                "keywords": ["ross", "cobb", "hubbard", "aviagen", "308", "500", "700"],
+            },
+            "sex": {
+                "regex": None,
+                "keywords": ["mâle", "femelle", "male", "female", "mixte", "mixed"],
+            },
+            "metric": {
+                "regex": None,
+                "keywords": [
+                    "poids",
+                    "weight",
+                    "fcr",
+                    "conversion",
+                    "mortalité",
+                    "gain",
+                ],
+            },
+        }
 
     def mark_pending(
         self,
@@ -189,54 +301,34 @@ class ConversationContextManager:
             )
 
     def is_clarification_response(self, message: str, pending_context: Dict) -> bool:
-        """Détecte si le message est une réponse à une clarification avec patterns robustes"""
+        """Détecte si le message est une réponse à une clarification avec patterns depuis intents.json"""
         if not pending_context:
             return False
 
         missing = pending_context.get("missing_fields", [])
         msg = message.lower()
 
-        # Patterns par type d'info manquante
-        patterns = {
-            "age": r"\d+\s*(jour|day|j\b|d\b|semaine|week|sem)",
-            "breed": ["ross", "cobb", "hubbard", "aviagen", "308", "500", "700"],
-            "sex": [
-                "mâle",
-                "femelle",
-                "male",
-                "female",
-                "mixte",
-                "mixed",
-                "mâles",
-                "femelles",
-            ],
-            "metric": [
-                "poids",
-                "weight",
-                "fcr",
-                "conversion",
-                "mortalité",
-                "mortality",
-                "gain",
-                "consommation",
-            ],
-        }
-
         # Vérifier chaque champ manquant
         for field in missing:
             # Normaliser les noms (age_days → age, metric_type → metric)
             normalized = field.replace("_days", "").replace("_type", "")
 
-            if normalized in patterns:
-                pattern = patterns[normalized]
-                if isinstance(pattern, str):  # regex
-                    import re
+            if normalized not in self.clarification_patterns:
+                continue
 
-                    if re.search(pattern, msg):
-                        return True
-                elif isinstance(pattern, list):  # keywords
-                    if any(kw in msg for kw in pattern):
-                        return True
+            pattern_config = self.clarification_patterns[normalized]
+
+            # Vérifier regex si présent
+            if pattern_config.get("regex"):
+                import re
+
+                if re.search(pattern_config["regex"], msg):
+                    return True
+
+            # Vérifier keywords si présents
+            if pattern_config.get("keywords"):
+                if any(kw in msg for kw in pattern_config["keywords"]):
+                    return True
 
         return False
 
