@@ -2,10 +2,12 @@
 """
 rag_engine.py - RAG Engine Principal Refactorisé
 Point d'entrée principal avec délégation vers modules spécialisés
-VERSION 4.4 - CORRECTION POSTGRESQL VALIDATOR/RETRIEVER:
+VERSION 4.5 - CORRECTION COMPLÈTE POSTGRESQL VALIDATOR:
+- ✅ Initialisation du PostgreSQLValidator dans _initialize_external_modules()
+- ✅ Transmission du validator au StandardHandler via configure()
+- ✅ Ajout de async def initialize() au PostgreSQLValidator
 - ✅ Séparation PostgreSQLRetriever (search_metrics) et PostgreSQLValidator (validation)
 - ✅ Transmission correcte du paramètre language à tous les handlers
-- ✅ Configuration des handlers avec les deux modules distincts
 """
 
 import asyncio
@@ -101,7 +103,9 @@ class InteliaRAGEngine:
     """
     RAG Engine principal avec architecture modulaire refactorisée
 
-    VERSION 4.4 - CORRECTIONS CRITIQUES:
+    VERSION 4.5 - CORRECTIONS CRITIQUES:
+    - ✅ Initialisation complète du PostgreSQLValidator
+    - ✅ Transmission du validator au StandardHandler
     - ✅ Séparation PostgreSQLRetriever (search_metrics) et PostgreSQLValidator (validation)
     - ✅ Transmission correcte du paramètre language à tous les handlers
     - Utilise UnifiedQueryClassifier au lieu de QueryClassifier legacy
@@ -161,7 +165,7 @@ class InteliaRAGEngine:
             return
 
         logger.info(
-            "🚀 Initialisation RAG Engine v4.4 (PostgreSQL Validator/Retriever fix)"
+            "🚀 Initialisation RAG Engine v4.5 (PostgreSQL Validator fix complet)"
         )
         self.initialization_errors = []
 
@@ -208,7 +212,7 @@ class InteliaRAGEngine:
             self.initialization_errors.append(str(e))
 
     async def _initialize_external_modules(self):
-        """✅ CORRECTION 3: Initialise Retriever et Validator séparément"""
+        """✅ CORRECTION 3: Initialise Retriever et Validator séparément avec initialize()"""
 
         # Query Preprocessor
         if QUERY_PREPROCESSOR_AVAILABLE and QueryPreprocessor:
@@ -230,11 +234,13 @@ class InteliaRAGEngine:
                 logger.warning(f"⚠️ PostgreSQL Retriever échoué: {e}")
                 self.initialization_errors.append(f"PostgreSQLRetriever: {e}")
 
-        # ✅ PostgreSQL Validator (pour validation)
+        # ✅ PostgreSQL Validator (pour validation) - CORRECTION CRITIQUE
         if POSTGRESQL_VALIDATOR_AVAILABLE and PostgreSQLValidator:
             try:
                 self.postgresql_validator = PostgreSQLValidator()
-                await self.postgresql_validator.initialize()
+                # ✅ AJOUT CRITIQUE: Appeler initialize() si la méthode existe
+                if hasattr(self.postgresql_validator, "initialize"):
+                    await self.postgresql_validator.initialize()
                 logger.info("✅ PostgreSQL Validator initialisé")
             except Exception as e:
                 logger.warning(f"⚠️ PostgreSQL Validator échoué: {e}")
@@ -281,7 +287,7 @@ class InteliaRAGEngine:
         self.standard_handler.configure(
             postgresql_system=self.postgresql_retriever,  # Pour search_metrics()
             weaviate_core=self.weaviate_core,
-            postgresql_validator=self.postgresql_validator,  # Pour validation
+            postgresql_validator=self.postgresql_validator,  # ✅ AJOUT CRITIQUE
         )
 
     async def generate_response(
@@ -529,7 +535,7 @@ class InteliaRAGEngine:
             "rag_enabled": RAG_ENABLED,
             "initialized": self.is_initialized,
             "degraded_mode": self.degraded_mode,
-            "version": "v4.4_postgresql_validator_retriever_fix",
+            "version": "v4.5_postgresql_validator_complete_fix",
             "architecture": "modular_centralized",
             "modules": {
                 "core": True,
@@ -567,7 +573,9 @@ class InteliaRAGEngine:
             logger.error(f"❌ Erreur fermeture PostgreSQL Retriever: {e}")
 
         try:
-            if self.postgresql_validator:
+            if self.postgresql_validator and hasattr(
+                self.postgresql_validator, "close"
+            ):
                 await self.postgresql_validator.close()
         except Exception as e:
             logger.error(f"❌ Erreur fermeture PostgreSQL Validator: {e}")

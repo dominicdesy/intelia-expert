@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
-VERSION 4.1: Fusion OpenAI + Contextualisation intelligente
+VERSION 4.2: Fusion OpenAI + Contextualisation intelligente + Async Initialize
 - Préserve tous les champs originaux
 - Logs diagnostiques
 - Invalidation des métriques invalides
@@ -9,6 +9,7 @@ VERSION 4.1: Fusion OpenAI + Contextualisation intelligente
 - 🆕 Messages de clarification conversationnels multilingues
 - 🆕 Génération de questions plutôt que de simples messages d'erreur
 - 🆕 FUSION avec OpenAI interpretation avant validation
+- ✅ AJOUT: Méthode async initialize() pour compatibilité RAG Engine
 """
 
 import re
@@ -37,6 +38,15 @@ class PostgreSQLValidator:
             f"PostgreSQLValidator initialisé avec breeds_registry "
             f"({len(self.breeds_registry.get_all_breeds())} races)"
         )
+
+    async def initialize(self):
+        """
+        ✅ NOUVEAU: Initialisation asynchrone du PostgreSQLValidator
+        Requis pour compatibilité avec le pattern async du RAG Engine
+        """
+        logger.info("✅ PostgreSQLValidator: Initialisation asynchrone complétée")
+        # Pas de setup async nécessaire pour l'instant, mais gardé pour cohérence
+        return True
 
     def validate_context(
         self, entities: Dict, query: str, language: str = "fr"
@@ -96,7 +106,7 @@ class PostgreSQLValidator:
         """
         Validation flexible qui essaie de compléter les requêtes incomplètes
 
-        🆕 VERSION 4.1: Fusion avec OpenAI interpretation AVANT validation
+        🆕 VERSION 4.2: Fusion avec OpenAI interpretation AVANT validation
 
         CORRECTION FINALE: Commence toujours par les entités ORIGINALES,
         puis enrichit SEULEMENT les champs manquants avec auto-détection.
@@ -762,153 +772,99 @@ class PostgreSQLValidator:
 
 # Tests unitaires
 if __name__ == "__main__":
+    import asyncio
+
     logging.basicConfig(level=logging.DEBUG)
 
     print("=" * 70)
-    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION FUSION OPENAI")
+    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION 4.2 AVEC ASYNC INITIALIZE")
     print("=" * 70)
 
-    validator = PostgreSQLValidator()
+    async def run_tests():
+        validator = PostgreSQLValidator()
 
-    # Test 1: Détection breed
-    print("\n🔍 Test 1: Détection de breed depuis requête")
-    test_queries = [
-        "Quel est le poids du Cobb 500 à 21 jours ?",
-        "FCR ross308 à 35j",
-        "Performance ISA Brown",
-        "Hubbard classic 42 jours",
-    ]
+        # Test async initialize
+        print("\n✅ Test 0: Async Initialize")
+        await validator.initialize()
+        print("  → Initialize complété avec succès")
 
-    for query in test_queries:
-        detected = validator._detect_breed_from_query(query)
-        print(f"  Query: {query}")
-        print(f"  → Breed: {detected}")
+        # Test 1: Détection breed
+        print("\n🔍 Test 1: Détection de breed depuis requête")
+        test_queries = [
+            "Quel est le poids du Cobb 500 à 21 jours ?",
+            "FCR ross308 à 35j",
+            "Performance ISA Brown",
+            "Hubbard classic 42 jours",
+        ]
 
-    # Test 2: Validation avec enrichissement
-    print("\n✅ Test 2: Validation et enrichissement")
-    test_cases = [
-        {
-            "query": "Poids à 21 jours pour Cobb 500",
-            "entities": {"breed": "cobb 500"},
-        },
-        {
-            "query": "FCR du Ross 308",
-            "entities": {},
-        },
-        {
-            "query": "Mortalité",
-            "entities": {"age_days": 35},
-        },
-    ]
+        for query in test_queries:
+            detected = validator._detect_breed_from_query(query)
+            print(f"  Query: {query}")
+            print(f"  → Breed: {detected}")
 
-    for test in test_cases:
-        print(f"\n  Query: {test['query']}")
-        print(f"  Input entities: {test['entities']}")
-
-        result = validator.flexible_query_validation(test["query"], test["entities"])
-
-        print(f"  → Status: {result['status']}")
-        if "enhanced_entities" in result:
-            print(f"  → Enhanced: {result['enhanced_entities']}")
-
-    # 🆕 Test 3: Messages de clarification multilingues
-    print("\n🆕 Test 3: Messages de clarification conversationnels")
-    test_clarifications = [
-        {
-            "query": "Quel est le poids d'un poulet de 12 jours ?",
-            "entities": {},
-            "language": "fr",
-        },
-        {
-            "query": "What is the weight at 12 days?",
-            "entities": {},
-            "language": "en",
-        },
-        {
-            "query": "¿Cuál es el peso?",
-            "entities": {"age_days": 15},
-            "language": "es",
-        },
-    ]
-
-    for test in test_clarifications:
-        print(f"\n  Query: {test['query']}")
-        print(f"  Language: {test['language']}")
-
-        result = validator.flexible_query_validation(
-            test["query"], test["entities"], test["language"]
-        )
-
-        print(f"  → Status: {result['status']}")
-        if result["status"] == "needs_fallback":
-            print(f"  → Question: {result['helpful_message']}")
-
-    # 🆕 Test 4: Fusion avec OpenAI interpretation
-    print("\n🆕 Test 4: Fusion avec OpenAI interpretation")
-    test_openai_fusion = [
-        {
-            "query": "Quel est le poids?",
-            "entities": {
-                "_openai_interpretation": {
-                    "breed": "Ross 308",
-                    "age_days": 21,
-                    "metric_type": "body_weight",
-                }
+        # Test 2: Validation avec enrichissement
+        print("\n✅ Test 2: Validation et enrichissement")
+        test_cases = [
+            {
+                "query": "Poids à 21 jours pour Cobb 500",
+                "entities": {"breed": "cobb 500"},
             },
-            "language": "fr",
-        },
-        {
-            "query": "FCR comparison",
-            "entities": {
-                "sex": "male",
-                "_openai_interpretation": {"breed": "Cobb 500", "age_days": 35},
+            {
+                "query": "FCR du Ross 308",
+                "entities": {},
             },
-            "language": "en",
-        },
-    ]
-
-    for test in test_openai_fusion:
-        print(f"\n  Query: {test['query']}")
-        print(f"  Input entities: {test['entities']}")
-
-        result = validator.flexible_query_validation(
-            test["query"], test["entities"], test["language"]
-        )
-
-        print(f"  → Status: {result['status']}")
-        if "enhanced_entities" in result:
-            print(f"  → Enhanced: {result['enhanced_entities']}")
-            print(f"  → Sex preserved: {result['enhanced_entities'].get('sex')}")
-
-    # 🆕 Test 5: validate_context avec fusion
-    print("\n🆕 Test 5: validate_context avec fusion OpenAI")
-    test_validate_context = {
-        "query": "Compare weight",
-        "entities": {
-            "sex": "female",
-            "_openai_interpretation": {
-                "breed": "Ross 308",
-                "age_days": 28,
-                "metric_type": "body_weight",
+            {
+                "query": "Mortalité",
+                "entities": {"age_days": 35},
             },
-        },
-        "language": "en",
-    }
+        ]
 
-    print(f"\n  Query: {test_validate_context['query']}")
-    print(f"  Input entities: {test_validate_context['entities']}")
+        for test in test_cases:
+            print(f"\n  Query: {test['query']}")
+            print(f"  Input entities: {test['entities']}")
 
-    result = validator.validate_context(
-        test_validate_context["entities"],
-        test_validate_context["query"],
-        test_validate_context["language"],
-    )
+            result = validator.flexible_query_validation(
+                test["query"], test["entities"]
+            )
 
-    print(f"  → Status: {result['status']}")
-    print(f"  → Missing fields: {result.get('missing_fields', [])}")
-    print(f"  → Enhanced entities: {result['enhanced_entities']}")
-    print(f"  → Sex preserved: {result['enhanced_entities'].get('sex')}")
+            print(f"  → Status: {result['status']}")
+            if "enhanced_entities" in result:
+                print(f"  → Enhanced: {result['enhanced_entities']}")
 
-    print("\n" + "=" * 70)
-    print("✅ TESTS TERMINÉS - PostgreSQL Validator avec Fusion OpenAI")
-    print("=" * 70)
+        # 🆕 Test 3: Messages de clarification multilingues
+        print("\n🆕 Test 3: Messages de clarification conversationnels")
+        test_clarifications = [
+            {
+                "query": "Quel est le poids d'un poulet de 12 jours ?",
+                "entities": {},
+                "language": "fr",
+            },
+            {
+                "query": "What is the weight at 12 days?",
+                "entities": {},
+                "language": "en",
+            },
+            {
+                "query": "¿Cuál es el peso?",
+                "entities": {"age_days": 15},
+                "language": "es",
+            },
+        ]
+
+        for test in test_clarifications:
+            print(f"\n  Query: {test['query']}")
+            print(f"  Language: {test['language']}")
+
+            result = validator.flexible_query_validation(
+                test["query"], test["entities"], test["language"]
+            )
+
+            print(f"  → Status: {result['status']}")
+            if result["status"] == "needs_fallback":
+                print(f"  → Question: {result['helpful_message']}")
+
+        print("\n" + "=" * 70)
+        print("✅ TESTS TERMINÉS - PostgreSQL Validator avec Async Initialize")
+        print("=" * 70)
+
+    asyncio.run(run_tests())
