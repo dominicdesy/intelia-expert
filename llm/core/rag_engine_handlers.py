@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 rag_engine_handlers.py - Handlers spécialisés pour différents types de requêtes
-VERSION 4.2 - CORRECTION COMPLÈTE TRANSMISSION LANGUE :
+VERSION 4.3 - CORRECTION COMPLÈTE TRANSMISSION LANGUE + ROUTING HINT POSTGRESQL:
 - Compatible avec la structure harmonisée du comparison_handler
 - Mode optimisation pour tri par pertinence
 - Évite double appel PostgreSQL avant fallback Weaviate
-- Respecte le routage suggéré par OpenAI
+- Respecte le routage suggéré par OpenAI avec priorité à PostgreSQL routing hint
 - ✅ CORRECTION: Transmission du paramètre 'language' à TOUS les appels (PostgreSQL + Weaviate)
+- ✅ NOUVEAU: Gestion routing_hint postgresql avec retour immédiat sur INSUFFICIENT_CONTEXT
 """
 
 import re
@@ -170,7 +171,7 @@ class ComparativeQueryHandler(BaseQueryHandler):
 
         # Extraction de la langue
         language = preprocessed_data.get("language", "fr")
-        logger.info(f"🌍 Fallback comparative avec langue: {language}")
+        logger.info(f"🌐 Fallback comparative avec langue: {language}")
 
         # Initialisation des métadonnées de disponibilité
         availability_metadata = {
@@ -188,7 +189,7 @@ class ComparativeQueryHandler(BaseQueryHandler):
                     query=query,
                     entities=entities,
                     top_k=RAG_SIMILARITY_TOP_K,
-                    language=language,  # ✅ CORRECTION
+                    language=language,
                 )
 
                 if result and result.source != RAGSource.NO_RESULTS:
@@ -324,7 +325,7 @@ class TemporalQueryHandler(BaseQueryHandler):
                     age_min=age_range[0],
                     age_max=age_range[1],
                     top_k=RAG_SIMILARITY_TOP_K,
-                    language=language,  # ✅ CORRECTION
+                    language=language,
                 )
 
                 if result and result.source != RAGSource.NO_RESULTS:
@@ -378,7 +379,7 @@ class TemporalQueryHandler(BaseQueryHandler):
         entities: Dict[str, Any],
         age_range: Tuple[int, int],
         start_time: float,
-        language: str = "fr",  # ✅ CORRECTION
+        language: str = "fr",
     ) -> RAGResult:
         """Fallback: requêtes multiples pour plage temporelle"""
 
@@ -393,7 +394,7 @@ class TemporalQueryHandler(BaseQueryHandler):
                 query=query,
                 entities=age_entities,
                 top_k=3,
-                language=language,  # ✅ CORRECTION
+                language=language,
             )
 
             if result and result.context_docs:
@@ -424,35 +425,49 @@ class StandardQueryHandler(BaseQueryHandler):
 
     async def handle(
         self,
-        preprocessed_data: Dict[str, Any],
-        start_time: float,
+        query: str = None,
+        entities: Dict = None,
+        preprocessed_data: Dict[str, Any] = None,
+        start_time: float = None,
         original_query: str = None,
         tenant_id: str = None,
         conversation_context: list = None,
         language: str = "fr",
+        preprocessing_result: Dict = None,
         **kwargs,
     ) -> RAGResult:
         """
         Traite les requêtes standard avec:
         - Respect du routage suggéré par OpenAI
+        - Priorité au routing hint 'postgresql' avec retour immédiat si INSUFFICIENT_CONTEXT
         - Évitement du double appel PostgreSQL
         - Fallback intelligent vers Weaviate
         - ✅ CORRECTION: Transmission correcte du paramètre language partout
         """
 
-        query = preprocessed_data["normalized_query"]
-        entities = preprocessed_data["entities"]
-        routing_hint = preprocessed_data.get("routing_hint")
-        is_optimization = preprocessed_data.get("is_optimization", False)
+        # Support des deux modes d'appel (legacy et nouveau)
+        if preprocessed_data:
+            query = preprocessed_data.get("normalized_query", query)
+            entities = preprocessed_data.get("entities", entities)
+            routing_hint = preprocessed_data.get("routing_hint")
+            is_optimization = preprocessed_data.get("is_optimization", False)
+            language = preprocessed_data.get("language", language)
+            if original_query is None:
+                original_query = preprocessed_data.get("original_query", query)
+        elif preprocessing_result:
+            routing_hint = preprocessing_result.get("routing_hint")
+            is_optimization = False
+        else:
+            routing_hint = None
+            is_optimization = False
 
-        if original_query is None:
-            original_query = preprocessed_data.get("original_query", query)
+        if start_time is None:
+            start_time = time.time()
 
-        # Extraction langue depuis preprocessed_data si disponible
-        if "language" in preprocessed_data:
-            language = preprocessed_data["language"]
+        if entities is None:
+            entities = {}
 
-        logger.info(f"🌍 StandardQueryHandler traite requête en langue: {language}")
+        logger.info(f"🌐 StandardQueryHandler traite requête en langue: {language}")
 
         # Configuration top_k selon mode
         if is_optimization:
@@ -461,7 +476,61 @@ class StandardQueryHandler(BaseQueryHandler):
         else:
             top_k = RAG_SIMILARITY_TOP_K
 
-        # Respect du routage suggéré par OpenAI
+        # 🆕 ÉTAPE 1: Vérifier le routing hint PostgreSQL en PRIORITÉ
+        if routing_hint == "postgresql":
+            logger.info(
+                "🎯 PostgreSQL routing hint détecté - tentative PostgreSQL d'abord"
+            )
+
+            if self.postgresql_system:
+                try:
+                    pg_result = await self.postgresql_system.search_metrics(
+                        query=query,
+                        entities=entities,
+                        language=language,
+                        top_k=top_k,
+                    )
+
+                    # Si contexte insuffisant, retourner la clarification immédiatement
+                    if pg_result.source == RAGSource.INSUFFICIENT_CONTEXT:
+                        logger.info(
+                            "❓ Contexte insuffisant - demande de clarification"
+                        )
+                        pg_result.metadata.update(
+                            {
+                                "source_type": "postgresql_insufficient_context",
+                                "routing_hint": "postgresql",
+                                "processing_time": time.time() - start_time,
+                                "language_used": language,
+                            }
+                        )
+                        return pg_result
+
+                    # Si résultats trouvés, retourner
+                    if pg_result.source == RAGSource.RAG_SUCCESS:
+                        logger.info(
+                            f"✅ PostgreSQL SUCCESS: {len(pg_result.context_docs or [])} documents"
+                        )
+                        pg_result.metadata.update(
+                            {
+                                "source_type": "postgresql_routing_hint",
+                                "routing_hint": "postgresql",
+                                "processing_time": time.time() - start_time,
+                                "language_used": language,
+                            }
+                        )
+                        return pg_result
+
+                    # Si NO_RESULTS, continuer vers Weaviate en fallback
+                    logger.info("⚠️ PostgreSQL NO_RESULTS - fallback vers Weaviate")
+
+                except Exception as e:
+                    logger.error(f"❌ Erreur PostgreSQL: {e}", exc_info=True)
+                    logger.info("⚠️ Fallback vers Weaviate après erreur PostgreSQL")
+            else:
+                logger.warning("⚠️ PostgreSQL non disponible malgré routing hint")
+
+        # 🆕 ÉTAPE 2: Respect du routage suggéré Weaviate par OpenAI
         if routing_hint == "weaviate":
             if self._is_qualitative_query(entities):
                 logger.info(
@@ -493,32 +562,11 @@ class StandardQueryHandler(BaseQueryHandler):
                     language,
                 )
 
-        # PostgreSQL avec hint prioritaire
-        if routing_hint == "postgresql" and self.postgresql_system:
-            logger.info(f"Routage PostgreSQL (preprocessing hint, langue={language})")
-            result = await self._search_postgresql_once(
-                query, entities, top_k, is_optimization, language  # ✅ CORRECTION
-            )
-
-            if result and result.source != RAGSource.NO_RESULTS:
-                return result
-
-            logger.info("⚠️ PostgreSQL sans résultat → fallback Weaviate immédiat")
-            if self.weaviate_core:
-                return await self._search_weaviate_direct(
-                    query,
-                    entities,
-                    top_k,
-                    is_optimization,
-                    start_time,
-                    language,
-                )
-
-        # PostgreSQL standard (UN SEUL APPEL)
-        if self.postgresql_system:
+        # PostgreSQL standard (UN SEUL APPEL) - seulement si pas déjà tenté avec routing hint
+        if self.postgresql_system and routing_hint != "postgresql":
             logger.info(f"Recherche PostgreSQL standard (langue={language})")
             result = await self._search_postgresql_once(
-                query, entities, top_k, is_optimization, language  # ✅ CORRECTION
+                query, entities, top_k, is_optimization, language
             )
 
             if result and result.source != RAGSource.NO_RESULTS:
@@ -526,8 +574,9 @@ class StandardQueryHandler(BaseQueryHandler):
 
             logger.info("⚠️ PostgreSQL sans résultat → fallback Weaviate direct")
 
-        # Weaviate fallback
+        # 🆕 ÉTAPE 3: Fallback Weaviate (comportement original)
         if self.weaviate_core:
+            logger.info(f"📚 Recherche Weaviate (top_k={top_k}, langue={language})")
             return await self._search_weaviate_direct(
                 query,
                 entities,
@@ -554,7 +603,7 @@ class StandardQueryHandler(BaseQueryHandler):
         entities: Dict[str, Any],
         top_k: int,
         is_optimization: bool,
-        language: str = "fr",  # ✅ CORRECTION: Ajout paramètre
+        language: str = "fr",
     ) -> Optional[RAGResult]:
         """
         Effectue UNE SEULE recherche PostgreSQL
@@ -566,7 +615,7 @@ class StandardQueryHandler(BaseQueryHandler):
                 query=query,
                 entities=entities,
                 top_k=top_k,
-                language=language,  # ✅ CORRECTION: Transmission langue
+                language=language,
             )
 
             if result and result.source != RAGSource.NO_RESULTS:
@@ -577,7 +626,7 @@ class StandardQueryHandler(BaseQueryHandler):
                     result.metadata["top_k_used"] = top_k
 
                 result.metadata["search_attempt"] = "postgresql_single"
-                result.metadata["language_used"] = language  # ✅ TRAÇABILITÉ
+                result.metadata["language_used"] = language
                 logger.info(
                     f"✅ PostgreSQL ({language}): {len(result.context_docs)} documents trouvés"
                 )
