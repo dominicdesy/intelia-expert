@@ -2,7 +2,10 @@
 """
 rag_engine.py - RAG Engine Principal Refactorisé
 Point d'entrée principal avec délégation vers modules spécialisés
-VERSION REFACTORISÉE + MULTILINGUE : Transmission correcte du paramètre language
+VERSION 4.4 - CORRECTION POSTGRESQL VALIDATOR/RETRIEVER:
+- ✅ Séparation PostgreSQLRetriever (search_metrics) et PostgreSQLValidator (validation)
+- ✅ Transmission correcte du paramètre language à tous les handlers
+- ✅ Configuration des handlers avec les deux modules distincts
 """
 
 import asyncio
@@ -40,23 +43,34 @@ from .validation_core import ValidationCore
 logger = logging.getLogger(__name__)
 
 # Imports conditionnels des modules externes
-POSTGRESQL_INTEGRATION_AVAILABLE = False
+POSTGRESQL_RETRIEVER_AVAILABLE = False
+POSTGRESQL_VALIDATOR_AVAILABLE = False
 QUERY_PREPROCESSOR_AVAILABLE = False
 COMPARISON_HANDLER_AVAILABLE = False
 WEAVIATE_CORE_AVAILABLE = False
 
-PostgreSQLSystem = None
+PostgreSQLRetriever = None
+PostgreSQLValidator = None
 QueryPreprocessor = None
 ComparisonHandler = None
 WeaviateCore = None
 
+# ✅ CORRECTION 1: Import séparé du Retriever et Validator
 try:
-    from .rag_postgresql_validator import PostgreSQLValidator as PostgreSQLSystem
+    from .rag_postgresql_retriever import PostgreSQLRetriever
 
-    POSTGRESQL_INTEGRATION_AVAILABLE = True
-    logger.info("✅ PostgreSQL System importé")
+    POSTGRESQL_RETRIEVER_AVAILABLE = True
+    logger.info("✅ PostgreSQL Retriever importé")
 except ImportError as e:
-    logger.warning(f"⚠️ PostgreSQL non disponible: {e}")
+    logger.warning(f"⚠️ PostgreSQL Retriever non disponible: {e}")
+
+try:
+    from .rag_postgresql_validator import PostgreSQLValidator
+
+    POSTGRESQL_VALIDATOR_AVAILABLE = True
+    logger.info("✅ PostgreSQL Validator importé")
+except ImportError as e:
+    logger.warning(f"⚠️ PostgreSQL Validator non disponible: {e}")
 
 try:
     from .query_preprocessor import QueryPreprocessor
@@ -87,12 +101,13 @@ class InteliaRAGEngine:
     """
     RAG Engine principal avec architecture modulaire refactorisée
 
-    NOUVEAUTÉS v2.0:
+    VERSION 4.4 - CORRECTIONS CRITIQUES:
+    - ✅ Séparation PostgreSQLRetriever (search_metrics) et PostgreSQLValidator (validation)
+    - ✅ Transmission correcte du paramètre language à tous les handlers
     - Utilise UnifiedQueryClassifier au lieu de QueryClassifier legacy
     - Intègre EntityExtractor pour extraction centralisée
     - Utilise ValidationCore pour validation unifiée
     - ComparisonHandler est maintenant un wrapper vers ComparisonEngine
-    - ✅ CORRECTION MULTILINGUE: Transmission du paramètre language à tous les handlers
     """
 
     def __init__(self, openai_client: AsyncOpenAI = None):
@@ -101,17 +116,18 @@ class InteliaRAGEngine:
         self.core = RAGEngineCore(openai_client)
 
         # NOUVEAUX MODULES CENTRALISÉS
-        self.query_classifier = UnifiedQueryClassifier()  # Nouveau classificateur
-        self.entity_extractor = EntityExtractor()  # Extraction centralisée
-        self.validator = ValidationCore()  # Validation centralisée
+        self.query_classifier = UnifiedQueryClassifier()
+        self.entity_extractor = EntityExtractor()
+        self.validator = ValidationCore()
 
         # Handlers spécialisés
         self.temporal_handler = TemporalQueryHandler()
         self.comparative_handler = ComparativeQueryHandler()
         self.standard_handler = StandardQueryHandler()
 
-        # Modules externes
-        self.postgresql_system = None
+        # ✅ CORRECTION 2: Modules externes avec Retriever ET Validator séparés
+        self.postgresql_retriever = None  # ✅ Pour search_metrics()
+        self.postgresql_validator = None  # ✅ Pour validation
         self.query_preprocessor = None
         self.comparison_handler = None
         self.weaviate_core = None
@@ -144,7 +160,9 @@ class InteliaRAGEngine:
         if self.is_initialized:
             return
 
-        logger.info("🚀 Initialisation RAG Engine modulaire v2.0 (multilingue)")
+        logger.info(
+            "🚀 Initialisation RAG Engine v4.4 (PostgreSQL Validator/Retriever fix)"
+        )
         self.initialization_errors = []
 
         try:
@@ -163,7 +181,8 @@ class InteliaRAGEngine:
                 name
                 for name, module in [
                     ("Preprocessor", self.query_preprocessor),
-                    ("PostgreSQL", self.postgresql_system),
+                    ("PostgreSQLRetriever", self.postgresql_retriever),
+                    ("PostgreSQLValidator", self.postgresql_validator),
                     ("WeaviateCore", self.weaviate_core),
                     ("ComparisonHandler", self.comparison_handler),
                     ("QueryClassifier", self.query_classifier),
@@ -189,26 +208,37 @@ class InteliaRAGEngine:
             self.initialization_errors.append(str(e))
 
     async def _initialize_external_modules(self):
-        """Initialise les modules externes"""
-        # Query Preprocessor (refactorisé - n'accepte plus de paramètres)
+        """✅ CORRECTION 3: Initialise Retriever et Validator séparément"""
+
+        # Query Preprocessor
         if QUERY_PREPROCESSOR_AVAILABLE and QueryPreprocessor:
             try:
                 self.query_preprocessor = QueryPreprocessor()
                 await self.query_preprocessor.initialize()
-                logger.info("✅ Query Preprocessor initialisé (refactorisé)")
+                logger.info("✅ Query Preprocessor initialisé")
             except Exception as e:
                 logger.warning(f"⚠️ Query Preprocessor échoué: {e}")
                 self.initialization_errors.append(f"Preprocessor: {e}")
 
-        # PostgreSQL System
-        if POSTGRESQL_INTEGRATION_AVAILABLE and PostgreSQLSystem:
+        # ✅ PostgreSQL Retriever (pour search_metrics)
+        if POSTGRESQL_RETRIEVER_AVAILABLE and PostgreSQLRetriever:
             try:
-                self.postgresql_system = PostgreSQLSystem()
-                await self.postgresql_system.initialize()
-                logger.info("✅ PostgreSQL System initialisé")
+                self.postgresql_retriever = PostgreSQLRetriever()
+                await self.postgresql_retriever.initialize()
+                logger.info("✅ PostgreSQL Retriever initialisé")
             except Exception as e:
-                logger.warning(f"⚠️ PostgreSQL échoué: {e}")
-                self.initialization_errors.append(f"PostgreSQL: {e}")
+                logger.warning(f"⚠️ PostgreSQL Retriever échoué: {e}")
+                self.initialization_errors.append(f"PostgreSQLRetriever: {e}")
+
+        # ✅ PostgreSQL Validator (pour validation)
+        if POSTGRESQL_VALIDATOR_AVAILABLE and PostgreSQLValidator:
+            try:
+                self.postgresql_validator = PostgreSQLValidator()
+                await self.postgresql_validator.initialize()
+                logger.info("✅ PostgreSQL Validator initialisé")
+            except Exception as e:
+                logger.warning(f"⚠️ PostgreSQL Validator échoué: {e}")
+                self.initialization_errors.append(f"PostgreSQLValidator: {e}")
 
         # Weaviate Core
         if WEAVIATE_CORE_AVAILABLE and WeaviateCore and self.core.openai_client:
@@ -220,37 +250,38 @@ class InteliaRAGEngine:
                 logger.warning(f"⚠️ Weaviate Core échoué: {e}")
                 self.initialization_errors.append(f"WeaviateCore: {e}")
 
-        # Comparison Handler (wrapper vers ComparisonEngine)
+        # Comparison Handler (utilise le Retriever)
         if COMPARISON_HANDLER_AVAILABLE and ComparisonHandler:
             try:
-                self.comparison_handler = ComparisonHandler(self.postgresql_system)
-                if not self.postgresql_system:
+                self.comparison_handler = ComparisonHandler(self.postgresql_retriever)
+                if not self.postgresql_retriever:
                     logger.warning(
-                        "⚠️ Comparison Handler initialisé en mode dégradé (PostgreSQL absent, utilisera Weaviate comme fallback)"
+                        "⚠️ Comparison Handler en mode dégradé (pas de PostgreSQL)"
                     )
                 else:
-                    logger.info(
-                        "✅ Comparison Handler initialisé (wrapper → ComparisonEngine)"
-                    )
+                    logger.info("✅ Comparison Handler initialisé")
             except Exception as e:
                 logger.warning(f"⚠️ Comparison Handler échoué: {e}")
                 self.initialization_errors.append(f"ComparisonHandler: {e}")
 
     async def _configure_handlers(self):
-        """Configure les handlers avec les modules"""
-        # Configuration temporal handler
-        self.temporal_handler.configure(postgresql_system=self.postgresql_system)
+        """✅ CORRECTION 4: Configure handlers avec Retriever ET Validator"""
 
-        # Configuration comparative handler
+        # Configuration temporal handler (utilise le Retriever)
+        self.temporal_handler.configure(postgresql_system=self.postgresql_retriever)
+
+        # Configuration comparative handler (utilise le Retriever)
         self.comparative_handler.configure(
             comparison_handler=self.comparison_handler,
             weaviate_core=self.weaviate_core,
-            postgresql_system=self.postgresql_system,
+            postgresql_system=self.postgresql_retriever,
         )
 
-        # Configuration standard handler
+        # ✅ Configuration standard handler (utilise RETRIEVER + VALIDATOR)
         self.standard_handler.configure(
-            postgresql_system=self.postgresql_system, weaviate_core=self.weaviate_core
+            postgresql_system=self.postgresql_retriever,  # Pour search_metrics()
+            weaviate_core=self.weaviate_core,
+            postgresql_validator=self.postgresql_validator,  # Pour validation
         )
 
     async def generate_response(
@@ -281,12 +312,11 @@ class InteliaRAGEngine:
                 metadata={"error": "Query vide"},
             )
 
-        # ✅ CORRECTION: Utiliser langue fournie ou défaut "fr"
         effective_language = language or "fr"
         logger.info(f"🌍 generate_response reçoit langue: {effective_language}")
 
         # Fallback si système indisponible
-        if self.degraded_mode and not self.postgresql_system:
+        if self.degraded_mode and not self.postgresql_retriever:
             return RAGResult(
                 source=RAGSource.FALLBACK_NEEDED,
                 answer="Le système RAG n'est pas disponible.",
@@ -312,21 +342,20 @@ class InteliaRAGEngine:
         enable_preprocessing: bool,
         start_time: float,
     ) -> RAGResult:
-        """Pipeline de traitement modulaire avec nouveaux composants"""
+        """Pipeline de traitement modulaire"""
 
         logger.info(f"🌍 _process_query traite avec langue: {language}")
 
-        # 1. Preprocessing (utilise les nouveaux modules en interne)
+        # 1. Preprocessing
         preprocessed_data = await self._apply_preprocessing(
             query, language, enable_preprocessing
         )
 
-        # ✅ CORRECTION CRITIQUE: S'assurer que language est dans preprocessed_data
         if "language" not in preprocessed_data:
             preprocessed_data["language"] = language
             logger.info(f"🌍 Langue ajoutée à preprocessed_data: {language}")
 
-        # 2. Classification avec UnifiedQueryClassifier
+        # 2. Classification
         classification = self.query_classifier.classify(
             preprocessed_data["normalized_query"]
         )
@@ -336,7 +365,7 @@ class InteliaRAGEngine:
             f"🎯 Type de requête détecté: {query_type} (confiance: {classification.confidence:.2%})"
         )
 
-        # Mise à jour des stats selon le type
+        # Mise à jour des stats
         if classification.query_type == QueryType.COMPARATIVE:
             self.optimization_stats["comparative_queries"] += 1
         elif classification.query_type == QueryType.TEMPORAL_RANGE:
@@ -350,16 +379,16 @@ class InteliaRAGEngine:
         elif classification.query_type == QueryType.DIAGNOSTIC:
             self.optimization_stats["diagnostic_queries"] += 1
 
-        # 3. Enrichir preprocessed_data avec classification
+        # 3. Enrichir preprocessed_data
         preprocessed_data["query_type"] = query_type
         preprocessed_data["classification"] = classification.to_dict()
 
-        # 4. Routage vers handler approprié avec language
+        # 4. Routage vers handler
         result = await self._route_to_handler(
-            query_type, preprocessed_data, start_time, language  # ✅ AJOUT language
+            query_type, preprocessed_data, start_time, language
         )
 
-        # 5. Enrichir avec métadonnées de preprocessing et classification
+        # 5. Enrichir métadonnées
         result.metadata.update(preprocessed_data["metadata"])
         result.metadata["classification"] = classification.to_dict()
 
@@ -368,13 +397,12 @@ class InteliaRAGEngine:
     async def _apply_preprocessing(
         self, query: str, language: str, enable_preprocessing: bool
     ) -> Dict[str, Any]:
-        """Applique le preprocessing avec nouveaux modules"""
+        """Applique le preprocessing"""
 
         logger.debug(f"🌍 _apply_preprocessing avec langue: {language}")
 
         if not enable_preprocessing or not self.query_preprocessor:
-            # Preprocessing minimal avec nouveaux modules
-            logger.debug("📋 Preprocessing minimal (sans Query Preprocessor)")
+            logger.debug("📋 Preprocessing minimal")
 
             extracted = self.entity_extractor.extract(query)
             entities_dict = extracted.to_dict()
@@ -383,7 +411,7 @@ class InteliaRAGEngine:
                 "normalized_query": query,
                 "original_query": query,
                 "entities": entities_dict,
-                "language": language,  # ✅ AJOUT CRITIQUE
+                "language": language,
                 "routing_hint": None,
                 "is_comparative": False,
                 "comparison_entities": [],
@@ -391,7 +419,7 @@ class InteliaRAGEngine:
                     "preprocessing_applied": False,
                     "extraction_confidence": extracted.confidence,
                     "entities_found": extracted.get_entity_count(),
-                    "language_detected": language,  # ✅ TRAÇABILITÉ
+                    "language_detected": language,
                 },
             }
 
@@ -407,7 +435,7 @@ class InteliaRAGEngine:
                 "normalized_query": preprocessed.get("normalized_query", query),
                 "original_query": query,
                 "entities": preprocessed.get("entities", {}),
-                "language": language,  # ✅ AJOUT CRITIQUE
+                "language": language,
                 "routing_hint": preprocessed.get("routing"),
                 "is_comparative": preprocessed.get("is_comparative", False),
                 "comparison_entities": preprocessed.get("comparison_entities", []),
@@ -419,17 +447,14 @@ class InteliaRAGEngine:
                     "is_comparative": preprocessed.get("is_comparative", False),
                     "preprocessing_applied": True,
                     "confidence": preprocessed.get("confidence", 1.0),
-                    "language_detected": language,  # ✅ TRAÇABILITÉ
+                    "language_detected": language,
                 },
             }
 
         except Exception as e:
-            logger.warning(
-                f"⚠️ Preprocessing échoué: {e}, fallback sur extraction basique"
-            )
+            logger.warning(f"⚠️ Preprocessing échoué: {e}, fallback basique")
             self.optimization_stats["preprocessing_failures"] += 1
 
-            # Fallback sur extraction basique
             extracted = self.entity_extractor.extract(query)
             entities_dict = extracted.to_dict()
 
@@ -437,7 +462,7 @@ class InteliaRAGEngine:
                 "normalized_query": query,
                 "original_query": query,
                 "entities": entities_dict,
-                "language": language,  # ✅ AJOUT CRITIQUE
+                "language": language,
                 "routing_hint": None,
                 "is_comparative": False,
                 "comparison_entities": [],
@@ -446,7 +471,7 @@ class InteliaRAGEngine:
                     "preprocessing_error": str(e),
                     "fallback_extraction": True,
                     "extraction_confidence": extracted.confidence,
-                    "language_detected": language,  # ✅ TRAÇABILITÉ
+                    "language_detected": language,
                 },
             }
 
@@ -455,9 +480,9 @@ class InteliaRAGEngine:
         query_type: str,
         preprocessed_data: Dict[str, Any],
         start_time: float,
-        language: str,  # ✅ AJOUT PARAMÈTRE
+        language: str,
     ) -> RAGResult:
-        """Route vers le handler approprié selon le type de requête"""
+        """Route vers le handler approprié"""
 
         logger.info(f"🌍 _route_to_handler avec langue: {language}")
 
@@ -473,95 +498,56 @@ class InteliaRAGEngine:
             logger.debug(f"→ Routage vers StandardHandler (type={query_type})")
             preprocessed_data["is_optimization"] = query_type == "optimization"
             preprocessed_data["is_calculation"] = query_type == "calculation"
-            # ✅ CORRECTION: Transmission explicite du language
             return await self.standard_handler.handle(
-                preprocessed_data, start_time, language=language  # ✅ AJOUT CRITIQUE
+                preprocessed_data, start_time, language=language
             )
 
         elif query_type == "economic":
             logger.debug("→ Requête économique détectée")
             return RAGResult(
                 source=RAGSource.ERROR,
-                answer="Les données économiques ne sont pas disponibles dans notre système.",
-                metadata={
-                    "query_type": "economic",
-                    "suggestion": "Nous pouvons fournir des données de performance que vous pouvez utiliser avec vos coûts locaux.",
-                },
+                answer="Les données économiques ne sont pas disponibles.",
+                metadata={"query_type": "economic"},
             )
 
         elif query_type == "diagnostic":
             logger.debug("→ Routage vers StandardHandler (diagnostic)")
             preprocessed_data["routing_hint"] = "weaviate"
-            # ✅ CORRECTION: Transmission explicite du language
             return await self.standard_handler.handle(
-                preprocessed_data, start_time, language=language  # ✅ AJOUT CRITIQUE
+                preprocessed_data, start_time, language=language
             )
 
         else:  # standard
             logger.debug("→ Routage vers StandardHandler (standard)")
-            # ✅ CORRECTION: Transmission explicite du language
             return await self.standard_handler.handle(
-                preprocessed_data, start_time, language=language  # ✅ AJOUT CRITIQUE
+                preprocessed_data, start_time, language=language
             )
 
     def get_status(self) -> Dict:
-        """Status système complet avec nouveaux modules"""
+        """Status système complet"""
         return {
             "rag_enabled": RAG_ENABLED,
             "initialized": self.is_initialized,
             "degraded_mode": self.degraded_mode,
-            "version": "v2.0.3_multilang_fixed",  # ✅ Version mise à jour
+            "version": "v4.4_postgresql_validator_retriever_fix",
             "architecture": "modular_centralized",
             "modules": {
-                # Core modules
                 "core": True,
                 "rag_engine": True,
-                # Nouveaux modules centralisés
                 "query_classifier": bool(self.query_classifier),
                 "entity_extractor": bool(self.entity_extractor),
                 "validation_core": bool(self.validator),
-                # Handlers
                 "temporal_handler": True,
                 "comparative_handler": True,
                 "standard_handler": True,
-                # Modules externes
                 "query_preprocessor": bool(self.query_preprocessor),
-                "postgresql_system": bool(self.postgresql_system),
+                "postgresql_retriever": bool(self.postgresql_retriever),
+                "postgresql_validator": bool(self.postgresql_validator),
                 "weaviate_core": bool(self.weaviate_core),
                 "comparison_handler": bool(self.comparison_handler),
             },
             "optimization_stats": self.optimization_stats.copy(),
-            "capabilities": {
-                "temporal_range_queries": True,
-                "comparative_queries": bool(self.comparison_handler),
-                "comparative_fallback_to_weaviate": True,
-                "optimization_queries": True,
-                "calculation_queries": True,
-                "economic_queries": False,
-                "diagnostic_queries": True,
-                "comparative_fallback": True,
-                "intelligent_preprocessing": bool(self.query_preprocessor),
-                "metrics_queries": bool(self.postgresql_system),
-                "weaviate_search": bool(self.weaviate_core),
-                "entity_extraction": True,
-                "query_classification": True,
-                "validation": True,
-                "multilingual_support": True,  # ✅ NOUVEAU
-            },
             "initialization_errors": self.initialization_errors,
-            "refactoring_info": {
-                "new_modules": [
-                    "entity_extractor",
-                    "query_classifier",
-                    "validation_core",
-                    "comparison_engine",
-                ],
-                "removed_files": 6,
-                "code_reduction": "~47%",
-                "compatibility": "100% (wrappers)",
-                "fallback_support": "Weaviate fallback for comparisons without PostgreSQL",
-                "multilingual_fix": "Language parameter correctly transmitted to all handlers",  # ✅ NOUVEAU
-            },
         }
 
     async def close(self):
@@ -571,27 +557,29 @@ class InteliaRAGEngine:
         try:
             if self.query_preprocessor:
                 await self.query_preprocessor.close()
-                logger.debug("✅ Query Preprocessor fermé")
         except Exception as e:
             logger.error(f"❌ Erreur fermeture Preprocessor: {e}")
 
         try:
-            if self.postgresql_system:
-                await self.postgresql_system.close()
-                logger.debug("✅ PostgreSQL System fermé")
+            if self.postgresql_retriever:
+                await self.postgresql_retriever.close()
         except Exception as e:
-            logger.error(f"❌ Erreur fermeture PostgreSQL: {e}")
+            logger.error(f"❌ Erreur fermeture PostgreSQL Retriever: {e}")
+
+        try:
+            if self.postgresql_validator:
+                await self.postgresql_validator.close()
+        except Exception as e:
+            logger.error(f"❌ Erreur fermeture PostgreSQL Validator: {e}")
 
         try:
             if self.weaviate_core:
                 await self.weaviate_core.close()
-                logger.debug("✅ Weaviate Core fermé")
         except Exception as e:
             logger.error(f"❌ Erreur fermeture Weaviate Core: {e}")
 
         try:
             await self.core.close()
-            logger.debug("✅ Core fermé")
         except Exception as e:
             logger.error(f"❌ Erreur fermeture Core: {e}")
 
@@ -605,34 +593,24 @@ def create_rag_engine(openai_client=None) -> InteliaRAGEngine:
 
 
 # Fonction de test
-async def test_comparative_query():
-    """Test d'une requête comparative avec nouvelle architecture"""
+async def test_clarification_query():
+    """Test d'une requête nécessitant clarification"""
     engine = InteliaRAGEngine()
 
     try:
         await engine.initialize()
 
-        test_queries = [
-            "Quelle est la différence de FCR entre un Cobb 500 mâle et femelle de 17 jours ?",
-            "Évolution du poids entre 21 et 35 jours",
-            "Quelle est la meilleure souche pour l'efficacité alimentaire ?",
-        ]
+        test_query = "Quel est le poids pour du Ross 308 ?"
 
-        for test_query in test_queries:
-            logger.info(f"\n{'='*60}")
-            logger.info(f"Testing: {test_query}")
-            logger.info(f"{'='*60}")
+        logger.info(f"\n{'='*60}")
+        logger.info(f"Testing: {test_query}")
+        logger.info(f"{'='*60}")
 
-            result = await engine.generate_response(test_query)
+        result = await engine.generate_response(test_query, language="fr")
 
-            print(f"Source: {result.source}")
-            print(
-                f"Answer: {result.answer[:200]}..."
-                if len(result.answer) > 200
-                else f"Answer: {result.answer}"
-            )
-            print(f"Metadata: {result.metadata.get('query_type', 'N/A')}")
-            print()
+        print(f"Source: {result.source}")
+        print(f"Answer: {result.answer}")
+        print(f"Metadata: {result.metadata}")
 
     except Exception as e:
         logger.error(f"❌ Test error: {e}")
@@ -645,4 +623,4 @@ if __name__ == "__main__":
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
-    asyncio.run(test_comparative_query())
+    asyncio.run(test_clarification_query())
