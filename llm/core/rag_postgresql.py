@@ -416,22 +416,25 @@ class PostgreSQLSystem:
                 )
 
                 if context_validation.get("status") == "needs_fallback":
+                    helpful_message = context_validation.get("helpful_message", "")
+
                     logger.warning(
                         f"⚠️ Contexte insuffisant détecté: {context_validation.get('missing')}"
+                    )
+                    logger.info(
+                        f"💬 Message de clarification: {helpful_message[:100]}..."
                     )
 
                     # Retourner un résultat spécial pour clarification
                     return RAGResult(
                         source=RAGSource.INSUFFICIENT_CONTEXT,
-                        answer=None,  # Pas de réponse générée
+                        answer=helpful_message,  # ✅ CORRECTION: Mettre le message ici
                         confidence=0.0,
                         metadata={
                             "validation_status": "needs_fallback",
                             "missing_fields": context_validation.get("missing", []),
                             "suggestions": context_validation.get("suggestions", []),
-                            "helpful_message": context_validation.get(
-                                "helpful_message", ""
-                            ),
+                            "helpful_message": helpful_message,
                             "enhanced_entities": context_validation.get(
                                 "enhanced_entities", {}
                             ),
