@@ -610,26 +610,99 @@ class PostgreSQLSystem:
         metric_results: List[MetricResult],
         entities: Dict,
     ) -> str:
-        """Génère une réponse avec OpenAI ou fallback"""
+        """Génère une réponse enrichie avec EnhancedResponseGenerator"""
 
         if not metric_results:
             return f"Aucune donnée trouvée pour '{query}'."
 
+        # Utiliser le générateur enrichi si OpenAI disponible
+        if self.openai_client:
+            try:
+                from generation.generators import create_enhanced_generator
+
+                logger.info(
+                    "🎨 Utilisation EnhancedResponseGenerator pour réponse de qualité"
+                )
+
+                generator = create_enhanced_generator(
+                    openai_client=self.openai_client, cache_manager=None, language="fr"
+                )
+
+                # Générer réponse enrichie avec contexte
+                response = await generator.generate_response(
+                    query=query,
+                    context_docs=documents,
+                    conversation_context="",
+                    language="fr",
+                    intent_result=None,
+                )
+
+                logger.info("✅ Réponse générée par EnhancedResponseGenerator")
+                return response
+
+            except Exception as e:
+                logger.warning(f"⚠️ Fallback sur génération basique: {e}")
+                # Continuer avec fallback ci-dessous
+
+        # Fallback : génération basique si OpenAI indisponible
+        return self._generate_basic_response(metric_results, entities)
+
+    def _generate_basic_response(
+        self,
+        metric_results: List[MetricResult],
+        entities: Dict,
+    ) -> str:
+        """Génération basique de secours (fallback)"""
+
         best_metric = metric_results[0]
-        sex_info = (
-            f" pour {best_metric.sex}"
-            if best_metric.sex and best_metric.sex != "as_hatched"
-            else ""
+
+        # Formater le nom de la métrique
+        metric_display_names = {
+            "feed_conversion_ratio": "Feed Conversion Ratio (FCR)",
+            "body_weight": "Poids vif",
+            "daily_gain": "Gain quotidien",
+            "feed_intake": "Consommation alimentaire cumulée",
+            "mortality": "Mortalité",
+        }
+
+        metric_base = (
+            best_metric.metric_name.split(" for ")[0]
+            if " for " in best_metric.metric_name
+            else best_metric.metric_name
         )
+        metric_display = metric_display_names.get(metric_base, metric_base)
 
-        # Inclure info sur l'interprétation OpenAI si disponible
-        interpretation_info = ""
-        if entities.get("_openai_interpretation"):
-            source = entities["_openai_interpretation"].get("source", "unknown")
-            if source == "openai":
-                interpretation_info = " (interprété par IA)"
+        # Formater la valeur
+        if best_metric.value_numeric is not None:
+            if "conversion" in metric_base.lower() or "fcr" in metric_base.lower():
+                value_str = f"{best_metric.value_numeric:.2f}"
+            elif "weight" in metric_base.lower() or "gain" in metric_base.lower():
+                value_str = f"{best_metric.value_numeric:.0f}g"
+            else:
+                value_str = f"{best_metric.value_numeric:.2f}"
 
-        return f"Données trouvées{sex_info}{interpretation_info}: {best_metric.metric_name} = {best_metric.value_numeric or best_metric.value_text} pour {best_metric.strain}."
+            if best_metric.unit and best_metric.unit not in value_str:
+                value_str += f" {best_metric.unit}"
+        else:
+            value_str = best_metric.value_text or "N/A"
+
+        # Sexe et âge
+        sex_info = ""
+        if best_metric.sex and best_metric.sex != "as_hatched":
+            sex_labels = {"male": "mâles", "female": "femelles"}
+            sex_info = f" ({sex_labels.get(best_metric.sex, best_metric.sex)})"
+
+        age_info = ""
+        if best_metric.age_min is not None:
+            age_info = (
+                f" à {best_metric.age_min} jours"
+                if best_metric.age_min == best_metric.age_max
+                else f" entre {best_metric.age_min}-{best_metric.age_max} jours"
+            )
+
+        breed_display = best_metric.strain.replace("/", " ")
+
+        return f"**{metric_display}** pour Ross {breed_display}{sex_info}{age_info} : **{value_str}**"
 
     async def close(self):
         """Fermeture du système"""
