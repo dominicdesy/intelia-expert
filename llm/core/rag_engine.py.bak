@@ -313,13 +313,6 @@ class InteliaRAGEngine:
             postgresql_validator=self.postgresql_validator,
         )
 
-        logger.critical(
-            f"🔍 HANDLER CONFIGURED - postgresql_system type: {type(self.standard_handler.postgresql_system)}"
-        )
-        logger.critical(
-            f"🔍 HANDLER CONFIGURED - postgresql_system is None: {self.standard_handler.postgresql_system is None}"
-        )
-
     async def generate_response(
         self,
         query: str,
