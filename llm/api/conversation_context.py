@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 api/conversation_context.py - Gestionnaire de contexte conversationnel
-Version 4.2.3 - DÉTECTION AMÉLIORÉE + GESTION AMBIGUÏTÉ + ABANDON
+Version 4.3.0 - FUSION D'ENTITÉS POUR MÉMOIRE CONVERSATIONNELLE
 """
 
 import time
 import re
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from pathlib import Path
 import json
 
@@ -17,7 +17,13 @@ logger = logging.getLogger(__name__)
 class ConversationContextManager:
     """
     Gestionnaire de contexte conversationnel pour clarifications
-    VERSION 4.2.3 - DÉTECTION AMÉLIORÉE + AMBIGUÏTÉ + ABANDON
+    VERSION 4.3.0 - FUSION D'ENTITÉS + MÉMOIRE CONVERSATIONNELLE
+
+    ✅ CORRECTIONS APPLIQUÉES:
+    - Stockage des entités partielles dans pending_clarifications
+    - Fusion intelligente des entités lors de update_accumulated_query
+    - Retour des entités fusionnées via get_pending()
+    - Préservation de tous les champs (age_days, metric_type, breed, sex, etc.)
     """
 
     # NOUVEAUX PATTERNS D'AMBIGUÏTÉ
@@ -176,8 +182,13 @@ class ConversationContextManager:
         missing_fields: List[str],
         suggestions: Dict,
         language: str,
+        partial_entities: Dict[str, Any] = None,  # ✅ AJOUT
     ):
-        """Marque une conversation en attente de clarification"""
+        """
+        Marque une conversation en attente de clarification
+
+        ✅ NOUVEAU: Stocke les entités partielles déjà extraites
+        """
         self.pending_clarifications[tenant_id] = {
             "original_query": original_query,
             "missing_fields": missing_fields,
@@ -187,13 +198,15 @@ class ConversationContextManager:
             "timestamp": time.time(),
             "clarification_count": 0,
             "clarification_attempts": 0,
+            "partial_entities": partial_entities or {},  # ✅ AJOUT
         }
         logger.info(
             f"Clarification en attente pour {tenant_id}: {missing_fields} (langue: {language})"
         )
+        logger.info(f"Entités partielles stockées: {partial_entities}")
 
     def get_pending(self, tenant_id: str) -> Optional[Dict]:
-        """Récupère le contexte en attente"""
+        """Récupère le contexte en attente avec les entités fusionnées"""
         return self.pending_clarifications.get(tenant_id)
 
     def clear_pending(self, tenant_id: str):
@@ -206,9 +219,10 @@ class ConversationContextManager:
         """
         Accumule les informations de clarification de manière intelligente
 
-        ✅ Version 2.0:
-        - Fusion sémantique au lieu de séparateur |
-        - Extraction des entités pour construction cohérente
+        ✅ Version 3.0 - FUSION D'ENTITÉS:
+        - Fusion sémantique de la requête (existant)
+        - ✅ NOUVEAU: Fusion des entités extraites
+        - Préservation de TOUS les champs (age_days, metric_type, breed, sex)
         - Maintien de la lisibilité de la requête
         """
         if tenant_id not in self.pending_clarifications:
@@ -224,7 +238,58 @@ class ConversationContextManager:
             extractor = EntityExtractor()
             response_entities = extractor.extract(new_info)
 
-            # Construire requête enrichie intelligemment
+            # ✅ NOUVELLE SECTION: FUSION DES ENTITÉS
+            partial_entities = context.get("partial_entities", {})
+
+            logger.info(f"🔄 Fusion entités - Avant: {partial_entities}")
+            logger.info(
+                f"🔄 Nouvelles entités extraites: {response_entities.to_dict()}"
+            )
+
+            # Fusionner : nouvelles entités ÉCRASENT les anciennes pour les champs présents
+            if response_entities.breed:
+                partial_entities["breed"] = response_entities.breed
+                partial_entities["has_explicit_breed"] = (
+                    response_entities.has_explicit_breed
+                )
+                logger.info(f"✅ Breed ajouté: {response_entities.breed}")
+
+            if response_entities.age_days is not None:
+                partial_entities["age_days"] = response_entities.age_days
+                partial_entities["has_explicit_age"] = (
+                    response_entities.has_explicit_age
+                )
+                logger.info(f"✅ Age ajouté: {response_entities.age_days}")
+
+            if response_entities.sex:
+                partial_entities["sex"] = response_entities.sex
+                partial_entities["has_explicit_sex"] = (
+                    response_entities.has_explicit_sex
+                )
+                logger.info(f"✅ Sex ajouté: {response_entities.sex}")
+
+            if response_entities.metric_type:
+                partial_entities["metric_type"] = response_entities.metric_type
+                logger.info(f"✅ Metric_type ajouté: {response_entities.metric_type}")
+
+            if response_entities.genetic_line:
+                partial_entities["genetic_line"] = response_entities.genetic_line
+                logger.info(f"✅ Genetic_line ajouté: {response_entities.genetic_line}")
+
+            # Copier également la confiance globale si elle existe
+            if hasattr(response_entities, "confidence"):
+                # Ne pas écraser une confiance existante plus élevée
+                existing_confidence = partial_entities.get("confidence", 0)
+                if response_entities.confidence > existing_confidence:
+                    partial_entities["confidence"] = response_entities.confidence
+
+            # Sauvegarder les entités fusionnées
+            context["partial_entities"] = partial_entities
+
+            logger.info(f"✅ Entités fusionnées - Après: {partial_entities}")
+            # FIN NOUVELLE SECTION
+
+            # Construire requête enrichie intelligemment (EXISTANT - CONSERVÉ)
             merged = original
 
             if response_entities.breed and response_entities.has_explicit_breed:

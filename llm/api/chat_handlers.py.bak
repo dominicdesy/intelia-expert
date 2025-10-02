@@ -236,7 +236,6 @@ class ChatHandlers:
                 "accumulated_query": pending_context["original_query"],
                 "language": language,
                 "continue_processing": True,
-                "merged_entities": pending_context.get("partial_entities", {}),
             }
 
         return None

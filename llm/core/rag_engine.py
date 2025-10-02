@@ -2,12 +2,13 @@
 """
 rag_engine.py - RAG Engine Principal Refactorisé
 Point d'entrée principal avec délégation vers modules spécialisés
-VERSION 4.5.1 - CORRECTION POSTGRESQL CONFIG:
+VERSION 4.6.0 - SUPPORT ENTITÉS PRÉ-EXTRAITES POUR MÉMOIRE CONVERSATIONNELLE:
 - ✅ Import automatique de POSTGRESQL_CONFIG dans _initialize_external_modules()
 - ✅ Instanciation PostgreSQLRetriever avec config centralisée
 - ✅ Plus besoin de passer config depuis monitoring.py
 - ✅ Séparation PostgreSQLRetriever (search_metrics) et PostgreSQLValidator (validation)
 - ✅ Transmission correcte du paramètre language à tous les handlers
+- ✅ NOUVEAU: Support des entités pré-extraites pour fusion conversationnelle
 """
 
 import asyncio
@@ -57,7 +58,7 @@ QueryPreprocessor = None
 ComparisonHandler = None
 WeaviateCore = None
 
-# ✅ Import séparé du Retriever et Validator
+# Import séparé du Retriever et Validator
 try:
     from .rag_postgresql_retriever import PostgreSQLRetriever
 
@@ -103,13 +104,14 @@ class InteliaRAGEngine:
     """
     RAG Engine principal avec architecture modulaire refactorisée
 
-    VERSION 4.5.1 - CORRECTIONS CRITIQUES:
-    - ✅ Configuration PostgreSQL chargée automatiquement depuis rag_postgresql_config.py
-    - ✅ Instanciation PostgreSQLRetriever avec config centralisée
-    - ✅ Initialisation complète du PostgreSQLValidator
-    - ✅ Transmission du validator au StandardHandler
-    - ✅ Séparation PostgreSQLRetriever (search_metrics) et PostgreSQLValidator (validation)
-    - ✅ Transmission correcte du paramètre language à tous les handlers
+    VERSION 4.6.0 - SUPPORT ENTITÉS PRÉ-EXTRAITES:
+    - Configuration PostgreSQL chargée automatiquement depuis rag_postgresql_config.py
+    - Instanciation PostgreSQLRetriever avec config centralisée
+    - Initialisation complète du PostgreSQLValidator
+    - Transmission du validator au StandardHandler
+    - Séparation PostgreSQLRetriever (search_metrics) et PostgreSQLValidator (validation)
+    - Transmission correcte du paramètre language à tous les handlers
+    - ✅ NOUVEAU: Méthode generate_response_with_entities() pour fusion conversationnelle
     - Utilise UnifiedQueryClassifier au lieu de QueryClassifier legacy
     - Intègre EntityExtractor pour extraction centralisée
     - Utilise ValidationCore pour validation unifiée
@@ -131,9 +133,9 @@ class InteliaRAGEngine:
         self.comparative_handler = ComparativeQueryHandler()
         self.standard_handler = StandardQueryHandler()
 
-        # ✅ Modules externes avec Retriever ET Validator séparés
-        self.postgresql_retriever = None  # ✅ Pour search_metrics()
-        self.postgresql_validator = None  # ✅ Pour validation
+        # Modules externes avec Retriever ET Validator séparés
+        self.postgresql_retriever = None
+        self.postgresql_validator = None
         self.query_preprocessor = None
         self.comparison_handler = None
         self.weaviate_core = None
@@ -159,6 +161,7 @@ class InteliaRAGEngine:
             "diagnostic_queries": 0,
             "postgresql_queries": 0,
             "errors_count": 0,
+            "preextracted_entities_queries": 0,
         }
 
     async def initialize(self):
@@ -167,7 +170,7 @@ class InteliaRAGEngine:
             return
 
         logger.info(
-            "🚀 Initialisation RAG Engine v4.5.1 (PostgreSQL Config Centralisée)"
+            "🚀 Initialisation RAG Engine v4.6.0 (Support Entités Pré-Extraites)"
         )
         self.initialization_errors = []
 
@@ -214,7 +217,7 @@ class InteliaRAGEngine:
             self.initialization_errors.append(str(e))
 
     async def _initialize_external_modules(self):
-        """✅ CORRECTION: Initialise Retriever et Validator avec config centralisée"""
+        """Initialise Retriever et Validator avec config centralisée"""
 
         # Query Preprocessor
         if QUERY_PREPROCESSOR_AVAILABLE and QueryPreprocessor:
@@ -226,7 +229,7 @@ class InteliaRAGEngine:
                 logger.warning(f"⚠️ Query Preprocessor échoué: {e}")
                 self.initialization_errors.append(f"Preprocessor: {e}")
 
-        # ✅ PostgreSQL Retriever (pour search_metrics) - CORRECTION CRITIQUE
+        # PostgreSQL Retriever (pour search_metrics)
         if POSTGRESQL_RETRIEVER_AVAILABLE and PostgreSQLRetriever:
             try:
                 # Import de la configuration centralisée
@@ -254,11 +257,11 @@ class InteliaRAGEngine:
                 logger.warning(f"⚠️ PostgreSQL Retriever échoué: {e}")
                 self.initialization_errors.append(f"PostgreSQLRetriever: {e}")
 
-        # ✅ PostgreSQL Validator (pour validation)
+        # PostgreSQL Validator (pour validation)
         if POSTGRESQL_VALIDATOR_AVAILABLE and PostgreSQLValidator:
             try:
                 self.postgresql_validator = PostgreSQLValidator()
-                # ✅ Appeler initialize() si la méthode existe
+                # Appeler initialize() si la méthode existe
                 if hasattr(self.postgresql_validator, "initialize"):
                     await self.postgresql_validator.initialize()
                 logger.info("✅ PostgreSQL Validator initialisé")
@@ -291,7 +294,7 @@ class InteliaRAGEngine:
                 self.initialization_errors.append(f"ComparisonHandler: {e}")
 
     async def _configure_handlers(self):
-        """✅ Configure handlers avec Retriever ET Validator"""
+        """Configure handlers avec Retriever ET Validator"""
 
         # Configuration temporal handler (utilise le Retriever)
         self.temporal_handler.configure(postgresql_system=self.postgresql_retriever)
@@ -303,11 +306,11 @@ class InteliaRAGEngine:
             postgresql_system=self.postgresql_retriever,
         )
 
-        # ✅ Configuration standard handler (utilise RETRIEVER + VALIDATOR)
+        # Configuration standard handler (utilise RETRIEVER + VALIDATOR)
         self.standard_handler.configure(
-            postgresql_system=self.postgresql_retriever,  # Pour search_metrics()
+            postgresql_system=self.postgresql_retriever,
             weaviate_core=self.weaviate_core,
-            postgresql_validator=self.postgresql_validator,  # ✅ Pour validation
+            postgresql_validator=self.postgresql_validator,
         )
 
     async def generate_response(
@@ -355,6 +358,76 @@ class InteliaRAGEngine:
             )
         except Exception as e:
             logger.error(f"❌ Erreur generate_response: {e}")
+            self.optimization_stats["errors_count"] += 1
+            return RAGResult(
+                source=RAGSource.INTERNAL_ERROR,
+                metadata={"error": str(e)},
+            )
+
+    async def generate_response_with_entities(
+        self,
+        query: str,
+        entities: Dict[str, Any],
+        tenant_id: str = "default",
+        language: Optional[str] = None,
+        **kwargs,
+    ) -> RAGResult:
+        """
+        Point d'entrée spécial pour requêtes avec entités pré-extraites
+
+        UTILISÉ POUR LA MÉMOIRE CONVERSATIONNELLE:
+        - Permet de passer directement les entités fusionnées depuis la session
+        - Bypass l'extraction normale du preprocessing
+        - Garantit que les entités accumulées sont utilisées
+
+        Args:
+            query: Requête utilisateur (peut être accumulée)
+            entities: Entités pré-extraites et fusionnées
+            tenant_id: Identifiant du tenant
+            language: Langue de la requête
+
+        Returns:
+            RAGResult avec réponse générée
+        """
+
+        if not self.is_initialized:
+            logger.warning("⚠️ RAG Engine non initialisé, tentative d'initialisation")
+            try:
+                await self.initialize()
+            except Exception as e:
+                logger.error(f"❌ Échec initialisation: {e}")
+
+        start_time = time.time()
+        self.optimization_stats["requests_total"] += 1
+        self.optimization_stats["preextracted_entities_queries"] += 1
+
+        # Validation
+        if not query or not query.strip():
+            return RAGResult(
+                source=RAGSource.ERROR,
+                metadata={"error": "Query vide"},
+            )
+
+        effective_language = language or "fr"
+        logger.info(
+            f"🌐 generate_response_with_entities reçoit langue: {effective_language}"
+        )
+        logger.info(f"🔄 Entités pré-extraites fournies: {entities}")
+
+        # Fallback si système indisponible
+        if self.degraded_mode and not self.postgresql_retriever:
+            return RAGResult(
+                source=RAGSource.FALLBACK_NEEDED,
+                answer="Le système RAG n'est pas disponible.",
+                metadata={"reason": "système_indisponible"},
+            )
+
+        try:
+            return await self._process_query_with_entities(
+                query, entities, effective_language, start_time
+            )
+        except Exception as e:
+            logger.error(f"❌ Erreur generate_response_with_entities: {e}")
             self.optimization_stats["errors_count"] += 1
             return RAGResult(
                 source=RAGSource.INTERNAL_ERROR,
@@ -417,6 +490,80 @@ class InteliaRAGEngine:
         # 5. Enrichir métadonnées
         result.metadata.update(preprocessed_data["metadata"])
         result.metadata["classification"] = classification.to_dict()
+
+        return result
+
+    async def _process_query_with_entities(
+        self,
+        query: str,
+        entities: Dict[str, Any],
+        language: str,
+        start_time: float,
+    ) -> RAGResult:
+        """
+        Pipeline de traitement avec entités pré-extraites
+
+        Similaire à _process_query mais utilise les entités fournies
+        au lieu de les extraire via le preprocessing
+        """
+
+        logger.info(f"🌐 _process_query_with_entities traite avec langue: {language}")
+        logger.info(f"🔄 Utilisation des entités pré-extraites: {entities}")
+
+        # 1. Créer preprocessed_data avec les entités fournies
+        preprocessed_data = {
+            "normalized_query": query,
+            "original_query": query,
+            "entities": entities,
+            "language": language,
+            "routing_hint": "postgresql",  # Force PostgreSQL car entités disponibles
+            "is_comparative": False,
+            "comparison_entities": [],
+            "metadata": {
+                "preprocessing_applied": True,
+                "entities_preextracted": True,
+                "extraction_confidence": entities.get("confidence", 1.0),
+                "entities_found": len([k for k in entities.keys() if entities.get(k)]),
+                "language_detected": language,
+            },
+        }
+
+        # 2. Classification
+        classification = self.query_classifier.classify(query)
+        query_type = classification.query_type.value
+
+        logger.info(
+            f"🎯 Type de requête détecté: {query_type} (confiance: {classification.confidence:.2%})"
+        )
+
+        # Mise à jour des stats
+        if classification.query_type == QueryType.COMPARATIVE:
+            self.optimization_stats["comparative_queries"] += 1
+        elif classification.query_type == QueryType.TEMPORAL_RANGE:
+            self.optimization_stats["temporal_queries"] += 1
+        elif classification.query_type == QueryType.OPTIMIZATION:
+            self.optimization_stats["optimization_queries"] += 1
+        elif classification.query_type == QueryType.CALCULATION:
+            self.optimization_stats["calculation_queries"] += 1
+        elif classification.query_type == QueryType.ECONOMIC:
+            self.optimization_stats["economic_queries"] += 1
+        elif classification.query_type == QueryType.DIAGNOSTIC:
+            self.optimization_stats["diagnostic_queries"] += 1
+
+        # 3. Enrichir preprocessed_data
+        preprocessed_data["query_type"] = query_type
+        preprocessed_data["classification"] = classification.to_dict()
+
+        # 4. Routage vers handler (force standard pour PostgreSQL)
+        # Utiliser standard handler car il gère PostgreSQL + validation
+        result = await self.standard_handler.handle(
+            preprocessed_data, start_time, language=language
+        )
+
+        # 5. Enrichir métadonnées
+        result.metadata.update(preprocessed_data["metadata"])
+        result.metadata["classification"] = classification.to_dict()
+        result.metadata["entities_source"] = "preextracted_from_session"
 
         return result
 
@@ -555,7 +702,7 @@ class InteliaRAGEngine:
             "rag_enabled": RAG_ENABLED,
             "initialized": self.is_initialized,
             "degraded_mode": self.degraded_mode,
-            "version": "v4.5.1_postgresql_config_centralized",
+            "version": "v4.6.0_entity_fusion_support",
             "architecture": "modular_centralized",
             "modules": {
                 "core": True,
