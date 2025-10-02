@@ -1,0 +1,341 @@
+{
+  "version": "1.3",
+  "aliases": {
+    "line": {
+      "ross 308": ["ross308","ross-308","r308","ross","ross 308 broiler","ross308 ap","ross 308 ap"],
+      "ross 708": ["ross708","ross-708","r708"],
+      "cobb 500": ["cobb500","cobb-500","c500","cobb","cobb 500 broiler"],
+      "cobb 700": ["cobb700","cobb-700","c700"],
+      "cobb 400": ["cobb400","cobb-400","c400"],
+      "hubbard classic": ["classic","hubbard-classic","hclassic"],
+      "hubbard flex": ["flex","hubbard-flex","hflex"],
+      "hubbard color": ["color","hubbard-color","hcolor","color broiler"],
+      "hubbard ja757": ["ja757","hubbard-ja757","ja 757","ja-757"],
+      "hubbard ja787": ["ja787","hubbard-ja787","ja 787","ja-787"],
+      "hubbard ja957": ["ja957","hubbard-ja957","ja 957","ja-957"],
+      "ranger classic": ["ranger-classic","rangerclassic"],
+      "ranger gold": ["ranger-gold","rangergold"],
+      "ranger premium": ["ranger-premium","rangerpremium"],
+      "freedom ranger": ["freedom-ranger","freedom","redbro"],
+      "sasso x44": ["x44","sasso-x44","sasso x 44"],
+      "sasso t44": ["t44","sasso-t44","sasso t 44"],
+      "sasso pla": ["pla","sasso-pla"],
+      "rowan range": ["rowan-range","rowanrange"],
+      "isa brown": ["isa","isa-brown","isa brown layer","isa brown pondeuse"],
+      "isa white": ["isa-white","isa w"],
+      "lohmann brown": ["lohmann","lohmann-brown","lb","lohmann brown layer"],
+      "lohmann white": ["lohmann-white","lw","lsl","lohmann lsl"],
+      "hy-line brown": ["hyline","hy-line","hyline-brown","hy line brown"],
+      "hy-line w-36": ["hyline w36","w-36","w36"],
+      "hy-line w-80": ["hyline w80","w-80","w80"],
+      "dekalb white": ["dekalb-white","dw"],
+      "dekalb brown": ["dekalb-brown","db"],
+      "bovans brown": ["bovans-brown","bb"],
+      "bovans white": ["bovans-white","bw"],
+      "shaver brown": ["shaver-brown","sb"],
+      "shaver white": ["shaver-white","sw"],
+      "novogen brown": ["novogen-brown","nb"],
+      "novogen white": ["novogen-white","nw"],
+      "hisex brown": ["hisex-brown","hb"],
+      "hisex white": ["hisex-white","hw"],
+      "nick chick": ["nick-chick","nickchick"],
+      "ross 308 ps": ["ross 308 parent stock","ross ps 308","ross308 ps"],
+      "cobb 500 ps": ["cobb 500 parent stock","cobb ps 500","cobb500 ps"]
+    },
+    "phase": {
+      "starter": ["démarrage","demarrage","start","0-10 jours","0-10d","phase 1","pre-starter","prestarter"],
+      "grower": ["croissance","grow","11-28 jours","11-28d","phase 2","developer"],
+      "finisher": ["finition","finish","29-42 jours","29-42d","phase 3"]
+    },
+    "sex": {
+      "male": [
+        "mâle","mâles","masculin","masculins","male","males",
+        "coq","coqs","rooster","roosters","cock","cocks",
+        "mâle broiler","male broiler","mâle poulet","male chicken",
+        "m","male birds","mâles broilers"
+      ],
+      "female": [
+        "femelle","femelles","féminin","féminins","female","females",
+        "poule","poules","hen","hens","pullet","pullets",
+        "femelle broiler","female broiler","femelle poulet","female chicken",
+        "f","female birds","femelles broilers"
+      ],
+      "as_hatched": [
+        "as-hatched","ashatched","as hatched","as_hatched",
+        "mixed","mixte","mélangé","mélangés","non sexé","non-sexé",
+        "unsexed","straight run","straight-run","straight_run",
+        "mixed sex","mixed-sex","sexes mélangés","both sexes","les deux sexes",
+        "sr","mix","straight","run","non déterminé","indifférencié",
+        "ensemble","tous sexes","all sexes","sexe mixte"
+      ]
+    },
+    "site_type": {
+      "broiler_farm": ["broiler","poulet de chair","poulets de chair","chair"],
+      "layer_farm": ["layer","pondeuse","pondeuses","œufs","oeufs"],
+      "rearing_farm": ["rearing","poulette","élevage poulettes","poulettes"],
+      "breeding_farm": ["breeding","reproducteur","reproducteurs","parents","parent stock"],
+      "hatchery": ["couvoir","hatch","incubation"],
+      "feed_mill": ["usine aliments","moulin","feedmill"]
+    },
+    "bird_type": {
+      "broiler": ["chair","poulet de chair","broilers"],
+      "layer": ["pondeuse","layers"],
+      "breeder": ["reproducteur","breeders","parents"],
+      "pullet": ["poulette","rearing"],
+      "chick": ["poussin","day-old","d0"]
+    },
+    "protocol_type": {
+      "vaccination": ["vaccin","vaccine","immunization","inoculation"],
+      "biosecurity": ["biosécurité","disinfection","cleaning","quarantine"],
+      "treatment": ["traitement","medication","therapy","cure"],
+      "lab_diagnostics": ["diagnostic","test","analyse","laboratory","lab"]
+    },
+    "signs": {
+      "respiratory": ["toux","dyspnée","râles","nasal discharge"],
+      "digestive": ["diarrhée","vomissement","anorexie","perte appétit"],
+      "nervous": ["ataxie","paralysie","convulsions","tremblements"],
+      "general": ["léthargie","fièvre","mortalité","weakness"]
+    },
+    "metric": {
+      "performance": ["poids","fcr","gain","croissance","production"],
+      "consumption": ["eau","aliment","feed","water"],
+      "environment": ["température","humidité","ventilation","lighting"],
+      "economics": ["coût","prix","rentabilité","economics"]
+    }
+  },
+
+  "sex_handling_logic": {
+    "description": "Configuration pour la logique de gestion sexe/as-hatched",
+    "default_behavior": "as_hatched",
+    "fallback_when_unspecified": "as_hatched",
+    "search_priority": [
+      "specified_sex_if_available",
+      "as_hatched_as_fallback",
+      "mixed_data_inclusion"
+    ],
+    "response_templates": {
+      "explicit_sex": "Pour {sex} {line} au jour {age}: {value}",
+      "as_hatched_fallback": "Pour as-hatched (sexes mélangés) {line} au jour {age}: {value}",
+      "as_hatched_explicit": "Pour sexes mélangés {line} au jour {age}: {value}",
+      "multiple_sex_data": "Données disponibles - Mâles: {male_value}, Femelles: {female_value}, As-hatched: {mixed_value}"
+    },
+    "query_expansion_rules": {
+      "when_male_specified": ["include_as_hatched_as_fallback"],
+      "when_female_specified": ["include_as_hatched_as_fallback"], 
+      "when_unspecified": ["default_to_as_hatched", "include_all_sexes_as_options"],
+      "when_as_hatched_specified": ["include_mixed_variants", "prioritize_mixed_data"]
+    }
+  },
+
+  "defaults_by_topic": {
+    "temperature": "broiler_farm",
+    "water": "broiler_farm",
+    "feed": "feed_mill",
+    "mortality": "broiler_farm",
+    "biosecurity": "hatchery",
+    "vaccination": "hatchery",
+    "lighting": "broiler_farm",
+    "ventilation": "broiler_farm",
+    "performance": "broiler_farm",
+    "conversion": "broiler_farm",
+    "economics": "broiler_farm",
+    "welfare": "broiler_farm"
+  },
+
+  "universal_slots": {
+    "site_type":    { "enum": ["broiler_farm","layer_farm","rearing_farm","breeding_farm","hatchery","feed_mill"] },
+    "bird_type":    { "enum": ["broiler","layer","breeder","pullet","chick"] },
+    "sex":          { 
+      "enum": ["male","female","as_hatched"], 
+      "optional": true,
+      "default": "as_hatched",
+      "fallback_behavior": "as_hatched",
+      "description": "Si non spécifié, utilise automatiquement as_hatched"
+    },
+    "line":         { "enum": ["ross 308","ross 708","cobb 500","cobb 700","cobb 400","hubbard classic","hubbard flex","hubbard color","hubbard ja757","hubbard ja787","hubbard ja957","ranger classic","ranger gold","ranger premium","freedom ranger","sasso x44","sasso t44","sasso pla","rowan range","isa brown","isa white","lohmann brown","lohmann white","hy-line brown","hy-line w-36","hy-line w-80","dekalb white","dekalb brown","bovans brown","bovans white","shaver brown","shaver white","novogen brown","novogen white","hisex brown","hisex white","nick chick","ross 308 ps","cobb 500 ps"] },
+    "age_days":     { "type": "int", "min": 0, "max": 120 },
+    "age_weeks":    { "type": "int", "min": 0, "max": 600 },
+    "phase":        { "enum": ["starter","grower","finisher"], "optional": true },
+    "environment":  { "enum": ["tunnel","natural","mechanical"], "optional": true },
+    "season":       { "enum": ["winter","spring","summer","autumn"], "optional": true },
+    "flock_size":   { "type": "int", "min": 1, "optional": true },
+    "region":       { "type": "string", "optional": true },
+    "feed_price":   { "type": "number", "optional": true },
+    "energy_price": { "type": "number", "optional": true },
+    "protocol_type": { "enum": ["vaccination","biosecurity","treatment","lab_diagnostics"] },
+    "signs":        { "enum": ["respiratory","digestive","nervous","general"] },
+    "metric":       { "enum": ["performance","consumption","environment","economics"] }
+  },
+
+  "intents": {
+    "metric_query": {
+      "description": "Questions chiffrées (poids, FCR, eau, aliment, lighting, welfare, etc.)",
+      "required": ["site_type","bird_type","line","metric"],
+      "at_least_one_of": [["age_days","age_weeks","phase"]],
+      "optional": ["sex","flock_size","environment","season"],
+      "sex_handling": {
+        "behavior": "fallback_to_as_hatched",
+        "include_alternatives": true,
+        "prioritize_specified": true
+      },
+      "followup_themes": ["water_consumption","feed_intake","housing_conditions","lighting_program","ventilation_strategy","health_monitoring"],
+
+      "metrics": {
+        "body_weight_target":     { "requires_one_of": [["age_days","age_weeks"]], "unit": "g", "sex_aware": true },
+        "body_weight_avg":        { "requires_one_of": [["age_days","age_weeks"]], "unit": "g", "sex_aware": true },
+        "daily_gain":             { "requires_one_of": [["age_days","age_weeks"]], "unit": "g/day", "sex_aware": true },
+        "uniformity_pct":         { "requires_one_of": [["age_days","age_weeks"]], "unit": "%", "sex_aware": true },
+        "fcr_target":             { "requires_one_of": [["age_days","phase"]], "unit": "", "sex_aware": true },
+        "production_index_epef":  { "requires_one_of": [["age_days","age_weeks"]], "unit": "", "sex_aware": true },
+        "mortality_expected_pct": { "requires_one_of": [["age_days","age_weeks"]], "unit": "%", "sex_aware": false },
+
+        "water_intake_daily":     { "requires_one_of": [["age_days","age_weeks"]], "optional": ["flock_size"], "unit": "L", "sex_aware": true },
+        "water_feed_ratio":       { "requires_one_of": [["age_days","age_weeks"]], "unit": "", "sex_aware": true },
+        "feed_intake_daily":      { "requires_one_of": [["age_days","age_weeks"]], "unit": "g", "sex_aware": true },
+        "feed_intake_cumulative": { "requires_one_of": [["age_days","age_weeks"]], "unit": "g", "sex_aware": true },
+
+        "stocking_density_kgm2":  { "requires_one_of": [["age_days","age_weeks"]], "unit": "kg/m2", "sex_aware": false },
+        "stocking_density_birdsm2": { "requires_one_of": [["age_days","age_weeks"]], "unit": "birds/m2", "sex_aware": false },
+        "feeder_space_cm":        { "requires_one_of": [["age_days","age_weeks"]], "unit": "cm/bird", "sex_aware": false },
+        "birds_per_nipple":       { "requires_one_of": [["age_days","age_weeks"]], "unit": "birds/nipple", "sex_aware": false },
+        "water_flow_ml_min":      { "requires_one_of": [["age_days","age_weeks"]], "unit": "ml/min", "sex_aware": false },
+        "nipple_pressure_kpa":    { "requires_one_of": [["age_days","age_weeks"]], "unit": "kPa", "sex_aware": false },
+        "nipple_height_cm":       { "requires_one_of": [["age_days","age_weeks"]], "unit": "cm", "sex_aware": false },
+
+        "ambient_temp_target":    { "requires_one_of": [["age_days","age_weeks","phase"]], "unit": "°C", "sex_aware": false },
+        "litter_temp_target":     { "requires_one_of": [["age_days","age_weeks"]], "unit": "°C", "sex_aware": false },
+        "humidity_target":        { "requires_one_of": [["age_days","age_weeks"]], "unit": "%", "sex_aware": false },
+        "co2_max_ppm":            { "unit": "ppm", "sex_aware": false },
+        "co_max_ppm":             { "unit": "ppm", "sex_aware": false },
+        "nh3_max_ppm":            { "unit": "ppm", "sex_aware": false },
+        "dust_max_mg_m3":         { "unit": "mg/m3", "sex_aware": false },
+        "air_speed_tunnel":       { "requires_one_of": [["age_days","age_weeks"]], "unit": "m/s", "sex_aware": false },
+        "static_pressure_pa":     { "unit": "Pa", "sex_aware": false },
+        "min_ventilation_rate_m3hkg": { "requires_one_of": [["age_days","age_weeks"]], "unit": "m3/h/kg", "sex_aware": false },
+
+        "lighting_hours":         { "requires_one_of": [["age_days","age_weeks","phase"]], "unit": "h/day", "sex_aware": false },
+        "light_intensity_lux":    { "requires_one_of": [["age_days","age_weeks","phase"]], "unit": "lux", "sex_aware": false },
+        "light_color_temp_k":     { "requires_one_of": [["age_days","age_weeks","phase"]], "unit": "K", "sex_aware": false },
+
+        "egg_production_pct":     { "requires": ["age_weeks"], "unit": "%", "sex_aware": false },
+        "hen_daily_feed":         { "requires": ["age_weeks"], "unit": "g/hen/day", "sex_aware": false },
+        "pullet_weight_target":   { "requires": ["age_weeks"], "unit": "g", "sex_aware": true },
+        "egg_weight_target":      { "requires": ["age_weeks"], "unit": "g", "sex_aware": false },
+        "nest_boxes_per_hen":     { "requires": ["age_weeks"], "unit": "boxes/hen", "sex_aware": false },
+        "perch_length_cm_per_hen":{ "requires": ["age_weeks"], "unit": "cm/hen", "sex_aware": false },
+
+        "me_kcalkg":              { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "kcal/kg", "sex_aware": true },
+        "cp_pct":                 { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "%", "sex_aware": true },
+        "lys_digestible_pct":     { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "%", "sex_aware": true },
+        "met_cys_pct":            { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "%", "sex_aware": true },
+        "thr_pct":                { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "%", "sex_aware": true },
+        "tsaa_pct":               { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "%", "sex_aware": true },
+        "ca_pct":                 { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "%", "sex_aware": true },
+        "av_p_pct":               { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "%", "sex_aware": true },
+        "dig_p_pct":              { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "%", "sex_aware": true },
+        "na_pct":                 { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "%", "sex_aware": true },
+        "cl_pct":                 { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "%", "sex_aware": true },
+        "k_pct":                  { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "%", "sex_aware": true },
+        "deb_meqkg":              { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "mEq/kg", "sex_aware": true },
+        "fiber_crude_pct":        { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "%", "sex_aware": true },
+        "ndf_pct":                { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "%", "sex_aware": true },
+        "starch_pct":             { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "%", "sex_aware": true },
+        "oil_fat_pct":            { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "%", "sex_aware": true }
+      }
+    },
+
+    "environment_setting": {
+      "description": "Réglages d'ambiance/ventilation/climat",
+      "required": ["site_type","bird_type","line","metric"],
+      "at_least_one_of": [["age_days","age_weeks","phase"]],
+      "optional": ["season","environment","flock_size"],
+      "sex_handling": {
+        "behavior": "sex_neutral",
+        "include_alternatives": false
+      },
+      "followup_themes": ["ventilation_strategy","heating_profile","cooling_pad_management","inlet_setup"],
+      "metrics": {
+        "min_ventilation_rate":   { "requires_one_of": [["age_days","age_weeks"]], "unit": "m3/h/kg", "sex_aware": false },
+        "air_speed_tunnel":       { "requires_one_of": [["age_days","age_weeks"]], "unit": "m/s", "sex_aware": false },
+        "static_pressure_pa":     { "unit": "Pa", "sex_aware": false },
+        "inlet_opening_mm":       { "requires_one_of": [["age_days","age_weeks"]], "unit": "mm", "sex_aware": false },
+        "cooling_pad_on_temp":    { "requires_one_of": [["age_days","age_weeks","season"]], "unit": "°C", "sex_aware": false },
+        "heater_setpoint_curve":  { "requires_one_of": [["age_days","age_weeks"]], "unit": "", "sex_aware": false },
+        "ambient_temp_target":    { "requires_one_of": [["age_days","age_weeks","phase"]], "unit": "°C", "sex_aware": false },
+        "humidity_target":        { "requires_one_of": [["age_days","age_weeks"]], "unit": "%", "sex_aware": false },
+        "nh3_max_ppm":            { "unit": "ppm", "sex_aware": false },
+        "co2_max_ppm":            { "unit": "ppm", "sex_aware": false }
+      }
+    },
+
+    "protocol_query": {
+      "description": "Protocoles (vaccination, biosécurité, traitements, diagnostics labo)",
+      "required": ["site_type","bird_type","line","protocol_type"],
+      "optional": ["pathogen","age_weeks","age_days","weight_kg","drug"],
+      "sex_handling": {
+        "behavior": "sex_neutral",
+        "include_alternatives": false
+      },
+      "followup_themes": ["monitoring_schedule","sampling_plan"],
+      "metrics": {
+        "vaccination_schedule": { "requires_one_of": [["age_days","age_weeks"]], "unit": "", "sex_aware": false },
+        "biosecurity_checklist": { "unit": "", "sex_aware": false },
+        "treatment_dosage": { "requires_one_of": [["weight_kg","age_days"]], "unit": "mg/kg", "sex_aware": true },
+        "lab_sampling_frequency": { "unit": "samples/week", "sex_aware": false }
+      }
+    },
+
+    "diagnosis_triage": {
+      "description": "Triage diagnostic (signes, mortalité, début, etc.)",
+      "required": ["site_type","bird_type","line","signs"],
+      "at_least_one_of": [["age_days","age_weeks"]],
+      "optional": ["onset","morbid_rate","mortality_rate","environment","season","recent_changes"],
+      "sex_handling": {
+        "behavior": "include_sex_if_relevant",
+        "include_alternatives": true
+      },
+      "followup_themes": ["lab_tests","biosecurity_review","management_checklist"],
+      "metrics": {
+        "differential_diagnosis": { "requires_one_of": [["age_days","age_weeks"]], "unit": "", "sex_aware": true },
+        "mortality_pattern": { "requires_one_of": [["age_days","age_weeks"]], "unit": "%", "sex_aware": true },
+        "treatment_priority": { "unit": "", "sex_aware": false },
+        "lab_tests_recommended": { "unit": "", "sex_aware": false }
+      }
+    },
+
+    "economics_cost": {
+      "description": "Calculs économiques/coûts",
+      "required": ["site_type","bird_type","line","metric"],
+      "at_least_one_of": [["age_days","age_weeks"]],
+      "optional": ["region","feed_price","energy_price","flock_size"],
+      "sex_handling": {
+        "behavior": "fallback_to_as_hatched",
+        "include_alternatives": true
+      },
+      "followup_themes": ["sensitivity_analysis","feed_strategy","marketing_weight"],
+      "metrics": {
+        "feed_cost_per_bird":         { "requires_one_of": [["phase","age_days","age_weeks"]], "unit": "currency/bird", "sex_aware": true },
+        "heating_cost_start":         { "requires_one_of": [["age_days","age_weeks","season"]], "unit": "currency/house/day", "sex_aware": false },
+        "total_feed_cost_to_slaughter": { "requires_one_of": [["age_days","age_weeks"]], "unit": "currency/bird", "sex_aware": true },
+        "cost_per_kg_gain":           { "requires_one_of": [["age_days","age_weeks"]], "unit": "currency/kg", "sex_aware": true },
+        "water_cost_per_bird":        { "requires_one_of": [["age_days","age_weeks"]], "unit": "currency/bird", "sex_aware": true },
+        "electricity_cost_per_bird":  { "requires_one_of": [["age_days","age_weeks","season"]], "unit": "currency/bird", "sex_aware": false }
+      }
+    }
+  },
+
+  "notes": [
+    "VERSION 1.3: Logique sexe/as-hatched améliorée",
+    "NOUVEAUTÉ: Section sex_handling_logic pour configuration centralisée",
+    "NOUVEAUTÉ: Alias as_hatched étendus avec variantes françaises et anglaises",
+    "NOUVEAUTÉ: Attribut sex_aware sur métriques pour différencier celles sensibles au sexe",
+    "NOUVEAUTÉ: Configuration sex_handling par intent avec comportements spécialisés",
+    "NOUVEAUTÉ: Templates de réponse pour clarifier le sexe des données utilisées",
+    "Compatibilité main.py: compute_missing utilise required, at_least_one_of et metrics.requires(_one_of).",
+    "Le slot 'sex' avec fallback automatique vers as_hatched si non spécifié.",
+    "Alias étendus pour couvrir slow-growing (Ranger/Sasso/Freedom), lignées pondeuses majeures, et PS.",
+    "defaults_by_topic propose un site_type par défaut si absent.",
+    "Slots manquants ajoutés: protocol_type, signs, metric avec aliases appropriés.",
+    "Champs metrics ajoutés pour protocol_query et diagnosis_triage."
+  ]
+}

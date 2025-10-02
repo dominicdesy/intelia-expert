@@ -2,13 +2,15 @@
 """
 rag_engine.py - RAG Engine Principal Refactorisé
 Point d'entrée principal avec délégation vers modules spécialisés
-VERSION 4.6.0 - SUPPORT ENTITÉS PRÉ-EXTRAITES POUR MÉMOIRE CONVERSATIONNELLE:
+VERSION 4.7.0 - CORRECTION CRITIQUE: GÉNÉRATION LLM POUR POSTGRESQL:
+- ✅ NOUVEAU: Génération automatique de réponse LLM après récupération documents
+- ✅ Appel generator.generate_response() si context_docs présents mais answer vide
 - ✅ Import automatique de POSTGRESQL_CONFIG dans _initialize_external_modules()
 - ✅ Instanciation PostgreSQLRetriever avec config centralisée
 - ✅ Plus besoin de passer config depuis monitoring.py
 - ✅ Séparation PostgreSQLRetriever (search_metrics) et PostgreSQLValidator (validation)
 - ✅ Transmission correcte du paramètre language à tous les handlers
-- ✅ NOUVEAU: Support des entités pré-extraites pour fusion conversationnelle
+- ✅ Support des entités pré-extraites pour fusion conversationnelle
 """
 
 import asyncio
@@ -104,13 +106,14 @@ class InteliaRAGEngine:
     """
     RAG Engine principal avec architecture modulaire refactorisée
 
-    VERSION 4.6.0 - SUPPORT ENTITÉS PRÉ-EXTRAITES:
+    VERSION 4.7.0 - GÉNÉRATION LLM AUTOMATIQUE:
     - Configuration PostgreSQL chargée automatiquement depuis rag_postgresql_config.py
     - Instanciation PostgreSQLRetriever avec config centralisée
     - Initialisation complète du PostgreSQLValidator
     - Transmission du validator au StandardHandler
     - Séparation PostgreSQLRetriever (search_metrics) et PostgreSQLValidator (validation)
     - Transmission correcte du paramètre language à tous les handlers
+    - ✅ CORRECTION CRITIQUE: Génération LLM automatique après récupération documents
     - ✅ NOUVEAU: Méthode generate_response_with_entities() pour fusion conversationnelle
     - Utilise UnifiedQueryClassifier au lieu de QueryClassifier legacy
     - Intègre EntityExtractor pour extraction centralisée
@@ -160,6 +163,7 @@ class InteliaRAGEngine:
             "economic_queries": 0,
             "diagnostic_queries": 0,
             "postgresql_queries": 0,
+            "llm_generations": 0,
             "errors_count": 0,
             "preextracted_entities_queries": 0,
         }
@@ -169,9 +173,7 @@ class InteliaRAGEngine:
         if self.is_initialized:
             return
 
-        logger.info(
-            "🚀 Initialisation RAG Engine v4.6.0 (Support Entités Pré-Extraites)"
-        )
+        logger.info("🚀 Initialisation RAG Engine v4.7.0 (Génération LLM Automatique)")
         self.initialization_errors = []
 
         try:
@@ -197,6 +199,7 @@ class InteliaRAGEngine:
                     ("QueryClassifier", self.query_classifier),
                     ("EntityExtractor", self.entity_extractor),
                     ("ValidationCore", self.validator),
+                    ("LLMGenerator", self.core.generator),
                 ]
                 if module is not None
             ]
@@ -313,10 +316,10 @@ class InteliaRAGEngine:
             postgresql_validator=self.postgresql_validator,
         )
 
-        logger.critical(
+        logger.debug(
             f"🔍 HANDLER CONFIGURED - postgresql_system type: {type(self.standard_handler.postgresql_system)}"
         )
-        logger.critical(
+        logger.debug(
             f"🔍 HANDLER CONFIGURED - postgresql_system is None: {self.standard_handler.postgresql_system is None}"
         )
 
@@ -494,6 +497,11 @@ class InteliaRAGEngine:
             query_type, preprocessed_data, start_time, language
         )
 
+        # ✅ CORRECTION CRITIQUE: Générer réponse LLM si nécessaire
+        result = await self._ensure_answer_generated(
+            result, preprocessed_data, query, language
+        )
+
         # 5. Enrichir métadonnées
         result.metadata.update(preprocessed_data["metadata"])
         result.metadata["classification"] = classification.to_dict()
@@ -562,15 +570,85 @@ class InteliaRAGEngine:
         preprocessed_data["classification"] = classification.to_dict()
 
         # 4. Routage vers handler (force standard pour PostgreSQL)
-        # Utiliser standard handler car il gère PostgreSQL + validation
         result = await self.standard_handler.handle(
             preprocessed_data, start_time, language=language
+        )
+
+        # ✅ CORRECTION CRITIQUE: Générer réponse LLM si nécessaire
+        result = await self._ensure_answer_generated(
+            result, preprocessed_data, query, language
         )
 
         # 5. Enrichir métadonnées
         result.metadata.update(preprocessed_data["metadata"])
         result.metadata["classification"] = classification.to_dict()
         result.metadata["entities_source"] = "preextracted_from_session"
+
+        return result
+
+    async def _ensure_answer_generated(
+        self,
+        result: RAGResult,
+        preprocessed_data: Dict[str, Any],
+        original_query: str,
+        language: str,
+    ) -> RAGResult:
+        """
+        ✅ NOUVELLE MÉTHODE CRITIQUE: Génère la réponse LLM si nécessaire
+
+        Vérifie si le RAGResult contient des documents mais pas de réponse,
+        et dans ce cas appelle le générateur LLM pour créer la réponse.
+
+        Args:
+            result: RAGResult du handler
+            preprocessed_data: Données preprocessées
+            original_query: Requête originale
+            language: Langue de la requête
+
+        Returns:
+            RAGResult avec answer généré
+        """
+        # Si on a déjà une réponse, on ne fait rien
+        if result.answer and result.answer.strip():
+            logger.debug("✅ Réponse déjà présente, génération LLM non nécessaire")
+            return result
+
+        # Si on a des documents mais pas de réponse, générer via LLM
+        if result.context_docs and len(result.context_docs) > 0:
+            if not self.core.generator:
+                logger.warning(
+                    "⚠️ Générateur LLM non disponible, impossible de générer réponse"
+                )
+                result.answer = "Data retrieved but response generation unavailable."
+                return result
+
+            logger.info(
+                f"📝 Génération réponse LLM pour {len(result.context_docs)} documents PostgreSQL"
+            )
+
+            try:
+                # Appel du générateur avec les documents récupérés
+                generated_answer = await self.core.generator.generate_response(
+                    query=preprocessed_data.get("original_query", original_query),
+                    context_docs=result.context_docs,
+                    conversation_context="",
+                    language=language,
+                    intent_result=None,
+                )
+
+                result.answer = generated_answer
+                result.metadata["llm_generation_applied"] = True
+                result.metadata["llm_input_docs_count"] = len(result.context_docs)
+                self.optimization_stats["llm_generations"] += 1
+
+                logger.info(
+                    f"✅ Réponse LLM générée ({len(generated_answer)} caractères)"
+                )
+
+            except Exception as e:
+                logger.error(f"❌ Erreur génération LLM: {e}")
+                result.answer = "Unable to generate response from the retrieved data."
+                result.metadata["llm_generation_error"] = str(e)
 
         return result
 
@@ -709,7 +787,7 @@ class InteliaRAGEngine:
             "rag_enabled": RAG_ENABLED,
             "initialized": self.is_initialized,
             "degraded_mode": self.degraded_mode,
-            "version": "v4.6.0_entity_fusion_support",
+            "version": "v4.7.0_llm_generation_fix",
             "architecture": "modular_centralized",
             "modules": {
                 "core": True,
@@ -725,6 +803,7 @@ class InteliaRAGEngine:
                 "postgresql_validator": bool(self.postgresql_validator),
                 "weaviate_core": bool(self.weaviate_core),
                 "comparison_handler": bool(self.comparison_handler),
+                "llm_generator": bool(self.core.generator),
             },
             "optimization_stats": self.optimization_stats.copy(),
             "initialization_errors": self.initialization_errors,
