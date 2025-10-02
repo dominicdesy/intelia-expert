@@ -2,7 +2,7 @@
 """
 rag_postgresql_retriever.py - Récupérateur de données PostgreSQL
 Version corrigée avec mapping breed → nom PostgreSQL via breeds_registry
-Version 2.0: Ajout filtre métrique basé sur interprétation OpenAI
+Version 3.0: Retourne RAGResult au lieu de List[MetricResult]
 """
 
 import logging
@@ -11,6 +11,7 @@ from typing import Dict, List, Any, Tuple, Optional
 from .rag_postgresql_config import ASYNCPG_AVAILABLE
 from .rag_postgresql_models import MetricResult
 from .rag_postgresql_normalizer import SQLQueryNormalizer
+from core.rag_types import RAGResult, RAGSource
 
 if ASYNCPG_AVAILABLE:
     import asyncpg
@@ -127,12 +128,18 @@ class PostgreSQLRetriever:
         entities: Dict[str, Any] = None,
         top_k: int = 10,
         strict_sex_match: bool = False,
-    ) -> List[MetricResult]:
+    ) -> RAGResult:
         """
         Recherche de métriques avec correspondance de sexe optionnelle stricte
 
         Args:
+            query: Requête de recherche
+            entities: Entités extraites (breed, age_days, sex, metric_type, etc.)
+            top_k: Nombre maximum de résultats
             strict_sex_match: Si True, correspondance exacte du sexe uniquement (pour comparaisons)
+
+        Returns:
+            RAGResult contenant les documents et métadonnées
         """
 
         if not self.is_initialized or not self.pool:
@@ -141,7 +148,11 @@ class PostgreSQLRetriever:
                 await self.initialize()
             except Exception as e:
                 logger.error(f"Initialization failed: {e}")
-                return []
+                return RAGResult(
+                    documents=[],
+                    source=RAGSource.INSUFFICIENT_CONTEXT,
+                    metadata={"error": str(e), "initialized": False},
+                )
 
         try:
             normalized_entities = self._normalize_entities(entities)
@@ -189,11 +200,39 @@ class PostgreSQLRetriever:
             logger.info(
                 f"PostgreSQL: {len(results)} metrics found from {len(rows)} rows"
             )
-            return results
+
+            # Retourner un RAGResult structuré
+            if len(results) > 0:
+                return RAGResult(
+                    documents=results,
+                    source=RAGSource.POSTGRESQL,
+                    metadata={
+                        "count": len(results),
+                        "query": query,
+                        "entities": normalized_entities,
+                        "strict_sex_match": strict_sex_match,
+                    },
+                )
+            else:
+                # Aucun résultat trouvé
+                return RAGResult(
+                    documents=[],
+                    source=RAGSource.INSUFFICIENT_CONTEXT,
+                    metadata={
+                        "count": 0,
+                        "query": query,
+                        "entities": normalized_entities,
+                        "reason": "no_matching_metrics",
+                    },
+                )
 
         except Exception as e:
             logger.error(f"PostgreSQL search error: {e}")
-            return []
+            return RAGResult(
+                documents=[],
+                source=RAGSource.INSUFFICIENT_CONTEXT,
+                metadata={"error": str(e), "query": query, "entities": entities},
+            )
 
     def _build_query(
         self,
@@ -243,7 +282,7 @@ class PostgreSQLRetriever:
             except (ValueError, TypeError):
                 logger.warning(f"Invalid age_days: {entities.get('age_days')}")
 
-        # 🆕 NOUVEAU: Filtre métrique basé sur interprétation OpenAI
+        # NOUVEAU: Filtre métrique basé sur interprétation OpenAI
         if (
             original_entities
             and "metric" in original_entities
