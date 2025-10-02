@@ -11,8 +11,7 @@ from typing import Dict, List, Any, Tuple, Optional
 from .rag_postgresql_config import ASYNCPG_AVAILABLE
 from .rag_postgresql_models import MetricResult
 from .rag_postgresql_normalizer import SQLQueryNormalizer
-from .data_models import RAGResult, RAGSource
-
+from core.rag_types import RAGResult, RAGSource
 
 if ASYNCPG_AVAILABLE:
     import asyncpg
