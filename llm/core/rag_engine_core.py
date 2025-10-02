@@ -23,19 +23,30 @@ class RAGEngineCore:
     def __init__(self, openai_client: AsyncOpenAI = None):
         """Initialisation du core avec tous les composants nécessaires"""
 
-        # Client OpenAI
+        # Client OpenAI - DOIT être initialisé en premier
         try:
             self.openai_client = openai_client or self._build_openai_client()
+            if self.openai_client:
+                logger.info("Client OpenAI créé avec httpx")
         except Exception as e:
             logger.warning(f"Erreur client OpenAI: {e}")
             self.openai_client = None
 
-        # Générateur de réponses - CORRECTION CRITIQUE
+        # Générateur de réponses - CORRECTION CRITIQUE avec passage du client
         try:
             from generation.generators import EnhancedResponseGenerator
 
-            self.generator = EnhancedResponseGenerator()
-            logger.info("✅ Generator initialisé dans RAGEngineCore")
+            if self.openai_client:
+                self.generator = EnhancedResponseGenerator(client=self.openai_client)
+                logger.info(
+                    "✅ Generator initialisé dans RAGEngineCore avec client OpenAI"
+                )
+            else:
+                logger.error(
+                    "❌ Impossible d'initialiser generator: client OpenAI manquant"
+                )
+                self.generator = None
+
         except Exception as e:
             logger.error(f"❌ Échec initialisation generator: {e}")
             self.generator = None
@@ -55,13 +66,9 @@ class RAGEngineCore:
                 import httpx
 
                 http_client = httpx.AsyncClient(timeout=30.0)
-                client = AsyncOpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
-                logger.info("Client OpenAI créé avec httpx")
-                return client
+                return AsyncOpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
             except ImportError:
-                client = AsyncOpenAI(api_key=OPENAI_API_KEY)
-                logger.info("Client OpenAI créé sans httpx")
-                return client
+                return AsyncOpenAI(api_key=OPENAI_API_KEY)
         except Exception as e:
             logger.error(f"Erreur création client OpenAI: {e}")
             return None
@@ -76,6 +83,8 @@ class RAGEngineCore:
 
         if not self.generator:
             logger.error("Generator non disponible - les réponses LLM échoueront")
+        else:
+            logger.info("✅ Tous les composants critiques disponibles")
 
         return self
 
