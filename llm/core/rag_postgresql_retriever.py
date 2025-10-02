@@ -150,8 +150,8 @@ class PostgreSQLRetriever:
             except Exception as e:
                 logger.error(f"Initialization failed: {e}")
                 return RAGResult(
-                    documents=[],
-                    source=RAGSource.INSUFFICIENT_CONTEXT,
+                    context_docs=[],
+                    source=RAGSource.INTERNAL_ERROR,
                     metadata={"error": str(e), "initialized": False},
                 )
 
@@ -205,8 +205,8 @@ class PostgreSQLRetriever:
             # Retourner un RAGResult structuré
             if len(results) > 0:
                 return RAGResult(
-                    documents=results,
-                    source=RAGSource.POSTGRESQL,
+                    context_docs=results,
+                    source=RAGSource.RAG_SUCCESS,
                     metadata={
                         "count": len(results),
                         "query": query,
@@ -217,8 +217,8 @@ class PostgreSQLRetriever:
             else:
                 # Aucun résultat trouvé
                 return RAGResult(
-                    documents=[],
-                    source=RAGSource.INSUFFICIENT_CONTEXT,
+                    context_docs=[],
+                    source=RAGSource.NO_RESULTS,
                     metadata={
                         "count": 0,
                         "query": query,
@@ -230,8 +230,8 @@ class PostgreSQLRetriever:
         except Exception as e:
             logger.error(f"PostgreSQL search error: {e}")
             return RAGResult(
-                documents=[],
-                source=RAGSource.INSUFFICIENT_CONTEXT,
+                context_docs=[],
+                source=RAGSource.INTERNAL_ERROR,
                 metadata={"error": str(e), "query": query, "entities": entities},
             )
 
