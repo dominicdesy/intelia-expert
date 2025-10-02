@@ -4,6 +4,7 @@ rag_engine_handlers.py - Handlers spécialisés pour différents types de requê
 VERSION 4.4 - CORRECTION VALIDATION AVANT SEARCH:
 - ✅ NOUVEAU: Validation PostgreSQLValidator AVANT appel search_metrics()
 - ✅ CORRECTION: Retour immédiat sur needs_fallback avec message de clarification
+- ✅ CORRECTION CRITIQUE: Vérification postgresql_validator au lieu de postgresql_system
 - Compatible avec la structure harmonisée du comparison_handler
 - Mode optimisation pour tri par pertinence
 - Évite double appel PostgreSQL avant fallback Weaviate
@@ -421,6 +422,7 @@ class StandardQueryHandler(BaseQueryHandler):
         """
         Traite une requête standard avec routage intelligent
         ✅ VERSION 4.4: Validation AVANT appel search_metrics()
+        ✅ CORRECTION CRITIQUE: Vérification postgresql_validator
         """
         # Extraction des données depuis preprocessed_data si disponible
         if preprocessed_data:
@@ -461,53 +463,47 @@ class StandardQueryHandler(BaseQueryHandler):
             logger.info("🎯 ROUTING HINT POSTGRESQL DÉTECTÉ - VALIDATION PUIS APPEL")
             logger.info("=" * 80)
 
+            # ✅ CORRECTION CRITIQUE: Vérifier VALIDATOR au lieu de postgresql_system
+            if self.postgresql_validator:
+                logger.info("🔍 Validation des entités avant appel PostgreSQL...")
+
+                validation_result = self.postgresql_validator.flexible_query_validation(
+                    query=query, entities=entities, language=language
+                )
+
+                logger.info(f"📋 Résultat validation: {validation_result['status']}")
+
+                # ✅ Si clarification nécessaire, retourner IMMÉDIATEMENT
+                if validation_result["status"] == "needs_fallback":
+                    logger.info("⚠️ Clarification nécessaire - retour immédiat")
+
+                    helpful_message = validation_result.get(
+                        "helpful_message",
+                        "Informations manquantes pour traiter votre requête.",
+                    )
+
+                    return RAGResult(
+                        source=RAGSource.INSUFFICIENT_CONTEXT,
+                        answer=helpful_message,
+                        metadata={
+                            "source_type": "postgresql_validation_clarification",
+                            "routing_hint": "postgresql",
+                            "missing_fields": validation_result.get("missing", []),
+                            "processing_time": time.time() - start_time,
+                            "language_used": language,
+                        },
+                    )
+
+                # ✅ Enrichir les entités avec la validation
+                if "enhanced_entities" in validation_result:
+                    entities = validation_result["enhanced_entities"]
+                    logger.info(f"✅ Entités enrichies par validation: {entities}")
+
+            else:
+                logger.warning("⚠️ PostgreSQLValidator non disponible - skip validation")
+
+            # ✅ MAINTENANT: Appeler search_metrics() si retriever disponible
             if self.postgresql_system:
-                # ✅ NOUVEAU: VALIDER D'ABORD avec PostgreSQLValidator
-                if self.postgresql_validator:
-                    logger.info("🔍 Validation des entités avant appel PostgreSQL...")
-
-                    validation_result = (
-                        self.postgresql_validator.flexible_query_validation(
-                            query=query, entities=entities, language=language
-                        )
-                    )
-
-                    logger.info(
-                        f"📋 Résultat validation: {validation_result['status']}"
-                    )
-
-                    # ✅ Si clarification nécessaire, retourner IMMÉDIATEMENT
-                    if validation_result["status"] == "needs_fallback":
-                        logger.info("❓ Clarification nécessaire - retour immédiat")
-
-                        helpful_message = validation_result.get(
-                            "helpful_message",
-                            "Informations manquantes pour traiter votre requête.",
-                        )
-
-                        return RAGResult(
-                            source=RAGSource.INSUFFICIENT_CONTEXT,
-                            answer=helpful_message,
-                            metadata={
-                                "source_type": "postgresql_validation_clarification",
-                                "routing_hint": "postgresql",
-                                "missing_fields": validation_result.get("missing", []),
-                                "processing_time": time.time() - start_time,
-                                "language_used": language,
-                            },
-                        )
-
-                    # ✅ Enrichir les entités avec la validation
-                    if "enhanced_entities" in validation_result:
-                        entities = validation_result["enhanced_entities"]
-                        logger.info(f"✅ Entités enrichies par validation: {entities}")
-
-                else:
-                    logger.warning(
-                        "⚠️ PostgreSQLValidator non disponible - skip validation"
-                    )
-
-                # ✅ MAINTENANT: Appeler search_metrics() avec entités validées
                 try:
                     logger.info(
                         "🔍 Appel PostgreSQL search_metrics() après validation..."
