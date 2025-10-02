@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 generators.py - Générateurs de réponses enrichis avec entités et cache externe
-Version 3.1 - Instructions de langue renforcées + system_prompts.json centralisés
+Version 3.2 - CORRECTION CRITIQUE: Support dict et Document pour context_docs
+- Instructions de langue renforcées + system_prompts.json centralisés
+- ✅ NOUVEAU: Gestion hybride dict/Document pour compatibilité PostgreSQL
 """
 
 import logging
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional, Union
 from dataclasses import dataclass
 from pathlib import Path
 import json
@@ -167,7 +169,7 @@ class EntityDescriptionsManager:
 class EnhancedResponseGenerator:
     """
     Générateur avec enrichissement d'entités et cache externe + ton affirmatif expert
-    Version 3.1: Instructions de langue renforcées
+    Version 3.2: Support dict et Document pour context_docs
     """
 
     def __init__(
@@ -219,15 +221,60 @@ class EnhancedResponseGenerator:
                     self.entity_descriptions.descriptions[entity_type] = {}
                 self.entity_descriptions.descriptions[entity_type].update(contexts)
 
+    def _get_doc_content(self, doc: Union[Document, dict]) -> str:
+        """
+        Extrait le contenu d'un document (dict ou objet Document)
+
+        Args:
+            doc: Document (objet ou dict)
+
+        Returns:
+            Contenu du document
+        """
+        if isinstance(doc, dict):
+            content = doc.get("content", "")
+            # ✅ LOG CRITIQUE pour debugging
+            if not content:
+                logger.warning(
+                    f"⚠️ Document dict avec content vide: {doc.get('metadata', {})}"
+                )
+            return content
+        return getattr(doc, "content", "")
+
+    def _get_doc_metadata(
+        self, doc: Union[Document, dict], key: str, default: str = "N/A"
+    ) -> str:
+        """
+        Extrait une métadonnée d'un document (dict ou objet Document)
+
+        Args:
+            doc: Document (objet ou dict)
+            key: Clé de métadonnée
+            default: Valeur par défaut
+
+        Returns:
+            Valeur de la métadonnée
+        """
+        if isinstance(doc, dict):
+            return doc.get("metadata", {}).get(key, default)
+        metadata = getattr(doc, "metadata", {})
+        if isinstance(metadata, dict):
+            return metadata.get(key, default)
+        return default
+
     async def generate_response(
         self,
         query: str,
-        context_docs: List[Document],
+        context_docs: List[Union[Document, dict]],
         conversation_context: str = "",
         language: Optional[str] = None,
         intent_result=None,
     ) -> str:
-        """Génère une réponse enrichie avec cache externe + ton affirmatif expert"""
+        """
+        Génère une réponse enrichie avec cache externe + ton affirmatif expert
+
+        VERSION 3.2: Accepte maintenant List[Document] OU List[dict]
+        """
 
         lang = language or self.language
 
@@ -243,6 +290,13 @@ class EnhancedResponseGenerator:
                     return error_msg
 
             return "Je n'ai pas trouvé d'informations pertinentes dans ma base de connaissances pour répondre à votre question. Pouvez-vous reformuler ou être plus spécifique ?"
+
+        # ✅ LOG CRITIQUE: Vérifier le type et contenu des documents
+        logger.info(f"📄 Received {len(context_docs)} documents for generation")
+        logger.debug(f"📄 First doc type: {type(context_docs[0])}")
+        if context_docs:
+            first_content = self._get_doc_content(context_docs[0])
+            logger.debug(f"📄 First doc content preview: {first_content[:200]}...")
 
         try:
             # Vérifier le cache externe
@@ -313,8 +367,26 @@ class EnhancedResponseGenerator:
             logger.error(f"Erreur génération réponse enrichie: {e}")
             return "Désolé, je ne peux pas générer une réponse pour cette question."
 
-    def _doc_to_dict(self, doc: Document) -> dict:
-        """Convertit Document en dict pour cache"""
+    def _doc_to_dict(self, doc: Union[Document, dict]) -> dict:
+        """
+        Convertit Document ou dict en dict unifié pour cache
+
+        VERSION 3.2: Gère les deux formats
+        """
+        if isinstance(doc, dict):
+            # Déjà un dict, normaliser la structure
+            return {
+                "content": doc.get("content", ""),
+                "title": doc.get("metadata", {}).get("title", ""),
+                "source": doc.get("metadata", {}).get("source", ""),
+                "score": doc.get("score", 0.0),
+                "genetic_line": doc.get("metadata", {}).get(
+                    "geneticLine", doc.get("metadata", {}).get("genetic_line", "")
+                ),
+                "species": doc.get("metadata", {}).get("species", ""),
+            }
+
+        # Objet Document
         result = {
             "content": doc.content,
             "title": doc.metadata.get("title", ""),
@@ -448,12 +520,16 @@ class EnhancedResponseGenerator:
     def _build_enhanced_prompt(
         self,
         query: str,
-        context_docs: List[Document],
+        context_docs: List[Union[Document, dict]],
         enrichment: ContextEnrichment,
         conversation_context: str,
         language: str,
     ) -> Tuple[str, str]:
-        """Construit un prompt enrichi avec instructions de langue renforcées"""
+        """
+        Construit un prompt enrichi avec instructions de langue renforcées
+
+        VERSION 3.2: Support dict et Document
+        """
 
         # DEBUG CRITIQUE : Logger la langue reçue
         logger.info(
@@ -461,13 +537,26 @@ class EnhancedResponseGenerator:
         )
         logger.debug(f"Query: '{query[:50]}...'")
 
-        # Contexte documentaire
-        context_text = "\n\n".join(
-            [
-                f"Document {i+1} ({doc.metadata.get('geneticLine', 'N/A')} - {doc.metadata.get('species', 'N/A')}):\n{doc.content[:1000]}"
-                for i, doc in enumerate(context_docs[:5])
-            ]
-        )
+        # ✅ CORRECTION CRITIQUE: Utiliser les helpers pour extraire le contenu
+        context_text_parts = []
+        for i, doc in enumerate(context_docs[:5]):
+            genetic_line = self._get_doc_metadata(doc, "geneticLine", "N/A")
+            species = self._get_doc_metadata(doc, "species", "N/A")
+            content = self._get_doc_content(doc)
+
+            # ✅ LOG CRITIQUE pour chaque document
+            logger.debug(
+                f"📄 Doc {i+1}: line={genetic_line}, species={species}, content_len={len(content)}"
+            )
+
+            doc_text = f"Document {i+1} ({genetic_line} - {species}):\n{content[:1000]}"
+            context_text_parts.append(doc_text)
+
+        context_text = "\n\n".join(context_text_parts)
+
+        # ✅ LOG CRITIQUE du contexte final
+        logger.info(f"📋 Context text length: {len(context_text)} chars")
+        logger.debug(f"📋 Context preview: {context_text[:300]}...")
 
         # Construction du prompt système avec instructions de langue RENFORCÉES
         if self.prompts_manager:
