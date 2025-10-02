@@ -515,7 +515,7 @@ class PostgreSQLValidator:
 
         Args:
             query: Requête originale de l'utilisateur
-            partial_entities: Entités partiellement extraites (breed, age_days, sex, etc.)
+            partial_entities: Entités partiellement extraites (breed, age_days, etc.)
             language: Langue de la réponse (fr, en, es)
 
         Returns:
@@ -525,7 +525,6 @@ class PostgreSQLValidator:
         # Extraire ce qu'on sait déjà
         breed = partial_entities.get("breed")
         age_days = partial_entities.get("age_days")
-        sex = partial_entities.get("sex")
 
         templates = {
             "fr": {
@@ -741,7 +740,7 @@ class PostgreSQLValidator:
     def _detect_age_from_query(self, query: str) -> Optional[int]:
         """Détecte l'âge dans le texte de la requête"""
         age_patterns = [
-            r"à\s+(\d+)\s+jours?",
+            r"à \s+(\d+)\s+jours?",
             r"(\d+)\s+jours?",
             r"(\d+)\s*j\b",
             r"(\d+)\s+semaines?",

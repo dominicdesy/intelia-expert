@@ -2,10 +2,10 @@
 """
 rag_engine.py - RAG Engine Principal Refactorisé
 Point d'entrée principal avec délégation vers modules spécialisés
-VERSION 4.5 - CORRECTION COMPLÈTE POSTGRESQL VALIDATOR:
-- ✅ Initialisation du PostgreSQLValidator dans _initialize_external_modules()
-- ✅ Transmission du validator au StandardHandler via configure()
-- ✅ Ajout de async def initialize() au PostgreSQLValidator
+VERSION 4.5.1 - CORRECTION POSTGRESQL CONFIG:
+- ✅ Import automatique de POSTGRESQL_CONFIG dans _initialize_external_modules()
+- ✅ Instanciation PostgreSQLRetriever avec config centralisée
+- ✅ Plus besoin de passer config depuis monitoring.py
 - ✅ Séparation PostgreSQLRetriever (search_metrics) et PostgreSQLValidator (validation)
 - ✅ Transmission correcte du paramètre language à tous les handlers
 """
@@ -57,7 +57,7 @@ QueryPreprocessor = None
 ComparisonHandler = None
 WeaviateCore = None
 
-# ✅ CORRECTION 1: Import séparé du Retriever et Validator
+# ✅ Import séparé du Retriever et Validator
 try:
     from .rag_postgresql_retriever import PostgreSQLRetriever
 
@@ -103,7 +103,9 @@ class InteliaRAGEngine:
     """
     RAG Engine principal avec architecture modulaire refactorisée
 
-    VERSION 4.5 - CORRECTIONS CRITIQUES:
+    VERSION 4.5.1 - CORRECTIONS CRITIQUES:
+    - ✅ Configuration PostgreSQL chargée automatiquement depuis rag_postgresql_config.py
+    - ✅ Instanciation PostgreSQLRetriever avec config centralisée
     - ✅ Initialisation complète du PostgreSQLValidator
     - ✅ Transmission du validator au StandardHandler
     - ✅ Séparation PostgreSQLRetriever (search_metrics) et PostgreSQLValidator (validation)
@@ -129,7 +131,7 @@ class InteliaRAGEngine:
         self.comparative_handler = ComparativeQueryHandler()
         self.standard_handler = StandardQueryHandler()
 
-        # ✅ CORRECTION 2: Modules externes avec Retriever ET Validator séparés
+        # ✅ Modules externes avec Retriever ET Validator séparés
         self.postgresql_retriever = None  # ✅ Pour search_metrics()
         self.postgresql_validator = None  # ✅ Pour validation
         self.query_preprocessor = None
@@ -165,7 +167,7 @@ class InteliaRAGEngine:
             return
 
         logger.info(
-            "🚀 Initialisation RAG Engine v4.5 (PostgreSQL Validator fix complet)"
+            "🚀 Initialisation RAG Engine v4.5.1 (PostgreSQL Config Centralisée)"
         )
         self.initialization_errors = []
 
@@ -212,7 +214,7 @@ class InteliaRAGEngine:
             self.initialization_errors.append(str(e))
 
     async def _initialize_external_modules(self):
-        """✅ CORRECTION 3: Initialise Retriever et Validator séparément avec initialize()"""
+        """✅ CORRECTION: Initialise Retriever et Validator avec config centralisée"""
 
         # Query Preprocessor
         if QUERY_PREPROCESSOR_AVAILABLE and QueryPreprocessor:
@@ -224,21 +226,39 @@ class InteliaRAGEngine:
                 logger.warning(f"⚠️ Query Preprocessor échoué: {e}")
                 self.initialization_errors.append(f"Preprocessor: {e}")
 
-        # ✅ PostgreSQL Retriever (pour search_metrics)
+        # ✅ PostgreSQL Retriever (pour search_metrics) - CORRECTION CRITIQUE
         if POSTGRESQL_RETRIEVER_AVAILABLE and PostgreSQLRetriever:
             try:
-                self.postgresql_retriever = PostgreSQLRetriever()
+                # Import de la configuration centralisée
+                from .rag_postgresql_config import POSTGRESQL_CONFIG
+
+                # Validation de la config
+                if not POSTGRESQL_CONFIG.get("password"):
+                    logger.warning(
+                        "⚠️ PostgreSQL config incomplète - variables d'environnement manquantes"
+                    )
+                    raise ValueError(
+                        "PostgreSQL password manquant dans la configuration"
+                    )
+
+                # Instanciation avec config centralisée
+                self.postgresql_retriever = PostgreSQLRetriever(
+                    config=POSTGRESQL_CONFIG,
+                    intents_file_path="/app/config/intents.json",
+                )
                 await self.postgresql_retriever.initialize()
-                logger.info("✅ PostgreSQL Retriever initialisé")
+                logger.info(
+                    "✅ PostgreSQL Retriever initialisé avec config centralisée"
+                )
             except Exception as e:
                 logger.warning(f"⚠️ PostgreSQL Retriever échoué: {e}")
                 self.initialization_errors.append(f"PostgreSQLRetriever: {e}")
 
-        # ✅ PostgreSQL Validator (pour validation) - CORRECTION CRITIQUE
+        # ✅ PostgreSQL Validator (pour validation)
         if POSTGRESQL_VALIDATOR_AVAILABLE and PostgreSQLValidator:
             try:
                 self.postgresql_validator = PostgreSQLValidator()
-                # ✅ AJOUT CRITIQUE: Appeler initialize() si la méthode existe
+                # ✅ Appeler initialize() si la méthode existe
                 if hasattr(self.postgresql_validator, "initialize"):
                     await self.postgresql_validator.initialize()
                 logger.info("✅ PostgreSQL Validator initialisé")
@@ -271,7 +291,7 @@ class InteliaRAGEngine:
                 self.initialization_errors.append(f"ComparisonHandler: {e}")
 
     async def _configure_handlers(self):
-        """✅ CORRECTION 4: Configure handlers avec Retriever ET Validator"""
+        """✅ Configure handlers avec Retriever ET Validator"""
 
         # Configuration temporal handler (utilise le Retriever)
         self.temporal_handler.configure(postgresql_system=self.postgresql_retriever)
@@ -287,7 +307,7 @@ class InteliaRAGEngine:
         self.standard_handler.configure(
             postgresql_system=self.postgresql_retriever,  # Pour search_metrics()
             weaviate_core=self.weaviate_core,
-            postgresql_validator=self.postgresql_validator,  # ✅ AJOUT CRITIQUE
+            postgresql_validator=self.postgresql_validator,  # ✅ Pour validation
         )
 
     async def generate_response(
@@ -319,7 +339,7 @@ class InteliaRAGEngine:
             )
 
         effective_language = language or "fr"
-        logger.info(f"🌍 generate_response reçoit langue: {effective_language}")
+        logger.info(f"🌐 generate_response reçoit langue: {effective_language}")
 
         # Fallback si système indisponible
         if self.degraded_mode and not self.postgresql_retriever:
@@ -350,7 +370,7 @@ class InteliaRAGEngine:
     ) -> RAGResult:
         """Pipeline de traitement modulaire"""
 
-        logger.info(f"🌍 _process_query traite avec langue: {language}")
+        logger.info(f"🌐 _process_query traite avec langue: {language}")
 
         # 1. Preprocessing
         preprocessed_data = await self._apply_preprocessing(
@@ -359,7 +379,7 @@ class InteliaRAGEngine:
 
         if "language" not in preprocessed_data:
             preprocessed_data["language"] = language
-            logger.info(f"🌍 Langue ajoutée à preprocessed_data: {language}")
+            logger.info(f"🌐 Langue ajoutée à preprocessed_data: {language}")
 
         # 2. Classification
         classification = self.query_classifier.classify(
@@ -405,7 +425,7 @@ class InteliaRAGEngine:
     ) -> Dict[str, Any]:
         """Applique le preprocessing"""
 
-        logger.debug(f"🌍 _apply_preprocessing avec langue: {language}")
+        logger.debug(f"🌐 _apply_preprocessing avec langue: {language}")
 
         if not enable_preprocessing or not self.query_preprocessor:
             logger.debug("📋 Preprocessing minimal")
@@ -490,7 +510,7 @@ class InteliaRAGEngine:
     ) -> RAGResult:
         """Route vers le handler approprié"""
 
-        logger.info(f"🌍 _route_to_handler avec langue: {language}")
+        logger.info(f"🌐 _route_to_handler avec langue: {language}")
 
         if query_type == "temporal_range":
             logger.debug("→ Routage vers TemporalQueryHandler")
@@ -535,7 +555,7 @@ class InteliaRAGEngine:
             "rag_enabled": RAG_ENABLED,
             "initialized": self.is_initialized,
             "degraded_mode": self.degraded_mode,
-            "version": "v4.5_postgresql_validator_complete_fix",
+            "version": "v4.5.1_postgresql_config_centralized",
             "architecture": "modular_centralized",
             "modules": {
                 "core": True,
