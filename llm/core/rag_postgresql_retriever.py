@@ -209,8 +209,26 @@ class PostgreSQLRetriever:
             # ✅ CONVERSION CRITIQUE: Transformer MetricResult en dict avec 'content'
             formatted_docs = []
             for metric in results:
-                # Créer un contenu textuel lisible
-                content = f"{metric.metric_name}: {metric.value_numeric} {metric.unit or ''} (Age: {metric.age_min}-{metric.age_max} days, Sex: {metric.sex or 'as hatched'})"
+                # Extraire le type de métrique de manière propre
+                metric_type_clean = self._extract_metric_type(metric.metric_name)
+
+                # Informations sur le sexe
+                sex_info = self._format_sex_info(metric.sex)
+
+                # Créer un contenu textuel naturel et lisible pour le LLM
+                if metric.value_numeric is not None:
+                    # Phrase complète avec contexte
+                    content = (
+                        f"At {metric.age_min} days old, {metric.strain} {sex_info} chickens "
+                        f"have an average {metric_type_clean} of {metric.value_numeric} "
+                        f"{metric.unit or 'grams'}."
+                    )
+                else:
+                    # Fallback pour valeurs textuelles
+                    content = (
+                        f"For {metric.strain} at {metric.age_min} days ({sex_info}): "
+                        f"{metric_type_clean} = {metric.value_text or 'N/A'}"
+                    )
 
                 # Structurer avec metadata complète
                 formatted_docs.append(
@@ -419,6 +437,57 @@ class PostgreSQLRetriever:
             score += 0.1
 
         return min(1.0, score)
+
+    def _extract_metric_type(self, metric_name: str) -> str:
+        """
+        Extrait et nettoie le type de métrique depuis le nom brut
+
+        Exemples:
+        - "body_weight for male" → "body weight"
+        - "feed_conversion_ratio for as_hatched" → "feed conversion ratio"
+        - "mortality for female" → "mortality rate"
+        """
+        if not metric_name:
+            return "metric"
+
+        # Retirer la partie "for [sex]"
+        clean_name = (
+            metric_name.split(" for ")[0] if " for " in metric_name else metric_name
+        )
+
+        # Remplacer underscores par espaces
+        clean_name = clean_name.replace("_", " ")
+
+        # Mapping pour des noms plus naturels
+        name_mappings = {
+            "body weight": "body weight",
+            "feed conversion ratio": "feed conversion ratio (FCR)",
+            "feed intake": "feed intake",
+            "daily gain": "daily weight gain",
+            "mortality": "mortality rate",
+            "livability": "livability rate",
+        }
+
+        return name_mappings.get(clean_name.lower(), clean_name)
+
+    def _format_sex_info(self, sex: Optional[str]) -> str:
+        """
+        Formate l'information sur le sexe de manière naturelle
+
+        Args:
+            sex: Sexe brut (male, female, as_hatched, mixed, None)
+
+        Returns:
+            Texte formaté (ex: "male", "female", "mixed-sex")
+        """
+        if not sex or sex.lower() in ["as_hatched", "as hatched", "mixed"]:
+            return "mixed-sex"
+        elif sex.lower() == "male":
+            return "male"
+        elif sex.lower() == "female":
+            return "female"
+        else:
+            return "mixed-sex"
 
     async def close(self):
         """Ferme la connexion PostgreSQL"""
